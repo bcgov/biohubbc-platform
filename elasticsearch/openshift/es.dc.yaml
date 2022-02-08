@@ -1,0 +1,435 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+labels:
+  app: "${NAME}"
+  template: "${NAME}-dc-template"
+metadata:
+  name: esearch
+objects:
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      creationTimestamp: null
+      annotations:
+        volume.beta.kubernetes.io/storage-provisioner: csi.trident.netapp.io
+        volume.beta.kubernetes.io/storage-class: netapp-file-standard
+      labels:
+        app.kubernetes.io/part-of: "${NAME}-app"
+        io.kompose.service: data01
+      name: "${NAME}-data01"
+      namespace: "${NAMESPACE}"
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: netapp-file-standard
+      volumeMode: Filesystem
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      creationTimestamp: null
+      annotations:
+        volume.beta.kubernetes.io/storage-provisioner: csi.trident.netapp.io
+        volume.beta.kubernetes.io/storage-class: netapp-file-standard
+      labels:
+        app.kubernetes.io/part-of: "${NAME}-app"
+        io.kompose.service: data02
+      name: "${NAME}-data02"
+      namespace: "${NAMESPACE}"
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: netapp-file-standard
+      volumeMode: Filesystem
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      creationTimestamp: null
+      annotations:
+        volume.beta.kubernetes.io/storage-provisioner: csi.trident.netapp.io
+        volume.beta.kubernetes.io/storage-class: netapp-file-standard
+      labels:
+        app.kubernetes.io/part-of: "${NAME}-app"
+        io.kompose.service: data03
+      name: "${NAME}-data03"
+      namespace: "${NAMESPACE}"
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: netapp-file-standard
+      volumeMode: Filesystem
+  - kind: DeploymentConfig
+    apiVersion: apps.openshift.io/v1
+    metadata:
+      name: es01
+      namespace: ${NAMESPACE}
+      labels:
+        io.kompose.service: es01
+    spec:
+      strategy:
+        type: Recreate
+        recreateParams:
+          timeoutSeconds: 600
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+          requests:
+            cpu: ${CPU_REQUEST}
+            memory: ${MEMORY_REQUEST}
+        activeDeadlineSeconds: 21600
+      triggers:
+        - type: ConfigChange
+      replicas: 1
+      revisionHistoryLimit: 10
+      test: false
+      selector:
+        app: ${NAME}
+        io.kompose.service: es01
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: ${NAME}
+            io.kompose.service: es01
+          annotations:
+            kompose.cmd: 'C:\oc\kompose.exe convert'
+            kompose.version: 1.26.0 (40646f47)
+        spec:
+          volumes:
+            - name: data01
+              persistentVolumeClaim:
+                claimName: "${NAME}-data01"
+          containers:
+            - resources:
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
+              terminationMessagePath: /dev/termination-log
+              name: es01
+              env:
+                - name: ES_JAVA_OPTS
+                  value: '-Xms512m -Xmx512m'
+                - name: bootstrap.memory_lock
+                  value: 'false'
+                - name: cluster.initial_master_nodes
+                  value: 'es01,es02,es03'
+                - name: cluster.name
+                  value: es-docker-cluster
+                - name: discovery.seed_hosts
+                  value: 'es02,es03'
+                - name: node.name
+                  value: es01
+              ports:
+                - containerPort: 9200
+                  protocol: TCP
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: data01
+                  mountPath: /usr/share/elasticsearch/data
+              terminationMessagePolicy: File
+              image: 'docker.elastic.co/elasticsearch/elasticsearch:7.17.0'
+          restartPolicy: Always
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext:
+            privileged: true
+          schedulerName: default-scheduler
+  - kind: DeploymentConfig
+    apiVersion: apps.openshift.io/v1
+    metadata:
+      name: es02
+      namespace: ${NAMESPACE}
+      labels:
+        io.kompose.service: es02
+    spec:
+      strategy:
+        type: Recreate
+        recreateParams:
+          timeoutSeconds: 600
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+          requests:
+            cpu: ${CPU_REQUEST}
+            memory: ${MEMORY_REQUEST}
+        activeDeadlineSeconds: 21600
+      triggers:
+        - type: ConfigChange
+      replicas: 1
+      revisionHistoryLimit: 10
+      test: false
+      selector:
+        app: ${NAME}
+        io.kompose.service: es02
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: ${NAME}
+            io.kompose.service: es02
+          annotations:
+            kompose.cmd: 'C:\oc\kompose.exe convert'
+            kompose.version: 1.26.0 (40646f47)
+        spec:
+          volumes:
+            - name: data02
+              persistentVolumeClaim:
+                claimName: "${NAME}-data02"
+          containers:
+            - resources:
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
+              terminationMessagePath: /dev/termination-log
+              name: es02
+              env:
+                - name: ES_JAVA_OPTS
+                  value: -Xms512m -Xmx512m
+                - name: bootstrap.memory_lock
+                  value: "false"
+                - name: cluster.initial_master_nodes
+                  value: es01,es02,es03
+                - name: cluster.name
+                  value: es-docker-cluster
+                - name: discovery.seed_hosts
+                  value: es01,es03
+                - name: node.name
+                  value: es02
+              ports:
+                - containerPort: 9200
+                  protocol: TCP
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: data02
+                  mountPath: /usr/share/elasticsearch/data
+              terminationMessagePolicy: File
+              image: 'docker.elastic.co/elasticsearch/elasticsearch:7.17.0'
+          restartPolicy: Always
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext:
+            privileged: true
+          schedulerName: default-scheduler
+  - kind: DeploymentConfig
+    apiVersion: apps.openshift.io/v1
+    metadata:
+      name: es03
+      namespace: ${NAMESPACE}
+      labels:
+        io.kompose.service: es03
+    spec:
+      strategy:
+        type: Recreate
+        recreateParams:
+          timeoutSeconds: 600
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+          requests:
+            cpu: ${CPU_REQUEST}
+            memory: ${MEMORY_REQUEST}
+        activeDeadlineSeconds: 21600
+      triggers:
+        - type: ConfigChange
+      replicas: 1
+      revisionHistoryLimit: 10
+      test: false
+      selector:
+        app: ${NAME}
+        io.kompose.service: es03
+      template:
+        metadata:
+          creationTimestamp: null
+          labels:
+            app: ${NAME}
+            io.kompose.service: es03
+          annotations:
+            kompose.cmd: 'C:\oc\kompose.exe convert'
+            kompose.version: 1.26.0 (40646f47)
+        spec:
+          volumes:
+            - name: data03
+              persistentVolumeClaim:
+                claimName: "${NAME}-data03"
+          containers:
+            - resources:
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
+              terminationMessagePath: /dev/termination-log
+              name: es03
+              env:
+                - name: ES_JAVA_OPTS
+                  value: -Xms512m -Xmx512m
+                - name: bootstrap.memory_lock
+                  value: "false"
+                - name: cluster.initial_master_nodes
+                  value: es01,es02,es03
+                - name: cluster.name
+                  value: es-docker-cluster
+                - name: discovery.seed_hosts
+                  value: es01,es02
+                - name: node.name
+                  value: es03
+              ports:
+                - containerPort: 9200
+                  protocol: TCP
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: data03
+                  mountPath: /usr/share/elasticsearch/data
+              terminationMessagePolicy: File
+              image: 'docker.elastic.co/elasticsearch/elasticsearch:7.17.0'
+          restartPolicy: Always
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext:
+            privileged: true
+          schedulerName: default-scheduler
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      annotations:
+        kompose.cmd: C:\oc\kompose.exe convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: es01
+        app: "${NAME}"
+        app.kubernetes.io/component: "${NAME}"
+        app.kubernetes.io/instance: "${NAME}"
+        app.kubernetes.io/part-of: "${NAME}-app"
+      name: es01
+      namespace: "${NAMESPACE}"
+    spec:
+      ports:
+        - name: "rest"
+          port: 9200
+          targetPort: 9200
+        - name: "inter-pod"
+          port: 9300
+          targetPort: 9300
+      selector:
+        io.kompose.service: es01
+      sessionAffinity: None
+      type: ClusterIP
+    status:
+      loadBalancer: {}
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      annotations:
+        kompose.cmd: C:\oc\kompose.exe convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: es02
+        app: "${NAME}"
+        app.kubernetes.io/component: "${NAME}"
+        app.kubernetes.io/instance: "${NAME}"
+        app.kubernetes.io/part-of: "${NAME}-app"
+      name: es02
+      namespace: "${NAMESPACE}"
+    spec:
+      ports:
+        - name: "inter-pod"
+          port: 9300
+          targetPort: 9300
+      selector:
+        io.kompose.service: es02
+      sessionAffinity: None
+      type: ClusterIP
+    status:
+      loadBalancer: {}
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      annotations:
+        kompose.cmd: C:\oc\kompose.exe convert
+        kompose.version: 1.26.0 (40646f47)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: es03
+        app: "${NAME}"
+        app.kubernetes.io/component: "${NAME}"
+        app.kubernetes.io/instance: "${NAME}"
+        app.kubernetes.io/part-of: "${NAME}-app"
+      name: es03
+      namespace: "${NAMESPACE}"
+    spec:
+      ports:
+        - name: "inter-pod"
+          port: 9300
+          targetPort: 9300
+      selector:
+        io.kompose.service: es03
+      sessionAffinity: None
+      type: ClusterIP
+    status:
+      loadBalancer: {}
+  - kind: Route
+    apiVersion: route.openshift.io/v1
+    metadata:
+      name: "${NAME}"
+      namespace: ${NAMESPACE}
+      labels:
+        app: "${NAME}"
+        app.kubernetes.io/component: "${NAME}"
+        app.kubernetes.io/instance: "${NAME}"
+        app.kubernetes.io/part-of: "${NAME}-app"
+        io.kompose.service: es01
+    spec:
+      host: "${NAME}-${NAMESPACE}.apps.silver.devops.gov.bc.ca"
+      to:
+        kind: Service
+        name: es01
+        weight: 100
+      port:
+        targetPort: rest
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+      wildcardPolicy: None
+parameters:
+  - name: NAME
+    displayName: Name
+    description: The name assigned to all of the objects defined in this template.
+    required: true
+    value: elasticsearch
+  - name: NAMESPACE
+    description: Target namespace reference (i.e. '9f0fbe-dev')
+    displayName: Namespace
+    required: true
+    value: af2668-tools
+  - name: CPU_REQUEST
+    description: CPU REQUEST for deployment config
+    value: '50m'
+  - name: CPU_LIMIT
+    description: CPU LIMIT for dc
+    value: '200m'
+  - name: MEMORY_REQUEST
+    description: MEMORY REQUEST for dc
+    value: '750Mi'
+  - name: MEMORY_LIMIT
+    description: MEMORY LIMIT for dc
+    value: '2Gi'
