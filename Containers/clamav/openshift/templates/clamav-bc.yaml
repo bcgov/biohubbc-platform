@@ -2,9 +2,9 @@ kind: Template
 apiVersion: template.openshift.io/v1
 metadata:
   name: clamav-build
-  namespace: af2668-tools
+  namespace: xx9999-tools
   selfLink: >-
-    /apis/template.openshift.io/v1/namespaces/af2668-tools/templates/clamav-build
+    /apis/template.openshift.io/v1/namespaces/xx9999-tools/templates/clamav-build
   uid: 4f945b52-0a11-490f-8859-689a21d0ecd4
   resourceVersion: '1643081480'
   creationTimestamp: '2021-09-08T18:47:11Z'
@@ -97,5 +97,5 @@ parameters:
     value: containers/clamav
   - name: NAME_SPACE
     displayName: Namespace for source image
-    value: af2668-tools
+    value: xx9999-tools
     required: true

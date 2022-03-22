@@ -6,6 +6,9 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+# SonarQube
+.sonarqube
+
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
@@ -42,7 +45,7 @@ node_modules/
 jspm_packages/
 
 # TypeScript v1 declaration files
-typings/
+# typings/
 
 # TypeScript cache
 *.tsbuildinfo
@@ -68,7 +71,7 @@ typings/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
+# env file used by local and docker builds/runs
 .env
 .env.test
 
@@ -102,3 +105,11 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Apple macOS folder attributes file
+**/.DS_Store
+
+# n8N - ignore root level temp config folder
+.n8n
+n8n/.n8n
+n8n/.config

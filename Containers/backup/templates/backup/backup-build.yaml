@@ -29,7 +29,7 @@ objects:
         type: Docker
         dockerStrategy:
           pullSecret:
-            name: af2668-artifactory
+            name: xx9999-artifactory
           from:
             kind: DockerImage
             name: ${BASE_IMAGE_FOR_BUILD}

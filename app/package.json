@@ -1,0 +1,149 @@
+{
+  "name": "sims-app",
+  "version": "0.0.0",
+  "description": "SIMS Web App",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bcgov/biohubbc.git"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "deploy_start": "node server",
+    "test": "react-scripts test --env=jsdom-fourteen --ci --watchAll=false --runInBand",
+    "test:watch": "react-scripts test --env=jsdom-fourteen",
+    "coverage": "react-scripts test --ci --coverage --testResultsProcessor jest-sonar-reporter --env=jsdom-fourteen --watchAll=false --runInBand",
+    "update-snapshots": "react-scripts test --env=jsdom-fourteen --ci --watchAll=false --updateSnapshot",
+    "lint": "eslint src/ --ext .jsx,.js,.ts,.tsx",
+    "lint:fix": "npm run lint -- --fix",
+    "format": "prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,scss}\"",
+    "format:fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
+  },
+  "engines": {
+    "node": ">= 14.0.0",
+    "npm": ">= 6.0.0"
+  },
+  "dependencies": {
+    "@bcgov/bc-sans": "~1.0.1",
+    "@material-ui/core": "~4.11.0",
+    "@material-ui/icons": "~4.2.1",
+    "@material-ui/lab": "latest",
+    "@material-ui/pickers": "~3.2.10",
+    "@material-ui/styles": "~4.10.0",
+    "@material-ui/system": "4.11.3",
+    "@mdi/js": "~6.4.95",
+    "@mdi/react": "~1.4.0",
+    "@react-keycloak/web": "~2.1.0",
+    "@react-leaflet/core": "~1.0.2",
+    "@tmcw/togeojson": "~4.2.0",
+    "@turf/bbox": "~6.3.0",
+    "@turf/boolean-equal": "~6.3.0",
+    "@turf/centroid": "~6.4.0",
+    "axios": "~0.21.4",
+    "clsx": "~1.1.1",
+    "express": "~4.17.1",
+    "formik": "~2.2.6",
+    "keycloak-js": "~9.0.2",
+    "leaflet": "~1.7.1",
+    "leaflet-draw": "~1.0.0",
+    "leaflet-fullscreen": "~1.0.2",
+    "leaflet.locatecontrol": "~0.72.0",
+    "lodash-es": "~4.17.21",
+    "moment": "~2.29.1",
+    "node-sass": "~4.14.1",
+    "qs": "~6.9.4",
+    "react": "~16.14.0",
+    "react-dom": "~16.14.0",
+    "react-dropzone": "~11.3.2",
+    "react-leaflet": "~3.1.0",
+    "react-leaflet-cluster": "~1.0.3",
+    "react-number-format": "~4.5.2",
+    "react-router": "~5.1.2",
+    "react-router-dom": "~5.1.2",
+    "react-window": "~1.8.6",
+    "reproj-helper": "~1.2.8",
+    "shpjs": "^3.6.3",
+    "typescript": "~4.1.6",
+    "uuid": "~8.3.2",
+    "yup": "~0.32.9"
+  },
+  "devDependencies": {
+    "@babel/preset-typescript": "~7.12.7",
+    "@testing-library/jest-dom": "~5.11.8",
+    "@testing-library/react": "~11.2.3",
+    "@testing-library/user-event": "~12.6.0",
+    "@types/geojson": "~7946.0.7",
+    "@types/jest": "~26.0.20",
+    "@types/leaflet": "~1.5.23",
+    "@types/leaflet-fullscreen": "~1.0.6",
+    "@types/lodash-es": "~4.17.4",
+    "@types/node": "~14.14.31",
+    "@types/node-sass": "~4.11.2",
+    "@types/qs": "~6.9.5",
+    "@types/react": "~16.9.17",
+    "@types/react-dom": "~16.9.4",
+    "@types/react-leaflet": "~2.5.2",
+    "@types/react-router": "~5.1.4",
+    "@types/react-router-dom": "~5.1.3",
+    "@types/react-window": "~1.8.2",
+    "@types/shpjs": "^3.4.0",
+    "@types/uuid": "~8.3.0",
+    "@typescript-eslint/eslint-plugin": "~3.10.1",
+    "@typescript-eslint/parser": "~3.10.1",
+    "axios-mock-adapter": "~1.19.0",
+    "eslint": "~6.8.0",
+    "eslint-config-prettier": "~6.15.0",
+    "eslint-plugin-prettier": "~3.3.1",
+    "jest": "~24.9.0",
+    "jest-sonar-reporter": "~2.0.0",
+    "prettier": "~2.2.1",
+    "react-scripts": "~3.4.4"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!lodash-es)/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "!<rootDir>/src/themes/**",
+      "!<rootDir>/src/constants/**",
+      "!<rootDir>/src/App.tsx",
+      "!<rootDir>/src/types/**",
+      "!<rootDir>/src/interfaces/**",
+      "!<rootDir>/src/AppRouter.tsx",
+      "!<rootDir>/src/react-app-env.d.ts",
+      "!<rootDir>/src/index.tsx",
+      "!<rootDir>/node_modules/**",
+      "!<rootDir>/coverage/**",
+      "!<rootDir>/public/**",
+      "!<rootDir>/build/**",
+      "!<rootDir>/src/serviceWorker.**",
+      "!<rootDir>/src/setupTests.*"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 0,
+        "functions": 0,
+        "lines": 0,
+        "statements": 0
+      }
+    },
+    "coverageReporters": [
+      "text",
+      "lcov"
+    ]
+  }
+}

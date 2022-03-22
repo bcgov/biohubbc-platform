@@ -1,0 +1,67 @@
+{
+  "name": "biohubbc-platform-platform",
+  "namespaceSuffix": "xx9999",
+  "namespace": {
+    "tools": "tools",
+    "dev": "dev",
+    "test": "test",
+    "prod": "prod"
+  },
+  "version": "1.0.0",
+  "timezone": {
+    "db": "America/Vancouver",
+    "api": "America/Vancouver"
+  },
+  "module": {
+    "db": "biohubbc-platform-db",
+    "api": "biohubbc-platform-api",
+    "app": "biohubbc-platform-app"
+  },
+  "staticBranches": [
+    "dev",
+    "test",
+    "prod"
+  ],
+  "staticUrls": {
+    "dev": "dev-biohubbc-platform.apps.silver.devops.gov.bc.ca",
+    "test": "test-biohubbc-platform.apps.silver.devops.gov.bc.ca",
+    "prod": "biohubbc-platform.apps.silver.devops.gov.bc.ca"
+  },
+  "staticUrlsAPI": {
+    "dev": "api-dev-biohubbc-platform.apps.silver.devops.gov.bc.ca",
+    "test": "api-test-biohubbc-platform.apps.silver.devops.gov.bc.ca",
+    "prod": "api-biohubbc-platform.apps.silver.devops.gov.bc.ca"
+  },
+  "staticUrlsN8N": {
+    "dev": "n8n-dev.apps.silver.devops.gov.bc.ca",
+    "test": "n8n-test.apps.silver.devops.gov.bc.ca",
+    "prod": "n8n-prod.apps.silver.devops.gov.bc.ca"
+  },
+  "certificateURL": {
+    "dev": "https://dev.oidc.gov.bc.ca/auth/realms/35r1iman/protocol/openid-connect/certs",
+    "test": "https://test.oidc.gov.bc.ca/auth/realms/35r1iman/protocol/openid-connect/certs",
+    "prod": "https://oidc.gov.bc.ca/auth/realms/35r1iman/protocol/openid-connect/certs"
+  },
+  "siteminderLogoutURL": {
+    "dev": "https://logontest.gov.bc.ca/clp-cgi/logoff.cgi",
+    "test": "https://logontest.gov.bc.ca/clp-cgi/logoff.cgi",
+    "prod": "https://logon7.gov.bc.ca/clp-cgi/logoff.cgi"
+  },
+  "sso": {
+    "dev": {
+      "url": "https://dev.oidc.gov.bc.ca/auth",
+      "clientId": "biohubbc-platform",
+      "realm": "35r1iman"
+    },
+    "test": {
+      "url": "https://test.oidc.gov.bc.ca/auth",
+      "clientId": "biohubbc-platform",
+      "realm": "35r1iman"
+    },
+    "prod": {
+      "url": "https://oidc.gov.bc.ca/auth",
+      "clientId": "biohubbc-platform",
+      "realm": "35r1iman"
+    }
+  }
+}

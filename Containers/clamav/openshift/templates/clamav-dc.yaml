@@ -96,5 +96,5 @@ objects:
           schedulerName: default-scheduler
 parameters:
   - name: NAME_SPACE
-    value: af2668-tools
+    value: xx9999-tools
     required: true
