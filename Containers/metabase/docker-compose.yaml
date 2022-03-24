@@ -1,0 +1,45 @@
+version: '3.9'
+# Derived from https://www.metabase.com/docs/latest/operations-guide/running-metabase-on-docker.html
+
+services:
+  db:
+    image: postgres:14
+    container_name: db
+    hostname: db
+    environment:
+      POSTGRES_USER: ${DB_USER:-metabase}
+      POSTGRES_DB: ${DB_NAME:-metabase}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-metabase}
+    volumes:
+      - ./postgresql/data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    networks:
+      - metabase
+
+  app:
+    image: metabase-test:latest
+    container_name: metabase-secrets
+    hostname: metabase-secrets
+    volumes:
+    - /dev/urandom:/dev/random:ro
+    ports:
+      - 3000:3000
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${DB_NAME:-metabase}
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${DB_USER:-metabase}
+      MB_DB_PASS: ${DB_PASSWORD:-metabase}
+      MB_DB_HOST: db
+      JAVA_TIMEZONE: US/Pacific
+    #   MUID=${UID-261162013}
+    #   MGID=${GID-1839645156}
+    networks:
+      - metabase
+    depends_on:
+      - db
+
+networks:
+  metabase:
+    driver: bridge
