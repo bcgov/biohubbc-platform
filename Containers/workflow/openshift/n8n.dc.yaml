@@ -514,12 +514,12 @@ parameters:
     description: Target namespace reference (i.e. '9f0fbe-dev')
     displayName: Namespace
     required: true
-    value: af2668-test
+    value: xx9999-test
   - name: N8N_IMAGE_NAMESPACE
     description: Target namespace reference (i.e. '9f0fbe-dev') for the N8N image
     displayName: Namespace
     required: true
-    value: af2668-tools
+    value: xx9999-tools
   - name: CPU_REQUEST
     description: Minimal CPU needed to run
     displayName: CPU Request

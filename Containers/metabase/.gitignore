@@ -1,0 +1,10 @@
+
+.env
+
+db_user.txt
+db_password.txt
+
+postgresql/data
+postgresql/data/*
+plugins/
+plugins/*

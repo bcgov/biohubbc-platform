@@ -11,8 +11,8 @@ While N8N does provide a Docker image [here](https://hub.docker.com/r/n8nio/n8n)
 ```sh
 oc process -n $NAMESPACE -f n8n.bc.yaml -p N8N_VERSION=$N8N_VERSION N8N_IMAGE_NAMESPACE=$N8N_IMAGE_NAMESPACE -o yaml | oc apply -n $NAMESPACE -f -
 
-export NAMESPACE=af2668-test
-export N8N_IMAGE_NAMESPACE=af2668-tools
+export NAMESPACE=xx9999-test
+export N8N_IMAGE_NAMESPACE=xx9999-tools
 export N8N_VERSION=0.131.0
 
 oc process -n $NAMESPACE -f n8n.bc.yaml -p N8N_VERSION=$N8N_VERSION -p N8N_IMAGE_NAMESPACE=$N8N_IMAGE_NAMESPACE -o yaml | oc apply -n $NAMESPACE -f -
@@ -26,8 +26,8 @@ This will create an ImageStream called `n8n`. This image is built on top of ubi8
 Once your N8N image has been successfully built, you can then deploy it in your project by using the following command (replace anything in angle brackets with the correct value):
 
 ```sh
-export NAMESPACE=af2668-dev
-export N8N_IMAGE_NAMESPACE=af2668-tools
+export NAMESPACE=xx9999-dev
+export N8N_IMAGE_NAMESPACE=xx9999-tools
 oc process -n $NAMESPACE -f n8n.dc.yaml NAMESPACE=$NAMESPACE -o yaml | oc apply -n $NAMESPACE -f -
 ```
 
