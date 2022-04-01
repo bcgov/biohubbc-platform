@@ -42,6 +42,8 @@ LABEL summary=$SUMMARY \
       usage="podman run -d --name postgresql_database -e POSTGRESQL_USER=user -e POSTGRESQL_PASSWORD=pass -e POSTGRESQL_DATABASE=db -p 5432:5432 rhscl/postgresql-$POSTGRESQL_VERSION-rhel7" \
       maintainer="SoftwareCollections.org <sclorg@redhat.com>"
 
+USER root
+
 COPY root/usr/libexec/fix-permissions /usr/libexec/fix-permissions
 
 # Copy entitlements and subscription manager configurations
@@ -50,16 +52,6 @@ COPY ./etc-pki-entitlement /etc/pki/entitlement
 COPY ./rhsm-conf /etc/rhsm
 COPY ./rhsm-ca /etc/rhsm/ca
 
-# This image must forever use UID 26 for postgres user so our volumes are
-# safe in the future. This should *never* change, the last test is there
-# to make sure of that.
-# rhel-7-server-ose-3.2-rpms is enabled for nss_wrapper until this pkg is
-# in base RHEL
-#
-# We need to call 2 (!) yum commands before being able to enable repositories properly
-# This is a workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1479388
-# Initialize /etc/yum.repos.d/redhat.repo
-# See https://access.redhat.com/solutions/1443553
 RUN yum repolist > /dev/null && \
     yum install -y yum-utils gettext && \
     yum-config-manager --disable \* &> /dev/null && \
