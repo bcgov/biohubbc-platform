@@ -40,7 +40,7 @@ jobs:
 
       - name: Scale down
         run: |
-          oc project xx9999-dev
+          oc project a0ec71-dev
           oc get deploymentconfig --selector env-id=$BUILD_ID -o name | awk '{print "oc scale --replicas=0  " $1}' | bash
 
   # Build the Database image
@@ -439,8 +439,8 @@ jobs:
       CYPRESS_RECORD_KEY: ${{ secrets.RECORDING_KEY }}
       CYPRESS_username: ${{ secrets.CYPRESS_USER_NAME }}
       CYPRESS_password: ${{ secrets.CYPRESS_PASSWORD }}
-      CYPRESS_BASE_URL: 'https://biohubbc-app-${{ github.event.number }}-xx9999-dev.apps.silver.devops.gov.bc.ca'
-      CYPRESS_host: 'https://biohubbc-app-${{ github.event.number }}-xx9999-dev.apps.silver.devops.gov.bc.ca'
+      CYPRESS_BASE_URL: 'https://biohubbc-app-${{ github.event.number }}-a0ec71-dev.apps.silver.devops.gov.bc.ca'
+      CYPRESS_host: 'https://biohubbc-app-${{ github.event.number }}-a0ec71-dev.apps.silver.devops.gov.bc.ca'
       CYPRESS_ENVIRONMENT: ${{ github.base_ref }}
       CYPRESS_authRealm: '35r1iman'
       CYPRESS_authClientId: 'biohubbc'
@@ -458,7 +458,7 @@ jobs:
       - name: Wait for API response
         uses: nev7n/wait_for_response@v1.0.1
         with:
-          url: 'https://biohubbc-api-${{ github.event.number }}-xx9999-dev.apps.silver.devops.gov.bc.ca/version'
+          url: 'https://biohubbc-api-${{ github.event.number }}-a0ec71-dev.apps.silver.devops.gov.bc.ca/version'
           responseCode: 200
           timeout: 240000
           interval: 500
@@ -466,7 +466,7 @@ jobs:
       - name: Wait for APP response
         uses: nev7n/wait_for_response@v1.0.1
         with:
-          url: 'https://biohubbc-app-${{ github.event.number }}-xx9999-dev.apps.silver.devops.gov.bc.ca'
+          url: 'https://biohubbc-app-${{ github.event.number }}-a0ec71-dev.apps.silver.devops.gov.bc.ca'
           responseCode: 200
           timeout: 120000
           interval: 500
@@ -478,7 +478,7 @@ jobs:
         id: smoke
         continue-on-error: false
         with:
-          wait-on: 'https://biohubbc-app-${{ github.event.number }}-xx9999-dev.apps.silver.devops.gov.bc.ca'
+          wait-on: 'https://biohubbc-app-${{ github.event.number }}-a0ec71-dev.apps.silver.devops.gov.bc.ca'
           wait-on-timeout: 120
           record: true
           working-directory: testing/e2e
