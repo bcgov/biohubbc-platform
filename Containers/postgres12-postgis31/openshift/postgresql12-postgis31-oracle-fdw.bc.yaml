@@ -2,7 +2,7 @@
 kind: Template
 apiVersion: template.openshift.io/v1
 metadata:
-  name: ${NAME}-build-template
+  name: postgis-postgres-build-template
 objects:
 
   - kind: ImageStream
@@ -36,10 +36,10 @@ objects:
           destinationDir: etc-pki-entitlement
         configMaps:
         - configMap:
-            name: rhsm-conf
+            name: platform-services-controlled-rhsm-conf
           destinationDir: rhsm-conf
         - configMap:
-            name: rhsm-ca
+            name: platform-services-controlled-rhsm-ca
           destinationDir: rhsm-ca
       strategy:
         type: Docker
@@ -90,7 +90,7 @@ parameters:
     displayName: Git Repo URL
     description: The URL to your GIT repo.
     required: true
-    value: https://github.com/bcgov/biohubbc.git
+    value: https://github.com/bcgov/biohubbc-platform.git
   - name: GIT_REF
     displayName: Git Reference
     description: The git reference or branch.
