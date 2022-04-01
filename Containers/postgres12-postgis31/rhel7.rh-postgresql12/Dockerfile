@@ -1,4 +1,4 @@
-FROM registry.redhat.io/rhscl/postgresql-12-rhel7
+FROM registry.redhat.io/rhscl/postgresql-12-rhel8
 
 # PostgreSQL image for OpenShift with PostGIS extension.
 # Volumes:
@@ -34,7 +34,7 @@ LABEL summary=$SUMMARY \
       io.k8s.display-name="PostgreSQL $POSTGRESQL_VERSION" \
       io.openshift.expose-services="5432:postgresql" \
       io.openshift.tags="database,postgresql,postgresql$POSTGRESQL_VERSION,rh-postgresql$POSTGRESQL_VERSION,postgis,postgis$POSTGISV" \
-      name="rhscl/postgresql-$POSTGRESQL_VERSION-rhel7" \
+      name="rhscl/postgresql-$POSTGRESQL_VERSION-rhel8" \
       com.redhat.component="rh-postgresql$POSTGRESQL_VERSION-container" \
       version="1" \
       release="1" \
@@ -55,9 +55,9 @@ COPY ./rhsm-ca /etc/rhsm/ca
 RUN yum repolist > /dev/null && \
     yum install -y yum-utils gettext && \
     yum-config-manager --disable \* &> /dev/null && \
-    yum-config-manager --enable rhel-server-rhscl-7-rpms && \
-    yum-config-manager --enable rhel-7-server-rpms && \
-    yum-config-manager --enable rhel-7-server-optional-rpms && \
+    yum-config-manager --enable rhel-server-rhscl-8-rpms && \
+    yum-config-manager --enable rhel-8-server-rpms && \
+    yum-config-manager --enable rhel-8-server-optional-rpms && \
     INSTALL_PKGS="rsync tar gettext bind-utils nss_wrapper" && \
     INSTALL_PKGS="$INSTALL_PKGS rh-postgresql$POSTGRESQL_VERSION-pgaudit" && \
     yum -y --setopt=tsflags=nodocs install $INSTALL_PKGS && \
@@ -93,8 +93,8 @@ ENV PATH /opt/rh/rh-postgresql12/root/usr/bin/:/usr/bin/:${PATH}
 
 # Aquire and build PostGIS 3.1, for PostgreSQL 12.x
 RUN cd /tmp && \
-    rpm -ivh https://download.postgresql.org/pub/repos/yum/reporpms/EL-6-x86_64/pgdg-redhat-repo-latest.noarch.rpm && \
-    yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    rpm -ivh https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm && \
+    yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
 RUN yum install -y postgis31_12 postgis31_12-client pgrouting_12
 
