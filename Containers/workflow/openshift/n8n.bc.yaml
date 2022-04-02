@@ -32,21 +32,20 @@ objects:
       postCommit: {}
       resources:
         limits:
-          cpu: 2000m
-          memory: 2Gi
+          cpu: 0
+          memory: 0
         requests:
-          cpu: 1000m
-          memory: 1Gi
+          cpu: 0
+          memory: 0
       runPolicy: SerialLatestOnly
       source:
         dockerfile: |
           FROM BuildConfig
-          ARG N8N_VERSION
           ENV HOME=/opt/app-root/src \
               TZ=America/Vancouver
           RUN mkdir -p $HOME
           WORKDIR $HOME
-          RUN npm install -g n8n@${N8N_VERSION}
+          RUN npm install -g n8n
           ENV PATH ${HOME}/node_modules/.bin/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
           VOLUME ${HOME}
           VOLUME [ "/data" ]
@@ -56,9 +55,6 @@ objects:
         type: Dockerfile
       strategy:
         dockerStrategy:
-          buildArgs:
-            - name: N8N_VERSION
-              value: "${N8N_VERSION}"
           from:
             kind: DockerImage
             name: registry.access.redhat.com/ubi8/nodejs-14:latest
@@ -71,11 +67,6 @@ parameters:
     description: The name assigned to all of the objects defined in this template.
     required: true
     value: n8n
-  - name: N8N_VERSION
-    displayName: N8N Version
-    description: Version of N8N to use
-    required: true
-    value: 0.131.0
   - name: VERSION
     displayName: Image version tag
     description: The version tag of the built image
