@@ -21,7 +21,7 @@ import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/Actio
 import { DeleteSystemUserI18N } from 'constants/i18n';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useContext, useState } from 'react';
@@ -56,7 +56,7 @@ export interface IActiveUsersListProps {
  */
 const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const classes = useStyles();
-  const biohubApi = useBiohubApi();
+  const biohubApi = useApi();
   const { activeUsers, codes } = props;
   const history = useHistory();
 
@@ -91,8 +91,8 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
       dialogTitle: 'Remove User?',
       dialogContent: (
         <Typography variant="body1" component="div" color="textSecondary">
-          Removing user <strong>{row.user_identifier}</strong> will revoke their access to this application and all
-          related projects. Are you sure you want to proceed?
+          Removing user <strong>{row.user_identifier}</strong> will revoke their access to this application. Are you
+          sure you want to proceed?
         </Typography>
       ),
       yesButtonLabel: 'Remove User',

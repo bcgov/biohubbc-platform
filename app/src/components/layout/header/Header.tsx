@@ -165,7 +165,10 @@ const Header: React.FC = () => {
               role="navigation"
               aria-label="Main Navigation"
               disableGutters>
-              <Link to="/" id="menu_search">
+              <Link to="/" id="menu_home">
+                Home
+              </Link>
+              <Link to="/search" id="menu_search">
                 Search
               </Link>
               <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>

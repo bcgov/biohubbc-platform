@@ -2,7 +2,7 @@ import { useKeycloak } from '@react-keycloak/web';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import { KeycloakInstance } from 'keycloak-js';
 import { useCallback, useEffect, useState } from 'react';
-import { useBiohubApi } from './useBioHubApi';
+import { useApi } from './useApi';
 
 export enum SYSTEM_IDENTITY_SOURCE {
   BCEID = 'BCEID',
@@ -106,7 +106,7 @@ export interface IKeycloakWrapper {
 function useKeycloakWrapper(): IKeycloakWrapper {
   const { keycloak } = useKeycloak();
 
-  const biohubApi = useBiohubApi();
+  const biohubApi = useApi();
 
   const [systemUser, setSystemUser] = useState<IGetUserResponse>();
   const [shouldLoadSystemUser, setShouldLoadSystemUser] = useState<boolean>(false);

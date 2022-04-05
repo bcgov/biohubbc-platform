@@ -12,7 +12,7 @@ import useUserApi from './api/useUserApi';
  *
  * @return {*} object whose properties are supported api methods.
  */
-export const useBiohubApi = () => {
+export const useApi = () => {
   const config = useContext(ConfigContext);
   const apiAxios = useAxios(config?.API_HOST);
   const n8nAxios = useAxios(config?.N8N_HOST);

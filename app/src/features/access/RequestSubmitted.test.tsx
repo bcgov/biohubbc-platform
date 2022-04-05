@@ -47,11 +47,11 @@ describe('RequestSubmitted', () => {
     expect(asFragment()).toMatchSnapshot();
   });
 
-  it('redirects to `/admin/projects` when user has at least 1 system role', () => {
+  it('redirects to `/` when user has at least 1 system role', () => {
     const authState = getMockAuthState({
       keycloakWrapper: {
         hasLoadedAllUserInfo: true,
-        systemRoles: [SYSTEM_ROLE.PROJECT_CREATOR],
+        systemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         hasAccessRequest: false,
 
         keycloak: {},
@@ -79,7 +79,7 @@ describe('RequestSubmitted', () => {
       </AuthStateContext.Provider>
     );
 
-    expect(history.location.pathname).toEqual('/admin/projects');
+    expect(history.location.pathname).toEqual('/');
   });
 
   it('redirects to `/` when user has no pending access request', () => {

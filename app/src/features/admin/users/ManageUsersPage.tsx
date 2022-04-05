@@ -4,7 +4,7 @@ import Container from '@material-ui/core/Container';
 import Typography from '@material-ui/core/Typography';
 import { AdministrativeActivityStatusType } from 'constants/misc';
 import AccessRequestList from 'features/admin/users/AccessRequestList';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
@@ -17,7 +17,7 @@ import ActiveUsersList from './ActiveUsersList';
  * @return {*}
  */
 const ManageUsersPage: React.FC = () => {
-  const biohubApi = useBiohubApi();
+  const biohubApi = useApi();
 
   const [accessRequests, setAccessRequests] = useState<IGetAccessRequestsListResponse[]>([]);
   const [isLoadingAccessRequests, setIsLoadingAccessRequests] = useState(false);

@@ -134,7 +134,7 @@ describe('AccessDenied', () => {
         hasLoadedAllUserInfo: true,
         hasAccessRequest: false,
 
-        systemRoles: [SYSTEM_ROLE.PROJECT_CREATOR],
+        systemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
         getUserIdentifier: jest.fn(),
         hasSystemRole: jest.fn(),
         getIdentitySource: jest.fn(),

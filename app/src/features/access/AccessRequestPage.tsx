@@ -7,13 +7,13 @@ import { Theme } from '@material-ui/core/styles/createMuiTheme';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import Typography from '@material-ui/core/Typography';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
-import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { AccessRequestI18N } from 'constants/i18n';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
+import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import React, { useContext, useEffect, useState } from 'react';
 import { Redirect, useHistory } from 'react-router';
@@ -31,8 +31,6 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 interface IAccessRequestForm {
   role: number;
-  work_from_regional_office: string;
-  regional_offices: number[];
   comments: string;
 }
 
@@ -45,7 +43,7 @@ export const AccessRequestPage: React.FC = () => {
   const classes = useStyles();
   const [codes, setCodes] = useState<IGetAllCodeSetsResponse>();
   const [isLoadingCodes, setIsLoadingCodes] = useState(false);
-  const biohubApi = useBiohubApi();
+  const biohubApi = useApi();
   const history = useHistory();
 
   const { keycloakWrapper } = useContext(AuthStateContext);

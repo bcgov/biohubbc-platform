@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/re
 import { AuthStateContext } from 'contexts/authStateContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import { createMemoryHistory } from 'history';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
 import React from 'react';
 import { Router } from 'react-router';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
@@ -10,8 +10,8 @@ import AccessRequestPage from './AccessRequestPage';
 
 const history = createMemoryHistory();
 
-jest.mock('../../hooks/useBioHubApi');
-const mockUseBiohubApi = {
+jest.mock('../../hooks/useApi');
+const mockUseApi = {
   codes: {
     getAllCodeSets: jest.fn<Promise<object>, []>()
   },
@@ -20,9 +20,7 @@ const mockUseBiohubApi = {
   }
 };
 
-const mockBiohubApi = ((useBiohubApi as unknown) as jest.Mock<typeof mockUseBiohubApi>).mockReturnValue(
-  mockUseBiohubApi
-);
+const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = () => {
   const authState = getMockAuthState({

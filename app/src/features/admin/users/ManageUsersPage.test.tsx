@@ -1,9 +1,9 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
-import { useBiohubApi } from 'hooks/useBioHubApi';
-import React from 'react';
-import ManageUsersPage from './ManageUsersPage';
 import { createMemoryHistory } from 'history';
+import { useApi } from 'hooks/useApi';
+import React from 'react';
 import { Router } from 'react-router';
+import ManageUsersPage from './ManageUsersPage';
 
 const history = createMemoryHistory();
 
@@ -15,8 +15,8 @@ const renderContainer = () => {
   );
 };
 
-jest.mock('../../../hooks/useBioHubApi');
-const mockUseBiohubApi = {
+jest.mock('../../../hooks/useApi');
+const mockUseApi = {
   admin: {
     getAccessRequests: jest.fn()
   },
@@ -28,9 +28,7 @@ const mockUseBiohubApi = {
   }
 };
 
-const mockBiohubApi = ((useBiohubApi as unknown) as jest.Mock<typeof mockUseBiohubApi>).mockReturnValue(
-  mockUseBiohubApi
-);
+const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 describe('ManageUsersPage', () => {
   beforeEach(() => {
