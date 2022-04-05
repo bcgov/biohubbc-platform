@@ -9,15 +9,3 @@ export enum SYSTEM_ROLE {
   PROJECT_CREATOR = 'Creator',
   DATA_ADMINISTRATOR = 'Data Administrator'
 }
-
-/**
- * Project level roles.
- *
- * @export
- * @enum {number}
- */
-export enum PROJECT_ROLE {
-  PROJECT_LEAD = 'Project Lead',
-  PROJECT_EDITOR = 'Editor',
-  PROJECT_VIEWER = 'Viewer'
-}

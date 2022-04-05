@@ -14,6 +14,9 @@ const raw_idir_identity_sources = ['IDIR'];
 
 /**
  * IUserInfo interface, represents the userinfo provided by keycloak.
+ *
+ * @export
+ * @interface IUserInfo
  */
 export interface IUserInfo {
   name?: string;
@@ -54,12 +57,6 @@ export interface IKeycloakWrapper {
    */
   systemRoles: string[];
   /**
-   * Returns `true` if the keycloak user is a registered system user, `false` otherwise.
-   *
-   * @memberof IKeycloakWrapper
-   */
-  isSystemUser: () => boolean;
-  /**
    * Returns `true` if the user's `systemRoles` contain at least 1 of the specified `validSystemRoles`, `false` otherwise.
    *
    * @memberof IKeycloakWrapper
@@ -89,6 +86,7 @@ export interface IKeycloakWrapper {
   email: string | undefined;
   firstName: string | undefined;
   lastName: string | undefined;
+  systemUserId: number;
   /**
    * Force this keycloak wrapper to refresh its data.
    *
@@ -110,15 +108,15 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const biohubApi = useBiohubApi();
 
-  const [bioHubUser, setBioHubUser] = useState<IGetUserResponse>();
-  const [isBioHubUserLoading, setIsBioHubUserLoading] = useState<boolean>(false);
+  const [systemUser, setSystemUser] = useState<IGetUserResponse>();
+  const [shouldLoadSystemUser, setShouldLoadSystemUser] = useState<boolean>(false);
+  const [isSystemUserLoading, setIsSystemUserLoading] = useState<boolean>(false);
+  const [hasLoadedSystemUser, setHasLoadedSystemUser] = useState<boolean>(false);
 
   const [keycloakUser, setKeycloakUser] = useState<IUserInfo | null>(null);
   const [isKeycloakUserLoading, setIsKeycloakUserLoading] = useState<boolean>(false);
 
   const [shouldLoadAccessRequest, setShouldLoadAccessRequest] = useState<boolean>(false);
-  const [hasLoadedAllUserInfo, setHasLoadedAllUserInfo] = useState<boolean>(false);
-
   const [hasAccessRequest, setHasAccessRequest] = useState<boolean>(false);
 
   /**
@@ -143,7 +141,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @param {object} keycloakToken
    * @return {*} {(string | null)}
    */
-  const getIdentitySource = useCallback((): string | null => {
+  const getIdentitySource = useCallback((): SYSTEM_IDENTITY_SOURCE | null => {
     const identitySource = keycloakUser?.['preferred_username']?.split('@')?.[1].toUpperCase();
 
     if (!identitySource) {
@@ -158,22 +156,22 @@ function useKeycloakWrapper(): IKeycloakWrapper {
       return SYSTEM_IDENTITY_SOURCE.IDIR;
     }
 
-    return identitySource;
+    return null;
   }, [keycloakUser]);
 
   useEffect(() => {
-    const getBioHubUser = async () => {
+    const getrestorationTrackerUser = async () => {
       let userDetails: IGetUserResponse;
 
       try {
         userDetails = await biohubApi.user.getUser();
       } catch {
-        // do nothing
+        //do nothing
       }
 
-      setBioHubUser(() => {
+      setSystemUser(() => {
         if (userDetails?.role_names?.length && !userDetails?.user_record_end_date) {
-          setHasLoadedAllUserInfo(true);
+          setHasLoadedSystemUser(true);
         } else {
           setShouldLoadAccessRequest(true);
         }
@@ -186,14 +184,14 @@ function useKeycloakWrapper(): IKeycloakWrapper {
       return;
     }
 
-    if (bioHubUser || isBioHubUserLoading) {
+    if (isSystemUserLoading || (systemUser && !shouldLoadSystemUser)) {
       return;
     }
 
-    setIsBioHubUserLoading(true);
+    setIsSystemUserLoading(true);
 
-    getBioHubUser();
-  }, [keycloak, bioHubUser, isBioHubUserLoading, biohubApi.user]);
+    getrestorationTrackerUser();
+  }, [keycloak, systemUser, isSystemUserLoading, shouldLoadSystemUser, biohubApi.user]);
 
   useEffect(() => {
     const getSystemAccessRequest = async () => {
@@ -204,9 +202,8 @@ function useKeycloakWrapper(): IKeycloakWrapper {
       } catch {
         // do nothing
       }
-
       setHasAccessRequest(() => {
-        setHasLoadedAllUserInfo(true);
+        setHasLoadedSystemUser(true);
         return accessRequests > 0;
       });
     };
@@ -241,24 +238,23 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     getKeycloakUser();
   }, [keycloak, keycloakUser, isKeycloakUserLoading]);
 
-  const isSystemUser = (): boolean => {
-    return !!bioHubUser;
+  const systemUserId = (): number => {
+    return systemUser?.id || 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return bioHubUser?.role_names || [];
+    return systemUser?.role_names || [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
     if (!validSystemRoles || !validSystemRoles.length) {
       return true;
     }
+
     const userSystemRoles = getSystemRoles();
 
-    for (const validRole of validSystemRoles) {
-      if (userSystemRoles.includes(validRole)) {
-        return true;
-      }
+    if (userSystemRoles.some((item) => validSystemRoles.includes(item))) {
+      return true;
     }
 
     return false;
@@ -285,8 +281,10 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   const refresh = () => {
-    // Set to false to ensure child pages wait for keycloak wrapper to fully re-load
-    setHasLoadedAllUserInfo(false);
+    // refresh system user
+    setHasLoadedSystemUser(false);
+    setIsSystemUserLoading(false);
+    setShouldLoadSystemUser(true);
 
     // refresh access requests
     setShouldLoadAccessRequest(true);
@@ -294,9 +292,8 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   return {
     keycloak: keycloak,
-    hasLoadedAllUserInfo,
+    hasLoadedAllUserInfo: hasLoadedSystemUser,
     systemRoles: getSystemRoles(),
-    isSystemUser,
     hasSystemRole,
     hasAccessRequest,
     getUserIdentifier,
@@ -306,6 +303,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     displayName: displayName(),
     firstName: firstName(),
     lastName: lastName(),
+    systemUserId: systemUserId(),
     refresh
   };
 }

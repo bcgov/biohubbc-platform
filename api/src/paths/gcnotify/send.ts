@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { HTTP400 } from '../../errors/custom-error';
+import { HTTP400 } from '../../errors/http-error';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { getLogger } from '../../utils/logger';
 import { GCNotifyService } from '../../services/gcnotify-service';
-import { IgcNotifyPostReturn } from '../../models/gcnotify';
+import { IgcNotifyPostReturn } from '../../interfaces/gcnotify.interface';
 
 const defaultLog = getLogger('paths/gcnotify');
 

@@ -2,8 +2,8 @@ export const rootAPIDoc = {
   openapi: '3.0.0',
   info: {
     version: '0.0.0',
-    title: 'sims-api',
-    description: 'API for SIMS (Species Inventory Management System)',
+    title: 'biohub-api',
+    description: 'API for BioHub',
     license: {
       name: 'Apache 2.0',
       url: 'https://www.apache.org/licenses/LICENSE-2.0.html'

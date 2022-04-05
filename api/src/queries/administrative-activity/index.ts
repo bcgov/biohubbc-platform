@@ -1,3 +1,1 @@
-import * as administrativeActivity from './administrative-activity-queries';
-
-export default { ...administrativeActivity };
+export * from './administrative-activity-queries';

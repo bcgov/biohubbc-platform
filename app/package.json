@@ -1,7 +1,7 @@
 {
-  "name": "sims-app",
+  "name": "biohub-app",
   "version": "0.0.0",
-  "description": "SIMS Web App",
+  "description": "BioHub Web App",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -16,9 +16,9 @@
     "coverage": "react-scripts test --ci --coverage --testResultsProcessor jest-sonar-reporter --env=jsdom-fourteen --watchAll=false --runInBand",
     "update-snapshots": "react-scripts test --env=jsdom-fourteen --ci --watchAll=false --updateSnapshot",
     "lint": "eslint src/ --ext .jsx,.js,.ts,.tsx",
-    "lint:fix": "npm run lint -- --fix",
+    "lint-fix": "npm run lint -- --fix",
     "format": "prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,scss}\"",
-    "format:fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
+    "format-fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
   },
   "engines": {
     "node": ">= 14.0.0",

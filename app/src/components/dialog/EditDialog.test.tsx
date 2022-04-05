@@ -59,22 +59,21 @@ const renderContainer = ({
 };
 
 describe('EditDialog', () => {
-  it('matches the snapshot when not open', () => {
-    const { baseElement } = renderContainer({ testFieldValue: 'this is a test', open: false });
+  it('renders component and data values', () => {
+    const { getByTestId, getByText } = renderContainer({ testFieldValue: 'this is a test' });
 
-    expect(baseElement).toMatchSnapshot();
-  });
-
-  it('matches the snapshot when open, with no error message', () => {
-    const { baseElement } = renderContainer({ testFieldValue: 'this is a test' });
-
-    expect(baseElement).toMatchSnapshot();
+    expect(getByTestId('testField')).toBeVisible();
+    expect(getByText('this is a test')).toBeVisible();
   });
 
   it('matches snapshot when open, with error message', () => {
-    const { baseElement } = renderContainer({ testFieldValue: 'this is a test', dialogError: 'This is an error' });
+    const { getByTestId, getByText } = renderContainer({
+      testFieldValue: 'this is a test',
+      dialogError: 'This is an error'
+    });
 
-    expect(baseElement).toMatchSnapshot();
+    expect(getByTestId('testField')).toBeVisible();
+    expect(getByText('This is an error')).toBeVisible();
   });
 
   it('calls the onSave prop when `Save Changes` button is clicked', async () => {

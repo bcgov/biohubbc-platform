@@ -1,4 +1,2 @@
-import * as occurrenceCreate from './occurrence-create-queries';
-import * as occurrenceView from './occurrence-view-queries';
-
-export default { ...occurrenceCreate, ...occurrenceView };
+export * as create from './occurrence-create-queries';
+export * as view from './occurrence-view-queries';

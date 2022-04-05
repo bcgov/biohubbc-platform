@@ -1,12 +1,20 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import * as pg from 'pg';
-import Sinon from 'sinon';
+import Sinon, { SinonStub } from 'sinon';
+import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
-import { HTTPError } from '../errors/custom-error';
-import { setSystemUserContextSQL } from '../queries/database/user-context-queries';
+import { HTTPError } from '../errors/http-error';
+import { Queries } from '../queries';
 import * as db from './db';
-import { getAPIUserDBConnection, getDBConnection, getDBPool, IDBConnection, initDBPool } from './db';
+import {
+  getAPIUserDBConnection,
+  getDBConnection,
+  getDBPool,
+  getKnexQueryBuilder,
+  IDBConnection,
+  initDBPool
+} from './db';
 
 describe('db', () => {
   beforeEach(() => {
@@ -52,15 +60,19 @@ describe('db', () => {
 
       const mockKeycloakToken = { preferred_username: 'test@idir' };
 
-      const queryStub = sinonSandbox.stub().resolves();
-      const releaseStub = sinonSandbox.stub().resolves();
-      const mockClient = { query: queryStub, release: releaseStub };
-      const connectStub = sinonSandbox.stub().resolves(mockClient);
-      const mockPool = { connect: connectStub };
-
+      let queryStub: SinonStub;
+      let releaseStub: SinonStub;
+      let mockClient: { query: SinonStub; release: SinonStub };
+      let connectStub: SinonStub;
+      let mockPool: { connect: SinonStub };
       let connection: IDBConnection;
 
       beforeEach(() => {
+        queryStub = sinonSandbox.stub().resolves();
+        releaseStub = sinonSandbox.stub().resolves();
+        mockClient = { query: queryStub, release: releaseStub };
+        connectStub = sinonSandbox.stub().resolves(mockClient);
+        mockPool = { connect: connectStub };
         connection = getDBConnection(mockKeycloakToken);
       });
 
@@ -78,7 +90,10 @@ describe('db', () => {
             expect(getDBPoolStub).to.have.been.calledOnce;
             expect(connectStub).to.have.been.calledOnce;
 
-            const expectedSystemUserContextSQL = setSystemUserContextSQL('test', SYSTEM_IDENTITY_SOURCE.IDIR);
+            const expectedSystemUserContextSQL = Queries.database.setSystemUserContextSQL(
+              'test',
+              SYSTEM_IDENTITY_SOURCE.IDIR
+            );
             expect(queryStub).to.have.been.calledWith(
               expectedSystemUserContextSQL?.text,
               expectedSystemUserContextSQL?.values
@@ -277,6 +292,41 @@ describe('db', () => {
           });
         });
       });
+
+      describe('sql', () => {
+        describe('when a connection is open', () => {
+          it('sends a sql statement', async () => {
+            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+
+            await connection.open();
+
+            const sqlStatement = SQL`sql query ${123}`;
+
+            await connection.sql(sqlStatement);
+
+            expect(queryStub).to.have.been.calledWith('sql query $1', [123]);
+          });
+        });
+
+        describe('when a connection is not open', () => {
+          it('throws an error', async () => {
+            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+
+            let expectedError: Error;
+            try {
+              const sqlStatement = SQL`sql query ${123}`;
+
+              await connection.sql(sqlStatement);
+
+              expect.fail('Expected an error to be thrown');
+            } catch (error) {
+              expectedError = error as Error;
+            }
+
+            expect(expectedError.message).to.equal('DBConnection is not open');
+          });
+        });
+      });
     });
   });
 
@@ -289,6 +339,14 @@ describe('db', () => {
       getAPIUserDBConnection();
 
       expect(getDBConnectionStub).to.have.been.calledWith({ preferred_username: 'biohub_api@database' });
+    });
+  });
+
+  describe('getKnexQueryBuilder', () => {
+    it('returns a Knex query builder', () => {
+      const queryBuilder = getKnexQueryBuilder();
+
+      expect(queryBuilder.client.config).to.eql({ client: 'pg' });
     });
   });
 });

@@ -1,7 +1,7 @@
 {
-  "name": "sims-n8n",
+  "name": "biohub-n8n",
   "version": "0.0.0",
-  "description": "N8N for SIMS",
+  "description": "N8N for BioHub",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
