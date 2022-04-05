@@ -420,7 +420,7 @@ parameters:
     description: Target namespace reference (i.e. '9f0fbe-dev')
     displayName: Namespace
     required: true
-    value: xx9999-tools
+    value: a0ec71-tools
   - name: CPU_REQUEST
     description: CPU REQUEST for deployment config
     value: '50m'

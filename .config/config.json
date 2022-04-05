@@ -1,6 +1,6 @@
 {
-  "name": "biohubbc-platform",
-  "namespaceSuffix": "xx9999",
+  "name": "biohub-platform",
+  "namespaceSuffix": "a0ec71",
   "namespace": {
     "tools": "tools",
     "dev": "dev",
@@ -13,9 +13,9 @@
     "api": "America/Vancouver"
   },
   "module": {
-    "db": "biohubbc-platform-db",
-    "api": "biohubbc-platform-api",
-    "app": "biohubbc-platform-app"
+    "db": "biohub-platform-db",
+    "api": "biohub-platform-api",
+    "app": "biohub-platform-app"
   },
   "staticBranches": [
     "dev",
@@ -23,14 +23,14 @@
     "prod"
   ],
   "staticUrls": {
-    "dev": "dev-biohubbc-platform.apps.silver.devops.gov.bc.ca",
-    "test": "test-biohubbc-platform.apps.silver.devops.gov.bc.ca",
-    "prod": "biohubbc-platform.apps.silver.devops.gov.bc.ca"
+    "dev": "dev-biohub-platform.apps.silver.devops.gov.bc.ca",
+    "test": "test-biohub-platform.apps.silver.devops.gov.bc.ca",
+    "prod": "biohub-platform.apps.silver.devops.gov.bc.ca"
   },
   "staticUrlsAPI": {
-    "dev": "api-dev-biohubbc-platform.apps.silver.devops.gov.bc.ca",
-    "test": "api-test-biohubbc-platform.apps.silver.devops.gov.bc.ca",
-    "prod": "api-biohubbc-platform.apps.silver.devops.gov.bc.ca"
+    "dev": "api-dev-biohub-platform.apps.silver.devops.gov.bc.ca",
+    "test": "api-test-biohub-platform.apps.silver.devops.gov.bc.ca",
+    "prod": "api-biohub-platform.apps.silver.devops.gov.bc.ca"
   },
   "staticUrlsN8N": {
     "dev": "n8n-dev.apps.silver.devops.gov.bc.ca",
@@ -50,17 +50,17 @@
   "sso": {
     "dev": {
       "url": "https://dev.oidc.gov.bc.ca/auth",
-      "clientId": "biohubbc-platform",
+      "clientId": "biohub-platform",
       "realm": "35r1iman"
     },
     "test": {
       "url": "https://test.oidc.gov.bc.ca/auth",
-      "clientId": "biohubbc-platform",
+      "clientId": "biohub-platform",
       "realm": "35r1iman"
     },
     "prod": {
       "url": "https://oidc.gov.bc.ca/auth",
-      "clientId": "biohubbc-platform",
+      "clientId": "biohub-platform",
       "realm": "35r1iman"
     }
   }

@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Template
+labels:
+  template: app-to-api-to-db
+metadata:
+  name: app-to-api-to-db
+parameters:
+  - description: The OpenShift Namespace license plate
+    displayName: Namespace
+    name: NAMESPACE
+    value: "a0ec71"
+objects:
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: api-to-db
+      namespace: "${NAMESPACE}-dev"
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  role: api
+          ports:
+            - port: 5432
+              protocol: TCP
+      podSelector:
+        matchLabels:
+          role: db
+      policyTypes:
+        - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: app-to-api
+      namespace: "${NAMESPACE}-dev"
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  role: app
+          ports:
+            - port: 6100
+              protocol: TCP
+      podSelector:
+        matchLabels:
+          role: api
+      policyTypes:
+        - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: api-to-db
+      namespace: "${NAMESPACE}-test"
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  role: api
+          ports:
+            - port: 5432
+              protocol: TCP
+      podSelector:
+        matchLabels:
+          role: db
+      policyTypes:
+        - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: app-to-api
+      namespace: "${NAMESPACE}-test"
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  role: app
+          ports:
+            - port: 6100
+              protocol: TCP
+      podSelector:
+        matchLabels:
+          role: api
+      policyTypes:
+        - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: api-to-db
+      namespace: "${NAMESPACE}-prod"
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  role: api
+          ports:
+            - port: 5432
+              protocol: TCP
+      podSelector:
+        matchLabels:
+          role: db
+      policyTypes:
+        - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: app-to-api
+      namespace: "${NAMESPACE}-prod"
+    spec:
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  role: app
+          ports:
+            - port: 6100
+              protocol: TCP
+      podSelector:
+        matchLabels:
+          role: api
+      policyTypes:
+        - Ingress
