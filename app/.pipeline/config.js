@@ -4,8 +4,8 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
-const defaultHost = 'biohubbc-xx9999-dev.apps.silver.devops.gov.bc.ca';
-const defaultHostAPI = 'biohubbc-xx9999-api-dev.apps.silver.devops.gov.bc.ca';
+const defaultHost = 'biohubbc-a0ec71-dev.apps.silver.devops.gov.bc.ca';
+const defaultHostAPI = 'biohubbc-a0ec71-api-dev.apps.silver.devops.gov.bc.ca';
 
 const name = (config.module && config.module['app']) || 'biohubbc-app';
 const apiName = (config.module && config.module['api']) || 'biohubbc-api';
@@ -56,7 +56,7 @@ options = processOptions(options);
 
 const phases = {
   build: {
-    namespace: 'xx9999-tools',
+    namespace: 'a0ec71-tools',
     name: `${name}`,
     phase: 'build',
     changeId: changeId,
@@ -68,7 +68,7 @@ const phases = {
     branch: branch
   },
   dev: {
-    namespace: 'xx9999-dev',
+    namespace: 'a0ec71-dev',
     name: `${name}`,
     phase: 'dev',
     changeId: deployChangeId,
@@ -78,10 +78,10 @@ const phases = {
     tag: `dev-${version}-${deployChangeId}`,
     host:
       (isStaticDeployment && (staticUrls.dev || defaultHost)) ||
-      `${name}-${changeId}-xx9999-dev.apps.silver.devops.gov.bc.ca`,
+      `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     apiHost:
       (isStaticDeployment && (staticUrlsAPI.dev || defaultHostAPI)) ||
-      `${apiName}-${changeId}-xx9999-dev.apps.silver.devops.gov.bc.ca`,
+      `${apiName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     n8nHost: '', // staticUrlsN8N.dev, // Disable until nginx is setup: https://quartech.atlassian.net/browse/BHBC-1435
     siteminderLogoutURL: config.siteminderLogoutURL.dev,
     maxUploadNumFiles,
@@ -92,7 +92,7 @@ const phases = {
     maxReplicas: 2
   },
   test: {
-    namespace: 'xx9999-test',
+    namespace: 'a0ec71-test',
     name: `${name}`,
     phase: 'test',
     changeId: deployChangeId,
@@ -112,7 +112,7 @@ const phases = {
     maxReplicas: 5
   },
   prod: {
-    namespace: 'xx9999-prod',
+    namespace: 'a0ec71-prod',
     name: `${name}`,
     phase: 'prod',
     changeId: deployChangeId,

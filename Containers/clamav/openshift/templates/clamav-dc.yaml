@@ -96,5 +96,5 @@ objects:
           schedulerName: default-scheduler
 parameters:
   - name: NAME_SPACE
-    value: xx9999-tools
+    value: a0ec71-tools
     required: true

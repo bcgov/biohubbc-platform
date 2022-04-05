@@ -4,8 +4,8 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
-const defaultHost = 'biohubbc-xx9999-api.apps.silver.devops.gov.bc.ca';
-const defaultHostAPP = 'biohubbc-xx9999-dev.apps.silver.devops.gov.bc.ca';
+const defaultHost = 'biohubbc-a0ec71-api.apps.silver.devops.gov.bc.ca';
+const defaultHostAPP = 'biohubbc-a0ec71-dev.apps.silver.devops.gov.bc.ca';
 
 const appName = (config.module && config.module['app']) || 'biohubbc-app';
 const name = (config.module && config.module['api']) || 'biohubbc-api';
@@ -51,7 +51,7 @@ options = processOptions(options);
 
 const phases = {
   build: {
-    namespace: 'xx9999-tools',
+    namespace: 'a0ec71-tools',
     name: `${name}`,
     dbName: `${dbName}`,
     phase: 'build',
@@ -66,7 +66,7 @@ const phases = {
     logLevel: isStaticDeployment && 'info' || 'debug'
   },
   dev: {
-    namespace: 'xx9999-dev',
+    namespace: 'a0ec71-dev',
     name: `${name}`,
     dbName: `${dbName}`,
     phase: 'dev',
@@ -77,10 +77,10 @@ const phases = {
     tag: `dev-${version}-${deployChangeId}`,
     host:
       (isStaticDeployment && (staticUrlsAPI.dev || defaultHost)) ||
-      `${name}-${changeId}-xx9999-dev.apps.silver.devops.gov.bc.ca`,
+      `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     appHost:
     (isStaticDeployment && (staticUrls.dev || defaultHostAPP)) ||
-      `${appName}-${changeId}-xx9999-dev.apps.silver.devops.gov.bc.ca`,
+      `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev',
     tz: config.timezone.api,
     certificateURL: config.certificateURL.dev,
@@ -89,7 +89,7 @@ const phases = {
     logLevel: isStaticDeployment && 'info' || 'debug'
   },
   test: {
-    namespace: 'xx9999-test',
+    namespace: 'a0ec71-test',
     name: `${name}`,
     dbName: `${dbName}`,
     phase: 'test',
@@ -107,7 +107,7 @@ const phases = {
     logLevel: 'info'
   },
   prod: {
-    namespace: 'xx9999-prod',
+    namespace: 'a0ec71-prod',
     name: `${name}`,
     dbName: `${dbName}`,
     phase: 'prod',
