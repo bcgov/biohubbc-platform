@@ -7,7 +7,7 @@ import { SQL, SQLStatement } from 'sql-template-strings';
  * @returns {SQLStatement} sql query object
  */
 export const getUserByUserIdentifierSQL = (userIdentifier: string): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     SELECT
       su.system_user_id,
       su.user_identifier,
@@ -31,8 +31,6 @@ export const getUserByUserIdentifierSQL = (userIdentifier: string): SQLStatement
       su.record_end_date,
       su.user_identifier;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -42,7 +40,7 @@ export const getUserByUserIdentifierSQL = (userIdentifier: string): SQLStatement
  * @returns {SQLStatement} sql query object
  */
 export const getUserByIdSQL = (userId: number): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     SELECT
       su.system_user_id,
       su.user_identifier,
@@ -68,8 +66,6 @@ export const getUserByIdSQL = (userId: number): SQLStatement => {
       su.record_end_date,
       su.user_identifier;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -78,7 +74,7 @@ export const getUserByIdSQL = (userId: number): SQLStatement => {
  * @returns {SQLStatement} sql query object
  */
 export const getUserListSQL = (): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     SELECT
       su.system_user_id,
       su.user_identifier,
@@ -102,8 +98,6 @@ export const getUserListSQL = (): SQLStatement => {
       su.record_end_date,
       su.user_identifier;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -114,7 +108,7 @@ export const getUserListSQL = (): SQLStatement => {
  * @return {*}  {SQLStatement}
  */
 export const addSystemUserSQL = (userIdentifier: string, identitySource: string): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     INSERT INTO system_user (
       user_identity_source_id,
       user_identifier,
@@ -127,8 +121,6 @@ export const addSystemUserSQL = (userIdentifier: string, identitySource: string)
     RETURNING
       *;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -139,7 +131,7 @@ export const addSystemUserSQL = (userIdentifier: string, identitySource: string)
  * @return {*}  {SQLStatement}
  */
 export const deactivateSystemUserSQL = (userId: number): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     UPDATE
       system_user
     SET
@@ -149,8 +141,6 @@ export const deactivateSystemUserSQL = (userId: number): SQLStatement => {
     RETURNING
       *;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -160,7 +150,7 @@ export const deactivateSystemUserSQL = (userId: number): SQLStatement => {
  * @return {*}  {SQLStatement}
  */
 export const activateSystemUserSQL = (userId: number): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     UPDATE
       system_user
     SET
@@ -170,8 +160,6 @@ export const activateSystemUserSQL = (userId: number): SQLStatement => {
     RETURNING
       *;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -182,7 +170,7 @@ export const activateSystemUserSQL = (userId: number): SQLStatement => {
  * @return {*}  {SQLStatement}
  */
 export const deleteAllSystemRolesSQL = (userId: number): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     DELETE FROM
       system_user_role
     WHERE
@@ -190,8 +178,6 @@ export const deleteAllSystemRolesSQL = (userId: number): SQLStatement => {
     RETURNING
       *;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -202,7 +188,7 @@ export const deleteAllSystemRolesSQL = (userId: number): SQLStatement => {
  * @return {*}  {SQLStatement}
  */
 export const deleteAllProjectRolesSQL = (userId: number): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     DELETE FROM
       project_participation
     WHERE
@@ -210,6 +196,4 @@ export const deleteAllProjectRolesSQL = (userId: number): SQLStatement => {
     RETURNING
       *;
   `;
-
-  return sqlStatement;
 };

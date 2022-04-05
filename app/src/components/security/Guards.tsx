@@ -13,34 +13,6 @@ interface IGuardProps<T = never> {
 }
 
 /**
- * Renders `props.children` only if the user is authenticated and has at least 1 of the specified valid system roles
- *
- * @param {*} props
- * @return {*}
- */
-export const RoleGuard: React.FC<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps> = (props) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
-
-  const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);
-
-  if (hasSystemRole) {
-    // User has a matching system role
-    return <>{props.children}</>;
-  }
-
-  // User has no matching system role or
-  if (props.fallback) {
-    if (isValidElement(props.fallback)) {
-      return <>{props.fallback}</>;
-    }
-
-    return props.fallback();
-  }
-
-  return <></>;
-};
-
-/**
  * Renders `props.children` only if the user is NOT authenticated and has none of the specified valid system roles
  *
  * @param {*} props

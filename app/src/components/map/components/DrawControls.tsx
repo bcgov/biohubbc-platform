@@ -134,7 +134,7 @@ const DrawControls: React.FC<IDrawControlsProps> = (props) => {
 
           return new L.Marker([latlng.lat, latlng.lng]);
         },
-        onEachFeature: function (feature, layer) {
+        onEachFeature: function (_feature, layer) {
           container.addLayer(layer);
         }
       });

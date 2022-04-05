@@ -3,7 +3,6 @@ import Button from '@material-ui/core/Button';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Container from '@material-ui/core/Container';
 import Paper from '@material-ui/core/Paper';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import Typography from '@material-ui/core/Typography';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
@@ -20,7 +19,7 @@ import { Redirect, useHistory } from 'react-router';
 import BCeIDRequestForm, { BCeIDRequestFormInitialValues, BCeIDRequestFormYupSchema } from './BCeIDRequestForm';
 import IDIRRequestForm, { IDIRRequestFormInitialValues, IDIRRequestFormYupSchema } from './IDIRRequestForm';
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles(() => ({
   actionButton: {
     minWidth: '6rem',
     '& + button': {
@@ -68,7 +67,10 @@ export const AccessRequestPage: React.FC = () => {
     const getAllCodeSets = async () => {
       const response = await biohubApi.codes.getAllCodeSets();
 
-      // TODO error handling/user messaging - Cant submit an access request if required code sets fail to fetch
+      if (!codesResponse) {
+        // TODO error handling/messaging
+        return;
+      }
 
       setCodes(() => {
         setIsLoadingCodes(false);

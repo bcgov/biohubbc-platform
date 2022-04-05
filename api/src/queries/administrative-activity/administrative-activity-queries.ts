@@ -71,7 +71,7 @@ export const getAdministrativeActivitiesSQL = (
  * @returns {SQLStatement} sql query object
  */
 export const getAdministrativeActivityById = (administrativeActivityTypeId: number): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     SELECT
       *
     FROM
@@ -79,8 +79,6 @@ export const getAdministrativeActivityById = (administrativeActivityTypeId: numb
     WHERE
       administrative_activity_status_type_id = ${administrativeActivityTypeId};
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -91,7 +89,7 @@ export const getAdministrativeActivityById = (administrativeActivityTypeId: numb
  * @return {*}  {SQLStatement}
  */
 export const postAdministrativeActivitySQL = (systemUserId: number, data: unknown): SQLStatement => {
-  const sqlStatement: SQLStatement = SQL`
+  return SQL`
     INSERT INTO administrative_activity (
       reported_system_user_id,
       administrative_activity_type_id,
@@ -107,8 +105,6 @@ export const postAdministrativeActivitySQL = (systemUserId: number, data: unknow
       administrative_activity_id as id,
       create_date::timestamptz;
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -118,7 +114,7 @@ export const postAdministrativeActivitySQL = (systemUserId: number, data: unknow
  * @return {*}  {SQLStatement}
  */
 export const countPendingAdministrativeActivitiesSQL = (userIdentifier: string): SQLStatement => {
-  const sqlStatement: SQLStatement = SQL`
+  return SQL`
     SELECT
       *
     FROM
@@ -131,8 +127,6 @@ export const countPendingAdministrativeActivitiesSQL = (userIdentifier: string):
       (aa.data -> 'username')::text =  '"' || ${userIdentifier} || '"'
     AND aast.name = 'Pending';
   `;
-
-  return sqlStatement;
 };
 
 /**
@@ -146,7 +140,7 @@ export const putAdministrativeActivitySQL = (
   administrativeActivityId: number,
   administrativeActivityStatusTypeId: number
 ): SQLStatement => {
-  const sqlStatement = SQL`
+  return SQL`
     UPDATE
       administrative_activity
     SET
@@ -156,6 +150,4 @@ export const putAdministrativeActivitySQL = (
     RETURNING
       administrative_activity_id as id;
   `;
-
-  return sqlStatement;
 };
