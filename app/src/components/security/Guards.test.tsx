@@ -113,7 +113,7 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <RoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={(id) => <div data-testid="fallback-child-component">{id}</div>}>
+                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}>
                   <div data-testid="child-component" />
                 </RoleGuard>
               </AuthStateContext.Provider>
@@ -136,7 +136,7 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <RoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={(id) => <div data-testid="fallback-child-component">{id}</div>}>
+                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}>
                   <div data-testid="child-component" />
                 </RoleGuard>
               </AuthStateContext.Provider>
@@ -254,7 +254,7 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <NoRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={(id) => <div data-testid="fallback-child-component">{id}</div>}>
+                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}>
                   <div data-testid="child-component" />
                 </NoRoleGuard>
               </AuthStateContext.Provider>
@@ -277,7 +277,7 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <NoRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={(id) => <div data-testid="fallback-child-component">{id}</div>}>
+                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}>
                   <div data-testid="child-component" />
                 </NoRoleGuard>
               </AuthStateContext.Provider>
@@ -682,7 +682,7 @@ describe('Guards', () => {
           <Router history={history}>
             <Route path="test/:id">
               <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={(id) => <div data-testid="fallback-child-component" />}>
+                <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
                   <div data-testid="child-component" />
                 </UnAuthGuard>
               </AuthStateContext.Provider>

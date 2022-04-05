@@ -56,7 +56,6 @@ describe('ReviewAccessRequestForm', () => {
       expect(getByText('test data name')).toBeVisible();
       expect(getByText('IDIR/test data username')).toBeVisible();
       expect(getByText('test data email')).toBeVisible();
-      expect(getByText('Office 1')).toBeVisible();
       expect(getByText('04/18/2021')).toBeVisible();
       expect(getByText('test data comment')).toBeVisible();
       expect(getByText('Role 2')).toBeVisible();
