@@ -24,7 +24,7 @@ parameters:
     value: app
   - name: SOURCE_REPOSITORY_URL
     required: true
-    value: https://github.com/bcgov/biohubbc
+    value: https://github.com/bcgov/biohubbc-platform.git
   - name: SOURCE_REPOSITORY_REF
     required: false
     value: dev

@@ -30,7 +30,7 @@ export const rootAPIDoc = {
   tags: [],
   externalDocs: {
     description: 'Visit GitHub to find out more about this API',
-    url: 'https://github.com/bcgov/biohubbc.git'
+    url: 'https://github.com/bcgov/biohubbc-platform.git'
   },
   paths: {},
   components: {

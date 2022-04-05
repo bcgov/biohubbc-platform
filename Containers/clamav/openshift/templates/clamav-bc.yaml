@@ -84,7 +84,7 @@ parameters:
   - name: GIT_SOURCE_URL
     displayName: GIT Source Repo URL
     description: A GIT URL to your source code.
-    value: 'https://github.com/bcgov/biohubbc.git'
+    value: 'https://github.com/bcgov/biohubbc-platform.git'
     required: true
   - name: GIT_REF
     displayName: Git Reference
