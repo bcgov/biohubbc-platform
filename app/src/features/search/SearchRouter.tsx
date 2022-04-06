@@ -1,18 +1,18 @@
-import BaseLayout from 'layouts/BaseLayout';
+import ContentLayout from 'layouts/ContentLayout';
 import React from 'react';
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import SearchPage from './SearchPage';
 
 /**
- * Router for all `/*` pages.
+ * Router for all `/search/*` pages.
  *
  * @return {*}
  */
 const SearchRouter: React.FC = () => {
   return (
     <Switch>
-      <AppRoute exact path="/search" layout={BaseLayout}>
+      <AppRoute exact path="/search" layout={ContentLayout}>
         <SearchPage />
       </AppRoute>
 

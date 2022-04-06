@@ -1,4 +1,4 @@
-import AdminUsersLayout from 'features/admin/AdminUsersLayout';
+import ContentLayout from 'layouts/ContentLayout';
 import React from 'react';
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
@@ -12,7 +12,7 @@ import ManageUsersPage from './users/ManageUsersPage';
 const AdminUsersRouter: React.FC = () => {
   return (
     <Switch>
-      <AppRoute exact path="/admin/users" layout={AdminUsersLayout}>
+      <AppRoute exact path="/admin/users" layout={ContentLayout}>
         <ManageUsersPage />
       </AppRoute>
 

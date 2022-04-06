@@ -67,32 +67,3 @@ export class ApiExecuteSQLError extends ApiError {
     super(ApiErrorType.EXECUTE_SQL, message, errors);
   }
 }
-
-export enum HTTPErrorType {
-  BAD_REQUEST = 'Bad Request',
-  UNAUTHORIZE = 'Unauthorized',
-  FORBIDDEN = 'Forbidden',
-  CONFLICT = 'Conflict',
-  INTERNAL_SERVER_ERROR = 'Internal Server Error'
-}
-
-export class HTTPError extends Error {
-  status: number;
-  errors?: (string | object)[];
-
-  constructor(name: HTTPErrorType, status: number, message: string, errors?: (string | object)[], stack?: string) {
-    super(message);
-
-    this.name = name;
-    this.status = status;
-    this.errors = errors || [];
-
-    if (stack) {
-      this.stack = stack;
-    }
-
-    if (!this.stack) {
-      Error.captureStackTrace(this);
-    }
-  }
-}

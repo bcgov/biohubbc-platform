@@ -13,7 +13,7 @@
   },
   "scripts": {
     "setup": "npm-run-all -l -s migrate-latest seed",
-    "migrate-latest": "knex migrate-latest --knexfile ./src/knexfile.ts",
+    "migrate-latest": "knex migrate:latest --knexfile ./src/knexfile.ts",
     "migrate-rollback": "knex migrate-rollback --knexfile ./src/knexfile.ts",
     "seed": "knex seed:run --knexfile ./src/knexfile.ts",
     "lint": "eslint src/ --ext .js,.ts",

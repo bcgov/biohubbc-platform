@@ -16,9 +16,7 @@ export type IAppRouteProps = RouteProps & {
   layout?: React.ComponentType<any>;
 };
 
-const AppRoute: React.FC<IAppRouteProps> = ({ component: Component, children, layout, title, ...rest }) => {
-  const Layout = layout === undefined ? (props: any) => <>{props.children}</> : layout;
-
+const AppRoute: React.FC<IAppRouteProps> = ({ component: Component, children, layout: Layout, title, ...rest }) => {
   if (title) {
     document.title = title;
   }
@@ -26,13 +24,17 @@ const AppRoute: React.FC<IAppRouteProps> = ({ component: Component, children, la
   return (
     <Route
       {...rest}
-      render={(props) => (
-        <Layout>
-          {React.Children.map(children, (child: any) => {
-            return React.cloneElement(child, props);
-          })}
-        </Layout>
-      )}
+      render={(props) => {
+        const childrenToRender = React.Children.map(children, (child: any) => {
+          return React.cloneElement(child, props);
+        });
+
+        if (Layout) {
+          return <Layout>{childrenToRender}</Layout>;
+        }
+
+        return childrenToRender;
+      }}
     />
   );
 };

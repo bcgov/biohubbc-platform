@@ -1,0 +1,9 @@
+ create or replace view administrative_activity as select * from biohub.administrative_activity;
+ create or replace view administrative_activity_status_type as select * from biohub.administrative_activity_status_type;
+ create or replace view administrative_activity_type as select * from biohub.administrative_activity_type;
+ create or replace view system_constant as select * from biohub.system_constant;
+ create or replace view system_metadata_constant as select * from biohub.system_metadata_constant;
+ create or replace view system_role as select * from biohub.system_role;
+ create or replace view system_user as select * from biohub.system_user;
+ create or replace view system_user_role as select * from biohub.system_user_role;
+ create or replace view user_identity_source as select * from biohub.user_identity_source;
