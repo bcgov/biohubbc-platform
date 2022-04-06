@@ -90,16 +90,16 @@ const ManageUsersPage: React.FC = () => {
 
   useEffect(() => {
     const getCodes = async () => {
-      const codesResponse = await biohubApi.codes.getAllCodeSets();
+      const response = await biohubApi.codes.getAllCodeSets();
 
-      if (!codesResponse) {
+      if (!response) {
         // TODO error handling/messaging
         return;
       }
 
       setCodes(() => {
         setIsLoadingCodes(false);
-        return codesResponse;
+        return response;
       });
     };
 

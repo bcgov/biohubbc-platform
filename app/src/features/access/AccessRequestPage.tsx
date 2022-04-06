@@ -67,7 +67,7 @@ export const AccessRequestPage: React.FC = () => {
     const getAllCodeSets = async () => {
       const response = await biohubApi.codes.getAllCodeSets();
 
-      if (!codesResponse) {
+      if (!response) {
         // TODO error handling/messaging
         return;
       }
