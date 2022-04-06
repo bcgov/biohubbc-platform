@@ -38,8 +38,8 @@
     "prod": "n8n-prod.apps.silver.devops.gov.bc.ca"
   },
   "siteminderLogoutURL": {
-    "dev": "https://logontest.gov.bc.ca/clp-cgi/logoff.cgi",
-    "test": "https://logontest.gov.bc.ca/clp-cgi/logoff.cgi",
+    "dev": "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi",
+    "test": "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi",
     "prod": "https://logon7.gov.bc.ca/clp-cgi/logoff.cgi"
   },
   "sso": {
