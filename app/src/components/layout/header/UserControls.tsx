@@ -15,11 +15,8 @@ export const LoggedInUserControls = () => {
 
   const userIdentifier = keycloakWrapper?.getUserIdentifier() || '';
 
-  function getDisplayName(userName: string, identitySource: string) {
-    return identitySource === SYSTEM_IDENTITY_SOURCE.BCEID ? `BCEID / ${userName}` : `IDIR / ${userName}`;
-  }
-
-  const loggedInUserDisplayName = getDisplayName(userIdentifier, identitySource);
+  const loggedInUserDisplayName =
+    identitySource === SYSTEM_IDENTITY_SOURCE.BCEID ? `BCEID / ${userIdentifier}` : `IDIR / ${userIdentifier}`;
 
   return (
     <>

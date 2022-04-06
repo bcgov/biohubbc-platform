@@ -205,12 +205,12 @@ const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
   }, [initiateCancel, isSafeToCancel, props]);
 
   const ErrorDetailsList = (errorProps: { errors: (string | object)[] }) => {
-    const items = errorProps.errors.map((error, index) => {
-      if (typeof error === 'string') {
-        return <li key={index}>{error}</li>;
+    const items = errorProps.errors.map((errorItem, index) => {
+      if (typeof errorItem === 'string') {
+        return <li key={index}>{errorItem}</li>;
       }
 
-      return <li key={index}>{JSON.stringify(error)}</li>;
+      return <li key={index}>{JSON.stringify(errorItem)}</li>;
     });
 
     return <ul>{items}</ul>;
