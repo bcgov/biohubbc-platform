@@ -30,7 +30,7 @@ describe('KeycloakService', () => {
       expect(response).to.eql('token');
 
       expect(axiosStub).to.have.been.calledWith(
-        'host/auth/realms/realm/protocol/openid-connect/token',
+        'host/realms/realm/protocol/openid-connect/token',
         'grant_type=client_credentials',
         {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -99,7 +99,7 @@ describe('KeycloakService', () => {
         }
       });
 
-      expect(axiosStub).to.have.been.calledWith('host/auth/admin/realms/realm/users/?username=test%40idir', {
+      expect(axiosStub).to.have.been.calledWith('host/admin/realms/realm/users/?username=test%40idir', {
         headers: { authorization: 'Bearer token' }
       });
     });
