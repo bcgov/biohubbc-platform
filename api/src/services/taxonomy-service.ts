@@ -22,11 +22,9 @@ export class TaxonomyService {
       const label = [
         item._source.code,
         [
-          [item._source.tty_kingdom || '', item._source.tty_name || ''].filter(Boolean).join(' '),
-          [item._source.unit_name1 || '', item._source.unit_name2 || '', item._source.unit_name3 || '']
-            .filter(Boolean)
-            .join(' '),
-          item._source.english_name || ''
+          [item._source.tty_kingdom, item._source.tty_name].filter(Boolean).join(' '),
+          [item._source.unit_name1, item._source.unit_name2, item._source.unit_name3].filter(Boolean).join(' '),
+          item._source.english_name
         ]
           .filter(Boolean)
           .join(', ')
