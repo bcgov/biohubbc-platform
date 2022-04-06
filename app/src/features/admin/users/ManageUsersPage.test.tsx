@@ -4,6 +4,7 @@ import { useApi } from 'hooks/useApi';
 import React from 'react';
 import { Router } from 'react-router';
 import ManageUsersPage from './ManageUsersPage';
+import useCodes from 'hooks/useCodes';
 
 const history = createMemoryHistory();
 
@@ -22,29 +23,28 @@ const mockUseApi = {
   },
   user: {
     getUsersList: jest.fn()
-  },
-  codes: {
-    getAllCodeSets: jest.fn()
   }
 };
-
 const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+
+jest.mock('../../../hooks/useCodes');
+const mockUseCodes = ((useCodes as unknown) as jest.Mock).mockReturnValue({
+  codes: {
+    system_roles: [{ id: 1, name: 'Role 1' }],
+    administrative_activity_status_type: [
+      { id: 1, name: 'Actioned' },
+      { id: 1, name: 'Rejected' }
+    ]
+  }
+});
 
 describe('ManageUsersPage', () => {
   beforeEach(() => {
     // clear mocks before each test
     mockBiohubApi().admin.getAccessRequests.mockClear();
     mockBiohubApi().user.getUsersList.mockClear();
-    mockBiohubApi().codes.getAllCodeSets.mockClear();
 
-    // mock code set response
-    mockBiohubApi().codes.getAllCodeSets.mockReturnValue({
-      system_roles: [{ id: 1, name: 'Role 1' }],
-      administrative_activity_status_type: [
-        { id: 1, name: 'Actioned' },
-        { id: 1, name: 'Rejected' }
-      ]
-    });
+    mockUseCodes.mockClear();
   });
 
   afterEach(() => {

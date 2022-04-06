@@ -12,9 +12,9 @@ import { DialogContext } from 'contexts/dialogContext';
 import { Formik } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import useCodes from 'hooks/useCodes';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Redirect, useHistory } from 'react-router';
 import BCeIDRequestForm, { BCeIDRequestFormInitialValues, BCeIDRequestFormYupSchema } from './BCeIDRequestForm';
 import IDIRRequestForm, { IDIRRequestFormInitialValues, IDIRRequestFormYupSchema } from './IDIRRequestForm';
@@ -40,14 +40,14 @@ interface IAccessRequestForm {
  */
 export const AccessRequestPage: React.FC = () => {
   const classes = useStyles();
-  const [codes, setCodes] = useState<IGetAllCodeSetsResponse>();
-  const [isLoadingCodes, setIsLoadingCodes] = useState(false);
   const biohubApi = useApi();
   const history = useHistory();
 
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const dialogContext = useContext(DialogContext);
+
+  const { codes } = useCodes();
 
   const defaultErrorDialogProps = {
     dialogTitle: AccessRequestI18N.requestTitle,
@@ -62,27 +62,6 @@ export const AccessRequestPage: React.FC = () => {
   };
 
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
-
-  useEffect(() => {
-    const getAllCodeSets = async () => {
-      const response = await biohubApi.codes.getAllCodeSets();
-
-      if (!response) {
-        // TODO error handling/messaging
-        return;
-      }
-
-      setCodes(() => {
-        setIsLoadingCodes(false);
-        return response;
-      });
-    };
-
-    if (!isLoadingCodes && !codes) {
-      getAllCodeSets();
-      setIsLoadingCodes(true);
-    }
-  }, [biohubApi, isLoadingCodes, codes]);
 
   const showAccessRequestErrorDialog = (textDialogProps?: Partial<IErrorDialogProps>) => {
     dialogContext.setErrorDialog({
