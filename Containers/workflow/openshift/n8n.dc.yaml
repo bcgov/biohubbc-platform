@@ -514,7 +514,7 @@ parameters:
     description: Target namespace reference (i.e. '9f0fbe-dev')
     displayName: Namespace
     required: true
-    value: a0ec71-test
+    value: a0ec71-dev
   - name: N8N_IMAGE_NAMESPACE
     description: Target namespace reference (i.e. '9f0fbe-dev') for the N8N image
     displayName: Namespace
@@ -527,20 +527,20 @@ parameters:
   - name: CPU_LIMIT
     description: Maximum CPU allowed to use
     displayName: CPU Limit
-    value: 500m
+    value: 50m
   - name: MEMORY_REQUEST
     description: Minimal amount of memory needed to run
     displayName: Memory Request
-    value: 768Mi
+    value: 100Mi
   - name: MEMORY_LIMIT
     description: Maximum amount of memory allowed to use
     displayName: Memory Limit
-    value: 1.0Gi
+    value: 0.5Gi
   - name: PVC_SIZE
     description: Amount of disk space needed for persistence
     displayName: PVC Size
     required: true
-    value: 2Gi
+    value: 1Gi
   - name: N8N_USER
     displayName: N8N User name
     description: The name associated with the n8n basic user
