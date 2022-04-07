@@ -1,22 +1,20 @@
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
-import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import AccessRequestList from 'features/admin/users/AccessRequestList';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
+import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IAccessRequestDataObject, IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import React from 'react';
 import { codes } from 'test-helpers/code-helpers';
 
-jest.mock('../../../hooks/useBioHubApi');
-const mockUseBiohubApi = {
+jest.mock('../../../hooks/useApi');
+const mockUseApi = {
   admin: {
     updateAccessRequest: jest.fn()
   }
 };
 
-const mockBiohubApi = ((useBiohubApi as unknown) as jest.Mock<typeof mockUseBiohubApi>).mockReturnValue(
-  mockUseBiohubApi
-);
+const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = (
   accessRequests: IGetAccessRequestsListResponse[],
@@ -62,7 +60,6 @@ describe('AccessRequestList', () => {
             role: 2,
             identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
             company: 'test company',
-            regional_offices: [1, 2],
             comments: 'test comment',
             request_reason: 'my reason'
           },
@@ -99,7 +96,6 @@ describe('AccessRequestList', () => {
             role: 2,
             identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
             company: 'test company',
-            regional_offices: [1, 2],
             comments: 'test comment',
             request_reason: 'my reason'
           },
@@ -136,7 +132,6 @@ describe('AccessRequestList', () => {
             role: 2,
             identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
             company: 'test company',
-            regional_offices: [1, 2],
             comments: 'test comment',
             request_reason: 'my reason'
           },
@@ -200,7 +195,6 @@ describe('AccessRequestList', () => {
             role: 2,
             identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
             company: 'test company',
-            regional_offices: [1, 2],
             comments: 'test comment',
             request_reason: 'my reason'
           },
@@ -254,7 +248,6 @@ describe('AccessRequestList', () => {
             role: 1,
             identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
             company: 'test company',
-            regional_offices: [1, 2],
             comments: 'test comment',
             request_reason: 'my reason'
           },

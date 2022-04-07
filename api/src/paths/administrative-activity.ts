@@ -1,18 +1,18 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { ACCESS_REQUEST_ADMIN_EMAIL } from '../constants/notifications';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { getAPIUserDBConnection, getDBConnection, IDBConnection } from '../database/db';
-import { HTTP400, HTTP500 } from '../errors/custom-error';
+import { HTTP400, HTTP500 } from '../errors/http-error';
 import {
   administrativeActivityResponseObject,
   hasPendingAdministrativeActivitiesResponseObject
 } from '../openapi/schemas/administrative-activity';
-import { queries } from '../queries/queries';
+import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
+import { GCNotifyService } from '../services/gcnotify-service';
 import { getUserIdentifier } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
-import { GCNotifyService } from '../services/gcnotify-service';
-import { ACCESS_REQUEST_ADMIN_EMAIL } from '../constants/notifications';
 
 const defaultLog = getLogger('paths/administrative-activity-request');
 
@@ -140,7 +140,7 @@ export function createAdministrativeActivity(): RequestHandler {
         throw new HTTP500('Failed to identify system user ID');
       }
 
-      const postAdministrativeActivitySQLStatement = queries.administrativeActivity.postAdministrativeActivitySQL(
+      const postAdministrativeActivitySQLStatement = AdministrativeActivityQueries.postAdministrativeActivitySQL(
         systemUserId,
         req?.body
       );
@@ -149,10 +149,7 @@ export function createAdministrativeActivity(): RequestHandler {
         throw new HTTP500('Failed to build SQL insert statement');
       }
 
-      const createAdministrativeActivityResponse = await connection.query(
-        postAdministrativeActivitySQLStatement.text,
-        postAdministrativeActivitySQLStatement.values
-      );
+      const createAdministrativeActivityResponse = await connection.sql(postAdministrativeActivitySQLStatement);
 
       await connection.commit();
 
@@ -208,15 +205,11 @@ export function getPendingAccessRequestsCount(): RequestHandler {
         throw new HTTP400('Missing required userIdentifier');
       }
 
-      const sqlStatement = queries.administrativeActivity.countPendingAdministrativeActivitiesSQL(userIdentifier);
-
-      if (!sqlStatement) {
-        throw new HTTP400('Failed to build SQL get statement');
-      }
+      const sqlStatement = AdministrativeActivityQueries.countPendingAdministrativeActivitiesSQL(userIdentifier);
 
       await connection.open();
 
-      const response = await connection.query(sqlStatement.text, sqlStatement.values);
+      const response = await connection.sql(sqlStatement);
 
       await connection.commit();
 
@@ -354,16 +347,12 @@ export const updateAdministrativeActivity = async (
   administrativeActivityStatusTypeId: number,
   connection: IDBConnection
 ) => {
-  const sqlStatement = queries.administrativeActivity.putAdministrativeActivitySQL(
+  const sqlStatement = AdministrativeActivityQueries.putAdministrativeActivitySQL(
     administrativeActivityId,
     administrativeActivityStatusTypeId
   );
 
-  if (!sqlStatement) {
-    throw new HTTP400('Failed to build SQL put statement');
-  }
-
-  const response = await connection.query(sqlStatement.text, sqlStatement.values);
+  const response = await connection.sql(sqlStatement);
 
   const result = (response && response.rowCount) || null;
 

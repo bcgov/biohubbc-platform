@@ -1,13 +1,15 @@
 import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
 import IconButton from '@material-ui/core/IconButton';
 import LinearProgress from '@material-ui/core/LinearProgress';
 import ListItem from '@material-ui/core/ListItem';
 import { Theme } from '@material-ui/core/styles/createMuiTheme';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import Typography from '@material-ui/core/Typography';
-import { mdiCheck, mdiTrashCanOutline, mdiFileOutline } from '@mdi/js';
+import { mdiCheck, mdiFileOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import axios, { CancelTokenSource } from 'axios';
+import ComponentDialog from 'components/dialog/ComponentDialog';
 import { APIError } from 'hooks/api/useAxios';
 import useIsMounted from 'hooks/useIsMounted';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -87,6 +89,10 @@ const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
   const { uploadHandler, fileHandler, onSuccess } = props;
 
   const [file] = useState<File>(props.file);
+
+  const [errors, setErrors] = useState<(string | object)[]>();
+  const [openDialog, setOpenDialog] = useState(false);
+
   const [error, setError] = useState<string | undefined>(props.error);
 
   const [status, setStatus] = useState<UploadFileStatus>(props.status || UploadFileStatus.PENDING);
@@ -145,6 +151,7 @@ const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
 
     uploadHandler(file, cancelToken, handleFileUploadProgress)
       .then(handleFileUploadSuccess, (error: APIError) => {
+        setErrors(error?.errors);
         setError(error?.message);
       })
       .catch();
@@ -197,6 +204,18 @@ const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
     props.fileHandler?.(null);
   }, [initiateCancel, isSafeToCancel, props]);
 
+  const ErrorDetailsList = (errorProps: { errors: (string | object)[] }) => {
+    const items = errorProps.errors.map((errorItem, index) => {
+      if (typeof errorItem === 'string') {
+        return <li key={index}>{errorItem}</li>;
+      }
+
+      return <li key={index}>{JSON.stringify(errorItem)}</li>;
+    });
+
+    return <ul>{items}</ul>;
+  };
+
   return (
     <ListItem key={file.name} disableGutters>
       <Box className={classes.uploadListItemBox}>
@@ -212,6 +231,20 @@ const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
                   {error || status}
                 </Typography>
               </Box>
+
+              {errors && (
+                <Box display="flex" alignItems="center">
+                  <Button color="primary" onClick={() => setOpenDialog(!openDialog)}>
+                    Show Detailed Error Message
+                  </Button>
+                  <ComponentDialog
+                    open={openDialog}
+                    dialogTitle="Treatment File Errors"
+                    onClose={() => setOpenDialog(false)}>
+                    <ErrorDetailsList errors={errors} />
+                  </ComponentDialog>
+                </Box>
+              )}
               <Box display="flex" alignItems="center">
                 <MemoizedActionButton status={status} onCancel={() => setInitiateCancel(true)} />
               </Box>

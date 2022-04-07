@@ -83,7 +83,7 @@ const phases = {
       `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev',
     tz: config.timezone.api,
-    certificateURL: config.certificateURL.dev,
+    sso: config.sso.dev,
     replicas: 1,
     maxReplicas: 2,
     logLevel: isStaticDeployment && 'info' || 'debug'
@@ -101,7 +101,7 @@ const phases = {
     host: staticUrlsAPI.test,
     env: 'test',
     tz: config.timezone.api,
-    certificateURL: config.certificateURL.test,
+    sso: config.sso.test,
     replicas: 3,
     maxReplicas: 5,
     logLevel: 'info'
@@ -119,7 +119,7 @@ const phases = {
     host: staticUrlsAPI.prod,
     env: 'prod',
     tz: config.timezone.api,
-    certificateURL: config.certificateURL.prod,
+    sso: config.sso.prod,
     replicas: 3,
     maxReplicas: 6,
     logLevel: 'info'

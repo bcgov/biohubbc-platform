@@ -18,7 +18,7 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { ReviewAccessRequestI18N } from 'constants/i18n';
 import { AdministrativeActivityStatusType } from 'constants/misc';
 import { DialogContext } from 'contexts/dialogContext';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import React, { useContext, useState } from 'react';
@@ -67,7 +67,7 @@ const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
 
   const classes = useStyles();
 
-  const biohubApi = useBiohubApi();
+  const biohubApi = useApi();
 
   const approvedCodeId = codes?.administrative_activity_status_type.find(
     (item) => item.name === AdministrativeActivityStatusType.ACTIONED
@@ -177,7 +177,6 @@ const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
                   return { value: item.id, label: item.name };
                 }) || []
               }
-              regional_offices={codes?.regional_offices}
             />
           )
         }}

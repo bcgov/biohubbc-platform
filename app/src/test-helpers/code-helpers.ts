@@ -7,7 +7,6 @@ export const codes: IGetAllCodeSetsResponse = {
   funding_source: [{ id: 1, name: 'Funding source code' }],
   investment_action_category: [{ id: 1, fs_id: 1, name: 'Investment action category' }],
   activity: [{ id: 1, name: 'Activity code' }],
-  project_type: [{ id: 1, name: 'Project type' }],
   region: [{ id: 1, name: 'Region code' }],
   species: [{ id: 1, name: 'Species code' }],
   proprietor_type: [
@@ -30,11 +29,6 @@ export const codes: IGetAllCodeSetsResponse = {
     { id: 1, name: 'Role 1' },
     { id: 2, name: 'Role 2' }
   ],
-  project_roles: [
-    { id: 1, name: 'Project Role 1' },
-    { id: 2, name: 'Project Role 2' }
-  ],
-  regional_offices: [{ id: 1, name: 'Office 1' }],
   administrative_activity_status_type: [
     { id: 1, name: 'Pending' },
     { id: 2, name: 'Actioned' },

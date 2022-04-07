@@ -1,6 +1,6 @@
-import { ApiBuildSQLError, ApiExecuteSQLError } from '../errors/custom-error';
-import { UserObject } from '../models/user';
-import { queries } from '../queries/queries';
+import { ApiExecuteSQLError } from '../errors/api-error';
+import { Models } from '../models';
+import { Queries } from '../queries';
 import { DBService } from './service';
 
 export type ListSystemUsers = {
@@ -16,38 +16,30 @@ export class UserService extends DBService {
    * Fetch a single system user by their ID.
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<UserObject | null>)}
+   * @return {*}  {(Promise<Models.user.UserObject | null>)}
    * @memberof UserService
    */
-  async getUserById(systemUserId: number): Promise<UserObject | null> {
-    const sqlStatement = queries.users.getUserByIdSQL(systemUserId);
+  async getUserById(systemUserId: number): Promise<Models.user.UserObject | null> {
+    const sqlStatement = Queries.users.getUserByIdSQL(systemUserId);
 
-    if (!sqlStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL select statement');
-    }
+    const response = await this.connection.sql(sqlStatement);
 
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
-
-    return (response?.rows?.[0] && new UserObject(response.rows[0])) || null;
+    return (response?.rows?.[0] && new Models.user.UserObject(response.rows[0])) || null;
   }
 
   /**
    * Get an existing system user.
    *
    * @param {string} userIdentifier
-   * @return {*}  {(Promise<UserObject | null>)}
+   * @return {*}  {(Promise<Models.user.UserObject | null>)}
    * @memberof UserService
    */
-  async getUserByIdentifier(userIdentifier: string): Promise<UserObject | null> {
-    const sqlStatement = queries.users.getUserByUserIdentifierSQL(userIdentifier);
+  async getUserByIdentifier(userIdentifier: string): Promise<Models.user.UserObject | null> {
+    const sqlStatement = Queries.users.getUserByUserIdentifierSQL(userIdentifier);
 
-    if (!sqlStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL select statement');
-    }
+    const response = await this.connection.sql(sqlStatement);
 
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
-
-    return (response?.rows?.[0] && new UserObject(response.rows[0])) || null;
+    return (response?.rows?.[0] && new Models.user.UserObject(response.rows[0])) || null;
   }
 
   /**
@@ -57,19 +49,15 @@ export class UserService extends DBService {
    *
    * @param {string} userIdentifier
    * @param {string} identitySource
-   * @return {*}  {Promise<UserObject>}
+   * @return {*}  {Promise<Models.user.UserObject>}
    * @memberof UserService
    */
-  async addSystemUser(userIdentifier: string, identitySource: string): Promise<UserObject> {
-    const addSystemUserSQLStatement = queries.users.addSystemUserSQL(userIdentifier, identitySource);
+  async addSystemUser(userIdentifier: string, identitySource: string): Promise<Models.user.UserObject> {
+    const addSystemUserSQLStatement = Queries.users.addSystemUserSQL(userIdentifier, identitySource);
 
-    if (!addSystemUserSQLStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL insert statement');
-    }
+    const response = await this.connection.sql(addSystemUserSQLStatement);
 
-    const response = await this.connection.query(addSystemUserSQLStatement.text, addSystemUserSQLStatement.values);
-
-    const userObject = (response?.rows?.[0] && new UserObject(response.rows[0])) || null;
+    const userObject = (response?.rows?.[0] && new Models.user.UserObject(response.rows[0])) || null;
 
     if (!userObject) {
       throw new ApiExecuteSQLError('Failed to insert system user');
@@ -81,22 +69,15 @@ export class UserService extends DBService {
   /**
    * Get a list of all system users.
    *
-   * @return {*}  {Promise<UserObject[]>}
+   * @return {*}  {Promise<Models.user.UserObject[]>}
    * @memberof UserService
    */
-  async listSystemUsers(): Promise<UserObject[]> {
-    const getUserListSQLStatement = queries.users.getUserListSQL();
+  async listSystemUsers(): Promise<Models.user.UserObject[]> {
+    const getUserListSQLStatement = Queries.users.getUserListSQL();
 
-    if (!getUserListSQLStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL select statement');
-    }
+    const getUserListResponse = await this.connection.sql(getUserListSQLStatement);
 
-    const getUserListResponse = await this.connection.query(
-      getUserListSQLStatement.text,
-      getUserListSQLStatement.values
-    );
-
-    return getUserListResponse.rows.map((row) => new UserObject(row));
+    return getUserListResponse.rows.map((row) => new Models.user.UserObject(row));
   }
 
   /**
@@ -106,11 +87,11 @@ export class UserService extends DBService {
    * @param {string} userIdentifier
    * @param {string} identitySource
    * @param {IDBConnection} connection
-   * @return {*}  {Promise<UserObject>}
+   * @return {*}  {Promise<Models.user.UserObject>}
    * @memberof UserService
    */
-  async ensureSystemUser(userIdentifier: string, identitySource: string): Promise<UserObject> {
-    // Check if the user exists in SIMS
+  async ensureSystemUser(userIdentifier: string, identitySource: string): Promise<Models.user.UserObject> {
+    // Check if the user exists
     let userObject = await this.getUserByIdentifier(userIdentifier);
 
     if (!userObject) {
@@ -147,17 +128,13 @@ export class UserService extends DBService {
    * Activates an existing system user that had been deactivated (soft deleted).
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<UserObject>)}
+   * @return {*}  {(Promise<Models.user.UserObject>)}
    * @memberof UserService
    */
   async activateSystemUser(systemUserId: number) {
-    const sqlStatement = queries.users.activateSystemUserSQL(systemUserId);
+    const sqlStatement = Queries.users.activateSystemUserSQL(systemUserId);
 
-    if (!sqlStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL update statement');
-    }
-
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
+    const response = await this.connection.sql(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to activate system user');
@@ -168,17 +145,13 @@ export class UserService extends DBService {
    * Deactivates an existing system user (soft delete).
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<UserObject>)}
+   * @return {*}  {(Promise<Models.user.UserObject>)}
    * @memberof UserService
    */
   async deactivateSystemUser(systemUserId: number) {
-    const sqlStatement = queries.users.deactivateSystemUserSQL(systemUserId);
+    const sqlStatement = Queries.users.deactivateSystemUserSQL(systemUserId);
 
-    if (!sqlStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL update statement');
-    }
-
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
+    const response = await this.connection.sql(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to deactivate system user');
@@ -192,13 +165,9 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async deleteUserSystemRoles(systemUserId: number) {
-    const sqlStatement = queries.users.deleteAllSystemRolesSQL(systemUserId);
+    const sqlStatement = Queries.users.deleteAllSystemRolesSQL(systemUserId);
 
-    if (!sqlStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL delete statement');
-    }
-
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
+    const response = await this.connection.sql(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to delete user system roles');
@@ -213,13 +182,9 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async addUserSystemRoles(systemUserId: number, roleIds: number[]) {
-    const sqlStatement = queries.users.postSystemRolesSQL(systemUserId, roleIds);
+    const sqlStatement = Queries.users.postSystemRolesSQL(systemUserId, roleIds);
 
-    if (!sqlStatement) {
-      throw new ApiBuildSQLError('Failed to build SQL insert statement');
-    }
-
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
+    const response = await this.connection.sql(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to insert user system roles');

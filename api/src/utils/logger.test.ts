@@ -1,12 +1,13 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { ApiError, ApiErrorType, HTTP500 } from '../errors/custom-error';
+import { ApiError, ApiErrorType } from '../errors/api-error';
+import { HTTP500 } from '../errors/http-error';
 import {
+  getPrintfFunction,
+  ILoggerMessage,
   isObject,
   isObjectWithkeys,
   prettyPrint,
-  getPrintfFunction,
-  ILoggerMessage,
   prettyPrintUnknown
 } from './logger';
 

@@ -28,8 +28,6 @@ const staticUrlsN8N = config.staticUrlsN8N || {};
 const maxUploadNumFiles = 10;
 const maxUploadFileSize = 52428800; // (bytes)
 
-const sso = config.sso;
-
 const processOptions = (options) => {
   const result = { ...options };
 
@@ -87,7 +85,7 @@ const phases = {
     maxUploadNumFiles,
     maxUploadFileSize,
     env: 'dev',
-    sso: sso.dev,
+    sso: config.sso.dev,
     replicas: 1,
     maxReplicas: 2
   },
@@ -107,7 +105,7 @@ const phases = {
     maxUploadNumFiles,
     maxUploadFileSize,
     env: 'test',
-    sso: sso.test,
+    sso: config.sso.test,
     replicas: 3,
     maxReplicas: 5
   },
@@ -127,7 +125,7 @@ const phases = {
     maxUploadNumFiles,
     maxUploadFileSize,
     env: 'prod',
-    sso: sso.prod,
+    sso: config.sso.prod,
     replicas: 3,
     maxReplicas: 6
   }

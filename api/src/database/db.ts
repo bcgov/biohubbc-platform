@@ -1,6 +1,8 @@
+import knex, { Knex } from 'knex';
 import * as pg from 'pg';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/custom-error';
-import { queries } from '../queries/queries';
+import { SQLStatement } from 'sql-template-strings';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import * as UserQueries from '../queries/database/user-context-queries';
 import { getUserIdentifier, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
 
@@ -15,6 +17,8 @@ const DB_DATABASE = process.env.DB_DATABASE;
 const DB_POOL_SIZE: number = Number(process.env.DB_POOL_SIZE) || 20;
 const DB_CONNECTION_TIMEOUT: number = Number(process.env.DB_CONNECTION_TIMEOUT) || 0;
 const DB_IDLE_TIMEOUT: number = Number(process.env.DB_IDLE_TIMEOUT) || 10000;
+
+const DB_CLIENT = 'pg';
 
 export const defaultPoolConfig: pg.PoolConfig = {
   user: DB_USERNAME,
@@ -116,13 +120,32 @@ export interface IDBConnection {
    */
   query: <T extends pg.QueryResultRow = any>(text: string, values?: any[]) => Promise<pg.QueryResult<T>>;
   /**
+   * Performs a query against this connection, returning the results.
+   *
+   * @param {SQLStatement} sqlStatement SQL statement object
+   * @return {*}  {(Promise<QueryResult<any>>)}
+   * @throws If the connection is not open.
+   * @memberof IDBConnection
+   */
+  sql: <T extends pg.QueryResultRow = any>(sqlStatement: SQLStatement) => Promise<pg.QueryResult<T>>;
+  /**
+   * Performs a query against this connection, returning the results.
+   *
+   * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
+   * @return {*}  {(Promise<QueryResult<any>>)}
+   * @throws If the connection is not open.
+   * @memberof IDBConnection
+   */
+  knex: <T extends pg.QueryResultRow = any>(queryBuilder: Knex.QueryBuilder) => Promise<pg.QueryResult<T>>;
+  /**
    * Get the ID of the system user in context.
    *
    * Note: will always return `null` if the connection is not open.
    *
+   * @throws If the connection is not open.
    * @memberof IDBConnection
    */
-  systemUserId: () => number | null;
+  systemUserId: () => number;
 }
 
 /**
@@ -133,9 +156,9 @@ export interface IDBConnection {
  * const connection = await getDBConnection(req['keycloak_token']);
  * try {
  *   await connection.open();
- *   await connection.query(sqlStatement1.text, sqlStatement1.values);
- *   await connection.query(sqlStatement2.text, sqlStatement2.values);
- *   await connection.query(sqlStatement3.text, sqlStatement3.values);
+ *   await connection.sql(sqlStatement1);
+ *   await connection.sql(sqlStatement2);
+ *   await connection.sql(sqlStatement3);
  *   await connection.commit();
  * } catch (error) {
  *   await connection.rollback();
@@ -254,8 +277,44 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
     return _client.query<T>(text, values || []);
   };
 
-  const _getSystemUserID = () => {
-    return _systemUserId;
+  /**
+   * Performs a query against this connection, returning the results.
+   *
+   * @template T
+   * @param {SQLStatement} sqlStatement SQL statement object
+   * @throws {Error} if the connection is not open
+   * @return {*}  {Promise<pg.QueryResult<T>>}
+   */
+  const _sql = async <T extends pg.QueryResultRow = any>(sqlStatement: SQLStatement): Promise<pg.QueryResult<T>> => {
+    return _query(sqlStatement.text, sqlStatement.values);
+  };
+
+  /**
+   * Performs a query against this connection, returning the results.
+   *
+   * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
+   * @throws {Error} if the connection is not open
+   * @return {*}  {Promise<pg.QueryResult<T>>}
+   */
+  const _knex = async (queryBuilder: Knex.QueryBuilder) => {
+    const { sql, bindings } = queryBuilder.toSQL().toNative();
+
+    return _query(sql, bindings as any[]);
+  };
+
+  /**
+   * Get the ID of the system user in context.
+   *
+   * Note: will always return `null` if the connection is not open.
+   *
+   * @return {*}  {number}
+   */
+  const _getSystemUserID = (): number => {
+    if (!_client || !_isOpen) {
+      throw Error('DBConnection is not open');
+    }
+
+    return _systemUserId as number;
   };
 
   /**
@@ -272,10 +331,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
     }
 
     // Set the user context for all queries made using this connection
-    const setSystemUserContextSQLStatement = queries.database.setSystemUserContextSQL(
-      userIdentifier,
-      userIdentitySource
-    );
+    const setSystemUserContextSQLStatement = UserQueries.setSystemUserContextSQL(userIdentifier, userIdentitySource);
 
     if (!setSystemUserContextSQLStatement) {
       throw new ApiExecuteSQLError('Failed to build SQL user context statement');
@@ -296,6 +352,8 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
   return {
     open: _open,
     query: _query,
+    sql: _sql,
+    knex: _knex,
     release: _release,
     commit: _commit,
     rollback: _rollback,
@@ -313,4 +371,18 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  */
 export const getAPIUserDBConnection = (): IDBConnection => {
   return getDBConnection({ preferred_username: 'biohub_api@database' });
+};
+
+/**
+ * Get a Knex instance.
+ *
+ * @template TRecord
+ * @template TResult
+ * @return {*}  {Knex.QueryBuilder<TRecord, TResult>}
+ */
+export const getKnexQueryBuilder = <
+  TRecord extends Record<string, any> = any,
+  TResult = Record<string, any>[]
+>(): Knex.QueryBuilder<TRecord, TResult> => {
+  return knex({ client: DB_CLIENT }).queryBuilder();
 };

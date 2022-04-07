@@ -4,8 +4,9 @@ import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ACCESS_REQUEST_APPROVAL_ADMIN_EMAIL } from '../constants/notifications';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { getDBConnection, IDBConnection } from '../database/db';
-import { ApiBuildSQLError, ApiGeneralError, HTTP400 } from '../errors/custom-error';
-import { queries } from '../queries/queries';
+import { ApiGeneralError } from '../errors/api-error';
+import { HTTP400 } from '../errors/http-error';
+import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
 import { GCNotifyService } from '../services/gcnotify-service';
 import { KeycloakService } from '../services/keycloak-service';
@@ -187,18 +188,11 @@ export async function checkIfAccessRequestIsApproval(
   adminActivityTypeId: number,
   connection: IDBConnection
 ): Promise<boolean> {
-  const adminActivityStatusTypeSQLStatment = queries.administrativeActivity.getAdministrativeActivityById(
+  const adminActivityStatusTypeSQLStatment = AdministrativeActivityQueries.getAdministrativeActivityById(
     adminActivityTypeId
   );
 
-  if (!adminActivityStatusTypeSQLStatment) {
-    throw new ApiBuildSQLError('Failed to build SQL select statement');
-  }
-
-  const response = await connection.query(
-    adminActivityStatusTypeSQLStatment.text,
-    adminActivityStatusTypeSQLStatment.values
-  );
+  const response = await connection.sql(adminActivityStatusTypeSQLStatment);
 
   if (response.rows?.[0]?.name === 'Actioned') {
     return true;

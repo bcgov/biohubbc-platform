@@ -1,27 +1,44 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
-import React, { ReactElement, useContext } from 'react';
+import React, { isValidElement, ReactElement, useContext } from 'react';
 import { isAuthenticated } from 'utils/authUtils';
 
-interface IGuardProps {
+interface IGuardProps<T = never> {
   /**
    * An optional backup ReactElement to render if the guard fails.
    *
-   * @type {ReactElement}
    * @memberof IGuardProps
    */
-  fallback?: ReactElement;
+  fallback?: ((...args: T[]) => ReactElement) | ReactElement;
 }
 
-export interface ISystemRoleGuardProps {
-  /**
-   * An array of valid system roles. The user must have 1 or more matching system roles to pass the guard.
-   *
-   * @type {SYSTEM_ROLE[]}
-   * @memberof ISystemRoleGuardProps
-   */
-  validSystemRoles: SYSTEM_ROLE[];
-}
+/**
+ * Renders `props.children` only if the user is NOT authenticated and has none of the specified valid system roles
+ *
+ * @param {*} props
+ * @return {*}
+ */
+export const NoRoleGuard: React.FC<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps> = (props) => {
+  const { keycloakWrapper } = useContext(AuthStateContext);
+
+  const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);
+
+  if (!hasSystemRole) {
+    // User has no matching system role
+    return <>{props.children}</>;
+  }
+
+  // User has matching system role
+  if (props.fallback) {
+    if (isValidElement(props.fallback)) {
+      return <>{props.fallback}</>;
+    }
+
+    return props.fallback();
+  }
+
+  return <></>;
+};
 
 /**
  * Renders `props.children` only if the user is authenticated and has at least 1 of the specified valid system roles.
@@ -29,24 +46,30 @@ export interface ISystemRoleGuardProps {
  * @param {*} props
  * @return {*}
  */
-export const SystemRoleGuard: React.FC<ISystemRoleGuardProps & IGuardProps> = (props) => {
+export const SystemRoleGuard: React.FC<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps> = (props) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);
 
-  if (!hasSystemRole) {
-    if (props.fallback) {
-      return <>{props.fallback}</>;
-    } else {
-      return <></>;
-    }
+  if (hasSystemRole) {
+    // User has a matching system role
+    return <>{props.children}</>;
   }
 
-  return <>{props.children}</>;
+  // User has no matching system role
+  if (props.fallback) {
+    if (isValidElement(props.fallback)) {
+      return <>{props.fallback}</>;
+    }
+
+    return props.fallback();
+  }
+
+  return <></>;
 };
 
 /**
- * Renders `props.children` only if the user is authenticated.
+ * Renders `props.children` only if the user is authenticated (logged in).
  *
  * @param {*} props
  * @return {*}
@@ -54,20 +77,25 @@ export const SystemRoleGuard: React.FC<ISystemRoleGuardProps & IGuardProps> = (p
 export const AuthGuard: React.FC<IGuardProps> = (props) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
-  if (!isAuthenticated(keycloakWrapper)) {
-    // Use is not logged in
-    if (props.fallback) {
-      return <>{props.fallback}</>;
-    } else {
-      return <></>;
-    }
+  if (isAuthenticated(keycloakWrapper)) {
+    // User is logged in
+    return <>{props.children}</>;
   }
 
-  return <>{props.children}</>;
+  // User is not logged in
+  if (props.fallback) {
+    if (isValidElement(props.fallback)) {
+      return <>{props.fallback}</>;
+    }
+
+    return props.fallback();
+  }
+
+  return <></>;
 };
 
 /**
- * Renders `props.children` only if the user is not authenticated.
+ * Renders `props.children` only if the user is not authenticated (logged in).
  *
  * @param {*} props
  * @return {*}
@@ -75,14 +103,19 @@ export const AuthGuard: React.FC<IGuardProps> = (props) => {
 export const UnAuthGuard: React.FC<IGuardProps> = (props) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
-  if (isAuthenticated(keycloakWrapper)) {
-    // Use is not logged in
-    if (props.fallback) {
-      return <>{props.fallback}</>;
-    } else {
-      return <></>;
-    }
+  if (!isAuthenticated(keycloakWrapper)) {
+    // User is not logged in
+    return <>{props.children}</>;
   }
 
-  return <>{props.children}</>;
+  // User is logged in
+  if (props.fallback) {
+    if (isValidElement(props.fallback)) {
+      return <>{props.fallback}</>;
+    }
+
+    return props.fallback();
+  }
+
+  return <></>;
 };

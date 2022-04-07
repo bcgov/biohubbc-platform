@@ -1,6 +1,6 @@
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { useEffect, useState } from 'react';
-import { useBiohubApi } from './useBioHubApi';
+import { useApi } from './useApi';
 
 export interface IUseCodes {
   codes: IGetAllCodeSetsResponse | undefined;
@@ -15,7 +15,7 @@ export interface IUseCodes {
  * @return {*}  {IUseCodes}
  */
 export default function useCodes(): IUseCodes {
-  const api = useBiohubApi();
+  const api = useApi();
 
   const [codes, setCodes] = useState<IGetAllCodeSetsResponse>();
   const [isLoading, setIsLoading] = useState<boolean>(false);

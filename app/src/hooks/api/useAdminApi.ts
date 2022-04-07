@@ -8,7 +8,7 @@ import {
 import qs from 'qs';
 
 /**
- * Returns a set of supported api methods for working with projects.
+ * Returns a set of supported api methods for working with admin functions.
  *
  * @param {AxiosInstance} axios
  * @return {*} object whose properties are supported api methods.

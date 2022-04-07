@@ -44,7 +44,7 @@ describe('FileUploadItem', () => {
     fireEvent.click(cancelButton);
 
     // Manually trigger the upload reject to simulate a cancelled request
-    // @ts-ignore
+    // @ts-ignore: ignore used before assigned warning
     rejectRef({ message: '' });
 
     await waitFor(() => {

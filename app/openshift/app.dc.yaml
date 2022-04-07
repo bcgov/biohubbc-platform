@@ -41,15 +41,15 @@ parameters:
   - name: APP_PORT_DEFAULT_NAME
     description: Default port resource name
     value: '7100-tcp'
-  - name: SSO_URL
+  - name: REACT_APP_KEYCLOAK_HOST
     description: Key clock login url
     value: 'https://oidc.gov.bc.ca/auth'
-  - name: SSO_CLIENT_ID
-    description: Client Id for application
-    value: 'lucy'
-  - name: SSO_REALM
+  - name: REACT_APP_KEYCLOAK_REALM
     description: Realm identifier or name
-    value: 35r1iman
+    value: '35r1iman'
+  - name: REACT_APP_KEYCLOAK_CLIENT_ID
+    description: Client Id for application
+    value: 'biohubbc'
   - name: CPU_REQUEST
     value: '10m'
   - name: CPU_LIMIT
@@ -134,12 +134,12 @@ objects:
                   value: ${REACT_APP_NODE_ENV}
                 - name: VERSION
                   value: ${VERSION}
-                - name: SSO_URL
-                  value: ${SSO_URL}
-                - name: SSO_CLIENT_ID
-                  value: ${SSO_CLIENT_ID}
-                - name: SSO_REALM
-                  value: ${SSO_REALM}
+                - name: REACT_APP_KEYCLOAK_HOST
+                  value: ${REACT_APP_KEYCLOAK_HOST}
+                - name: REACT_APP_KEYCLOAK_CLIENT_ID
+                  value: ${REACT_APP_KEYCLOAK_CLIENT_ID}
+                - name: REACT_APP_KEYCLOAK_REALM
+                  value: ${REACT_APP_KEYCLOAK_REALM}
               image: ' '
               imagePullPolicy: Always
               name: app

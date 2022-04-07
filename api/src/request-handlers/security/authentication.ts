@@ -1,13 +1,12 @@
 import { Request } from 'express';
 import { decode, GetPublicKeyOrSecret, Secret, verify, VerifyErrors } from 'jsonwebtoken';
 import { JwksClient } from 'jwks-rsa';
-import { HTTP401 } from '../../errors/custom-error';
+import { HTTP401 } from '../../errors/http-error';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('request-handlers/security/authentication');
 
-const KEYCLOAK_URL =
-  process.env.KEYCLOAK_URL || 'https://dev.oidc.gov.bc.ca/auth/realms/35r1iman/protocol/openid-connect/certs';
+const KEYCLOAK_URL = `${process.env.KEYCLOAK_HOST}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/certs`;
 
 /**
  * Authenticate the request by validating the authorization bearer token (JWT).

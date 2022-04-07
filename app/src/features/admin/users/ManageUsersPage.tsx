@@ -4,9 +4,9 @@ import Container from '@material-ui/core/Container';
 import Typography from '@material-ui/core/Typography';
 import { AdministrativeActivityStatusType } from 'constants/misc';
 import AccessRequestList from 'features/admin/users/AccessRequestList';
-import { useBiohubApi } from 'hooks/useBioHubApi';
+import { useApi } from 'hooks/useApi';
+import useCodes from 'hooks/useCodes';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useEffect, useState } from 'react';
 import ActiveUsersList from './ActiveUsersList';
@@ -17,7 +17,7 @@ import ActiveUsersList from './ActiveUsersList';
  * @return {*}
  */
 const ManageUsersPage: React.FC = () => {
-  const biohubApi = useBiohubApi();
+  const biohubApi = useApi();
 
   const [accessRequests, setAccessRequests] = useState<IGetAccessRequestsListResponse[]>([]);
   const [isLoadingAccessRequests, setIsLoadingAccessRequests] = useState(false);
@@ -27,8 +27,7 @@ const ManageUsersPage: React.FC = () => {
   const [isLoadingActiveUsers, setIsLoadingActiveUsers] = useState(false);
   const [hasLoadedActiveUsers, setHasLoadedActiveUsers] = useState(false);
 
-  const [codes, setCodes] = useState<IGetAllCodeSetsResponse>();
-  const [isLoadingCodes, setIsLoadingCodes] = useState(false);
+  const { codes } = useCodes();
 
   const refreshAccessRequests = async () => {
     const accessResponse = await biohubApi.admin.getAccessRequests([
@@ -87,30 +86,6 @@ const ManageUsersPage: React.FC = () => {
 
     getActiveUsers();
   }, [biohubApi, isLoadingActiveUsers, hasLoadedActiveUsers]);
-
-  useEffect(() => {
-    const getCodes = async () => {
-      const codesResponse = await biohubApi.codes.getAllCodeSets();
-
-      if (!codesResponse) {
-        // TODO error handling/messaging
-        return;
-      }
-
-      setCodes(() => {
-        setIsLoadingCodes(false);
-        return codesResponse;
-      });
-    };
-
-    if (isLoadingCodes || codes) {
-      return;
-    }
-
-    setIsLoadingCodes(true);
-
-    getCodes();
-  }, [biohubApi.codes, isLoadingCodes, codes]);
 
   if (!hasLoadedAccessRequests || !hasLoadedActiveUsers || !codes) {
     return <CircularProgress className="pageProgress" size={40} />;

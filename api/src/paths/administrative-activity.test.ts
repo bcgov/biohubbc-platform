@@ -2,13 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as administrative_activity from './administrative-activity';
-import administrative_queries from '../queries/administrative-activity';
 import * as db from '../database/db';
-import { getMockDBConnection } from '../__mocks__/db';
-import SQL from 'sql-template-strings';
+import { HTTPError } from '../errors/http-error';
 import * as keycloak_utils from '../utils/keycloak-utils';
-import { HTTPError } from '../errors/custom-error';
+import { getMockDBConnection } from '../__mocks__/db';
+import * as administrative_activity from './administrative-activity';
 
 chai.use(sinonChai);
 
@@ -39,7 +37,7 @@ describe('updateAccessRequest', () => {
     sinon.stub(db, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
-        return null;
+        return (null as unknown) as number;
       }
     });
 
@@ -51,26 +49,6 @@ describe('updateAccessRequest', () => {
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(500);
       expect((actualError as HTTPError).message).to.equal('Failed to identify system user ID');
-    }
-  });
-
-  it('should throw a 400 error when failed to build postAdministrativeActivitySQL statement', async () => {
-    sinon.stub(db, 'getDBConnection').returns({
-      ...dbConnectionObj,
-      systemUserId: () => {
-        return 20;
-      }
-    });
-    sinon.stub(administrative_queries, 'postAdministrativeActivitySQL').returns(null);
-
-    try {
-      const result = administrative_activity.createAdministrativeActivity();
-
-      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).status).to.equal(500);
-      expect((actualError as HTTPError).message).to.equal('Failed to build SQL insert statement');
     }
   });
 
@@ -86,9 +64,8 @@ describe('updateAccessRequest', () => {
       systemUserId: () => {
         return 20;
       },
-      query: mockQuery
+      sql: mockQuery
     });
-    sinon.stub(administrative_queries, 'postAdministrativeActivitySQL').returns(SQL`some`);
 
     try {
       const result = administrative_activity.createAdministrativeActivity();
@@ -118,9 +95,8 @@ describe('updateAccessRequest', () => {
       systemUserId: () => {
         return 20;
       },
-      query: mockQuery
+      sql: mockQuery
     });
-    sinon.stub(administrative_queries, 'postAdministrativeActivitySQL').returns(SQL`some`);
 
     try {
       const result = administrative_activity.createAdministrativeActivity();
@@ -150,9 +126,8 @@ describe('updateAccessRequest', () => {
       systemUserId: () => {
         return 20;
       },
-      query: mockQuery
+      sql: mockQuery
     });
-    sinon.stub(administrative_queries, 'postAdministrativeActivitySQL').returns(SQL`some`);
 
     const result = administrative_activity.createAdministrativeActivity();
 
@@ -202,27 +177,6 @@ describe('getPendingAccessRequestsCount', () => {
     }
   });
 
-  it('should throw a 400 error when failed to build countPendingAdministrativeActivitiesSQL statement', async () => {
-    sinon.stub(keycloak_utils, 'getUserIdentifier').returns('identifier');
-    sinon.stub(db, 'getDBConnection').returns({
-      ...dbConnectionObj,
-      systemUserId: () => {
-        return 20;
-      }
-    });
-    sinon.stub(administrative_queries, 'countPendingAdministrativeActivitiesSQL').returns(null);
-
-    try {
-      const result = administrative_activity.getPendingAccessRequestsCount();
-
-      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).status).to.equal(400);
-      expect((actualError as HTTPError).message).to.equal('Failed to build SQL get statement');
-    }
-  });
-
   it('should return 0 on success (no rowCount)', async () => {
     sinon.stub(keycloak_utils, 'getUserIdentifier').returns('identifier');
 
@@ -237,9 +191,8 @@ describe('getPendingAccessRequestsCount', () => {
       systemUserId: () => {
         return 20;
       },
-      query: mockQuery
+      sql: mockQuery
     });
-    sinon.stub(administrative_queries, 'countPendingAdministrativeActivitiesSQL').returns(SQL`something`);
 
     const result = administrative_activity.getPendingAccessRequestsCount();
 
@@ -262,9 +215,8 @@ describe('getPendingAccessRequestsCount', () => {
       systemUserId: () => {
         return 20;
       },
-      query: mockQuery
+      sql: mockQuery
     });
-    sinon.stub(administrative_queries, 'countPendingAdministrativeActivitiesSQL').returns(SQL`something`);
 
     const result = administrative_activity.getPendingAccessRequestsCount();
 
@@ -323,27 +275,7 @@ describe('updateAdministrativeActivity', () => {
 
   const dbConnectionObj = getMockDBConnection();
 
-  it('should throw a 400 error when failed to build putAdministrativeActivitySQL statement', async () => {
-    sinon.stub(administrative_queries, 'putAdministrativeActivitySQL').returns(null);
-
-    try {
-      await administrative_activity.updateAdministrativeActivity(1, 2, {
-        ...dbConnectionObj,
-        systemUserId: () => {
-          return 20;
-        }
-      });
-
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).status).to.equal(400);
-      expect((actualError as HTTPError).message).to.equal('Failed to build SQL put statement');
-    }
-  });
-
   it('should throw a 500 error when failed to update administrative activity', async () => {
-    sinon.stub(administrative_queries, 'putAdministrativeActivitySQL').returns(SQL`some`);
-
     const mockQuery = sinon.stub();
 
     mockQuery.resolves({
@@ -356,7 +288,7 @@ describe('updateAdministrativeActivity', () => {
         systemUserId: () => {
           return 20;
         },
-        query: mockQuery
+        sql: mockQuery
       });
 
       expect.fail();
