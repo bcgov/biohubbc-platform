@@ -36,7 +36,6 @@ const systemUsers = [
   { identifier: 'cypress', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR }
 ];
 
-
 /**
  * Insert system_user rows for each member of the development team if they don't already exist in the system user table.
  *
