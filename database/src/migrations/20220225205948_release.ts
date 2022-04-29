@@ -5,7 +5,7 @@ import path from 'path';
 const DB_USER_API_PASS = process.env.DB_USER_API_PASS;
 const DB_USER_API = process.env.DB_USER_API;
 
-const DB_RELEASE = 'temp';
+const DB_RELEASE = 'release.0.1.0';
 
 /**
  * Apply biohub-platform release changes.
@@ -17,7 +17,7 @@ const DB_RELEASE = 'temp';
 export async function up(knex: Knex): Promise<void> {
   const create_spatial_extensions = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'create_spatial_extensions.psql'));
 
-  const biohub_ddl = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'biohub-platform.sql'));
+  const biohub_ddl = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'biohub.sql'));
   const populate_user_identity_source = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_user_identity_source.sql')
   );
@@ -41,17 +41,18 @@ export async function up(knex: Knex): Promise<void> {
   );
 
   const populate_system_constants = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_constant.sql'));
-
   const populate_system_role = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_role.sql'));
-  const populate_administrative_activity_type = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_administrative_activity_type.sql')
-  );
-  const populate_administrative_activity_status_type = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_administrative_activity_status_type.sql')
-  );
-
   const populate_system_metadata_constant = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_system_metadata_constant.sql')
+  );
+  const populate_submission_status_type = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'populate_submission_status_type.sql')
+  );
+  const populate_submission_message_class = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'populate_submission_message_class.sql')
+  );
+  const populate_submission_message_type = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'populate_submission_message_type.sql')
   );
 
   const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
@@ -100,9 +101,11 @@ export async function up(knex: Knex): Promise<void> {
     set search_path = biohub, public;
     ${populate_system_constants}
     ${populate_system_role}
-    ${populate_administrative_activity_type}
-    ${populate_administrative_activity_status_type}
     ${populate_system_metadata_constant}
+    ${populate_submission_status_type}
+    ${populate_submission_message_class}
+    ${populate_submission_message_type}
+
 
     -- create the views
     set search_path = biohub_dapi_v1;
