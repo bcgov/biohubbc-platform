@@ -6,6 +6,7 @@ import { authorizeRequestHandler } from '../../request-handlers/security/authori
 import { getLogger } from '../../utils/logger';
 import { GCNotifyService } from '../../services/gcnotify-service';
 import { IgcNotifyPostReturn } from '../../interfaces/gcnotify.interface';
+import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 
 const defaultLog = getLogger('paths/gcnotify');
 
@@ -123,21 +124,7 @@ POST.apiDoc = {
         }
       }
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/403'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 

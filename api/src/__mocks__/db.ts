@@ -41,9 +41,6 @@ export const getMockDBConnection = (config?: Partial<IDBConnection>): IDBConnect
     rollback: async () => {
       // do nothing
     },
-    query: async () => {
-      return (undefined as unknown) as QueryResult<any>;
-    },
     sql: async () => {
       return (undefined as unknown) as QueryResult<any>;
     },

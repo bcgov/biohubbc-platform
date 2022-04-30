@@ -3,14 +3,6 @@ import { Models } from '../models';
 import { Queries } from '../queries';
 import { DBService } from './service';
 
-export type ListSystemUsers = {
-  id: number;
-  user_identifier: string;
-  record_end_date: string;
-  role_ids: number[];
-  role_names: string[];
-};
-
 export class UserService extends DBService {
   /**
    * Fetch a single system user by their ID.

@@ -112,16 +112,6 @@ export interface IDBConnection {
   /**
    * Performs a query against this connection, returning the results.
    *
-   * @param {string} text SQL text
-   * @param {any[]} [values] SQL values array (optional)
-   * @return {*}  {(Promise<QueryResult<any>>)}
-   * @throws If the connection is not open.
-   * @memberof IDBConnection
-   */
-  query: <T extends pg.QueryResultRow = any>(text: string, values?: any[]) => Promise<pg.QueryResult<T>>;
-  /**
-   * Performs a query against this connection, returning the results.
-   *
    * @param {SQLStatement} sqlStatement SQL statement object
    * @return {*}  {(Promise<QueryResult<any>>)}
    * @throws If the connection is not open.
@@ -351,7 +341,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
 
   return {
     open: _open,
-    query: _query,
     sql: _sql,
     knex: _knex,
     release: _release,

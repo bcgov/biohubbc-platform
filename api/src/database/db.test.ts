@@ -252,47 +252,6 @@ describe('db', () => {
         });
       });
 
-      describe('query', () => {
-        describe('when a connection is open', () => {
-          it('sends a query with values', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
-
-            await connection.open();
-
-            await connection.query('sql query', ['value1', 'value2']);
-
-            expect(queryStub).to.have.been.calledWith('sql query', ['value1', 'value2']);
-          });
-
-          it('sends a query with empty values', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
-
-            await connection.open();
-
-            await connection.query('sql query');
-
-            expect(queryStub).to.have.been.calledWith('sql query', []);
-          });
-        });
-
-        describe('when a connection is not open', () => {
-          it('throws an error', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
-
-            let expectedError: Error;
-            try {
-              await connection.query('sql query');
-
-              expect.fail('Expected an error to be thrown');
-            } catch (error) {
-              expectedError = error as Error;
-            }
-
-            expect(expectedError.message).to.equal('DBConnection is not open');
-          });
-        });
-      });
-
       describe('sql', () => {
         describe('when a connection is open', () => {
           it('sends a sql statement', async () => {
@@ -305,6 +264,18 @@ describe('db', () => {
             await connection.sql(sqlStatement);
 
             expect(queryStub).to.have.been.calledWith('sql query $1', [123]);
+          });
+
+          it('sends a query with empty values', async () => {
+            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+
+            await connection.open();
+
+            const sqlStatement = SQL`sql query`;
+
+            await connection.sql(sqlStatement);
+
+            expect(queryStub).to.have.been.calledWith('sql query', []);
           });
         });
 
