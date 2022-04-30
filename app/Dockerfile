@@ -14,9 +14,7 @@ WORKDIR $HOME
 # A wildcard is used to ensure both package.json AND package-lock.json are copied where available (npm@5+)
 COPY ./package*.json ./
 
-# If you are building your code for production
-# RUN npm install --only=production
-RUN npm install
+RUN npm ci --only=production
 
 ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.npm-global/bin/:${HOME}/bin:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 

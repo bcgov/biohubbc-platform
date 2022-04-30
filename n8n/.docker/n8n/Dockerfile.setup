@@ -12,9 +12,6 @@ WORKDIR $HOME
 
 COPY . .
 
-# If you are building your code for production
-# RUN npm install --only=production
-# RUN npm set progress=false
 RUN npm install
 
 # run the database migrations and seeding

@@ -54,7 +54,7 @@ describe('getFormattedAmount', () => {
 
 describe('getFormattedDate', () => {
   beforeAll(() => {
-    // ignore warning about invalid date string being passed to moment
+    // ignore warning about invalid date string being passed
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -73,7 +73,7 @@ describe('getFormattedDate', () => {
 
 describe('getFormattedDateRangeString', () => {
   beforeAll(() => {
-    // ignore warning about invalid date string being passed to moment
+    // ignore warning about invalid date string being passed
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -119,15 +119,19 @@ describe('getLogOutUrl', () => {
   it('returns null when config is missing `KEYCLOAK_CONFIG.url`', () => {
     const config = {
       API_HOST: '',
+      N8N_HOST: '',
       CHANGE_VERSION: '',
       NODE_ENV: '',
+      REACT_APP_NODE_ENV: '',
       VERSION: '',
       KEYCLOAK_CONFIG: {
         url: '',
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      MAX_UPLOAD_NUM_FILES: 1,
+      MAX_UPLOAD_FILE_SIZE: 1
     };
 
     expect(getLogOutUrl(config)).toBeUndefined();
@@ -136,15 +140,19 @@ describe('getLogOutUrl', () => {
   it('returns null when config is missing `KEYCLOAK_CONFIG.realm`', () => {
     const config = {
       API_HOST: '',
+      N8N_HOST: '',
       CHANGE_VERSION: '',
       NODE_ENV: '',
+      REACT_APP_NODE_ENV: '',
       VERSION: '',
       KEYCLOAK_CONFIG: {
         url: 'https://www.keycloaklogout.com/auth',
         realm: '',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      MAX_UPLOAD_NUM_FILES: 1,
+      MAX_UPLOAD_FILE_SIZE: 1
     };
 
     expect(getLogOutUrl(config)).toBeUndefined();
@@ -153,15 +161,19 @@ describe('getLogOutUrl', () => {
   it('returns null when config is missing `SITEMINDER_LOGOUT_URL`', () => {
     const config = {
       API_HOST: '',
+      N8N_HOST: '',
       CHANGE_VERSION: '',
       NODE_ENV: '',
+      REACT_APP_NODE_ENV: '',
       VERSION: '',
       KEYCLOAK_CONFIG: {
         url: 'https://www.keycloaklogout.com/auth',
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: ''
+      SITEMINDER_LOGOUT_URL: '',
+      MAX_UPLOAD_NUM_FILES: 1,
+      MAX_UPLOAD_FILE_SIZE: 1
     };
 
     expect(getLogOutUrl(config)).toBeUndefined();
@@ -178,15 +190,19 @@ describe('getLogOutUrl', () => {
 
     const config = {
       API_HOST: '',
+      N8N_HOST: '',
       CHANGE_VERSION: '',
       NODE_ENV: '',
+      REACT_APP_NODE_ENV: '',
       VERSION: '',
       KEYCLOAK_CONFIG: {
         url: 'https://www.keycloaklogout.com/auth',
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      MAX_UPLOAD_NUM_FILES: 1,
+      MAX_UPLOAD_FILE_SIZE: 1
     };
 
     expect(getLogOutUrl(config)).toEqual(
@@ -197,7 +213,7 @@ describe('getLogOutUrl', () => {
 
 describe('getFormattedFileSize', () => {
   it('returns `0 KB` if no file size exists', async () => {
-    const formattedFileSize = getFormattedFileSize(null as unknown);
+    const formattedFileSize = getFormattedFileSize((null as unknown) as number);
     expect(formattedFileSize).toEqual('0 KB');
   });
 

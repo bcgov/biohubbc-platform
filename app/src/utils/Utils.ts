@@ -1,6 +1,6 @@
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
-import moment from 'moment';
+import { DateTime } from 'luxon';
 
 /**
  * Checks if a url string starts with an `http(s)://` protocol, and adds `https://` if it does not.
@@ -51,14 +51,14 @@ export const getFormattedDateRangeString = (
  * @return {string} formatted date string, or an empty string if unable to parse the date
  */
 export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateTime = DateTime.fromISO(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateTime.isValid) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(dateFormat);
+  return dateTime.toFormat(dateFormat);
 };
 
 /**
@@ -69,14 +69,14 @@ export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string 
  * @return {string} formatted time string, or an empty string if unable to parse the date
  */
 export const getFormattedTime = (timeFormat: TIME_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateTime = DateTime.fromISO(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateTime.isValid) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(timeFormat);
+  return dateTime.toFormat(timeFormat);
 };
 
 /**

@@ -30,7 +30,7 @@ jobs:
 
       - name: Install database dependencies
         working-directory: database
-        run: npm install
+        run: npm ci
 
       - name: Run database linter
         working-directory: database
@@ -49,7 +49,7 @@ jobs:
 
       - name: Install api dependencies
         working-directory: api
-        run: npm install
+        run: npm ci
 
       - name: Run api linter
         working-directory: api
@@ -68,7 +68,7 @@ jobs:
 
       - name: Install app dependencies
         working-directory: app
-        run: npm install
+        run: npm ci
 
       - name: Run app linter
         working-directory: app
