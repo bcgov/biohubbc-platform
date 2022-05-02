@@ -2,12 +2,9 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as administrative_activities from './administrative-activities';
-import administrative_queries from '../queries/administrative-activity';
 import * as db from '../database/db';
 import { getMockDBConnection } from '../__mocks__/db';
-import SQL from 'sql-template-strings';
-import { HTTPError } from '../errors/custom-error';
+import * as administrative_activities from './administrative-activities';
 
 chai.use(sinonChai);
 
@@ -20,7 +17,7 @@ describe('getAdministrativeActivities', () => {
 
   const sampleReq = {
     keycloak_token: {},
-    query: {
+    sql: {
       type: 'type',
       status: ['status']
     }
@@ -38,24 +35,7 @@ describe('getAdministrativeActivities', () => {
     }
   };
 
-  it('should throw a 400 error when failed to build getAdministrativeActivitiesSQL statement', async () => {
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-    sinon.stub(administrative_queries, 'getAdministrativeActivitiesSQL').returns(null);
-
-    try {
-      const result = administrative_activities.getAdministrativeActivities();
-
-      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).status).to.equal(400);
-      expect((actualError as HTTPError).message).to.equal('Failed to build SQL get statement');
-    }
-  });
-
   it('should return the rows on success (empty)', async () => {
-    sinon.stub(administrative_queries, 'getAdministrativeActivitiesSQL').returns(SQL`some`);
-
     const mockQuery = sinon.stub();
 
     mockQuery.resolves({
@@ -63,7 +43,7 @@ describe('getAdministrativeActivities', () => {
       rowCount: 0
     });
 
-    sinon.stub(db, 'getDBConnection').returns({ ...dbConnectionObj, query: mockQuery });
+    sinon.stub(db, 'getDBConnection').returns({ ...dbConnectionObj, sql: mockQuery });
 
     const result = administrative_activities.getAdministrativeActivities();
 
@@ -73,8 +53,6 @@ describe('getAdministrativeActivities', () => {
   });
 
   it('should return the rows on success (not empty)', async () => {
-    sinon.stub(administrative_queries, 'getAdministrativeActivitiesSQL').returns(SQL`some`);
-
     const data = {
       id: 1,
       type: 'type',
@@ -94,7 +72,7 @@ describe('getAdministrativeActivities', () => {
       rowCount: 1
     });
 
-    sinon.stub(db, 'getDBConnection').returns({ ...dbConnectionObj, query: mockQuery });
+    sinon.stub(db, 'getDBConnection').returns({ ...dbConnectionObj, sql: mockQuery });
 
     const result = administrative_activities.getAdministrativeActivities();
 

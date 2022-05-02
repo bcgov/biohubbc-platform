@@ -2,8 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { getDBConnection } from '../database/db';
-import { HTTP400 } from '../errors/custom-error';
-import { queries } from '../queries/queries';
+import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
 import { getLogger } from '../utils/logger';
 
@@ -146,18 +145,14 @@ export function getAdministrativeActivities(): RequestHandler {
       const administrativeActivityStatusTypes: string[] =
         (req.query?.status as string[]) || getAllAdministrativeActivityStatusTypes();
 
-      const sqlStatement = queries.administrativeActivity.getAdministrativeActivitiesSQL(
+      const sqlStatement = AdministrativeActivityQueries.getAdministrativeActivitiesSQL(
         administrativeActivityTypeName,
         administrativeActivityStatusTypes
       );
 
-      if (!sqlStatement) {
-        throw new HTTP400('Failed to build SQL get statement');
-      }
-
       await connection.open();
 
-      const response = await connection.query(sqlStatement.text, sqlStatement.values);
+      const response = await connection.sql(sqlStatement);
 
       await connection.commit();
 

@@ -3,14 +3,13 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import * as db from '../database/db';
-import { HTTPError } from '../errors/custom-error';
-import { IgcNotifyPostReturn } from '../models/gcnotify';
-import { UserObject } from '../models/user';
+import { HTTPError } from '../errors/http-error';
+import { IgcNotifyPostReturn } from '../interfaces/gcnotify.interface';
+import { Models } from '../models';
 import * as administrative_activity from '../paths/administrative-activity';
-import { queries } from '../queries/queries';
+import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
 import { GCNotifyService } from '../services/gcnotify-service';
 import { KeycloakService, KeycloakUser } from '../services/keycloak-service';
 import { UserService } from '../services/user-service';
@@ -148,7 +147,7 @@ describe('updateAccessRequest', () => {
 
     const systemUserId = 4;
     const existingRoleIds = [1, 2];
-    const mockSystemUser: UserObject = {
+    const mockSystemUser: Models.user.UserObject = {
       id: systemUserId,
       user_identifier: '',
       record_end_date: '',
@@ -175,44 +174,35 @@ describe('updateAccessRequest', () => {
   it('checks If Access request if approval is false', async () => {
     const mockResponseRow = { name: 'Rejected' };
     const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
-    const mockDBConnection = getMockDBConnection({ query: async () => mockQueryResponse });
+    const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
-    const mockgetAdminActTypeSQLResponse = SQL`Test SQL Statement`;
-    const queriesStub = sinon
-      .stub(queries.administrativeActivity, 'getAdministrativeActivityById')
-      .resolves(mockgetAdminActTypeSQLResponse);
+    const queriesSpy = sinon.spy(AdministrativeActivityQueries, 'getAdministrativeActivityById');
 
     const functionResponse = await access_request.checkIfAccessRequestIsApproval(1, mockDBConnection);
 
     expect(functionResponse).to.equal(false);
-    expect(queriesStub).to.be.calledOnce;
+    expect(queriesSpy).to.be.calledOnce;
   });
 
   it('checks If Access request if approval is true', async () => {
     const mockResponseRow = { name: 'Actioned' };
     const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
-    const mockDBConnection = getMockDBConnection({ query: async () => mockQueryResponse });
+    const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
-    const mockgetAdminActTypeSQLResponse = SQL`Test SQL Statement`;
-    const queriesStub = sinon
-      .stub(queries.administrativeActivity, 'getAdministrativeActivityById')
-      .resolves(mockgetAdminActTypeSQLResponse);
+    const queriesSpy = sinon.spy(AdministrativeActivityQueries, 'getAdministrativeActivityById');
 
     const functionResponse = await access_request.checkIfAccessRequestIsApproval(2, mockDBConnection);
 
     expect(functionResponse).to.equal(true);
-    expect(queriesStub).to.be.calledOnce;
+    expect(queriesSpy).to.be.calledOnce;
   });
 
   it('attempts to send approval email', async () => {
     const mockResponseRow = { name: 'Actioned' };
     const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
-    const mockDBConnection = getMockDBConnection({ query: async () => mockQueryResponse });
+    const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
-    const mockgetAdminActTypeSQLResponse = SQL`Test SQL Statement`;
-    const queriesStub = sinon
-      .stub(queries.administrativeActivity, 'getAdministrativeActivityById')
-      .resolves(mockgetAdminActTypeSQLResponse);
+    const queriesSpy = sinon.spy(AdministrativeActivityQueries, 'getAdministrativeActivityById');
 
     const keycloakUserReturnObject = {
       id: '0',
@@ -248,7 +238,7 @@ describe('updateAccessRequest', () => {
 
     await access_request.sendApprovalEmail(2, mockDBConnection, 'name', SYSTEM_IDENTITY_SOURCE.IDIR);
 
-    expect(queriesStub).to.be.calledOnce;
+    expect(queriesSpy).to.be.calledOnce;
     expect(getUserByUsernameStub).to.be.calledOnce;
     expect(sendEmailGCNotificationStub).to.be.calledOnce;
   });

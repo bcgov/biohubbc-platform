@@ -15,7 +15,7 @@ describe('FileUpload', () => {
     expect(getByText('Drag your files here', { exact: false })).toBeVisible();
   });
 
-  it('renders an item in the list for each file added for survey list', async () => {
+  it('renders an item in the list for each file added', async () => {
     const mockUploadHandler = jest.fn().mockResolvedValue(null);
 
     const { getByTestId, getByText } = renderContainer({ uploadHandler: mockUploadHandler });

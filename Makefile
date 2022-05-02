@@ -1,7 +1,7 @@
 #!make
 
 # ------------------------------------------------------------------------------
-# Makefile -- SIMS
+# Makefile -- BioHub
 # ------------------------------------------------------------------------------
 
 -include .env
@@ -59,7 +59,7 @@ clean: ## Closes and cleans (removes) all project containers
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Postgres DB Commands
-## - Builds all of the SIMS postgres db projects (db, db_setup)
+## - Builds all of the BioHub postgres db projects (db, db_setup)
 ## ------------------------------------------------------------------------------
 
 build-postgres: ## Builds the postgres db containers
@@ -76,7 +76,7 @@ run-postgres: ## Runs the postgres db containers
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend Commands
-## - Builds all of the SIMS backend projects (db, db_setup, api)
+## - Builds all of the BioHub backend projects (db, db_setup, api)
 ## ------------------------------------------------------------------------------
 
 build-backend: ## Builds all backend containers
@@ -93,22 +93,24 @@ run-backend: ## Runs all backend containers
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
-## - Builds all of the SIMS backend+web projects (db, db_setup, api, app, n8n, n8n_nginx, n8n_setup)
+## - Builds all of the BioHub backend+web projects (db, db_setup, api, app, n8n, n8n_nginx, n8n_setup)
 ## ------------------------------------------------------------------------------
 
 build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api app n8n n8n_nginx n8n_setup
+	@docker-compose -f docker-compose.yml build db db_setup api app
+  # @docker-compose -f docker-compose.yml build db db_setup api app n8n n8n_nginx n8n_setup
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api app n8n n8n_nginx n8n_setup
+	@docker-compose -f docker-compose.yml up -d db db_setup api app
   ## Restart n8n as a workaround to resolve this known issue: https://github.com/n8n-io/n8n/issues/2155
-	@docker-compose restart n8n
+  # @docker-compose -f docker-compose.yml up -d n8n n8n_nginx n8n_setup
+  # @docker-compose restart n8n
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container
@@ -271,19 +273,19 @@ lint: ## Runs `npm lint` for all projects
 	@echo "==============================================="
 	@cd database && npm run lint && cd ..
 
-lint-fix: ## Runs `npm run lint:fix ` for all projects
+lint-fix: ## Runs `npm run lint-fix ` for all projects
 	@echo "==============================================="
-	@echo "Running /api lint:fix"
+	@echo "Running /api lint-fix"
 	@echo "==============================================="
-	@cd api && npm run lint:fix && cd ..
+	@cd api && npm run lint-fix && cd ..
 	@echo "==============================================="
-	@echo "Running /app lint:fix"
+	@echo "Running /app lint-fix"
 	@echo "==============================================="
-	@cd app && npm run lint:fix && cd ..
+	@cd app && npm run lint-fix && cd ..
 	@echo "==============================================="
-	@echo "Running /database lint:fix"
+	@echo "Running /database lint-fix"
 	@echo "==============================================="
-	@cd database && npm run lint:fix && cd ..
+	@cd database && npm run lint-fix && cd ..
 
 format: ## Runs `npm run format` for all projects
 	@echo "==============================================="
@@ -299,19 +301,19 @@ format: ## Runs `npm run format` for all projects
 	@echo "==============================================="
 	@cd database && npm run format && cd ..
 
-format-fix: ## Runs `npm run format:fix` for all projects
+format-fix: ## Runs `npm run format-fix` for all projects
 	@echo "==============================================="
-	@echo "Running /api format:fix"
+	@echo "Running /api format-fix"
 	@echo "==============================================="
-	@cd api && npm run format:fix && cd ..
+	@cd api && npm run format-fix && cd ..
 	@echo "==============================================="
-	@echo "Running /app format:fix"
+	@echo "Running /app format-fix"
 	@echo "==============================================="
-	@cd app && npm run format:fix && cd ..
+	@cd app && npm run format-fix && cd ..
 	@echo "==============================================="
-	@echo "Running /database format:fix"
+	@echo "Running /database format-fix"
 	@echo "==============================================="
-	@cd database && npm run format:fix && cd ..
+	@cd database && npm run format-fix && cd ..
 
 ## ------------------------------------------------------------------------------
 ## Run `docker logs <container> -f` commands for all projects

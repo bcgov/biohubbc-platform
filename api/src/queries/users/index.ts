@@ -1,4 +1,2 @@
-import * as systemRole from './system-role-queries';
-import * as user from './user-queries';
-
-export default { ...systemRole, ...user };
+export * from './system-role-queries';
+export * from './user-queries';

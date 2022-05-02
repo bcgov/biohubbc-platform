@@ -2,7 +2,7 @@ import { AxiosInstance } from 'axios';
 import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 
 /**
- * Returns a set of supported api methods for working with projects.
+ * Returns a set of supported api methods for working with codes.
  *
  * @param {AxiosInstance} axios
  * @return {*} object whose properties are supported api methods.

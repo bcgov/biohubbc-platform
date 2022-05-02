@@ -22,7 +22,7 @@ module.exports = (settings) => {
   let objects = [];
 
   objects.push(
-    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/api.dc.yaml`, {
+...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/api.dc.yaml`, {
       param: {
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
@@ -33,7 +33,9 @@ module.exports = (settings) => {
         NODE_ENV: phases[phase].env || 'dev',
         TZ: phases[phase].tz,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
-        CERTIFICATE_URL: phases[phase].certificateURL,
+        KEYCLOAK_HOST: phases[phase].sso.url,
+        KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
+        KEYCLOAK_REALM: phases[phase].sso.realm,
         REPLICAS: phases[phase].replicas || 1,
         REPLICA_MAX: phases[phase].maxReplicas || 1,
         LOG_LEVEL: phases[phase].logLevel || 'info'
