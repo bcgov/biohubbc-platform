@@ -3,6 +3,9 @@ import { HTTP400 } from '../errors/http-error';
 import { Queries } from '../queries';
 import { PostOccurrence } from '../models/occurrence/create';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { GetObjectOutput } from 'aws-sdk/clients/s3';
+import { parseUnknownMedia } from '../utils/media/media-utils';
+import { ArchiveFile } from '../utils/media/media-file';
 
 export class DarwinCoreService extends DBService {
   async getS3Key(submissionId: number) {
@@ -18,7 +21,28 @@ export class DarwinCoreService extends DBService {
       throw new HTTP400('Failed to get submission');
     }
 
-    return response.rows[0]?.input_key;
+    console.log('hello nthers no data in the base we are hotwiring this badboy');
+
+    return 'platform/test/csv.zip';
+    // return response.rows[0]?.input_key;
+  }
+
+  async prepDWCArchive(s3File: GetObjectOutput): Promise<DWCArchive> {
+    const parsedMedia = parseUnknownMedia(s3File);
+
+    console.log('parsedMedia:', parsedMedia);
+
+    if (!parsedMedia) {
+      throw new HTTP400('Failed to parse submission, file was empty');
+    }
+
+    if (!(parsedMedia instanceof ArchiveFile)) {
+      throw new HTTP400('Failed to parse submission, not a valid DwC Archive Zip file');
+    }
+
+    const dwcArchive = new DWCArchive(parsedMedia);
+
+    return dwcArchive;
   }
 
   async getOccurrenceSubmission(occurrenceSubmissionId: number) {
@@ -57,6 +81,8 @@ export class DarwinCoreService extends DBService {
       vernacularNameHeader
     } = this.getHeadersAndRowsFromFile(dwcArchive);
 
+    console.log('HELLO///////////////////////////////////////////////////');
+
     const scrapedOccurrences = occurrenceRows?.map((row: any) => {
       const occurrenceId = row[occurrenceIdHeader];
       const associatedTaxa = row[associatedTaxaHeader];
@@ -92,7 +118,7 @@ export class DarwinCoreService extends DBService {
         sex: sex,
         individualCount: individualCount,
         vernacularName: vernacularName,
-        data,
+        data: data,
         verbatimCoordinates: verbatimCoordinates,
         organismQuantity: organismQuantity,
         organismQuantityType: organismQuantityType,
@@ -100,23 +126,28 @@ export class DarwinCoreService extends DBService {
       });
     });
 
+    console.log('scrapedOccurrences:', scrapedOccurrences);
+
     await Promise.all(
       scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
-        this.uploadScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
+        await this.uploadScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
+
+        console.log('UPLOADING///////////////////////////////////////////////////');
       }) || []
     );
+    console.log('FINNNIIISSSSSSSSSSSSSHEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDDDDDDDDDDDDDDD');
   }
 
   /**
    * Upload scraped occurrence data.
    *
-   * @param {number} occurrenceSubmissionId
+   * @param {number} submissionId
    * @param {any} scrapedOccurrence
    * @param {IDBConnection} connection
    * @return {*}
    */
-  async uploadScrapedOccurrence(occurrenceSubmissionId: number, scrapedOccurrence: PostOccurrence) {
-    const sqlStatement = Queries.occurrence.create.postOccurrenceSQL(occurrenceSubmissionId, scrapedOccurrence);
+  async uploadScrapedOccurrence(submissionId: number, scrapedOccurrence: PostOccurrence) {
+    const sqlStatement = Queries.occurrence.create.postOccurrenceSQL(submissionId, scrapedOccurrence);
 
     if (!sqlStatement) {
       throw new HTTP400('Failed to build SQL post statement');

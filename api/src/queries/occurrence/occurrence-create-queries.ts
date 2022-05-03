@@ -3,16 +3,17 @@ import { Models } from '../../models';
 import { parseLatLongString, parseUTMString } from '../../utils/spatial-utils';
 
 export const postOccurrenceSQL = (
-  occurrenceSubmissionId: number,
+  submissionId: number,
   occurrence: Models.occurrence.create.PostOccurrence
 ): SQLStatement => {
+  console.log('occurrence:', occurrence);
+
   const sqlStatement: SQLStatement = SQL`
     INSERT INTO occurrence (
-      occurrence_submission_id,
+      submission_id,
       taxonid,
       lifestage,
       sex,
-      data,
       vernacularname,
       eventdate,
       individualcount,
@@ -20,11 +21,10 @@ export const postOccurrenceSQL = (
       organismquantitytype,
       geography
     ) VALUES (
-      ${occurrenceSubmissionId},
+      ${submissionId},
       ${occurrence.associatedTaxa},
       ${occurrence.lifeStage},
       ${occurrence.sex},
-      ${occurrence.data},
       ${occurrence.vernacularName},
       ${occurrence.eventDate},
       ${occurrence.individualCount},
