@@ -5,16 +5,18 @@ labels:
 metadata:
   creationTimestamp: null
   name: biohubbc-db-dc
+annotations:
+  iconClass: iconpostgresql
 parameters:
   - description: The name of the OpenShift Service exposed for the database.
     displayName: Database Service Name
     name: NAME
     required: true
     value: 'postgresql'
-  - description: The OpenShift ImageStream name.
+  - description: The ImageStream name.
     displayName: IMAGE_STREAM_NAME
     name: IMAGE_STREAM_NAME
-    value: 'postgis-postgres'
+    value: 'crunchy-postgres-gis'
   - description: The OpenShift Namespace where the ImageStream resides.
     displayName: Namespace
     name: IMAGE_STREAM_NAMESPACE
@@ -60,19 +62,11 @@ parameters:
     name: VOLUME_CAPACITY
     required: true
     value: '3Gi'
-  - description: Version of PostgreSQL image to be used (9.2, 9.4, 9.5 or latest).
-    displayName: Version of PostgreSQL Image
+  - description: Version of PostgreSQL-PostGIS image to be used (9.2, 9.4, 9.5 or latest).
+    displayName: Version of PostgreSQL-PostGIS Image
     name: IMAGE_STREAM_VERSION
     required: true
-    value: '12-31'
-  - description: Indicator to enable pgcrypto extension (provided out-of-the-box with PostgreSQL).
-    displayName: Flag to enable pgcrypto PostgreSQL extension.
-    name: PGCRYPTO_EXTENSION
-    value: 'Y'
-  - description: Indicator to enable postgis extension (from official PostgeSQL YUM repo).
-    displayName: Flag to enable postgis PostgreSQL extension.
-    name: POSTGIS_EXTENSION
-    value: 'Y'
+    value: 'ubi8-14.2-3.1-0'
   - name: CPU_REQUEST
     value: '10m'
   - name: CPU_LIMIT
@@ -94,6 +88,7 @@ objects:
         template.openshift.io/expose-admin-username: "{.data['database-user']}"
         as-copy-of: biohubbc-creds
       name: '${DATABASE_SERVICE_NAME}'
+      role: db
     stringData:
       database-name: '${POSTGRESQL_DATABASE}'
       database-user-password: '${POSTGRESQL_PASSWORD}'
@@ -104,6 +99,7 @@ objects:
     metadata:
       annotations:
         template.openshift.io/expose-uri: postgres://{.spec.clusterIP}:{.spec.ports[?(.name=="postgresql")].port}
+        role: db
       name: '${DATABASE_SERVICE_NAME}'
     spec:
       ports:
@@ -122,6 +118,7 @@ objects:
     kind: PersistentVolumeClaim
     metadata:
       name: '${DATABASE_SERVICE_NAME}'
+      role: db
     spec:
       accessModes:
         - ReadWriteMany
@@ -136,6 +133,7 @@ objects:
       labels:
         shared: 'true'
       annotations: {}
+      role: db
     spec:
       lookupPolicy:
         local: false
@@ -145,10 +143,12 @@ objects:
       annotations:
         template.alpha.openshift.io/wait-for-ready: 'true'
       name: '${DATABASE_SERVICE_NAME}'
+      role: db
     spec:
       replicas: '${{REPLICAS}}'
       selector:
         name: '${DATABASE_SERVICE_NAME}'
+        role: db
       strategy:
         type: Recreate
         maxSurge: 50%
@@ -162,30 +162,42 @@ objects:
           containers:
             - capabilities: {}
               env:
-                - name: POSTGRESQL_USER
+                - name: PG_USER
                   valueFrom:
                     secretKeyRef:
                       key: database-user
                       name: '${DATABASE_SERVICE_NAME}'
-                - name: POSTGRESQL_PASSWORD
+                - name: PG_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       key: database-user-password
                       name: '${DATABASE_SERVICE_NAME}'
-                - name: POSTGRESQL_ADMIN_PASSWORD
+                - name: PG_ROOT_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       key: database-admin-password
                       name: '${DATABASE_SERVICE_NAME}'
-                - name: POSTGRESQL_DATABASE
+                - name: PG_DATABASE
                   valueFrom:
                     secretKeyRef:
                       key: database-name
                       name: '${DATABASE_SERVICE_NAME}'
-                - name: PGCRYPTO_EXTENSION
-                  value: 'N'
-                - name: POSTGIS_EXTENSION
-                  value: 'N'
+                - name: PG_PRIMARY_PORT
+                  value: '5432'
+                - name: PG_PRIMARY_USER
+                  valueFrom:
+                    secretKeyRef:
+                      key: database-user
+                      name: '${DATABASE_SERVICE_NAME}'
+                - name: PG_PRIMARY_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: database-user-password
+                      name: '${DATABASE_SERVICE_NAME}'
+                - name: PG_MODE
+                  value: 'primary'
+                - name: MODE
+                  value: 'postgres'
                 - name: PGOPTIONS
                   value: '-c maintenance_work_mem=128MB'
                 - name: PGTZ
@@ -207,9 +219,21 @@ objects:
                     - '/bin/sh'
                     - '-i'
                     - '-c'
-                    - psql -h 127.0.0.1 -U $POSTGRESQL_USER -q -d $POSTGRESQL_DATABASE -c 'SELECT 1'
+                    - pg_isready -h 127.0.0.1 -q -t10
                 initialDelaySeconds: 5
                 timeoutSeconds: 1
+              startupProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - '-i'
+                    - '-c'
+                    - pg_isready -h 127.0.0.1 -q -t 10
+                initialDelaySeconds: 10
+                timeoutSeconds: 3
+                periodSeconds: 15
+                successThreshold: 1
+                failureThreshold: 10
               resources:
                 requests:
                   cpu: '${CPU_REQUEST}'
@@ -222,7 +246,7 @@ objects:
                 privileged: false
               terminationMessagePath: '/dev/termination-log'
               volumeMounts:
-                - mountPath: '/var/lib/pgsql/data'
+                - mountPath: '/pgdata'
                   name: '${DATABASE_SERVICE_NAME}-data'
                 - mountPath: '/var/run/postgresql'
                   name: '${DATABASE_SERVICE_NAME}-run'

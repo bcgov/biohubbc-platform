@@ -1,85 +1,10 @@
----
 kind: Template
-apiVersion: v1
+apiVersion: template.openshift.io/v1
 labels:
   app: "${NAME}"
-  template: "metabase-dc"
+  template: "${NAME}-dc-template"
 metadata:
-  name: metabase-dc
-parameters:
-  - name: NAME
-    displayName: Name
-    description: The name assigned to all of the objects defined in this template.
-    required: true
-    value: metabase
-  - name: IS_NAMESPACE
-    description: The OpenShift Namespace where the ImageStream resides.
-    displayName: Image Namespace
-    value: af2668-test
-    required: true
-  - description: The OpenShift ImageStream name.
-    displayName: Image Stream
-    name: IS_IMAGE
-    value: metabase
-  - name: PR_ENVIRONMENT
-    displayName: PR Based Environment
-    description:
-      A setting to turn off metabase in OpenShift namespaces where resources
-      need to be minimized due to duplication of applications (one for each Pull Request).  Setting
-      the value to 'true' will turn off metabase.
-    value: ""
-  - name: VERSION
-    description: A version used for the image tags
-    displayName: Version
-    required: true
-    value: latest
-  - name: CPU_REQUEST
-    description: Minimal CPU needed to run
-    displayName: CPU Request
-    value: 100m
-  - name: CPU_LIMIT
-    description: Maximum CPU allowed to use
-    displayName: CPU Limit
-    value: 500m
-  - name: MEMORY_REQUEST
-    description: Minimal amount of memory needed to run
-    displayName: Memory Request
-    value: 768Mi
-  - name: MEMORY_LIMIT
-    description: Maximum amount of memory allowed to use
-    displayName: Memory Limit
-    value: 1.0Gi
-  - name: PVC_SIZE
-    description: Amount of disk space needed for persistence
-    displayName: PVC Size
-    required: true
-    value: 2Gi
-  - name: ADMIN_EMAIL
-    displayName: Admin Email
-    description: The email associated with the metabase admin user
-    required: true
-  - name: ADMIN_PASSWORD
-    displayName: Admin Password
-    description:
-      The password for the metabase admin user. Requires 2 upper, 2 lower,
-      1 special, 1 numeric chars and minimum 8 char length
-    generate: expression
-    from: "[a-zA-Z0-9]{8}!@#$%^&_[a-zA-Z0-9]{8}"
-    required: true
-  - name: DATABASE_PASSWORD
-    displayName: Database Password
-    description:
-      A minimum 16 character password that is generated in the target database,
-      and then copied over into this field.
-    generate: expression
-    from: "[a-zA-Z0-9]{16}"
-    required: true
-  - name: EMBEDDING_SECRET_KEY
-    displayName: Embedding Secret Key
-    description: A key that is used to embed metabase screens from within a website
-    generate: expression
-    from: "[a-zA-Z0-9]{16}"
-    required: true
+  name: "metabase"
 objects:
   - kind: Secret
     apiVersion: v1
@@ -88,26 +13,24 @@ objects:
       name: "${NAME}-secret"
       annotations:
         template.openshift.io/expose-password: "{.data['database-password']}"
-        as-copy-of: template.${NAME}-secret
     stringData:
       admin-email: "${ADMIN_EMAIL}"
       admin-password: "${ADMIN_PASSWORD}"
       admin-username: "${NAME}-admin"
       embedding-secret-key: "${EMBEDDING_SECRET_KEY}"
-  # - kind: Secret
-  #   apiVersion: v1
-  #   metadata:
-  #     app: "${NAME}"
-  #     name: "postgresql-${NAME}-secret"
-  #     annotations:
-  #       template.openshift.io/expose-database_name: "{.data[database-name]}"
-  #       template.openshift.io/expose-password: "{.data[database-password]}"
-  #       template.openshift.io/expose-username: "{.data['database-user]}"
-  #       as-copy-of: template.postgresql-${NAME}-secret
-  #   stringData:
-  #     database-name: ${NAME}
-  #     database-password: ${DATABASE_PASSWORD}
-  #     database-user: ${NAME}
+  - kind: Secret
+    apiVersion: v1
+    metadata:
+      app: "${NAME}"
+      name: "postgresql-${NAME}-secret"
+      annotations:
+        template.openshift.io/expose-database_name: "{.data[database-name]}"
+        template.openshift.io/expose-password: "{.data[database-password]}"
+        template.openshift.io/expose-username: "{.data['database-user]}"
+    stringData:
+      database-name: ${NAME}
+      database-password: ${DATABASE_PASSWORD}
+      database-user: ${NAME}
   - kind: Service
     apiVersion: v1
     metadata:
@@ -122,26 +45,26 @@ objects:
         app: "${NAME}"
       type: ClusterIP
       sessionAffinity: None
-  # - kind: Service
-  #   apiVersion: v1
-  #   metadata:
-  #     name: "postgresql-${NAME}"
-  #   spec:
-  #     ports:
-  #       - name: postgresql
-  #         port: 5432
-  #         protocol: TCP
-  #         targetPort: 5432
-  #     selector:
-  #       name: "postgresql-${NAME}"
-  #     sessionAffinity: None
-  #     type: ClusterIP
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      name: "postgresql-${NAME}"
+    spec:
+      ports:
+        - name: postgresql
+          port: 5432
+          protocol: TCP
+          targetPort: 5432
+      selector:
+        name: "postgresql-${NAME}"
+      sessionAffinity: None
+      type: ClusterIP
   - kind: Route
     apiVersion: v1
     metadata:
       name: "${NAME}"
     spec:
-      host: "${NAME}.apps.silver.devops.gov.bc.ca"
+      host: "${NAME}-${NAMESPACE}-${TARGET_NS}.apps.silver.devops.gov.bc.ca"
       tls:
         insecureEdgeTerminationPolicy: Redirect
         termination: edge
@@ -152,35 +75,42 @@ objects:
       port:
         targetPort: 3000-tcp
       wildcardPolicy: None
-  # - apiVersion: v1
-  #   kind: PersistentVolumeClaim
-  #   metadata:
-  #     name: "postgresql-${NAME}-data"
-  #     annotations:
-  #       volume.beta.kubernetes.io/storage-class: netapp-file-standard
-  #   spec:
-  #     accessModes:
-  #       - ReadWriteMany
-  #     resources:
-  #       requests:
-  #         storage: "${PVC_SIZE}"
-  # - kind: DeploymentConfig
-  #   apiVersion: v1
-  #   metadata:
-  #     name: "postgresql-${NAME}"
-  #   spec:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: "postgresql-${NAME}-data"
+      annotations:
+        volume.beta.kubernetes.io/storage-class: netapp-file-standard
+    spec:
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: "${PVC_SIZE}"
+      storageClassName: netapp-file-standard
+      volumeMode: Filesystem
+  - kind: DeploymentConfig
+    apiVersion: v1
+    metadata:
+      name: "postgresql-${NAME}"
+      labels:
+        app: metabase
+        app.kubernetes.io/part-of: metabase
+    spec:
       replicas: 1
       strategy:
         type: Recreate
       selector:
         app: "${NAME}"
         deploymentconfig: "postgresql-${NAME}"
+        name: "postgresql-${NAME}"
       template:
         metadata:
           name: "postgresql-${NAME}"
           labels:
             app: "${NAME}"
             deploymentconfig: "postgresql-${NAME}"
+            name: "postgresql-${NAME}"
         spec:
           containers:
             - env:
@@ -199,7 +129,7 @@ objects:
                     secretKeyRef:
                       key: database-name
                       name: "postgresql-${NAME}-secret"
-              image: docker-registry.default.svc:5000/openshift/postgresql:latest
+              image: image-registry.openshift-image-registry.svc:5000/openshift/postgresql:latest
               imagePullPolicy: IfNotPresent
               livenessProbe:
                 exec:
@@ -260,9 +190,17 @@ objects:
     apiVersion: v1
     metadata:
       name: "${NAME}"
+      labels:
+        app: metabase
+        app.kubernetes.io/part-of: metabase
+        template: metabase-dc-template
     spec:
       replicas: 1
       strategy:
+        activeDeadlineSeconds: 21600
+        recreateParams:
+          timeoutSeconds: 600
+        resources: {}
         type: Recreate
       selector:
         app: "${NAME}"
@@ -275,39 +213,34 @@ objects:
             deploymentconfig: "${NAME}"
         spec:
           containers:
-            - command:
-                - bash
-                - "-c"
-                - cd /app && if [[ $PR_ENVIRONMENT == 'true' ]]; then tail -f /dev/null;
-                  else java -jar metabase.jar; fi
-              env:
+            - env:
                 - name: MB_DB_TYPE
                   value: postgres
                 - name: MB_DB_HOST
-                  value: ${NAME}-postgresql
+                  value: postgresql-${NAME}
                 - name: MB_DB_DBNAME
                   valueFrom:
                     secretKeyRef:
-                      name: "${NAME}-postgresql"
+                      name: "postgresql-${NAME}-secret"
                       key: database-name
                 - name: MB_DB_PORT
                   value: "5432"
                 - name: MB_DB_USER
                   valueFrom:
                     secretKeyRef:
-                      name: "${NAME}-postgresql"
+                      name: "postgresql-${NAME}-secret"
                       key: database-user
                 - name: MB_DB_PASS
                   valueFrom:
                     secretKeyRef:
-                      name: "${NAME}-postgresql"
+                      name: "postgresql-${NAME}-secret"
                       key: database-password
                 - name: MB_JETTY_HOST
                   value: 0.0.0.0
                 - name: MB_PASSWORD_COMPLEXITY
                   value: strong
-              image: docker-registry.default.svc:5000/${IS_NAMESPACE}/${IS_IMAGE}:${VERSION}
-              imagePullPolicy: IfNotPresent
+              image: artifacts.developer.gov.bc.ca/docker-remote/metabase/metabase:latest
+              imagePullPolicy: Always
               livenessProbe:
                 failureThreshold: 3
                 httpGet:
@@ -336,17 +269,75 @@ objects:
                   cpu: "${CPU_LIMIT}"
                   memory: "${MEMORY_LIMIT}"
               terminationMessagePath: "/dev/termination-log"
+              terminationMessagePolicy: File
           dnsPolicy: ClusterFirst
+          imagePullSecrets:
+            - name: artifacts-pull-default-opbofo
           restartPolicy: Always
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
       test: false
       triggers:
-        - imageChangeParams:
-            automatic: true
-            containerNames:
-              - metabase
-            from:
-              kind: ImageStreamTag
-              name: "${IS_IMAGE}:${VERSION}"
-              namespace: "${IS_NAMESPACE}"
-          type: ImageChange
         - type: ConfigChange
+parameters:
+  - name: NAME
+    displayName: Name
+    description: The name assigned to all of the objects defined in this template.
+    required: true
+    value: metabase
+  - name: NAMESPACE
+    description: Namespace reference (i.e. '9f0fbe')
+    displayName: Namespace
+    required: true
+  - name: TARGET_NS
+    description: Target Area reference (i.e. 'dev, test, prod or tools')
+    displayName: Namespace target
+    required: true
+  - name: CPU_REQUEST
+    description: Minimal CPU needed to run
+    displayName: CPU Request
+    value: 100m
+  - name: CPU_LIMIT
+    description: Maximum CPU allowed to use
+    displayName: CPU Limit
+    value: 500m
+  - name: MEMORY_REQUEST
+    description: Minimal amount of memory needed to run
+    displayName: Memory Request
+    value: 768Mi
+  - name: MEMORY_LIMIT
+    description: Maximum amount of memory allowed to use
+    displayName: Memory Limit
+    value: 1.0Gi
+  - name: PVC_SIZE
+    description: Amount of disk space needed for persistence
+    displayName: PVC Size
+    required: true
+    value: 1Gi
+  - name: ADMIN_EMAIL
+    displayName: Admin Email
+    description: The email associated with the metabase admin user
+    required: true
+  - name: ADMIN_PASSWORD
+    displayName: Admin Password
+    description:
+      The password for the metabase admin user. Requires 2 upper, 2 lower,
+      1 special, 1 numeric chars and minimum 8 char length
+    generate: expression
+    from: "[a-zA-Z0-9]{8}!@#$%^&_[a-zA-Z0-9]{8}"
+    required: true
+  - name: DATABASE_PASSWORD
+    displayName: Admin Password
+    description:
+      The password for the postgres admin user. Requires 2 upper, 2 lower,
+      1 special, 1 numeric chars and minimum 8 char length
+    generate: expression
+    from: "[a-zA-Z0-9]{8}!@#$%^&_[a-zA-Z0-9]{8}"
+    required: true
+  - name: EMBEDDING_SECRET_KEY
+    displayName: Embedding Secret Key
+    description: A key that is used to embed metabase screens from within a website
+    generate: expression
+    from: "[a-zA-Z0-9]{16}"
+    required: true

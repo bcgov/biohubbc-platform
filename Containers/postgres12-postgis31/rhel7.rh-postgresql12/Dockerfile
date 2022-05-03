@@ -1,4 +1,5 @@
-FROM registry.redhat.io/rhscl/postgresql-12-rhel8
+FROM artifacts.developer.gov.bc.ca/redhat-docker-remote/rhel8/postgresql-12:latest
+# registry.redhat.io/rhscl/postgresql-12-rhel8
 
 # PostgreSQL image for OpenShift with PostGIS extension.
 # Volumes:
@@ -45,12 +46,6 @@ LABEL summary=$SUMMARY \
 USER root
 
 COPY root/usr/libexec/fix-permissions /usr/libexec/fix-permissions
-
-# Copy entitlements and subscription manager configurations
-# https://github.com/BCDevOps/OpenShift4-Migration/issues/15
-COPY ./etc-pki-entitlement /etc/pki/entitlement
-COPY ./rhsm-conf /etc/rhsm
-COPY ./rhsm-ca /etc/rhsm/ca
 
 RUN yum repolist > /dev/null && \
     yum install -y yum-utils gettext && \
@@ -103,10 +98,6 @@ RUN /usr/bin/install -c -m 755  /usr/pgsql-12/lib/* '/opt/rh/rh-postgresql12/roo
     mv /usr/pgsql-12/share/contrib/postgis-3.1/ /opt/rh/rh-postgresql12/root/usr/share/pgsql/contrib/
 
 RUN rm -rf /tmp/pgdg-redhat-repo-latest.noarch.rpm /var/cache/yum
-
-# Remove entitlements and Subscription Manager configs
-RUN rm -rf /etc/pki/entitlement && \
-    rm -rf /etc/rhsm
 
 RUN bash /usr/libexec/fix-permissions /var/lib/pgsql
 

@@ -1,0 +1,21 @@
+apiVersion: ops.gov.bc.ca/v1alpha1
+kind: SysdigTeam
+metadata:
+  name: <namespace>-sysdigteam
+  namespace: <namespace>-tools
+spec:
+  team:
+    description: The Sysdig Team for <Project>
+    users:
+      - name: <email>
+        role: ROLE_TEAM_MANAGER
+      - name: <email>
+        role: ROLE_TEAM_EDIT
+      - name: <email>
+        role: ROLE_TEAM_STANDARD
+      - name: <email>
+        role: ROLE_TEAM_READ
+
+
+
+
