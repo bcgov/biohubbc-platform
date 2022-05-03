@@ -3,6 +3,8 @@ apiVersion: v1
 metadata:
   name: postgresql
   creationTimestamp: null
+annotations:
+  iconClass: iconpostgresql
 parameters:
   - name: NAME
     displayName: Name
@@ -30,7 +32,7 @@ objects:
           annotations:
           from:
             kind: ImageStreamTag
-            name: postgis-postgres:12-31
+            name: crunchy-postgres-gis:ubi8-14.2-3.1-0
             namespace: a0ec71-tools
           generation: 1
           importPolicy: {}

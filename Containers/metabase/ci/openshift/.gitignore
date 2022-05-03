@@ -1,8 +1,0 @@
-
-.env
-
-db_user.txt
-db_password.txt
-
-./postgresql/data
-plugins/*
