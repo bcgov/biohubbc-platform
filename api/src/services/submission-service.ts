@@ -14,7 +14,7 @@ export interface ISubmissionData {
 }
 
 export class SubmissionService extends DBService {
-  async insertSubmission(submissionData: ISubmissionData): Promise<QueryResult<any>> {
+  async insertSubmissionRecord(submissionData: ISubmissionData): Promise<QueryResult<any>> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source,
@@ -32,7 +32,29 @@ export class SubmissionService extends DBService {
         ${submissionData.input_file_name},
         ${submissionData.eml_source},
         ${submissionData.darwin_core_source}
-      );
+      )
+      RETURNING
+        submission_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert submission record');
+    }
+
+    return response;
+  }
+
+  async updateSubmissionRecordInputKey(inputKey: ISubmissionData['input_key']): Promise<QueryResult<any>> {
+    const sqlStatement = SQL`
+      UPDATE submission SET(
+        input_key
+      ) VALUES (
+        ${inputKey}
+      )
+      RETURNING
+        submission_id;
     `;
 
     const response = await this.connection.sql(sqlStatement);

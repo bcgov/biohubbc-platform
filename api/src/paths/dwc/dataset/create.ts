@@ -116,22 +116,30 @@ export function submitDataset(): RequestHandler {
 
       await connection.open();
 
-      const s3Key = generateS3FileKey({
-        folder: 'submissions',
-        fileName: (parsedMedia as ArchiveFile).fileName
-      });
-
       const submissionService = new SubmissionService(connection);
 
-      await submissionService.insertSubmission({
+      const response = await submissionService.insertSubmissionRecord({
         source: 'SIMS', // TODO temporarily hardcoded
         input_file_name: (parsedMedia as ArchiveFile).fileName,
-        input_key: s3Key,
+        input_key: '',
         event_timestamp: new Date().toISOString(),
         eml_source: '', // TODO populate
         darwin_core_source: '{}', // TODO populate
         uuid: dataPackageId
       });
+
+      const submissionId = response.rows?.[0]?.submissionId;
+
+      if (!submissionId) {
+        throw new HTTP400('Failed to insert submission record');
+      }
+
+      const s3Key = generateS3FileKey({
+        submissionId: submissionId,
+        fileName: (parsedMedia as ArchiveFile).fileName
+      });
+
+      await submissionService.updateSubmissionRecordInputKey(submissionId);
 
       await uploadFileToS3(rawMediaFile, s3Key, {
         filename: rawMediaFile.originalname

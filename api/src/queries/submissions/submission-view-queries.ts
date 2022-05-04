@@ -1,7 +1,7 @@
 import { SQL, SQLStatement } from 'sql-template-strings';
 
-export const getSubmissionForViewSQL = (submissionId: number): SQLStatement => {
-  const sqlStatement: SQLStatement = SQL`
+export const getSubmissionRecordSQL = (submissionId: number): SQLStatement => {
+  return SQL`
       SELECT
         *
       FROM
@@ -9,6 +9,4 @@ export const getSubmissionForViewSQL = (submissionId: number): SQLStatement => {
       WHERE
         submission_id = ${submissionId};
     `;
-
-  return sqlStatement;
 };

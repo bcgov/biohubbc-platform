@@ -125,7 +125,7 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 }
 
 export interface IS3FileKey {
-  folder?: string;
+  submissionId: number;
   fileName: string;
 }
 
@@ -139,8 +139,8 @@ export interface IS3FileKey {
 export function generateS3FileKey(options: IS3FileKey): string {
   const keyParts: (string | number)[] = ['platform'];
 
-  if (options.folder) {
-    keyParts.push(options.folder);
+  if (options.submissionId) {
+    keyParts.push(options.submissionId);
   }
 
   keyParts.push(options.fileName);

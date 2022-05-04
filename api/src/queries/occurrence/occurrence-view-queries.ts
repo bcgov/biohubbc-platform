@@ -1,7 +1,7 @@
 import { SQL, SQLStatement } from 'sql-template-strings';
 
 export const getOccurrencesForViewSQL = (occurrenceId: number): SQLStatement => {
-  const sqlStatement: SQLStatement = SQL`
+  return SQL`
       SELECT
         o.occurrence_id,
         o.submission_id,
@@ -26,6 +26,4 @@ export const getOccurrencesForViewSQL = (occurrenceId: number): SQLStatement => 
       AND
         os.delete_timestamp is null;
     `;
-
-  return sqlStatement;
 };

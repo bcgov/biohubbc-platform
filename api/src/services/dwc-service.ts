@@ -10,23 +10,19 @@ import { DBService } from './service';
 
 export class DarwinCoreService extends DBService {
   /**
-   * Collect s3Key from subbmison file in db
+   * Collect s3Key from submission file in db
    *
    * @param {number} submissionId
    * @return {*}  {Promise<string>}
    * @memberof DarwinCoreService
    */
   async getS3Key(submissionId: number): Promise<string> {
-    const sqlStatement = await Queries.submission.view.getSubmissionForViewSQL(submissionId);
+    const sqlStatement = await Queries.submission.view.getSubmissionRecordSQL(submissionId);
 
-    if (!sqlStatement) {
-      throw new HTTP400('Failed to build SQL get statement');
-    }
+    const response = await this.connection.sql(sqlStatement);
 
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
-
-    if (!response || !response.rows.length || !response.rows[0]?.input_key) {
-      throw new HTTP400('Failed to get submission s3Key');
+    if (!response.rowCount) {
+      throw new HTTP400('Failed to get submission record');
     }
 
     return 'platform/test/csv.zip';
@@ -57,7 +53,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Get Occurence row associated to occurence Id.
+   * Get Occurrence row associated to occurrence Id.
    *
    * @param {number} occurrenceId
    * @return {*}  {Promise<GetOccurrencesViewData>}
@@ -66,13 +62,9 @@ export class DarwinCoreService extends DBService {
   async getOccurrenceSubmission(occurrenceId: number): Promise<GetOccurrencesViewData> {
     const sqlStatement = Queries.occurrence.view.getOccurrencesForViewSQL(occurrenceId);
 
-    if (!sqlStatement) {
-      throw new HTTP400('Failed to build SQL get statement');
-    }
+    const response = await this.connection.sql(sqlStatement);
 
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
-
-    if (!response || !response.rows.length) {
+    if (!response.rowCount) {
       throw new HTTP400('Failed to get occurrence submission');
     }
 
@@ -166,13 +158,9 @@ export class DarwinCoreService extends DBService {
   async uploadScrapedOccurrence(submissionId: number, scrapedOccurrence: PostOccurrence) {
     const sqlStatement = Queries.occurrence.create.postOccurrenceSQL(submissionId, scrapedOccurrence);
 
-    if (!sqlStatement) {
-      throw new HTTP400('Failed to build SQL post statement');
-    }
+    const response = await this.connection.sql(sqlStatement);
 
-    const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
-
-    if (!response || !response.rowCount) {
+    if (!response.rowCount) {
       throw new HTTP400('Failed to insert occurrence data');
     }
   }
