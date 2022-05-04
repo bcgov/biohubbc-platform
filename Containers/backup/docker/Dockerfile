@@ -1,16 +1,18 @@
 # This image provides a postgres installation from which to run backups
 
-FROM artifacts.developer.gov.bc.ca/docker-remote/centos/postgresql-12-centos7
+FROM artifacts.developer.gov.bc.ca/redhat-docker-remote/ubi8/ubi:8.3
 
 # Change timezone to PST for convenience
 ENV TZ=PST8PDT
+
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+RUN dnf install -y postgresql14-server postgresql14-contrib
 
 # Set the workdir to be root
 WORKDIR /
 
 # Load the backup scripts into the container (must be executable).
 COPY backup.* /
-COPY s3_config.txt /
 
 COPY webhook-template.json /
 
@@ -28,8 +30,6 @@ ARG GOCROND_VERSION=0.6.3
 ADD https://github.com/$SOURCE_REPO/go-crond/releases/download/$GOCROND_VERSION/go-crond-64-linux /usr/bin/go-crond
 
 USER root
-RUN yum install -y epel-release
-RUN yum -y install s3cmd
 
 RUN chmod +x /usr/bin/go-crond
 RUN chmod +x /backup.sh
@@ -45,4 +45,4 @@ RUN echo $TZ > /etc/timezone
 USER 26
 
 # Set the default CMD.
-CMD envsubst < /s3_config.txt > ~/.s3cfg &&  sh /backup.sh
+CMD sh /backup.sh
