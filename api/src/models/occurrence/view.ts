@@ -10,24 +10,26 @@ export class GetOccurrencesViewData {
   occurrences: IGetOccurrencesViewData[];
 
   constructor(occurrencesData?: any) {
-    this.occurrences = occurrencesData?.map((occurrence: any) => {
-      const feature =
-        (occurrence.geometry && { type: 'Feature', geometry: JSON.parse(occurrence.geometry), properties: {} }) || null;
+    this.occurrences =
+      occurrencesData?.map((occurrence: any) => {
+        const feature =
+          (occurrence.geometry && { type: 'Feature', geometry: JSON.parse(occurrence.geometry), properties: {} }) ||
+          null;
 
-      return {
-        occurrenceId: occurrence.occurrence_id,
-        submissionId: occurrence.submission_id,
-        taxonId: occurrence.taxonid,
-        lifeStage: occurrence.lifestage,
-        sex: occurrence.sex,
-        eventDate: occurrence.eventdate,
-        vernacularName: occurrence.vernacularname,
-        individualCount: Number(occurrence.individualcount),
-        organismQuantity: Number(occurrence.organismquantity),
-        organismQuantityType: occurrence.organismquantitytype,
-        geometry: feature
-      };
-    });
+        return {
+          occurrenceId: occurrence.occurrence_id,
+          submissionId: occurrence.submission_id,
+          taxonId: occurrence.taxonid,
+          lifeStage: occurrence.lifestage,
+          sex: occurrence.sex,
+          eventDate: occurrence.eventdate,
+          vernacularName: occurrence.vernacularname,
+          individualCount: Number(occurrence.individualcount),
+          organismQuantity: Number(occurrence.organismquantity),
+          organismQuantityType: occurrence.organismquantitytype,
+          geometry: feature
+        };
+      }) || null;
   }
 }
 

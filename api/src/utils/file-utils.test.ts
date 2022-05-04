@@ -20,20 +20,14 @@ describe('getS3SignedURL', () => {
 
 describe('generateS3FileKey', () => {
   it('returns a basic file path', async () => {
-    const result = generateS3FileKey({ fileName: 'testFileName' });
+    const result = generateS3FileKey({ submissionId: 1, fileName: 'testFileName' });
 
-    expect(result).to.equal('platform/testFileName');
+    expect(result).to.equal('platform/1/testFileName');
   });
 
   it('returns a long file path', async () => {
-    const result = generateS3FileKey({ fileName: 'extra/folders/testFileName' });
+    const result = generateS3FileKey({ submissionId: 1, fileName: 'extra/folders/testFileName' });
 
-    expect(result).to.equal('platform/extra/folders/testFileName');
-  });
-
-  it('returns file path with folder', async () => {
-    const result = generateS3FileKey({ fileName: 'testFileName', folder: 'afolder' });
-
-    expect(result).to.equal('platform/afolder/testFileName');
+    expect(result).to.equal('platform/1/extra/folders/testFileName');
   });
 });
