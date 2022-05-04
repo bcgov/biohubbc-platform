@@ -1,18 +1,20 @@
 import { SQL, SQLStatement } from 'sql-template-strings';
 
-export const getOccurrencesForViewSQL = (occurrenceSubmissionId: number): SQLStatement => {
+export const getOccurrencesForViewSQL = (occurrenceId: number): SQLStatement => {
   const sqlStatement: SQLStatement = SQL`
       SELECT
-        public.ST_asGeoJSON(o.geography) as geometry,
-        o.taxonid,
         o.occurrence_id,
+        o.submission_id,
+        o.occurrenceid,
+        o.taxonid,
         o.lifestage,
         o.sex,
         o.vernacularname,
+        o.eventdate,
         o.individualcount,
         o.organismquantity,
         o.organismquantitytype,
-        o.eventdate
+        public.ST_asGeoJSON(o.geography) as geometry
       FROM
         occurrence as o
       LEFT OUTER JOIN
@@ -20,7 +22,7 @@ export const getOccurrencesForViewSQL = (occurrenceSubmissionId: number): SQLSta
       ON
         o.occurrence_submission_id = os.occurrence_submission_id
       WHERE
-        o.occurrence_submission_id = ${occurrenceSubmissionId}
+        o.occurrence_submission_id = ${occurrenceId}
       AND
         os.delete_timestamp is null;
     `;

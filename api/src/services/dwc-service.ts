@@ -1,6 +1,7 @@
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { HTTP400 } from '../errors/http-error';
 import { PostOccurrence } from '../models/occurrence/create';
+import { GetOccurrencesViewData } from '../models/occurrence/view';
 import { Queries } from '../queries';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile } from '../utils/media/media-file';
@@ -8,7 +9,14 @@ import { parseUnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './service';
 
 export class DarwinCoreService extends DBService {
-  async getS3Key(submissionId: number) {
+  /**
+   * Collect s3Key from subbmison file in db
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<string>}
+   * @memberof DarwinCoreService
+   */
+  async getS3Key(submissionId: number): Promise<string> {
     const sqlStatement = await Queries.submission.view.getSubmissionForViewSQL(submissionId);
 
     if (!sqlStatement) {
@@ -17,14 +25,21 @@ export class DarwinCoreService extends DBService {
 
     const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
 
-    if (!response || !response.rows.length) {
-      throw new HTTP400('Failed to get submission');
+    if (!response || !response.rows.length || !response.rows[0]?.input_key) {
+      throw new HTTP400('Failed to get submission s3Key');
     }
 
     return 'platform/test/csv.zip';
-    // return response.rows[0]?.input_key;
+    // return response.rows[0]?.input_key; //TODO IMPORTANT ACTUAL FUNCTIONALITY HERE!!!!!!!!
   }
 
+  /**
+   * Parse out submission file to convert to DWArchive file
+   *
+   * @param {GetObjectOutput} s3File
+   * @return {*}  {Promise<DWCArchive>}
+   * @memberof DarwinCoreService
+   */
   async prepDWCArchive(s3File: GetObjectOutput): Promise<DWCArchive> {
     const parsedMedia = parseUnknownMedia(s3File);
 
@@ -41,8 +56,15 @@ export class DarwinCoreService extends DBService {
     return dwcArchive;
   }
 
-  async getOccurrenceSubmission(occurrenceSubmissionId: number) {
-    const sqlStatement = Queries.occurrence.view.getOccurrencesForViewSQL(occurrenceSubmissionId);
+  /**
+   * Get Occurence row associated to occurence Id.
+   *
+   * @param {number} occurrenceId
+   * @return {*}  {Promise<GetOccurrencesViewData>}
+   * @memberof DarwinCoreService
+   */
+  async getOccurrenceSubmission(occurrenceId: number): Promise<GetOccurrencesViewData> {
+    const sqlStatement = Queries.occurrence.view.getOccurrencesForViewSQL(occurrenceId);
 
     if (!sqlStatement) {
       throw new HTTP400('Failed to build SQL get statement');
@@ -51,12 +73,19 @@ export class DarwinCoreService extends DBService {
     const response = await this.connection.query(sqlStatement.text, sqlStatement.values);
 
     if (!response || !response.rows.length) {
-      throw new HTTP400('Failed to get survey occurrence submission');
+      throw new HTTP400('Failed to get occurrence submission');
     }
 
-    return response.rows[0];
+    return new GetOccurrencesViewData(response.rows[0]);
   }
 
+  /**
+   * Scrape submission file for occurence data and upload to db.
+   *
+   * @param {number} occurrenceSubmissionId
+   * @param {DWCArchive} dwcArchive
+   * @memberof DarwinCoreService
+   */
   async scrapeAndUploadOccurrences(occurrenceSubmissionId: number, dwcArchive: DWCArchive) {
     const {
       occurrenceRows,
@@ -131,9 +160,8 @@ export class DarwinCoreService extends DBService {
    * Upload scraped occurrence data.
    *
    * @param {number} submissionId
-   * @param {any} scrapedOccurrence
-   * @param {IDBConnection} connection
-   * @return {*}
+   * @param {PostOccurrence} scrapedOccurrence
+   * @memberof DarwinCoreService
    */
   async uploadScrapedOccurrence(submissionId: number, scrapedOccurrence: PostOccurrence) {
     const sqlStatement = Queries.occurrence.create.postOccurrenceSQL(submissionId, scrapedOccurrence);
@@ -150,7 +178,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   *
+   * Collect headers and rows from subbmission file
    *
    * @param {DWCArchive} dwcArchive
    * @return {*}

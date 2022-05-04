@@ -1,3 +1,5 @@
+import { Feature } from 'geojson';
+
 /**
  * Pre-processes GET occurrences data for view-only purposes
  *
@@ -5,7 +7,7 @@
  * @class GetOccurrencesViewData
  */
 export class GetOccurrencesViewData {
-  occurrences: any[];
+  occurrences: IGetOccurrencesViewData[];
 
   constructor(occurrencesData?: any) {
     this.occurrences = occurrencesData?.map((occurrence: any) => {
@@ -13,17 +15,32 @@ export class GetOccurrencesViewData {
         (occurrence.geometry && { type: 'Feature', geometry: JSON.parse(occurrence.geometry), properties: {} }) || null;
 
       return {
-        geometry: feature,
-        taxonId: occurrence.taxonid,
         occurrenceId: occurrence.occurrence_id,
-        individualCount: Number(occurrence.individualcount),
+        submissionId: occurrence.submission_id,
+        taxonId: occurrence.taxonid,
         lifeStage: occurrence.lifestage,
         sex: occurrence.sex,
+        eventDate: occurrence.eventdate,
+        vernacularName: occurrence.vernacularname,
+        individualCount: Number(occurrence.individualcount),
         organismQuantity: Number(occurrence.organismquantity),
         organismQuantityType: occurrence.organismquantitytype,
-        vernacularName: occurrence.vernacularname,
-        eventDate: occurrence.eventdate
+        geometry: feature
       };
     });
   }
+}
+
+export interface IGetOccurrencesViewData {
+  occurrenceId: number;
+  submissionId: number;
+  taxonId: string;
+  lifeStage: string;
+  sex: string;
+  eventDate: string; //TODO is this a timeStamp?
+  vernacularName: string;
+  individualCount: number;
+  organismQuantity: number;
+  organismQuantityType: string;
+  geometry: Feature;
 }
