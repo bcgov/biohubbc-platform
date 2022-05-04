@@ -1,9 +1,9 @@
 import AWS from 'aws-sdk';
 import { DeleteObjectOutput, GetObjectOutput, ManagedUpload, Metadata } from 'aws-sdk/clients/s3';
-import { S3_ROLE } from '../constants/roles';
 import clamd from 'clamdjs';
+import { S3_ROLE } from '../constants/roles';
 
-const clamScanner =
+const ClamAVScanner =
   (process.env.ENABLE_FILE_VIRUS_SCAN === 'true' &&
     clamd.createScanner(process.env.CLAMAV_HOST || 'clamav', Number(process.env.CLAMAV_PORT) || 3310)) ||
   null;
@@ -64,6 +64,16 @@ export async function uploadFileToS3(
   }).promise();
 }
 
+/**
+ * Upload a file buffer to S3.F
+ *
+ * @export
+ * @param {Buffer} buffer a file buffer containing information about a single piece of media.
+ * @param {string} mimetype the file mimetype.
+ * @param {string} key the path where S3 will store the file
+ * @param {Metadata} [metadata={}] A metadata object to store additional information with the file
+ * @return {*}  {Promise<ManagedUpload.SendData>} the response from S3 or null if required parameters are null
+ */
 export async function uploadBufferToS3(
   buffer: Buffer,
   mimetype: string,
@@ -115,55 +125,44 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 }
 
 export interface IS3FileKey {
-  projectId: number;
-  surveyId?: number;
-  submissionId?: number;
-  summaryId?: number;
   folder?: string;
   fileName: string;
 }
 
+/**
+ * Helper function for generating S3 keys.
+ *
+ * @export
+ * @param {IS3FileKey} options
+ * @return {*}  {string}
+ */
 export function generateS3FileKey(options: IS3FileKey): string {
-  const keyParts: (string | number)[] = [];
-
-  if (options.projectId) {
-    keyParts.push('projects');
-    keyParts.push(options.projectId);
-  }
-
-  if (options.surveyId) {
-    keyParts.push('surveys');
-    keyParts.push(options.surveyId);
-  }
-
-  if (options.submissionId) {
-    keyParts.push('submissions');
-    keyParts.push(options.submissionId);
-  }
-
-  if (options.summaryId) {
-    keyParts.push('summaryresults');
-    keyParts.push(options.summaryId);
-  }
+  const keyParts: (string | number)[] = ['platform'];
 
   if (options.folder) {
     keyParts.push(options.folder);
   }
 
-  if (options.fileName) {
-    keyParts.push(options.fileName);
-  }
+  keyParts.push(options.fileName);
 
   return keyParts.join('/');
 }
 
+/**
+ * Scan a file for viruses.
+ *
+ * @export
+ * @param {Express.Multer.File} file
+ * @return {*}  {Promise<boolean>} `true` if the file is safe, `false` if the file is a virus or contains malicious
+ * content.
+ */
 export async function scanFileForVirus(file: Express.Multer.File): Promise<boolean> {
   // if virus scan is not to be performed/cannot be performed
-  if (!clamScanner) {
+  if (!ClamAVScanner) {
     return true;
   }
 
-  const clamavScanResult = await clamScanner.scanBuffer(file.buffer, 3000, 1024 * 1024);
+  const clamavScanResult = await ClamAVScanner.scanBuffer(file.buffer, 3000, 1024 * 1024);
 
   // if virus found in file
   if (clamavScanResult.includes('FOUND')) {

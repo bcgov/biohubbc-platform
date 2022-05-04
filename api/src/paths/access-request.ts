@@ -6,6 +6,7 @@ import { SYSTEM_ROLE } from '../constants/roles';
 import { getDBConnection, IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
+import { defaultErrorResponses } from '../openapi/schemas/http-responses';
 import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
 import { GCNotifyService } from '../services/gcnotify-service';
@@ -81,21 +82,7 @@ PUT.apiDoc = {
     200: {
       description: 'Add system user roles to user OK.'
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 

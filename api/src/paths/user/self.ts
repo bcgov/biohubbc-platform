@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
+import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { UserService } from '../../services/user-service';
 import { getLogger } from '../../utils/logger';
@@ -70,21 +71,7 @@ GET.apiDoc = {
         }
       }
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 

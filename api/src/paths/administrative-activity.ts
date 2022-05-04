@@ -8,6 +8,7 @@ import {
   administrativeActivityResponseObject,
   hasPendingAdministrativeActivitiesResponseObject
 } from '../openapi/schemas/administrative-activity';
+import { defaultErrorResponses } from '../openapi/schemas/http-responses';
 import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
 import { GCNotifyService } from '../services/gcnotify-service';
@@ -55,21 +56,7 @@ POST.apiDoc = {
         }
       }
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 
@@ -104,21 +91,7 @@ GET.apiDoc = {
         }
       }
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 
@@ -271,24 +244,7 @@ PUT.apiDoc = {
     }
   },
   responses: {
-    200: {
-      description: 'Put administrative activity OK'
-    },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 
