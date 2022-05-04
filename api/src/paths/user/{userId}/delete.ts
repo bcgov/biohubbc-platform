@@ -36,7 +36,7 @@ DELETE.apiDoc = {
       in: 'path',
       name: 'userId',
       schema: {
-        type: 'number'
+        type: 'integer'
       },
       required: true
     }

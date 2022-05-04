@@ -71,11 +71,11 @@ GET.apiDoc = {
               type: 'object',
               properties: {
                 id: {
-                  type: 'number',
+                  type: 'integer',
                   description: 'Administrative activity row ID'
                 },
                 type: {
-                  type: 'number',
+                  type: 'integer',
                   description: 'Administrative activity type ID'
                 },
                 type_name: {
@@ -83,7 +83,7 @@ GET.apiDoc = {
                   description: 'Administrative activity type name'
                 },
                 status: {
-                  type: 'number',
+                  type: 'integer',
                   description: 'Administrative activity status type ID'
                 },
                 status_name: {

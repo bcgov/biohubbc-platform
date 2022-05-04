@@ -42,7 +42,7 @@ GET.apiDoc = {
               type: 'object',
               properties: {
                 id: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 user_identifier: {
                   type: 'string'

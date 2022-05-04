@@ -259,11 +259,11 @@ PUT.apiDoc = {
           properties: {
             id: {
               title: 'administrative activity record ID',
-              type: 'number'
+              type: 'integer'
             },
             status: {
               title: 'administrative activity status type code ID',
-              type: 'number'
+              type: 'integer'
             }
           }
         }

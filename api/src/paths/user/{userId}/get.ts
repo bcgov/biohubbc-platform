@@ -36,7 +36,7 @@ GET.apiDoc = {
       in: 'path',
       name: 'userId',
       schema: {
-        type: 'number'
+        type: 'integer'
       },
       required: true
     }
@@ -52,7 +52,7 @@ GET.apiDoc = {
             properties: {
               id: {
                 description: 'user id',
-                type: 'number'
+                type: 'integer'
               },
               user_identifier: {
                 description: 'The unique user identifier',
@@ -66,7 +66,7 @@ GET.apiDoc = {
                 description: 'list of role ids for the user',
                 type: 'array',
                 items: {
-                  type: 'number'
+                  type: 'integer'
                 }
               },
               role_names: {

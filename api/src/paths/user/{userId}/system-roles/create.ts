@@ -36,7 +36,7 @@ POST.apiDoc = {
       in: 'path',
       name: 'userId',
       schema: {
-        type: 'number'
+        type: 'integer'
       },
       required: true
     }
@@ -52,7 +52,7 @@ POST.apiDoc = {
             roles: {
               type: 'array',
               items: {
-                type: 'number'
+                type: 'integer'
               },
               description: 'An array of role ids'
             }

@@ -7,7 +7,7 @@ export const administrativeActivityResponseObject = {
   required: ['id', 'date'],
   properties: {
     id: {
-      type: 'number'
+      type: 'integer'
     },
     date: {
       type: 'string',
@@ -21,5 +21,5 @@ export const administrativeActivityResponseObject = {
  */
 export const hasPendingAdministrativeActivitiesResponseObject = {
   title: '`Has Pending Administrative Activities` Response Object',
-  type: 'number'
+  type: 'integer'
 };

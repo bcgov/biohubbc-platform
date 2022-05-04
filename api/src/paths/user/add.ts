@@ -49,7 +49,7 @@ POST.apiDoc = {
               enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID]
             },
             roleId: {
-              type: 'number',
+              type: 'integer',
               minimum: 1
             }
           }

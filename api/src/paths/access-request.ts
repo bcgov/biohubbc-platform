@@ -57,17 +57,17 @@ PUT.apiDoc = {
               enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID]
             },
             requestId: {
-              type: 'number',
+              type: 'integer',
               description: 'The id of the access request to update.'
             },
             requestStatusTypeId: {
-              type: 'number',
+              type: 'integer',
               description: 'The status type id to set for the access request.'
             },
             roleIds: {
               type: 'array',
               items: {
-                type: 'number'
+                type: 'integer'
               },
               description:
                 'An array of role ids to add, if the access-request was approved. Ignored if the access-request was denied.'

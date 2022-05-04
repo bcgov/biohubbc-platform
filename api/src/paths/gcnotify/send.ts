@@ -61,7 +61,7 @@ POST.apiDoc = {
                   type: 'string'
                 },
                 userId: {
-                  type: 'number'
+                  type: 'integer'
                 }
               }
             },
