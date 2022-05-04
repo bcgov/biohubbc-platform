@@ -243,6 +243,27 @@ jobs:
           # npm ci
           DEBUG=* npm run db-setup:deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
 
+  cycleschemaspy:
+    name: Cycle SchemaSpy to refresh after database update in dev
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false && github.base_ref == 'dev' }}
+    env:
+      BUILD_ID: ${{ github.event.number }}
+    needs:
+      - deployDatabaseSetup
+    steps:
+      # Log in to OpenShift.
+      # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
+      # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
+      - name: Log in to OpenShift
+        run: oc login --token=${{ secrets.TOOLS_SA_TOKEN }} --server=https://api.silver.devops.gov.bc.ca:6443
+
+      - name: Scale down
+        run: |
+          oc project a0ec71-dev
+          oc scale --replicas=0 dc schemaspy
+          oc scale --replicas=1 dc schemaspy
+
   # Clean build/deployment artifacts
   clean:
     name: Clean Build/Deployment Artifacts
