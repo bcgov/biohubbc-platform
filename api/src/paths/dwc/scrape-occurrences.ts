@@ -4,6 +4,7 @@ import { PROJECT_ROLE } from '../../constants/roles';
 import { getDBConnection } from '../../database/db';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../services/dwc-service';
+import { SubmissionService } from '../../services/submission-service';
 import { getFileFromS3 } from '../../utils/file-utils';
 import { getLogger } from '../../utils/logger';
 import { DWCArchive } from '../../utils/media/dwc/dwc-archive-file';
@@ -83,11 +84,13 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
     try {
       await connection.open();
 
+      const submissionService = new SubmissionService(connection);
+
+      const submissionObject = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+      const s3File = await getFileFromS3(submissionObject.input_key);
+
       const darwinCoreService = new DarwinCoreService(connection);
-
-      const s3Key = await darwinCoreService.getS3Key(submissionId);
-
-      const s3File = await getFileFromS3(s3Key);
 
       const dwcArchive: DWCArchive = await darwinCoreService.prepDWCArchive(s3File);
 

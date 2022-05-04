@@ -128,10 +128,10 @@ export function submitDataset(): RequestHandler {
         uuid: dataPackageId
       });
 
-      const submissionId = response.rows?.[0]?.submissionId;
+      const submissionId = response.rows[0].submission_id;
 
       if (!submissionId) {
-        throw new HTTP400('Failed to insert submission record');
+        throw new HTTP400('Failed to insert submission record', ['submissionId was null or undefined']);
       }
 
       const s3Key = generateS3FileKey({
@@ -139,7 +139,7 @@ export function submitDataset(): RequestHandler {
         fileName: (parsedMedia as ArchiveFile).fileName
       });
 
-      await submissionService.updateSubmissionRecordInputKey(submissionId);
+      await submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
 
       await uploadFileToS3(rawMediaFile, s3Key, {
         filename: rawMediaFile.originalname

@@ -1,20 +1,21 @@
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { HTTP400 } from '../errors/http-error';
+import { IInsertSubmissionRecord, ISubmissionRecord, SubmissionObject } from '../models/submission/view';
 import { DBService } from './service';
 
-export interface ISubmissionData {
-  source: string;
-  uuid: string;
-  event_timestamp: string;
-  input_key: string;
-  input_file_name: string;
-  eml_source: string;
-  darwin_core_source: string;
-}
-
 export class SubmissionService extends DBService {
-  async insertSubmissionRecord(submissionData: ISubmissionData): Promise<QueryResult<any>> {
+  /**
+   * Insert a new submission record.
+   *
+   * @param {IInsertSubmissionRecord} submissionData
+   * @return {*}  {Promise<QueryResult<{ submission_id: number }>>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionRecord(
+    submissionData: IInsertSubmissionRecord
+  ): Promise<QueryResult<{ submission_id: number }>> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source,
@@ -37,7 +38,7 @@ export class SubmissionService extends DBService {
         submission_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission record');
@@ -46,23 +47,52 @@ export class SubmissionService extends DBService {
     return response;
   }
 
-  async updateSubmissionRecordInputKey(inputKey: ISubmissionData['input_key']): Promise<QueryResult<any>> {
+  /**
+   * Update the `input_key` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {IInsertSubmissionRecord['input_key']} inputKey
+   * @return {*}  {Promise<QueryResult<never>>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionRecordInputKey(
+    submissionId: number,
+    inputKey: IInsertSubmissionRecord['input_key']
+  ): Promise<QueryResult<never>> {
     const sqlStatement = SQL`
-      UPDATE submission SET(
-        input_key
-      ) VALUES (
-        ${inputKey}
-      )
-      RETURNING
-        submission_id;
+      UPDATE
+        submission
+      SET
+        input_key = ${inputKey}
+      WHERE
+        submission_id = ${submissionId};
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql<never>(sqlStatement);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission record');
     }
 
     return response;
+  }
+
+  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionObject> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission
+      WHERE
+        submission_id = ${submissionId};
+    `;
+
+    const response = await this.connection.sql<ISubmissionRecord>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new HTTP400('Failed to get submission record');
+    }
+
+    return new SubmissionObject(response.rows[0]);
   }
 }

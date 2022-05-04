@@ -10,26 +10,6 @@ import { DBService } from './service';
 
 export class DarwinCoreService extends DBService {
   /**
-   * Collect s3Key from submission file in db
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<string>}
-   * @memberof DarwinCoreService
-   */
-  async getS3Key(submissionId: number): Promise<string> {
-    const sqlStatement = await Queries.submission.view.getSubmissionRecordSQL(submissionId);
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new HTTP400('Failed to get submission record');
-    }
-
-    return 'platform/test/csv.zip';
-    // return response.rows[0]?.input_key; //TODO IMPORTANT ACTUAL FUNCTIONALITY HERE!!!!!!!!
-  }
-
-  /**
    * Parse out submission file to convert to DWArchive file
    *
    * @param {GetObjectOutput} s3File
