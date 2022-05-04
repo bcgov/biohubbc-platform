@@ -36,9 +36,6 @@ export const parseUnknownMulterFile = (rawMedia: Express.Multer.File): null | Me
 export const parseUnknownS3File = (rawMedia: GetObjectOutput): null | MediaFile | ArchiveFile => {
   const mimetype = rawMedia.ContentType;
 
-  console.log('mimetype:', mimetype);
-
-
   if (isZipMimetype(mimetype || '')) {
     if (!rawMedia.Body) {
       return null;

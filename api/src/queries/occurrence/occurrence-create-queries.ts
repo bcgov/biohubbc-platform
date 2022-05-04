@@ -6,8 +6,6 @@ export const postOccurrenceSQL = (
   submissionId: number,
   occurrence: Models.occurrence.create.PostOccurrence
 ): SQLStatement => {
-  console.log('occurrence:', occurrence);
-
   const sqlStatement: SQLStatement = SQL`
     INSERT INTO occurrence (
       submission_id,

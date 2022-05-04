@@ -1,11 +1,11 @@
-import { DBService } from './service';
-import { HTTP400 } from '../errors/http-error';
-import { Queries } from '../queries';
-import { PostOccurrence } from '../models/occurrence/create';
-import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
-import { parseUnknownMedia } from '../utils/media/media-utils';
+import { HTTP400 } from '../errors/http-error';
+import { PostOccurrence } from '../models/occurrence/create';
+import { Queries } from '../queries';
+import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile } from '../utils/media/media-file';
+import { parseUnknownMedia } from '../utils/media/media-utils';
+import { DBService } from './service';
 
 export class DarwinCoreService extends DBService {
   async getS3Key(submissionId: number) {
@@ -21,16 +21,12 @@ export class DarwinCoreService extends DBService {
       throw new HTTP400('Failed to get submission');
     }
 
-    console.log('hello nthers no data in the base we are hotwiring this badboy');
-
     return 'platform/test/csv.zip';
     // return response.rows[0]?.input_key;
   }
 
   async prepDWCArchive(s3File: GetObjectOutput): Promise<DWCArchive> {
     const parsedMedia = parseUnknownMedia(s3File);
-
-    console.log('parsedMedia:', parsedMedia);
 
     if (!parsedMedia) {
       throw new HTTP400('Failed to parse submission, file was empty');
@@ -81,8 +77,6 @@ export class DarwinCoreService extends DBService {
       vernacularNameHeader
     } = this.getHeadersAndRowsFromFile(dwcArchive);
 
-    console.log('HELLO///////////////////////////////////////////////////');
-
     const scrapedOccurrences = occurrenceRows?.map((row: any) => {
       const occurrenceId = row[occurrenceIdHeader];
       const associatedTaxa = row[associatedTaxaHeader];
@@ -126,16 +120,11 @@ export class DarwinCoreService extends DBService {
       });
     });
 
-    console.log('scrapedOccurrences:', scrapedOccurrences);
-
     await Promise.all(
       scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
         await this.uploadScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
-
-        console.log('UPLOADING///////////////////////////////////////////////////');
       }) || []
     );
-    console.log('FINNNIIISSSSSSSSSSSSSHEEEEEEEEEEEEEEEEEEDDDDDDDDDDDDDDDDDDDDDDDDDD');
   }
 
   /**
