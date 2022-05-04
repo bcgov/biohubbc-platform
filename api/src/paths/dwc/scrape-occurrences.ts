@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { PROJECT_ROLE } from '../../constants/roles';
 import { getDBConnection } from '../../database/db';
+import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../services/dwc-service';
@@ -58,7 +59,6 @@ POST.apiDoc = {
       description: 'Successfully scraped and uploaded occurrence information.'
     },
     ...defaultErrorResponses
-    }
   }
 };
 
@@ -76,6 +76,10 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const submissionObject = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+      if (!submissionObject.input_key) {
+        throw new HTTP400('Failed to get submission record');
+      }
 
       const s3File = await getFileFromS3(submissionObject.input_key);
 

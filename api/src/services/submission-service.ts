@@ -2,8 +2,34 @@ import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
-import { IInsertSubmissionRecord, ISubmissionRecord, SubmissionObject } from '../models/submission/view';
 import { DBService } from './service';
+
+export interface IInsertSubmissionRecord {
+  source: string;
+  uuid: string;
+  event_timestamp: string;
+  input_key: string;
+  input_file_name: string;
+  eml_source: string;
+  darwin_core_source: string;
+}
+
+export interface ISubmissionRecord {
+  submission_id: number;
+  source: string | null;
+  uuid: string;
+  event_timestamp: string;
+  delete_timestamp: string | null;
+  input_key: string | null;
+  input_file_name: string | null;
+  eml_source: string | null;
+  darwin_core_source: string | null;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+}
 
 export class SubmissionService extends DBService {
   /**
@@ -77,7 +103,7 @@ export class SubmissionService extends DBService {
     return response;
   }
 
-  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<SubmissionObject> {
+  async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionRecord> {
     const sqlStatement = SQL`
       SELECT
         *
@@ -93,6 +119,6 @@ export class SubmissionService extends DBService {
       throw new HTTP400('Failed to get submission record');
     }
 
-    return new SubmissionObject(response.rows[0]);
+    return response.rows[0];
   }
 }
