@@ -1,31 +1,27 @@
-import { GetObjectOutput } from 'aws-sdk/clients/s3';
-import { HTTP400 } from '../errors/http-error';
+import { ApiGeneralError } from '../errors/api-error';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile } from '../utils/media/media-file';
-import { parseUnknownMedia } from '../utils/media/media-utils';
-import { DBService } from './db-service';
+import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 
-export class DarwinCoreService extends DBService {
+export class DarwinCoreService {
   /**
-   * Parse out submission file to convert to DWArchive file
+   * Parse unknown submission file and convert to DWArchive file.
    *
-   * @param {GetObjectOutput} s3File
-   * @return {*}  {Promise<DWCArchive>}
+   * @param {UnknownMedia} unknownMedia
+   * @return {*}  {DWCArchive}
    * @memberof DarwinCoreService
    */
-  async prepDWCArchive(s3File: GetObjectOutput): Promise<DWCArchive> {
-    const parsedMedia = parseUnknownMedia(s3File);
+  prepDWCArchive(unknownMedia: UnknownMedia): DWCArchive {
+    const parsedMedia = parseUnknownMedia(unknownMedia);
 
     if (!parsedMedia) {
-      throw new HTTP400('Failed to parse submission, file was empty');
+      throw new ApiGeneralError('Failed to parse submission, file was empty');
     }
 
     if (!(parsedMedia instanceof ArchiveFile)) {
-      throw new HTTP400('Failed to parse submission, not a valid DwC Archive Zip file');
+      throw new ApiGeneralError('Failed to parse submission, not a valid DwC Archive Zip file');
     }
 
-    const dwcArchive = new DWCArchive(parsedMedia);
-
-    return dwcArchive;
+    return new DWCArchive(parsedMedia);
   }
 }

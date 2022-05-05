@@ -3,16 +3,18 @@ import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import mime from 'mime';
 import { ArchiveFile, MediaFile } from './media-file';
 
+export type UnknownMedia = Express.Multer.File | GetObjectOutput;
+
 /**
  * Parses an unknown file into an array of MediaFile.
  *
  * Note: The array will always have 1 item unless the unknown file is a zip file containing multiple files, in which
  * case the array will have 1 item per file in the zip (folders ignored).
  *
- * @param {(Express.Multer.File | GetObjectOutput)} rawMedia
+ * @param {(UnknownMedia)} rawMedia
  * @return {*}  {(MediaFile | ArchiveFile)}
  */
-export const parseUnknownMedia = (rawMedia: Express.Multer.File | GetObjectOutput): null | MediaFile | ArchiveFile => {
+export const parseUnknownMedia = (rawMedia: UnknownMedia): null | MediaFile | ArchiveFile => {
   if ((rawMedia as Express.Multer.File).originalname) {
     return parseUnknownMulterFile(rawMedia as Express.Multer.File);
   } else {

@@ -6,10 +6,10 @@ import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../../services/dwc-service';
+import { OccurrenceService } from '../../../../services/occurrence/occurrence-service';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getFileFromS3 } from '../../../../utils/file-utils';
 import { getLogger } from '../../../../utils/logger';
-import { DWCArchive } from '../../../../utils/media/dwc/dwc-archive-file';
 
 const defaultLog = getLogger('paths/dwc/dataset/{submissionId}/scrape-occurrences');
 
@@ -64,7 +64,8 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
     try {
       await connection.open();
 
-      const darwinCoreService = new DarwinCoreService(connection);
+      const darwinCoreService = new DarwinCoreService();
+      const occurrenceService = new OccurrenceService(connection);
       const submissionService = new SubmissionService(connection);
 
       const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
@@ -75,9 +76,9 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
 
       const s3File = await getFileFromS3(submissionRecord.input_key);
 
-      const dwcArchive: DWCArchive = await darwinCoreService.prepDWCArchive(s3File);
+      const dwcArchive = await darwinCoreService.prepDWCArchive(s3File);
 
-      await darwinCoreService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
+      await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
 
       await connection.commit();
 

@@ -2,14 +2,14 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { v4 as uuidv4 } from 'uuid';
 import { getDBConnection } from '../../../database/db';
+import { ApiGeneralError } from '../../../errors/api-error';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { DarwinCoreService } from '../../../services/dwc-service';
 import { SubmissionService } from '../../../services/submission-service';
 import { generateS3FileKey, scanFileForVirus, uploadFileToS3 } from '../../../utils/file-utils';
 import { getLogger } from '../../../utils/logger';
-import { ArchiveFile } from '../../../utils/media/media-file';
-import { parseUnknownMedia } from '../../../utils/media/media-utils';
 
 const defaultLog = getLogger('paths/dwc/dataset/create');
 
@@ -87,31 +87,24 @@ export function submitDataset(): RequestHandler {
       throw new HTTP400('Missing required `media`');
     }
 
-    const rawMediaFile: Express.Multer.File = req.files[0];
+    const unknownMedia: Express.Multer.File = req.files[0];
 
     const dataPackageId = req.body.data_package_id || uuidv4();
 
-    if (!(await scanFileForVirus(rawMediaFile))) {
+    if (!(await scanFileForVirus(unknownMedia))) {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
-      const parsedMedia = parseUnknownMedia(rawMediaFile);
+      const darwinCoreService = new DarwinCoreService();
 
-      let parseError = '';
-
-      if (!parsedMedia) {
-        parseError = 'Failed to parse submission, file was empty';
-      }
-
-      if (!(parsedMedia instanceof ArchiveFile)) {
-        parseError = 'Failed to parse submission, not a valid DwC Archive Zip file';
-      }
-
-      if (parseError) {
-        throw new HTTP400(parseError);
+      let dwcArchive;
+      try {
+        dwcArchive = darwinCoreService.prepDWCArchive(unknownMedia);
+      } catch (error) {
+        throw new HTTP400((error as ApiGeneralError).message, (error as ApiGeneralError).errors);
       }
 
       await connection.open();
@@ -120,10 +113,10 @@ export function submitDataset(): RequestHandler {
 
       const response = await submissionService.insertSubmissionRecord({
         source: 'SIMS', // TODO temporarily hardcoded
-        input_file_name: (parsedMedia as ArchiveFile).fileName,
+        input_file_name: dwcArchive.rawFile.fileName,
         input_key: '',
         event_timestamp: new Date().toISOString(),
-        eml_source: '', // TODO populate
+        eml_source: dwcArchive.extra.eml,
         darwin_core_source: '{}', // TODO populate
         uuid: dataPackageId
       });
@@ -136,13 +129,13 @@ export function submitDataset(): RequestHandler {
 
       const s3Key = generateS3FileKey({
         submissionId: submissionId,
-        fileName: (parsedMedia as ArchiveFile).fileName
+        fileName: unknownMedia.originalname
       });
 
       await submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
 
-      await uploadFileToS3(rawMediaFile, s3Key, {
-        filename: rawMediaFile.originalname
+      await uploadFileToS3(unknownMedia, s3Key, {
+        filename: unknownMedia.originalname
       });
 
       await connection.commit();
