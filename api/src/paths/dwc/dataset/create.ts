@@ -98,7 +98,7 @@ export function submitDataset(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
-      const darwinCoreService = new DarwinCoreService();
+      const darwinCoreService = new DarwinCoreService(connection);
 
       let dwcArchive;
       try {
