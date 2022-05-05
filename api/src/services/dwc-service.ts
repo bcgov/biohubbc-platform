@@ -3,7 +3,7 @@ import { HTTP400 } from '../errors/http-error';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile } from '../utils/media/media-file';
 import { parseUnknownMedia } from '../utils/media/media-utils';
-import { DBService } from './service';
+import { DBService } from './db-service';
 
 export class DarwinCoreService extends DBService {
   /**

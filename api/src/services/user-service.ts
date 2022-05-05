@@ -1,7 +1,7 @@
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Models } from '../models';
 import { Queries } from '../queries';
-import { DBService } from './service';
+import { DBService } from './db-service';
 
 export class UserService extends DBService {
   /**
