@@ -2,14 +2,10 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { PROJECT_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../../services/dwc-service';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getFileFromS3 } from '../../../../utils/file-utils';
 import { getLogger } from '../../../../utils/logger';
-import { DWCArchive } from '../../../../utils/media/dwc/dwc-archive-file';
 
 const defaultLog = getLogger('paths/dwc/dataset/{submissionId}/scrape-occurrences');
 
@@ -47,7 +43,23 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Successfully scraped and uploaded occurrence information.'
+      description: 'Successfully scraped and uploaded occurrence information.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['occurrence_id'],
+              properties: {
+                occurrence_id: {
+                  type: 'number'
+                }
+              }
+            }
+          }
+        }
+      }
     },
     ...defaultErrorResponses
   }
@@ -65,23 +77,12 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
       await connection.open();
 
       const darwinCoreService = new DarwinCoreService(connection);
-      const submissionService = new SubmissionService(connection);
 
-      const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
-
-      if (!submissionRecord.input_key) {
-        throw new HTTP400('s3Key for submission unavailable');
-      }
-
-      const s3File = await getFileFromS3(submissionRecord.input_key);
-
-      const dwcArchive: DWCArchive = await darwinCoreService.prepDWCArchive(s3File);
-
-      await darwinCoreService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
+      const response = await darwinCoreService.scrapeAndUploadOccurences(submissionId);
 
       await connection.commit();
 
-      res.status(200).send();
+      res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'scrapeAndUploadOccurrences', message: 'error', error });
       await connection.rollback();

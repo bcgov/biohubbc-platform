@@ -51,9 +51,8 @@ export class OccurrenceRepository extends BaseRepository {
     submissionId: number,
     scrapedOccurrence: IPostOccurrenceData
   ): Promise<{ occurrence_id: number }> {
-    const queryBuilder = getKnexQueryBuilder().insert({
+    let insertData = {
       submission_id: submissionId,
-
       taxonid: scrapedOccurrence.associatedTaxa,
       lifestage: scrapedOccurrence.lifeStage,
       sex: scrapedOccurrence.sex,
@@ -61,68 +60,42 @@ export class OccurrenceRepository extends BaseRepository {
       eventdate: scrapedOccurrence.eventDate,
       individualcount: scrapedOccurrence.individualCount,
       organismquantity: scrapedOccurrence.organismQuantity,
-      organismquantitytype: scrapedOccurrence.organismQuantityType,
-      geography: ''
-    }).from;
-    const sqlStatement = SQL`
-      INSERT INTO occurrence (
-        submission_id
-        taxonid,
-        lifestage,
-        sex,
-        vernacularname,
-        eventdate,
-        individualcount,
-        organismquantity,
-        organismquantitytype,
-        geography
-      ) VALUES (
-        ${submissionId},
-        ${scrapedOccurrence.associatedTaxa},
-        ${scrapedOccurrence.lifeStage},
-        ${scrapedOccurrence.sex},
-        ${scrapedOccurrence.vernacularName},
-        ${scrapedOccurrence.eventDate},
-        ${scrapedOccurrence.individualCount},
-        ${scrapedOccurrence.organismQuantity},
-        ${scrapedOccurrence.organismQuantityType}
-    `;
+      organismquantitytype: scrapedOccurrence.organismQuantityType
+    };
 
     const utm = parseUTMString(scrapedOccurrence.verbatimCoordinates || '');
     const latLong = parseLatLongString(scrapedOccurrence.verbatimCoordinates || '');
 
+    //TODO UNSURE IF THIS WORKS NEEDS TO BE TESTED
     if (utm) {
       // transform utm string into point, if it is not null
-      sqlStatement.append(SQL`
-      ,public.ST_Transform(
-        public.ST_SetSRID(
-          public.ST_MakePoint(${utm.easting}, ${utm.northing}),
-          ${utm.zone_srid}
-        ),
-        4326
-      )
-    `);
+      insertData = Object.assign(insertData, {
+        geography: SQL`
+          public.ST_Transform(
+            public.ST_SetSRID(
+              public.ST_MakePoint(${utm.easting}, ${utm.northing}),
+              ${utm.zone_srid}
+            ),
+            4326
+          )`
+      });
     } else if (latLong) {
       // transform latLong string into point, if it is not null
-      sqlStatement.append(SQL`
-      ,public.ST_Transform(
-        public.ST_SetSRID(
-          public.ST_MakePoint(${latLong.long}, ${latLong.lat}),
-          4326
-        ),
-        4326
-      )
-    `);
-    } else {
-      // insert null geography
-      sqlStatement.append(SQL`
-        ,null
-      `);
+      insertData = Object.assign(insertData, {
+        geography: SQL`
+          public.ST_Transform(
+            public.ST_SetSRID(
+              public.ST_MakePoint(${latLong.long}, ${latLong.lat}),
+              4326
+            ),
+            4326
+          )`
+      });
     }
 
-    sqlStatement.append(') RETURNING occurrence_id;');
+    const queryBuilder = getKnexQueryBuilder().insert(insertData).from('occurrence').returning('occurrence_id');
 
-    const response = await this.connection.sql<{ occurrence_id: number }>(sqlStatement);
+    const response = await this.connection.knex(queryBuilder);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert occurrence data'); //TODO is sql connections an api error or http?

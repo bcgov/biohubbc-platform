@@ -1,11 +1,7 @@
-import { IDBConnection } from '../../database/db';
-import {
-  IGetOccurrenceData,
-  IPostOccurrenceData,
-  OccurrenceRepository
-} from '../../repositories/occurrence-repository';
-import { DWCArchive } from '../../utils/media/dwc/dwc-archive-file';
-import { DBService } from '../service';
+import { IDBConnection } from '../database/db';
+import { IGetOccurrenceData, IPostOccurrenceData, OccurrenceRepository } from '../repositories/occurrence-repository';
+import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { DBService } from './db-service';
 
 export class OccurrenceService extends DBService {
   occurrenceRepository: OccurrenceRepository;
@@ -19,22 +15,26 @@ export class OccurrenceService extends DBService {
    * Get Occurrence row associated to occurrence Id.
    *
    * @param {number} occurrenceId
-   * @return {*}  {Promise<GetOccurrencesViewData>}
+   * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceService
    */
   async getOccurrenceSubmission(occurrenceId: number): Promise<IGetOccurrenceData[]> {
-    return this.occurrenceRepository.getOccurrenceSubmission(occurrenceId);
+    return await this.occurrenceRepository.getOccurrenceSubmission(occurrenceId);
   }
 
   /**
    * Upload scraped occurrence data.
    *
    * @param {number} submissionId
-   * @param {PostOccurrence} scrapedOccurrence
+   * @param {IPostOccurrenceData} scrapedOccurrence
+   * @return {*}  {Promise<{ occurrence_id: number }>}
    * @memberof OccurrenceService
    */
-  async uploadScrapedOccurrence(submissionId: number, scrapedOccurrence: IPostOccurrenceData) {
-    return this.occurrenceRepository.uploadScrapedOccurrence(submissionId, scrapedOccurrence);
+  async uploadScrapedOccurrence(
+    submissionId: number,
+    scrapedOccurrence: IPostOccurrenceData
+  ): Promise<{ occurrence_id: number }> {
+    return await this.occurrenceRepository.uploadScrapedOccurrence(submissionId, scrapedOccurrence);
   }
 
   /**
@@ -42,9 +42,21 @@ export class OccurrenceService extends DBService {
    *
    * @param {number} occurrenceSubmissionId
    * @param {DWCArchive} dwcArchive
+   * @return {*}  {Promise<
+   *     {
+   *       occurrence_id: number;
+   *     }[]
+   *   >}
    * @memberof OccurrenceService
    */
-  async scrapeAndUploadOccurrences(occurrenceSubmissionId: number, dwcArchive: DWCArchive) {
+  async scrapeAndUploadOccurrences(
+    occurrenceSubmissionId: number,
+    dwcArchive: DWCArchive
+  ): Promise<
+    {
+      occurrence_id: number;
+    }[]
+  > {
     const {
       occurrenceRows,
       occurrenceIdHeader,
@@ -99,7 +111,7 @@ export class OccurrenceService extends DBService {
           lifeStage: lifeStage,
           sex: sex,
           individualCount: individualCount,
-          vernacularName: vernacularName || '',
+          vernacularName: vernacularName || '', //TODO How to handle undefined
           data: data,
           verbatimCoordinates: verbatimCoordinates || '',
           organismQuantity: organismQuantity,
@@ -109,11 +121,13 @@ export class OccurrenceService extends DBService {
       }
     );
 
-    await Promise.all(
+    const uploadResponse = await Promise.all(
       scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
-        await this.uploadScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
+        return await this.uploadScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
       }) || []
     );
+
+    return uploadResponse;
   }
 
   /**
