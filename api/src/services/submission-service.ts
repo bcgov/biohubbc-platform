@@ -1,7 +1,16 @@
+import { IDBConnection } from '../database/db';
 import { IInsertSubmissionRecord, ISubmissionModel, SubmissionRepository } from '../repositories/submission-repository';
-import { DBService } from './service';
+import { DBService } from './db-service';
 
 export class SubmissionService extends DBService {
+  submissionRepository: SubmissionRepository;
+
+  constructor(connection: IDBConnection) {
+    super(connection);
+
+    this.submissionRepository = new SubmissionRepository(this.connection);
+  }
+
   /**
    * Insert a new submission record.
    *
@@ -10,9 +19,7 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
-    const submissionRepository = new SubmissionRepository(this.connection);
-
-    return submissionRepository.insertSubmissionRecord(submissionData);
+    return this.submissionRepository.insertSubmissionRecord(submissionData);
   }
 
   /**
@@ -27,9 +34,7 @@ export class SubmissionService extends DBService {
     submissionId: number,
     inputKey: IInsertSubmissionRecord['input_key']
   ): Promise<{ submission_id: number }> {
-    const submissionRepository = new SubmissionRepository(this.connection);
-
-    return submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
+    return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
   }
 
   /**
@@ -40,8 +45,6 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
-    const submissionRepository = new SubmissionRepository(this.connection);
-
-    return submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+    return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
   }
 }
