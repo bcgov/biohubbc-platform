@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { PROJECT_ROLE } from '../../../../constants/roles';
 import { getDBConnection } from '../../../../database/db';
+import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../../services/dwc-service';
@@ -67,6 +68,10 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+      if (!submissionRecord.input_key) {
+        throw new HTTP400('s3Key for submission unavailable');
+      }
 
       const s3File = await getFileFromS3(submissionRecord.input_key);
 

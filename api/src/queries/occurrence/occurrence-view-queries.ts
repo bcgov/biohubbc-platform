@@ -1,5 +1,7 @@
 import { SQL, SQLStatement } from 'sql-template-strings';
 
+//TODO DELETE FILE
+
 export const getOccurrencesForViewSQL = (occurrenceId: number): SQLStatement => {
   return SQL`
       SELECT

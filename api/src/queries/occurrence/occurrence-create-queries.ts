@@ -2,6 +2,7 @@ import { SQL, SQLStatement } from 'sql-template-strings';
 import { Models } from '../../models';
 import { parseLatLongString, parseUTMString } from '../../utils/spatial-utils';
 
+//TODO DELETE FILE
 export const postOccurrenceSQL = (
   submissionId: number,
   occurrence: Models.occurrence.create.PostOccurrence
