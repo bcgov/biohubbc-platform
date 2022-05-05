@@ -128,7 +128,7 @@ export function submitDataset(): RequestHandler {
         uuid: dataPackageId
       });
 
-      const submissionId = response.rows[0].submission_id;
+      const submissionId = response.submission_id;
 
       if (!submissionId) {
         throw new HTTP400('Failed to insert submission record', ['submissionId was null or undefined']);
