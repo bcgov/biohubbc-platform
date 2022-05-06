@@ -2,14 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { HTTPError } from '../../../../errors/http-error';
 import { DarwinCoreService } from '../../../../services/dwc-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import chaiResponseValidator from 'chai-openapi-response-validator';
 import * as db from '../../../../database/db';
 import * as scrapeOccurrences from './scrape-occurrences';
 import { ApiGeneralError } from '../../../../errors/api-error';
-import axios from 'axios';
+import { OpenApiValidator } from 'openapi-data-validator';
+import { POST } from './scrape-occurrences';
+import { rootAPIDoc } from '../../../../openapi/root-api-doc';
+import { OpenAPIV3 } from 'openapi-data-validator/dist/framework/types';
 
 chai.use(sinonChai);
 
@@ -33,18 +34,41 @@ describe.only('scrape-occurrences', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const response = await axios.get('paths/dwc/dataset/1/scrape-occurrences');
-      const openApiSpec = response.data;
-      chai.use(chaiResponseValidator(openApiSpec));
+      const newPath = {
+        '/dwc/dataset/{submissionId}/scrape-occurrences': {
+          post: POST.apiDoc
+        }
+      };
+      console.log('newPath', newPath);
+
+      const newRootApiDoc: OpenAPIV3.Document = ({ ...rootAPIDoc, paths: newPath } as unknown) as OpenAPIV3.Document;
+
+      console.log('newRootApiDoc', newRootApiDoc);
+
+      const openApiValidator = new OpenApiValidator({ apiSpec: newRootApiDoc });
+
+      console.log('openApiValidator', openApiValidator);
+
+      const validator = await openApiValidator.createValidator();
+
+      console.log('validator', validator);
 
       try {
-        const res = await axios.get('http://localhost:6100/paths/dwc/dataset/null/scrape-occurrences');
+        const newRequest = {
+          method: 'POST',
+          route: '/dwc/dataset/{submissionId}/scrape-occurrences',
+          // headers: { Authorization: 'Bearer Token' },
+          // query: { limit: 10 },
+          // body: { field: true },
 
-        console.log('res:', res);
+          path: {}
+        };
+        await validator(newRequest);
 
         expect.fail();
-      } catch (actualError) {
-        console.log('actualError:', actualError);
+      } catch (error) {
+        expect((error as any).status).to.equal(400);
+        expect((error as any).errors[0].message).to.equal("must have required property 'submissionId'");
       }
     });
 
@@ -90,8 +114,6 @@ describe.only('scrape-occurrences', () => {
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();
       } catch (actualError) {
-        console.log('actualError:', actualError);
-
         expect(dbConnectionObj.commit).to.not.be.called;
         expect(dbConnectionObj.rollback).to.be.calledOnce;
         expect(dbConnectionObj.release).to.be.calledOnce;
