@@ -67,7 +67,7 @@ POST.apiDoc = {
 
 export function scrapeAndUploadOccurrences(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'scrapeAndUploadOccurrences', message: 'params', files: req.body });
+    defaultLog.debug({ label: 'scrapeAndUploadOccurrences', message: 'params', files: req.params });
 
     const submissionId = Number(req.params.submissionId);
 

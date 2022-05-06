@@ -93,7 +93,7 @@ export class OccurrenceRepository extends BaseRepository {
       });
     }
 
-    const queryBuilder = getKnexQueryBuilder().insert(insertData).from('occurrence').returning('occurrence_id');
+    const queryBuilder = getKnexQueryBuilder().insert(insertData).into('occurrence').returning('occurrence_id');
 
     const response = await this.connection.knex(queryBuilder);
 
