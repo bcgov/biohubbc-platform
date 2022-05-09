@@ -29,10 +29,6 @@ describe.only('scrape-occurrences', () => {
     const sampleRes = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
 
     it('should throw an error on OpenApiSchema validation', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
       const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
 
       const request = {
@@ -52,10 +48,6 @@ describe.only('scrape-occurrences', () => {
     });
 
     it('should succeed on OpenApiSchema validation', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
       const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
 
       const request = {
