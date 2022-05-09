@@ -38,15 +38,11 @@ export class OccurrenceService extends DBService {
   }
 
   /**
-   * Scrape submission file for occurence data and upload to db.
+   * Scrape submission file for occurrence data and upload to db.
    *
    * @param {number} occurrenceSubmissionId
    * @param {DWCArchive} dwcArchive
-   * @return {*}  {Promise<
-   *     {
-   *       occurrence_id: number;
-   *     }[]
-   *   >}
+   * @return {*}  {Promise<{ occurrence_id: number }[]>}
    * @memberof OccurrenceService
    */
   async scrapeAndUploadOccurrences(
@@ -127,7 +123,7 @@ export class OccurrenceService extends DBService {
   }
 
   /**
-   * Collect headers and rows from subbmission file
+   * Collect headers and rows from submission file
    *
    * @param {DWCArchive} dwcArchive
    * @return {*}
