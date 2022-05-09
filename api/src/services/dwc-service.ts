@@ -15,11 +15,15 @@ export class DarwinCoreService extends DBService {
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord.input_key) {
-      throw new ApiGeneralError('s3Key for submission unavailable');
+    if (!submissionRecord || !submissionRecord.input_key) {
+      throw new ApiGeneralError('s3Key submissionRecord unavailable');
     }
 
     const s3File = await getFileFromS3(submissionRecord.input_key);
+
+    if (!s3File) {
+      throw new ApiGeneralError('s3File unavailable');
+    }
 
     const dwcArchive: DWCArchive = await this.prepDWCArchive(s3File);
 
@@ -41,7 +45,7 @@ export class DarwinCoreService extends DBService {
     }
 
     if (!(parsedMedia instanceof ArchiveFile)) {
-      throw new ApiGeneralError('Failed to parse submission, not a valid DwC Archive Zip file');
+      throw new ApiGeneralError('Failed to parse submission, not a valid Archive file');
     }
 
     return new DWCArchive(parsedMedia);

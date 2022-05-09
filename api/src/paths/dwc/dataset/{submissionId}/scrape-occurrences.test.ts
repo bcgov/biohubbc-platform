@@ -13,7 +13,7 @@ import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-
 
 chai.use(sinonChai);
 
-describe.only('scrape-occurrences', () => {
+describe('scrape-occurrences', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
