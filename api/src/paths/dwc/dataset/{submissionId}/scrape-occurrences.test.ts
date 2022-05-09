@@ -9,11 +9,107 @@ import * as scrapeOccurrences from './scrape-occurrences';
 import { ApiGeneralError } from '../../../../errors/api-error';
 import { POST } from './scrape-occurrences';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
-// import { rootAPIDoc } from '../../../../openapi/root-api-doc';
+import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 
 chai.use(sinonChai);
 
 describe.only('scrape-occurrences', () => {
+  describe('openApiSchema', () => {
+    describe('request validation', () => {
+      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+
+      const basicRequest = {
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: {},
+        params: {}
+      };
+
+      describe('should throw an error when', () => {
+        it('has null value', async () => {
+          const request = { ...basicRequest, params: { submissionId: null } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response.status).to.equal(400);
+          expect(response.errors[0].message).to.equal('must be number');
+        });
+
+        it('has negative value', async () => {
+          const request = { ...basicRequest, params: { submissionId: -1 } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response.status).to.equal(400);
+          expect(response.errors[0].message).to.equal('must be >= 0');
+        });
+
+        it('has string value', async () => {
+          const request = { ...basicRequest, params: { submissionId: 'string' } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response.status).to.equal(400);
+          expect(response.errors[0].message).to.equal('must be number');
+        });
+
+        it('has invalid key', async () => {
+          const request = { ...basicRequest, params: { id: 1 } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response.status).to.equal(400);
+          expect(response.errors[0].message).to.equal("must have required property 'submissionId'");
+        });
+      });
+
+      describe('should succeed when', () => {
+        it('has valid values', async () => {
+          const request = { ...basicRequest, params: { submissionId: 1 } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response).to.equal(undefined);
+        });
+      });
+    });
+
+    describe('response validation', () => {
+      const responseValidator = new OpenAPIResponseValidator((POST.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+
+      describe('should throw an error when', () => {
+        it('has null value', async () => {
+          const apiResponse = null;
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal('must be array');
+        });
+
+        it('has array with invalid key value', async () => {
+          const apiResponse = [{ id: 1 }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal("must have required property 'occurrence_id'");
+        });
+
+        it('has array with invalid value', async () => {
+          const apiResponse = [{ occurrence_id: 'test' }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal('must be number');
+        });
+      });
+
+      describe('should succeed when', () => {
+        it('has valid values', async () => {
+          const apiResponse = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response).to.equal(undefined);
+        });
+      });
+    });
+  });
+
   describe('scrapeAndUploadOccurrences', () => {
     afterEach(() => {
       sinon.restore();
@@ -27,43 +123,6 @@ describe.only('scrape-occurrences', () => {
     } as any;
 
     const sampleRes = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
-
-    it('should throw an error on OpenApiSchema validation', async () => {
-      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
-
-      const request = {
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: {},
-        params: {
-          submissionId: null
-        }
-      };
-
-      const response = requestValidator.validateRequest(request);
-
-      expect(response.status).to.equal(400);
-      expect(response.errors[0].message).to.equal('must be number');
-    });
-
-    it('should succeed on OpenApiSchema validation', async () => {
-      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
-
-      const request = {
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: {},
-        params: {
-          submissionId: 1
-        }
-      };
-
-      const response = requestValidator.validateRequest(request);
-
-      expect(response).to.equal(undefined);
-    });
 
     it('scrapes subbmission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {
       const dbConnectionObj = getMockDBConnection();

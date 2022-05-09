@@ -36,7 +36,8 @@ POST.apiDoc = {
       in: 'path',
       name: 'submissionId',
       schema: {
-        type: 'number'
+        type: 'number',
+        minimum: 0
       },
       required: true
     }
