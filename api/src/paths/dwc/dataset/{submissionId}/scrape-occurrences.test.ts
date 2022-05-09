@@ -7,10 +7,9 @@ import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks
 import * as db from '../../../../database/db';
 import * as scrapeOccurrences from './scrape-occurrences';
 import { ApiGeneralError } from '../../../../errors/api-error';
-import { OpenApiValidator } from 'openapi-data-validator';
 import { POST } from './scrape-occurrences';
-import { rootAPIDoc } from '../../../../openapi/root-api-doc';
-import { OpenAPIV3 } from 'openapi-data-validator/dist/framework/types';
+import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
+// import { rootAPIDoc } from '../../../../openapi/root-api-doc';
 
 chai.use(sinonChai);
 
@@ -29,47 +28,49 @@ describe.only('scrape-occurrences', () => {
 
     const sampleRes = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
 
-    it('should throw an error on OpenApiSchema', async () => {
+    it('should throw an error on OpenApiSchema validation', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const newPath = {
-        '/dwc/dataset/{submissionId}/scrape-occurrences': {
-          post: POST.apiDoc
+      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+
+      const request = {
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: {},
+        params: {
+          submissionId: null
         }
       };
-      console.log('newPath', newPath);
 
-      const newRootApiDoc: OpenAPIV3.Document = ({ ...rootAPIDoc, paths: newPath } as unknown) as OpenAPIV3.Document;
+      const response = requestValidator.validateRequest(request);
 
-      console.log('newRootApiDoc', newRootApiDoc);
+      expect(response.status).to.equal(400);
+      expect(response.errors[0].message).to.equal('must be number');
+    });
 
-      const openApiValidator = new OpenApiValidator({ apiSpec: newRootApiDoc });
+    it('should succeed on OpenApiSchema validation', async () => {
+      const dbConnectionObj = getMockDBConnection();
 
-      console.log('openApiValidator', openApiValidator);
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const validator = await openApiValidator.createValidator();
+      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
 
-      console.log('validator', validator);
+      const request = {
+        headers: {
+          'content-type': 'application/json'
+        },
+        body: {},
+        params: {
+          submissionId: 1
+        }
+      };
 
-      try {
-        const newRequest = {
-          method: 'POST',
-          route: '/dwc/dataset/{submissionId}/scrape-occurrences',
-          // headers: { Authorization: 'Bearer Token' },
-          // query: { limit: 10 },
-          // body: { field: true },
+      const response = requestValidator.validateRequest(request);
 
-          path: {}
-        };
-        await validator(newRequest);
-
-        expect.fail();
-      } catch (error) {
-        expect((error as any).status).to.equal(400);
-        expect((error as any).errors[0].message).to.equal("must have required property 'submissionId'");
-      }
+      expect(response).to.equal(undefined);
     });
 
     it('scrapes subbmission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {

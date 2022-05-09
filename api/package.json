@@ -46,7 +46,7 @@
     "mime": "~2.5.2",
     "moment": "~2.29.2",
     "multer": "~1.4.3",
-    "openapi-data-validator": "^2.0.44",
+    "openapi-request-validator": "^11.0.0",
     "pg": "~8.7.1",
     "qs": "~6.10.1",
     "sql-template-strings": "~2.2.2",
