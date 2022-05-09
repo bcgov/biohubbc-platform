@@ -1,4 +1,4 @@
-![Lifecycle:Experimental](https://img.shields.io/badge/Lifecycle-Experimental-339999) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bcgov_biohubbc-platform&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bcgov_biohubbc-platform)
+![Lifecycle:Experimental](https://img.shields.io/badge/Lifecycle-Experimental-339999) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bcgov_biohubbc-platform&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bcgov_biohubbc-platform) [![codecov](https://codecov.io/gh/bcgov/biohubbc-platform/branch/dev/graph/badge.svg?token=a8JYkqRXz4)](https://codecov.io/gh/bcgov/biohubbc-platform)
 
 # BioHub Platform
 
