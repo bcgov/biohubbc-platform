@@ -19,7 +19,7 @@ export class OccurrenceService extends DBService {
    * @memberof OccurrenceService
    */
   async getOccurrenceSubmission(occurrenceId: number): Promise<IGetOccurrenceData> {
-    return await this.occurrenceRepository.getOccurrenceSubmission(occurrenceId);
+    return this.occurrenceRepository.getOccurrenceSubmission(occurrenceId);
   }
 
   /**
@@ -34,7 +34,7 @@ export class OccurrenceService extends DBService {
     submissionId: number,
     scrapedOccurrence: IPostOccurrenceData
   ): Promise<{ occurrence_id: number }> {
-    return await this.occurrenceRepository.insertScrapedOccurrence(submissionId, scrapedOccurrence);
+    return this.occurrenceRepository.insertScrapedOccurrence(submissionId, scrapedOccurrence);
   }
 
   /**
@@ -49,49 +49,53 @@ export class OccurrenceService extends DBService {
     occurrenceSubmissionId: number,
     dwcArchive: DWCArchive
   ): Promise<{ occurrence_id: number }[]> {
-    const {
-      occurrenceRows,
-      occurrenceIdHeader,
-      associatedTaxaHeader,
-      eventRows,
-      lifeStageHeader,
-      sexHeader,
-      individualCountHeader,
-      organismQuantityHeader,
-      organismQuantityTypeHeader,
-      eventIdHeader,
-      eventDateHeader,
-      eventVerbatimCoordinatesHeader,
-      taxonRows,
-      taxonIdHeader,
-      vernacularNameHeader
-    } = this.getHeadersAndRowsFromFile(dwcArchive);
+    const { rows, headers } = this.getHeadersAndRowsFromFile(dwcArchive);
 
-    const scrapedOccurrences = occurrenceRows?.map(
+    const scrapedOccurrences = this.scrapeOccurrences(rows, headers);
+
+    const uploadResponse = await Promise.all(
+      scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
+        return this.insertScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
+      }) || []
+    );
+
+    return uploadResponse;
+  }
+
+  /**
+   * Scrape row data, for occurrences
+   *
+   * @param {*} rows
+   * @param {*} headers
+   * @return {*}  {IPostOccurrenceData[]}
+   * @memberof OccurrenceService
+   */
+  scrapeOccurrences(rows: any, headers: any): IPostOccurrenceData[] {
+    return rows.occurrenceRows?.map(
       (row: any): IPostOccurrenceData => {
-        const occurrenceId = row[occurrenceIdHeader];
-        const associatedTaxa = row[associatedTaxaHeader];
-        const lifeStage = row[lifeStageHeader];
-        const sex = row[sexHeader];
-        const individualCount = row[individualCountHeader];
-        const organismQuantity = row[organismQuantityHeader];
-        const organismQuantityType = row[organismQuantityTypeHeader];
+        const occurrenceId = row[headers.occurrenceIdHeader];
+        const associatedTaxa = row[headers.associatedTaxaHeader];
+        const lifeStage = row[headers.lifeStageHeader];
+        const sex = row[headers.sexHeader];
+        const individualCount = row[headers.individualCountHeader];
+        const organismQuantity = row[headers.organismQuantityHeader];
+        const organismQuantityType = row[headers.organismQuantityTypeHeader];
 
         let verbatimCoordinates;
         let eventDate;
 
-        eventRows?.forEach((eventRow: any) => {
-          if (eventRow[eventIdHeader] === occurrenceId) {
-            eventDate = eventRow[eventDateHeader];
-            verbatimCoordinates = eventRow[eventVerbatimCoordinatesHeader];
+        row.eventRows?.forEach((eventRow: any) => {
+          if (eventRow[headers.eventIdHeader] === occurrenceId) {
+            eventDate = eventRow[headers.eventDateHeader];
+            verbatimCoordinates = eventRow[headers.eventVerbatimCoordinatesHeader];
           }
         });
 
         let vernacularName;
 
-        taxonRows?.forEach((taxonRow: any) => {
-          if (taxonRow[taxonIdHeader] === occurrenceId) {
-            vernacularName = taxonRow[vernacularNameHeader];
+        row.taxonRows?.forEach((taxonRow: any) => {
+          if (taxonRow[headers.taxonIdHeader] === occurrenceId) {
+            vernacularName = taxonRow[headers.vernacularNameHeader];
           }
         });
 
@@ -108,14 +112,6 @@ export class OccurrenceService extends DBService {
         };
       }
     );
-
-    const uploadResponse = await Promise.all(
-      scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
-        return await this.insertScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
-      }) || []
-    );
-
-    return uploadResponse;
   }
 
   /**
@@ -126,8 +122,8 @@ export class OccurrenceService extends DBService {
    * @memberof OccurrenceService
    */
   private getHeadersAndRowsFromFile(dwcArchive: DWCArchive) {
-    const eventHeaders = dwcArchive.worksheets.event?.getHeaders();
     const eventRows = dwcArchive.worksheets.event?.getRows();
+    const eventHeaders = dwcArchive.worksheets.event?.getHeaders();
 
     const eventIdHeader = eventHeaders?.indexOf('id') as number;
     const eventVerbatimCoordinatesHeader = eventHeaders?.indexOf('verbatimCoordinates') as number;
@@ -149,23 +145,33 @@ export class OccurrenceService extends DBService {
     const taxonIdHeader = taxonHeaders?.indexOf('id') as number;
     const vernacularNameHeader = taxonHeaders?.indexOf('vernacularName') as number;
 
+    const rows = {
+      eventRows: eventRows,
+      occurrenceRows: occurrenceRows,
+      taxonRows: taxonRows
+    };
+
+    const headers = {
+      eventHeaders: eventHeaders,
+      eventIdHeader: eventIdHeader,
+      eventVerbatimCoordinatesHeader: eventVerbatimCoordinatesHeader,
+      eventDateHeader: eventDateHeader,
+      occurrenceHeaders: occurrenceHeaders,
+      occurrenceIdHeader: occurrenceIdHeader,
+      associatedTaxaHeader: associatedTaxaHeader,
+      lifeStageHeader: lifeStageHeader,
+      sexHeader: sexHeader,
+      individualCountHeader: individualCountHeader,
+      organismQuantityHeader: organismQuantityHeader,
+      organismQuantityTypeHeader: organismQuantityTypeHeader,
+      taxonHeaders: taxonHeaders,
+      taxonIdHeader: taxonIdHeader,
+      vernacularNameHeader: vernacularNameHeader
+    };
+
     return {
-      occurrenceRows,
-      occurrenceIdHeader,
-      associatedTaxaHeader,
-      eventRows,
-      lifeStageHeader,
-      sexHeader,
-      individualCountHeader,
-      organismQuantityHeader,
-      organismQuantityTypeHeader,
-      occurrenceHeaders,
-      eventIdHeader,
-      eventDateHeader,
-      eventVerbatimCoordinatesHeader,
-      taxonRows,
-      taxonIdHeader,
-      vernacularNameHeader
+      rows,
+      headers
     };
   }
 }

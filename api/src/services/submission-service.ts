@@ -50,24 +50,6 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
-    if (submissionId === 2) {
-      return {
-        submission_id: 1,
-        source: '',
-        uuid: 'string',
-        event_timestamp: 'string',
-        delete_timestamp: '',
-        input_key: 'platform/test/csv.zip',
-        input_file_name: '',
-        eml_source: '',
-        darwin_core_source: '',
-        create_date: 'string',
-        create_user: 3,
-        update_date: '',
-        update_user: 0,
-        revision_count: 1
-      };
-    } //TODO REMOVE. THIS ITS FOR TESTIHF
     return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
   }
 

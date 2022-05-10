@@ -36,7 +36,7 @@ POST.apiDoc = {
       in: 'path',
       name: 'submissionId',
       schema: {
-        type: 'number',
+        type: 'integer',
         minimum: 0
       },
       required: true
@@ -54,7 +54,8 @@ POST.apiDoc = {
               required: ['occurrence_id'],
               properties: {
                 occurrence_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 0
                 }
               }
             }

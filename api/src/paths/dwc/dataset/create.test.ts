@@ -14,7 +14,7 @@ import { POST } from './create';
 
 chai.use(sinonChai);
 
-describe.only('create', () => {
+describe('create', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
@@ -148,7 +148,6 @@ describe.only('create', () => {
             const apiResponse = { data_package_id: 'not a uuid' };
             const response = responseValidator.validateResponse(200, apiResponse);
 
-            console.log(response);
             expect(response.message).to.equal('The response was not valid.');
             expect(response.errors[0].message).to.equal('must match format "uuid"');
           });

@@ -32,7 +32,7 @@ describe('scrape-occurrences', () => {
           const response = requestValidator.validateRequest(request);
 
           expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal('must be number');
+          expect(response.errors[0].message).to.equal('must be integer');
         });
 
         it('has negative value', async () => {
@@ -48,7 +48,7 @@ describe('scrape-occurrences', () => {
           const response = requestValidator.validateRequest(request);
 
           expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal('must be number');
+          expect(response.errors[0].message).to.equal('must be integer');
         });
 
         it('has invalid key', async () => {
@@ -95,7 +95,7 @@ describe('scrape-occurrences', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be number');
+          expect(response.errors[0].message).to.equal('must be integer');
         });
       });
 
@@ -115,15 +115,6 @@ describe('scrape-occurrences', () => {
       sinon.restore();
     });
 
-    const sampleReq = {
-      keycloak_token: {},
-      params: {
-        submissionId: 1
-      }
-    } as any;
-
-    const sampleRes = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
-
     it('scrapes subbmission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {
       const dbConnectionObj = getMockDBConnection();
 
@@ -131,16 +122,18 @@ describe('scrape-occurrences', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = sampleReq.params;
+      mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences').resolves(sampleRes);
+      sinon
+        .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
+        .resolves([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
 
       const requestHandler = scrapeOccurrences.scrapeAndUploadOccurrences();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.equal(sampleRes);
+      expect(mockRes.jsonValue).to.eql([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
     });
 
     it('should throw an error if scrapeAndUploadOccurrences throws an ApiGeneralError', async () => {
@@ -154,7 +147,7 @@ describe('scrape-occurrences', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = sampleReq.params;
+      mockReq.params = { submissionId: '1' };
 
       sinon
         .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
