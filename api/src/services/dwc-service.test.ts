@@ -18,7 +18,7 @@ import { ArchiveFile, MediaFile } from '../utils/media/media-file';
 
 chai.use(sinonChai);
 
-describe.only('DarwinCoreService', () => {
+describe('DarwinCoreService', () => {
   describe('scrapeAndUploadOccurences', () => {
     afterEach(() => {
       sinon.restore();

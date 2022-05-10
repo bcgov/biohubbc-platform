@@ -141,7 +141,7 @@ export class OccurrenceRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get occurrence record'); //TODO is sql connections an api error or http?
+      throw new ApiExecuteSQLError('Failed to get occurrence record');
     }
 
     return response.rows[0];
