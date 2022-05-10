@@ -10,7 +10,7 @@ import { OccurrenceService } from './occurrence-service';
 import { SubmissionService } from './submission-service';
 
 export class DarwinCoreService extends DBService {
-  async scrapeAndUploadOccurences(submissionId: number): Promise<{ occurrence_id: number }[]> {
+  async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
     const submissionService = new SubmissionService(this.connection);
     const occurrenceService = new OccurrenceService(this.connection);
 
@@ -83,13 +83,13 @@ export class DarwinCoreService extends DBService {
       uuid: dataPackageId
     });
 
-    const submissionId = response.submission_id;
-
-    if (!submissionId) {
+    if (!response || !response.submission_id) {
       throw new ApiGeneralError('Failed to insert submission record', [
-        `submissionId was null or undefined: ${submissionId}`
+        `submissionId was null or undefined: ${response}`
       ]);
     }
+
+    const submissionId = response.submission_id;
 
     const s3Key = generateS3FileKey({
       submissionId: submissionId,

@@ -112,7 +112,7 @@ describe('create', () => {
 
       mockReq.params = sampleReq.params;
 
-      sinon.stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurences').resolves(sampleRes);
+      sinon.stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences').resolves(sampleRes);
 
       const requestHandler = create.submitDataset();
 

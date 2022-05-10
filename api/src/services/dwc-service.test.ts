@@ -15,11 +15,12 @@ import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { OccurrenceService } from './occurrence-service';
 import { UnknownMedia } from '../utils/media/media-utils';
 import { ArchiveFile, MediaFile } from '../utils/media/media-file';
+import { ManagedUpload } from 'aws-sdk/clients/s3';
 
 chai.use(sinonChai);
 
 describe('DarwinCoreService', () => {
-  describe('scrapeAndUploadOccurences', () => {
+  describe('scrapeAndUploadOccurrences', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -33,7 +34,7 @@ describe('DarwinCoreService', () => {
         .resolves((null as unknown) as ISubmissionModel);
 
       try {
-        await darwinCoreService.scrapeAndUploadOccurences(1);
+        await darwinCoreService.scrapeAndUploadOccurrences(1);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('s3Key submissionRecord unavailable');
@@ -51,7 +52,7 @@ describe('DarwinCoreService', () => {
       sinon.stub(fileUtils, 'getFileFromS3').resolves((null as unknown) as S3.GetObjectOutput);
 
       try {
-        await darwinCoreService.scrapeAndUploadOccurences(1);
+        await darwinCoreService.scrapeAndUploadOccurrences(1);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('s3File unavailable');
@@ -70,7 +71,7 @@ describe('DarwinCoreService', () => {
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves(('test' as unknown) as DWCArchive);
       sinon.stub(OccurrenceService.prototype, 'scrapeAndUploadOccurrences').resolves([{ occurrence_id: 1 }]);
 
-      const response = await darwinCoreService.scrapeAndUploadOccurences(1);
+      const response = await darwinCoreService.scrapeAndUploadOccurrences(1);
 
       expect(response).to.eql([{ occurrence_id: 1 }]);
     });
@@ -106,7 +107,7 @@ describe('DarwinCoreService', () => {
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal(
-          'Failed to parse submission, not a valid DwC Archive Zip file'
+          'Failed to parse submission, not a valid Archive file'
         );
       }
     });
@@ -124,6 +125,71 @@ describe('DarwinCoreService', () => {
       const response = await darwinCoreService.prepDWCArchive(('test' as unknown) as UnknownMedia);
 
       expect(response).to.equal(dwcStub);
+    });
+  });
+
+  describe('ingestNewDwCADataPackage', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when media is invalid or empty', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const mockArchiveFile = {
+        rawFile: {
+          fileName: 'test'
+        },
+        extra: {
+          eml: 'test'
+        }
+      };
+
+      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns((mockArchiveFile as unknown) as DWCArchive);
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves(undefined);
+
+      try {
+        await darwinCoreService.ingestNewDwCADataPackage(('file' as unknown) as Express.Multer.File, {
+          dataPackageId: 'string',
+          source: 'test'
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
+      }
+    });
+
+    it('should succeed', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const mockArchiveFile = {
+        rawFile: {
+          fileName: 'test'
+        },
+        extra: {
+          eml: 'test'
+        }
+      };
+
+      sinon.stub(fileUtils, 'uploadFileToS3').resolves(('test' as unknown) as ManagedUpload.SendData);
+      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns((mockArchiveFile as unknown) as DWCArchive);
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordInputKey').resolves({ submission_id: 1 });
+      sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      const response = await darwinCoreService.ingestNewDwCADataPackage(
+        ({ originalname: 'name' } as unknown) as Express.Multer.File,
+        {
+          dataPackageId: 'string',
+          source: 'test'
+        }
+      );
+
+      expect(response).to.eql({ dataPackageId: 'string', submissionId: 1 });
     });
   });
 });

@@ -79,7 +79,7 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const response = await darwinCoreService.scrapeAndUploadOccurences(submissionId);
+      const response = await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
       await connection.commit();
 
