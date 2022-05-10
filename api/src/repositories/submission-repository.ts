@@ -248,7 +248,7 @@ export class SubmissionRepository extends BaseRepository {
           FROM
             submission_message_type
           WHERE
-            name = ${submissionMessageType}F
+            name = ${submissionMessageType}
         ),
         now()
       )

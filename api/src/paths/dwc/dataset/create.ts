@@ -80,7 +80,7 @@ POST.apiDoc = {
 
 export function submitDataset(): RequestHandler {
   return async (req, res) => {
-    if (!req.files || !req.files.length) {
+    if (!req?.files?.length) {
       throw new HTTP400('Missing required `media`');
     }
 
