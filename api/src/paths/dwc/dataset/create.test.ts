@@ -2,15 +2,14 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { DarwinCoreService } from '../../../services/dwc-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import { DWCArchive } from '../../../utils/media/dwc/dwc-archive-file';
-
-import * as fileUtils from '../../../utils/file-utils';
-import * as db from '../../../database/db';
-import * as create from './create';
 import { SubmissionService } from '../../../services/submission-service';
+import * as fileUtils from '../../../utils/file-utils';
+import { DWCArchive } from '../../../utils/media/dwc/dwc-archive-file';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import * as create from './create';
 
 chai.use(sinonChai);
 
@@ -20,22 +19,14 @@ describe('create', () => {
       sinon.restore();
     });
 
-    const sampleReq = {
-      keycloak_token: {},
-      body: {
-        media: 'test',
-        data_package_id: 'uuid'
-      },
-      files: [({ something: 'file' } as unknown) as Express.Multer.File]
-    } as any;
-
-    const sampleRes = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
-
     it('should throw an error when req.file is detected to be malicious', async () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = sampleReq.files;
-      mockReq.body = sampleReq.body;
+      mockReq.files = [({ something: 'file' } as unknown) as Express.Multer.File];
+      mockReq.body = {
+        media: 'test',
+        data_package_id: 'uuid'
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(false);
 
@@ -56,8 +47,11 @@ describe('create', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = sampleReq.files;
-      mockReq.body = sampleReq.body;
+      mockReq.files = [({ something: 'file' } as unknown) as Express.Multer.File];
+      mockReq.body = {
+        media: 'test',
+        data_package_id: 'uuid'
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').throws('error');
@@ -81,8 +75,11 @@ describe('create', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = sampleReq.files;
-      mockReq.body = sampleReq.body;
+      mockReq.files = [({ something: 'file' } as unknown) as Express.Multer.File];
+      mockReq.body = {
+        media: 'test',
+        data_package_id: 'uuid'
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon
@@ -104,15 +101,15 @@ describe('create', () => {
       }
     });
 
-    it('scrapes subbmission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {
+    it('scrapes submission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = sampleReq.params;
-
-      sinon.stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurences').resolves(sampleRes);
+      sinon
+        .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurences')
+        .resolves([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
 
       const requestHandler = create.submitDataset();
 
@@ -121,7 +118,7 @@ describe('create', () => {
       expect(mockRes.statusValue).to.equal(200);
       console.log(mockRes);
 
-      expect(mockRes.jsonValue).to.equal(sampleRes);
+      expect(mockRes.jsonValue).to.equal([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
     });
   });
 });
