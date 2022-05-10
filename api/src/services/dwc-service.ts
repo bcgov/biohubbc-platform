@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ApiGeneralError } from '../errors/api-error';
+import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile } from '../utils/media/media-file';
@@ -96,6 +97,8 @@ export class DarwinCoreService extends DBService {
     });
 
     await submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
+
+    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMITTED);
 
     await uploadFileToS3(file, s3Key, {
       filename: file.originalname

@@ -40,6 +40,39 @@ export interface ISubmissionModel {
   revision_count: number;
 }
 
+export enum SUBMISSION_STATUS_TYPE {
+  'SUBMITTED' = 'Submitted',
+  'TEMPLATE_VALIDATED' = 'Template Validated',
+  'DARWIN_CORE_VALIDATED' = 'Darwin Core Validated',
+  'TEMPLATE_TRANSFORMED' = 'Template Transformed',
+  'SUBMISSION_DATA_INGESTED' = 'Submission Data Ingested',
+  'SECURED' = 'Secured',
+  'AWAITING_CURATION' = 'Awaiting Curration',
+  'PUBLISHED' = 'Published',
+  'REJECTED' = 'Rejected',
+  'ON_HOLD' = 'On Hold',
+  'SYSTEM_ERROR' = 'System Error'
+}
+
+export enum SUBMISSION_MESSAGE_TYPE {
+  'DUPLICATE_HEADER' = 'Duplicate Header',
+  'UNKNOWN_HEADER' = 'Unknown Header',
+  'MISSING_REQUIRED_HEADER' = 'Missing Required Header',
+  'MISSING_RECOMMENDED_HEADER' = 'Missing Recommended Header',
+  'MISCELLANEOUS' = 'Miscellaneous',
+  'MISSING_REQUIRED_FIELD' = 'Missing Required Field',
+  'UNEXPECTED_FORMAT' = 'Unexpected Format',
+  'OUT_OF_RANGE' = 'Out Of Range',
+  'INVALID_VALUE' = 'Invalid Value',
+  'MISSING_VALIDATION_SCHEMA' = 'Missing Validation Schema'
+}
+
+export enum SUBMISSION_MESSAGE_CLASS {
+  'NOTICE' = 'Notice',
+  'ERROR' = 'Error',
+  'WARNING' = 'Warning'
+}
+
 /**
  * A repository class for accessing submission data.
  *
@@ -140,6 +173,96 @@ export class SubmissionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new HTTP400('Failed to get submission record');
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert a new submission status record.
+   *
+   * @param {number} submissionId
+   * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
+   * @return {*}  {Promise<{ submission_status_id: number; submission_status_type_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionStatus(
+    submissionId: number,
+    submissionStatusType: SUBMISSION_STATUS_TYPE
+  ): Promise<{ submission_status_id: number; submission_status_type_id: number }> {
+    const sqlStatement = SQL`
+    INSERT INTO submission_status (
+      submission_id,
+      submission_status_type_id,
+      event_timestamp
+    ) VALUES (
+      ${submissionId},
+      (
+        SELECT
+          submission_status_type_id
+        FROM
+          submission_status_type
+        WHERE
+          name = ${submissionStatusType}
+      ),
+      now()
+    )
+    RETURNING
+      submission_status_id,
+      submission_status_type_id;
+  `;
+
+    const response = await this.connection.sql<{ submission_status_id: number; submission_status_type_id: number }>(
+      sqlStatement
+    );
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert submission status record');
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert a submission message record.
+   *
+   * @param {number} submissionStatusId
+   * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
+   * @return {*}  {Promise<{ submission_message_id: number; submission_message_type_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionMessage(
+    submissionStatusId: number,
+    submissionMessageType: SUBMISSION_MESSAGE_TYPE
+  ): Promise<{ submission_message_id: number; submission_message_type_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_message (
+        submission_status_id,
+        submission_message_type_id,
+        event_timestamp
+      ) VALUES (
+        ${submissionStatusId},
+        (
+          SELECT
+            submission_message_type_id
+          FROM
+            submission_message_type
+          WHERE
+            name = ${submissionMessageType}F
+        ),
+        now()
+      )
+      RETURNING
+        submission_message_id,
+        submission_message_type_id;
+    `;
+
+    const response = await this.connection.sql<{ submission_message_id: number; submission_message_type_id: number }>(
+      sqlStatement
+    );
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert submission message record');
     }
 
     return response.rows[0];

@@ -1,7 +1,12 @@
 import { IDBConnection } from '../database/db';
-import { IInsertSubmissionRecord, ISubmissionModel, SubmissionRepository } from '../repositories/submission-repository';
+import {
+  IInsertSubmissionRecord,
+  ISubmissionModel,
+  SubmissionRepository,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE
+} from '../repositories/submission-repository';
 import { DBService } from './db-service';
-
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
 
@@ -64,5 +69,47 @@ export class SubmissionService extends DBService {
       };
     } //TODO REMOVE. THIS ITS FOR TESTIHF
     return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+  }
+
+  /**
+   * Insert a submission status record.
+   *
+   * @param {number} submissionId
+   * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
+   * @return {*}  {Promise<{
+   *     submission_status_id: number;
+   *     submission_status_type_id: number;
+   *   }>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionStatus(
+    submissionId: number,
+    submissionStatusType: SUBMISSION_STATUS_TYPE
+  ): Promise<{
+    submission_status_id: number;
+    submission_status_type_id: number;
+  }> {
+    return this.submissionRepository.insertSubmissionStatus(submissionId, submissionStatusType);
+  }
+
+  /**
+   * Insert a submission message record.
+   *
+   * @param {number} submissionStatusId
+   * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
+   * @return {*}  {Promise<{
+   *     submission_message_id: number;
+   *     submission_message_type_id: number;
+   *   }>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionMessage(
+    submissionStatusId: number,
+    submissionMessageType: SUBMISSION_MESSAGE_TYPE
+  ): Promise<{
+    submission_message_id: number;
+    submission_message_type_id: number;
+  }> {
+    return this.submissionRepository.insertSubmissionMessage(submissionStatusId, submissionMessageType);
   }
 }

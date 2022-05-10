@@ -91,6 +91,11 @@ const openAPIFramework = initialize({
     // Ensure all errors (intentionally thrown or not) are in the same format as specified by the schema
     const httpError = ensureHTTPError(error);
 
+    if (res.headersSent) {
+      // response has already been sent
+      return;
+    }
+
     res
       .status(httpError.status)
       .json({ name: httpError.name, status: httpError.status, message: httpError.message, errors: httpError.errors });

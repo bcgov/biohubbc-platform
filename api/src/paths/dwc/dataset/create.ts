@@ -99,12 +99,12 @@ export function submitDataset(): RequestHandler {
 
       const { dataPackageId, submissionId } = await darwinCoreService.ingestNewDwCADataPackage(file);
 
-      // run scrape process, don't await results
-      darwinCoreService.scrapeAndUploadOccurences(submissionId);
+      // return after creating the submission
+      res.status(200).json({ data_package_id: dataPackageId });
+
+      await darwinCoreService.scrapeAndUploadOccurences(submissionId);
 
       await connection.commit();
-
-      res.status(200).json({ data_package_id: dataPackageId });
     } catch (error) {
       defaultLog.error({ label: 'submitDataset', message: 'error', error });
       await connection.rollback();
