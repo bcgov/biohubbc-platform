@@ -104,7 +104,7 @@ describe('create', () => {
     it('scrapes submission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
+s
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       sinon

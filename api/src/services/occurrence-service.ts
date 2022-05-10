@@ -18,23 +18,23 @@ export class OccurrenceService extends DBService {
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceService
    */
-  async getOccurrenceSubmission(occurrenceId: number): Promise<IGetOccurrenceData[]> {
+  async getOccurrenceSubmission(occurrenceId: number): Promise<IGetOccurrenceData> {
     return await this.occurrenceRepository.getOccurrenceSubmission(occurrenceId);
   }
 
   /**
-   * Upload scraped occurrence data.
+   * Insert scraped occurrence data.
    *
    * @param {number} submissionId
    * @param {IPostOccurrenceData} scrapedOccurrence
    * @return {*}  {Promise<{ occurrence_id: number }>}
    * @memberof OccurrenceService
    */
-  async uploadScrapedOccurrence(
+  async insertScrapedOccurrence(
     submissionId: number,
     scrapedOccurrence: IPostOccurrenceData
   ): Promise<{ occurrence_id: number }> {
-    return await this.occurrenceRepository.uploadScrapedOccurrence(submissionId, scrapedOccurrence);
+    return await this.occurrenceRepository.insertScrapedOccurrence(submissionId, scrapedOccurrence);
   }
 
   /**
@@ -59,7 +59,6 @@ export class OccurrenceService extends DBService {
       individualCountHeader,
       organismQuantityHeader,
       organismQuantityTypeHeader,
-      occurrenceHeaders,
       eventIdHeader,
       eventDateHeader,
       eventVerbatimCoordinatesHeader,
@@ -77,8 +76,6 @@ export class OccurrenceService extends DBService {
         const individualCount = row[individualCountHeader];
         const organismQuantity = row[organismQuantityHeader];
         const organismQuantityType = row[organismQuantityTypeHeader];
-
-        const data = { headers: occurrenceHeaders, rows: row };
 
         let verbatimCoordinates;
         let eventDate;
@@ -104,7 +101,6 @@ export class OccurrenceService extends DBService {
           sex: sex,
           individualCount: individualCount,
           vernacularName: vernacularName || '', //TODO How to handle undefined
-          data: data,
           verbatimCoordinates: verbatimCoordinates || '',
           organismQuantity: organismQuantity,
           organismQuantityType: organismQuantityType,
@@ -115,7 +111,7 @@ export class OccurrenceService extends DBService {
 
     const uploadResponse = await Promise.all(
       scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
-        return await this.uploadScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
+        return await this.insertScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
       }) || []
     );
 

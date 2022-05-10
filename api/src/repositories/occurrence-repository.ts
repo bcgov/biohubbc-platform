@@ -1,8 +1,8 @@
 import { Feature } from 'geojson';
-import SQL from 'sql-template-strings';
+import SQL, { SQLStatement } from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { parseLatLongString, parseUTMString } from '../utils/spatial-utils';
+import { ILatLong, IUTM, parseLatLongString, parseUTMString } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface IGetOccurrenceData {
@@ -23,7 +23,6 @@ export interface IPostOccurrenceData {
   associatedTaxa: string | null;
   lifeStage: string | null;
   sex: string | null;
-  data: object | null;
   verbatimCoordinates: string | null;
   individualCount: number | null;
   vernacularName: string | null;
@@ -47,7 +46,7 @@ export class OccurrenceRepository extends BaseRepository {
    * @param {PostOccurrence} scrapedOccurrence
    * @memberof OccurrenceService
    */
-  async uploadScrapedOccurrence(
+  async insertScrapedOccurrence(
     submissionId: number,
     scrapedOccurrence: IPostOccurrenceData
   ): Promise<{ occurrence_id: number }> {
@@ -68,28 +67,16 @@ export class OccurrenceRepository extends BaseRepository {
 
     //TODO UNSURE IF THIS WORKS NEEDS TO BE TESTED
     if (utm) {
+      const utmSql = this.getGeographySqlFromUtm(utm);
       // transform utm string into point, if it is not null
       insertData = Object.assign(insertData, {
-        geography: SQL`
-          public.ST_Transform(
-            public.ST_SetSRID(
-              public.ST_MakePoint(${utm.easting}, ${utm.northing}),
-              ${utm.zone_srid}
-            ),
-            4326
-          )`
+        geography: utmSql
       });
     } else if (latLong) {
+      const utmLatLong = this.getGeographySqlFromLatLong(latLong);
       // transform latLong string into point, if it is not null
       insertData = Object.assign(insertData, {
-        geography: SQL`
-          public.ST_Transform(
-            public.ST_SetSRID(
-              public.ST_MakePoint(${latLong.long}, ${latLong.lat}),
-              4326
-            ),
-            4326
-          )`
+        geography: utmLatLong
       });
     }
 
@@ -104,6 +91,28 @@ export class OccurrenceRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  getGeographySqlFromUtm(utm: IUTM): SQLStatement {
+    return SQL`
+    public.ST_Transform(
+      public.ST_SetSRID(
+        public.ST_MakePoint(${utm.easting}, ${utm.northing}),
+        ${utm.zone_srid}
+      ),
+      4326
+    )`;
+  }
+
+  getGeographySqlFromLatLong(latLong: ILatLong): SQLStatement {
+    return SQL`
+    public.ST_Transform(
+      public.ST_SetSRID(
+        public.ST_MakePoint(${latLong.long}, ${latLong.lat}),
+        4326
+      ),
+      4326
+    )`;
+  }
+
   /**
    * Get Occurrence row associated to occurrence Id.
    *
@@ -111,7 +120,7 @@ export class OccurrenceRepository extends BaseRepository {
    * @return {*}  {Promise<GetOccurrencesViewData>}
    * @memberof OccurrenceRepository
    */
-  async getOccurrenceSubmission(occurrenceId: number): Promise<IGetOccurrenceData[]> {
+  async getOccurrenceSubmission(occurrenceId: number): Promise<IGetOccurrenceData> {
     const sqlStatement = SQL`
       SELECT
         o.occurrence_id,
