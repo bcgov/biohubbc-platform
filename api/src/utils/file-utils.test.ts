@@ -19,47 +19,15 @@ describe('getS3SignedURL', () => {
 });
 
 describe('generateS3FileKey', () => {
-  it('returns project file path', async () => {
-    const result = generateS3FileKey({ projectId: 1, fileName: 'testFileName' });
+  it('returns a basic file path', async () => {
+    const result = generateS3FileKey({ submissionId: 1, fileName: 'testFileName' });
 
-    expect(result).to.equal('projects/1/testFileName');
+    expect(result).to.equal('platform/1/testFileName');
   });
 
-  it('returns survey file path', async () => {
-    const result = generateS3FileKey({ projectId: 1, surveyId: 2, fileName: 'testFileName' });
+  it('returns a long file path', async () => {
+    const result = generateS3FileKey({ submissionId: 1, fileName: 'extra/folders/testFileName' });
 
-    expect(result).to.equal('projects/1/surveys/2/testFileName');
-  });
-
-  it('returns project folder file path', async () => {
-    const result = generateS3FileKey({ projectId: 1, folder: 'folder', fileName: 'testFileName' });
-
-    expect(result).to.equal('projects/1/folder/testFileName');
-  });
-
-  it('returns survey folder file path', async () => {
-    const result = generateS3FileKey({ projectId: 1, surveyId: 2, folder: 'folder', fileName: 'testFileName' });
-
-    expect(result).to.equal('projects/1/surveys/2/folder/testFileName');
-  });
-  it('returns survey occurrence folder file path', async () => {
-    const result = generateS3FileKey({
-      projectId: 1,
-      surveyId: 2,
-      submissionId: 3,
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('projects/1/surveys/2/submissions/3/testFileName');
-  });
-  it('returns survey summaryresults folder file path', async () => {
-    const result = generateS3FileKey({
-      projectId: 1,
-      surveyId: 2,
-      summaryId: 3,
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('projects/1/surveys/2/summaryresults/3/testFileName');
+    expect(result).to.equal('platform/1/extra/folders/testFileName');
   });
 });

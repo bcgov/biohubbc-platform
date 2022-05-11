@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { HTTP400 } from '../errors/http-error';
+import { defaultErrorResponses } from '../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
 import { setLogLevel, WinstonLogLevel, WinstonLogLevels } from '../utils/logger';
 
@@ -43,18 +44,7 @@ GET.apiDoc = {
     200: {
       description: 'OK'
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 

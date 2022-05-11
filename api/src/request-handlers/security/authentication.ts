@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { decode, GetPublicKeyOrSecret, Secret, verify, VerifyErrors } from 'jsonwebtoken';
+import { decode, verify } from 'jsonwebtoken';
 import { JwksClient } from 'jwks-rsa';
 import { HTTP401 } from '../../errors/http-error';
 import { getLogger } from '../../utils/logger';
@@ -7,6 +7,7 @@ import { getLogger } from '../../utils/logger';
 const defaultLog = getLogger('request-handlers/security/authentication');
 
 const KEYCLOAK_URL = `${process.env.KEYCLOAK_HOST}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/certs`;
+const KEYCLOAK_ISSUER = `${process.env.KEYCLOAK_HOST}/realms/${process.env.KEYCLOAK_REALM}`;
 
 /**
  * Authenticate the request by validating the authorization bearer token (JWT).
@@ -71,7 +72,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     const signingKey = key.getPublicKey();
 
     // Verify token using public signing key
-    const verifiedToken = verifyToken(tokenString, signingKey);
+    const verifiedToken = verify(tokenString, signingKey, { issuer: [KEYCLOAK_ISSUER] });
 
     if (!verifiedToken) {
       throw new HTTP401('Access Denied');
@@ -85,46 +86,4 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     defaultLog.warn({ label: 'authenticate', message: `unexpected error - ${(error as Error).message}`, error });
     throw new HTTP401('Access Denied');
   }
-};
-
-/**
- * Verify jwt token.
- *
- * @param {string} tokenString
- * @param {(Secret | GetPublicKeyOrSecret)} secretOrPublicKey
- * @return {*} The decoded token, or null.
- */
-const verifyToken = function (tokenString: string, secretOrPublicKey: Secret | GetPublicKeyOrSecret): any {
-  return verify(tokenString, secretOrPublicKey, verifyTokenCallback);
-};
-
-/**
- * Callback that returns the decoded token, or null.
- *
- * @param {(VerifyErrors | null)} verificationError
- * @param {(object | undefined)} verifiedToken
- * @return {*} {(object | null | undefined)}
- */
-const verifyTokenCallback = function (
-  verificationError: VerifyErrors | null,
-  verifiedToken: object | undefined
-): object | null | undefined {
-  if (verificationError) {
-    defaultLog.warn({ label: 'verifyToken', message: 'jwt verification error', verificationError });
-    return null;
-  }
-
-  // Verify that the token came from the expected issuer
-  // Example: when running in prod, only accept tokens from `sso.pathfinder...` and not `sso-dev.pathfinder...`, etc
-  if (!KEYCLOAK_URL.includes(verifiedToken?.['iss'])) {
-    defaultLog.warn({
-      label: 'verifyToken',
-      message: 'jwt verification error: issuer mismatch',
-      'actual token issuer': verifiedToken?.['iss'],
-      'expected to be a substring of': KEYCLOAK_URL
-    });
-    return null;
-  }
-
-  return verifiedToken;
 };

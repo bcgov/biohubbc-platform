@@ -7,6 +7,7 @@ import { authorizeRequestHandler } from '../../request-handlers/security/authori
 import { UserService } from '../../services/user-service';
 import { getLogger } from '../../utils/logger';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
+import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 
 const defaultLog = getLogger('paths/user/add');
 
@@ -61,21 +62,7 @@ POST.apiDoc = {
     200: {
       description: 'Add system user OK.'
     },
-    400: {
-      $ref: '#/components/responses/400'
-    },
-    401: {
-      $ref: '#/components/responses/401'
-    },
-    403: {
-      $ref: '#/components/responses/401'
-    },
-    500: {
-      $ref: '#/components/responses/500'
-    },
-    default: {
-      $ref: '#/components/responses/default'
-    }
+    ...defaultErrorResponses
   }
 };
 

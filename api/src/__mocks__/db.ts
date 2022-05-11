@@ -41,9 +41,6 @@ export const getMockDBConnection = (config?: Partial<IDBConnection>): IDBConnect
     rollback: async () => {
       // do nothing
     },
-    query: async () => {
-      return (undefined as unknown) as QueryResult<any>;
-    },
     sql: async () => {
       return (undefined as unknown) as QueryResult<any>;
     },
@@ -64,6 +61,12 @@ export class MockReq {
 
 export type ExtendedMockRes = MockRes & Response;
 export class MockRes {
+  /**
+   * The value of the last `.status(<value>)` call.
+   *
+   * @type {*}
+   * @memberof MockRes
+   */
   statusValue: any;
   status = sinon.fake((value: any) => {
     this.statusValue = value;
@@ -71,6 +74,12 @@ export class MockRes {
     return this;
   });
 
+  /**
+   * The value of the last `.json(<value>)` call.
+   *
+   * @type {*}
+   * @memberof MockRes
+   */
   jsonValue: any;
   json = sinon.fake((value: any) => {
     this.jsonValue = value;
@@ -78,6 +87,12 @@ export class MockRes {
     return this;
   });
 
+  /**
+   * The value of the last `.send(<value>)` call.
+   *
+   * @type {*}
+   * @memberof MockRes
+   */
   sendValue: any;
   send = sinon.fake((value: any) => {
     this.sendValue = value;

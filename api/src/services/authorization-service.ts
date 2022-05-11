@@ -1,7 +1,7 @@
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { Models } from '../models';
-import { DBService } from './service';
+import { DBService } from './db-service';
 import { UserService } from './user-service';
 
 export enum AuthorizeOperator {

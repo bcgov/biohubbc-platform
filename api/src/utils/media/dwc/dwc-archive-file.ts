@@ -9,6 +9,12 @@ export enum DWC_CLASS {
   MEASUREMENTORFACT = 'measurementorfact',
   RESOURCERELATIONSHIP = 'resourcerelationship',
   TAXON = 'taxon',
+  EML = 'eml',
+  META = 'meta'
+}
+
+export enum DWC_EXTRA {
+  EML = 'eml',
   META = 'meta'
 }
 
@@ -16,11 +22,13 @@ export const DEFAULT_XLSX_SHEET = 'Sheet1';
 
 export type DWCWorksheets = { [name in DWC_CLASS]?: CSVWorksheet };
 
+export type DWCExtras = { [name in DWC_EXTRA]?: any }; // TODO XML type?
+
 /**
  * Supports Darwin Core Archive CSV files.
  *
  * Expects an array of known named-files
- *
+ *F
  * @export
  * @class DWCArchive
  */
@@ -31,7 +39,7 @@ export class DWCArchive {
 
   worksheets: DWCWorksheets;
 
-  extra: { [name: string]: any };
+  extra: DWCExtras;
 
   constructor(archiveFile: ArchiveFile) {
     this.rawFile = archiveFile;
@@ -80,8 +88,11 @@ export class DWCArchive {
             xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
-        case DWC_CLASS.META:
-          this.extra[DWC_CLASS.META] = rawFile;
+        case DWC_EXTRA.EML:
+          this.extra[DWC_EXTRA.EML] = rawFile;
+          break;
+        case DWC_EXTRA.META:
+          this.extra[DWC_EXTRA.META] = rawFile;
       }
     }
   }
