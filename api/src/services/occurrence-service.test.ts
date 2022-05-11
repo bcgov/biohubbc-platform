@@ -12,7 +12,7 @@ import { DwCAOccurrenceHeaders, DwCAOccurrenceRows, OccurrenceService } from './
 
 chai.use(sinonChai);
 
-describe.only('OccurrenceService', () => {
+describe('OccurrenceService', () => {
   afterEach(() => {
     sinon.restore();
   });
