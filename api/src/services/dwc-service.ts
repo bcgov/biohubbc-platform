@@ -12,7 +12,6 @@ import { SubmissionService } from './submission-service';
 export class DarwinCoreService extends DBService {
   async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
     const submissionService = new SubmissionService(this.connection);
-    const occurrenceService = new OccurrenceService(this.connection);
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
@@ -28,7 +27,13 @@ export class DarwinCoreService extends DBService {
 
     const dwcArchive: DWCArchive = await this.prepDWCArchive(s3File);
 
-    return await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
+    const occurrenceService = new OccurrenceService(this.connection);
+
+    const response = await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
+
+    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+
+    return response;
   }
 
   /**

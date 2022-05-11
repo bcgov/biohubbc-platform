@@ -40,15 +40,36 @@ describe('OccurrenceService', () => {
     });
   });
 
-  //TODO NOT DONE TESTS
   describe('scrapeAndUploadOccurrences', () => {
-    it('should return an array occurrence_id on scrape and upload', async () => {
+    it('returns an array of occurrence_id', async () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceService = new OccurrenceService(mockDBConnection);
 
+      const getHeadersAndRowsFromFileStub = sinon
+        .stub(OccurrenceService.prototype, 'getHeadersAndRowsFromFile')
+        .returns({ rows: {} as any, headers: {} as any });
+
+      const scrapeOccurrencesStub = sinon
+        .stub(OccurrenceService.prototype, 'scrapeOccurrences')
+        .returns([{} as any, {} as any, {} as any]);
+
+      sinon
+        .stub(OccurrenceService.prototype, 'insertScrapedOccurrence')
+        .onCall(0)
+        .resolves({ occurrence_id: 1 })
+        .onCall(1)
+        .resolves({ occurrence_id: 2 })
+        .onCall(2)
+        .resolves({ occurrence_id: 3 })
+        .onCall(3)
+        .resolves({ occurrence_id: 4 });
+
       const response = await occurrenceService.scrapeAndUploadOccurrences(1, ({} as unknown) as DWCArchive);
 
-      expect(response).to.be.eql([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
+      expect(getHeadersAndRowsFromFileStub).to.have.been.calledOnce;
+      expect(scrapeOccurrencesStub).to.have.been.calledOnce;
+
+      expect(response).to.be.eql([{ occurrence_id: 1 }, { occurrence_id: 2 }, { occurrence_id: 3 }]);
     });
   });
 });

@@ -1,15 +1,15 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
-import sinon from 'sinon';
-import sinonChai from 'sinon-chai';
-import { DarwinCoreService } from '../../../../services/dwc-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import * as db from '../../../../database/db';
-import * as scrapeOccurrences from './scrape-occurrences';
-import { ApiGeneralError } from '../../../../errors/api-error';
-import { POST } from './scrape-occurrences';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
+import sinon from 'sinon';
+import sinonChai from 'sinon-chai';
+import * as db from '../../../../database/db';
+import { ApiGeneralError } from '../../../../errors/api-error';
+import { DarwinCoreService } from '../../../../services/dwc-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as scrapeOccurrences from './scrape-occurrences';
+import { POST } from './scrape-occurrences';
 
 chai.use(sinonChai);
 

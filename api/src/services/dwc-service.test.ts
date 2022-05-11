@@ -1,21 +1,21 @@
+import { S3 } from 'aws-sdk';
+import { ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiGeneralError } from '../errors/api-error';
+import { ISubmissionModel } from '../repositories/submission-repository';
+import * as fileUtils from '../utils/file-utils';
+import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
+import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { ArchiveFile, MediaFile } from '../utils/media/media-file';
+import * as mediaUtils from '../utils/media/media-utils';
+import { UnknownMedia } from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
-import { SubmissionService } from './submission-service';
-import { ISubmissionModel } from '../repositories/submission-repository';
-import { ApiGeneralError } from '../errors/api-error';
-import * as fileUtils from '../utils/file-utils';
-import * as mediaUtils from '../utils/media/media-utils';
-import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
-import { S3 } from 'aws-sdk';
-import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { OccurrenceService } from './occurrence-service';
-import { UnknownMedia } from '../utils/media/media-utils';
-import { ArchiveFile, MediaFile } from '../utils/media/media-file';
-import { ManagedUpload } from 'aws-sdk/clients/s3';
+import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
@@ -70,6 +70,8 @@ describe('DarwinCoreService', () => {
       sinon.stub(fileUtils, 'getFileFromS3').resolves(('test' as unknown) as S3.GetObjectOutput);
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves(('test' as unknown) as DWCArchive);
       sinon.stub(OccurrenceService.prototype, 'scrapeAndUploadOccurrences').resolves([{ occurrence_id: 1 }]);
+
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
 
       const response = await darwinCoreService.scrapeAndUploadOccurrences(1);
 

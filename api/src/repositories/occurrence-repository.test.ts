@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection } from '../__mocks__/db';
-import { ApiGeneralError } from '../errors/api-error';
-import { QueryResult } from 'pg';
-import { IPostOccurrenceData, OccurrenceRepository } from './occurrence-repository';
 import SQL from 'sql-template-strings';
+import { ApiGeneralError } from '../errors/api-error';
+import { getMockDBConnection } from '../__mocks__/db';
+import { IPostOccurrenceData, OccurrenceRepository } from './occurrence-repository';
 
 chai.use(sinonChai);
 
@@ -33,7 +33,7 @@ describe('OccurrenceRepository', () => {
       const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => {
+        sql: async () => {
           return mockQueryResponse;
         }
       });
@@ -44,7 +44,7 @@ describe('OccurrenceRepository', () => {
         await occurrenceRepository.insertScrapedOccurrence(1, (mockParams as unknown) as IPostOccurrenceData);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert occurrence data');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert occurrence record');
       }
     });
 
@@ -54,7 +54,7 @@ describe('OccurrenceRepository', () => {
       const getUtm = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromUtm').returns(SQL`test`);
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => {
+        sql: async () => {
           return mockQueryResponse;
         }
       });
@@ -75,7 +75,7 @@ describe('OccurrenceRepository', () => {
       const getUtm = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromUtm').returns(SQL`test`);
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => {
+        sql: async () => {
           return mockQueryResponse;
         }
       });
@@ -96,7 +96,7 @@ describe('OccurrenceRepository', () => {
       const getLatLong = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromLatLong').returns(SQL`test`);
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => {
+        sql: async () => {
           return mockQueryResponse;
         }
       });
@@ -117,7 +117,7 @@ describe('OccurrenceRepository', () => {
       const getLatLong = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromLatLong').returns(SQL`test`);
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => {
+        sql: async () => {
           return mockQueryResponse;
         }
       });
@@ -136,7 +136,7 @@ describe('OccurrenceRepository', () => {
       const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        knex: async () => {
+        sql: async () => {
           return mockQueryResponse;
         }
       });
@@ -152,45 +152,47 @@ describe('OccurrenceRepository', () => {
     });
   });
 
-  describe('getGeography', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('from UTM', async () => {
+  describe('getGeographySqlFromUtm', () => {
+    it('returns expected SQL', async () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
 
       const mockUtm = { easting: 1, northing: 2, zone_srid: 3, zone_letter: 'a', zone_number: 4 };
 
-      const response = occurrenceRepository.getGeographySqlFromUtm(mockUtm);
+      const actualSQL = occurrenceRepository.getGeographySqlFromUtm(mockUtm);
 
-      expect(response).to.eql(SQL`
-    public.ST_Transform(
-      public.ST_SetSRID(
-        public.ST_MakePoint(${1}, ${2}),
-        ${3}
-      ),
-      4326
-    )`);
+      const expectedSQL = SQL`
+      public.ST_Transform(
+        public.ST_SetSRID(
+          public.ST_MakePoint(${1}, ${2}),
+          ${3}
+        ),
+        4326
+      )`;
+
+      expect(actualSQL).to.eql(expectedSQL);
     });
+  });
 
-    it('from LatLong', async () => {
+  describe('getGeographySqlFromLatLong', () => {
+    it('returns expected SQL', async () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
 
       const mockLatLong = { long: 1, lat: 2 };
 
-      const response = occurrenceRepository.getGeographySqlFromLatLong(mockLatLong);
+      const actualSQL = occurrenceRepository.getGeographySqlFromLatLong(mockLatLong);
 
-      expect(response).to.eql(SQL`
-    public.ST_Transform(
-      public.ST_SetSRID(
-        public.ST_MakePoint(${1}, ${2}),
+      const expectedSQL = SQL`
+      public.ST_Transform(
+        public.ST_SetSRID(
+          public.ST_MakePoint(${1}, ${2}),
+          4326
+        ),
         4326
-      ),
-      4326
-    )`);
+      )`;
+
+      expect(actualSQL).to.eql(expectedSQL);
     });
   });
 

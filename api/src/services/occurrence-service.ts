@@ -3,6 +3,29 @@ import { IGetOccurrenceData, IPostOccurrenceData, OccurrenceRepository } from '.
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { DBService } from './db-service';
 
+export interface DwCAOccurrenceRows {
+  eventRows: string[][] | undefined;
+  occurrenceRows: string[][] | undefined;
+  taxonRows: string[][] | undefined;
+}
+
+export interface DwCAOccurrenceHeaders {
+  eventHeaders: string[] | undefined;
+  eventIdHeader: number;
+  eventVerbatimCoordinatesHeader: number;
+  eventDateHeader: number;
+  occurrenceHeaders: string[] | undefined;
+  occurrenceIdHeader: number;
+  associatedTaxaHeader: number;
+  lifeStageHeader: number;
+  sexHeader: number;
+  individualCountHeader: number;
+  organismQuantityHeader: number;
+  organismQuantityTypeHeader: number;
+  taxonHeaders: string[] | undefined;
+  taxonIdHeader: number;
+  vernacularNameHeader: number;
+}
 export class OccurrenceService extends DBService {
   occurrenceRepository: OccurrenceRepository;
 
@@ -65,63 +88,65 @@ export class OccurrenceService extends DBService {
   /**
    * Scrape row data, for occurrences
    *
-   * @param {*} rows
-   * @param {*} headers
+   * @param {DwCAOccurrenceRows} rows
+   * @param {DwCAOccurrenceHeaders} headers
    * @return {*}  {IPostOccurrenceData[]}
    * @memberof OccurrenceService
    */
-  scrapeOccurrences(rows: any, headers: any): IPostOccurrenceData[] {
-    return rows.occurrenceRows?.map(
-      (row: any): IPostOccurrenceData => {
-        const occurrenceId = row[headers.occurrenceIdHeader];
-        const associatedTaxa = row[headers.associatedTaxaHeader];
-        const lifeStage = row[headers.lifeStageHeader];
-        const sex = row[headers.sexHeader];
-        const individualCount = row[headers.individualCountHeader];
-        const organismQuantity = row[headers.organismQuantityHeader];
-        const organismQuantityType = row[headers.organismQuantityTypeHeader];
+  scrapeOccurrences(rows: DwCAOccurrenceRows, headers: DwCAOccurrenceHeaders): IPostOccurrenceData[] {
+    if (!rows?.occurrenceRows?.length) {
+      return [];
+    }
 
-        let verbatimCoordinates;
-        let eventDate;
+    return rows.occurrenceRows.map((row) => {
+      const occurrenceId = row[headers.occurrenceIdHeader];
+      const associatedTaxa = row[headers.associatedTaxaHeader];
+      const lifeStage = row[headers.lifeStageHeader];
+      const sex = row[headers.sexHeader];
+      const individualCount = row[headers.individualCountHeader];
+      const organismQuantity = row[headers.organismQuantityHeader];
+      const organismQuantityType = row[headers.organismQuantityTypeHeader];
 
-        row.eventRows?.forEach((eventRow: any) => {
-          if (eventRow[headers.eventIdHeader] === occurrenceId) {
-            eventDate = eventRow[headers.eventDateHeader];
-            verbatimCoordinates = eventRow[headers.eventVerbatimCoordinatesHeader];
-          }
-        });
+      let verbatimCoordinates;
+      let eventDate;
 
-        let vernacularName;
+      rows.eventRows?.forEach((eventRow) => {
+        if (eventRow[headers.eventIdHeader] === occurrenceId) {
+          eventDate = eventRow[headers.eventDateHeader];
+          verbatimCoordinates = eventRow[headers.eventVerbatimCoordinatesHeader];
+        }
+      });
 
-        row.taxonRows?.forEach((taxonRow: any) => {
-          if (taxonRow[headers.taxonIdHeader] === occurrenceId) {
-            vernacularName = taxonRow[headers.vernacularNameHeader];
-          }
-        });
+      let vernacularName;
 
-        return {
-          associatedTaxa: associatedTaxa,
-          lifeStage: lifeStage,
-          sex: sex,
-          individualCount: individualCount,
-          vernacularName: vernacularName || '', //TODO How to handle undefined
-          verbatimCoordinates: verbatimCoordinates || '',
-          organismQuantity: organismQuantity,
-          organismQuantityType: organismQuantityType,
-          eventDate: eventDate || ''
-        };
-      }
-    );
+      rows.taxonRows?.forEach((taxonRow) => {
+        if (taxonRow[headers.taxonIdHeader] === occurrenceId) {
+          vernacularName = taxonRow[headers.vernacularNameHeader];
+        }
+      });
+
+      return {
+        associatedTaxa: associatedTaxa,
+        lifeStage: lifeStage,
+        sex: sex,
+        individualCount: individualCount,
+        vernacularName: vernacularName || '', //TODO How to handle undefined
+        verbatimCoordinates: verbatimCoordinates || '',
+        organismQuantity: organismQuantity,
+        organismQuantityType: organismQuantityType,
+        eventDate: eventDate || ''
+      };
+    });
   }
 
   /**
    * Collect headers and rows from submission file
    *
    * @param {DWCArchive} dwcArchive
-   * @return {*}
+   * @return {*}  {{ rows: DwCAOccurrenceRows; headers: DwCAOccurrenceHeaders }}
    * @memberof OccurrenceService
    */
-  private getHeadersAndRowsFromFile(dwcArchive: DWCArchive) {
+  getHeadersAndRowsFromFile(dwcArchive: DWCArchive): { rows: DwCAOccurrenceRows; headers: DwCAOccurrenceHeaders } {
     const eventRows = dwcArchive.worksheets.event?.getRows();
     const eventHeaders = dwcArchive.worksheets.event?.getHeaders();
 

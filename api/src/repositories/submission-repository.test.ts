@@ -1,16 +1,16 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection } from '../__mocks__/db';
 import { ApiGeneralError } from '../errors/api-error';
+import { getMockDBConnection } from '../__mocks__/db';
 import {
   IInsertSubmissionRecord,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from './submission-repository';
-import { QueryResult } from 'pg';
 
 chai.use(sinonChai);
 
