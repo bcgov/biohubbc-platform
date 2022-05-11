@@ -25,7 +25,7 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('s3File unavailable');
     }
 
-    const dwcArchive: DWCArchive = await this.prepDWCArchive(s3File);
+    const dwcArchive: DWCArchive = this.prepDWCArchive(s3File);
 
     const occurrenceService = new OccurrenceService(this.connection);
 
