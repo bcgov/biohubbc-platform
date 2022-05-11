@@ -12,7 +12,7 @@ import { DwCAOccurrenceHeaders, DwCAOccurrenceRows, OccurrenceService } from './
 
 chai.use(sinonChai);
 
-describe('OccurrenceService', () => {
+describe.only('OccurrenceService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -48,6 +48,26 @@ describe('OccurrenceService', () => {
   });
 
   describe('scrapeAndUploadOccurrences', () => {
+    it('returns an empty array ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const occurrenceService = new OccurrenceService(mockDBConnection);
+
+      const getHeadersAndRowsFromFileStub = sinon
+        .stub(OccurrenceService.prototype, 'getHeadersAndRowsFromFile')
+        .returns({ rows: {} as any, headers: {} as any });
+
+      const scrapeOccurrencesStub = sinon.stub(OccurrenceService.prototype, 'scrapeOccurrences').returns([]);
+
+      const insertOccurrenceStub = sinon.stub(OccurrenceService.prototype, 'insertScrapedOccurrence').resolves();
+
+      const response = await occurrenceService.scrapeAndUploadOccurrences(1, ({} as unknown) as DWCArchive);
+
+      expect(getHeadersAndRowsFromFileStub).to.have.been.calledOnce;
+      expect(scrapeOccurrencesStub).to.have.been.calledOnce;
+      expect(insertOccurrenceStub).to.have.not.been.called;
+      expect(response).to.be.eql([]);
+    });
+
     it('returns an array of occurrence_id', async () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceService = new OccurrenceService(mockDBConnection);
@@ -81,7 +101,7 @@ describe('OccurrenceService', () => {
   });
 
   describe('scrapeOccurrences', () => {
-    it('returns an empty array', () => {
+    it('returns an empty array when no data provided', () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceService = new OccurrenceService(mockDBConnection);
 
@@ -93,7 +113,7 @@ describe('OccurrenceService', () => {
       expect(response).to.eql([]);
     });
 
-    it('returns an array with no event or taxo data', () => {
+    it('returns an partial array when no event or taxo data provided', () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceService = new OccurrenceService(mockDBConnection);
 
@@ -140,7 +160,7 @@ describe('OccurrenceService', () => {
       expect(response).to.eql(mockResponse);
     });
 
-    it('returns an array all data', () => {
+    it('returns an array with all data', () => {
       const mockDBConnection = getMockDBConnection();
       const occurrenceService = new OccurrenceService(mockDBConnection);
 
@@ -185,145 +205,138 @@ describe('OccurrenceService', () => {
       ];
 
       expect(response).to.eql(mockResponse);
-      describe('getHeadersAndRowsFromFile', () => {
-        it('returns empty rows and headers when DWCArchive CSVWorksheets have no data', async () => {
-          const mediaFile = new MediaFile('fileName', 'txt', Buffer.from([]));
-          const archiveFile = new ArchiveFile('zipName', 'zip', Buffer.from([]), [mediaFile]);
+    });
+  });
 
-          const dwcArchive = new DWCArchive(archiveFile);
+  describe('getHeadersAndRowsFromFile', () => {
+    it('returns empty rows and headers when DWCArchive CSVWorksheets have no data', async () => {
+      const mediaFile = new MediaFile('fileName', 'txt', Buffer.from([]));
+      const archiveFile = new ArchiveFile('zipName', 'zip', Buffer.from([]), [mediaFile]);
 
-          dwcArchive.worksheets = {
-            event: new CSVWorksheet('event'),
-            occurrence: new CSVWorksheet('occurrence'),
-            taxon: new CSVWorksheet('taxon')
-          };
+      const dwcArchive = new DWCArchive(archiveFile);
 
-          const mockDBConnection = getMockDBConnection();
+      dwcArchive.worksheets = {
+        event: new CSVWorksheet('event'),
+        occurrence: new CSVWorksheet('occurrence'),
+        taxon: new CSVWorksheet('taxon')
+      };
 
-          const occurrenceService = new OccurrenceService(mockDBConnection);
+      const mockDBConnection = getMockDBConnection();
 
-          const { rows, headers } = occurrenceService.getHeadersAndRowsFromFile(dwcArchive);
+      const occurrenceService = new OccurrenceService(mockDBConnection);
 
-          const expectedRows: DwCAOccurrenceRows = {
-            eventRows: [],
-            occurrenceRows: [],
-            taxonRows: []
-          };
+      const { rows, headers } = occurrenceService.getHeadersAndRowsFromFile(dwcArchive);
 
-          const expectedHeaders: DwCAOccurrenceHeaders = {
-            eventHeaders: [],
-            eventIdHeader: -1,
-            eventVerbatimCoordinatesHeader: -1,
-            eventDateHeader: -1,
-            occurrenceHeaders: [],
-            occurrenceIdHeader: -1,
-            associatedTaxaHeader: -1,
-            lifeStageHeader: -1,
-            sexHeader: -1,
-            individualCountHeader: -1,
-            organismQuantityHeader: -1,
-            organismQuantityTypeHeader: -1,
-            taxonHeaders: [],
-            taxonIdHeader: -1,
-            vernacularNameHeader: -1
-          };
+      const expectedRows: DwCAOccurrenceRows = {
+        eventRows: [],
+        occurrenceRows: [],
+        taxonRows: []
+      };
 
-          expect(rows).to.eql(expectedRows);
-          expect(headers).to.eql(expectedHeaders);
-        });
+      const expectedHeaders: DwCAOccurrenceHeaders = {
+        eventHeaders: [],
+        eventIdHeader: -1,
+        eventVerbatimCoordinatesHeader: -1,
+        eventDateHeader: -1,
+        occurrenceHeaders: [],
+        occurrenceIdHeader: -1,
+        associatedTaxaHeader: -1,
+        lifeStageHeader: -1,
+        sexHeader: -1,
+        individualCountHeader: -1,
+        organismQuantityHeader: -1,
+        organismQuantityTypeHeader: -1,
+        taxonHeaders: [],
+        taxonIdHeader: -1,
+        vernacularNameHeader: -1
+      };
 
-        it('returns rows and headers when DWCArchive CSVWorksheets have valid expected data', async () => {
-          const mediaFile = new MediaFile('fileName', 'txt', Buffer.from([]));
-          const archiveFile = new ArchiveFile('zipName', 'zip', Buffer.from([]), [mediaFile]);
+      expect(rows).to.eql(expectedRows);
+      expect(headers).to.eql(expectedHeaders);
+    });
 
-          const dwcArchive = new DWCArchive(archiveFile);
+    it('returns rows and headers when DWCArchive CSVWorksheets have valid expected data', async () => {
+      const mediaFile = new MediaFile('fileName', 'txt', Buffer.from([]));
+      const archiveFile = new ArchiveFile('zipName', 'zip', Buffer.from([]), [mediaFile]);
 
-          dwcArchive.worksheets = {
-            event: new CSVWorksheet(
-              'event',
-              xlsx.utils.aoa_to_sheet([
-                ['id', 'eventDate', 'verbatimCoordinates'],
-                ['1', '2022-05-11', '9N 573674 6114170'],
-                ['2', '2022-06-12', '8N 573674 6114170']
-              ])
-            ),
-            occurrence: new CSVWorksheet(
-              'occurrence',
-              xlsx.utils.aoa_to_sheet([
-                [
-                  'id',
-                  'associatedTaxa',
-                  'lifeStage',
-                  'sex',
-                  'individualCount',
-                  'organismQuantity',
-                  'organismQuantityType'
-                ],
-                ['1', 'Alces Americanus', 'Adult', 'Male', '2', '', ''],
-                ['2', 'Alces Americanus', 'Adult', 'Female', '3', '4', '5']
-              ])
-            ),
-            taxon: new CSVWorksheet(
-              'taxon',
-              xlsx.utils.aoa_to_sheet([
-                ['id', 'vernacularName'],
-                ['1', 'Moose'],
-                ['2', 'Moose']
-              ])
-            )
-          };
+      const dwcArchive = new DWCArchive(archiveFile);
 
-          const mockDBConnection = getMockDBConnection();
+      dwcArchive.worksheets = {
+        event: new CSVWorksheet(
+          'event',
+          xlsx.utils.aoa_to_sheet([
+            ['id', 'eventDate', 'verbatimCoordinates'],
+            ['1', '2022-05-11', '9N 573674 6114170'],
+            ['2', '2022-06-12', '8N 573674 6114170']
+          ])
+        ),
+        occurrence: new CSVWorksheet(
+          'occurrence',
+          xlsx.utils.aoa_to_sheet([
+            ['id', 'associatedTaxa', 'lifeStage', 'sex', 'individualCount', 'organismQuantity', 'organismQuantityType'],
+            ['1', 'Alces Americanus', 'Adult', 'Male', '2', '', ''],
+            ['2', 'Alces Americanus', 'Adult', 'Female', '3', '4', '5']
+          ])
+        ),
+        taxon: new CSVWorksheet(
+          'taxon',
+          xlsx.utils.aoa_to_sheet([
+            ['id', 'vernacularName'],
+            ['1', 'Moose'],
+            ['2', 'Moose']
+          ])
+        )
+      };
 
-          const occurrenceService = new OccurrenceService(mockDBConnection);
+      const mockDBConnection = getMockDBConnection();
 
-          const { rows, headers } = occurrenceService.getHeadersAndRowsFromFile(dwcArchive);
+      const occurrenceService = new OccurrenceService(mockDBConnection);
 
-          const expectedRows: DwCAOccurrenceRows = {
-            eventRows: [
-              ['1', '2022-05-11', '9N 573674 6114170'],
-              ['2', '2022-06-12', '8N 573674 6114170']
-            ],
-            occurrenceRows: [
-              ['1', 'Alces Americanus', 'Adult', 'Male', '2', '', ''],
-              ['2', 'Alces Americanus', 'Adult', 'Female', '3', '4', '5']
-            ],
-            taxonRows: [
-              ['1', 'Moose'],
-              ['2', 'Moose']
-            ]
-          };
+      const { rows, headers } = occurrenceService.getHeadersAndRowsFromFile(dwcArchive);
 
-          const expectedHeaders: DwCAOccurrenceHeaders = {
-            eventHeaders: ['id', 'eventDate', 'verbatimCoordinates'],
-            eventIdHeader: 0,
-            eventVerbatimCoordinatesHeader: 2,
-            eventDateHeader: 1,
-            occurrenceHeaders: [
-              'id',
-              'associatedTaxa',
-              'lifeStage',
-              'sex',
-              'individualCount',
-              'organismQuantity',
-              'organismQuantityType'
-            ],
-            occurrenceIdHeader: 0,
-            associatedTaxaHeader: 1,
-            lifeStageHeader: 2,
-            sexHeader: 3,
-            individualCountHeader: 4,
-            organismQuantityHeader: 5,
-            organismQuantityTypeHeader: 6,
-            taxonHeaders: ['id', 'vernacularName'],
-            taxonIdHeader: 0,
-            vernacularNameHeader: 1
-          };
+      const expectedRows: DwCAOccurrenceRows = {
+        eventRows: [
+          ['1', '2022-05-11', '9N 573674 6114170'],
+          ['2', '2022-06-12', '8N 573674 6114170']
+        ],
+        occurrenceRows: [
+          ['1', 'Alces Americanus', 'Adult', 'Male', '2', '', ''],
+          ['2', 'Alces Americanus', 'Adult', 'Female', '3', '4', '5']
+        ],
+        taxonRows: [
+          ['1', 'Moose'],
+          ['2', 'Moose']
+        ]
+      };
 
-          expect(rows).to.eql(expectedRows);
-          expect(headers).to.eql(expectedHeaders);
-        });
-      });
+      const expectedHeaders: DwCAOccurrenceHeaders = {
+        eventHeaders: ['id', 'eventDate', 'verbatimCoordinates'],
+        eventIdHeader: 0,
+        eventVerbatimCoordinatesHeader: 2,
+        eventDateHeader: 1,
+        occurrenceHeaders: [
+          'id',
+          'associatedTaxa',
+          'lifeStage',
+          'sex',
+          'individualCount',
+          'organismQuantity',
+          'organismQuantityType'
+        ],
+        occurrenceIdHeader: 0,
+        associatedTaxaHeader: 1,
+        lifeStageHeader: 2,
+        sexHeader: 3,
+        individualCountHeader: 4,
+        organismQuantityHeader: 5,
+        organismQuantityTypeHeader: 6,
+        taxonHeaders: ['id', 'vernacularName'],
+        taxonIdHeader: 0,
+        vernacularNameHeader: 1
+      };
+
+      expect(rows).to.eql(expectedRows);
+      expect(headers).to.eql(expectedHeaders);
     });
   });
 });
