@@ -7,6 +7,8 @@ import SQL from 'sql-template-strings';
 import { ApiGeneralError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { IPostOccurrenceData, OccurrenceRepository } from './occurrence-repository';
+import * as spatialUtils from '../utils/spatial-utils';
+import { ILatLong, IUTM } from '../utils/spatial-utils';
 
 chai.use(sinonChai);
 
@@ -48,88 +50,98 @@ describe('OccurrenceRepository', () => {
       }
     });
 
-    it('should not append geography to insertData object if utm invalid', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
+    describe('UTM & LatLong Parse', () => {
+      it('should not append geography to insertData object if utm invalid', async () => {
+        const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
 
-      const getUtm = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromUtm').returns(SQL`test`);
+        const getUtm = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromUtm').returns(SQL`test`);
+        const parseUtm = sinon.stub(spatialUtils, 'parseUTMString').returns(null);
 
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        const mockDBConnection = getMockDBConnection({
+          sql: async () => {
+            return mockQueryResponse;
+          }
+        });
+
+        const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+
+        await occurrenceRepository.insertScrapedOccurrence(1, ({
+          ...mockParams,
+          verbatimCoordinates: null
+        } as unknown) as IPostOccurrenceData);
+
+        expect(parseUtm).to.be.calledOnceWith('');
+        expect(getUtm).to.not.be.called;
       });
 
-      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+      it('should append geography to insertData object if utm valid', async () => {
+        const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
 
-      await occurrenceRepository.insertScrapedOccurrence(1, ({
-        ...mockParams,
-        verbatimCoordinates: 'test'
-      } as unknown) as IPostOccurrenceData);
+        const getUtm = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromUtm').returns(SQL`test`);
+        const parseUtm = sinon.stub(spatialUtils, 'parseUTMString').returns(({} as unknown) as IUTM);
 
-      expect(getUtm).to.not.be.called;
-    });
+        const mockDBConnection = getMockDBConnection({
+          sql: async () => {
+            return mockQueryResponse;
+          }
+        });
 
-    it('should append geography to insertData object if utm valid', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
+        const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
 
-      const getUtm = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromUtm').returns(SQL`test`);
+        await occurrenceRepository.insertScrapedOccurrence(1, ({
+          ...mockParams,
+          verbatimCoordinates: '9N 573674 6114170'
+        } as unknown) as IPostOccurrenceData);
 
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        expect(parseUtm).to.be.calledOnceWith('9N 573674 6114170');
+        expect(getUtm).to.be.calledOnce;
       });
 
-      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+      it('should not append geography to insertData object if latLong invalid', async () => {
+        const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
 
-      await occurrenceRepository.insertScrapedOccurrence(1, ({
-        ...mockParams,
-        verbatimCoordinates: '9N 573674 6114170'
-      } as unknown) as IPostOccurrenceData);
+        const getLatLong = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromLatLong').returns(SQL`test`);
+        const parseLatLong = sinon.stub(spatialUtils, 'parseLatLongString').returns(null);
 
-      expect(getUtm).to.be.calledOnce;
-    });
+        const mockDBConnection = getMockDBConnection({
+          sql: async () => {
+            return mockQueryResponse;
+          }
+        });
 
-    it('should not append geography to insertData object if latLong invalid', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
+        const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
 
-      const getLatLong = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromLatLong').returns(SQL`test`);
+        await occurrenceRepository.insertScrapedOccurrence(1, ({
+          ...mockParams,
+          verbatimCoordinates: null
+        } as unknown) as IPostOccurrenceData);
 
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        expect(parseLatLong).to.be.calledOnceWith('');
+        expect(getLatLong).to.not.be.called;
       });
 
-      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+      it('should append geography to insertData object if latLong valid', async () => {
+        const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
 
-      await occurrenceRepository.insertScrapedOccurrence(1, ({
-        ...mockParams,
-        verbatimCoordinates: 'test'
-      } as unknown) as IPostOccurrenceData);
+        const getLatLong = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromLatLong').returns(SQL`test`);
+        const parseLatLong = sinon.stub(spatialUtils, 'parseLatLongString').returns(({} as unknown) as ILatLong);
 
-      expect(getLatLong).to.not.be.called;
-    });
+        const mockDBConnection = getMockDBConnection({
+          sql: async () => {
+            return mockQueryResponse;
+          }
+        });
 
-    it('should append geography to insertData object if latLong valid', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ occurrence_id: 1 }] } as any) as Promise<QueryResult<any>>;
+        const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
 
-      const getLatLong = sinon.stub(OccurrenceRepository.prototype, 'getGeographySqlFromLatLong').returns(SQL`test`);
+        await occurrenceRepository.insertScrapedOccurrence(1, ({
+          ...mockParams,
+          verbatimCoordinates: '49.116906 -122.62887'
+        } as unknown) as IPostOccurrenceData);
 
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        expect(parseLatLong).to.be.calledOnceWith('49.116906 -122.62887');
+        expect(getLatLong).to.be.calledOnce;
       });
-
-      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
-
-      await occurrenceRepository.insertScrapedOccurrence(1, ({
-        ...mockParams,
-        verbatimCoordinates: '49.116906 -122.62887'
-      } as unknown) as IPostOccurrenceData);
-
-      expect(getLatLong).to.be.calledOnce;
     });
 
     it('should succeed with valid data', async () => {

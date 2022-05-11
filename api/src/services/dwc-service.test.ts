@@ -153,7 +153,7 @@ describe('DarwinCoreService', () => {
 
       try {
         await darwinCoreService.ingestNewDwCADataPackage(('file' as unknown) as Express.Multer.File, {
-          dataPackageId: 'string',
+          dataPackageId: undefined,
           source: 'test'
         });
         expect.fail();
