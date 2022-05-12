@@ -91,7 +91,8 @@ export class OccurrenceRepository extends BaseRepository {
     }
 
     sqlStatement.append(`
-      );
+    ) RETURNING
+      occurrence_id;
     `);
 
     const response = await this.connection.sql(sqlStatement);
