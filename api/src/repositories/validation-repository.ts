@@ -1,6 +1,5 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { HTTP400 } from '../errors/http-error';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertStyleSchema {
@@ -20,13 +19,16 @@ export class ValidationRepository extends BaseRepository {
         ${styleSchema}
       )
       RETURNING
-        stylesheet_id;
+        style_id;
     `;
 
     const response = await this.connection.sql<{ style_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert style schema');
+      throw new ApiExecuteSQLError('Failed to insert style schema', [
+        'ValidationRepository->insertStyleSchema',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
     return { style_id: 1 }; //TODO hard coded
     // return response.rows[0];
@@ -45,10 +47,13 @@ export class ValidationRepository extends BaseRepository {
     const response = await this.connection.sql<IStyleModel>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new HTTP400('Failed to get style schema');
+      throw new ApiExecuteSQLError('Failed to get style schema', [
+        'ValidationRepository->getStyleSchemaByStyleId',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
-    return { something: 'style' }; //TODO hard coded
+    return { something: 'thing' }; //TODO hard coded
 
     // return response.rows[0];
   }

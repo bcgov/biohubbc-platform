@@ -49,13 +49,14 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['validation'],
+            required: ['validation', 'mediaState'],
             properties: {
               validation: {
                 type: 'boolean'
               },
               mediaState: {
                 type: 'object',
+                required: ['fileName', 'fileErrors', 'isValid'],
                 properties: {
                   fileName: {
                     type: 'string'
@@ -76,12 +77,6 @@ POST.apiDoc = {
                 items: {
                   type: 'string'
                 }
-              },
-              errors: {
-                type: 'array',
-                items: {
-                  type: 'string'
-                }
               }
             }
           }
@@ -94,8 +89,6 @@ POST.apiDoc = {
 
 export function validateSubmission(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'validateSubmission', message: 'params', files: req.params });
-
     const submissionId = Number(req.params.submissionId);
 
     const connection = getDBConnection(req['keycloak_token']);

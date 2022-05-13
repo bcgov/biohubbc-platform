@@ -18,13 +18,19 @@ export class DarwinCoreService extends DBService {
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
     if (!submissionRecord || !submissionRecord.input_key) {
-      throw new ApiGeneralError('s3Key submissionRecord unavailable');
+      throw new ApiGeneralError('submission record s3Key unavailable', [
+        'DarwinCoreService->getSubmissionRecordAndConvertToDWCArchive',
+        'submission record was invalid or did not contain input_key'
+      ]);
     }
 
     const s3File = await getFileFromS3(submissionRecord.input_key);
 
     if (!s3File) {
-      throw new ApiGeneralError('s3File unavailable');
+      throw new ApiGeneralError('s3 file unavailable', [
+        'DarwinCoreService->getSubmissionRecordAndConvertToDWCArchive',
+        's3 file is invalid or unavailable'
+      ]);
     }
 
     return this.prepDWCArchive(s3File);
@@ -34,9 +40,10 @@ export class DarwinCoreService extends DBService {
     const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
     const occurrenceService = new OccurrenceService(this.connection);
-    const submissionService = new SubmissionService(this.connection);
 
     const response = await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
+
+    const submissionService = new SubmissionService(this.connection);
 
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
@@ -54,11 +61,17 @@ export class DarwinCoreService extends DBService {
     const parsedMedia = parseUnknownMedia(unknownMedia);
 
     if (!parsedMedia) {
-      throw new ApiGeneralError('Failed to parse submission, file was empty');
+      throw new ApiGeneralError('Failed to parse submission', [
+        'DarwinCoreService->prepDWCArchive',
+        'unknown media file was empty or unable to be parsed'
+      ]);
     }
 
     if (!(parsedMedia instanceof ArchiveFile)) {
-      throw new ApiGeneralError('Failed to parse submission, not a valid Archive file');
+      throw new ApiGeneralError('Failed to parse submission', [
+        'DarwinCoreService->prepDWCArchive',
+        'unknown media file was not a valid Archive file'
+      ]);
     }
 
     return new DWCArchive(parsedMedia);
@@ -95,12 +108,6 @@ export class DarwinCoreService extends DBService {
       uuid: dataPackageId
     });
 
-    if (!response || !response.submission_id) {
-      throw new ApiGeneralError('Failed to insert submission record', [
-        `submissionId was null or undefined: ${response}`
-      ]);
-    }
-
     const submissionId = response.submission_id;
 
     const s3Key = generateS3FileKey({
@@ -129,6 +136,16 @@ export class DarwinCoreService extends DBService {
 
     const styleSchema = await validationService.getStyleSchemaByStyleId(styleSheetId || 1); //TODO Hard coded
 
-    return validationService.validateDWCArchiveWithStyleSchema(submissionId, dwcArchive, styleSchema);
+    const response = await validationService.validateDWCArchiveWithStyleSchema(dwcArchive, styleSchema);
+
+    const submissionService = new SubmissionService(this.connection);
+
+    if (!response.validation) {
+      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
+    } else {
+      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+    }
+
+    return response;
   }
 }

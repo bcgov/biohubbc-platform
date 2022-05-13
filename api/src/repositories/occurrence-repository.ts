@@ -98,7 +98,10 @@ export class OccurrenceRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert occurrence record');
+      throw new ApiExecuteSQLError('Failed to insert occurrence record', [
+        'OccurrenceRepository->insertScrapedOccurrence',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -163,7 +166,10 @@ export class OccurrenceRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get occurrence record');
+      throw new ApiExecuteSQLError('Failed to get occurrence record', [
+        'OccurrenceRepository->getOccurrenceSubmission',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];

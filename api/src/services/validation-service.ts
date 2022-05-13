@@ -5,8 +5,6 @@ import { ValidationSchemaParser } from '../utils/media/validation/validation-sch
 import { IMediaState } from '../utils/media/media-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ICsvState } from '../utils/media/csv/csv-file';
-import { SubmissionService } from './submission-service';
-import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
@@ -25,25 +23,20 @@ export class ValidationService extends DBService {
     return this.validationRepository.getStyleSchemaByStyleId(styleId);
   }
 
-  async validateDWCArchiveWithStyleSchema(
-    submissionId: number,
+  validateDWCArchiveWithStyleSchema(
     dwcArchive: DWCArchive,
     styleSchema: IStyleModel
-  ): Promise<{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }> {
-    const submissionService = new SubmissionService(this.connection);
-
+  ): { validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] } {
     const validationSchemaParser: ValidationSchemaParser = new ValidationSchemaParser(styleSchema);
 
     const mediaState: IMediaState = dwcArchive.isMediaValid(validationSchemaParser);
 
     if (!mediaState.isValid) {
-      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
       return { validation: false, mediaState: mediaState };
     }
 
     const csvState: ICsvState[] = dwcArchive.isContentValid(validationSchemaParser);
 
-    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
     return { validation: true, mediaState: mediaState, csvState: csvState };
   }
 }
