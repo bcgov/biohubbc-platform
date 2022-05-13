@@ -7,6 +7,12 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { DBService } from './db-service';
+import { SearchRequest } from '@elastic/elasticsearch/lib/api/types';
+import { Client } from '@elastic/elasticsearch';
+import { getLogger } from '../utils/logger';
+
+const defaultLog = getLogger('services/submission-service');
+
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
 
@@ -14,6 +20,42 @@ export class SubmissionService extends DBService {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
+  }
+
+  private async elasticSearch(searchRequest: SearchRequest) {
+    try {
+      const client = new Client({ node: process.env.ELASTICSEARCH_URL });
+      return await client.search({
+        index: 'submission', //TODO IM NOT SURE WHAT TO DO HERE
+        ...searchRequest
+      });
+    } catch (error) {
+      defaultLog.debug({ label: 'elasticSearch', message: 'error', error });
+    }
+  }
+
+  async searchSubmission(term: string) {
+    const searchConfig: object[] = [];
+
+    const splitTerms = term.split(' ');
+
+    splitTerms.forEach((item) => {
+      searchConfig.push({
+        wildcard: {
+          name: { value: `*${item}*`, boost: 4.0, case_insensitive: true } //TODO name? what are search fields
+        }
+      });
+    });
+
+    const response = await this.elasticSearch({
+      query: {
+        bool: {
+          should: searchConfig
+        }
+      }
+    });
+
+    return response;
   }
 
   /**
