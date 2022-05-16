@@ -58,6 +58,10 @@ export class SubmissionService extends DBService {
     return response;
   }
 
+  async findSubmissionByCriteria(submissionCriteria: any): Promise<{ submission_id: number }[]> {
+    return this.submissionRepository.findSubmissionByCriteria(submissionCriteria);
+  }
+
   /**
    * Insert a new submission record.
    *
