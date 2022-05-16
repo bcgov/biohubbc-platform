@@ -54,9 +54,7 @@ export async function up(knex: Knex): Promise<void> {
   const populate_submission_message_type = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_submission_message_type.sql')
   );
-  const populate_source = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_source.sql')
-  );
+  const populate_source = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_source.sql'));
 
   const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
 
