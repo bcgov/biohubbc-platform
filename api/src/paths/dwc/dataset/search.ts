@@ -6,6 +6,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { getLogger } from '../../../utils/logger';
 import { SubmissionService } from '../../../services/submission-service';
+import { ISearchSubmissionCriteria } from '../../../repositories/submission-repository';
 
 const defaultLog = getLogger('paths/dwc/dataset/search');
 
@@ -41,6 +42,15 @@ GET.apiDoc = {
         nullable: true
       },
       allowEmptyValue: true
+    },
+    {
+      in: 'query',
+      name: 'spatial',
+      schema: {
+        type: 'string',
+        nullable: true
+      },
+      allowEmptyValue: true
     }
   ],
   responses: {
@@ -49,21 +59,13 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              searchResponse: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['id', 'label'],
-                  properties: {
-                    id: {
-                      type: 'string'
-                    },
-                    label: {
-                      type: 'string'
-                    }
-                  }
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['submission_id'],
+              properties: {
+                submission_id: {
+                  type: 'number'
                 }
               }
             }
@@ -77,7 +79,7 @@ GET.apiDoc = {
 
 export function searchSubmission(): RequestHandler {
   return async (req, res) => {
-    const searchCriteria: any = req.query || {}; //TODO any type
+    const searchCriteria: ISearchSubmissionCriteria = req.query || {};
 
     const connection = getDBConnection(req['keycloak_token']);
 
@@ -90,7 +92,7 @@ export function searchSubmission(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json({ searchResponse: response });
+      res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'searchSubmission', message: 'error', error });
       await connection.rollback();

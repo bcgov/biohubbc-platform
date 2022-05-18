@@ -2,11 +2,17 @@ import SQL from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
+import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export type Subset<K> = {
   [attr in keyof K]?: K[attr] extends object ? Subset<K[attr]> : K[attr];
 };
+
+export interface ISearchSubmissionCriteria {
+  keyword?: string;
+  spatial?: string;
+}
 
 export interface IInsertSubmissionRecord {
   source: string;
@@ -82,35 +88,49 @@ export enum SUBMISSION_MESSAGE_CLASS {
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
-  async findSubmissionByCriteria(criteria: any): Promise<{ submission_id: number }[]> {
+  async findSubmissionByCriteria(criteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
     const queryBuilder = getKnexQueryBuilder<any, { project_id: number }>()
       .select('submission.submission_id')
-      .from('submission');
+      .from('submission')
+      .leftJoin('occurrence', 'submission.submission_id', 'occurrence.submission_id');
 
     if (criteria.keyword) {
       queryBuilder.and.where(function () {
-        this.or.whereILike('submission.source', `%${criteria.keyword}%`);
-        this.or.whereILike('submission.uuid', `%${criteria.keyword}%`);
-        this.or.whereILike('submission.input_file_name', `%${criteria.keyword}%`);
-      });
-    }
-
-    if (criteria.occurrence) {
-      queryBuilder.leftJoin('occurrence', 'submission.submission_id', 'occurrence.submission_id');
-
-      queryBuilder.and.where(function () {
-        this.or.whereILike('occurrence.taxoid', `%${criteria.occurrence}%`);
-        this.or.whereILike('occurrence.lifestage', `%${criteria.occurrence}%`);
-        this.or.whereILike('occurrence.sex', `%${criteria.occurrence}%`);
-        this.or.whereILike('occurrence.vernacularname', `%${criteria.occurrence}%`);
+        this.or.whereILike('occurrence.taxonid', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.lifestage', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.vernacularname', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.individualcount', `%${criteria.keyword}%`);
       });
     }
 
     if (criteria.spatial) {
-      //TODO posgis spatial search
+      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(criteria.spatial));
+
+      const sqlStatement = SQL`
+      public.ST_INTERSECTS(
+        geography,
+        public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(`;
+
+      sqlStatement.append(geometryCollectionSQL);
+
+      sqlStatement.append(`,
+              4326
+            )
+          )
+        )
+      )`);
+
+      queryBuilder.and.whereRaw(sqlStatement.sql, sqlStatement.values);
     }
 
-    return [];
+    queryBuilder.groupBy('submission.submission_id');
+
+    const response = await this.connection.knex<{ submission_id: number }>(queryBuilder);
+
+    return response.rows;
   }
 
   /**
