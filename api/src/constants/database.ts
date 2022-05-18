@@ -3,3 +3,9 @@ export enum SYSTEM_IDENTITY_SOURCE {
   IDIR = 'IDIR',
   BCEID = 'BCEID'
 }
+
+export enum ES_INDEX {
+  TAXONOMY = 'taxonomy',
+  EML = 'eml'
+}
+

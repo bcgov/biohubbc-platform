@@ -1,4 +1,5 @@
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuid4 } from 'uuid';
+import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
@@ -69,7 +70,7 @@ export class DarwinCoreService extends DBService {
     file: Express.Multer.File,
     options?: { dataPackageId?: string; source?: string }
   ): Promise<{ dataPackageId: string; submissionId: number }> {
-    const dataPackageId = options?.dataPackageId || uuidv4();
+    const dataPackageId = options?.dataPackageId || uuid4();
     const source = options?.source || 'SIMS'; // TODO Parse from the provided EML file?
 
     // TODO Check if `dataPackageId` already exists? If so, update or throw error?
@@ -110,5 +111,23 @@ export class DarwinCoreService extends DBService {
     });
 
     return { dataPackageId, submissionId };
+  }
+
+  async sendEMLToELasticSearch() {
+    const esClient = await this.getEsClient();
+
+    const id = 'ab006e90-fe0d-4d51-b056-c70b3a25fff8';
+
+    const jsonDoc = {
+      id: 1,
+      concept: {
+        items: {
+          id: 2,
+          content: 'this is a string'
+        }
+      }
+    };
+
+    await esClient.create({ id: id, index: ES_INDEX.EML, document: jsonDoc });
   }
 }
