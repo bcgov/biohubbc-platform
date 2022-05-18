@@ -8,7 +8,6 @@ import { ESService } from './es-service';
  * @class DBService
  */
 export class DBService extends ESService {
-
   connection: IDBConnection;
 
   constructor(connection: IDBConnection) {

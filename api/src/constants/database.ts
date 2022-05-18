@@ -8,4 +8,3 @@ export enum ES_INDEX {
   TAXONOMY = 'taxonomy',
   EML = 'eml'
 }
-

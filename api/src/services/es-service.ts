@@ -1,6 +1,5 @@
 import { Client } from '@elastic/elasticsearch';
 
-
 /**
  * Base class for services that require a elastic search connection.
  *
