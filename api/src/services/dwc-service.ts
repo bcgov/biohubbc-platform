@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { SOURCE } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
@@ -61,18 +62,19 @@ export class DarwinCoreService extends DBService {
    * Ingest a Darwin Core Archive (DwCA) data package.
    *
    * @param {Express.Multer.File} file
-   * @param {{ dataPackageId?: string }} [options] A globally unique id. Will default to a random uuid if not supplied.
+   * @param {string} source
+   * @param {{ dataPackageId?: string }} [options]
    * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
    * @memberof DarwinCoreService
    */
   async ingestNewDwCADataPackage(
     file: Express.Multer.File,
-    options?: { dataPackageId?: string; source?: string }
+    source: SOURCE,
+    options?: { dataPackageId?: string }
   ): Promise<{ dataPackageId: string; submissionId: number }> {
     const dataPackageId = options?.dataPackageId || uuidv4();
-    const source = options?.source || 'SIMS'; // TODO Parse from the provided EML file?
 
-    // TODO Check if `dataPackageId` already exists? If so, update or throw error?
+    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
 
     const dwcArchive = this.prepDWCArchive(file);
 

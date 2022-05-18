@@ -57,7 +57,10 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
 
     await connection.open();
 
-    const authorizationService = new AuthorizationService(connection, { systemUser: req['system_user'] });
+    const authorizationService = new AuthorizationService(connection, {
+      systemUser: req['system_user'],
+      keycloakToken: req['keycloak_token']
+    });
 
     const isAuthorized =
       (await authorizationService.authorizeSystemAdministrator()) ||

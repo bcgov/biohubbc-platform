@@ -1,14 +1,11 @@
 import SQL from 'sql-template-strings';
+import { SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP400 } from '../errors/http-error';
 import { BaseRepository } from './base-repository';
 
-export type Subset<K> = {
-  [attr in keyof K]?: K[attr] extends object ? Subset<K[attr]> : K[attr];
-};
-
 export interface IInsertSubmissionRecord {
-  source: string;
+  source: SOURCE;
   uuid: string;
   event_timestamp: string;
   input_key: string;
@@ -91,7 +88,7 @@ export class SubmissionRepository extends BaseRepository {
   async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source,
+        source_transform_id,
         uuid,
         event_timestamp,
         input_key,
@@ -99,7 +96,18 @@ export class SubmissionRepository extends BaseRepository {
         eml_source,
         darwin_core_source
       ) VALUES (
-        ${submissionData.source},
+        (
+          SELECT
+            source_transform_id
+          FROM
+            source_transform
+          JOIN
+            source
+          ON
+            source.source_id = source_transform.source_id
+          WHERE
+            source.identifier = ${submissionData.source}
+        ),
         ${submissionData.uuid},
         ${submissionData.event_timestamp},
         ${submissionData.input_key},

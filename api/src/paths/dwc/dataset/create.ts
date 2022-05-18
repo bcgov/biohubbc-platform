@@ -1,11 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SOURCE } from '../../../constants/database';
 import { getDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../services/dwc-service';
 import { scanFileForVirus } from '../../../utils/file-utils';
+import { getKeycloakSource } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/dataset/create');
@@ -15,7 +17,8 @@ export const POST: Operation = [
     return {
       and: [
         {
-          discriminator: 'SystemUser'
+          validServiceClientIDs: [SOURCE['SIMS-SVC']],
+          discriminator: 'ServiceClient'
         }
       ]
     };
@@ -36,7 +39,7 @@ POST.apiDoc = {
       'multipart/form-data': {
         schema: {
           type: 'object',
-          required: ['media'],
+          required: ['media', 'data_package_id'],
           properties: {
             media: {
               type: 'string',
@@ -90,6 +93,16 @@ export function submitDataset(): RequestHandler {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
+    console.log(process.env);
+
+    const source = getKeycloakSource(req['keycloak_token']);
+
+    if (!source) {
+      throw new HTTP400('Failed to identify known submission source', [
+        'token did not contain a clientId or clientId value is unknown'
+      ]);
+    }
+
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
@@ -97,7 +110,9 @@ export function submitDataset(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const { dataPackageId, submissionId } = await darwinCoreService.ingestNewDwCADataPackage(file);
+      const { dataPackageId, submissionId } = await darwinCoreService.ingestNewDwCADataPackage(file, source, {
+        dataPackageId: req.body.data_package_id
+      });
 
       // return after creating the submission
       res.status(200).json({ data_package_id: dataPackageId });

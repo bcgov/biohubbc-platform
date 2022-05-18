@@ -218,109 +218,109 @@ describe('authorizeBySystemUser', function () {
   });
 });
 
-describe('userHasValidRole', () => {
-  describe('validSystemRoles is a string', () => {
-    describe('userSystemRoles is a string', () => {
+describe('hasAtLeastOneValidValue', () => {
+  describe('validValues is a string', () => {
+    describe('incomingValues is a string', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole('', '');
+        const response = AuthorizationService.hasAtLeastOneValidValue('', '');
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', '');
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', '');
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', 'user');
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', 'user');
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole('admin', 'admin');
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', 'admin');
 
         expect(response).to.be.true;
       });
     });
 
-    describe('userSystemRoles is an array', () => {
+    describe('incomingValues is an array', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole('', []);
+        const response = AuthorizationService.hasAtLeastOneValidValue('', []);
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', []);
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', []);
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', ['user']);
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', ['user']);
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole('admin', ['admin']);
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', ['admin']);
 
         expect(response).to.be.true;
       });
     });
   });
 
-  describe('validSystemRoles is an array', () => {
-    describe('userSystemRoles is a string', () => {
+  describe('validValues is an array', () => {
+    describe('incomingValues is a string', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole([], '');
+        const response = AuthorizationService.hasAtLeastOneValidValue([], '');
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], '');
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], '');
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], 'user');
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], 'user');
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], 'admin');
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], 'admin');
 
         expect(response).to.be.true;
       });
     });
 
-    describe('userSystemRoles is an array', () => {
+    describe('incomingValues is an array', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole([], []);
+        const response = AuthorizationService.hasAtLeastOneValidValue([], []);
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], []);
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], []);
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], ['user']);
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], ['user']);
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], ['admin']);
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], ['admin']);
 
         expect(response).to.be.true;
       });
