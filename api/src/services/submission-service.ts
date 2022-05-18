@@ -94,4 +94,15 @@ export class SubmissionService extends DBService {
   }> {
     return this.submissionRepository.insertSubmissionMessage(submissionStatusId, submissionMessageType);
   }
+
+  /**
+   * List all submissions
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionModel>}
+   * @memberof SubmissionService
+   */
+  async listSubmissionRecords(): Promise<ISubmissionModel[]> {
+    return this.submissionRepository.listSubmissionRecords();
+  }
 }

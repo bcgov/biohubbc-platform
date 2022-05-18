@@ -267,4 +267,39 @@ export class SubmissionRepository extends BaseRepository {
 
     return response.rows[0];
   }
+
+  /**
+   * Fetch a submission record by primary id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionModel>}
+   * @memberof SubmissionRepository
+   */
+   async listSubmissionRecords(): Promise<ISubmissionModel[]> {
+    const sqlStatement = SQL`
+      SELECT
+        t1.submission_status,
+        s.*
+      FROM
+        submission s
+      LEFT JOIN
+        (SELECT DISTINCT ON (ss.submission_id)
+          ss.submission_id,
+          sst.name AS submission_status
+        FROM
+          submission_status ss
+        LEFT JOIN
+          submission_status_type sst
+        ON
+          ss.submission_status_type_id = sst.submission_status_type_id 
+        ORDER BY
+          ss.submission_id, ss.submission_status_id DESC) t1
+      ON
+        t1.submission_id = s.submission_id;
+    `;
+
+    const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+
+    return response.rows;
+  }
 }

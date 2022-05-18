@@ -1,0 +1,73 @@
+import { RequestHandler } from 'express';
+import { Operation } from 'express-openapi';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { ISubmissionModel } from '../../../repositories/submission-repository';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
+
+const defaultLog = getLogger('paths/dwc/dataset/create');
+
+export const GET: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  listDataset()
+];
+
+GET.apiDoc = {
+  description: 'List submitted Darwin Core Archive (DwCA) data packages.',
+  tags: ['dwc'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
+  responses: {
+    200: {
+      description: 'Darwin Core data packages.',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'array',
+            items: {
+              //
+            }
+          }
+        }
+      }
+    },
+    ...defaultErrorResponses
+  }
+};
+
+export function listDataset(): RequestHandler {
+  return async (req, res) => {
+    const connection = getDBConnection(req['keycloak_token']);
+
+    try {
+      await connection.open();
+
+      const submissionService = new SubmissionService(connection);
+
+      const submissions: ISubmissionModel[] = await submissionService.listSubmissionRecords();
+
+      await connection.commit();
+
+      res.status(200).json(submissions);
+    } catch (error) {
+      defaultLog.error({ label: 'listDataset', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+}
