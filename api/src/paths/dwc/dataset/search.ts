@@ -65,7 +65,8 @@ GET.apiDoc = {
               required: ['submission_id'],
               properties: {
                 submission_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 0
                 }
               }
             }

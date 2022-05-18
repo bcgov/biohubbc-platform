@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import {
   IInsertSubmissionRecord,
+  ISearchSubmissionCriteria,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -15,6 +16,22 @@ import { SubmissionService } from './submission-service';
 chai.use(sinonChai);
 
 describe('SubmissionService', () => {
+  describe('findSubmissionByCriteria', () => {
+    it('should return array of submission_id on call', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'findSubmissionByCriteria')
+        .resolves([{ submission_id: 1 }]);
+
+      const response = await submissionService.findSubmissionByCriteria(({} as unknown) as ISearchSubmissionCriteria);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([{ submission_id: 1 }]);
+    });
+  });
+
   describe('insertSubmissionRecord', () => {
     it('should return submission_id on insert', async () => {
       const mockDBConnection = getMockDBConnection();
