@@ -93,8 +93,6 @@ export function submitDataset(): RequestHandler {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
-    console.log(process.env);
-
     const source = getKeycloakSource(req['keycloak_token']);
 
     if (!source) {

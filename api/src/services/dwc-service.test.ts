@@ -4,6 +4,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { SOURCE } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { ISubmissionModel } from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
@@ -152,10 +153,11 @@ describe('DarwinCoreService', () => {
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves(undefined);
 
       try {
-        await darwinCoreService.ingestNewDwCADataPackage(('file' as unknown) as Express.Multer.File, {
-          dataPackageId: undefined,
-          source: 'test'
-        });
+        await darwinCoreService.ingestNewDwCADataPackage(
+          ('file' as unknown) as Express.Multer.File,
+          SOURCE['SIMS-SVC'],
+          { dataPackageId: '123-456-789' }
+        );
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -185,10 +187,8 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.ingestNewDwCADataPackage(
         ({ originalname: 'name' } as unknown) as Express.Multer.File,
-        {
-          dataPackageId: 'string',
-          source: 'test'
-        }
+        SOURCE['SIMS-SVC'],
+        { dataPackageId: 'string' }
       );
 
       expect(response).to.eql({ dataPackageId: 'string', submissionId: 1 });

@@ -24,7 +24,7 @@ describe('create', () => {
           it('is undefined', async () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
-              body: { media: undefined }
+              body: { media: undefined, data_package_id: '64f47e65-f306-410e-82fa-115f9916910b' }
             };
 
             const response = requestValidator.validateRequest(request);
@@ -36,7 +36,7 @@ describe('create', () => {
           it('is null', async () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
-              body: { media: null }
+              body: { media: null, data_package_id: '64f47e65-f306-410e-82fa-115f9916910b' }
             };
 
             const response = requestValidator.validateRequest(request);
@@ -77,7 +77,7 @@ describe('create', () => {
         it('required values are valid', async () => {
           const request = {
             headers: { 'content-type': 'multipart/form-data' },
-            body: { media: 'file' }
+            body: { media: 'file', data_package_id: '64f47e65-f306-410e-82fa-115f9916910b' }
           };
 
           const response = requestValidator.validateRequest(request);
