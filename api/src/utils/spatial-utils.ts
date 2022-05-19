@@ -144,12 +144,10 @@ export function generateGeometryCollectionSQL(geometry: Feature | Feature[]): SQ
     // as long as it is not the last geometry, keep adding to the ST_collect
     if (index !== geometry.length - 1) {
       sqlStatement.append(SQL`
-        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo})),
-      `);
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo})),`);
     } else {
       sqlStatement.append(SQL`
-        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo}))]))
-      `);
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo}))]))`);
     }
   });
 

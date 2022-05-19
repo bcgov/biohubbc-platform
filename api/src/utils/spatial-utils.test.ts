@@ -176,9 +176,8 @@ describe('generateGeometryCollectionSQL', () => {
 
     expect(generateGeometryCollectionSQL(mockFeature)).to.eql(
       SQL`public.ST_AsText(public.ST_Collect(array[
-          public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo0})),
-          public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo1}))]))
-        `
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo0})),
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo1}))]))`
     );
   });
 });
