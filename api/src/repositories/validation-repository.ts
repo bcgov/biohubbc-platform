@@ -10,7 +10,21 @@ export interface IStyleModel {
   something: any; //TODO
 }
 
+/**
+ *THIS REPO IS ALL HARD CODED DO NOT USE
+ *
+ * @export
+ * @class ValidationRepository
+ * @extends {BaseRepository}
+ */
 export class ValidationRepository extends BaseRepository {
+  /**
+   * Insert Style sheet into db
+   *
+   * @param {IInsertStyleSchema} styleSchema
+   * @return {*}  {Promise<{ style_id: number }>}
+   * @memberof ValidationRepository
+   */
   async insertStyleSchema(styleSchema: IInsertStyleSchema): Promise<{ style_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO styles (
@@ -34,6 +48,13 @@ export class ValidationRepository extends BaseRepository {
     // return response.rows[0];
   }
 
+  /**
+   * Get Style sheet from db with given id
+   *
+   * @param {number} styleId
+   * @return {*}  {Promise<IStyleModel>}
+   * @memberof ValidationRepository
+   */
   async getStyleSchemaByStyleId(styleId: number): Promise<IStyleModel> {
     const sqlStatement = SQL`
       SELECT

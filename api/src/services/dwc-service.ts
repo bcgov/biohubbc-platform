@@ -126,6 +126,29 @@ export class DarwinCoreService extends DBService {
     return { dataPackageId, submissionId };
   }
 
+  /**
+   *  Temp replacement for validation until more requirements are set
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async tempValidateSubmission(submissionId: number) {
+    const submissionService = new SubmissionService(this.connection);
+
+    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+
+    return { validation: true, mediaState: { fileName: '', isValid: true } };
+  }
+
+  /**
+   * Validate submission againest style sheet
+   *
+   * @param {number} submissionId
+   * @param {number} [styleSheetId]
+   * @return {*}  {Promise<{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }>}
+   * @memberof DarwinCoreService
+   */
   async validateSubmission(
     submissionId: number,
     styleSheetId?: number

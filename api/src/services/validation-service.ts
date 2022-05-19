@@ -15,14 +15,36 @@ export class ValidationService extends DBService {
     this.validationRepository = new ValidationRepository(connection);
   }
 
+  /**
+   * Insert Style sheet into db
+   *
+   * @param {IInsertStyleSchema} styleSchema
+   * @return {*}  {Promise<{ style_id: number }>}
+   * @memberof ValidationService
+   */
   async insertStyleSchema(styleSchema: IInsertStyleSchema): Promise<{ style_id: number }> {
     return this.validationRepository.insertStyleSchema(styleSchema);
   }
 
+  /**
+   * Get Style sheet from db with given id
+   *
+   * @param {number} styleId
+   * @return {*}  {Promise<IStyleModel>}
+   * @memberof ValidationService
+   */
   async getStyleSchemaByStyleId(styleId: number): Promise<IStyleModel> {
     return this.validationRepository.getStyleSchemaByStyleId(styleId);
   }
 
+  /**
+   * Validate DWCArchive file with given stylesheet
+   *
+   * @param {DWCArchive} dwcArchive
+   * @param {IStyleModel} styleSchema
+   * @return {*}  {{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }}
+   * @memberof ValidationService
+   */
   validateDWCArchiveWithStyleSchema(
     dwcArchive: DWCArchive,
     styleSchema: IStyleModel

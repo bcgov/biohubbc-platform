@@ -56,7 +56,7 @@ POST.apiDoc = {
               },
               mediaState: {
                 type: 'object',
-                required: ['fileName', 'fileErrors', 'isValid'],
+                required: ['fileName', 'isValid'],
                 properties: {
                   fileName: {
                     type: 'string'
@@ -98,7 +98,7 @@ export function validateSubmission(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const response = await darwinCoreService.validateSubmission(submissionId);
+      const response = await darwinCoreService.tempValidateSubmission(submissionId);
 
       await connection.commit();
 
