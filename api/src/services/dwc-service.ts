@@ -138,7 +138,7 @@ export class DarwinCoreService extends DBService {
 
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
 
-    return { validation: true, mediaState: { fileName: '', isValid: true } };
+    return { validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] };
   }
 
   /**

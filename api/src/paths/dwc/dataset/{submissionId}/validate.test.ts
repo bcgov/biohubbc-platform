@@ -99,14 +99,6 @@ describe('validate', () => {
             expect(response.errors[0].message).to.equal("must have required property 'fileName'");
           });
 
-          it('mediaState is missing fileErrors', async () => {
-            const apiResponse = { validation: true, mediaState: { fileName: '' } };
-            const response = responseValidator.validateResponse(200, apiResponse);
-
-            expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal("must have required property 'fileErrors'");
-          });
-
           it('mediaState is missing isValid', async () => {
             const apiResponse = { validation: true, mediaState: { fileName: '', fileErrors: [] } };
             const response = responseValidator.validateResponse(200, apiResponse);
@@ -200,7 +192,7 @@ describe('validate', () => {
       mockReq.params = { submissionId: '1' };
 
       sinon
-        .stub(DarwinCoreService.prototype, 'validateSubmission')
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
         .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
 
       const requestHandler = validate.validateSubmission();
