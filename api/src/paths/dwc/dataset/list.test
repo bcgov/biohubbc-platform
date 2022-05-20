@@ -1,5 +1,4 @@
 
-/*
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
@@ -307,5 +306,3 @@ describe('create', () => {
     });
   });
 });
-
-*/
