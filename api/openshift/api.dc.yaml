@@ -3,12 +3,12 @@ kind: Template
 metadata:
   resourceVersion: ''
   selfLink: ''
-  name: biohubbc-api-dc
+  name: biohub-platform-api-dc
 parameters:
   - name: ENABLE_FILE_VIRUS_SCAN
     value: 'true'
   - name: NAME
-    value: biohubbc-api
+    value: biohub-platform-api
   - name: SUFFIX
     value: '-dev'
   - name: VERSION
