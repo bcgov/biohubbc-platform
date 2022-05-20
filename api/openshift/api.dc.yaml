@@ -7,6 +7,10 @@ metadata:
 parameters:
   - name: ENABLE_FILE_VIRUS_SCAN
     value: 'true'
+  - name: CLAMAV_HOST
+    value: 'clamav'
+  - name: CLAMAV_PORT
+    value: 3310
   - name: NAME
     value: biohub-platform-api
   - name: SUFFIX
@@ -153,6 +157,10 @@ objects:
                   value: ${APP_HOST}
                 - name: ENABLE_FILE_VIRUS_SCAN
                   value: ${ENABLE_FILE_VIRUS_SCAN}
+                - name: CLAMAV_HOST
+                  value: ${CLAMAV_HOST}
+                - name: CLAMAV_PORT
+                  value: ${CLAMAV_PORT}
                 - name: DB_HOST
                   value: ${DB_SERVICE_NAME}
                 - name: DB_USER_API
