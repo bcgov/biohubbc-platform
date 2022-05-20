@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import {
   IInsertSubmissionRecord,
   ISubmissionModel,
+  ISubmissionModelWithStatus,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -102,7 +103,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<ISubmissionModel>}
    * @memberof SubmissionService
    */
-  async listSubmissionRecords(): Promise<ISubmissionModel[]> {
+  async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
   }
 }

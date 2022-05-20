@@ -40,6 +40,10 @@ export interface ISubmissionModel {
   revision_count: number;
 }
 
+export interface ISubmissionModelWithStatus extends ISubmissionModel {
+  submission_status: string
+}
+
 export enum SUBMISSION_STATUS_TYPE {
   'SUBMITTED' = 'Submitted',
   'TEMPLATE_VALIDATED' = 'Template Validated',
@@ -275,7 +279,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionModel>}
    * @memberof SubmissionRepository
    */
-   async listSubmissionRecords(): Promise<ISubmissionModel[]> {
+   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     const sqlStatement = SQL`
       SELECT
         t1.submission_status,
@@ -298,7 +302,7 @@ export class SubmissionRepository extends BaseRepository {
         t1.submission_id = s.submission_id;
     `;
 
-    const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+    const response = await this.connection.sql<ISubmissionModelWithStatus>(sqlStatement);
 
     return response.rows;
   }

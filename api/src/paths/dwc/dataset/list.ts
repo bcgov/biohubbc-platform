@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { ISubmissionModel } from '../../../repositories/submission-repository';
+import { ISubmissionModelWithStatus } from '../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
@@ -57,7 +57,7 @@ export function listDataset(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const submissions: ISubmissionModel[] = await submissionService.listSubmissionRecords();
+      const submissions: ISubmissionModelWithStatus[] = await submissionService.listSubmissionRecords();
 
       await connection.commit();
 
