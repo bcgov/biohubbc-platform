@@ -76,7 +76,7 @@ export class OccurrenceService extends DBService {
 
     const scrapedOccurrences = this.scrapeOccurrences(rows, headers);
 
-    return await Promise.all(
+    return Promise.all(
       scrapedOccurrences?.map(async (scrapedOccurrence: any) => {
         return this.insertScrapedOccurrence(occurrenceSubmissionId, scrapedOccurrence);
       }) || []

@@ -115,6 +115,8 @@ export function submitDataset(): RequestHandler {
       // return after creating the submission
       res.status(200).json({ data_package_id: dataPackageId });
 
+      await darwinCoreService.tempValidateSubmission(submissionId);
+
       await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
       await connection.commit();

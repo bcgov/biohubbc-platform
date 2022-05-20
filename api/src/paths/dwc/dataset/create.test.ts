@@ -8,6 +8,7 @@ import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { DarwinCoreService } from '../../../services/dwc-service';
 import * as fileUtils from '../../../utils/file-utils';
+import * as keycloakUtils from '../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as create from './create';
 import { POST } from './create';
@@ -225,6 +226,7 @@ describe('create', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
       sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').throws(new Error('test error'));
 
@@ -251,6 +253,12 @@ describe('create', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
 
       sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
@@ -283,6 +291,12 @@ describe('create', () => {
       };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
 
       const ingestNewDwCADataPackageStub = sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')

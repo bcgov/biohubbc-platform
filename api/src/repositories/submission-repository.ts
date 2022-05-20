@@ -1,7 +1,6 @@
 import SQL from 'sql-template-strings';
 import { SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { HTTP400 } from '../errors/http-error';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertSubmissionRecord {
@@ -122,7 +121,10 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission record');
+      throw new ApiExecuteSQLError('Failed to insert submission record', [
+        'SubmissionRepository->insertSubmissionRecord',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -154,7 +156,10 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission record');
+      throw new ApiExecuteSQLError('Failed to update submission record key', [
+        'SubmissionRepository->updateSubmissionRecordInputKey',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -180,7 +185,10 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new HTTP400('Failed to get submission record');
+      throw new ApiExecuteSQLError('Failed to get submission record', [
+        'SubmissionRepository->getSubmissionRecordBySubmissionId',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -225,7 +233,10 @@ export class SubmissionRepository extends BaseRepository {
     );
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission status record');
+      throw new ApiExecuteSQLError('Failed to insert submission status record', [
+        'SubmissionRepository->insertSubmissionStatus',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -270,7 +281,10 @@ export class SubmissionRepository extends BaseRepository {
     );
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission message record');
+      throw new ApiExecuteSQLError('Failed to insert submission message record', [
+        'SubmissionRepository->insertSubmissionMessage',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
