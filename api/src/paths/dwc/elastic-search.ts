@@ -21,7 +21,7 @@ export const GET: Operation = [
       ]
     };
   }),
-  searchSubmission()
+  searchInElasticSearch()
 ];
 
 GET.apiDoc = {
@@ -49,23 +49,9 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              searchResponse: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['id', 'label'],
-                  properties: {
-                    id: {
-                      type: 'string'
-                    },
-                    label: {
-                      type: 'string'
-                    }
-                  }
-                }
-              }
+            type: 'array',
+            items: {
+              type: 'object'
             }
           }
         }
@@ -108,23 +94,41 @@ export function searchSubmission(): RequestHandler {
  */
 export function searchInElasticSearch(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'getSearchResults', message: 'request params', req_params: req.query.terms });
+    defaultLog.debug({
+      label: 'getSearchResults',
+      message: 'request params',
+      terms: req.query.terms,
+      index: req.query.index
+    });
 
     const terms = String(req.query.terms) || '';
     const indexName = String(req.query.index) || '';
+
     try {
       const elasticSearch = await new ESService().getEsClient();
+
       const response = await elasticSearch.search({
         index: indexName.toLowerCase(),
         query: {
-          simple_query_string: {
-            query: terms,
-            fields: ['title', '*_name']
+          match: {
+            model: terms
           }
-        }
+        },
+        fields: ['*']
       });
 
-      res.status(200).json({ searchResponse: response });
+      const result =
+        (response &&
+          response.hits.hits.map((item) => {
+            return {
+              id: item._id,
+              source: item._source,
+              fields: item.fields
+            };
+          })) ||
+        [];
+
+      res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'getSearchResults', message: 'error', error });
       throw error;

@@ -31,27 +31,29 @@ parameters:
     description: Application Environment type variable
     required: true
     value: 'dev'
+  - name: ELASTICSEARCH_URL
+    description: Platform Elasticsearch URL
+    required: true
+    value: 'https://elasticsearch-af2668-dev.apps.silver.devops.gov.bc.ca'
   - name: TZ
     description: Application timezone
     required: false
     value: 'America/Vancouver'
+  - name: CERTIFICATE_URL
+    description: Authentication certificate urls
+    required: true
+    value: 'https://oidc.gov.bc.ca/auth/realms/35r1iman/protocol/openid-connect/certs'
   - name: KEYCLOAK_HOST
-    description: Key clock login url
-    value: 'https://oidc.gov.bc.ca/auth'
-    required: true
+    description: keycloak host url
+    value: https://dev.oidc.gov.bc.ca
   - name: KEYCLOAK_REALM
-    description: Realm identifier or name
-    value: '35r1iman'
-    required: true
-  - name: KEYCLOAK_CLIENT_ID
-    description: Client Id for application
-    value: 'biohubbc'
-    required: true
+    description: keycloak realm definition
+    value: 35r1iman
   - name: KEYCLOAK_ADMIN_USERNAME
     description: keycloak host admin username
     value: biohubbc-svc
   - name: KEYCLOAK_ADMIN_PASSWORD
-    description: keycloak host admin passowrd
+    description: keycloak host url
     value: 'keycloak-admin-password'
   - name: API_PORT_DEFAULT
     value: '6100'
@@ -172,10 +174,10 @@ objects:
                       name: ${DB_SERVICE_NAME}
                 - name: DB_PORT
                   value: '5432'
+                - name: KEYCLOAK_URL
+                  value: ${CERTIFICATE_URL}
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
-                - name: KEYCLOAK_CLIENT_ID
-                  value: ${KEYCLOAK_CLIENT_ID}
                 - name: KEYCLOAK_REALM
                   value: ${KEYCLOAK_REALM}
                 - name: KEYCLOAK_ADMIN_USERNAME
@@ -189,6 +191,8 @@ objects:
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
                   value: ${NODE_ENV}
+                - name: ELASTICSEARCH_URL
+                  value: ${ELASTICSEARCH_URL}
                 - name: TZ
                   value: ${TZ}
                 - name: VERSION
