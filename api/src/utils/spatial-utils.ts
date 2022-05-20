@@ -120,9 +120,13 @@ export function parseLatLongString(latLong: string): ILatLong | null {
   return { lat, long };
 }
 
-/*
-  Function to generate the SQL for insertion of a geometry collection
-*/
+/**
+ * Function to generate the SQL for insertion of a geometry collection
+ *
+ * @export
+ * @param {(Feature | Feature[])} geometry
+ * @return {*}  {SQLStatement}
+ */
 export function generateGeometryCollectionSQL(geometry: Feature | Feature[]): SQLStatement {
   if (!Array.isArray(geometry)) {
     const geo = JSON.stringify(geometry.geometry);
