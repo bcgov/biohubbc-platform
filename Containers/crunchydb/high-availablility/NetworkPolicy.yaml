@@ -1,0 +1,42 @@
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: allow-crunchydb-ha
+  labels:
+    postgres-operator.crunchydata.com/cluster: biohub
+spec:
+  podSelector:
+    matchLabels:
+      postgres-operator.crunchydata.com/cluster: biohub
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              postgres-operator.crunchydata.com/cluster: biohub
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8008
+        - protocol: TCP
+          port: 2022
+---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: allow-crunchydb-monitoring
+  labels:
+    postgres-operator.crunchydata.com/cluster: biohub
+spec:
+  podSelector:
+    matchLabels:
+      postgres-operator.crunchydata.com/cluster: biohub
+  ingress:
+    - from:
+        - namespaceSelector:
+            name: a0ec71
+            environment: tools
+      ports:
+        - protocol: TCP
+          port: 9187
