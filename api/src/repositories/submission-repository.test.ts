@@ -88,7 +88,7 @@ describe('SubmissionRepository', () => {
         await submissionRepository.updateSubmissionRecordInputKey(1, 'test');
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record key');
       }
     });
 
