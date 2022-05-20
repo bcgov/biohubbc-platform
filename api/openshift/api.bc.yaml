@@ -3,14 +3,14 @@ kind: Template
 metadata:
   creationTimestamp: null
   labels:
-    build: biohubbc-api
-  name: biohubbc-api
+    build: biohub-platform-api
+  name: biohub-platform-api
 parameters:
   - name: NAME
     displayName: Name
     description: Image name
     required: true
-    value: biohubbc-api
+    value: biohub-platform-api
   - name: SUFFIX
     displayName: Name Suffix
     description: A suffix appended to all objects
