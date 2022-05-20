@@ -3,10 +3,10 @@ kind: Template
 metadata:
   resourceVersion: ''
   selfLink: ''
-  name: biohubbc-app-dc
+  name: biohub-platform-app-dc
 parameters:
   - name: NAME
-    value: biohubbc-app
+    value: biohub-platform-app
   - name: SUFFIX
     value: 'dev'
   - name: VERSION
