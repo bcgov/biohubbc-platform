@@ -261,10 +261,6 @@ describe('create', () => {
         .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
 
       sinon
-        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
-        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
-
-      sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
         .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
 
