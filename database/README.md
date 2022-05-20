@@ -57,7 +57,7 @@ Seeds will run in alphanumeric order, so if the order of seeds is important, con
 
    Ex:
 
-   oc port-forward biohubbc-db-postgresql-dev-deploy-100 5555:5432
+   oc port-forward biohub-platform-db-postgresql-dev-deploy-100 5555:5432
    ```
 
 <br />

@@ -4,7 +4,7 @@ labels:
   template: postgresql-persistent-template
 metadata:
   creationTimestamp: null
-  name: biohubbc-db-dc
+  name: biohub-platform-db-dc
 annotations:
   iconClass: iconpostgresql
 parameters:

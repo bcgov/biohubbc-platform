@@ -4,9 +4,9 @@
     "metadata": {
         "creationTimestamp": null,
         "labels": {
-            "build": "biohubbc-app"
+            "build": "biohub-platform-app"
         },
-        "name": "biohubbc-app"
+        "name": "biohub-platform-app"
     },
     "parameters": [
         {
@@ -14,7 +14,7 @@
           "displayName": "Name",
           "description": "A suffix appended to all objects",
           "required": true,
-          "value": "biohubbc-app"
+          "value": "biohub-platform-app"
         },
         {
           "name": "SUFFIX",
