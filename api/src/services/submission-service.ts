@@ -100,10 +100,23 @@ export class SubmissionService extends DBService {
    * List all submissions
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModel>}
+   * @return {*}  {Promise<ISubmissionModelWithStatus>}
    * @memberof SubmissionService
    */
   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
+  }
+
+  /**
+   * Get a submission record's S3 key by its id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<string | null>}
+   * @memberof SubmissionService
+   */
+   async getSubmissionRecordS3Key(submissionId: number): Promise<string | null> {
+    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId)
+    
+    return submission?.input_key || null
   }
 }

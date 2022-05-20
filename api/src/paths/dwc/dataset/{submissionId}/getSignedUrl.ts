@@ -1,8 +1,8 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
+import { HTTP500 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { ISubmissionModel, ISubmissionModelWithStatus } from '../../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getS3SignedURL } from '../../../../utils/file-utils';
@@ -56,14 +56,16 @@ export function getSubmissionSignedUrl(): RequestHandler {
       
       const submissionService = new SubmissionService(connection);
       
-      const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
-      const { input_key } = submission
-      
-      const x = await getS3SignedURL(input_key || '')
+      const s3Key: string | null = await submissionService.getSubmissionRecordS3Key(submissionId);
+      if (!s3Key) {
+        throw new HTTP500('Failed to find submission S3 key.');
+      }
+
+      const signedS3Url: string | null = await getS3SignedURL(s3Key)
 
       await connection.commit();
 
-      res.status(200).json(x);
+      res.status(200).send(signedS3Url);
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionSignedUrl', message: 'error', error });
       await connection.rollback();
