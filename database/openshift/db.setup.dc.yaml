@@ -8,7 +8,7 @@ parameters:
     description: 'Image for pod'
     required: true
   - name: NAME
-    value: biohubbc-db-setup
+    value: biohub-platform-db-setup
   - name: SUFFIX
     value: '-dev'
   - name: VERSION
