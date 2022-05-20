@@ -160,5 +160,5 @@ parameters:
     description: >-
       The name associated to the database deployment resources.  In particular,
       this is used to wrie up the credentials associated to the database.
-    value: biohubbc-db-postgresql-dev-deploy
+    value: biohub-platform-db-postgresql-dev-deploy
     required: true

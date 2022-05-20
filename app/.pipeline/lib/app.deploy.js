@@ -30,9 +30,9 @@ module.exports = (settings) => {
         REACT_APP_MAX_UPLOAD_FILE_SIZE: phases[phase].maxUploadFileSize,
         NODE_ENV: phases[phase].env || 'dev',
         REACT_APP_NODE_ENV: phases[phase].env || 'dev',
-        KEYCLOAK_HOST: phases[phase].sso.url,
-        KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
-        KEYCLOAK_REALM: phases[phase].sso.realm,
+        REACT_APP_KEYCLOAK_HOST: phases[phase].sso.url,
+        REACT_APP_KEYCLOAK_REALM: phases[phase].sso.realm,
+        REACT_APP_KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         REPLICAS: phases[phase].replicas || 1,
         REPLICA_MAX: phases[phase].maxReplicas || 1
       }
