@@ -1,0 +1,75 @@
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: biohub
+spec:
+  monitoring:
+    pgmonitor:
+      exporter:
+        image: artifacts.developer.gov.bc.ca/redhat-docker-remote/crunchydata/crunchy-postgres-exporter:latest
+  image: artifacts.developer.gov.bc.ca/redhat-docker-remote/crunchydata/crunchy-postgres-gis:latest
+  postgresVersion: 14
+  instances:
+    - name: ha1
+      replicas: 3
+      dataVolumeClaimSpec:
+        accessModes:
+        - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: netapp-block-standard
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  postgres-operator.crunchydata.com/cluster: biohub
+                  postgres-operator.crunchydata.com/instance-set: ha1
+  users:
+    - name: biohub
+      databases:
+        - biohub
+    - name: biohub-api
+      options: "CREATEROLE"
+    - name: postgres
+  backups:
+    pgbackrest:
+      global:
+        repo1-retention-full: "2"
+      image: artifacts.developer.gov.bc.ca/redhat-docker-remote/crunchydata/crunchy-pgbackrest:latest
+      repos:
+      - name: repo1
+        schedules:
+          # Full backup every day at 8:00am UTC
+          full: "0 8 * * *"
+          # Incremental backup every 4 hours, except at 8am UTC (when the full backup is running)
+          incremental: "0 0,4,12,16,20 * * *"
+        volume:
+          volumeClaimSpec:
+            accessModes:
+            - "ReadWriteOnce"
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: netapp-file-backup
+  proxy:
+    pgBouncer:
+      config:
+        global:
+          client_tls_sslmode: disable
+      image: artifacts.developer.gov.bc.ca/redhat-docker-remote/crunchydata/crunchy-pgbouncer:latest
+      replicas: 2
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  postgres-operator.crunchydata.com/cluster: biohub
+                  postgres-operator.crunchydata.com/role: pgbouncer
