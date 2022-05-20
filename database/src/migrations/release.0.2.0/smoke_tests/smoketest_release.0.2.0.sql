@@ -4,6 +4,7 @@
 set role postgres;
 set search_path=biohub;
 
+/**
 do $$
 declare
   _count integer = 0;
@@ -30,6 +31,7 @@ begin
   raise notice 'smoketest_release(1): PASS';
 end
 $$;
+**/
 
 set role biohub_api;
 set search_path to biohub_dapi_v1, biohub, public, topology;
@@ -40,16 +42,18 @@ declare
   _submission_id submission.submission_id%type;
   _submission_status_id submission_status.submission_status_id%type;
   _geography occurrence.geography%type;
+  _source_transform_id source_transform.source_transform_id%type;
 begin
   -- set security context
-  select api_set_context('myIDIR', 'IDIR') into _system_user_id;
+  select api_set_context('SIMS-SVC', 'SYSTEM') into _system_user_id;
   --select api_set_context('biohub_api', 'DATABASE') into _system_user_id;
 
+  select source_transform_id into _source_transform_id from source_transform where system_user_id = (select system_user_id from system_user where user_identifier = 'SIMS-SVC') and version = 1;
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
 
   -- occurrence
   -- occurrence submission 1
-  insert into submission (source_transform_id, event_timestamp) values ((select source_transform_id from source_transform where source_id = (select source_id from source where identifier = 'SIMS-SVC') and version = 1), now()-interval '1 day') returning submission_id into _submission_id;
+  insert into submission (source_transform_id, event_timestamp) values (_source_transform_id, now()-interval '1 day') returning submission_id into _submission_id;
   select count(1) into _count from submission;
   assert _count = 1, 'FAIL submission';
   insert into occurrence (submission_id, taxonid, lifestage, eventdate, sex) values (_submission_id, 'M-ALAL', 'Adult', now()-interval '10 day', 'male');
@@ -62,7 +66,7 @@ begin
   --insert into system_user_role (system_user_id, system_role_id) values (_system_user_id, (select system_role_id from system_role where name = 'System Administrator'));
   
   -- occurrence submission 2
-  insert into submission (source_transform_id, event_timestamp) values ((select source_transform_id from source_transform where source_id = (select source_id from source where identifier = 'SIMS-SVC') and version = 1), now()) returning submission_id into _submission_id;
+  insert into submission (source_transform_id, event_timestamp) values (_source_transform_id, now()) returning submission_id into _submission_id;
   select count(1) into _count from submission;
   assert _count = 2, 'FAIL submission';
   insert into occurrence (submission_id, taxonid, lifestage, eventdate, sex) values (_submission_id, 'M-ALAL', 'Adult', now()-interval '5 day', 'female');

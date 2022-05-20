@@ -1,8 +1,7 @@
--- populate_source.sql
+-- populate_source_transform.sql
 
-insert into source (name, description, identifier) values ('Species Information Management System (SIMS)', 'Species Information Management System', 'SIMS-SVC');
-
-insert into source_transform (source_id, version, metadata_transform, metadata_index) values ((select source_id from source where identifier = 'SIMS-SVC'), 1, '<?xml version="1.0" encoding="UTF-8"?>
+insert into source_transform (system_user_id, version, metadata_transform, metadata_index) values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), 1
+, '<?xml version="1.0" encoding="UTF-8"?>
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     xmlns:eml="https://eml.ecoinformatics.org/eml-2.2.0"

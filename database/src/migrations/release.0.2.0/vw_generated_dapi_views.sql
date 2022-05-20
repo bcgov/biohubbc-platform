@@ -1,5 +1,4 @@
  create or replace view occurrence as select * from biohub.occurrence;
- create or replace view source as select * from biohub.source;
  create or replace view source_transform as select * from biohub.source_transform;
  create or replace view submission as select * from biohub.submission;
  create or replace view submission_message as select * from biohub.submission_message;

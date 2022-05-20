@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Monday, May 16, 2022 13:39:11
+-- Date Created : Friday, May 20, 2022 09:11:54
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -110,59 +110,12 @@ COMMENT ON TABLE occurrence IS 'Occurrence records that have been ingested from 
 ;
 
 -- 
--- TABLE: source 
---
-
-CREATE TABLE source(
-    source_id                integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    name                     varchar(300)      NOT NULL,
-    description              varchar(250)      NOT NULL,
-    identifier               varchar(50)       NOT NULL,
-    record_effective_date    date              DEFAULT now() NOT NULL,
-    record_end_date          date,
-    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user              integer           NOT NULL,
-    update_date              timestamptz(6),
-    update_user              integer,
-    revision_count           integer           DEFAULT 0 NOT NULL,
-    CONSTRAINT source_pk PRIMARY KEY (source_id)
-)
-;
-
-
-
-COMMENT ON COLUMN source.source_id IS 'System generated surrogate primary key identifier.'
-;
-COMMENT ON COLUMN source.name IS 'The name of the record.'
-;
-COMMENT ON COLUMN source.description IS 'The description of the record.'
-;
-COMMENT ON COLUMN source.identifier IS 'The sources name identifier as supplied by the source system or the security layer in order to identify itself to the backbone. Examples include "SIMS" or "RESTORATION".'
-;
-COMMENT ON COLUMN source.record_effective_date IS 'Record level effective date.'
-;
-COMMENT ON COLUMN source.record_end_date IS 'Record level end date.'
-;
-COMMENT ON COLUMN source.create_date IS 'The datetime the record was created.'
-;
-COMMENT ON COLUMN source.create_user IS 'The id of the user who created the record as identified in the system user table.'
-;
-COMMENT ON COLUMN source.update_date IS 'The datetime the record was updated.'
-;
-COMMENT ON COLUMN source.update_user IS 'The id of the user who updated the record as identified in the system user table.'
-;
-COMMENT ON COLUMN source.revision_count IS 'Revision count used for concurrency control.'
-;
-COMMENT ON TABLE source IS 'Details regarding the source system that is supplying the data to the backbone.'
-;
-
--- 
 -- TABLE: source_transform 
 --
 
 CREATE TABLE source_transform(
     source_transform_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    source_id                integer           NOT NULL,
+    system_user_id           integer           NOT NULL,
     version                  integer           NOT NULL,
     metadata_transform       varchar(30000)    NOT NULL,
     metadata_index           varchar(100)      NOT NULL,
@@ -181,7 +134,7 @@ CREATE TABLE source_transform(
 
 COMMENT ON COLUMN source_transform.source_transform_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN source_transform.source_id IS 'System generated surrogate primary key identifier.'
+COMMENT ON COLUMN source_transform.system_user_id IS 'System generated surrogate primary key identifier.'
 ;
 COMMENT ON COLUMN source_transform.version IS 'The version  number of the transformation data set for a specific source system.'
 ;
@@ -203,7 +156,7 @@ COMMENT ON COLUMN source_transform.update_user IS 'The id of the user who update
 ;
 COMMENT ON COLUMN source_transform.revision_count IS 'Revision count used for concurrency control.'
 ;
-COMMENT ON TABLE source_transform IS 'Stores data transform information for data sources. This information is used by data ingest logic to lookup version information and transformations for processing data submissions.'
+COMMENT ON TABLE source_transform IS 'Stores data transform information for data sources. This information is used by data ingest logic to lookup version information and transformations for processing data submissions. Note that foreign keys to system users should be restricted to users with a user identity source of "SYSTEM".'
 ;
 
 -- 
@@ -541,7 +494,7 @@ CREATE TABLE system_metadata_constant(
     update_date                    timestamptz(6),
     update_user                    integer,
     revision_count                 integer           DEFAULT 0 NOT NULL,
-    CONSTRAINT system_metadata_constant_id_pk PRIMARY KEY (system_metadata_constant_id)
+    CONSTRAINT system_metadata_constant_pk PRIMARY KEY (system_metadata_constant_id)
 )
 ;
 
@@ -753,22 +706,16 @@ COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. Thi
 CREATE INDEX "Ref165161" ON occurrence(submission_id)
 ;
 -- 
--- INDEX: source_nuk1 
---
-
-CREATE UNIQUE INDEX source_nuk1 ON source(identifier, (record_end_date is NULL)) where record_end_date is null
-;
--- 
 -- INDEX: source_transform_nuk1 
 --
 
-CREATE UNIQUE INDEX source_transform_nuk1 ON source_transform(source_id, version, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX source_transform_nuk1 ON source_transform(version, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
--- INDEX: "Ref198181" 
+-- INDEX: "Ref191183" 
 --
 
-CREATE INDEX "Ref198181" ON source_transform(source_id)
+CREATE INDEX "Ref191183" ON source_transform(system_user_id)
 ;
 -- 
 -- INDEX: submission_nuk1 
@@ -837,10 +784,10 @@ CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, 
 CREATE UNIQUE INDEX system_constant_uk1 ON system_constant(constant_name)
 ;
 -- 
--- INDEX: system_metadata_constant_id_uk1 
+-- INDEX: system_metadata_constant_uk1 
 --
 
-CREATE UNIQUE INDEX system_metadata_constant_id_uk1 ON system_metadata_constant(constant_name)
+CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(constant_name)
 ;
 -- 
 -- INDEX: system_role_nuk1 
@@ -898,9 +845,9 @@ ALTER TABLE occurrence ADD CONSTRAINT "Refsubmission161"
 -- TABLE: source_transform 
 --
 
-ALTER TABLE source_transform ADD CONSTRAINT "Refsource181" 
-    FOREIGN KEY (source_id)
-    REFERENCES source(source_id)
+ALTER TABLE source_transform ADD CONSTRAINT "Refsystem_user183" 
+    FOREIGN KEY (system_user_id)
+    REFERENCES system_user(system_user_id)
 ;
 
 
