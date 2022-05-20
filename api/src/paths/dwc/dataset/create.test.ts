@@ -253,6 +253,10 @@ describe('create', () => {
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
 
       sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
+
+      sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
         .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
 
@@ -283,6 +287,10 @@ describe('create', () => {
       };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
 
       const ingestNewDwCADataPackageStub = sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')

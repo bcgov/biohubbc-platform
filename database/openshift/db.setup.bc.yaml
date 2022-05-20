@@ -3,14 +3,14 @@ kind: Template
 metadata:
   creationTimestamp: null
   labels:
-    build: biohubbc-db-setup
-  name: biohubbc-db-setup
+    build: biohub-platform-db-setup
+  name: biohub-platform-db-setup
 parameters:
   - name: NAME
     displayName: Name
     description: Image name
     required: true
-    value: biohubbc-db-setup
+    value: biohub-platform-db-setup
   - name: SUFFIX
     displayName: Name Suffix
     description: A suffix appended to all objects

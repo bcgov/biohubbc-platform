@@ -4,11 +4,8 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
-const defaultHost = 'biohubbc-a0ec71-dev.apps.silver.devops.gov.bc.ca';
-const defaultHostAPI = 'biohubbc-a0ec71-api-dev.apps.silver.devops.gov.bc.ca';
-
-const name = (config.module && config.module['app']) || 'biohubbc-app';
-const apiName = (config.module && config.module['api']) || 'biohubbc-api';
+const name = config.module.app;
+const apiName = config.module.api;
 
 const changeId = options.pr || `${Math.floor(Date.now() * 1000) / 60.0}`; // aka pull-request or branch
 const version = config.version || '1.0.0';
@@ -20,10 +17,9 @@ const deployChangeId = (isStaticDeployment && 'deploy') || changeId;
 const branch = (isStaticDeployment && options.branch) || null;
 const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${version}-${changeId}`;
 
-const staticBranches = config.staticBranches || [];
 const staticUrls = config.staticUrls || {};
 const staticUrlsAPI = config.staticUrlsAPI || {};
-const staticUrlsN8N = config.staticUrlsN8N || {};
+// const staticUrlsN8N = config.staticUrlsN8N || {};
 
 const maxUploadNumFiles = 10;
 const maxUploadFileSize = 52428800; // (bytes)
@@ -75,10 +71,10 @@ const phases = {
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
     host:
-      (isStaticDeployment && (staticUrls.dev || defaultHost)) ||
+      (isStaticDeployment && (staticUrls.dev)) ||
       `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     apiHost:
-      (isStaticDeployment && (staticUrlsAPI.dev || defaultHostAPI)) ||
+      (isStaticDeployment && (staticUrlsAPI.dev)) ||
       `${apiName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     n8nHost: '', // staticUrlsN8N.dev, // Disable until nginx is setup: https://quartech.atlassian.net/browse/BHBC-1435
     siteminderLogoutURL: config.siteminderLogoutURL.dev,
@@ -99,7 +95,7 @@ const phases = {
     version: `${version}`,
     tag: `test-${version}`,
     host: staticUrls.test,
-    apiHost: staticUrlsAPI.test || defaultHostAPI,
+    apiHost: staticUrlsAPI.test,
     n8nHost: '', // staticUrlsN8N.test, // Disable until nginx is setup: https://quartech.atlassian.net/browse/BHBC-1435
     siteminderLogoutURL: config.siteminderLogoutURL.test,
     maxUploadNumFiles,
@@ -119,7 +115,7 @@ const phases = {
     version: `${version}`,
     tag: `prod-${version}`,
     host: staticUrls.prod,
-    apiHost: staticUrlsAPI.prod || defaultHostAPI,
+    apiHost: staticUrlsAPI.prod,
     n8nHost: '', // staticUrlsN8N.prod, // Disable until nginx is setup: https://quartech.atlassian.net/browse/BHBC-1435
     siteminderLogoutURL: config.siteminderLogoutURL.prod,
     maxUploadNumFiles,
@@ -137,4 +133,4 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-module.exports = exports = { phases, options, staticBranches };
+module.exports = exports = { phases, options };
