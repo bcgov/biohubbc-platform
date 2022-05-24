@@ -57,13 +57,14 @@ export function getSubmissionSignedUrl(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const s3Key: string | null = await submissionService.getSubmissionRecordS3Key(submissionId);
+      const s3Key = await submissionService.getSubmissionRecordS3Key(submissionId);
       console.log('s3Key:', s3Key);
+  
       if (!s3Key) {
         throw new HTTP500('Failed to find submission S3 key.');
       }
 
-      const signedS3Url: string | null = await getS3SignedURL(s3Key);
+      const signedS3Url = await getS3SignedURL(s3Key);
       console.log('SIGNEDURL:', signedS3Url);
 
       await connection.commit();

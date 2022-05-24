@@ -31,7 +31,7 @@ describe.only('getSubmissionSignedUrl', () => {
 
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    const mockResponse = 'hello-world';
+    const mockResponse = 'test-signed-url';
 
     sinon.stub(SubmissionService.prototype, 'getSubmissionRecordS3Key').resolves(mockResponse);
 
@@ -39,7 +39,7 @@ describe.only('getSubmissionSignedUrl', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(mockRes.jsonValue).to.eql(mockResponse);
+    expect(mockRes.sendValue).to.eql(mockResponse);
   });
 
   it('should throw an error when submissionId is missing', async () => {

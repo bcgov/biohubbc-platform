@@ -231,6 +231,7 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+    console.log('sql response:', response)
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
