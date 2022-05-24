@@ -111,8 +111,7 @@ export class SubmissionRepository extends BaseRepository {
         ${submissionData.darwin_core_source}
       )
       RETURNING
-        submission_id,
-        uuid;
+        submission_id;
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);

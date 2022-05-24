@@ -26,7 +26,7 @@ export class SubmissionService extends DBService {
     try {
       const client = new Client({ node: process.env.ELASTICSEARCH_URL });
       return await client.search({
-        index: 'submission', //TODO IM NOT SURE WHAT TO DO HERE
+        index: 'submission',
         ...searchRequest
       });
     } catch (error) {
@@ -42,7 +42,7 @@ export class SubmissionService extends DBService {
     splitTerms.forEach((item) => {
       searchConfig.push({
         wildcard: {
-          name: { value: `*${item}*`, boost: 4.0, case_insensitive: true } //TODO name? what are search fields
+          name: { value: `*${item}*`, boost: 4.0, case_insensitive: true }
         }
       });
     });

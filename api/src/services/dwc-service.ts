@@ -1,4 +1,4 @@
-import { v4 as uuid4 } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
@@ -72,7 +72,7 @@ export class DarwinCoreService extends DBService {
     file: Express.Multer.File,
     options?: { dataPackageId?: string; source?: string }
   ): Promise<{ dataPackageId: string; submissionId: number }> {
-    const dataPackageId = options?.dataPackageId || uuid4();
+    const dataPackageId = options?.dataPackageId || uuidv4();
     const source = options?.source || 'SIMS'; // TODO Parse from the provided EML file?
 
     // TODO Check if `dataPackageId` already exists? If so, update or throw error?
