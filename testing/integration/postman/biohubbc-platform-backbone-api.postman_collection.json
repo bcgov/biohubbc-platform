@@ -6153,7 +6153,6 @@
 					"            { key: \"scope\", value: \"openid\" },",
 					"            { key: \"grant_type\", value: \"client_credentials\" },",
 					"            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_ID\") },",
-					"            // { key: \"password\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_PASSWORD\") },",
 					"        ],",
 					"    },",
 					"};",
