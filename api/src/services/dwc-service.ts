@@ -151,7 +151,8 @@ export class DarwinCoreService extends DBService {
     if (!emlSource) {
       return;
     }
-    const jsonDoc = {
+
+    return {
       datasetName: 'Coastal Caribou',
       publishDate: '2021-08-05',
       projects: [
@@ -178,8 +179,6 @@ export class DarwinCoreService extends DBService {
         }
       ]
     };
-
-    return jsonDoc;
   }
   /**
    *  Temp replacement for validation until more requirements are set

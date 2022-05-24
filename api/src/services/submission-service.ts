@@ -48,15 +48,13 @@ export class SubmissionService extends DBService {
       });
     });
 
-    const response = await this.elasticSearch({
+    return await this.elasticSearch({
       query: {
         bool: {
           should: searchConfig
         }
       }
     });
-
-    return response;
   }
 
   async findSubmissionByCriteria(submissionCriteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
