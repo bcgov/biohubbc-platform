@@ -1,10 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { PROJECT_ROLE } from '../../../constants/roles';
-import { getDBConnection } from '../../../database/db';
+
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { SubmissionService } from '../../../services/submission-service';
+
 import { getLogger } from '../../../utils/logger';
 import { ESService } from '../../../services/es-service';
 
@@ -61,32 +61,6 @@ GET.apiDoc = {
   }
 };
 
-export function searchSubmission(): RequestHandler {
-  return async (req, res) => {
-    const term = String(req.query.terms) || '';
-
-    const connection = getDBConnection(req['keycloak_token']);
-
-    try {
-      await connection.open();
-
-      const submissionService = new SubmissionService(connection);
-
-      const response = await submissionService.searchSubmission(term.toLowerCase());
-
-      await connection.commit();
-
-      res.status(200).json({ searchResponse: response });
-    } catch (error) {
-      defaultLog.error({ label: 'searchSubmission', message: 'error', error });
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  };
-}
-
 /**
  * Get taxonomic search results.
  *
@@ -111,7 +85,7 @@ export function searchInElasticSearch(): RequestHandler {
         index: indexName.toLowerCase(),
         query: {
           match: {
-            model: terms
+            'projects.projectName': terms
           }
         },
         fields: ['*']

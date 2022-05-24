@@ -1,7 +1,9 @@
+import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { ESService } from '../services/es-service';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -10,8 +12,6 @@ import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SubmissionService } from './submission-service';
-import { ESService } from '../services/es-service';
-import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { ValidationService } from './validation-service';
 
 export class DarwinCoreService extends DBService {
@@ -141,18 +141,23 @@ export class DarwinCoreService extends DBService {
     const esClient = await new ESService().getEsClient();
     const jsonDoc = this.convertEMLtoJSON(submissionRecord.eml_source);
 
-    await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
+    console.log('jsonDoc is: ', jsonDoc);
+
+    const r4 = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
+    console.log('r4 is: ', r4);
 
     //TODO: We need a new submission status type
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+
+    return r4;
   }
 
-  async convertEMLtoJSON(emlSource: XmlString) {
+  convertEMLtoJSON(emlSource: XmlString) {
     if (!emlSource) {
       return;
     }
 
-    return {
+    const jsonDoc = {
       datasetName: 'Coastal Caribou',
       publishDate: '2021-08-05',
       projects: [
@@ -179,6 +184,8 @@ export class DarwinCoreService extends DBService {
         }
       ]
     };
+
+    return jsonDoc;
   }
   /**
    *  Temp replacement for validation until more requirements are set
