@@ -1,11 +1,17 @@
 import SQL from 'sql-template-strings';
+import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { HTTP400 } from '../errors/http-error';
+import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export type Subset<K> = {
   [attr in keyof K]?: K[attr] extends object ? Subset<K[attr]> : K[attr];
 };
+
+export interface ISearchSubmissionCriteria {
+  keyword?: string;
+  spatial?: string;
+}
 
 export interface IInsertSubmissionRecord {
   source: string;
@@ -81,6 +87,51 @@ export enum SUBMISSION_MESSAGE_CLASS {
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
+  async findSubmissionByCriteria(criteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
+    const queryBuilder = getKnexQueryBuilder<any, { project_id: number }>()
+      .select('submission.submission_id')
+      .from('submission')
+      .leftJoin('occurrence', 'submission.submission_id', 'occurrence.submission_id');
+
+    if (criteria.keyword) {
+      queryBuilder.and.where(function () {
+        this.or.whereILike('occurrence.taxonid', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.lifestage', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.vernacularname', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.individualcount', `%${criteria.keyword}%`);
+      });
+    }
+
+    if (criteria.spatial) {
+      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(criteria.spatial));
+
+      const sqlStatement = SQL`
+      public.ST_INTERSECTS(
+        geography,
+        public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(`;
+
+      sqlStatement.append(geometryCollectionSQL);
+
+      sqlStatement.append(`,
+              4326
+            )
+          )
+        )
+      )`);
+
+      queryBuilder.and.whereRaw(sqlStatement.sql, sqlStatement.values);
+    }
+
+    queryBuilder.groupBy('submission.submission_id');
+
+    const response = await this.connection.knex<{ submission_id: number }>(queryBuilder);
+
+    return response.rows;
+  }
+
   /**
    * Insert a new submission record.
    *
@@ -117,7 +168,10 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission record');
+      throw new ApiExecuteSQLError('Failed to insert submission record', [
+        'SubmissionRepository->insertSubmissionRecord',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -149,7 +203,10 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission record');
+      throw new ApiExecuteSQLError('Failed to update submission record key', [
+        'SubmissionRepository->updateSubmissionRecordInputKey',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -175,7 +232,10 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new HTTP400('Failed to get submission record');
+      throw new ApiExecuteSQLError('Failed to get submission record', [
+        'SubmissionRepository->getSubmissionRecordBySubmissionId',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -220,7 +280,10 @@ export class SubmissionRepository extends BaseRepository {
     );
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission status record');
+      throw new ApiExecuteSQLError('Failed to insert submission status record', [
+        'SubmissionRepository->insertSubmissionStatus',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];
@@ -265,7 +328,10 @@ export class SubmissionRepository extends BaseRepository {
     );
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission message record');
+      throw new ApiExecuteSQLError('Failed to insert submission message record', [
+        'SubmissionRepository->insertSubmissionMessage',
+        'rowCount was null or undefined, expeceted rowCount = 1'
+      ]);
     }
 
     return response.rows[0];

@@ -22,7 +22,7 @@ module.exports = (settings) => {
   let objects = [];
 
   objects.push(
-...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/api.dc.yaml`, {
+    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/api.dc.yaml`, {
       param: {
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
@@ -33,6 +33,9 @@ module.exports = (settings) => {
         NODE_ENV: phases[phase].env || 'dev',
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         TZ: phases[phase].tz,
+        KEYCLOAK_ADMIN_USERNAME: 'biohubbc-svc',
+        KEYCLOAK_SECRET: 'keycloak-admin-password',
+        KEYCLOAK_SECRET_ADMIN_PASSWORD: 'keycloak_admin_password',
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         KEYCLOAK_HOST: phases[phase].sso.url,
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,

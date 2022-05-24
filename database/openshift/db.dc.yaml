@@ -4,7 +4,7 @@ labels:
   template: postgresql-persistent-template
 metadata:
   creationTimestamp: null
-  name: biohubbc-db-dc
+  name: biohub-platform-db-dc
 annotations:
   iconClass: iconpostgresql
 parameters:
@@ -229,8 +229,8 @@ objects:
                     - '-i'
                     - '-c'
                     - pg_isready -h 127.0.0.1 -q -t 10
-                initialDelaySeconds: 10
-                timeoutSeconds: 3
+                initialDelaySeconds: 30
+                timeoutSeconds: 10
                 periodSeconds: 15
                 successThreshold: 1
                 failureThreshold: 10

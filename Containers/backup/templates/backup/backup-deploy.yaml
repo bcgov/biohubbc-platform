@@ -280,7 +280,7 @@ parameters:
     displayName: Database Service Name
     description: Used for backward compatibility only. Not needed when using the recommended 'backup.conf' configuration.  The name of the database service.
     required: false
-    value: biohubbc-db-postgresql-dev-deploy
+    value: biohub-platform-db-postgresql-dev-deploy
   - name: DATABASE_NAME
     displayName: Database Name
     description: Used for backward compatibility only. Not needed when using the recommended 'backup.conf' configuration.  The name of the database.
@@ -295,7 +295,7 @@ parameters:
     displayName: Database Deployment Name
     description: The name associated to the database deployment resources.  In particular, this is used to wire up the credentials associated to the database.
     required: true
-    value: biohubbc-db-postgresql-dev-deploy
+    value: biohub-platform-db-postgresql-dev-deploy
   - name: DATABASE_USER_KEY_NAME
     displayName: Database User Key Name
     description: The database user key name stored in database deployment resources specified by DATABASE_DEPLOYMENT_NAME.

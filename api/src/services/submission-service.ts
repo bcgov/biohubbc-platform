@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import {
   IInsertSubmissionRecord,
+  ISearchSubmissionCriteria,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -56,6 +57,10 @@ export class SubmissionService extends DBService {
     });
 
     return response;
+  }
+
+  async findSubmissionByCriteria(submissionCriteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
+    return this.submissionRepository.findSubmissionByCriteria(submissionCriteria);
   }
 
   /**

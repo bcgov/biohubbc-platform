@@ -4,7 +4,7 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
-const name = (config.module && config.module['db']) || 'biohubbc-db';
+const name = config.module.db;
 
 const changeId = options.pr || `${Math.floor(Date.now() * 1000) / 60.0}`; // aka pull-request or branch
 const version = config.version || '1.0.0';
