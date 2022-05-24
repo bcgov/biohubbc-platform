@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from 'uuid';
-import { SOURCE } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
@@ -82,14 +81,12 @@ export class DarwinCoreService extends DBService {
    * Ingest a Darwin Core Archive (DwCA) data package.
    *
    * @param {Express.Multer.File} file
-   * @param {string} source
    * @param {{ dataPackageId?: string }} [options]
    * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
    * @memberof DarwinCoreService
    */
   async ingestNewDwCADataPackage(
     file: Express.Multer.File,
-    source: SOURCE,
     options?: { dataPackageId?: string }
   ): Promise<{ dataPackageId: string; submissionId: number }> {
     const dataPackageId = options?.dataPackageId || uuidv4();
@@ -100,8 +97,13 @@ export class DarwinCoreService extends DBService {
 
     const submissionService = new SubmissionService(this.connection);
 
+    // Fetch the source transform record for this submission based on the source system user id
+    const sourceTransformRecord = await submissionService.getSourceTransformRecordBySystemUserId(
+      this.connection.systemUserId()
+    );
+
     const response = await submissionService.insertSubmissionRecord({
-      source: source,
+      source_transform_id: sourceTransformRecord.source_transform_id,
       input_file_name: dwcArchive.rawFile.fileName,
       input_key: '',
       event_timestamp: new Date().toISOString(),

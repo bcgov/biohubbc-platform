@@ -1,6 +1,7 @@
 import knex, { Knex } from 'knex';
 import * as pg from 'pg';
 import { SQLStatement } from 'sql-template-strings';
+import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import * as UserQueries from '../queries/database/user-context-queries';
 import { getUserIdentifier, getUserIdentitySource } from '../utils/keycloak-utils';
@@ -360,6 +361,19 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  */
 export const getAPIUserDBConnection = (): IDBConnection => {
   return getDBConnection({ preferred_username: 'biohub_api@database' });
+};
+
+/**
+ * Returns an IDBConnection where the system user context is set to a service client user.
+ *
+ * Note: Use of this should be limited to requests that are sent by an external system that is participating in BioHub
+ * by submitting data to the BioHub Platform Backbone.
+ *
+ * @param {SOURCE_SYSTEM} sourceSystem
+ * @return {*}  {IDBConnection}
+ */
+export const getServiceAccountDBConnection = (sourceSystem: SOURCE_SYSTEM): IDBConnection => {
+  return getDBConnection({ preferred_username: `${sourceSystem}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}` });
 };
 
 /**

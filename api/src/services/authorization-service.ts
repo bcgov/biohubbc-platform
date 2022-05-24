@@ -1,8 +1,8 @@
-import { SOURCE } from '../constants/database';
+import { SOURCE_SYSTEM } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { Models } from '../models';
-import { getKeycloakSource } from '../utils/keycloak-utils';
+import { getKeycloakSource, getUserIdentifier } from '../utils/keycloak-utils';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
@@ -11,17 +11,37 @@ export enum AuthorizeOperator {
   OR = 'or'
 }
 
+/**
+ * Authorization rule that checks if a user's system role matches at least one of the required system roles.
+ *
+ * @export
+ * @interface AuthorizeBySystemRoles
+ */
 export interface AuthorizeBySystemRoles {
   validSystemRoles: SYSTEM_ROLE[];
   discriminator: 'SystemRole';
 }
 
+/**
+ * Authorization rule that checks if a user is a known and active user of the system.
+ *
+ * @export
+ * @interface AuthorizeBySystemUser
+ */
 export interface AuthorizeBySystemUser {
   discriminator: 'SystemUser';
 }
 
+/**
+ * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
+ *
+ * Note: This is specifically for system-to-system communication.
+ *
+ * @export
+ * @interface AuthorizeByServiceClient
+ */
 export interface AuthorizeByServiceClient {
-  validServiceClientIDs: SOURCE[];
+  validServiceClientIDs: SOURCE_SYSTEM[];
   discriminator: 'ServiceClient';
 }
 
@@ -89,7 +109,7 @@ export class AuthorizationService extends DBService {
           authorizeResults.push(await this.authorizeBySystemUser());
           break;
         case 'ServiceClient':
-          authorizeResults.push(await this.authorizeBySystemUser());
+          authorizeResults.push(await this.authorizeByServiceClient(authorizeRule));
           break;
       }
     }
@@ -172,7 +192,7 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user is a valid system user.
+   * Check if the user is a valid system client.
    *
    * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a valid system user, `Promise<false>` otherwise.
    */
@@ -247,12 +267,16 @@ export class AuthorizationService extends DBService {
    * @return {*}  {(Promise<Models.user.UserObject | null>)}
    */
   async getSystemUserWithRoles(): Promise<Models.user.UserObject | null> {
-    const systemUserId = this.connection.systemUserId();
-
-    if (!systemUserId) {
+    if (!this._keycloakToken) {
       return null;
     }
 
-    return this._userService.getUserById(systemUserId);
+    const userIdentifier = getUserIdentifier(this._keycloakToken);
+
+    if (!userIdentifier) {
+      return null;
+    }
+
+    return this._userService.getUserByIdentifier(userIdentifier);
   }
 }

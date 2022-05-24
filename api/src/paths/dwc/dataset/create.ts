@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SOURCE } from '../../../constants/database';
-import { getDBConnection } from '../../../database/db';
+import { SOURCE_SYSTEM } from '../../../constants/database';
+import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
@@ -17,7 +17,7 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE['SIMS-SVC']],
+          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -93,22 +93,22 @@ export function submitDataset(): RequestHandler {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
-    const source = getKeycloakSource(req['keycloak_token']);
+    const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
-    if (!source) {
-      throw new HTTP400('Failed to identify known submission source', [
-        'token did not contain a clientId or clientId value is unknown'
+    if (!sourceSystem) {
+      throw new HTTP400('Failed to identify known submission source system', [
+        'token did not contain a clientId/azp or clientId/azp value is unknown'
       ]);
     }
 
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
       await connection.open();
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const { dataPackageId, submissionId } = await darwinCoreService.ingestNewDwCADataPackage(file, source, {
+      const { dataPackageId, submissionId } = await darwinCoreService.ingestNewDwCADataPackage(file, {
         dataPackageId: req.body.data_package_id
       });
 

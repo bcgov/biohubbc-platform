@@ -7,11 +7,12 @@
 export enum SYSTEM_IDENTITY_SOURCE {
   DATABASE = 'DATABASE',
   IDIR = 'IDIR',
-  BCEID = 'BCEID'
+  BCEID = 'BCEID',
+  SYSTEM = 'SYSTEM'
 }
 
 /**
- * The source of a DwCA data set submission.
+ * The source system of a DwCA data set submission.
  *
  * Typically an external system that is participating in BioHub by submitting data to the BioHub Platform Backbone.
  *
@@ -21,6 +22,6 @@ export enum SYSTEM_IDENTITY_SOURCE {
  * @export
  * @enum {number}
  */
-export enum SOURCE {
+export enum SOURCE_SYSTEM {
   'SIMS-SVC' = 'SIMS-SVC'
 }

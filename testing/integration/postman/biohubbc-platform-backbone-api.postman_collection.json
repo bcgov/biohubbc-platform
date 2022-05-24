@@ -1,0 +1,6210 @@
+{
+	"info": {
+		"_postman_id": "402536dc-0d0f-4052-bc34-28b4a6d88c40",
+		"name": "biohubbc-platform-backbone-api",
+		"description": "API for BioHub",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4169714"
+	},
+	"item": [
+		{
+			"name": "user",
+			"item": [
+				{
+					"name": "{user Id}",
+					"item": [
+						{
+							"name": "system-roles",
+							"item": [
+								{
+									"name": "/user/:userId/system-roles/update",
+									"request": {
+										"method": "PATCH",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"roles\": [\n    -94770880.62883592,\n    21920134.85989675\n  ]\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"system-roles",
+												"update"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										},
+										"description": "Update system role for a user."
+									},
+									"response": [
+										{
+											"name": "Add system user roles to user OK.",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "text/plain"
+												}
+											],
+											"cookie": [],
+											"body": ""
+										},
+										{
+											"name": "Bad Request",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Bad Request",
+											"code": 400,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Unauthorized",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Unauthorized",
+											"code": 401,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Unauthorized",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Forbidden",
+											"code": 403,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Conflict",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Conflict",
+											"code": 409,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Internal Server Error",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Unknown Error",
+											"originalRequest": {
+												"method": "PATCH",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/update",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"update"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										}
+									]
+								},
+								{
+									"name": "/user/:userId/system-roles/create",
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Content-Type",
+												"value": "application/json"
+											},
+											{
+												"key": "Accept",
+												"value": "application/json"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n  \"roles\": [\n    -94770880.62883592,\n    21920134.85989675\n  ]\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"system-roles",
+												"create"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										},
+										"description": "Add system roles to a user."
+									},
+									"response": [
+										{
+											"name": "Add system user roles to user OK.",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "OK",
+											"code": 200,
+											"_postman_previewlanguage": "text",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "text/plain"
+												}
+											],
+											"cookie": [],
+											"body": ""
+										},
+										{
+											"name": "Bad Request",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Bad Request",
+											"code": 400,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Unauthorized",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Unauthorized",
+											"code": 401,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Unauthorized",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Forbidden",
+											"code": 403,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Conflict",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Conflict",
+											"code": 409,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Internal Server Error",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										},
+										{
+											"name": "Unknown Error",
+											"originalRequest": {
+												"method": "POST",
+												"header": [
+													{
+														"description": "Added as a part of security scheme: bearer",
+														"key": "Authorization",
+														"value": "Bearer <token>"
+													}
+												],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n  \"roles\": [\n    -55189668.62383192,\n    28985.341706186533\n  ]\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{API_BASE_URL}}/user/:userId/system-roles/create",
+													"host": [
+														"{{API_BASE_URL}}"
+													],
+													"path": [
+														"user",
+														":userId",
+														"system-roles",
+														"create"
+													],
+													"variable": [
+														{
+															"key": "userId",
+															"value": "22488233.415640607",
+															"description": "(Required) "
+														}
+													]
+												}
+											},
+											"status": "Internal Server Error",
+											"code": 500,
+											"_postman_previewlanguage": "json",
+											"header": [
+												{
+													"key": "Content-Type",
+													"value": "application/json"
+												}
+											],
+											"cookie": [],
+											"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+										}
+									]
+								}
+							]
+						},
+						{
+							"name": "/user/:userId/get",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/:userId/get",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										":userId",
+										"get"
+									],
+									"variable": [
+										{
+											"key": "userId",
+											"value": "22488233.415640607",
+											"description": "(Required) "
+										}
+									]
+								},
+								"description": "Get user details from userId."
+							},
+							"response": [
+								{
+									"name": "User details for userId.",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"id\": -74454069.68539757,\n  \"user_identifier\": \"Lorem mollit\",\n  \"record_end_date\": \"anim\",\n  \"role_ids\": [\n    -80861424.22435443,\n    70507087.6861814\n  ],\n  \"role_names\": [\n    \"reprehenderit\",\n    \"Lorem minim eu ad\"\n  ]\n}"
+								},
+								{
+									"name": "Bad Request",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Internal Server Error",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Unknown Error",
+									"originalRequest": {
+										"method": "GET",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/get",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"get"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								}
+							]
+						},
+						{
+							"name": "/user/:userId/delete",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/:userId/delete",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										":userId",
+										"delete"
+									],
+									"variable": [
+										{
+											"key": "userId",
+											"value": "22488233.415640607",
+											"description": "(Required) "
+										}
+									]
+								},
+								"description": "Remove a user from the system."
+							},
+							"response": [
+								{
+									"name": "Remove system user from system OK.",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "text",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "text/plain"
+										}
+									],
+									"cookie": [],
+									"body": ""
+								},
+								{
+									"name": "Bad Request",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Internal Server Error",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								},
+								{
+									"name": "Unknown Error",
+									"originalRequest": {
+										"method": "DELETE",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/user/:userId/delete",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"user",
+												":userId",
+												"delete"
+											],
+											"variable": [
+												{
+													"key": "userId",
+													"value": "22488233.415640607",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "/user/self",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/user/self",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"user",
+								"self"
+							]
+						},
+						"description": "Get user details for the currently authenticated user."
+					},
+					"response": [
+						{
+							"name": "User details for the currently authenticated user.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"id\": -72895404.69209008,\n  \"user_identifier\": \"ullamco deserun\",\n  \"record_end_date\": \"1990-03-09\",\n  \"role_ids\": [\n    63423882.62126231,\n    15663779.54984808\n  ],\n  \"role_names\": [\n    \"ex\",\n    \"fugiat\"\n  ]\n}"
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/self",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"self"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				},
+				{
+					"name": "/user/list",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/user/list",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"user",
+								"list"
+							]
+						},
+						"description": "Get all Users."
+					},
+					"response": [
+						{
+							"name": "User response object.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n  {\n    \"id\": 61074205.67351797,\n    \"user_identifier\": \"do Excepteur laboris incididunt labore\",\n    \"role_ids\": [\n      \"cillum voluptate\",\n      \"anim officia\"\n    ],\n    \"role_names\": [\n      \"fugiat est qui\",\n      \"Duis\"\n    ]\n  },\n  {\n    \"id\": -24461212.155250594,\n    \"user_identifier\": \"eu dolore\",\n    \"role_ids\": [\n      \"qui ullamco\",\n      \"amet commodo cillum\"\n    ],\n    \"role_names\": [\n      \"dolor labore\",\n      \"magna nulla ad ut\"\n    ]\n  }\n]"
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/list",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"list"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				},
+				{
+					"name": "/user/add",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/user/add",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"user",
+								"add"
+							]
+						},
+						"description": "Add a new system user with role."
+					},
+					"response": [
+						{
+							"name": "Add system user OK.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "text",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "text/plain"
+								}
+							],
+							"cookie": [],
+							"body": ""
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userIdentifier\": \"irure consectetur velit mollit labore\",\n  \"identitySource\": \"BCEID\",\n  \"roleId\": 83024400.93266898\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/user/add",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"user",
+										"add"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "dwc/dataset",
+			"item": [
+				{
+					"name": "{submissionId}",
+					"item": [
+						{
+							"name": "/dwc/dataset/:submissionId/validate",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"validate"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "9695487",
+											"description": "(Required) "
+										}
+									]
+								},
+								"description": "Validate submission file"
+							},
+							"response": [
+								{
+									"name": "Successfully validated submission file",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"validation\": true,\n  \"mediaState\": {\n    \"fileName\": \"ea ullamco\",\n    \"isValid\": true,\n    \"fileErrors\": [\n      \"consequat\",\n      \"elit nisi do in\"\n    ]\n  },\n  \"csvState\": [\n    \"incididunt ullamco tempor\",\n    \"et sit nisi consectetur\"\n  ]\n}"
+								},
+								{
+									"name": "Bad Request",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Internal Server Error",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Unknown Error",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"validate"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								}
+							]
+						},
+						{
+							"name": "/dwc/dataset/:submissionId/scrape-occurrences",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Accept",
+										"value": "application/json"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "9695487",
+											"description": "(Required) "
+										}
+									]
+								},
+								"description": "Scrape information from file into occurrence table."
+							},
+							"response": [
+								{
+									"name": "Successfully scraped and uploaded occurrence information.",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "OK",
+									"code": 200,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "[\n  {\n    \"occurrence_id\": 41145514\n  },\n  {\n    \"occurrence_id\": 97150276\n  }\n]"
+								},
+								{
+									"name": "Bad Request",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Bad Request",
+									"code": 400,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Unauthorized",
+									"code": 401,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Unauthorized",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Forbidden",
+									"code": 403,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Conflict",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Conflict",
+									"code": 409,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Internal Server Error",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								},
+								{
+									"name": "Unknown Error",
+									"originalRequest": {
+										"method": "POST",
+										"header": [
+											{
+												"description": "Added as a part of security scheme: bearer",
+												"key": "Authorization",
+												"value": "Bearer <token>"
+											}
+										],
+										"url": {
+											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"host": [
+												"{{API_BASE_URL}}"
+											],
+											"path": [
+												"dwc",
+												"dataset",
+												":submissionId",
+												"scrape-occurrences"
+											],
+											"variable": [
+												{
+													"key": "submissionId",
+													"value": "9695487",
+													"description": "(Required) "
+												}
+											]
+										}
+									},
+									"status": "Internal Server Error",
+									"code": 500,
+									"_postman_previewlanguage": "json",
+									"header": [
+										{
+											"key": "Content-Type",
+											"value": "application/json"
+										}
+									],
+									"cookie": [],
+									"body": "{\n  \"name\": \"ut\",\n  \"status\": -51637422.34451894,\n  \"message\": \"laborum\",\n  \"errors\": [\n    \"voluptate cillum\",\n    \"eiusmod veniam\"\n  ]\n}"
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "/dwc/dataset/create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "multipart/form-data"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "media",
+									"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+									"type": "file",
+									"src": "/C:/w/git/biohub/files/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip"
+								},
+								{
+									"key": "data_package_id",
+									"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+									"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"dwc",
+								"dataset",
+								"create"
+							]
+						},
+						"description": "Submit a new Darwin Core Archive (DwCA) data package."
+					},
+					"response": [
+						{
+							"name": "Submission OK.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"data_package_id\": \"urn:uuid:65c6816b-5b6c-c41e-e20e-e61fe787ca04\"\n}"
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "media",
+											"description": "(Required) A Darwin Core Archive (DwCA) data package. A zipped archive that must contain the following files: `eml.xml`, `event.csv`, `occurrence.csv`, `taxon.csv`, and can optionally include: `measurementorfact.csv`, `resourcerelationship.csv`, `meta.xml`.",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "data_package_id",
+											"value": "fcbc46b2-8c80-f160-f573-94797e0922d8",
+											"description": "(Required) The unique identifier for this Darwin Core Archive (DwCA) data package. If one is not provided, one will be generated.",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										"create"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				},
+				{
+					"name": "/dwc/dataset/:submissionId/scrape-occurrences",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"dwc",
+								"dataset",
+								":submissionId",
+								"scrape-occurrences"
+							],
+							"variable": [
+								{
+									"key": "submissionId",
+									"value": "55159562",
+									"description": "(Required) "
+								}
+							]
+						},
+						"description": "Scrape information from file into occurrence table."
+					},
+					"response": [
+						{
+							"name": "Successfully scraped and uploaded occurrence information.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "[\n  {\n    \"occurrence_id\": 63067060\n  },\n  {\n    \"occurrence_id\": 62877168\n  }\n]"
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"dwc",
+										"dataset",
+										":submissionId",
+										"scrape-occurrences"
+									],
+									"variable": [
+										{
+											"key": "submissionId",
+											"value": "55159562",
+											"description": "(Required) "
+										}
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "administrative-activity",
+			"item": [
+				{
+					"name": "/administrative-activity",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activity",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activity"
+							]
+						},
+						"description": "Create a new Administrative Activity."
+					},
+					"response": [
+						{
+							"name": "Administrative activity post response object.",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"id\": 60157914.779325426,\n  \"date\": \"ut\"\n}"
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				},
+				{
+					"name": "/administrative-activity",
+					"protocolProfileBehavior": {
+						"disableBodyPruning": true
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activity",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activity"
+							]
+						},
+						"description": "Has one or more pending Administrative Activities."
+					},
+					"response": [
+						{
+							"name": "`Has Pending Administrative Activities` get response object.",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "-91646101.96987444"
+						},
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				},
+				{
+					"name": "/administrative-activity",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activity",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activity"
+							]
+						},
+						"description": "Update an existing administrative activity."
+					},
+					"response": [
+						{
+							"name": "Bad Request",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unauthorized",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Conflict",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Conflict",
+							"code": 409,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Internal Server Error",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						},
+						{
+							"name": "Unknown Error",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"description": "Added as a part of security scheme: bearer",
+										"key": "Authorization",
+										"value": "Bearer <token>"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"id\": -85314739.90429012,\n  \"status\": 48879035.605061114\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{API_BASE_URL}}/administrative-activity",
+									"host": [
+										"{{API_BASE_URL}}"
+									],
+									"path": [
+										"administrative-activity"
+									]
+								}
+							},
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "/version",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{API_BASE_URL}}/version",
+					"host": [
+						"{{API_BASE_URL}}"
+					],
+					"path": [
+						"version"
+					]
+				},
+				"description": "Get API information"
+			},
+			"response": [
+				{
+					"name": "API information",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{API_BASE_URL}}/version",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"version"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"version\": -93426124.65327641,\n  \"environment\": \"officia eiusmod cupidatat laboris\",\n  \"timezone\": \"laborum eu\"\n}"
+				},
+				{
+					"name": "Unknown Error",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{API_BASE_URL}}/version",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"version"
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"et irure\",\n  \"status\": -4918985.407053307,\n  \"message\": \"est dolore\",\n  \"errors\": [\n    \"aliquip veniam Duis\",\n    \"velit magna dolore occaecat reprehenderit\"\n  ]\n}"
+				}
+			]
+		},
+		{
+			"name": "/logger",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{API_BASE_URL}}/logger?level=info",
+					"host": [
+						"{{API_BASE_URL}}"
+					],
+					"path": [
+						"logger"
+					],
+					"query": [
+						{
+							"key": "level",
+							"value": "info",
+							"description": "(Required) "
+						}
+					]
+				},
+				"description": "Update the log level for the API's default logger"
+			},
+			"response": [
+				{
+					"name": "OK",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "text",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "text/plain"
+						}
+					],
+					"cookie": [],
+					"body": ""
+				},
+				{
+					"name": "Bad Request",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "Bad Request",
+					"code": 400,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "Unauthorized",
+					"code": 401,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "Forbidden",
+					"code": 403,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Conflict",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "Conflict",
+					"code": 409,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Internal Server Error",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unknown Error",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/logger?level=info",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"logger"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "info"
+								}
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				}
+			]
+		},
+		{
+			"name": "/gcnotify/send",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{API_BASE_URL}}/gcnotify/send",
+					"host": [
+						"{{API_BASE_URL}}"
+					],
+					"path": [
+						"gcnotify",
+						"send"
+					]
+				},
+				"description": "Send notification to defined recipient"
+			},
+			"response": [
+				{
+					"name": "GC Notify Response",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"content\": {},\n  \"id\": \"consequat laborum amet\",\n  \"reference\": \"ea\",\n  \"scheduled_for\": \"aute\",\n  \"template\": {},\n  \"uri\": \"dolor t\"\n}"
+				},
+				{
+					"name": "Bad Request",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "Bad Request",
+					"code": 400,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "Unauthorized",
+					"code": 401,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "Forbidden",
+					"code": 403,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Conflict",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "Conflict",
+					"code": 409,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Internal Server Error",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unknown Error",
+					"originalRequest": {
+						"method": "POST",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipient\": {},\n  \"message\": {\n    \"subject\": \"ipsum incididunt eu et\",\n    \"header\": \"ea sed sit ex\",\n    \"body1\": \"sed ad Ut veniam\",\n    \"body2\": \"in\",\n    \"footer\": \"Duis anim sed\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/gcnotify/send",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"gcnotify",
+								"send"
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				}
+			]
+		},
+		{
+			"name": "/administrative-activities",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Actioned&status=Rejected",
+					"host": [
+						"{{API_BASE_URL}}"
+					],
+					"path": [
+						"administrative-activities"
+					],
+					"query": [
+						{
+							"key": "type",
+							"value": "System Access"
+						},
+						{
+							"key": "status",
+							"value": "Actioned"
+						},
+						{
+							"key": "status",
+							"value": "Rejected"
+						}
+					]
+				},
+				"description": "Get a list of administrative activities based on the provided criteria."
+			},
+			"response": [
+				{
+					"name": "List of administrative activities.",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "[\n  {\n    \"id\": 99679952.1292989,\n    \"type\": -12346253.240049705,\n    \"type_name\": \"velit mollit magna\",\n    \"status\": 78923423.55599159,\n    \"status_name\": \"consectetur proident nisi irure\",\n    \"description\": \"eiusmod Duis pariatur nulla\",\n    \"notes\": \"ullamco anim\",\n    \"data\": {},\n    \"create_date\": \"quis amet\"\n  },\n  {\n    \"id\": -27700510.5534001,\n    \"type\": -56091963.972508594,\n    \"type_name\": \"do anim fugiat nisi Ut\",\n    \"status\": -27393747.580535382,\n    \"status_name\": \"ad fugiat\",\n    \"description\": \"cillum id aute tempor do\",\n    \"notes\": \"nostrud\",\n    \"data\": {},\n    \"create_date\": \"mollit in consectetur velit\"\n  }\n]"
+				},
+				{
+					"name": "Bad Request",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "Bad Request",
+					"code": 400,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "Unauthorized",
+					"code": 401,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "Forbidden",
+					"code": 403,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Conflict",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "Conflict",
+					"code": 409,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Internal Server Error",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unknown Error",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"url": {
+							"raw": "{{API_BASE_URL}}/administrative-activities?type=System Access&status=Pending&status=Pending",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"administrative-activities"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "System Access"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								},
+								{
+									"key": "status",
+									"value": "Pending"
+								}
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				}
+			]
+		},
+		{
+			"name": "/access-request",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userIdentifier\": \"pariatur nostrud\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -9706471.770350337,\n  \"requestStatusTypeId\": -66137959.17564867,\n  \"roleIds\": [\n    58422022.88503033,\n    87558950.60097417\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{API_BASE_URL}}/access-request",
+					"host": [
+						"{{API_BASE_URL}}"
+					],
+					"path": [
+						"access-request"
+					]
+				},
+				"description": "Update a user's system access request and add any specified system roles to the user."
+			},
+			"response": [
+				{
+					"name": "Add system user roles to user OK.",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "text",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "text/plain"
+						}
+					],
+					"cookie": [],
+					"body": ""
+				},
+				{
+					"name": "Bad Request",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "Bad Request",
+					"code": 400,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "Unauthorized",
+					"code": 401,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unauthorized",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "Forbidden",
+					"code": 403,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Conflict",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "Conflict",
+					"code": 409,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Internal Server Error",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				},
+				{
+					"name": "Unknown Error",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"description": "Added as a part of security scheme: bearer",
+								"key": "Authorization",
+								"value": "Bearer <token>"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userIdentifier\": \"proident\",\n  \"identitySource\": \"IDIR\",\n  \"requestId\": -62957014.66875294,\n  \"requestStatusTypeId\": 36963750.29331437,\n  \"roleIds\": [\n    19786830.86760804,\n    -32607082.664507642\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{API_BASE_URL}}/access-request",
+							"host": [
+								"{{API_BASE_URL}}"
+							],
+							"path": [
+								"access-request"
+							]
+						}
+					},
+					"status": "Internal Server Error",
+					"code": 500,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"name\": \"in id\",\n  \"status\": 2547790.4084626287,\n  \"message\": \"eu laboris aliqua eiusmod\",\n  \"errors\": [\n    \"labore ea culpa sit\",\n    \"sed veniam dolor dolore\"\n  ]\n}"
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{KEYCLOAK_TOKEN}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"const fetchUserToken = {",
+					"    url: pm.environment.get(\"KEYCLOAK_URL\"),",
+					"    method: \"POST\",",
+					"    header: \"Content-Type:application/x-www-form-urlencoded\",",
+					"    body: {",
+					"        mode: \"urlencoded\",",
+					"        urlencoded: [",
+					"            { key: \"scope\", value: \"openid\" },",
+					"            { key: \"grant_type\", value: \"password\" },",
+					"            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_CLIENT_ID\") },",
+					"            { key: \"username\", value: pm.environment.get(\"KEYCLOAK_USER_NAME\") },",
+					"            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_USER_PASSWORD\") },",
+					"        ],",
+					"    },",
+					"};",
+					"",
+					"const fetchServiceAccountToken = {",
+					"    url: pm.environment.get(\"KEYCLOAK_URL\"),",
+					"    method: \"POST\",",
+					"    header: \"Content-Type:application/x-www-form-urlencoded\",",
+					"    auth: {",
+					"        type: \"basic\",",
+					"        basic: [",
+					"            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_PASSWORD\") }",
+					"        ],",
+					"    },",
+					"    body: {",
+					"        mode: \"urlencoded\",",
+					"        urlencoded: [",
+					"            { key: \"scope\", value: \"openid\" },",
+					"            { key: \"grant_type\", value: \"client_credentials\" },",
+					"            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_ID\") },",
+					"            // { key: \"password\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_PASSWORD\") },",
+					"        ],",
+					"    },",
+					"};",
+					"",
+					"if (pm.environment.get(\"KEYCLOAK_TOKEN_EXPIRY\") > new Date().getTime()) {",
+					"    return;",
+					"}",
+					"",
+					"let fetchTokenFunction = fetchUserToken;",
+					"if (pm.environment.get(\"KEYCLOAK_AUTH_TYPE\") === \"service\") {",
+					"    fetchTokenFunction = fetchServiceAccountToken;",
+					"}",
+					"",
+					"pm.sendRequest(fetchTokenFunction, function (err, res) {",
+					"    if (err) {",
+					"        console.log(\"Failed to fetch token:\", err);",
+					"        return;",
+					"    }",
+					"",
+					"    const responseJson = res.json();",
+					"",
+					"    if (responseJson.error) {",
+					"        console.log(\"keycloak responded with an error\");",
+					"        console.log(\"response: \", res.json());",
+					"        return;",
+					"    }",
+					"",
+					"    console.log(\"keycloak returned successfully\");",
+					"    console.log(\"response: \", res.json());",
+					"",
+					"    console.log(\"Saving keycloak token and expiry date\");",
+					"",
+					"    pm.environment.set(\"KEYCLOAK_TOKEN\", responseJson.access_token);",
+					"",
+					"    const expiryDate = new Date();",
+					"    expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
+					"    pm.environment.set(\"KEYCLOAK_TOKEN_EXPIRY\", expiryDate.getTime());",
+					"});",
+					"",
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

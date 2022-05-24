@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import {
   IInsertSubmissionRecord,
+  ISourceTransformModel,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -58,6 +59,22 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('getSourceTransformRecordBySystemUserId', () => {
+    it('should return submission source transform row object', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySystemUserId')
+        .resolves(({ source_transform_id: 1 } as unknown) as ISourceTransformModel);
+
+      const response = await submissionService.getSourceTransformRecordBySystemUserId(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ source_transform_id: 1 });
     });
   });
 
