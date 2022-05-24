@@ -174,8 +174,6 @@ objects:
                       name: ${DB_SERVICE_NAME}
                 - name: DB_PORT
                   value: '5432'
-                - name: KEYCLOAK_URL
-                  value: ${CERTIFICATE_URL}
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
                 - name: KEYCLOAK_REALM

@@ -89,6 +89,7 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+    //TODO: the eml source needs to be updated with the correct XML
     submissionData.eml_source = 'some string';
 
     const sqlStatement = SQL`

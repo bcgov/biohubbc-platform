@@ -136,8 +136,6 @@ export class DarwinCoreService extends DBService {
   }
 
   async convertEMLtoJSON(emlSource: XmlString) {
-    console.log(emlSource);
-
     if (!emlSource) {
       return;
     }
