@@ -1,7 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { PROJECT_ROLE } from '../../../constants/roles';
-
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 
@@ -15,7 +13,6 @@ export const GET: Operation = [
     return {
       and: [
         {
-          validSystemRoles: [PROJECT_ROLE.PROJECT_LEAD, PROJECT_ROLE.PROJECT_EDITOR],
           discriminator: 'SystemUser'
         }
       ]
