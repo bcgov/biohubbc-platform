@@ -1,14 +1,14 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { PROJECT_ROLE } from '../../constants/roles';
-import { getDBConnection } from '../../database/db';
-import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { SubmissionService } from '../../services/submission-service';
-import { getLogger } from '../../utils/logger';
-import { ESService } from '../../services/es-service';
+import { PROJECT_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
+import { ESService } from '../../../services/es-service';
 
-const defaultLog = getLogger('paths/dwc/search');
+const defaultLog = getLogger('paths/dwc/eml/search');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {

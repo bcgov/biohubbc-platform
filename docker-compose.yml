@@ -273,7 +273,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["npm", "run", "migrate:latest"]
+    command: ["npm", "run", "migrate-latest"]
 
   ## Rollback the latest database migrations
   db_rollback:
@@ -300,7 +300,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["npm", "run", "migrate:rollback"]
+    command: ["npm", "run", "migrate-rollback"]
 
 networks:
   local-network:

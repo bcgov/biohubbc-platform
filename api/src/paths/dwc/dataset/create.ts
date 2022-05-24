@@ -106,6 +106,8 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
+      await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
+
       await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'submitDataset', message: 'error', error });

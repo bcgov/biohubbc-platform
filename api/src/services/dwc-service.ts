@@ -9,6 +9,8 @@ import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SubmissionService } from './submission-service';
+import { ESService } from '../services/es-service';
+import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 
 export class DarwinCoreService extends DBService {
   async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
@@ -115,14 +117,30 @@ export class DarwinCoreService extends DBService {
     return { dataPackageId, submissionId };
   }
 
-  async transformAndUploadMetaData() {
-    //convert this into a function that transforms and upload eml function that is similar to the scrape and upload
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string) {
+    const submissionService = new SubmissionService(this.connection);
 
-    //this function calls another function that converts the eml to json
-    const esClient = this.esClient;
+    const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    const id = 'ab006e90-fe0d-4d51-b056-c70b3a25fff8';
+    if (!submissionRecord || !submissionRecord.eml_source) {
+      throw new ApiGeneralError('eml source is not available');
+    }
 
+    const esClient = await new ESService().getEsClient();
+    const jsonDoc = this.convertEMLtoJSON(submissionRecord.eml_source);
+
+    await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
+
+    //TODO: We need a new submission status type
+    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+  }
+
+  async convertEMLtoJSON(emlSource: XmlString) {
+    console.log(emlSource);
+
+    if (!emlSource) {
+      return;
+    }
     const jsonDoc = {
       datasetName: 'Coastal Caribou',
       publishDate: '2021-08-05',
@@ -151,8 +169,6 @@ export class DarwinCoreService extends DBService {
       ]
     };
 
-    await esClient.create({ id: id, index: ES_INDEX.EML, document: jsonDoc });
+    return jsonDoc;
   }
-
-  //different function to parse the eml .. blackbox in short term
 }
