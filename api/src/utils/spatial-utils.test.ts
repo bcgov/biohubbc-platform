@@ -1,6 +1,8 @@
 import { expect } from 'chai';
+import { Feature } from 'geojson';
 import { describe } from 'mocha';
-import { parseLatLongString, parseUTMString } from './spatial-utils';
+import SQL from 'sql-template-strings';
+import { parseLatLongString, parseUTMString, generateGeometryCollectionSQL } from './spatial-utils';
 
 describe('parseUTMString', () => {
   it('returns null when no UTM string provided', async () => {
@@ -139,5 +141,43 @@ describe('parseLatLongString', () => {
     const result = parseLatLongString('49.123 -120.123');
 
     expect(result).to.eql({ lat: 49.123, long: -120.123 });
+  });
+});
+
+describe('generateGeometryCollectionSQL', () => {
+  it('returns sql statement when not array', () => {
+    const mockFeature: Feature[] = [
+      { type: 'Feature', properties: {}, id: 'id', geometry: { type: 'Polygon', coordinates: [[]] } },
+      { type: 'Feature', properties: {}, id: 'id', geometry: { type: 'Polygon', coordinates: [[]] } }
+    ];
+
+    const geo = JSON.stringify(mockFeature[0].geometry);
+    expect(generateGeometryCollectionSQL(mockFeature[0])).to.eql(
+      SQL`public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo}))`
+    );
+  });
+  it('returns sql statement when array is length 1', () => {
+    const mockFeature: Feature[] = [
+      { type: 'Feature', properties: {}, id: 'id', geometry: { type: 'Polygon', coordinates: [[]] } }
+    ];
+    const geo = JSON.stringify(mockFeature[0].geometry);
+    expect(generateGeometryCollectionSQL(mockFeature)).to.eql(
+      SQL`public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo}))`
+    );
+  });
+
+  it('returns longer sql statement when array', () => {
+    const mockFeature: Feature[] = [
+      { type: 'Feature', properties: {}, id: 'id', geometry: { type: 'Polygon', coordinates: [[]] } },
+      { type: 'Feature', properties: {}, id: 'id', geometry: { type: 'Polygon', coordinates: [[]] } }
+    ];
+    const geo0 = JSON.stringify(mockFeature[0].geometry);
+    const geo1 = JSON.stringify(mockFeature[1].geometry);
+
+    expect(generateGeometryCollectionSQL(mockFeature)).to.eql(
+      SQL`public.ST_AsText(public.ST_Collect(array[
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo0})),
+        public.ST_Force2D(public.ST_GeomFromGeoJSON(${geo1}))]))`
+    );
   });
 });
