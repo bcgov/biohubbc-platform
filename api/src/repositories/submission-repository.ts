@@ -47,7 +47,7 @@ export interface ISubmissionModel {
 }
 
 export interface ISubmissionModelWithStatus extends ISubmissionModel {
-  submission_status: string
+  submission_status: string;
 }
 
 export enum SUBMISSION_STATUS_TYPE {
@@ -345,7 +345,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionModel>}
    * @memberof SubmissionRepository
    */
-   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
+  async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     const sqlStatement = SQL`
       SELECT
         t1.submission_status,

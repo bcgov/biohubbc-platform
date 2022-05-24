@@ -47,7 +47,7 @@ describe.only('getSubmissionSignedUrl', () => {
 
     try {
       const result = getSubmissionSignedUrl();
-      console.log('RES:', result)
+      console.log('RES:', result);
 
       await result(
         { ...sampleReq, params: { ...sampleReq.params, submissionId: null } },

@@ -120,9 +120,9 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<string | null>}
    * @memberof SubmissionService
    */
-   async getSubmissionRecordS3Key(submissionId: number): Promise<string | null> {
-    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId)
-    
-    return submission?.input_key || null
+  async getSubmissionRecordS3Key(submissionId: number): Promise<string | null> {
+    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+
+    return submission?.input_key || null;
   }
 }
