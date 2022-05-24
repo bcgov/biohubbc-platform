@@ -102,8 +102,6 @@ export function submitDataset(): RequestHandler {
       // return after creating the submission
       res.status(200).json({ data_package_id: dataPackageId });
 
-      //call the new function from here (input: submission id)
-
       await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
       await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
