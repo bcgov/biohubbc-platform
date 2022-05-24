@@ -122,8 +122,6 @@ export class DarwinCoreService extends DBService {
 
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMITTED);
 
-    // await call the function
-
     await uploadFileToS3(file, s3Key, {
       filename: file.originalname
     });
