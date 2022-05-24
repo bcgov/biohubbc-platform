@@ -57,7 +57,8 @@ export function getSubmissionSignedUrl(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const s3Key = await submissionService.getSubmissionRecordS3Key(submissionId);
+      const submission = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+      const s3Key = submission?.input_key || null;
       console.log('s3Key:', s3Key);
   
       if (!s3Key) {
