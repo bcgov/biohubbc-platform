@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP400, HTTP500 } from '../../../../errors/http-error';
+import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
@@ -36,7 +36,7 @@ GET.apiDoc = {
       in: 'path',
       name: 'submissionId',
       schema: {
-        type: 'number',
+        type: 'integer',
         minimum: 0
       },
       required: true
@@ -68,19 +68,17 @@ export function getSubmissionSignedUrl(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const submission = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
-      if (!submission) {
-        throw new HTTP400(`Failed to find submission with id ${submissionId}`);
-      }
-      const s3Key = submission?.input_key || null;
+
+      const s3Key = submission.input_key;
 
       if (!s3Key) {
-        throw new HTTP500('Failed to find submission S3 key.');
+        throw new HTTP400('Failed to find submission S3 key.');
       }
 
       const signedS3Url = await getS3SignedURL(s3Key);
 
       if (!signedS3Url) {
-        throw new HTTP500('Failed to retreive signed S3 URL from the given S3 key.');
+        throw new HTTP400('Failed to retreive signed S3 URL from the given S3 key.');
       }
 
       await connection.commit();
