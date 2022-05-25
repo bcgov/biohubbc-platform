@@ -349,7 +349,7 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.listSubmissionRecords();
 
-      expect(response).to.eql(mockResponse);
+      expect(response).to.eql([mockResponse]);
     });
   });
 });
