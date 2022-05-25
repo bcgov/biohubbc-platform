@@ -55,7 +55,7 @@ describe('search', () => {
       });
     });
 
-    describe('response validation', () => {
+    describe.only('response validation', () => {
       const responseValidator = new OpenAPIResponseValidator((GET.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
@@ -65,6 +65,51 @@ describe('search', () => {
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].message).to.equal('must be array');
+        });
+
+        it('has array with invalid key value: id', async () => {
+          const apiResponse = [{ id1: 1 }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal("must have required property 'id'");
+        });
+
+        it('has array with invalid key value: source', async () => {
+          const apiResponse = [{ id: 'test', source1: 1 }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal("must have required property 'source'");
+        });
+
+        it('has array with invalid key value: fields', async () => {
+          const apiResponse = [{ id: 'test', source: {}, fields1: {} }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal("must have required property 'fields'");
+        });
+        it('has array with invalid value: id', async () => {
+          const apiResponse = [{ id: 14, source: {}, fields: {} }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal('must be string');
+        });
+        it('has array with invalid value: source', async () => {
+          const apiResponse = [{ id: 'test', source: 1, fields: {} }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal('must be object');
+        });
+        it('has array with invalid value: fields', async () => {
+          const apiResponse = [{ id: 'test', source: {}, fields: 1 }];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal('must be object');
         });
       });
     });

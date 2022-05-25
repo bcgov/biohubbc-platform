@@ -47,7 +47,34 @@ GET.apiDoc = {
           schema: {
             type: 'array',
             items: {
-              type: 'object'
+              type: 'object',
+              required: ['id', 'source', 'fields'],
+              nullable: true,
+              properties: {
+                id: {
+                  type: 'string'
+                },
+                source: {
+                  type: 'object',
+                  properties: {
+                    datasetName: {
+                      type: 'string'
+                    },
+                    publishDate: {
+                      type: 'string'
+                    },
+                    projects: {
+                      type: 'array',
+                      items: {
+                        type: 'object'
+                      }
+                    }
+                  }
+                },
+                fields: {
+                  type: 'object'
+                }
+              }
             }
           }
         }
@@ -97,6 +124,8 @@ export function searchInElasticSearch(): RequestHandler {
             };
           })) ||
         [];
+
+      console.log('result is :', result);
 
       res.status(200).json(result);
     } catch (error) {
