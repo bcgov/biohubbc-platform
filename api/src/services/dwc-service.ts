@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
-import { ESService } from '../services/es-service';
+//import { ESService } from '../services/es-service';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -138,7 +138,8 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('eml source is not available');
     }
 
-    const esClient = await new ESService().getEsClient();
+    const esClient = await this.getEsClient();
+
     const jsonDoc = this.convertEMLtoJSON(submissionRecord.eml_source);
 
     const response = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });

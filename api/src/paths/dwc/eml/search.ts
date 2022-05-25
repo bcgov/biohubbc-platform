@@ -104,6 +104,8 @@ export function searchInElasticSearch(): RequestHandler {
     try {
       const elasticSearch = await new ESService().getEsClient();
 
+      console.log('elastic search is: ', elasticSearch);
+
       const response = await elasticSearch.search({
         index: indexName.toLowerCase(),
         query: {
