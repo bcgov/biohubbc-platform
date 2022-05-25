@@ -21,7 +21,7 @@ describe.only('getSubmissionSignedUrl', () => {
 
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    const testResponseSignedUrl: string = 'test-signed-url';
+    const testResponseSignedUrl = 'test-signed-url';
     const mockServiceResponse = {
       submission_id: 1,
       source: 'SIMS',

@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP500 } from '../../../../errors/http-error';
+import { HTTP400, HTTP500 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
@@ -57,8 +57,11 @@ export function getSubmissionSignedUrl(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const submission = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+      if (!submission) {
+        throw new HTTP400(`Failed to find submission with id ${submissionId}`);
+      }
       const s3Key = submission?.input_key || null;
-  
+
       if (!s3Key) {
         throw new HTTP500('Failed to find submission S3 key.');
       }
