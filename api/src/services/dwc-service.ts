@@ -107,7 +107,7 @@ export class DarwinCoreService extends DBService {
       input_file_name: dwcArchive.rawFile.fileName,
       input_key: '',
       event_timestamp: new Date().toISOString(),
-      eml_source: dwcArchive.extra.eml?.buffer.toString() || '',
+      eml_source: dwcArchive.extra.eml?.buffer?.toString() || '',
       darwin_core_source: '{}', // TODO populate
       uuid: dataPackageId
     });

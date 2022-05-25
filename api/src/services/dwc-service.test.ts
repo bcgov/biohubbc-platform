@@ -145,7 +145,9 @@ describe('DarwinCoreService', () => {
           fileName: 'test'
         },
         extra: {
-          eml: 'test'
+          eml: {
+            buffer: Buffer.from('test')
+          }
         }
       };
 
