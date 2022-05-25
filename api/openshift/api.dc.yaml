@@ -43,22 +43,24 @@ parameters:
     description: Application timezone
     required: false
     value: 'America/Vancouver'
-  - name: CERTIFICATE_URL
-    description: Authentication certificate urls
-    required: true
-    value: 'https://oidc.gov.bc.ca/auth/realms/35r1iman/protocol/openid-connect/certs'
   - name: KEYCLOAK_HOST
-    description: keycloak host url
-    value: https://dev.oidc.gov.bc.ca
+    description: Key clock login url
+    value: 'https://oidc.gov.bc.ca/auth'
+    required: true
   - name: KEYCLOAK_REALM
-    description: keycloak realm definition
-    value: 35r1iman
+    description: Realm identifier or name
+    value: '35r1iman'
+    required: true
+  - name: KEYCLOAK_CLIENT_ID
+    description: Client Id for application
+    value: 'biohubbc'
+    required: true
   - name: KEYCLOAK_ADMIN_USERNAME
     description: keycloak host admin username
-    value: biohubbc-svc
-  - name: KEYCLOAK_ADMIN_PASSWORD
-    description: keycloak host url
-    value: 'keycloak-admin-password'
+  - name: KEYCLOAK_SECRET
+    description: The name of the keycloak secret
+  - name: KEYCLOAK_SECRET_ADMIN_PASSWORD
+    description: The key of the admin password in the keycloak secret
   - name: API_PORT_DEFAULT
     value: '6100'
   - name: API_PORT_DEFAULT_NAME
@@ -184,6 +186,8 @@ objects:
                   value: '5432'
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
+                - name: KEYCLOAK_CLIENT_ID
+                  value: ${KEYCLOAK_CLIENT_ID}
                 - name: KEYCLOAK_REALM
                   value: ${KEYCLOAK_REALM}
                 - name: KEYCLOAK_ADMIN_USERNAME
