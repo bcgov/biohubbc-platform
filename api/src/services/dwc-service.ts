@@ -3,7 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
-//import { ESService } from '../services/es-service';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -54,7 +53,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Parse unknown submission file and convert to DWArchive file.
+   *Parse unknown submission file and convert to DWArchive file.
    *
    * @param {UnknownMedia} unknownMedia
    * @return {*}  {DWCArchive}
@@ -129,6 +128,14 @@ export class DarwinCoreService extends DBService {
     return { dataPackageId, submissionId };
   }
 
+  /**
+   *
+   *
+   * @param {number} submissionId
+   * @param {string} dataPackageId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
   async transformAndUploadMetaData(submissionId: number, dataPackageId: string) {
     const submissionService = new SubmissionService(this.connection);
 
@@ -150,6 +157,13 @@ export class DarwinCoreService extends DBService {
     return response;
   }
 
+  /**
+   *
+   *
+   * @param {XmlString} emlSource
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
   convertEMLtoJSON(emlSource: XmlString) {
     if (!emlSource) {
       return;
@@ -185,6 +199,7 @@ export class DarwinCoreService extends DBService {
 
     return jsonDoc;
   }
+
   /**
    *  Temp replacement for validation until more requirements are set
    *
@@ -201,7 +216,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Validate submission againest style sheet
+   * Validate submission against style sheet
    *
    * @param {number} submissionId
    * @param {number} [styleSheetId]

@@ -85,7 +85,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get taxonomic search results.
+ * Search for meta data in Elastic Search.
  *
  * @returns {RequestHandler}
  */
@@ -103,8 +103,6 @@ export function searchInElasticSearch(): RequestHandler {
 
     try {
       const elasticSearch = await new ESService().getEsClient();
-
-      console.log('elastic search is: ', elasticSearch);
 
       const response = await elasticSearch.search({
         index: indexName.toLowerCase(),
@@ -126,8 +124,6 @@ export function searchInElasticSearch(): RequestHandler {
             };
           })) ||
         [];
-
-      console.log('result is :', result);
 
       res.status(200).json(result);
     } catch (error) {
