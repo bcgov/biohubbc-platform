@@ -141,15 +141,12 @@ export class DarwinCoreService extends DBService {
     const esClient = await new ESService().getEsClient();
     const jsonDoc = this.convertEMLtoJSON(submissionRecord.eml_source);
 
-    console.log('jsonDoc is: ', jsonDoc);
-
-    const r4 = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
-    console.log('r4 is: ', r4);
+    const response = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
 
     //TODO: We need a new submission status type
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
-    return r4;
+    return response;
   }
 
   convertEMLtoJSON(emlSource: XmlString) {

@@ -6,7 +6,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
+//import { ISubmissionModel } from '../../../repositories/submission-repository';
 import { DarwinCoreService } from '../../../services/dwc-service';
+//import { SubmissionService } from '../../../services/submission-service';
 import * as fileUtils from '../../../utils/file-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as create from './create';
@@ -299,6 +301,8 @@ describe('create', () => {
       const scrapeAndUploadOccurrencesStub = sinon
         .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
         .resolves();
+
+      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
 
       const requestHandler = create.submitDataset();
 

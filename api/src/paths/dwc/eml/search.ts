@@ -2,7 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-
 import { getLogger } from '../../../utils/logger';
 import { ESService } from '../../../services/es-service';
 
@@ -23,7 +22,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'searches submission files with elastic search',
-  tags: ['elastic', 'search'],
+  tags: ['search'],
   security: [
     {
       Bearer: []
