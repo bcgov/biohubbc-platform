@@ -47,7 +47,6 @@ GET.apiDoc = {
 };
 
 export function getSubmissionSignedUrl(): RequestHandler {
-  console.log('getSubmissionSignedUrl()');
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const submissionId = Number(req.params.submissionId);
@@ -59,14 +58,12 @@ export function getSubmissionSignedUrl(): RequestHandler {
 
       const submission = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
       const s3Key = submission?.input_key || null;
-      console.log('s3Key:', s3Key);
   
       if (!s3Key) {
         throw new HTTP500('Failed to find submission S3 key.');
       }
 
       const signedS3Url = await getS3SignedURL(s3Key);
-      console.log('SIGNEDURL:', signedS3Url);
 
       await connection.commit();
 
