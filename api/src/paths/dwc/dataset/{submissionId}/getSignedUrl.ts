@@ -79,6 +79,10 @@ export function getSubmissionSignedUrl(): RequestHandler {
 
       const signedS3Url = await getS3SignedURL(s3Key);
 
+      if (!signedS3Url) {
+        throw new HTTP500('Failed to retreive signed S3 URL from the given S3 key.');
+      }
+
       await connection.commit();
 
       res.status(200).send(signedS3Url);
