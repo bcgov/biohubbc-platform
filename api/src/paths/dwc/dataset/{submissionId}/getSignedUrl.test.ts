@@ -16,7 +16,7 @@ import { ISubmissionModel } from '../../../../repositories/submission-repository
 
 chai.use(sinonChai);
 
-describe.only('getSubmissionSignedUrl', () => {
+describe('getSubmissionSignedUrl', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -89,8 +89,8 @@ describe.only('getSubmissionSignedUrl', () => {
           expect(response.errors[0].message).to.equal('must be string');
         });
 
-        it('has array with invalid key value', async () => {
-          const apiResponse = [{ id: 1 }];
+        it('has invalid key value', async () => {
+          const apiResponse = { id: 1 };
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');

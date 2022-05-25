@@ -31,7 +31,7 @@ export interface IInsertSubmissionRecord {
  */
 export interface ISubmissionModel {
   submission_id: number;
-  source: string | null;
+  source: string;
   uuid: string;
   event_timestamp: string;
   delete_timestamp: string | null;
@@ -361,7 +361,7 @@ export class SubmissionRepository extends BaseRepository {
         LEFT JOIN
           submission_status_type sst
         ON
-          ss.submission_status_type_id = sst.submission_status_type_id 
+          ss.submission_status_type_id = sst.submission_status_type_id
         ORDER BY
           ss.submission_id, ss.submission_status_id DESC) t1
       ON

@@ -40,31 +40,38 @@ GET.apiDoc = {
             items: {
               title: 'Darwin Core Data Packages Response Object',
               type: 'object',
+              required: [
+                'submission_id',
+                'source',
+                'uuid',
+                'event_timestamp',
+                'create_date',
+                'create_user',
+                'revision_count'
+              ],
               properties: {
                 submission_status: {
                   type: 'string',
                   nullable: true
                 },
-                source: {
-                  type: 'string',
-                  nullable: true
+                submission_id: {
+                  type: 'integer',
+                  minimum: 0
                 },
-                uuid: {
+                source: {
                   type: 'string'
                 },
+                uuid: {
+                  type: 'string',
+                  format: 'uuid'
+                },
                 event_timestamp: {
-                  oneOf: [
-                    {
-                      type: 'string',
-                      nullable: true
-                    },
-                    {
-                      type: 'object'
-                    }
-                  ]
+                  type: 'string',
+                  format: 'date-time'
                 },
                 delete_timestamp: {
                   type: 'string',
+                  format: 'date-time',
                   nullable: true
                 },
                 input_key: {
@@ -80,47 +87,27 @@ GET.apiDoc = {
                   nullable: true
                 },
                 darwin_core_source: {
-                  oneOf: [
-                    {
-                      type: 'string',
-                      nullable: true
-                    },
-                    {
-                      type: 'object'
-                    }
-                  ]
+                  type: 'string',
+                  nullable: true
                 },
-                created_date: {
-                  oneOf: [
-                    {
-                      type: 'string',
-                      nullable: true
-                    },
-                    {
-                      type: 'object'
-                    }
-                  ]
+                create_date: {
+                  type: 'string',
+                  format: 'date-time'
                 },
-                created_user: {
-                  type: 'number'
+                create_user: {
+                  type: 'integer'
                 },
                 update_date: {
-                  oneOf: [
-                    {
-                      type: 'string',
-                      nullable: true
-                    },
-                    {
-                      type: 'object'
-                    }
-                  ]
+                  type: 'string',
+                  format: 'date-time',
+                  nullable: true
                 },
                 update_user: {
-                  type: 'number',
+                  type: 'integer',
                   nullable: true
                 },
                 revision_count: {
-                  type: 'number'
+                  type: 'integer'
                 }
               }
             }
