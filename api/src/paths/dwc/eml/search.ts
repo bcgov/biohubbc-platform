@@ -74,6 +74,8 @@ export function searchInElasticSearch(): RequestHandler {
     const terms = String(req.query.terms) || '';
     const indexName = String(req.query.index) || '';
 
+    console.log(req.query);
+
     try {
       const elasticSearch = await new ESService().getEsClient();
 
