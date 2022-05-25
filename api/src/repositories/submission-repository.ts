@@ -370,6 +370,13 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISubmissionModelWithStatus>(sqlStatement);
 
+    if (response.rows !== [] && !response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to retreive submission records', [
+        'SubmissionRepository->listSubmissionRecords',
+        'rowCount was null or undefined, expeceted rows = [] or rowCount > 0.'
+      ]);
+    }
+
     return response.rows;
   }
 }
