@@ -31,6 +31,17 @@ GET.apiDoc = {
       Bearer: []
     }
   ],
+  parameters: [
+    {
+      in: 'path',
+      name: 'submissionId',
+      schema: {
+        type: 'number',
+        minimum: 0
+      },
+      required: true
+    }
+  ],
   responses: {
     200: {
       description: 'S3 signed URL.',
