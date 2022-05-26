@@ -17,7 +17,8 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $DB_ADMIN -p 5432 -d $DB_DATABASE"]
       interval: 5s
-      retries: 20
+      timeout: 5s
+      retries: 30
     environment:
       - NODE_ENV=${NODE_ENV}
       - POSTGRES_USER=${DB_ADMIN}
@@ -40,6 +41,7 @@ services:
       - ${API_PORT}:${API_PORT}
     environment:
       - NODE_ENV=${NODE_ENV}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
       - TZ=${API_TZ}
       - API_HOST=${API_HOST}
       - API_PORT=${API_PORT}

@@ -31,6 +31,7 @@ module.exports = (settings) => {
         CHANGE_ID: phases.build.changeId || changeId,
         APP_HOST: phases[phase].appHost,
         NODE_ENV: phases[phase].env || 'dev',
+        ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         TZ: phases[phase].tz,
         KEYCLOAK_ADMIN_USERNAME: 'biohubbc-svc',
         KEYCLOAK_SECRET: 'keycloak-admin-password',
