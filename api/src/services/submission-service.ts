@@ -4,6 +4,7 @@ import {
   ISearchSubmissionCriteria,
   ISourceTransformModel,
   ISubmissionModel,
+  ISubmissionModelWithStatus,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -118,5 +119,16 @@ export class SubmissionService extends DBService {
     submission_message_type_id: number;
   }> {
     return this.submissionRepository.insertSubmissionMessage(submissionStatusId, submissionMessageType);
+  }
+
+  /**
+   * List all submissions
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionModelWithStatus>}
+   * @memberof SubmissionService
+   */
+  async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
+    return this.submissionRepository.listSubmissionRecords();
   }
 }

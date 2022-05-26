@@ -42,6 +42,9 @@ export interface ISubmissionModel {
   revision_count: number;
 }
 
+export interface ISubmissionModelWithStatus extends ISubmissionModel {
+  submission_status: string;
+}
 /**
  * Submission source transform table model.
  *
@@ -382,5 +385,40 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Fetch a submission record by primary id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionModel>}
+   * @memberof SubmissionRepository
+   */
+  async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
+    const sqlStatement = SQL`
+      SELECT
+        t1.submission_status,
+        s.*
+      FROM
+        submission s
+      LEFT JOIN
+        (SELECT DISTINCT ON (ss.submission_id)
+          ss.submission_id,
+          sst.name AS submission_status
+        FROM
+          submission_status ss
+        LEFT JOIN
+          submission_status_type sst
+        ON
+          ss.submission_status_type_id = sst.submission_status_type_id
+        ORDER BY
+          ss.submission_id, ss.submission_status_id DESC) t1
+      ON
+        t1.submission_id = s.submission_id;
+    `;
+
+    const response = await this.connection.sql<ISubmissionModelWithStatus>(sqlStatement);
+
+    return response.rows;
   }
 }
