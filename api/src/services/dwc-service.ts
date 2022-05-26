@@ -98,29 +98,33 @@ export class DarwinCoreService extends DBService {
    * Ingest a Darwin Core Archive (DwCA) data package.
    *
    * @param {Express.Multer.File} file
-   * @param {{ dataPackageId?: string }} [options] A globally unique id. Will default to a random uuid if not supplied.
+   * @param {{ dataPackageId?: string }} [options]
    * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
    * @memberof DarwinCoreService
    */
   async ingestNewDwCADataPackage(
     file: Express.Multer.File,
-    options?: { dataPackageId?: string; source?: string }
+    options?: { dataPackageId?: string }
   ): Promise<{ dataPackageId: string; submissionId: number }> {
     const dataPackageId = options?.dataPackageId || uuidv4();
-    const source = options?.source || 'SIMS'; // TODO Parse from the provided EML file?
 
-    // TODO Check if `dataPackageId` already exists? If so, update or throw error?
+    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
 
     const dwcArchive = this.prepDWCArchive(file);
 
     const submissionService = new SubmissionService(this.connection);
 
+    // Fetch the source transform record for this submission based on the source system user id
+    const sourceTransformRecord = await submissionService.getSourceTransformRecordBySystemUserId(
+      this.connection.systemUserId()
+    );
+
     const response = await submissionService.insertSubmissionRecord({
-      source: source,
+      source_transform_id: sourceTransformRecord.source_transform_id,
       input_file_name: dwcArchive.rawFile.fileName,
       input_key: '',
       event_timestamp: new Date().toISOString(),
-      eml_source: dwcArchive.extra.eml,
+      eml_source: dwcArchive.extra.eml?.buffer?.toString() || '',
       darwin_core_source: '{}', // TODO populate
       uuid: dataPackageId
     });
@@ -214,6 +218,7 @@ export class DarwinCoreService extends DBService {
 
     return jsonDoc;
   }
+
   /**
    *  Temp replacement for validation until more requirements are set
    *
@@ -230,7 +235,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Validate submission againest style sheet
+   * Validate submission against style sheet
    *
    * @param {number} submissionId
    * @param {number} [styleSheetId]

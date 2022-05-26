@@ -41,7 +41,7 @@ export class ValidationRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert style schema', [
         'ValidationRepository->insertStyleSchema',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
     return { style_id: 1 }; //TODO hard coded
@@ -70,7 +70,7 @@ export class ValidationRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get style schema', [
         'ValidationRepository->getStyleSchemaByStyleId',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 

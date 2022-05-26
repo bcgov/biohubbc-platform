@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Friday, April 29, 2022 14:04:02
+-- Date Created : Tuesday, May 24, 2022 14:54:28
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -110,24 +110,77 @@ COMMENT ON TABLE occurrence IS 'Occurrence records that have been ingested from 
 ;
 
 -- 
+-- TABLE: source_transform 
+--
+
+CREATE TABLE source_transform(
+    source_transform_id              integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    system_user_id                   integer           NOT NULL,
+    version                          varchar(20)       NOT NULL,
+    metadata_transform               text              NOT NULL,
+    metadata_transform_precompile    text,
+    metadata_index                   varchar(100)      NOT NULL,
+    record_effective_date            date              DEFAULT now() NOT NULL,
+    record_end_date                  date,
+    create_date                      timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                      integer           NOT NULL,
+    update_date                      timestamptz(6),
+    update_user                      integer,
+    revision_count                   integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT source_transform_pk PRIMARY KEY (source_transform_id)
+)
+;
+
+
+
+COMMENT ON COLUMN source_transform.source_transform_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN source_transform.system_user_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN source_transform.version IS 'The version  number of the transformation data set for a specific source system. Examples include "0.1" and "2.0.1".'
+;
+COMMENT ON COLUMN source_transform.metadata_transform IS 'The metadata transform template. This template is to be used to transform specific metadata for population of the search engine layer.'
+;
+COMMENT ON COLUMN source_transform.metadata_transform_precompile IS 'A pre-compiled XSLT transformation file. An example would be a file based on the SaxonJS Stylesheet Export File (SEF) format.'
+;
+COMMENT ON COLUMN source_transform.metadata_index IS 'The search engine layer index that the metadata transform conforms to. This attribute provides the index name that is the target for the metadata produced by the associated "metadata transform" template.'
+;
+COMMENT ON COLUMN source_transform.record_effective_date IS 'Record level effective date.'
+;
+COMMENT ON COLUMN source_transform.record_end_date IS 'Record level end date.'
+;
+COMMENT ON COLUMN source_transform.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN source_transform.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN source_transform.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN source_transform.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN source_transform.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE source_transform IS 'Stores data transform information for data sources. This information is used by data ingest logic to lookup version information and transformations for processing data submissions. Note that foreign keys to system users should be restricted to users with a user identity source of "SYSTEM".'
+;
+
+-- 
 -- TABLE: submission 
 --
 
 CREATE TABLE submission(
-    submission_id         integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    source                varchar(300)      NOT NULL,
-    uuid                  uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    event_timestamp       TIMESTAMPTZ       NOT NULL,
-    delete_timestamp      TIMESTAMPTZ,
-    input_key             varchar(1000),
-    input_file_name       varchar(300),
-    eml_source            xml,
-    darwin_core_source    jsonb,
-    create_date           timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user           integer           NOT NULL,
-    update_date           timestamptz(6),
-    update_user           integer,
-    revision_count        integer           DEFAULT 0 NOT NULL,
+    submission_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    source_transform_id    integer           NOT NULL,
+    uuid                   uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    event_timestamp        TIMESTAMPTZ       NOT NULL,
+    delete_timestamp       TIMESTAMPTZ,
+    input_key              varchar(1000),
+    input_file_name        varchar(300),
+    eml_source             xml,
+    darwin_core_source     jsonb,
+    create_date            timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user            integer           NOT NULL,
+    update_date            timestamptz(6),
+    update_user            integer,
+    revision_count         integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_pk PRIMARY KEY (submission_id)
 )
 ;
@@ -136,7 +189,7 @@ CREATE TABLE submission(
 
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN submission.source IS 'The name of the source system that is supplying the data.'
+COMMENT ON COLUMN submission.source_transform_id IS 'System generated surrogate primary key identifier.'
 ;
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.'
 ;
@@ -217,7 +270,7 @@ CREATE TABLE submission_message_class(
     submission_message_class_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                           varchar(50)       NOT NULL,
     record_end_date                date,
-    record_effective_date          date              NOT NULL,
+    record_effective_date          date              DEFAULT now() NOT NULL,
     description                    varchar(250),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
@@ -262,7 +315,7 @@ CREATE TABLE submission_message_type(
     submission_message_class_id    integer           NOT NULL,
     name                           varchar(50)       NOT NULL,
     record_end_date                date,
-    record_effective_date          date              NOT NULL,
+    record_effective_date          date              DEFAULT now() NOT NULL,
     description                    varchar(250),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
@@ -349,7 +402,7 @@ CREATE TABLE submission_status_type(
     submission_status_type_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                         varchar(50)       NOT NULL,
     record_end_date              date,
-    record_effective_date        date              NOT NULL,
+    record_effective_date        date              DEFAULT now() NOT NULL,
     description                  varchar(250),
     create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                  integer           NOT NULL,
@@ -444,7 +497,7 @@ CREATE TABLE system_metadata_constant(
     update_date                    timestamptz(6),
     update_user                    integer,
     revision_count                 integer           DEFAULT 0 NOT NULL,
-    CONSTRAINT system_metadata_constant_id_pk PRIMARY KEY (system_metadata_constant_id)
+    CONSTRAINT system_metadata_constant_pk PRIMARY KEY (system_metadata_constant_id)
 )
 ;
 
@@ -480,7 +533,7 @@ COMMENT ON TABLE system_metadata_constant IS 'A list of system metadata constant
 CREATE TABLE system_role(
     system_role_id           integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                     varchar(50)       NOT NULL,
-    record_effective_date    date              NOT NULL,
+    record_effective_date    date              DEFAULT now() NOT NULL,
     record_end_date          date,
     description              varchar(250)      NOT NULL,
     notes                    varchar(3000),
@@ -528,7 +581,7 @@ CREATE TABLE system_user(
     system_user_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     user_identity_source_id    integer           NOT NULL,
     user_identifier            varchar(200)      NOT NULL,
-    record_effective_date      date              NOT NULL,
+    record_effective_date      date              DEFAULT now() NOT NULL,
     record_end_date            date,
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
@@ -609,7 +662,7 @@ COMMENT ON TABLE system_user_role IS 'A associative entity that joins system use
 CREATE TABLE user_identity_source(
     user_identity_source_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                       varchar(50)       NOT NULL,
-    record_effective_date      date              NOT NULL,
+    record_effective_date      date              DEFAULT now() NOT NULL,
     record_end_date            date,
     description                varchar(250),
     notes                      varchar(3000),
@@ -656,6 +709,30 @@ COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. Thi
 CREATE INDEX "Ref165161" ON occurrence(submission_id)
 ;
 -- 
+-- INDEX: source_transform_nuk1 
+--
+
+CREATE UNIQUE INDEX source_transform_nuk1 ON source_transform(version, (record_end_date is NULL)) where record_end_date is null
+;
+-- 
+-- INDEX: "Ref191183" 
+--
+
+CREATE INDEX "Ref191183" ON source_transform(system_user_id)
+;
+-- 
+-- INDEX: submission_nuk1 
+--
+
+CREATE UNIQUE INDEX submission_nuk1 ON submission(uuid)
+;
+-- 
+-- INDEX: "Ref199182" 
+--
+
+CREATE INDEX "Ref199182" ON submission(source_transform_id)
+;
+-- 
 -- INDEX: "Ref184166" 
 --
 
@@ -671,13 +748,13 @@ CREATE INDEX "Ref182167" ON submission_message(submission_message_type_id)
 -- INDEX: submission_message_class_nuk1 
 --
 
-CREATE UNIQUE INDEX submission_message_class_nuk1 ON submission_message_class(name, record_end_date)
+CREATE UNIQUE INDEX submission_message_class_nuk1 ON submission_message_class(name, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
 -- INDEX: submission_message_type_nuk1 
 --
 
-CREATE UNIQUE INDEX submission_message_type_nuk1 ON submission_message_type(name, record_end_date)
+CREATE UNIQUE INDEX submission_message_type_nuk1 ON submission_message_type(name, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
 -- INDEX: "Ref189177" 
@@ -701,7 +778,7 @@ CREATE INDEX "Ref183164" ON submission_status(submission_status_type_id)
 -- INDEX: submission_status_type_nuk1 
 --
 
-CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, record_end_date)
+CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
 -- INDEX: system_constant_uk1 
@@ -710,16 +787,16 @@ CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, 
 CREATE UNIQUE INDEX system_constant_uk1 ON system_constant(constant_name)
 ;
 -- 
--- INDEX: system_metadata_constant_id_uk1 
+-- INDEX: system_metadata_constant_uk1 
 --
 
-CREATE UNIQUE INDEX system_metadata_constant_id_uk1 ON system_metadata_constant(constant_name)
+CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(constant_name)
 ;
 -- 
 -- INDEX: system_role_nuk1 
 --
 
-CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, record_end_date)
+CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
 -- INDEX: system_user_nuk1 
@@ -755,7 +832,7 @@ CREATE INDEX "Ref192180" ON system_user_role(system_role_id)
 -- INDEX: user_identity_source_nuk1 
 --
 
-CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, record_end_date)
+CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
 -- TABLE: occurrence 
@@ -764,6 +841,26 @@ CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, reco
 ALTER TABLE occurrence ADD CONSTRAINT "Refsubmission161" 
     FOREIGN KEY (submission_id)
     REFERENCES submission(submission_id)
+;
+
+
+-- 
+-- TABLE: source_transform 
+--
+
+ALTER TABLE source_transform ADD CONSTRAINT "Refsystem_user183" 
+    FOREIGN KEY (system_user_id)
+    REFERENCES system_user(system_user_id)
+;
+
+
+-- 
+-- TABLE: submission 
+--
+
+ALTER TABLE submission ADD CONSTRAINT "Refsource_transform182" 
+    FOREIGN KEY (source_transform_id)
+    REFERENCES source_transform(source_transform_id)
 ;
 
 

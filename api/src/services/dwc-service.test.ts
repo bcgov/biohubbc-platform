@@ -4,8 +4,10 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ESService } from '../services/es-service';
+// import { getRequestHandlerMocks } from '../__mocks__/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 import * as fileUtils from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
@@ -19,6 +21,7 @@ import { DarwinCoreService } from './dwc-service';
 import { OccurrenceService } from './occurrence-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
+import { Client } from '@elastic/elasticsearch';
 
 chai.use(sinonChai);
 
@@ -145,13 +148,18 @@ describe('DarwinCoreService', () => {
           fileName: 'test'
         },
         extra: {
-          eml: 'test'
+          eml: {
+            buffer: Buffer.from('test')
+          }
         }
       };
 
       sinon.stub(fileUtils, 'uploadFileToS3').resolves(('test' as unknown) as ManagedUpload.SendData);
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns((mockArchiveFile as unknown) as DWCArchive);
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
+      sinon
+        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
+        .resolves(({ source_transform_id: 1 } as unknown) as ISourceTransformModel);
       sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordInputKey').resolves({ submission_id: 1 });
       sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatus')
@@ -159,10 +167,7 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.ingestNewDwCADataPackage(
         ({ originalname: 'name' } as unknown) as Express.Multer.File,
-        {
-          dataPackageId: 'string',
-          source: 'test'
-        }
+        { dataPackageId: 'string' }
       );
 
       expect(response).to.eql({ dataPackageId: 'string', submissionId: 1 });
@@ -222,6 +227,103 @@ describe('DarwinCoreService', () => {
         csvState: ({} as unknown) as ICsvState
       });
       expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+    });
+  });
+
+  describe('transformAndUploadMetaData', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('throws an error if there is no submission record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves((null as unknown) as ISubmissionModel);
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('eml source is not available');
+      }
+    });
+
+    it('throws an error if there is no eml_source in the submission record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves(({ id: 1 } as unknown) as ISubmissionModel);
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('eml source is not available');
+      }
+    });
+
+    it('throws an error when getting the Elastic Search service fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves(({ id: 1, eml_source: {} } as unknown) as ISubmissionModel);
+
+      sinon.stub(ESService.prototype, 'getEsClient').resolves(undefined);
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal("Cannot read property 'create' of undefined");
+      }
+    });
+
+    it('inserts a record in elastic search with valid data and connection', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves(({ id: 1, eml_source: {} } as unknown) as ISubmissionModel);
+      sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      sinon.stub(DarwinCoreService.prototype, 'convertEMLtoJSON').resolves({ some_field: 'some_value' });
+
+      const createStub = sinon.stub().resolves({
+        _index: 'eml',
+        _type: '_doc',
+        _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
+        _version: 1,
+        result: 'created',
+        _shards: { total: 2, successful: 2, failed: 0 },
+        _seq_no: 26,
+        _primary_term: 1
+      });
+
+      sinon.stub(ESService.prototype, 'getEsClient').resolves(({
+        create: createStub
+      } as unknown) as Client);
+
+      const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+      expect(response).eql({
+        _index: 'eml',
+        _type: '_doc',
+        _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
+        _version: 1,
+        result: 'created',
+        _shards: { total: 2, successful: 2, failed: 0 },
+        _seq_no: 26,
+        _primary_term: 1
+      });
     });
   });
 });

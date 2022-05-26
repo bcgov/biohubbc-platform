@@ -1,6 +1,6 @@
 import { Request } from 'express';
 import { RequestHandler } from 'express-serve-static-core';
-import { getDBConnection } from '../../database/db';
+import { getAPIUserDBConnection } from '../../database/db';
 import { HTTP403 } from '../../errors/http-error';
 import { AuthorizationScheme, AuthorizationService } from '../../services/authorization-service';
 import { getLogger } from '../../utils/logger';
@@ -45,7 +45,7 @@ export function authorizeRequestHandler(authorizationSchemeCallback: Authorizati
  * @return {*}  {Promise<boolean>}
  */
 export const authorizeRequest = async (req: Request): Promise<boolean> => {
-  const connection = getDBConnection(req['keycloak_token']);
+  const connection = getAPIUserDBConnection();
 
   try {
     const authorizationScheme: AuthorizationScheme = req['authorization_scheme'];
@@ -57,7 +57,10 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
 
     await connection.open();
 
-    const authorizationService = new AuthorizationService(connection, { systemUser: req['system_user'] });
+    const authorizationService = new AuthorizationService(connection, {
+      systemUser: req['system_user'],
+      keycloakToken: req['keycloak_token']
+    });
 
     const isAuthorized =
       (await authorizationService.authorizeSystemAdministrator()) ||

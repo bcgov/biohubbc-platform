@@ -218,109 +218,109 @@ describe('authorizeBySystemUser', function () {
   });
 });
 
-describe('userHasValidRole', () => {
-  describe('validSystemRoles is a string', () => {
-    describe('userSystemRoles is a string', () => {
+describe('hasAtLeastOneValidValue', () => {
+  describe('validValues is a string', () => {
+    describe('incomingValues is a string', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole('', '');
+        const response = AuthorizationService.hasAtLeastOneValidValue('', '');
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', '');
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', '');
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', 'user');
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', 'user');
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole('admin', 'admin');
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', 'admin');
 
         expect(response).to.be.true;
       });
     });
 
-    describe('userSystemRoles is an array', () => {
+    describe('incomingValues is an array', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole('', []);
+        const response = AuthorizationService.hasAtLeastOneValidValue('', []);
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', []);
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', []);
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole('admin', ['user']);
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', ['user']);
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole('admin', ['admin']);
+        const response = AuthorizationService.hasAtLeastOneValidValue('admin', ['admin']);
 
         expect(response).to.be.true;
       });
     });
   });
 
-  describe('validSystemRoles is an array', () => {
-    describe('userSystemRoles is a string', () => {
+  describe('validValues is an array', () => {
+    describe('incomingValues is a string', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole([], '');
+        const response = AuthorizationService.hasAtLeastOneValidValue([], '');
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], '');
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], '');
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], 'user');
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], 'user');
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], 'admin');
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], 'admin');
 
         expect(response).to.be.true;
       });
     });
 
-    describe('userSystemRoles is an array', () => {
+    describe('incomingValues is an array', () => {
       it('returns true if the valid roles is empty', () => {
-        const response = AuthorizationService.userHasValidRole([], []);
+        const response = AuthorizationService.hasAtLeastOneValidValue([], []);
 
         expect(response).to.be.true;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], []);
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], []);
 
         expect(response).to.be.false;
       });
 
       it('returns false if the user has no matching roles', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], ['user']);
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], ['user']);
 
         expect(response).to.be.false;
       });
 
       it('returns true if the user has a matching role', () => {
-        const response = AuthorizationService.userHasValidRole(['admin'], ['admin']);
+        const response = AuthorizationService.hasAtLeastOneValidValue(['admin'], ['admin']);
 
         expect(response).to.be.true;
       });
@@ -379,8 +379,8 @@ describe('getSystemUserWithRoles', function () {
     sinon.restore();
   });
 
-  it('returns null if the system user id is null', async function () {
-    const mockDBConnection = getMockDBConnection({ systemUserId: () => (null as unknown) as number });
+  it('returns null if the keycloak token is null', async function () {
+    const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -390,14 +390,29 @@ describe('getSystemUserWithRoles', function () {
     expect(result).to.be.null;
   });
 
+  it('returns null if the system user identifier is null', async function () {
+    const mockDBConnection = getMockDBConnection();
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: { preferred_username: '' }
+    });
+
+    const result = await authorizationService.getSystemUserWithRoles();
+
+    expect(result).to.be.null;
+  });
+
   it('returns a UserObject', async function () {
-    const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
+    const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const userObjectMock = new Models.user.UserObject();
-    sinon.stub(UserService.prototype, 'getUserById').resolves(userObjectMock);
+    sinon.stub(UserService.prototype, 'getUserByIdentifier').resolves(userObjectMock);
 
-    const authorizationService = new AuthorizationService(mockDBConnection);
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: { preferred_username: 'userIdentifier@IDIR' }
+    });
 
     const result = await authorizationService.getSystemUserWithRoles();
 

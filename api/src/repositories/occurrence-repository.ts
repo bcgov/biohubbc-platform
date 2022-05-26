@@ -100,7 +100,7 @@ export class OccurrenceRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert occurrence record', [
         'OccurrenceRepository->insertScrapedOccurrence',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
@@ -168,7 +168,7 @@ export class OccurrenceRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get occurrence record', [
         'OccurrenceRepository->getOccurrenceSubmission',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
