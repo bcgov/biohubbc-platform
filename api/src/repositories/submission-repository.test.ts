@@ -339,7 +339,7 @@ describe('SubmissionRepository', () => {
       };
       const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({sql: async () => mockQueryResponse });
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
