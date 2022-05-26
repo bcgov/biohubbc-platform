@@ -10,7 +10,7 @@ import { scanFileForVirus } from '../../../utils/file-utils';
 import { getKeycloakSource } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/dataset/create');
+const defaultLog = getLogger('paths/dwc/submission/create');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {

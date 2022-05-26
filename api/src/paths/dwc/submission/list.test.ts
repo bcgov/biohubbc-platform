@@ -1,20 +1,20 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SubmissionService } from '../../../services/submission-service';
 import * as db from '../../../database/db';
+import { ApiGeneralError } from '../../../errors/api-error';
+import { SubmissionService } from '../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { GET, listDataset } from './list';
-import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
-import { ApiGeneralError } from '../../../errors/api-error';
 
 chai.use(sinonChai);
 
 describe('submissions', () => {
   describe('openApiSchema', () => {
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator((GET.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         describe('required return properties is missing', () => {
@@ -280,7 +280,7 @@ describe('submissions', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      sinon.stub(SubmissionService.prototype, 'listSubmissionRecords').throws(('error' as unknown) as ApiGeneralError);
+      sinon.stub(SubmissionService.prototype, 'listSubmissionRecords').throws('error' as unknown as ApiGeneralError);
 
       try {
         const requestHandler = listDataset();

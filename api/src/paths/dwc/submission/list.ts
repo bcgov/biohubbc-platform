@@ -7,7 +7,7 @@ import { authorizeRequestHandler } from '../../../request-handlers/security/auth
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/dataset/list');
+const defaultLog = getLogger('paths/dwc/submission/list');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {

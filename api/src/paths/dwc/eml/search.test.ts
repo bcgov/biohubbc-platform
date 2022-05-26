@@ -1,21 +1,21 @@
+import { Client } from '@elastic/elasticsearch';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getRequestHandlerMocks } from '../../../__mocks__/db';
-import { GET } from './search';
-import * as search from './search';
 import { ESService } from '../../../services/es-service';
-import { Client } from '@elastic/elasticsearch';
+import { getRequestHandlerMocks } from '../../../__mocks__/db';
+import * as search from './search';
+import { GET } from './search';
 
 chai.use(sinonChai);
 
 describe('search', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator((GET.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       const basicRequest = {
         headers: {
@@ -61,7 +61,7 @@ describe('search', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator((GET.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         it('has null value', async () => {
@@ -175,9 +175,9 @@ describe('search', () => {
           }
         });
 
-        sinon.stub(ESService.prototype, 'getEsClient').resolves(({
+        sinon.stub(ESService.prototype, 'getEsClient').resolves({
           search: searchStub
-        } as unknown) as Client);
+        } as unknown as Client);
 
         const requestHandler = search.searchInElasticSearch();
 

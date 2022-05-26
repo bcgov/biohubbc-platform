@@ -1,8 +1,8 @@
 import { render } from '@testing-library/react';
-import React from 'react';
-import BaseLayout from './BaseLayout';
-import { Router } from 'react-router-dom';
 import { createMemoryHistory } from 'history';
+import React from 'react';
+import { Router } from 'react-router-dom';
+import BaseLayout from './BaseLayout';
 
 const history = createMemoryHistory();
 

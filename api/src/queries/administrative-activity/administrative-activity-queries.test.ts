@@ -15,7 +15,7 @@ describe('getAdministrativeActivitiesSQL', () => {
   });
 
   it('returns a SQL statement when administrativeActivityStatusTypes is null and administrativeActivityStatusTypes is valid', () => {
-    const response = getAdministrativeActivitiesSQL((null as unknown) as string, ['status']);
+    const response = getAdministrativeActivitiesSQL(null as unknown as string, ['status']);
 
     expect(response).to.not.be.null;
   });
@@ -27,7 +27,7 @@ describe('getAdministrativeActivitiesSQL', () => {
   });
 
   it('returns a SQL statement when administrativeActivityStatusTypes is valid and administrativeActivityStatusTypes is null', () => {
-    const response = getAdministrativeActivitiesSQL('type', (null as unknown) as string[]);
+    const response = getAdministrativeActivitiesSQL('type', null as unknown as string[]);
 
     expect(response).to.not.be.null;
   });

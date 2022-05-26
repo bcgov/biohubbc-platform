@@ -4,65 +4,63 @@ import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-re
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../../database/db';
-import { ApiGeneralError } from '../../../../errors/api-error';
-import { DarwinCoreService } from '../../../../services/dwc-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import * as scrapeOccurrences from './scrape-occurrences';
-import { POST } from './scrape-occurrences';
+import * as db from '../../../database/db';
+import { ApiGeneralError } from '../../../errors/api-error';
+import { SubmissionService } from '../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import * as search from './search';
+import { GET } from './search';
 
 chai.use(sinonChai);
 
-describe('scrape-occurrences', () => {
+describe('search', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       const basicRequest = {
         headers: {
           'content-type': 'application/json'
         },
         body: {},
-        params: {}
+        params: {},
+        query: {}
       };
 
       describe('should throw an error when', () => {
-        it('has null value', async () => {
-          const request = { ...basicRequest, params: { submissionId: null } };
+        it('has invalid type', async () => {
+          const request = { ...basicRequest, query: { keyword: false, spatial: false } };
           const response = requestValidator.validateRequest(request);
 
           expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal('must be integer');
-        });
-
-        it('has negative value', async () => {
-          const request = { ...basicRequest, params: { submissionId: -1 } };
-          const response = requestValidator.validateRequest(request);
-
-          expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal('must be >= 0');
-        });
-
-        it('has string value', async () => {
-          const request = { ...basicRequest, params: { submissionId: 'string' } };
-          const response = requestValidator.validateRequest(request);
-
-          expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal('must be integer');
-        });
-
-        it('has invalid key', async () => {
-          const request = { ...basicRequest, params: { id: 1 } };
-          const response = requestValidator.validateRequest(request);
-
-          expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal("must have required property 'submissionId'");
+          expect(response.errors[0].message).to.equal('must be string');
         });
       });
 
       describe('should succeed when', () => {
+        it('has valid no value', async () => {
+          const request = { ...basicRequest, query: {} };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response).to.equal(undefined);
+        });
+
+        it('has valid single keyword value', async () => {
+          const request = { ...basicRequest, query: { keyword: 'test' } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response).to.equal(undefined);
+        });
+
+        it('has valid single spatial value', async () => {
+          const request = { ...basicRequest, query: { spatial: 'test' } };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response).to.equal(undefined);
+        });
+
         it('has valid values', async () => {
-          const request = { ...basicRequest, params: { submissionId: 1 } };
+          const request = { ...basicRequest, query: { keyword: 'test', spatial: 'test' } };
           const response = requestValidator.validateRequest(request);
 
           expect(response).to.equal(undefined);
@@ -71,7 +69,7 @@ describe('scrape-occurrences', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator((POST.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         it('has null value', async () => {
@@ -87,11 +85,11 @@ describe('scrape-occurrences', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal("must have required property 'occurrence_id'");
+          expect(response.errors[0].message).to.equal("must have required property 'submission_id'");
         });
 
         it('has array with invalid value', async () => {
-          const apiResponse = [{ occurrence_id: 'test' }];
+          const apiResponse = [{ submission_id: 'test' }];
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
@@ -100,8 +98,15 @@ describe('scrape-occurrences', () => {
       });
 
       describe('should succeed when', () => {
+        it('has empty valid values', async () => {
+          const apiResponse: never[] = [];
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response).to.equal(undefined);
+        });
+
         it('has valid values', async () => {
-          const apiResponse = [{ occurrence_id: 1 }, { occurrence_id: 2 }];
+          const apiResponse = [{ submission_id: 1 }, { submission_id: 2 }];
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response).to.equal(undefined);
@@ -110,33 +115,33 @@ describe('scrape-occurrences', () => {
     });
   });
 
-  describe('scrapeAndUploadOccurrences', () => {
+  describe('searchSubmission', () => {
     afterEach(() => {
       sinon.restore();
     });
 
-    it('scrapes subbmission file and uploads occurrences and returns 200 and occurrence ids on success', async () => {
+    it('searches occurrence table and returns submission_id associated to data', async () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = { submissionId: '1' };
+      mockReq.query = { keyword: 'male', spatial: 'valid data' };
 
       sinon
-        .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
-        .resolves([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
+        .stub(SubmissionService.prototype, 'findSubmissionByCriteria')
+        .resolves([{ submission_id: 1 }, { submission_id: 2 }]);
 
-      const requestHandler = scrapeOccurrences.scrapeAndUploadOccurrences();
+      const requestHandler = search.searchSubmission();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql([{ occurrence_id: 1 }, { occurrence_id: 2 }]);
+      expect(mockRes.jsonValue).to.eql([{ submission_id: 1 }, { submission_id: 2 }]);
     });
 
-    it('should throw an error if scrapeAndUploadOccurrences throws an ApiGeneralError', async () => {
+    it('should throw an error if searchSubmission throws an ApiGeneralError', async () => {
       const dbConnectionObj = getMockDBConnection({
         commit: sinon.stub(),
         rollback: sinon.stub(),
@@ -147,14 +152,12 @@ describe('scrape-occurrences', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = { submissionId: '1' };
+      mockReq.query = {};
 
-      sinon
-        .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
-        .throws(('error' as unknown) as ApiGeneralError);
+      sinon.stub(SubmissionService.prototype, 'findSubmissionByCriteria').throws('error' as unknown as ApiGeneralError);
 
       try {
-        const requestHandler = scrapeOccurrences.scrapeAndUploadOccurrences();
+        const requestHandler = search.searchSubmission();
 
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();

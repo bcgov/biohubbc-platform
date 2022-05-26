@@ -1,10 +1,10 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
+import useCodes from 'hooks/useCodes';
 import React from 'react';
 import { Router } from 'react-router';
 import ManageUsersPage from './ManageUsersPage';
-import useCodes from 'hooks/useCodes';
 
 const history = createMemoryHistory();
 
@@ -25,10 +25,10 @@ const mockUseApi = {
     getUsersList: jest.fn()
   }
 };
-const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 jest.mock('../../../hooks/useCodes');
-const mockUseCodes = ((useCodes as unknown) as jest.Mock).mockReturnValue({
+const mockUseCodes = (useCodes as unknown as jest.Mock).mockReturnValue({
   codes: {
     system_roles: [{ id: 1, name: 'Role 1' }],
     administrative_activity_status_type: [
