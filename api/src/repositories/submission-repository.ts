@@ -4,17 +4,13 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
-export type Subset<K> = {
-  [attr in keyof K]?: K[attr] extends object ? Subset<K[attr]> : K[attr];
-};
-
 export interface ISearchSubmissionCriteria {
   keyword?: string;
   spatial?: string;
 }
 
 export interface IInsertSubmissionRecord {
-  source: string;
+  source_transform_id: number;
   uuid: string;
   event_timestamp: string;
   input_key: string;
@@ -31,7 +27,7 @@ export interface IInsertSubmissionRecord {
  */
 export interface ISubmissionModel {
   submission_id: number;
-  source: string | null;
+  source_transform_id: string;
   uuid: string;
   event_timestamp: string;
   delete_timestamp: string | null;
@@ -39,6 +35,28 @@ export interface ISubmissionModel {
   input_file_name: string | null;
   eml_source: string | null;
   darwin_core_source: string | null;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+}
+
+/**
+ * Submission source transform table model.
+ *
+ * @export
+ * @interface ISourceTransformModel
+ */
+export interface ISourceTransformModel {
+  source_transform_id: number;
+  system_user_id: number;
+  version: number;
+  metadata_transform: string;
+  metadata_transform_precompile: string | null;
+  metadata_index: string;
+  record_effective_date: string;
+  record_end_date: string | null;
   create_date: string;
   create_user: number;
   update_date: string | null;
@@ -142,7 +160,7 @@ export class SubmissionRepository extends BaseRepository {
   async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source,
+        source_transform_id,
         uuid,
         event_timestamp,
         input_key,
@@ -150,7 +168,7 @@ export class SubmissionRepository extends BaseRepository {
         eml_source,
         darwin_core_source
       ) VALUES (
-        ${submissionData.source},
+        ${submissionData.source_transform_id},
         ${submissionData.uuid},
         ${submissionData.event_timestamp},
         ${submissionData.input_key},
@@ -167,7 +185,7 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission record', [
         'SubmissionRepository->insertSubmissionRecord',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
@@ -202,7 +220,7 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update submission record key', [
         'SubmissionRepository->updateSubmissionRecordInputKey',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
@@ -231,7 +249,36 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
         'SubmissionRepository->getSubmissionRecordBySubmissionId',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Fetch a submission source transform record by associated source system user id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionRepository
+   */
+  async getSourceTransformRecordBySystemUserId(systemUserId: number): Promise<ISourceTransformModel> {
+    const sqlStatement = SQL`
+        SELECT
+          *
+        FROM
+          source_transform
+        WHERE
+          system_user_id = ${systemUserId};
+      `;
+
+    const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission source transform record', [
+        'SubmissionRepository->getSourceTransformRecordBySystemUserId',
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
@@ -279,7 +326,7 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission status record', [
         'SubmissionRepository->insertSubmissionStatus',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
@@ -327,7 +374,7 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission message record', [
         'SubmissionRepository->insertSubmissionMessage',
-        'rowCount was null or undefined, expeceted rowCount = 1'
+        'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
