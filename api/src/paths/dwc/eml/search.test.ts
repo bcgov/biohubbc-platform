@@ -7,7 +7,6 @@ import sinonChai from 'sinon-chai';
 import { getRequestHandlerMocks } from '../../../__mocks__/db';
 import { GET } from './search';
 import * as search from './search';
-
 import { ESService } from '../../../services/es-service';
 import { Client } from '@elastic/elasticsearch';
 
@@ -162,7 +161,7 @@ describe('search', () => {
         }
       });
 
-      it('returns search results when Elastic Search service succeeds with ', async () => {
+      it('returns search results when Elastic Search service succeeds with valid data', async () => {
         const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
         mockReq.query = {
