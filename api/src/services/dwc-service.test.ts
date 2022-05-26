@@ -322,7 +322,6 @@ describe('DarwinCoreService', () => {
         _seq_no: 26,
         _primary_term: 1
       });
-      //expect.fail();
     });
   });
 });
