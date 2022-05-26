@@ -5,7 +5,6 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ESService } from '../services/es-service';
-// import { getRequestHandlerMocks } from '../__mocks__/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
