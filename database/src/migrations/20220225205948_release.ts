@@ -5,7 +5,7 @@ import path from 'path';
 const DB_USER_API_PASS = process.env.DB_USER_API_PASS;
 const DB_USER_API = process.env.DB_USER_API;
 
-const DB_RELEASE = 'release.0.1.0';
+const DB_RELEASE = 'release.0.2.0';
 
 /**
  * Apply biohub-platform release changes.
@@ -54,6 +54,7 @@ export async function up(knex: Knex): Promise<void> {
   const populate_submission_message_type = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_submission_message_type.sql')
   );
+  const populate_source_transform = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_source_transform.sql'));
 
   const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
 
@@ -105,6 +106,7 @@ export async function up(knex: Knex): Promise<void> {
     ${populate_submission_status_type}
     ${populate_submission_message_class}
     ${populate_submission_message_type}
+    ${populate_source_transform}
 
 
     -- create the views

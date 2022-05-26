@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
+  ISourceTransformModel,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -78,6 +79,22 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('getSourceTransformRecordBySystemUserId', () => {
+    it('should return submission source transform row object', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySystemUserId')
+        .resolves(({ source_transform_id: 1 } as unknown) as ISourceTransformModel);
+
+      const response = await submissionService.getSourceTransformRecordBySystemUserId(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ source_transform_id: 1 });
+    });
+  });
+
   describe('insertSubmissionStatus', () => {
     it('should return submission status data', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -118,7 +135,7 @@ describe('SubmissionService', () => {
         {
           submission_status: 'Submission Data Ingested',
           submission_id: 1,
-          source: 'SIMS',
+          source_transform_id: 'SIMS',
           uuid: '2267501d-c6a9-43b5-b951-2324faff6397',
           event_timestamp: '2022-05-24T18:41:42.211Z',
           delete_timestamp: null,

@@ -61,6 +61,7 @@ alter role biohub_api set search_path to biohub_dapi_v1, biohub, public, topolog
 \i populate_submission_status_type.sql
 \i populate_submission_message_class.sql
 \i populate_submission_message_type.sql
+\i populate_source_transform.sql
 
 -- create the views
 set search_path = biohub_dapi_v1;

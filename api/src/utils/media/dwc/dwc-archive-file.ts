@@ -1,6 +1,6 @@
 import xlsx from 'xlsx';
 import { CSVWorksheet, ICsvState } from '../csv/csv-file';
-import { ArchiveFile, IMediaState, MediaValidation } from '../media-file';
+import { ArchiveFile, IMediaState, MediaFile, MediaValidation } from '../media-file';
 import { ValidationSchemaParser } from '../validation/validation-schema-parser';
 
 export enum DWC_CLASS {
@@ -22,7 +22,7 @@ export const DEFAULT_XLSX_SHEET = 'Sheet1';
 
 export type DWCWorksheets = { [name in DWC_CLASS]?: CSVWorksheet };
 
-export type DWCExtras = { [name in DWC_EXTRA]?: any }; // TODO XML type?
+export type DWCExtras = { [name in DWC_EXTRA]?: MediaFile };
 
 /**
  * Supports Darwin Core Archive CSV files.

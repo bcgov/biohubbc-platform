@@ -86,7 +86,7 @@ describe('SubmissionRepository', () => {
     });
 
     const mockParams = {
-      source: 'test',
+      source_transform_id: 'test',
       input_file_name: 'test',
       input_key: 'test',
       event_timestamp: 'test',
@@ -200,7 +200,7 @@ describe('SubmissionRepository', () => {
 
     it('should succeed with valid data', async () => {
       const mockResponse = {
-        source: 'test',
+        source_transform_id: 'test',
         input_file_name: 'test',
         input_key: 'test',
         event_timestamp: 'test',
@@ -219,6 +219,43 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSubmissionRecordBySubmissionId(1);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getSourceTransformRecordBySystemUserId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSourceTransformRecordBySystemUserId(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission source transform record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        source_transform_id: 1
+      };
+
+      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSourceTransformRecordBySystemUserId(1);
 
       expect(response).to.eql(mockResponse);
     });
@@ -323,7 +360,7 @@ describe('SubmissionRepository', () => {
       const mockResponse = {
         submission_status: 'Submission Data Ingested',
         submission_id: 1,
-        source: 'SIMS',
+        source_transform_id: 'SIMS',
         uuid: '2267501d-c6a9-43b5-b951-2324faff6397',
         event_timestamp: '2022-05-24T18:41:42.211Z',
         delete_timestamp: null,
@@ -349,7 +386,7 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.listSubmissionRecords();
 
-      expect(response).to.eql(mockResponse);
+      expect(response).to.eql([mockResponse]);
     });
   });
 });
