@@ -101,6 +101,8 @@ export function submitDataset(): RequestHandler {
       ]);
     }
 
+    // const sourceSystem = SOURCE_SYSTEM['SIMS-SVC'];
+
     const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
