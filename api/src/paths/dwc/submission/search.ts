@@ -2,12 +2,12 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { getLogger } from '../../../utils/logger';
-import { SubmissionService } from '../../../services/submission-service';
 import { ISearchSubmissionCriteria } from '../../../repositories/submission-repository';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/dataset/search');
+const defaultLog = getLogger('paths/dwc/submission/search');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {

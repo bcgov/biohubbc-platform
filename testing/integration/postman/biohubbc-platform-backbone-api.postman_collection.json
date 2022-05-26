@@ -2364,13 +2364,13 @@
 			]
 		},
 		{
-			"name": "dwc/dataset",
+			"name": "dwc/submission",
 			"item": [
 				{
 					"name": "{submissionId}",
 					"item": [
 						{
-							"name": "/dwc/dataset/:submissionId/validate",
+							"name": "/dwc/submission/:submissionId/validate",
 							"request": {
 								"method": "POST",
 								"header": [
@@ -2380,13 +2380,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"validate"
 									],
@@ -2413,13 +2413,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2456,13 +2456,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2499,13 +2499,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2542,13 +2542,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2585,13 +2585,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2628,13 +2628,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2671,13 +2671,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/validate",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/validate",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"validate"
 											],
@@ -2705,7 +2705,7 @@
 							]
 						},
 						{
-							"name": "/dwc/dataset/:submissionId/scrape-occurrences",
+							"name": "/dwc/submission/:submissionId/scrape-occurrences",
 							"request": {
 								"method": "POST",
 								"header": [
@@ -2715,13 +2715,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -2748,13 +2748,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -2791,13 +2791,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -2834,13 +2834,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -2877,13 +2877,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -2920,13 +2920,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -2963,13 +2963,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -3006,13 +3006,13 @@
 											}
 										],
 										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+											"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 											"host": [
 												"{{API_BASE_URL}}"
 											],
 											"path": [
 												"dwc",
-												"dataset",
+												"submission",
 												":submissionId",
 												"scrape-occurrences"
 											],
@@ -3042,7 +3042,7 @@
 					]
 				},
 				{
-					"name": "/dwc/dataset/create",
+					"name": "/dwc/submission/create",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -3073,13 +3073,13 @@
 							]
 						},
 						"url": {
-							"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+							"raw": "{{API_BASE_URL}}/dwc/submission/create",
 							"host": [
 								"{{API_BASE_URL}}"
 							],
 							"path": [
 								"dwc",
-								"dataset",
+								"submission",
 								"create"
 							]
 						},
@@ -3115,13 +3115,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3167,13 +3167,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3219,13 +3219,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3271,13 +3271,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3323,13 +3323,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3375,13 +3375,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3427,13 +3427,13 @@
 									]
 								},
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/create",
+									"raw": "{{API_BASE_URL}}/dwc/submission/create",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										"create"
 									]
 								}
@@ -3453,7 +3453,7 @@
 					]
 				},
 				{
-					"name": "/dwc/dataset/:submissionId/scrape-occurrences",
+					"name": "/dwc/submission/:submissionId/scrape-occurrences",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -3463,13 +3463,13 @@
 							}
 						],
 						"url": {
-							"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+							"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 							"host": [
 								"{{API_BASE_URL}}"
 							],
 							"path": [
 								"dwc",
-								"dataset",
+								"submission",
 								":submissionId",
 								"scrape-occurrences"
 							],
@@ -3496,13 +3496,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -3539,13 +3539,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -3582,13 +3582,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -3625,13 +3625,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -3668,13 +3668,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -3711,13 +3711,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],
@@ -3754,13 +3754,13 @@
 									}
 								],
 								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/dataset/:submissionId/scrape-occurrences",
+									"raw": "{{API_BASE_URL}}/dwc/submission/:submissionId/scrape-occurrences",
 									"host": [
 										"{{API_BASE_URL}}"
 									],
 									"path": [
 										"dwc",
-										"dataset",
+										"submission",
 										":submissionId",
 										"scrape-occurrences"
 									],

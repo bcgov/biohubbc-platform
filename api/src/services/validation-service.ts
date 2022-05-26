@@ -1,10 +1,10 @@
 import { IDBConnection } from '../database/db';
-import { DBService } from './db-service';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
-import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
-import { IMediaState } from '../utils/media/media-file';
-import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ICsvState } from '../utils/media/csv/csv-file';
+import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { IMediaState } from '../utils/media/media-file';
+import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
+import { DBService } from './db-service';
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;

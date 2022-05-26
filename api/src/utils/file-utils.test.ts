@@ -4,7 +4,7 @@ import { deleteFileFromS3, generateS3FileKey, getS3SignedURL } from './file-util
 
 describe('deleteFileFromS3', () => {
   it('returns null when no key specified', async () => {
-    const result = await deleteFileFromS3((null as unknown) as string);
+    const result = await deleteFileFromS3(null as unknown as string);
 
     expect(result).to.be.null;
   });
@@ -12,7 +12,7 @@ describe('deleteFileFromS3', () => {
 
 describe('getS3SignedURL', () => {
   it('returns null when no key specified', async () => {
-    const result = await getS3SignedURL((null as unknown) as string);
+    const result = await getS3SignedURL(null as unknown as string);
 
     expect(result).to.be.null;
   });

@@ -2,8 +2,8 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { getLogger } from '../../../utils/logger';
 import { ESService } from '../../../services/es-service';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/search');
 

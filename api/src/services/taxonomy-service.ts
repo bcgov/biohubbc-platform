@@ -1,6 +1,5 @@
+import { SearchHit, SearchRequest } from '@elastic/elasticsearch/lib/api/types';
 import { getLogger } from '../utils/logger';
-import { SearchRequest, SearchHit } from '@elastic/elasticsearch/lib/api/types';
-
 import { ESService } from './es-service';
 
 const defaultLog = getLogger('services/taxonomy-service');

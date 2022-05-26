@@ -8,7 +8,7 @@ import { SubmissionService } from '../../../../services/submission-service';
 import { getS3SignedURL } from '../../../../utils/file-utils';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/dataset/create');
+const defaultLog = getLogger('paths/dwc/submission/create');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {

@@ -6,7 +6,7 @@ import { authorizeRequestHandler } from '../../../../request-handlers/security/a
 import { DarwinCoreService } from '../../../../services/dwc-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/dataset/{submissionId}/validate');
+const defaultLog = getLogger('paths/dwc/submission/{submissionId}/validate');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {

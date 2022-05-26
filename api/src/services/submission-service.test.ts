@@ -26,7 +26,7 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'findSubmissionByCriteria')
         .resolves([{ submission_id: 1 }]);
 
-      const response = await submissionService.findSubmissionByCriteria(({} as unknown) as ISearchSubmissionCriteria);
+      const response = await submissionService.findSubmissionByCriteria({} as unknown as ISearchSubmissionCriteria);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql([{ submission_id: 1 }]);
@@ -40,7 +40,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecord(({} as unknown) as IInsertSubmissionRecord);
+      const response = await submissionService.insertSubmissionRecord({} as unknown as IInsertSubmissionRecord);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
@@ -70,7 +70,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves(({ submission_id: 1 } as unknown) as ISubmissionModel);
+        .resolves({ submission_id: 1 } as unknown as ISubmissionModel);
 
       const response = await submissionService.getSubmissionRecordBySubmissionId(1);
 
@@ -86,7 +86,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySystemUserId')
-        .resolves(({ source_transform_id: 1 } as unknown) as ISourceTransformModel);
+        .resolves({ source_transform_id: 1 } as unknown as ISourceTransformModel);
 
       const response = await submissionService.getSourceTransformRecordBySystemUserId(1);
 
