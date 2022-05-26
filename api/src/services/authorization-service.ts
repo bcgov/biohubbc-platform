@@ -1,6 +1,8 @@
+import { SOURCE_SYSTEM } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { Models } from '../models';
+import { getKeycloakSource, getUserIdentifier } from '../utils/keycloak-utils';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
@@ -9,16 +11,41 @@ export enum AuthorizeOperator {
   OR = 'or'
 }
 
+/**
+ * Authorization rule that checks if a user's system role matches at least one of the required system roles.
+ *
+ * @export
+ * @interface AuthorizeBySystemRoles
+ */
 export interface AuthorizeBySystemRoles {
   validSystemRoles: SYSTEM_ROLE[];
   discriminator: 'SystemRole';
 }
 
+/**
+ * Authorization rule that checks if a user is a known and active user of the system.
+ *
+ * @export
+ * @interface AuthorizeBySystemUser
+ */
 export interface AuthorizeBySystemUser {
   discriminator: 'SystemUser';
 }
 
-export type AuthorizeRule = AuthorizeBySystemRoles | AuthorizeBySystemUser;
+/**
+ * Authorization rule that checks if a jwt token's client id matches at least one of the required client ids.
+ *
+ * Note: This is specifically for system-to-system communication.
+ *
+ * @export
+ * @interface AuthorizeByServiceClient
+ */
+export interface AuthorizeByServiceClient {
+  validServiceClientIDs: SOURCE_SYSTEM[];
+  discriminator: 'ServiceClient';
+}
+
+export type AuthorizeRule = AuthorizeBySystemRoles | AuthorizeBySystemUser | AuthorizeByServiceClient;
 
 export type AuthorizeConfigOr = {
   [AuthorizeOperator.AND]?: never;
@@ -35,11 +62,13 @@ export type AuthorizationScheme = AuthorizeConfigAnd | AuthorizeConfigOr;
 export class AuthorizationService extends DBService {
   _userService = new UserService(this.connection);
   _systemUser: Models.user.UserObject | undefined = undefined;
+  _keycloakToken: object | undefined = undefined;
 
-  constructor(connection: IDBConnection, init?: { systemUser?: Models.user.UserObject }) {
+  constructor(connection: IDBConnection, init?: { systemUser?: Models.user.UserObject; keycloakToken?: object }) {
     super(connection);
 
     this._systemUser = init?.systemUser;
+    this._keycloakToken = init?.keycloakToken;
   }
 
   get systemUser(): Models.user.UserObject | undefined {
@@ -78,6 +107,9 @@ export class AuthorizationService extends DBService {
           break;
         case 'SystemUser':
           authorizeResults.push(await this.authorizeBySystemUser());
+          break;
+        case 'ServiceClient':
+          authorizeResults.push(await this.authorizeByServiceClient(authorizeRule));
           break;
       }
     }
@@ -133,7 +165,10 @@ export class AuthorizationService extends DBService {
     }
 
     // Check if the user has at least 1 of the valid roles
-    return AuthorizationService.userHasValidRole(authorizeSystemRoles.validSystemRoles, systemUserObject?.role_names);
+    return AuthorizationService.hasAtLeastOneValidValue(
+      authorizeSystemRoles.validSystemRoles,
+      systemUserObject?.role_names
+    );
   }
 
   /**
@@ -157,28 +192,52 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Compares an array of user roles against an array of valid roles.
+   * Check if the user is a valid system client.
    *
-   * @param {(string | string[])} validRoles valid roles to match against
-   * @param {(string | string[])} userRoles user roles to check against the valid roles
-   * @return {*} {boolean} true if the user has at least 1 of the valid roles or no valid roles are specified, false
-   * otherwise
+   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a valid system user, `Promise<false>` otherwise.
    */
-  static userHasValidRole = function (validRoles: string | string[], userRoles: string | string[]): boolean {
-    if (!validRoles || !validRoles.length) {
+  async authorizeByServiceClient(authorizeServiceClient: AuthorizeByServiceClient): Promise<boolean> {
+    if (!this._keycloakToken) {
+      // Cannot verify token source
+      return false;
+    }
+
+    const source = getKeycloakSource(this._keycloakToken);
+
+    if (!source) {
+      // Cannot verify token source
+      return false;
+    }
+
+    return AuthorizationService.hasAtLeastOneValidValue(authorizeServiceClient.validServiceClientIDs, source);
+  }
+
+  /**
+   * Compares an array of incoming values against an array of valid values.
+   *
+   * @param {(string | string[])} validValues valid values to match against
+   * @param {(string | string[])} incomingValues incoming values to check against the valid values
+   * @return {*} {boolean} true if the incomingValues has at least 1 of the validValues or no valid values are
+   * specified, false otherwise
+   */
+  static hasAtLeastOneValidValue = function (
+    validValues: string | string[],
+    incomingValues: string | string[]
+  ): boolean {
+    if (!validValues || !validValues.length) {
       return true;
     }
 
-    if (!Array.isArray(validRoles)) {
-      validRoles = [validRoles];
+    if (!Array.isArray(validValues)) {
+      validValues = [validValues];
     }
 
-    if (!Array.isArray(userRoles)) {
-      userRoles = [userRoles];
+    if (!Array.isArray(incomingValues)) {
+      incomingValues = [incomingValues];
     }
 
-    for (const validRole of validRoles) {
-      if (userRoles.includes(validRole)) {
+    for (const validRole of validValues) {
+      if (incomingValues.includes(validRole)) {
         return true;
       }
     }
@@ -208,12 +267,16 @@ export class AuthorizationService extends DBService {
    * @return {*}  {(Promise<Models.user.UserObject | null>)}
    */
   async getSystemUserWithRoles(): Promise<Models.user.UserObject | null> {
-    const systemUserId = this.connection.systemUserId();
-
-    if (!systemUserId) {
+    if (!this._keycloakToken) {
       return null;
     }
 
-    return this._userService.getUserById(systemUserId);
+    const userIdentifier = getUserIdentifier(this._keycloakToken);
+
+    if (!userIdentifier) {
+      return null;
+    }
+
+    return this._userService.getUserByIdentifier(userIdentifier);
   }
 }

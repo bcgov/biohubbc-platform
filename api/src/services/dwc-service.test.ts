@@ -7,7 +7,7 @@ import sinonChai from 'sinon-chai';
 import { ESService } from '../services/es-service';
 // import { getRequestHandlerMocks } from '../__mocks__/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 import * as fileUtils from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
@@ -148,13 +148,18 @@ describe('DarwinCoreService', () => {
           fileName: 'test'
         },
         extra: {
-          eml: 'test'
+          eml: {
+            buffer: Buffer.from('test')
+          }
         }
       };
 
       sinon.stub(fileUtils, 'uploadFileToS3').resolves(('test' as unknown) as ManagedUpload.SendData);
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns((mockArchiveFile as unknown) as DWCArchive);
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
+      sinon
+        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
+        .resolves(({ source_transform_id: 1 } as unknown) as ISourceTransformModel);
       sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordInputKey').resolves({ submission_id: 1 });
       sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatus')
@@ -162,10 +167,7 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.ingestNewDwCADataPackage(
         ({ originalname: 'name' } as unknown) as Express.Multer.File,
-        {
-          dataPackageId: 'string',
-          source: 'test'
-        }
+        { dataPackageId: 'string' }
       );
 
       expect(response).to.eql({ dataPackageId: 'string', submissionId: 1 });

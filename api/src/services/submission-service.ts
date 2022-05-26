@@ -2,6 +2,7 @@ import { IDBConnection } from '../database/db';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
+  ISourceTransformModel,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -57,6 +58,17 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
     return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+  }
+
+  /**
+   * Get source transform record by its associated source system user id.
+   *
+   * @param {number} systemUserId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionService
+   */
+  async getSourceTransformRecordBySystemUserId(systemUserId: number): Promise<ISourceTransformModel> {
+    return this.submissionRepository.getSourceTransformRecordBySystemUserId(systemUserId);
   }
 
   /**

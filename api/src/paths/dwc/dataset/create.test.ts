@@ -8,6 +8,7 @@ import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
 import { DarwinCoreService } from '../../../services/dwc-service';
 import * as fileUtils from '../../../utils/file-utils';
+import * as keycloakUtils from '../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as create from './create';
 import { POST } from './create';
@@ -24,7 +25,7 @@ describe('create', () => {
           it('is undefined', async () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
-              body: { media: undefined }
+              body: { media: undefined, data_package_id: '64f47e65-f306-410e-82fa-115f9916910b' }
             };
 
             const response = requestValidator.validateRequest(request);
@@ -36,7 +37,7 @@ describe('create', () => {
           it('is null', async () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
-              body: { media: null }
+              body: { media: null, data_package_id: '64f47e65-f306-410e-82fa-115f9916910b' }
             };
 
             const response = requestValidator.validateRequest(request);
@@ -77,7 +78,7 @@ describe('create', () => {
         it('required values are valid', async () => {
           const request = {
             headers: { 'content-type': 'multipart/form-data' },
-            body: { media: 'file' }
+            body: { media: 'file', data_package_id: '64f47e65-f306-410e-82fa-115f9916910b' }
           };
 
           const response = requestValidator.validateRequest(request);
@@ -225,6 +226,7 @@ describe('create', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
       sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').throws(new Error('test error'));
 
@@ -251,6 +253,8 @@ describe('create', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
       sinon
         .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
@@ -287,6 +291,8 @@ describe('create', () => {
       };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
       sinon
         .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
