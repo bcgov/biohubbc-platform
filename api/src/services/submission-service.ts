@@ -20,6 +20,13 @@ export class SubmissionService extends DBService {
     this.submissionRepository = new SubmissionRepository(connection);
   }
 
+  /**
+   * Search with keyword or spatial for submission IDs
+   *
+   * @param {ISearchSubmissionCriteria} submissionCriteria
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SubmissionService
+   */
   async findSubmissionByCriteria(submissionCriteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
     return this.submissionRepository.findSubmissionByCriteria(submissionCriteria);
   }

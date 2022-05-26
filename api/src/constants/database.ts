@@ -25,3 +25,8 @@ export enum SYSTEM_IDENTITY_SOURCE {
 export enum SOURCE_SYSTEM {
   'SIMS-SVC' = 'SIMS-SVC'
 }
+
+export enum ES_INDEX {
+  TAXONOMY = 'taxonomy',
+  EML = 'eml'
+}

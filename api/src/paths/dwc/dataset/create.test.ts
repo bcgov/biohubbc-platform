@@ -306,6 +306,8 @@ describe('create', () => {
         .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
         .resolves();
 
+      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+
       const requestHandler = create.submitDataset();
 
       await requestHandler(mockReq, mockRes, mockNext);
