@@ -1,9 +1,9 @@
+import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
-//import { ESService } from '../services/es-service';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -15,6 +15,13 @@ import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
 export class DarwinCoreService extends DBService {
+  /**
+   * Parse submission record to DWCArchive file
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<DWCArchive>}
+   * @memberof DarwinCoreService
+   */
   async getSubmissionRecordAndConvertToDWCArchive(submissionId: number): Promise<DWCArchive> {
     const submissionService = new SubmissionService(this.connection);
 
@@ -39,6 +46,13 @@ export class DarwinCoreService extends DBService {
     return this.prepDWCArchive(s3File);
   }
 
+  /**
+   * Scrape occurrences from submissionFile and upload to table
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ occurrence_id: number }[]>}
+   * @memberof DarwinCoreService
+   */
   async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
     const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
@@ -54,7 +68,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Parse unknown submission file and convert to DWArchive file.
+   * Parse unknown submission record and convert to DWArchive file.
    *
    * @param {UnknownMedia} unknownMedia
    * @return {*}  {DWCArchive}
@@ -129,7 +143,15 @@ export class DarwinCoreService extends DBService {
     return { dataPackageId, submissionId };
   }
 
-  async transformAndUploadMetaData(submissionId: number, dataPackageId: string) {
+  /**
+   * transform submission record eml to json and upload metadata
+   *
+   * @param {number} submissionId
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<WriteResponseBase>}
+   * @memberof DarwinCoreService
+   */
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<WriteResponseBase> {
     const submissionService = new SubmissionService(this.connection);
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
@@ -150,6 +172,13 @@ export class DarwinCoreService extends DBService {
     return response;
   }
 
+  /**
+   * Conversion of eml to JSON
+   *
+   * @param {XmlString} emlSource
+   * @return {*} //TODO RETURN TYPE
+   * @memberof DarwinCoreService
+   */
   convertEMLtoJSON(emlSource: XmlString) {
     if (!emlSource) {
       return;
@@ -189,7 +218,7 @@ export class DarwinCoreService extends DBService {
    *  Temp replacement for validation until more requirements are set
    *
    * @param {number} submissionId
-   * @return {*}
+   * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
   async tempValidateSubmission(submissionId: number) {
