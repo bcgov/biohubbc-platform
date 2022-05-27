@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { IGetSearchResultsResponse } from 'interfaces/useSearchApi.interface';
+import { IGetOccurrenceData, IGetSearchResultsResponse } from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with search functionality
@@ -19,8 +19,20 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
+ /**
+   * Get search results (spatial)
+   *
+   * @return {*}  {Promise<IGetSearchResultsResponse[]>}
+   */
+  const getOccurrenceData = async (): Promise<IGetOccurrenceData[]> => {
+    const { data } = await axios.get(`/api/dwc/submission/occurrence/list`);
+    return data;
+  };
+
+
   return {
-    getSearchResults
+    getSearchResults,
+    getOccurrenceData
   };
 };
 

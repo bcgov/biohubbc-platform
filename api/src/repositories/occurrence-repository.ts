@@ -39,6 +39,42 @@ export interface IPostOccurrenceData {
  */
 export class OccurrenceRepository extends BaseRepository {
   /**
+   * Get all occurrences data
+   *
+   * @return {*}  {Promise<IGetOccurrenceData[]>}
+   * @memberof OccurrenceRepository
+   */
+  async getAllOccurrences(): Promise<IGetOccurrenceData[]> {
+    const sqlStatement = SQL`
+      SELECT
+        o.occurrence_id,
+        o.submission_id,
+        o.occurrenceid,
+        o.taxonid,
+        o.lifestage,
+        o.sex,
+        o.vernacularname,
+        o.eventdate,
+        o.individualcount,
+        o.organismquantity,
+        o.organismquantitytype,
+        public.ST_asGeoJSON(o.geography) as geometry
+      FROM
+        occurrence as o;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get occurrence records', [
+        'OccurrenceRepository->getAllOccurrences',
+        'rowCount was null or undefined, expected rowCount = 0 or greater'
+      ]);
+    }
+
+    return response.rows;
+  }
+  /**
    * Upload scraped occurrence data.
    *
    * @param {number} submissionId

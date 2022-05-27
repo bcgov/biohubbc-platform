@@ -22,3 +22,23 @@ export interface ISearchResultsAdvancedFilterRequest {
   record_type: string;
   geometry: Feature[];
 }
+
+/**
+ * Interface for Occurrence table return.
+ * Check api\src\repositories\occurrence-repository.ts for updates
+ * @export
+ * @interface IGetOccurrenceData
+ */
+export interface IGetOccurrenceData {
+  occurrenceId: number;
+  submissionId: number;
+  taxonId: string | null;
+  lifeStage: string | null;
+  sex: string | null;
+  eventDate: string | null;
+  vernacularName: string | null;
+  individualCount: number | null;
+  organismQuantity: number | null;
+  organismQuantityType: string | null;
+  geometry: Feature | null;
+}

@@ -35,6 +35,16 @@ export class OccurrenceService extends DBService {
   }
 
   /**
+   * Get all occurrences in table
+   *
+   * @return {*}  {Promise<IGetOccurrenceData[]>}
+   * @memberof OccurrenceService
+   */
+  async getAllOccurrences(): Promise<IGetOccurrenceData[]> {
+    return this.occurrenceRepository.getAllOccurrences();
+  }
+
+  /**
    * Get Occurrence row associated to occurrence Id.
    *
    * @param {number} occurrenceId
