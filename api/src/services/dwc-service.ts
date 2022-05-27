@@ -1,5 +1,6 @@
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
+import SaxonJS from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
@@ -166,7 +167,7 @@ export class DarwinCoreService extends DBService {
 
     const esClient = await this.getEsClient();
 
-    const jsonDoc = this.convertEMLtoJSON(submissionRecord.eml_source);
+    const jsonDoc = this.convertEMLtoJSON(submissionRecord.submission_id, submissionRecord.eml_source);
 
     const response = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
 
@@ -183,40 +184,109 @@ export class DarwinCoreService extends DBService {
    * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
-  convertEMLtoJSON(emlSource: XmlString) {
+  async convertEMLtoJSON(submissionId: number, emlSource: XmlString) {
     if (!emlSource) {
       return;
     }
 
-    const jsonDoc = {
-      datasetName: 'Coastal Caribou',
-      publishDate: '2021-08-05',
-      projects: [
-        {
-          projectId: '78ba2b5d-252b-46dc-909f-e634aa26a402',
-          projectName: 'West Coast',
-          projectObjectives:
-            'The new Common Terms Query is designed to fix this situations, and it does so through a very clever mechanism. At a high level, Common Terms analyzes your query, identifies which words are important and performs a search using just those words. Only after documents are matched with important words are the unimportant words considered.',
-          fundingSource: 'Together for Wildlife'
-        },
-        {
-          projectId: 'd26547a9-31f3-4477-9ca4-e8a8e7edc237',
-          projectName: 'North West Coast',
-          projectObjectives:
-            'With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn’t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.',
-          fundingSource: 'Together for Wildlife'
-        },
-        {
-          projectId: 'd26547a9-31f3-4477-9ca4-e8a8e7edc236',
-          projectName: 'South West Coast',
-          projectObjectives:
-            "To be, or not to be, that is the question: Whether 'tis nobler in the mind to suffer Or to take arms against a sea of troubles The slings and arrows of outrageous fortune, And by opposing end them. To die—to sleep, No more; and by a sleep to say we end The heart-ache and the thousand natural shocks That flesh is heir to: 'tis a consummation Devoutly to be wish'd. To die, to sleep; To sleep, perchance to dream—ay, there's the rub: For in that sleep of death what dreams may come, When we have shuffled off this mortal coil, Must give us pause—there's the respect That makes calamity of so long life. For who would bear the whips and scorns of time, Th'oppressor's wrong, the proud man's contumely, The pangs of dispriz'd love, the law's delay, The insolence of office, and the spurns",
-          fundingSource: 'Some Funding'
-        }
-      ]
-    };
+    //---------------using the stylesheet from the source_transform table
 
-    return jsonDoc;
+    // const submissionService = new SubmissionService(this.connection);
+
+    // const precompiled_sheet = await submissionService.getEMLStyleSheet(submissionId);
+
+    // console.log('precompiled_sheet is: ', precompiled_sheet);
+
+    // if (!precompiled_sheet) {
+    //   return;
+    // }
+
+    // //const sheet_as_string = JSON.Stringify(precompiled_sheet);
+
+    // //JSON.stringify(precompiled_sheet);
+
+    // //const precompiled_sheet_as_obj = JSON.stringify(precompiled_sheet);
+    // // console.log('precompiled_sheet_as_object: ', precompiled_sheet_as_obj);
+
+    // // console.log('emlSource: ', emlSource);
+
+    // try {
+    //   //@ts-ignore
+    //   SaxonJS.transform({
+    //     //stylesheetInternal: precompiled_sheet_as_obj,
+    //     stylesheetInternal: precompiled_sheet,
+    //     sourceText: emlSource,
+    //     destination: 'serialized'
+    //   }).then((doc: any) => {
+    //     console.log('doc is', doc);
+    //   });
+    // } catch (error) {
+    //   console.log('error is: ', error);
+    // }
+
+    //------------------creating the stylesheet programmatically
+
+    const submissionService = new SubmissionService(this.connection);
+
+    const metadata = await submissionService.getEMLStyleSheet(submissionId);
+
+    console.log('metadata is: ', metadata);
+
+    if (!metadata) {
+      return;
+    }
+
+    const env = SaxonJS.getPlatform();
+
+    const doc = env.parseXmlFromString(metadata);
+
+    const sef = SaxonJS.compile(doc);
+    console.log('sef is: ', sef);
+
+    console.log('emlSource: ', emlSource);
+
+    try {
+      //@ts-ignore
+      SaxonJS.transform({
+        stylesheetInternal: sef,
+        sourceText: emlSource,
+        destination: 'serialized'
+      }).then((doc: any) => {
+        console.log('doc is', doc);
+      });
+    } catch (error) {
+      console.log('error is: ', error);
+    }
+
+    // const jsonDoc = {
+    //   datasetName: 'Coastal Caribou',
+    //   publishDate: '2021-08-05',
+    //   projects: [
+    //     {
+    //       projectId: '78ba2b5d-252b-46dc-909f-e634aa26a402',
+    //       projectName: 'West Coast',
+    //       projectObjectives:
+    //         'The new Common Terms Query is designed to fix this situations, and it does so through a very clever mechanism. At a high level, Common Terms analyzes your query, identifies which words are important and performs a search using just those words. Only after documents are matched with important words are the unimportant words considered.',
+    //       fundingSource: 'Together for Wildlife'
+    //     },
+    //     {
+    //       projectId: 'd26547a9-31f3-4477-9ca4-e8a8e7edc237',
+    //       projectName: 'North West Coast',
+    //       projectObjectives:
+    //         'With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn’t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.',
+    //       fundingSource: 'Together for Wildlife'
+    //     },
+    //     {
+    //       projectId: 'd26547a9-31f3-4477-9ca4-e8a8e7edc236',
+    //       projectName: 'South West Coast',
+    //       projectObjectives:
+    //         "To be, or not to be, that is the question: Whether 'tis nobler in the mind to suffer Or to take arms against a sea of troubles The slings and arrows of outrageous fortune, And by opposing end them. To die—to sleep, No more; and by a sleep to say we end The heart-ache and the thousand natural shocks That flesh is heir to: 'tis a consummation Devoutly to be wish'd. To die, to sleep; To sleep, perchance to dream—ay, there's the rub: For in that sleep of death what dreams may come, When we have shuffled off this mortal coil, Must give us pause—there's the respect That makes calamity of so long life. For who would bear the whips and scorns of time, Th'oppressor's wrong, the proud man's contumely, The pangs of dispriz'd love, the law's delay, The insolence of office, and the spurns",
+    //       fundingSource: 'Some Funding'
+    //     }
+    //   ]
+    // };
+
+    return {};
   }
 
   /**

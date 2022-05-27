@@ -131,4 +131,15 @@ export class SubmissionService extends DBService {
   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
   }
+
+  /**
+   *
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionService
+   */
+  async getEMLStyleSheet(submissionId: number): Promise<string | null> {
+    return (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)).metadata_transform;
+  }
 }

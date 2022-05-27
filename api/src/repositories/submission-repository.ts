@@ -162,7 +162,6 @@ export class SubmissionRepository extends BaseRepository {
    */
   async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     //TODO: the eml source needs to be updated with the correct XML
-    submissionData.eml_source = 'some string';
 
     const sqlStatement = SQL`
       INSERT INTO submission (
@@ -420,5 +419,38 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<ISubmissionModelWithStatus>(sqlStatement);
 
     return response.rows;
+  }
+
+  /**
+   * Fetch a submission source transform record by associated source system user id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionRepository
+   */
+  async getSourceTransformIdBySubmissionId(submissionId: number): Promise<ISourceTransformModel> {
+    const sqlStatement = SQL`
+          SELECT
+            *
+          FROM
+            source_transform st
+          LEFT JOIN
+            submission s
+          ON
+            st.source_transform_id = s.source_transform_id
+          WHERE
+            s.submission_id = ${submissionId};
+        `;
+
+    const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission source transform record', [
+        'SubmissionRepository->getSourceTransformRecordBySystemUserId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
   }
 }
