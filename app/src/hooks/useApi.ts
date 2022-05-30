@@ -4,6 +4,7 @@ import useAdminApi from './api/useAdminApi';
 import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
 import useN8NApi from './api/useN8NApi';
+import useSubmissionsApi from './api/useSubmissionsApi'
 import { usePublicSearchApi } from './api/useSearchApi';
 import useUserApi from './api/useUserApi';
 
@@ -25,6 +26,8 @@ export const useApi = () => {
 
   const n8n = useN8NApi(n8nAxios);
 
+  const submissions = useSubmissionsApi(apiAxios)
+
   const publicApis = {
     search: usePublicSearchApi(apiAxios)
   };
@@ -34,6 +37,7 @@ export const useApi = () => {
     user,
     admin,
     n8n,
+    submissions,
     public: publicApis
   };
 };
