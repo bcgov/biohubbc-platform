@@ -167,9 +167,15 @@ export class DarwinCoreService extends DBService {
 
     const esClient = await this.getEsClient();
 
-    const jsonDoc = this.convertEMLtoJSON(submissionRecord.submission_id, submissionRecord.eml_source);
+    const jsonDoc = JSON.parse(
+      await this.convertEMLtoJSON(submissionRecord.submission_id, submissionRecord.eml_source)
+    );
 
-    const response = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
+    const response = await esClient.create({
+      id: dataPackageId,
+      index: ES_INDEX.EML,
+      document: jsonDoc
+    });
 
     //TODO: We need a new submission status type
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
@@ -184,9 +190,9 @@ export class DarwinCoreService extends DBService {
    * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
-  async convertEMLtoJSON(submissionId: number, emlSource: XmlString) {
+  async convertEMLtoJSON(submissionId: number, emlSource: XmlString): Promise<string> {
     if (!emlSource) {
-      return;
+      return '';
     }
 
     const submissionService = new SubmissionService(this.connection);
@@ -194,27 +200,20 @@ export class DarwinCoreService extends DBService {
     const stylesheet = await submissionService.getEMLStyleSheet(submissionId);
 
     if (!stylesheet) {
-      return;
+      return '';
     }
 
-    try {
-      const result: {
-        principalResult: string;
-        resultDocuments: unknown;
-        stylesheetInternal: Record<string, unknown>;
-        masterDocument: unknown;
-      } = SaxonJS.transform({
-        stylesheetInternal: stylesheet,
-        sourceText: emlSource,
-        destination: 'serialized'
-      });
-
-      console.log(result);
-    } catch (error) {
-      console.log(error);
-    }
-
-    return {};
+    const result: {
+      principalResult: string;
+      resultDocuments: unknown;
+      stylesheetInternal: Record<string, unknown>;
+      masterDocument: unknown;
+    } = SaxonJS.transform({
+      stylesheetInternal: stylesheet,
+      sourceText: emlSource,
+      destination: 'serialized'
+    });
+    return result.principalResult;
   }
 
   /**

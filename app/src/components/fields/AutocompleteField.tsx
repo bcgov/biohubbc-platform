@@ -30,7 +30,7 @@ const AutocompleteField: React.FC<IAutocompleteField<string | number>> = <T exte
     const result = props.options.find((option) => existingValue === option.value);
 
     if (!result) {
-      return null as unknown as IAutocompleteFieldOption<T>;
+      return (null as unknown) as IAutocompleteFieldOption<T>;
     }
 
     return result;

@@ -14,7 +14,7 @@ const mockUseApi = {
   }
 };
 
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = (
   accessRequests: IGetAccessRequestsListResponse[],
@@ -161,7 +161,7 @@ describe('AccessRequestList', () => {
           status_name: 'Pending',
           description: 'test description',
           notes: 'test notes',
-          data: null as unknown as IAccessRequestDataObject,
+          data: (null as unknown) as IAccessRequestDataObject,
           create_date: '2020-04-20'
         }
       ],
