@@ -9,6 +9,7 @@ import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import LogOutPage from 'features/logout/LogOutPage';
 import SearchRouter from 'features/search/SearchRouter';
+import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
 import BaseLayout from 'layouts/BaseLayout';
 import React from 'react';
 import { Redirect, Switch, useLocation } from 'react-router-dom';
@@ -31,6 +32,10 @@ const AppRouter: React.FC = () => {
 
       <AppRoute path="/search" title={getTitle('Search')} layout={BaseLayout}>
         <SearchRouter />
+      </AppRoute>
+
+      <AppRoute path="/submissions" title={getTitle('Submissions')} layout={BaseLayout}>
+        <SubmissionsRouter />
       </AppRoute>
 
       <AppRoute path="/page-not-found" title={getTitle('Page Not Found')} layout={BaseLayout}>

@@ -171,6 +171,9 @@ const Header: React.FC = () => {
               <Link to="/search" id="menu_search">
                 Search
               </Link>
+              <Link to="/submissions" id="menu_submissions">
+                Submissions
+              </Link>
               <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                 <Link to="/admin/users" id="menu_admin_users">
                   Manage Users
