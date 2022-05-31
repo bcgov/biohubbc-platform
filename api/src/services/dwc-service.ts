@@ -1,6 +1,6 @@
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
-import SaxonJS from 'saxon-js';
+import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
@@ -167,9 +167,9 @@ export class DarwinCoreService extends DBService {
 
     const esClient = await this.getEsClient();
 
-    const jsonDoc = JSON.parse(
-      await this.convertEMLtoJSON(submissionRecord.submission_id, submissionRecord.eml_source)
-    );
+    const doc = await this.convertEMLtoJSON(submissionRecord.submission_id, submissionRecord.eml_source);
+
+    const jsonDoc = JSON.parse(doc);
 
     const response = await esClient.create({
       id: dataPackageId,
@@ -203,12 +203,31 @@ export class DarwinCoreService extends DBService {
       return '';
     }
 
+    // try {
+    //   const env = SaxonJS2N.getPlatform();
+
+    //   console.log('env is', env);
+
+    //   const doc = env.parseXmlFromString(stylesheet);
+
+    //   console.log('doc is: ', doc);
+
+    //   const sef = SaxonJS2N.compile(doc);
+
+    //   console.log('sef is :', sef);
+    // } catch (error) {
+    //   console.log(error);
+    // }
+
+    //bug is similar to this one
+    //https://saxonica.plan.io/issues/5038
+
     const result: {
       principalResult: string;
       resultDocuments: unknown;
       stylesheetInternal: Record<string, unknown>;
       masterDocument: unknown;
-    } = SaxonJS.transform({
+    } = SaxonJS2N.transform({
       stylesheetInternal: stylesheet,
       sourceText: emlSource,
       destination: 'serialized'

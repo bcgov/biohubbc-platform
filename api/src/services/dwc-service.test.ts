@@ -280,7 +280,7 @@ describe('DarwinCoreService', () => {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
         expect.fail();
       } catch (actualError) {
-        expect((actualError as Error).message).to.equal("Cannot read property 'create' of undefined");
+        expect((actualError as Error).message).to.equal("Cannot read property 'rowCount' of undefined");
       }
     });
 
@@ -295,7 +295,7 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'insertSubmissionStatus')
         .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
 
-      sinon.stub(DarwinCoreService.prototype, 'convertEMLtoJSON').resolves({ some_field: 'some_value' });
+      sinon.stub(DarwinCoreService.prototype, 'convertEMLtoJSON').resolves(`{"id": "1", "value": "some_value"}`);
 
       const createStub = sinon.stub().resolves({
         _index: 'eml',

@@ -144,4 +144,10 @@ export class SubmissionService extends DBService {
       await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)
     ).metadata_transform_precompile;
   }
+
+  async getRawEMLStyleSheet(submissionId: number): Promise<ISourceTransformModel['metadata_transform_precompile']> {
+    return await (
+      await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)
+    ).metadata_transform;
+  }
 }
