@@ -67,11 +67,11 @@ GET.apiDoc = {
                 },
                 event_timestamp: {
                   type: 'string',
-                  format: 'date-time'
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                 },
                 delete_timestamp: {
                   type: 'string',
-                  format: 'date-time',
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                   nullable: true
                 },
                 input_key: {
@@ -87,19 +87,19 @@ GET.apiDoc = {
                   nullable: true
                 },
                 darwin_core_source: {
-                  type: 'string',
+                  oneOf: [{ type: 'object' }, { type: 'string' }],
                   nullable: true
                 },
                 create_date: {
                   type: 'string',
-                  format: 'date-time'
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                 },
                 create_user: {
                   type: 'integer'
                 },
                 update_date: {
                   type: 'string',
-                  format: 'date-time',
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                   nullable: true
                 },
                 update_user: {
