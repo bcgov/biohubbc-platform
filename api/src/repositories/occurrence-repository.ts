@@ -5,16 +5,17 @@ import { ILatLong, IUTM, parseLatLongString, parseUTMString } from '../utils/spa
 import { BaseRepository } from './base-repository';
 
 export interface IGetOccurrenceData {
-  occurrenceId: number;
-  submissionId: number;
-  taxonId: string | null;
-  lifeStage: string | null;
+  occurrence_id: number;
+  submission_id: number;
+  occurrenceid: string | null;
+  taxonid: string | null;
+  lifestage: string | null;
   sex: string | null;
-  eventDate: string | null; //TODO is this a timeStamp?
-  vernacularName: string | null;
-  individualCount: number | null;
-  organismQuantity: number | null;
-  organismQuantityType: string | null;
+  eventdate: string | null; //TODO is this a timeStamp?
+  vernacularname: string | null;
+  individualcount: number | null;
+  organismquantity: number | null;
+  organismquantitytype: string | null;
   geometry: Feature | null;
 }
 
@@ -63,9 +64,9 @@ export class OccurrenceRepository extends BaseRepository {
         occurrence as o;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
+    const response = await this.connection.sql<IGetOccurrenceData>(sqlStatement);
 
-    if (!response.rowCount) {
+    if (!response.rows) {
       throw new ApiExecuteSQLError('Failed to get occurrence records', [
         'OccurrenceRepository->getAllOccurrences',
         'rowCount was null or undefined, expected rowCount = 0 or greater'

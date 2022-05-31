@@ -1,3 +1,4 @@
+import { Feature } from 'geojson';
 import { IDBConnection } from '../database/db';
 import { IGetOccurrenceData, IPostOccurrenceData, OccurrenceRepository } from '../repositories/occurrence-repository';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -26,6 +27,27 @@ export interface DwCAOccurrenceHeaders {
   taxonIdHeader: number;
   vernacularNameHeader: number;
 }
+
+export interface IGetMapOccurrenceData {
+  id: string;
+  taxonid: string;
+  geometry: Feature;
+  dataPoints: [
+    {
+      eventdate: string;
+      data: [
+        {
+          lifestage: string;
+          vernacularname: string;
+          sex: string;
+          individualcount: number;
+          organismquantity: number;
+          organismquantitytype: string;
+        }
+      ];
+    }
+  ];
+}
 export class OccurrenceService extends DBService {
   occurrenceRepository: OccurrenceRepository;
 
@@ -40,8 +62,55 @@ export class OccurrenceService extends DBService {
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceService
    */
-  async getAllOccurrences(): Promise<IGetOccurrenceData[]> {
-    return this.occurrenceRepository.getAllOccurrences();
+  async getAllOccurrences(): Promise<IGetMapOccurrenceData[]> {
+    const allOccurrences = await this.occurrenceRepository.getAllOccurrences();
+
+    const formated = this.formatOccurrenceDataForMap(allOccurrences);
+
+    return formated;
+  }
+
+  formatOccurrenceDataForMap(occurrenceData: IGetOccurrenceData[]): IGetMapOccurrenceData[] {
+    const curatedOccurrences: IGetMapOccurrenceData[] = [];
+
+    for (const occur of occurrenceData) {
+      // console.log('occur:', occur);
+      // console.log('curatedOccurrences:', curatedOccurrences);
+      let flagGeoTax = true;
+
+      for (const cur of curatedOccurrences) {
+        if (occur.geometry == cur.geometry && occur.taxonid == cur.taxonid) {
+          for (const data of cur.dataPoints) {
+            if (occur.eventdate == data.eventdate) {
+              data.data.push();
+            }
+          }
+
+          // console.log('sammmmmmee geo');
+          cur.dataPoints.push(occur);
+          flag = false;
+          break;
+        }
+      }
+
+      if (flagGeoTax) {
+        // console.log('Not SAMe geo');
+        curatedOccurrences.push({
+          id: `${occur.occurrence_id}`,
+          taxonid: occur.taxonid,
+          geometry: occur.geometry,
+          dataPoints: [occur]
+        });
+      }
+    }
+
+    console.log('curatedOccurrences:', curatedOccurrences);
+
+    return curatedOccurrences;
+  }
+
+  formatSimilarOccurrences(){
+
   }
 
   /**
