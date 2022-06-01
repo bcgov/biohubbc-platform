@@ -29,6 +29,17 @@ GET.apiDoc = {
       Bearer: []
     }
   ],
+  parameters: [
+    {
+      in: 'query',
+      name: 'spatial',
+      schema: {
+        type: 'string',
+        nullable: true
+      },
+      allowEmptyValue: true
+    }
+  ],
   responses: {
     200: {
       description: 'Darwin Core data packages.',
@@ -53,6 +64,8 @@ GET.apiDoc = {
 
 export function listOccurrences(): RequestHandler {
   return async (req, res) => {
+    const searchCriteria: { spatial?: string } = req.query || {};
+
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
@@ -60,7 +73,7 @@ export function listOccurrences(): RequestHandler {
 
       const occurrenceService = new OccurrenceService(connection);
 
-      const submissions = await occurrenceService.getAllOccurrences();
+      const submissions = await occurrenceService.getMapOccurrences(searchCriteria.spatial);
 
       await connection.commit();
 

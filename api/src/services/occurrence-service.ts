@@ -29,25 +29,26 @@ export interface DwCAOccurrenceHeaders {
 }
 
 export interface IGetMapOccurrenceData {
-  id: string;
-  taxonid: string;
-  geometry: Feature;
-  dataPoints: [
+  id: number;
+  taxonid: string | undefined;
+  geometry: Feature | undefined;
+  observations: [
     {
       eventdate: string;
-      data: [
-        {
-          lifestage: string;
-          vernacularname: string;
-          sex: string;
-          individualcount: number;
-          organismquantity: number;
-          organismquantitytype: string;
-        }
-      ];
+      data: [IGetOrganismData];
     }
   ];
 }
+
+export interface IGetOrganismData {
+  lifestage: string | undefined;
+  vernacularname: string | undefined;
+  sex: string | undefined;
+  individualcount: number | undefined;
+  organismquantity: number | undefined;
+  organismquantitytype: string | undefined;
+}
+
 export class OccurrenceService extends DBService {
   occurrenceRepository: OccurrenceRepository;
 
@@ -62,8 +63,8 @@ export class OccurrenceService extends DBService {
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceService
    */
-  async getAllOccurrences(): Promise<IGetMapOccurrenceData[]> {
-    const allOccurrences = await this.occurrenceRepository.getAllOccurrences();
+  async getMapOccurrences(mapView?: string | undefined): Promise<IGetMapOccurrenceData[]> {
+    const allOccurrences = await this.occurrenceRepository.getMapOccurrences(mapView);
 
     const formated = this.formatOccurrenceDataForMap(allOccurrences);
 
@@ -73,44 +74,94 @@ export class OccurrenceService extends DBService {
   formatOccurrenceDataForMap(occurrenceData: IGetOccurrenceData[]): IGetMapOccurrenceData[] {
     const curatedOccurrences: IGetMapOccurrenceData[] = [];
 
-    for (const occur of occurrenceData) {
-      // console.log('occur:', occur);
-      // console.log('curatedOccurrences:', curatedOccurrences);
-      let flagGeoTax = true;
+    for (const occurrence of occurrenceData) {
+      const findByTaxonGeometry = curatedOccurrences.findIndex((check) => {
+        return check.taxonid == occurrence.taxonid && occurrence.geometry == check.geometry;
+      });
 
-      for (const cur of curatedOccurrences) {
-        if (occur.geometry == cur.geometry && occur.taxonid == cur.taxonid) {
-          for (const data of cur.dataPoints) {
-            if (occur.eventdate == data.eventdate) {
-              data.data.push();
-            }
-          }
-
-          // console.log('sammmmmmee geo');
-          cur.dataPoints.push(occur);
-          flag = false;
-          break;
-        }
-      }
-
-      if (flagGeoTax) {
-        // console.log('Not SAMe geo');
+      if (findByTaxonGeometry != -1) {
+        curatedOccurrences[findByTaxonGeometry].observations = this.formatObservationByDate(
+          curatedOccurrences[findByTaxonGeometry].observations,
+          occurrence
+        );
+      } else {
         curatedOccurrences.push({
-          id: `${occur.occurrence_id}`,
-          taxonid: occur.taxonid,
-          geometry: occur.geometry,
-          dataPoints: [occur]
+          id: occurrence.occurrence_id,
+          taxonid: occurrence.taxonid,
+          geometry: occurrence.geometry,
+          observations: [
+            {
+              eventdate: occurrence.eventdate,
+              data: [
+                {
+                  lifestage: occurrence.lifestage,
+                  vernacularname: occurrence.vernacularname,
+                  sex: occurrence.sex,
+                  individualcount: occurrence.individualcount,
+                  organismquantity: occurrence.organismquantity,
+                  organismquantitytype: occurrence.organismquantitytype
+                }
+              ]
+            }
+          ]
         });
       }
     }
-
-    console.log('curatedOccurrences:', curatedOccurrences);
-
     return curatedOccurrences;
   }
 
-  formatSimilarOccurrences(){
+  formatObservationByDate(
+    curatedOccurrencesObservations: IGetMapOccurrenceData['observations'],
+    occurrence: IGetOccurrenceData
+  ): IGetMapOccurrenceData['observations'] {
+    const findByEventDate = curatedOccurrencesObservations.findIndex((check) => {
+      return String(check.eventdate) == String(occurrence.eventdate);
+    });
 
+    if (findByEventDate != -1) {
+      curatedOccurrencesObservations[findByEventDate].data = this.formatObservationByLifestageSex(
+        curatedOccurrencesObservations[findByEventDate].data,
+        occurrence
+      );
+    } else {
+      curatedOccurrencesObservations.push({
+        eventdate: occurrence.eventdate,
+        data: [
+          {
+            lifestage: occurrence.lifestage,
+            vernacularname: occurrence.vernacularname,
+            sex: occurrence.sex,
+            individualcount: occurrence.individualcount,
+            organismquantity: occurrence.organismquantity,
+            organismquantitytype: occurrence.organismquantitytype
+          }
+        ]
+      });
+    }
+
+    return curatedOccurrencesObservations;
+  }
+
+  formatObservationByLifestageSex(curatedData: [IGetOrganismData], occurrence: IGetOccurrenceData): [IGetOrganismData] {
+    const findBySexLifestage = curatedData.findIndex((check) => {
+      return check.lifestage == occurrence.lifestage && check.sex == occurrence.sex;
+    });
+
+    if (findBySexLifestage != -1) {
+      curatedData[findBySexLifestage].individualcount =
+        Number(curatedData[findBySexLifestage].individualcount) + Number(occurrence.individualcount);
+    } else {
+      curatedData.push({
+        lifestage: occurrence.lifestage,
+        vernacularname: occurrence.vernacularname,
+        sex: occurrence.sex,
+        individualcount: occurrence.individualcount,
+        organismquantity: occurrence.organismquantity,
+        organismquantitytype: occurrence.organismquantitytype
+      });
+    }
+
+    return curatedData;
   }
 
   /**

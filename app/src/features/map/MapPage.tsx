@@ -3,12 +3,12 @@ import Box from '@material-ui/core/Box';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { IMarker } from 'components/map/components/MarkerCluster';
 import MapContainer from 'components/map/MapContainer';
-import { OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
+import { IGetMapOccurrenceData, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
 import { DialogContext } from 'contexts/dialogContext';
+import { Feature } from 'geojson';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-// import { generateValidGeometryCollection } from 'utils/mapUtils';
 
 const MapPage: React.FC = () => {
   const platformApi = useApi();
@@ -34,47 +34,107 @@ const MapPage: React.FC = () => {
     [dialogContext]
   );
 
-  const getOccurrenceData = useCallback(async () => {
-    try {
-      const response = await platformApi.search.getOccurrenceData();
+  // const tester = () => {
 
-      if (!response) {
-        setPerformSearch(false);
-        return;
-      }
+  //   console.log('////////////////////////////////////////////////////');
+  // };
+  //   [
+  //   {
+  //     "type": "Feature",
+  //     "properties": {},
+  //     "geometry": {
+  //       "type": "Polygon",
+  //       "coordinates": [
+  //         [
+  //           [
+  //             -129.149437,
+  //             55.354526
+  //           ],
+  //           [
+  //             -129.149437,
+  //             55.422779
+  //           ],
+  //           [
+  //             -128.983955,
+  //             55.422779
+  //           ],
+  //           [
+  //             -128.983955,
+  //             55.354526
+  //           ],
+  //           [
+  //             -129.149437,
+  //             55.354526
+  //           ]
+  //         ]
+  //       ]
+  //     }
+  //   }
+  // ]
 
-      // console.log('response:', response);
+  const getOccurrenceData = useCallback(
+    async (bounds?: any) => {
+      console.log('getOccurrenceData bopubnds', bounds);
+      try {
+        let spatialBounds: Feature = {} as unknown as Feature;
 
-      const markers: IMarker[] = [];
+        if (bounds) {
+          spatialBounds = {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [bounds._northEast.lat, bounds._northEast.lng],
+                  [bounds._northEast.lat, bounds._northEast.lng],
+                  [bounds._southWest.lat, bounds._southWest.lng],
+                  [bounds._southWest.lat, bounds._southWest.lng],
+                  [bounds._northEast.lat, bounds._northEast.lng]
 
-      response.forEach((result: any) => {
-        if (result?.geometry) {
-          const geo = JSON.parse(result?.geometry);
-          // console.log('result:', result);
-          // console.log('geo:', geo);
-          // console.log('geometry.type:', geo.type);
-          // console.log('geometry.coordinates:', geo.coordinates);
-
-          markers.push({
-            position: geo.coordinates,
-            popup: <OccurrenceFeaturePopup featureData={result}/>
-          });
+                ]
+              ]
+            }
+          } as Feature;
         }
-      });
 
-      setPerformSearch(false);
-      setGeometries(markers);
+        console.log('spatialBounds', spatialBounds);
 
-      // console.log('clusteredPointGeometries:', markers);
-    } catch (error) {
-      const apiError = error as APIError;
-      showFilterErrorDialog({
-        dialogTitle: 'Error Searching For Results',
-        dialogError: apiError?.message,
-        dialogErrorDetails: apiError?.errors
-      });
-    }
-  }, [platformApi.search, showFilterErrorDialog]);
+        const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
+
+        if (!response) {
+          setPerformSearch(false);
+          return;
+        }
+
+        const markers: IMarker[] = [];
+
+        response.forEach((result: IGetMapOccurrenceData) => {
+          if (result?.geometry) {
+            const geo = JSON.parse(result?.geometry);
+
+            markers.push({
+              position: geo.coordinates,
+              popup: <OccurrenceFeaturePopup featureData={result} />
+            });
+          }
+        });
+
+        setPerformSearch(false);
+        setGeometries(markers);
+
+        // console.log('clusteredPointGeometries:', markers);
+      } catch (error) {
+        const apiError = error as APIError;
+        showFilterErrorDialog({
+          dialogTitle: 'Error Searching For Results',
+          dialogError: apiError?.message,
+          dialogErrorDetails: apiError?.errors
+        });
+      }
+    },
+    [platformApi.search, showFilterErrorDialog]
+  );
 
   useEffect(() => {
     if (performSearch) {
@@ -92,7 +152,12 @@ const MapPage: React.FC = () => {
           <Box mb={4}>
             <Grid item xs={12}>
               <Box mt={2} height={750}>
-                <MapContainer mapId="boundary_map" scrollWheelZoom={true} markers={geometries}/>
+                <MapContainer
+                  mapId="boundary_map"
+                  getOccurrenceData={getOccurrenceData}
+                  scrollWheelZoom={true}
+                  markers={geometries}
+                />
               </Box>
             </Grid>
           </Box>

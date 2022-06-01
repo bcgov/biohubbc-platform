@@ -1,22 +1,28 @@
 import { Feature } from 'geojson';
 import SQL, { SQLStatement } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { ILatLong, IUTM, parseLatLongString, parseUTMString } from '../utils/spatial-utils';
+import {
+  generateGeometryCollectionSQL,
+  ILatLong,
+  IUTM,
+  parseLatLongString,
+  parseUTMString
+} from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface IGetOccurrenceData {
   occurrence_id: number;
   submission_id: number;
-  occurrenceid: string | null;
-  taxonid: string | null;
-  lifestage: string | null;
-  sex: string | null;
-  eventdate: string | null; //TODO is this a timeStamp?
-  vernacularname: string | null;
-  individualcount: number | null;
-  organismquantity: number | null;
-  organismquantitytype: string | null;
-  geometry: Feature | null;
+  occurrenceid: string | undefined;
+  taxonid: string | undefined;
+  lifestage: string | undefined;
+  sex: string | undefined;
+  eventdate: string; //TODO is this a timeStamp?
+  vernacularname: string | undefined;
+  individualcount: number | undefined;
+  organismquantity: number | undefined;
+  organismquantitytype: string | undefined;
+  geometry: Feature | undefined;
 }
 
 export interface IPostOccurrenceData {
@@ -45,7 +51,7 @@ export class OccurrenceRepository extends BaseRepository {
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceRepository
    */
-  async getAllOccurrences(): Promise<IGetOccurrenceData[]> {
+  async getMapOccurrences(mapView?: string | undefined): Promise<IGetOccurrenceData[]> {
     const sqlStatement = SQL`
       SELECT
         o.occurrence_id,
@@ -61,8 +67,29 @@ export class OccurrenceRepository extends BaseRepository {
         o.organismquantitytype,
         public.ST_asGeoJSON(o.geography) as geometry
       FROM
-        occurrence as o;
+        occurrence as o
     `;
+
+    if (mapView) {
+      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(mapView));
+
+      sqlStatement.append(`
+      WHERE
+      public.ST_INTERSECTS(
+        geography,
+        public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(`);
+
+      sqlStatement.append(geometryCollectionSQL);
+
+      sqlStatement.append(`,
+              4326
+            )
+          )
+        )
+      );`);
+    }
 
     const response = await this.connection.sql<IGetOccurrenceData>(sqlStatement);
 

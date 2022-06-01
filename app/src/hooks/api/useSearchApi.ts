@@ -1,5 +1,8 @@
 import { AxiosInstance } from 'axios';
-import { IGetOccurrenceData, IGetSearchResultsResponse } from 'interfaces/useSearchApi.interface';
+import { IGetMapOccurrenceData } from 'components/map/OccurrenceFeaturePopup';
+import { Feature } from 'geojson';
+import { IGetSearchResultsResponse } from 'interfaces/useSearchApi.interface';
+// import qs from 'qs';
 
 /**
  * Returns a set of supported api methods for working with search functionality
@@ -20,11 +23,12 @@ const useSearchApi = (axios: AxiosInstance) => {
   };
 
  /**
-   * Get search results (spatial)
+   * Get occurrence map data
    *
-   * @return {*}  {Promise<IGetSearchResultsResponse[]>}
+   * @return {*}  {Promise<IGetMapOccurrenceData[]>}
    */
-  const getOccurrenceData = async (): Promise<IGetOccurrenceData[]> => {
+  const getMapOccurrenceData = async (spatialSearch?: Feature): Promise<IGetMapOccurrenceData[]> => {
+    axios.defaults.params = { spatial: JSON.stringify(spatialSearch) };
     const { data } = await axios.get(`/api/dwc/submission/occurrence/list`);
     return data;
   };
@@ -32,7 +36,7 @@ const useSearchApi = (axios: AxiosInstance) => {
 
   return {
     getSearchResults,
-    getOccurrenceData
+    getMapOccurrenceData
   };
 };
 

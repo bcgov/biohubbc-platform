@@ -13,59 +13,60 @@ const useStyles = makeStyles(() => ({
     }
   }
 }));
+export interface IGetMapOccurrenceData {
+  id: number;
+  taxonid: string | undefined;
+  geometry: string | undefined;
+  observations: [
+    {
+      eventdate: string;
+      data: [
+        {
+          lifestage: string | undefined;
+          vernacularname: string | undefined;
+          sex: string | undefined;
+          individualcount: number | undefined;
+          organismquantity: number | undefined;
+          organismquantitytype: string | undefined;
+        }
+      ];
+    }
+  ];
+}
 
-export const OccurrenceFeaturePopup: React.FC<{ featureData: any }> = (props) => {
+export const OccurrenceFeaturePopup: React.FC<{ featureData: IGetMapOccurrenceData }> = (props) => {
   const { featureData } = props;
 
   const classes = useStyles();
 
-  const occurArray = [];
-
-  for (const occur of featureData.dataPoints) {
-    occurArray.push({
-      printLine: `${occur.lifestage} - ${occur.sex} - ${
-        occur.organismquantity
-          ? `${occur.organismquantity} ${occur.organismquantitytype}`
-          : `${occur.individualcount} Individuals`
-      }`,
-      date: occur.eventdate
-    });
-  }
-
-  const pointArray: { points: string[]; date: string }[] = [];
-
-  for (const occur of occurArray) {
-    let flag = true;
-
-    for (const point of pointArray) {
-      if (occur.date == point.date) {
-        point.points.push(occur.printLine);
-        flag = false;
-        break;
-      }
-    }
-
-    if (flag) {
-      pointArray.push({ points: [occur.printLine], date: occur.date });
-    }
-  }
-
-  for (const item of pointArray) {
-    item.points = item.points.sort();
-  }
+  // console.log('featureData', featureData);
 
   return (
-    <Popup className={classes.popUp} key={featureData.id} maxHeight={300} minWidth={300} keepInView={false} autoPan={false}>
+    <Popup
+      className={classes.popUp}
+      key={featureData.id}
+      maxHeight={300}
+      minWidth={275}
+      keepInView={false}
+      autoPan={false}>
       <h3>{featureData.taxonid} ( Lifestage - Sex - Count )</h3>
       <div>
-        {pointArray.map((point) => {
+        {featureData.observations.map((point) => {
           return (
-            <div>
-              {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat2, point.date)}
+            <div key={point.eventdate}>
+              {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat2, point.eventdate)}
 
-              <Box component='ul' pl={3}>
-                {point.points.map((occur) => {
-                  return <li>{occur}</li>;
+              <Box component="ul" pl={3}>
+                {point.data.map((occur) => {
+                  return (
+                    <li key={String(occur.lifestage) + String(occur.sex) + String(occur.individualcount) }>
+                      {`${occur.lifestage} - ${occur.sex} - ${
+                        occur.organismquantity
+                          ? `${occur.organismquantity} ${occur.organismquantitytype}`
+                          : `${occur.individualcount} Individuals`
+                      }`}
+                    </li>
+                  );
                 })}
               </Box>
             </div>
