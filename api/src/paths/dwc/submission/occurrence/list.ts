@@ -46,71 +46,70 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-              title: 'occurences by taxonid and gemetry',
-              type: 'object',
-              properties: {
-                id: {
-                  type: 'integer',
-                  minimum: 0
-                },
-                taxonid: {
-                  type: 'string',
-                  nullable: true
-                },
-                geometry: {
-                  type: 'string',
-                  nullable: true
-                },
-                observations: {
-                  type: 'array',
-                  items: {
-                    title: 'occurences by eventdate',
-                    type: 'object',
-                    properties: {
-                      eventdate: {
-                        type: 'string',
-                        nullable: true
-                      },
-                      data: {
-                        type: 'array',
-                        items: {
-                          title: 'occurences by lifestage, sex, count',
-                          type: 'object',
-                          properties: {
-                            lifestage: {
-                              type: 'string',
-                              nullable: true
-                            },
-                            vernacularname: {
-                              type: 'string',
-                              nullable: true
-                            },
-                            sex: {
-                              type: 'string',
-                              nullable: true
-                            },
-                            individualcount: {
-                              type: 'string',
-                              nullable: true
-                            },
-                            organismquantity: {
-                              type: 'string',
-                              nullable: true
-                            },
-                            organismquantitytype: {
-                              type: 'string',
-                              nullable: true
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+            //   type: 'array',
+            //   items: {
+            //     title: 'occurences by taxonid and gemetry',
+            //     type: 'object',
+            //     properties: {
+            //       id: {
+            //         type: 'integer',
+            //         minimum: 0
+            //       },
+            //       taxonid: {
+            //         type: 'string',
+            //         nullable: true
+            //       },
+            //       geometry: {
+            //         type: 'string',
+            //         nullable: true
+            //       },
+            //       observations: {
+            //         type: 'array',
+            //         items: {
+            //           title: 'occurences by eventdate',
+            //           type: 'object',
+            //           properties: {
+            //             eventdate: {
+            //               type: 'string'
+            //             },
+            //             data: {
+            //               type: 'array',
+            //               items: {
+            //                 title: 'occurences by lifestage, sex, count',
+            //                 type: 'object',
+            //                 properties: {
+            //                   lifestage: {
+            //                     type: 'string',
+            //                     nullable: true
+            //                   },
+            //                   vernacularname: {
+            //                     type: 'string',
+            //                     nullable: true
+            //                   },
+            //                   sex: {
+            //                     type: 'string',
+            //                     nullable: true
+            //                   },
+            //                   individualcount: {
+            //                     type: 'string',
+            //                     nullable: true
+            //                   },
+            //                   organismquantity: {
+            //                     type: 'string',
+            //                     nullable: true
+            //                   },
+            //                   organismquantitytype: {
+            //                     type: 'string',
+            //                     nullable: true
+            //                   }
+            //                 }
+            //               }
+            //             }
+            //           }
+            //         }
+            //       }
+            //     }
+            //   }
           }
         }
       }

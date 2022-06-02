@@ -15,17 +15,19 @@ export const SetMapBounds: React.FC<IMapBoundsProps> = (props) => {
   return null;
 };
 
-export const GetMapBounds: React.FC<{ getOccurrenceData: (bounds: LatLngBounds) => void }> = (props) => {
-  const { getOccurrenceData } = props;
+export const GetMapBounds: React.FC<{ onChange: (bounds: LatLngBounds) => void }> = (props) => {
+  const { onChange } = props;
 
   const map = useMapEvents({
     zoomend() {
       const bounds = map.getBounds();
-      getOccurrenceData(bounds);
+      map.closePopup()
+      onChange(bounds);
     },
     moveend() {
       const bounds = map.getBounds();
-      getOccurrenceData(bounds);
+      map.closePopup()
+      onChange(bounds);
     }
   });
 

@@ -48,7 +48,7 @@ export interface IMapContainerProps {
   zoom?: number;
   eventHandlers?: LeafletEventHandlerFnMap;
   LeafletMapContainerProps?: Partial<React.ComponentProps<typeof LeafletMapContainer>>;
-  getOccurrenceData: (bounds: LatLngBounds) => void;
+  onBoundsChange?: (bounds: LatLngBounds) => void;
 }
 
 const MapContainer: React.FC<IMapContainerProps> = (props) => {
@@ -65,7 +65,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
     zoom,
     eventHandlers,
     LeafletMapContainerProps,
-    getOccurrenceData
+    onBoundsChange
   } = props;
 
   const fullscreenControlProp = (fullScreenControl && { pseudoFullscreen: true }) || undefined;
@@ -88,7 +88,13 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
       <SetMapBounds bounds={bounds} />
-      <GetMapBounds getOccurrenceData={getOccurrenceData} />
+      <GetMapBounds
+        onChange={(bounds: LatLngBounds) => {
+          if (onBoundsChange) {
+            onBoundsChange(bounds);
+          }
+        }}
+      />
 
       {drawControls && (
         <FeatureGroup>

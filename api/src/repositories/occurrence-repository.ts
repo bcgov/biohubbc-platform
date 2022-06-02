@@ -46,7 +46,7 @@ export interface IPostOccurrenceData {
  */
 export class OccurrenceRepository extends BaseRepository {
   /**
-   * Get all occurrences data with mapView
+   * Get all occurrences data within mapView
    *
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceRepository

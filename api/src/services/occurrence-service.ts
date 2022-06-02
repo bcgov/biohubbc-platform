@@ -34,8 +34,8 @@ export interface IGetMapOccurrenceData {
   geometry: Feature | undefined;
   observations: [
     {
-      eventdate: string;
-      data: [IGetOrganismData];
+      eventdate: string | undefined;
+      data: IGetOrganismData[];
     }
   ];
 }
@@ -164,12 +164,12 @@ export class OccurrenceService extends DBService {
    * Format and curate raw data from occurrences
    * Third sort by same lifestage and sex, increment individual count //TODO increment organismquantity if valid
    *
-   * @param {[IGetOrganismData]} curatedData
+   * @param {IGetOrganismData[]} curatedData
    * @param {IGetOccurrenceData} occurrence
-   * @return {*}  {[IGetOrganismData]}
+   * @return {*}  {IGetOrganismData[]}
    * @memberof OccurrenceService
    */
-  formatObservationByLifestageSex(curatedData: [IGetOrganismData], occurrence: IGetOccurrenceData): [IGetOrganismData] {
+  formatObservationByLifestageSex(curatedData: IGetOrganismData[], occurrence: IGetOccurrenceData): IGetOrganismData[] {
     const findBySexLifestage = curatedData.findIndex((check) => {
       return check.lifestage == occurrence.lifestage && check.sex == occurrence.sex;
     });

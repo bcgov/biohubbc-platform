@@ -13,6 +13,83 @@ import { IPostOccurrenceData, OccurrenceRepository } from './occurrence-reposito
 chai.use(sinonChai);
 
 describe('OccurrenceRepository', () => {
+  describe('getMapOccurrences', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    const mockResponse = {
+      occurrence_id: 1,
+      submission_id: 2,
+      occurrenceid: 'string',
+      taxonid: 'string',
+      lifestage: 'string',
+      sex: 'string',
+      eventdate: 'string',
+      vernacularname: 'string',
+      individualcount: 1,
+      organismquantity: 1,
+      organismquantitytype: 'string',
+      geometry: {}
+    };
+
+    it('should throw an error when get sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+
+      try {
+        await occurrenceRepository.getMapOccurrences();
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get occurrence records');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+
+      const response = await occurrenceRepository.getMapOccurrences();
+
+      expect(response).to.eql([mockResponse]);
+    });
+
+    it('should call generateGeometryCollectionSQL when mapBounds are given', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const generateGeometryStub = sinon.stub(spatialUtils, 'generateGeometryCollectionSQL').returns(SQL`valid sql`);
+
+      const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
+
+      const mockInput = { temp: 'string' };
+
+      const response = await occurrenceRepository.getMapOccurrences(JSON.stringify(mockInput));
+
+      expect(response).to.eql([mockResponse]);
+      expect(generateGeometryStub).to.be.calledOnceWith(mockInput);
+    });
+  });
+
   describe('insertScrapedOccurrence', () => {
     afterEach(() => {
       sinon.restore();

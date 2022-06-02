@@ -37,7 +37,6 @@ const MapPage: React.FC = () => {
 
   const getOccurrenceData = useCallback(
     async (bounds?: LatLngBounds) => {
-      // console.log('getOccurrenceData bopubnds', bounds);
       try {
         let spatialBounds: Feature = {} as unknown as Feature;
 
@@ -63,8 +62,6 @@ const MapPage: React.FC = () => {
           } as Feature;
         }
 
-        // console.log('spatialBounds', spatialBounds);
-
         const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
 
         if (!response) {
@@ -87,9 +84,6 @@ const MapPage: React.FC = () => {
 
         setPerformSearch(false);
         setGeometries(markers);
-
-        // console.log('markers:', markers);
-        // console.log('clusteredPointGeometries:', markers);
       } catch (error) {
         const apiError = error as APIError;
         showFilterErrorDialog({
@@ -120,7 +114,7 @@ const MapPage: React.FC = () => {
               <Box mt={2} height={750}>
                 <MapContainer
                   mapId="boundary_map"
-                  getOccurrenceData={getOccurrenceData}
+                  onBoundsChange={getOccurrenceData}
                   scrollWheelZoom={true}
                   markers={geometries}
                 />
