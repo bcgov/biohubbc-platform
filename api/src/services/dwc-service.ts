@@ -236,7 +236,7 @@ export class DarwinCoreService extends DBService {
       stylesheetInternal: Record<string, unknown>;
       masterDocument: unknown;
     } = SaxonJS2N.transform({
-      stylesheetInternal: stylesheet,
+      stylesheetNode: stylesheet,
       sourceText: emlSource,
       destination: 'serialized'
     });
