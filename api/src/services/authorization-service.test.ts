@@ -22,7 +22,7 @@ describe('executeAuthorizationScheme', function () {
   });
 
   it('returns false if any AND authorizationScheme rules return false', async function () {
-    const mockAuthorizationScheme = { and: [] } as unknown as AuthorizationScheme;
+    const mockAuthorizationScheme = ({ and: [] } as unknown) as AuthorizationScheme;
     const mockDBConnection = getMockDBConnection();
 
     sinon.stub(AuthorizationService.prototype, 'executeAuthorizeConfig').resolves([true, false, true]);
@@ -35,7 +35,7 @@ describe('executeAuthorizationScheme', function () {
   });
 
   it('returns true if all AND authorizationScheme rules return true', async function () {
-    const mockAuthorizationScheme = { and: [] } as unknown as AuthorizationScheme;
+    const mockAuthorizationScheme = ({ and: [] } as unknown) as AuthorizationScheme;
     const mockDBConnection = getMockDBConnection();
 
     sinon.stub(AuthorizationService.prototype, 'executeAuthorizeConfig').resolves([true, true, true]);
@@ -48,7 +48,7 @@ describe('executeAuthorizationScheme', function () {
   });
 
   it('returns false if all OR authorizationScheme rules return false', async function () {
-    const mockAuthorizationScheme = { or: [] } as unknown as AuthorizationScheme;
+    const mockAuthorizationScheme = ({ or: [] } as unknown) as AuthorizationScheme;
     const mockDBConnection = getMockDBConnection();
 
     sinon.stub(AuthorizationService.prototype, 'executeAuthorizeConfig').resolves([false, false, false]);
@@ -61,7 +61,7 @@ describe('executeAuthorizationScheme', function () {
   });
 
   it('returns true if any OR authorizationScheme rules return true', async function () {
-    const mockAuthorizationScheme = { or: [] } as unknown as AuthorizationScheme;
+    const mockAuthorizationScheme = ({ or: [] } as unknown) as AuthorizationScheme;
     const mockDBConnection = getMockDBConnection();
 
     sinon.stub(AuthorizationService.prototype, 'executeAuthorizeConfig').resolves([false, true, false]);
@@ -108,7 +108,7 @@ describe('authorizeBySystemRole', function () {
   });
 
   it('returns false if `authorizeSystemRoles` is null', async function () {
-    const mockAuthorizeSystemRoles = null as unknown as AuthorizeBySystemRoles;
+    const mockAuthorizeSystemRoles = (null as unknown) as AuthorizeBySystemRoles;
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -125,7 +125,7 @@ describe('authorizeBySystemRole', function () {
     };
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = (null as unknown) as Models.user.UserObject;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -143,7 +143,7 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: {} as unknown as Models.user.UserObject
+      systemUser: ({} as unknown) as Models.user.UserObject
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -159,7 +159,7 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: { role_names: [] } as unknown as Models.user.UserObject
+      systemUser: ({ role_names: [] } as unknown) as Models.user.UserObject
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -175,7 +175,7 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: { role_names: [SYSTEM_ROLE.PROJECT_CREATOR] } as unknown as Models.user.UserObject
+      systemUser: ({ role_names: [SYSTEM_ROLE.PROJECT_CREATOR] } as unknown) as Models.user.UserObject
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -192,7 +192,7 @@ describe('authorizeBySystemUser', function () {
   it('returns false if `systemUserObject` is null', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = (null as unknown) as Models.user.UserObject;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -205,11 +205,11 @@ describe('authorizeBySystemUser', function () {
   it('returns true if `systemUserObject` is not null', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = (null as unknown) as Models.user.UserObject;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: {} as unknown as Models.user.UserObject
+      systemUser: ({} as unknown) as Models.user.UserObject
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemUser();

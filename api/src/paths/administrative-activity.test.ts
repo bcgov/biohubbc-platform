@@ -37,14 +37,14 @@ describe('updateAccessRequest', () => {
     sinon.stub(db, 'getDBConnection').returns({
       ...dbConnectionObj,
       systemUserId: () => {
-        return null as unknown as number;
+        return (null as unknown) as number;
       }
     });
 
     try {
       const result = administrative_activity.createAdministrativeActivity();
 
-      await result(sampleReq, null as unknown as any, null as unknown as any);
+      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
       expect.fail();
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(500);
@@ -70,7 +70,7 @@ describe('updateAccessRequest', () => {
     try {
       const result = administrative_activity.createAdministrativeActivity();
 
-      await result(sampleReq, null as unknown as any, null as unknown as any);
+      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
       expect.fail();
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(500);
@@ -101,7 +101,7 @@ describe('updateAccessRequest', () => {
     try {
       const result = administrative_activity.createAdministrativeActivity();
 
-      await result(sampleReq, null as unknown as any, null as unknown as any);
+      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
       expect.fail();
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(500);
@@ -131,7 +131,7 @@ describe('updateAccessRequest', () => {
 
     const result = administrative_activity.createAdministrativeActivity();
 
-    await result(sampleReq, sampleRes as any, null as unknown as any);
+    await result(sampleReq, sampleRes as any, (null as unknown) as any);
 
     expect(actualResult).to.eql({
       id: 1,
@@ -169,7 +169,7 @@ describe('getPendingAccessRequestsCount', () => {
     try {
       const result = administrative_activity.getPendingAccessRequestsCount();
 
-      await result(sampleReq, null as unknown as any, null as unknown as any);
+      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
       expect.fail();
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(400);
@@ -196,7 +196,7 @@ describe('getPendingAccessRequestsCount', () => {
 
     const result = administrative_activity.getPendingAccessRequestsCount();
 
-    await result(sampleReq, sampleRes as any, null as unknown as any);
+    await result(sampleReq, sampleRes as any, (null as unknown) as any);
 
     expect(actualResult).to.equal(0);
   });
@@ -220,7 +220,7 @@ describe('getPendingAccessRequestsCount', () => {
 
     const result = administrative_activity.getPendingAccessRequestsCount();
 
-    await result(sampleReq, sampleRes as any, null as unknown as any);
+    await result(sampleReq, sampleRes as any, (null as unknown) as any);
 
     expect(actualResult).to.equal(23);
   });
@@ -243,7 +243,7 @@ describe('getUpdateAdministrativeActivityHandler', () => {
     try {
       const result = administrative_activity.getUpdateAdministrativeActivityHandler();
 
-      await result(sampleReq, null as unknown as any, null as unknown as any);
+      await result(sampleReq, (null as unknown) as any, (null as unknown) as any);
       expect.fail();
     } catch (actualError) {
       expect((actualError as HTTPError).status).to.equal(400);
@@ -257,8 +257,8 @@ describe('getUpdateAdministrativeActivityHandler', () => {
 
       await result(
         { ...sampleReq, body: { ...sampleReq.body, id: 2 } },
-        null as unknown as any,
-        null as unknown as any
+        (null as unknown) as any,
+        (null as unknown) as any
       );
       expect.fail();
     } catch (actualError) {

@@ -54,7 +54,6 @@ export async function up(knex: Knex): Promise<void> {
   const populate_submission_message_type = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_submission_message_type.sql')
   );
-  const populate_source_transform = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_source_transform.sql'));
 
   const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
 
@@ -106,8 +105,6 @@ export async function up(knex: Knex): Promise<void> {
     ${populate_submission_status_type}
     ${populate_submission_message_class}
     ${populate_submission_message_type}
-    ${populate_source_transform}
-
 
     -- create the views
     set search_path = biohub_dapi_v1;

@@ -617,8 +617,11 @@ begin
   select api_set_context('SIMS-SVC', 'SYSTEM') into _system_user_id;
   --select api_set_context('biohub_api', 'DATABASE') into _system_user_id;
 
-  select source_transform_id into _source_transform_id from source_transform where system_user_id = (select system_user_id from system_user where user_identifier = 'SIMS-SVC') and version = '1.0';
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
+
+	-- source transform
+	insert into source_transform (system_user_id, version, metadata_index, transform_filename, transform_key, transform_precompile_filename, transform_precompile_key) 
+		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '1.0', 'biohub_metadata', 'sims_eml_transform.1.xsl', 'sims_eml_transform.1.key', 'sims_eml_transform.1.xsl.sef', 'sims_eml_transform.1.sef.key') returning source_transform_id into _source_transform_id;
 
   -- occurrence
   -- occurrence submission 1
