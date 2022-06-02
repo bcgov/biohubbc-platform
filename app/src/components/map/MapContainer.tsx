@@ -1,6 +1,6 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import { Feature } from 'geojson';
-import L, { LeafletEventHandlerFnMap } from 'leaflet';
+import L, { LatLngBounds, LeafletEventHandlerFnMap } from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
 import 'leaflet-fullscreen/dist/Leaflet.fullscreen.js';
@@ -11,7 +11,7 @@ import 'leaflet/dist/leaflet.css';
 import React from 'react';
 import { FeatureGroup, LayersControl, MapContainer as LeafletMapContainer } from 'react-leaflet';
 import BaseLayerControls from './components/BaseLayerControls';
-import MapBounds, { GetMapBounds } from './components/Bounds';
+import { GetMapBounds, SetMapBounds } from './components/Bounds';
 import DrawControls from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
@@ -48,7 +48,7 @@ export interface IMapContainerProps {
   zoom?: number;
   eventHandlers?: LeafletEventHandlerFnMap;
   LeafletMapContainerProps?: Partial<React.ComponentProps<typeof LeafletMapContainer>>;
-  getOccurrenceData?: any;
+  getOccurrenceData: (bounds: LatLngBounds) => void;
 }
 
 const MapContainer: React.FC<IMapContainerProps> = (props) => {
@@ -87,7 +87,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       {...LeafletMapContainerProps}>
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
-      <MapBounds bounds={bounds} getOccurrenceData={getOccurrenceData} />
+      <SetMapBounds bounds={bounds} />
       <GetMapBounds getOccurrenceData={getOccurrenceData} />
 
       {drawControls && (

@@ -25,6 +25,7 @@ const useSearchApi = (axios: AxiosInstance) => {
  /**
    * Get occurrence map data
    *
+   * @param {Feature} [spatialSearch]
    * @return {*}  {Promise<IGetMapOccurrenceData[]>}
    */
   const getMapOccurrenceData = async (spatialSearch?: Feature): Promise<IGetMapOccurrenceData[]> => {

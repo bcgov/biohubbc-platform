@@ -58,9 +58,10 @@ export class OccurrenceService extends DBService {
   }
 
   /**
-   * Get all occurrences in table
+   * Get all occurrences within map bounds
    *
-   * @return {*}  {Promise<IGetOccurrenceData[]>}
+   * @param {(string | undefined)} [mapView]
+   * @return {*}  {Promise<IGetMapOccurrenceData[]>}
    * @memberof OccurrenceService
    */
   async getMapOccurrences(mapView?: string | undefined): Promise<IGetMapOccurrenceData[]> {
@@ -71,6 +72,14 @@ export class OccurrenceService extends DBService {
     return formated;
   }
 
+  /**
+   * Format and curate raw data from occurrences
+   * First sort by same taxonid and geometry
+   *
+   * @param {IGetOccurrenceData[]} occurrenceData
+   * @return {*}  {IGetMapOccurrenceData[]}
+   * @memberof OccurrenceService
+   */
   formatOccurrenceDataForMap(occurrenceData: IGetOccurrenceData[]): IGetMapOccurrenceData[] {
     const curatedOccurrences: IGetMapOccurrenceData[] = [];
 
@@ -110,6 +119,15 @@ export class OccurrenceService extends DBService {
     return curatedOccurrences;
   }
 
+  /**
+   * Format and curate raw data from occurrences
+   * Second sort by same date
+   *
+   * @param {IGetMapOccurrenceData['observations']} curatedOccurrencesObservations
+   * @param {IGetOccurrenceData} occurrence
+   * @return {*}  {IGetMapOccurrenceData['observations']}
+   * @memberof OccurrenceService
+   */
   formatObservationByDate(
     curatedOccurrencesObservations: IGetMapOccurrenceData['observations'],
     occurrence: IGetOccurrenceData
@@ -142,6 +160,15 @@ export class OccurrenceService extends DBService {
     return curatedOccurrencesObservations;
   }
 
+  /**
+   * Format and curate raw data from occurrences
+   * Third sort by same lifestage and sex, increment individual count //TODO increment organismquantity if valid
+   *
+   * @param {[IGetOrganismData]} curatedData
+   * @param {IGetOccurrenceData} occurrence
+   * @return {*}  {[IGetOrganismData]}
+   * @memberof OccurrenceService
+   */
   formatObservationByLifestageSex(curatedData: [IGetOrganismData], occurrence: IGetOccurrenceData): [IGetOrganismData] {
     const findBySexLifestage = curatedData.findIndex((check) => {
       return check.lifestage == occurrence.lifestage && check.sex == occurrence.sex;

@@ -46,7 +46,7 @@ export interface IPostOccurrenceData {
  */
 export class OccurrenceRepository extends BaseRepository {
   /**
-   * Get all occurrences data
+   * Get all occurrences data with mapView
    *
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceRepository
@@ -95,7 +95,7 @@ export class OccurrenceRepository extends BaseRepository {
 
     if (!response.rows) {
       throw new ApiExecuteSQLError('Failed to get occurrence records', [
-        'OccurrenceRepository->getAllOccurrences',
+        'OccurrenceRepository->getMapOccurrences',
         'rowCount was null or undefined, expected rowCount = 0 or greater'
       ]);
     }

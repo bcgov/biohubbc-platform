@@ -19,7 +19,7 @@ export interface IGetMapOccurrenceData {
   geometry: string | undefined;
   observations: [
     {
-      eventdate: string;
+      eventdate: string | undefined;
       data: [
         {
           lifestage: string | undefined;
@@ -39,14 +39,12 @@ export const OccurrenceFeaturePopup: React.FC<{ featureData: IGetMapOccurrenceDa
 
   const classes = useStyles();
 
-  // console.log('featureData', featureData);
-
   return (
     <Popup
       className={classes.popUp}
       key={featureData.id}
       maxHeight={300}
-      minWidth={275}
+      minWidth={250}
       keepInView={false}
       autoPan={false}>
       <h3>{featureData.taxonid} ( Lifestage - Sex - Count )</h3>
@@ -54,7 +52,7 @@ export const OccurrenceFeaturePopup: React.FC<{ featureData: IGetMapOccurrenceDa
         {featureData.observations.map((point) => {
           return (
             <div key={point.eventdate}>
-              {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat2, point.eventdate)}
+              {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat2, point.eventdate || '')}
 
               <Box component="ul" pl={3}>
                 {point.data.map((occur) => {

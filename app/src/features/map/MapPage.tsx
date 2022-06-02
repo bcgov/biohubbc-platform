@@ -8,6 +8,7 @@ import { DialogContext } from 'contexts/dialogContext';
 import { Feature } from 'geojson';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { LatLngBounds } from 'leaflet';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 
 const MapPage: React.FC = () => {
@@ -34,51 +35,16 @@ const MapPage: React.FC = () => {
     [dialogContext]
   );
 
-  // const tester = () => {
-
-  //   console.log('////////////////////////////////////////////////////');
-  // };
-  //   [
-  //   {
-  //     "type": "Feature",
-  //     "properties": {},
-  //     "geometry": {
-  //       "type": "Polygon",
-  //       "coordinates": [
-  //         [
-  //           [
-  //             -129.149437,
-  //             55.354526
-  //           ],
-  //           [
-  //             -129.149437,
-  //             55.422779
-  //           ],
-  //           [
-  //             -128.983955,
-  //             55.422779
-  //           ],
-  //           [
-  //             -128.983955,
-  //             55.354526
-  //           ],
-  //           [
-  //             -129.149437,
-  //             55.354526
-  //           ]
-  //         ]
-  //       ]
-  //     }
-  //   }
-  // ]
-
   const getOccurrenceData = useCallback(
-    async (bounds?: any) => {
-      console.log('getOccurrenceData bopubnds', bounds);
+    async (bounds?: LatLngBounds) => {
+      // console.log('getOccurrenceData bopubnds', bounds);
       try {
         let spatialBounds: Feature = {} as unknown as Feature;
 
         if (bounds) {
+          const southWest = bounds.getSouthWest();
+          const northEast = bounds.getNorthEast();
+
           spatialBounds = {
             type: 'Feature',
             properties: {},
@@ -86,19 +52,18 @@ const MapPage: React.FC = () => {
               type: 'Polygon',
               coordinates: [
                 [
-                  [bounds._northEast.lat, bounds._northEast.lng],
-                  [bounds._northEast.lat, bounds._northEast.lng],
-                  [bounds._southWest.lat, bounds._southWest.lng],
-                  [bounds._southWest.lat, bounds._southWest.lng],
-                  [bounds._northEast.lat, bounds._northEast.lng]
-
+                  [southWest.lng, southWest.lat],
+                  [southWest.lng, northEast.lat],
+                  [northEast.lng, northEast.lat],
+                  [northEast.lng, southWest.lat],
+                  [southWest.lng, southWest.lat]
                 ]
               ]
             }
           } as Feature;
         }
 
-        console.log('spatialBounds', spatialBounds);
+        // console.log('spatialBounds', spatialBounds);
 
         const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
 
@@ -123,6 +88,7 @@ const MapPage: React.FC = () => {
         setPerformSearch(false);
         setGeometries(markers);
 
+        // console.log('markers:', markers);
         // console.log('clusteredPointGeometries:', markers);
       } catch (error) {
         const apiError = error as APIError;
