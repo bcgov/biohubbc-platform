@@ -19,7 +19,7 @@ describe('UserService', () => {
     });
 
     it('returns null if the query response has no rows', async function () {
-      const mockQueryResponse = { rows: [] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [] } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -31,7 +31,7 @@ describe('UserService', () => {
 
     it('returns a UserObject for the first row of the response', async function () {
       const mockResponseRow = { id: 123 };
-      const mockQueryResponse = { rows: [mockResponseRow] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -48,7 +48,7 @@ describe('UserService', () => {
     });
 
     it('returns null if the query response has no rows', async function () {
-      const mockQueryResponse = { rows: [] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [] } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -60,7 +60,7 @@ describe('UserService', () => {
 
     it('returns a UserObject for the first row of the response', async function () {
       const mockResponseRow = { id: 123 };
-      const mockQueryResponse = { rows: [mockResponseRow] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -77,7 +77,7 @@ describe('UserService', () => {
     });
 
     it('should throw an error when response has no rows', async () => {
-      const mockQueryResponse = { rows: [] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [] } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -95,7 +95,7 @@ describe('UserService', () => {
 
     it('should not throw an error on success', async () => {
       const mockRowObj = { id: 123 };
-      const mockQueryResponse = { rows: [mockRowObj] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [mockRowObj] } as unknown) as QueryResult<any>;
       const mockQuery = sinon.fake.resolves(mockQueryResponse);
       const mockDBConnection = getMockDBConnection({ sql: mockQuery });
 
@@ -121,7 +121,7 @@ describe('UserService', () => {
     });
 
     it('returns empty array if the query response has no rows', async function () {
-      const mockQueryResponse = { rows: [] } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rows: [] } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -135,9 +135,9 @@ describe('UserService', () => {
       const mockResponseRow1 = { id: 123 };
       const mockResponseRow2 = { id: 456 };
       const mockResponseRow3 = { id: 789 };
-      const mockQueryResponse = {
+      const mockQueryResponse = ({
         rows: [mockResponseRow1, mockResponseRow2, mockResponseRow3]
-      } as unknown as QueryResult<any>;
+      } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -158,7 +158,7 @@ describe('UserService', () => {
     });
 
     it('throws an error if it fails to get the current system user id', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => null as unknown as number });
+      const mockDBConnection = getMockDBConnection({ systemUserId: () => (null as unknown) as number });
 
       const existingSystemUser = null;
       const getUserByIdentifierStub = sinon
@@ -335,7 +335,7 @@ describe('UserService', () => {
     });
 
     it('throws an error if the query response has no rowCount', async function () {
-      const mockQueryResponse = { rowCount: 0 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 0 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -349,7 +349,7 @@ describe('UserService', () => {
     });
 
     it('returns nothing on success', async function () {
-      const mockQueryResponse = { rowCount: 1 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 1 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -366,7 +366,7 @@ describe('UserService', () => {
     });
 
     it('throws an error if the query response has no rowCount', async function () {
-      const mockQueryResponse = { rowCount: 0 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 0 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -380,7 +380,7 @@ describe('UserService', () => {
     });
 
     it('returns nothing on success', async function () {
-      const mockQueryResponse = { rowCount: 1 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 1 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -397,7 +397,7 @@ describe('UserService', () => {
     });
 
     it('throws an error if the query response has no rowCount', async function () {
-      const mockQueryResponse = { rowCount: 0 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 0 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -411,7 +411,7 @@ describe('UserService', () => {
     });
 
     it('returns nothing on success', async function () {
-      const mockQueryResponse = { rowCount: 1 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 1 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -428,7 +428,7 @@ describe('UserService', () => {
     });
 
     it('throws an error if the query response has no rowCount', async function () {
-      const mockQueryResponse = { rowCount: 0 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 0 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
@@ -442,7 +442,7 @@ describe('UserService', () => {
     });
 
     it('returns nothing on success', async function () {
-      const mockQueryResponse = { rowCount: 1 } as unknown as QueryResult<any>;
+      const mockQueryResponse = ({ rowCount: 1 } as unknown) as QueryResult<any>;
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1, sql: async () => mockQueryResponse });
 
       const userService = new UserService(mockDBConnection);
