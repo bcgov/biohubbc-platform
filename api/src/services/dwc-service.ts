@@ -1,10 +1,9 @@
-import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
-import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -156,26 +155,62 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<WriteResponseBase> {
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
     const submissionService = new SubmissionService(this.connection);
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord || !submissionRecord.eml_source) {
-      throw new ApiGeneralError('eml source is not available');
+    if (!submissionRecord) {
+      throw new ApiGeneralError('The submission record is not available');
     }
 
-    const esClient = await this.getEsClient();
+    if (!submissionRecord.eml_source) {
+      throw new ApiGeneralError('The eml source is not available');
+    }
 
-    const doc = await this.convertEMLtoJSON(submissionRecord.submission_id, submissionRecord.eml_source);
+    const stylesheet = await submissionService.getEMLStyleSheet(submissionId);
 
-    const jsonDoc = JSON.parse(doc);
+    if (!stylesheet) {
+      throw new ApiGeneralError('The stylesheet is not available');
+    }
 
-    const response = await esClient.create({
-      id: dataPackageId,
-      index: ES_INDEX.EML,
-      document: jsonDoc
-    });
+    let transformedEML;
+    let response;
+
+    //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
+    try {
+      transformedEML = await this.transformEMLtoJSON(submissionId, submissionRecord.eml_source, stylesheet);
+    } catch (error) {
+      const submissionStatusId = await submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED
+      );
+
+      await submissionService.insertSubmissionMessage(
+        submissionStatusId.submission_status_id,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'eml transformation failed'
+      );
+
+      return;
+    }
+
+    //call to the ElasticSearch API to create a record with our transformed EML
+    try {
+      response = await this.uploadtoElasticSearch(dataPackageId, transformedEML);
+    } catch (error) {
+      const submissionStatusId = await submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED
+      );
+
+      await submissionService.insertSubmissionMessage(
+        submissionStatusId.submission_status_id,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'upload to elastic search failed'
+      );
+      return;
+    }
 
     //TODO: We need a new submission status type
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
@@ -190,37 +225,10 @@ export class DarwinCoreService extends DBService {
    * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
-  async convertEMLtoJSON(submissionId: number, emlSource: XmlString): Promise<string> {
-    if (!emlSource) {
-      return '';
-    }
-
-    const submissionService = new SubmissionService(this.connection);
-
-    const stylesheet = await submissionService.getEMLStyleSheet(submissionId);
-
-    if (!stylesheet) {
-      return '';
-    }
-
-    // try {
-    //   const env = SaxonJS2N.getPlatform();
-
-    //   console.log('env is', env);
-
-    //   const doc = env.parseXmlFromString(stylesheet);
-
-    //   console.log('doc is: ', doc);
-
-    //   const sef = SaxonJS2N.compile(doc);
-
-    //   console.log('sef is :', sef);
-    // } catch (error) {
-    //   console.log(error);
-    // }
-
-    //bug is similar to this one
-    //https://saxonica.plan.io/issues/5038
+  async transformEMLtoJSON(submissionId: number, emlSource: XmlString, stylesheet: any): Promise<any> {
+    // for future reference
+    // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
+    //to see the library's author respond to one of our questions
 
     const result: {
       principalResult: string;
@@ -232,7 +240,10 @@ export class DarwinCoreService extends DBService {
       sourceText: emlSource,
       destination: 'serialized'
     });
-    return result.principalResult;
+
+    const jsonDoc = JSON.parse(result.principalResult);
+
+    return jsonDoc;
   }
 
   /**
@@ -279,5 +290,15 @@ export class DarwinCoreService extends DBService {
     }
 
     return response;
+  }
+
+  async uploadtoElasticSearch(dataPackageId: string, convertedEML: string) {
+    const esClient = await this.getEsClient();
+
+    return await esClient.create({
+      id: dataPackageId,
+      index: ES_INDEX.EML,
+      document: convertedEML
+    });
   }
 }

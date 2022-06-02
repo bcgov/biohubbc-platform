@@ -113,12 +113,17 @@ export class SubmissionService extends DBService {
    */
   async insertSubmissionMessage(
     submissionStatusId: number,
-    submissionMessageType: SUBMISSION_MESSAGE_TYPE
+    submissionMessageType: SUBMISSION_MESSAGE_TYPE,
+    submissionMessage: string
   ): Promise<{
     submission_message_id: number;
     submission_message_type_id: number;
   }> {
-    return this.submissionRepository.insertSubmissionMessage(submissionStatusId, submissionMessageType);
+    return this.submissionRepository.insertSubmissionMessage(
+      submissionStatusId,
+      submissionMessageType,
+      submissionMessage
+    );
   }
 
   /**

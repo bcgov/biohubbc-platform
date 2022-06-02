@@ -348,13 +348,15 @@ export class SubmissionRepository extends BaseRepository {
    */
   async insertSubmissionMessage(
     submissionStatusId: number,
-    submissionMessageType: SUBMISSION_MESSAGE_TYPE
+    submissionMessageType: SUBMISSION_MESSAGE_TYPE,
+    submissionMessage: string
   ): Promise<{ submission_message_id: number; submission_message_type_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_message (
         submission_status_id,
         submission_message_type_id,
-        event_timestamp
+        event_timestamp,
+        message
       ) VALUES (
         ${submissionStatusId},
         (
@@ -365,7 +367,8 @@ export class SubmissionRepository extends BaseRepository {
           WHERE
             name = ${submissionMessageType}
         ),
-        now()
+        now(),
+        ${submissionMessage}
       )
       RETURNING
         submission_message_id,

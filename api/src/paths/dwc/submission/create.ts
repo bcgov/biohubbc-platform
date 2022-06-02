@@ -4,8 +4,10 @@ import { SOURCE_SYSTEM } from '../../../constants/database';
 import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../services/dwc-service';
+import { SubmissionService } from '../../../services/submission-service';
 import { scanFileForVirus } from '../../../utils/file-utils';
 import { getKeycloakSource } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
@@ -119,7 +121,23 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
-      await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
+      //TODO: create a generic function that inserts the submissionStatus AND inserts a submissionMessage
+      try {
+        await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
+      } catch (error) {
+        const submissionService = new SubmissionService(connection);
+
+        const submissionStatusId = await submissionService.insertSubmissionStatus(
+          submissionId,
+          SUBMISSION_STATUS_TYPE.REJECTED
+        );
+
+        await submissionService.insertSubmissionMessage(
+          submissionStatusId.submission_status_id,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to transform and upload metadata'
+        );
+      }
 
       await connection.commit();
     } catch (error) {
