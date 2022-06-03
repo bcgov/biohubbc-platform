@@ -337,7 +337,7 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getEMLStyleSheet')
-        .resolves(null as unknown as ISourceTransformModel['metadata_transform_precompile']);
+        .resolves((null as unknown) as ISourceTransformModel['metadata_transform_precompile']);
 
       try {
         await darwinCoreService.convertEMLtoJSON(1, `<?xml version="1.0" encoding="UTF-8"?>`);
