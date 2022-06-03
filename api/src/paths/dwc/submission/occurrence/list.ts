@@ -25,7 +25,7 @@ export const GET: Operation = [
 
 GET.apiDoc = {
   description: 'List all occurrences within map bounds',
-  tags: ['occurrence'],
+  tags: ['occurrence', 'map'],
   security: [
     {
       Bearer: []
@@ -48,70 +48,97 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            //   type: 'array',
-            //   items: {
-            //     title: 'occurences by taxonid and gemetry',
-            //     type: 'object',
-            //     properties: {
-            //       id: {
-            //         type: 'integer',
-            //         minimum: 0
-            //       },
-            //       taxonid: {
-            //         type: 'string',
-            //         nullable: true
-            //       },
-            //       geometry: {
-            //         type: 'string',
-            //         nullable: true
-            //       },
-            //       observations: {
-            //         type: 'array',
-            //         items: {
-            //           title: 'occurences by eventdate',
-            //           type: 'object',
-            //           properties: {
-            //             eventdate: {
-            //               type: 'string'
-            //             },
-            //             data: {
-            //               type: 'array',
-            //               items: {
-            //                 title: 'occurences by lifestage, sex, count',
-            //                 type: 'object',
-            //                 properties: {
-            //                   lifestage: {
-            //                     type: 'string',
-            //                     nullable: true
-            //                   },
-            //                   vernacularname: {
-            //                     type: 'string',
-            //                     nullable: true
-            //                   },
-            //                   sex: {
-            //                     type: 'string',
-            //                     nullable: true
-            //                   },
-            //                   individualcount: {
-            //                     type: 'string',
-            //                     nullable: true
-            //                   },
-            //                   organismquantity: {
-            //                     type: 'string',
-            //                     nullable: true
-            //                   },
-            //                   organismquantitytype: {
-            //                     type: 'string',
-            //                     nullable: true
-            //                   }
-            //                 }
-            //               }
-            //             }
-            //           }
-            //         }
-            //       }
-            //     }
-            //   }
+            type: 'array',
+            items: {
+              title: 'occurences by taxonid and gemetry',
+              type: 'object',
+              required: ['id', 'taxonid', 'geometry', 'observations'],
+              properties: {
+                id: {
+                  type: 'integer',
+                  minimum: 0
+                },
+                taxonid: {
+                  type: 'string',
+                  nullable: true
+                },
+                geometry: {
+                  type: 'string',
+                  nullable: true
+                },
+                observations: {
+                  type: 'array',
+                  items: {
+                    title: 'occurences by eventdate',
+                    type: 'object',
+                    required: ['eventdate', 'data'],
+                    properties: {
+                      eventdate: {
+                        type: 'object',
+                        nullable: true
+                      },
+                      data: {
+                        type: 'array',
+                        items: {
+                          title: 'occurences by lifestage, sex, count',
+                          type: 'object',
+                          required: [
+                            'lifestage',
+                            'vernacularname',
+                            'sex',
+                            'individualcount',
+                            'organismquantity',
+                            'organismquantitytype'
+                          ],
+                          properties: {
+                            lifestage: {
+                              type: 'string',
+                              nullable: true
+                            },
+                            vernacularname: {
+                              type: 'string',
+                              nullable: true
+                            },
+                            sex: {
+                              type: 'string',
+                              nullable: true
+                            },
+                            individualcount: {
+                              oneOf: [
+                                {
+                                  type: 'number',
+                                  nullable: true
+                                },
+                                {
+                                  type: 'string',
+                                  nullable: true
+                                }
+                              ]
+                            },
+                            organismquantity: {
+                              oneOf: [
+                                {
+                                  type: 'number',
+                                  nullable: true
+                                },
+                                {
+                                  type: 'string',
+                                  nullable: true
+                                }
+                              ]
+                            },
+                            organismquantitytype: {
+                              type: 'string',
+                              nullable: true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

@@ -32,8 +32,6 @@ const MarkerClusterGroup: React.FC<IMarkerClusterProps> = (props) => {
     popupAnchor: [0, -28]
   });
 
-
-
   return (
     <ReactLeafletMarkerClusterGroup chunkedLoading>
       {props.markers.map((item, index: number) => (

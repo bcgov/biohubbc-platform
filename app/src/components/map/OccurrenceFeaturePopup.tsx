@@ -57,7 +57,7 @@ export const OccurrenceFeaturePopup: React.FC<{ featureData: IGetMapOccurrenceDa
               <Box component="ul" pl={3}>
                 {point.data.map((occur) => {
                   return (
-                    <li key={String(occur.lifestage) + String(occur.sex) + String(occur.individualcount) }>
+                    <li key={String(occur.lifestage) + String(occur.sex) + String(occur.individualcount)}>
                       {`${occur.lifestage} - ${occur.sex} - ${
                         occur.organismquantity
                           ? `${occur.organismquantity} ${occur.organismquantitytype}`

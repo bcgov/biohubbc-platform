@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import { Feature } from 'geojson';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
@@ -81,9 +82,9 @@ describe('OccurrenceRepository', () => {
 
       const occurrenceRepository = new OccurrenceRepository(mockDBConnection);
 
-      const mockInput = { temp: 'string' };
+      const mockInput = { type: 'Feature', geometry: { type: 'polygon' } } as unknown as Feature;
 
-      const response = await occurrenceRepository.getMapOccurrences(JSON.stringify(mockInput));
+      const response = await occurrenceRepository.getMapOccurrences(mockInput);
 
       expect(response).to.eql([mockResponse]);
       expect(generateGeometryStub).to.be.calledOnceWith(mockInput);

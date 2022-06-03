@@ -89,9 +89,9 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
 
       <SetMapBounds bounds={bounds} />
       <GetMapBounds
-        onChange={(bounds: LatLngBounds) => {
+        onChange={(getBounds: LatLngBounds) => {
           if (onBoundsChange) {
-            onBoundsChange(bounds);
+            onBoundsChange(getBounds);
           }
         }}
       />

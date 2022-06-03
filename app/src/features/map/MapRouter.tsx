@@ -5,14 +5,13 @@ import AppRoute from 'utils/AppRoute';
 import MapPage from './MapPage';
 
 /**
- * Router for all `/*` pages.
+ * Router for all `/map` pages.
  *
  * @return {*}
  */
-const HomeRouter: React.FC = () => {
+const MapRouter: React.FC = () => {
   return (
     <Switch>
-
       <AppRoute exact path="/map" layout={ContentLayout}>
         <MapPage />
       </AppRoute>
@@ -20,4 +19,4 @@ const HomeRouter: React.FC = () => {
   );
 };
 
-export default HomeRouter;
+export default MapRouter;

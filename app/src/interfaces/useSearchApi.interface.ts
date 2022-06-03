@@ -35,7 +35,7 @@ export interface IGetOccurrenceData {
   taxonId: string | null;
   lifeStage: string | null;
   sex: string | null;
-  eventDate: string | null;
+  eventDate: object | null;
   vernacularName: string | null;
   individualCount: number | null;
   organismQuantity: number | null;

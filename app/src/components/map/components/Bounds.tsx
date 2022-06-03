@@ -21,12 +21,12 @@ export const GetMapBounds: React.FC<{ onChange: (bounds: LatLngBounds) => void }
   const map = useMapEvents({
     zoomend() {
       const bounds = map.getBounds();
-      map.closePopup()
+      map.closePopup();
       onChange(bounds);
     },
     moveend() {
       const bounds = map.getBounds();
-      map.closePopup()
+      map.closePopup();
       onChange(bounds);
     }
   });
