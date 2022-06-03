@@ -28,6 +28,7 @@ export interface DwCAOccurrenceHeaders {
   vernacularNameHeader: number;
 }
 
+//Interface for Occurrence feature popup
 export interface IGetMapOccurrenceData {
   id: number;
   taxonid: string | undefined;
@@ -58,18 +59,16 @@ export class OccurrenceService extends DBService {
   }
 
   /**
-   * Get all occurrences within map bounds
+   * Get all occurrences within map bounds and format the results
    *
    * @param {(string | undefined)} [mapView]
    * @return {*}  {Promise<IGetMapOccurrenceData[]>}
    * @memberof OccurrenceService
    */
-  async getMapOccurrences(mapView?: string | undefined): Promise<IGetMapOccurrenceData[]> {
+  async getMapOccurrences(mapView?: Feature | undefined): Promise<IGetMapOccurrenceData[]> {
     const allOccurrences = await this.occurrenceRepository.getMapOccurrences(mapView);
 
-    const formated = this.formatOccurrenceDataForMap(allOccurrences);
-
-    return formated;
+    return this.formatOccurrenceDataForMap(allOccurrences);
   }
 
   /**
@@ -83,17 +82,21 @@ export class OccurrenceService extends DBService {
   formatOccurrenceDataForMap(occurrenceData: IGetOccurrenceData[]): IGetMapOccurrenceData[] {
     const curatedOccurrences: IGetMapOccurrenceData[] = [];
 
+    //For each occurrence row in the table
     for (const occurrence of occurrenceData) {
+      //Find index by same taxonid and geometry
       const findByTaxonGeometry = curatedOccurrences.findIndex((check) => {
         return check.taxonid == occurrence.taxonid && occurrence.geometry == check.geometry;
       });
 
+      //If index exists sort further by date
       if (findByTaxonGeometry != -1) {
         curatedOccurrences[findByTaxonGeometry].observations = this.formatObservationByDate(
           curatedOccurrences[findByTaxonGeometry].observations,
           occurrence
         );
       } else {
+        //If index does not exist add new curated taxon and geometry occurrence
         curatedOccurrences.push({
           id: occurrence.occurrence_id,
           taxonid: occurrence.taxonid,
@@ -132,16 +135,19 @@ export class OccurrenceService extends DBService {
     curatedOccurrencesObservations: IGetMapOccurrenceData['observations'],
     occurrence: IGetOccurrenceData
   ): IGetMapOccurrenceData['observations'] {
+    //Find index by same date
     const findByEventDate = curatedOccurrencesObservations.findIndex((check) => {
       return String(check.eventdate) == String(occurrence.eventdate);
     });
 
+    //If index exists sort further by lifestage and sex
     if (findByEventDate != -1) {
       curatedOccurrencesObservations[findByEventDate].data = this.formatObservationByLifestageSex(
         curatedOccurrencesObservations[findByEventDate].data,
         occurrence
       );
     } else {
+      //If index does not exist add new curated date occurrence
       curatedOccurrencesObservations.push({
         eventdate: occurrence.eventdate,
         data: [
@@ -170,14 +176,18 @@ export class OccurrenceService extends DBService {
    * @memberof OccurrenceService
    */
   formatObservationByLifestageSex(curatedData: IGetOrganismData[], occurrence: IGetOccurrenceData): IGetOrganismData[] {
+    //Find index by same lifestage and sex
     const findBySexLifestage = curatedData.findIndex((check) => {
       return check.lifestage == occurrence.lifestage && check.sex == occurrence.sex;
     });
 
+    //If index exists then increase individual count
     if (findBySexLifestage != -1) {
+      //TODO increment organismquantity if valid
       curatedData[findBySexLifestage].individualcount =
         Number(curatedData[findBySexLifestage].individualcount) + Number(occurrence.individualcount);
     } else {
+      //If index does not exist add new curated lifestage and sex occurrence
       curatedData.push({
         lifestage: occurrence.lifestage,
         vernacularname: occurrence.vernacularname,

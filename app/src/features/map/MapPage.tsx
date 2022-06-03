@@ -65,7 +65,6 @@ const MapPage: React.FC = () => {
         const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
 
         if (!response) {
-          setPerformSearch(false);
           return;
         }
 
@@ -82,7 +81,6 @@ const MapPage: React.FC = () => {
           }
         });
 
-        setPerformSearch(false);
         setGeometries(markers);
       } catch (error) {
         const apiError = error as APIError;
@@ -99,6 +97,7 @@ const MapPage: React.FC = () => {
   useEffect(() => {
     if (performSearch) {
       getOccurrenceData();
+      setPerformSearch(false);
     }
   }, [performSearch, getOccurrenceData]);
 

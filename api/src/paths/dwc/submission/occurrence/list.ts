@@ -1,5 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { Feature } from 'geojson';
+import qs from 'qs';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
@@ -118,9 +120,22 @@ GET.apiDoc = {
   }
 };
 
+function isFeature(test: any): test is Feature {
+  if (test?.type == 'Feature' && test?.geometry) {
+    return true;
+  }
+  return false;
+}
+
 export function listOccurrences(): RequestHandler {
   return async (req, res) => {
-    const searchCriteria: { spatial?: string } = req.query || {};
+    const inputQuery = qs.parse(req.query.spatial as string) || {};
+
+    let searchCriteria = undefined;
+
+    if (isFeature(inputQuery)) {
+      searchCriteria = inputQuery;
+    }
 
     const connection = getDBConnection(req['keycloak_token']);
 
@@ -129,7 +144,7 @@ export function listOccurrences(): RequestHandler {
 
       const occurrenceService = new OccurrenceService(connection);
 
-      const submissions = await occurrenceService.getMapOccurrences(searchCriteria.spatial);
+      const submissions = await occurrenceService.getMapOccurrences(searchCriteria);
 
       await connection.commit();
 

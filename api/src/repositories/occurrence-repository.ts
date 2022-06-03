@@ -51,27 +51,27 @@ export class OccurrenceRepository extends BaseRepository {
    * @return {*}  {Promise<IGetOccurrenceData[]>}
    * @memberof OccurrenceRepository
    */
-  async getMapOccurrences(mapView?: string | undefined): Promise<IGetOccurrenceData[]> {
+  async getMapOccurrences(mapView?: Feature | undefined): Promise<IGetOccurrenceData[]> {
     const sqlStatement = SQL`
       SELECT
-        o.occurrence_id,
-        o.submission_id,
-        o.occurrenceid,
-        o.taxonid,
-        o.lifestage,
-        o.sex,
-        o.vernacularname,
-        o.eventdate,
-        o.individualcount,
-        o.organismquantity,
-        o.organismquantitytype,
-        public.ST_asGeoJSON(o.geography) as geometry
+        occurrence_id,
+        submission_id,
+        occurrenceid,
+        taxonid,
+        lifestage,
+        sex,
+        vernacularname,
+        eventdate,
+        individualcount,
+        organismquantity,
+        organismquantitytype,
+        public.ST_asGeoJSON(geography) as geometry
       FROM
-        occurrence as o
+        occurrence
     `;
 
     if (mapView) {
-      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(mapView));
+      const geometryCollectionSQL = generateGeometryCollectionSQL(mapView);
 
       sqlStatement.append(`
       WHERE

@@ -5,7 +5,6 @@ import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster
 export interface IMarker {
   position: LatLngExpression;
   popup?: ReactElement;
-  color?: string;
 }
 
 export interface IMarkerClusterProps {
@@ -17,7 +16,7 @@ const MarkerClusterGroup: React.FC<IMarkerClusterProps> = (props) => {
     return null;
   }
 
-  //TODO needs improvment for dynamic icons
+  //TODO needs improvment for dynamic icons and colours
   const iconSettings = {
     mapIconUrl:
       '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path fill="#2F5982" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>',
