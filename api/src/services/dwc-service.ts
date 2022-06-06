@@ -173,20 +173,18 @@ export class DarwinCoreService extends DBService {
 
     const parsedStylesheet = parseS3File(stylesheetfromS3);
 
-    const stylesheetBuffer = parsedStylesheet.buffer;
-
-    if (!stylesheetBuffer) {
+    if (!parsedStylesheet) {
       throw new ApiGeneralError('Failed to parse the stylesheet');
     }
 
-    const styleSheetBufferConvertedToString = stylesheetBuffer.toString();
+    const compiledTemplate = parsedStylesheet.buffer.toString();
 
     let transformedEML;
     let response;
 
     //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
-      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, styleSheetBufferConvertedToString);
+      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, compiledTemplate);
     } catch (error) {
       return await submissionService.insertSubmissionStatusAndMessage(
         submissionId,
