@@ -176,20 +176,16 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('Failed to parse the stylesheet');
     }
 
-    const stylesheetContent = parsedStylesheet?.buffer;
+    const stylesheetBuffer = parsedStylesheet?.buffer;
 
-    const styleSheetBufferConvertedToString = stylesheetContent.toString();
+    const styleSheetBufferConvertedToString = stylesheetBuffer.toString();
 
     let transformedEML;
     let response;
 
     //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
-      transformedEML = await this.transformEMLtoJSON(
-        submissionId,
-        submissionRecord.eml_source,
-        styleSheetBufferConvertedToString
-      );
+      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, styleSheetBufferConvertedToString);
     } catch (error) {
       const submissionStatusId = await submissionService.insertSubmissionStatus(
         submissionId,
@@ -235,7 +231,7 @@ export class DarwinCoreService extends DBService {
    * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
-  async transformEMLtoJSON(submissionId: number, emlSource: XmlString, stylesheet: any): Promise<any> {
+  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
     // for future reference
     // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
     //to see the library's author respond to one of our questions
