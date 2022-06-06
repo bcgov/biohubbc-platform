@@ -127,13 +127,9 @@ export function submitDataset(): RequestHandler {
       } catch (error) {
         const submissionService = new SubmissionService(connection);
 
-        const submissionStatusId = await submissionService.insertSubmissionStatus(
+        await submissionService.insertSubmissionStatusAndMessage(
           submissionId,
-          SUBMISSION_STATUS_TYPE.REJECTED
-        );
-
-        await submissionService.insertSubmissionMessage(
-          submissionStatusId.submission_status_id,
+          SUBMISSION_STATUS_TYPE.REJECTED,
           SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
           'Failed to transform and upload metadata'
         );

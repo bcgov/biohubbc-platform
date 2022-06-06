@@ -187,35 +187,24 @@ export class DarwinCoreService extends DBService {
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, styleSheetBufferConvertedToString);
     } catch (error) {
-      const submissionStatusId = await submissionService.insertSubmissionStatus(
+      return await submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED
-      );
-
-      await submissionService.insertSubmissionMessage(
-        submissionStatusId.submission_status_id,
+        SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'eml transformation failed'
       );
-
-      return;
     }
 
     //call to the ElasticSearch API to create a record with our transformed EML
     try {
       response = await this.uploadtoElasticSearch(dataPackageId, transformedEML);
     } catch (error) {
-      const submissionStatusId = await submissionService.insertSubmissionStatus(
+      return await submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED
-      );
-
-      await submissionService.insertSubmissionMessage(
-        submissionStatusId.submission_status_id,
+        SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'upload to elastic search failed'
       );
-      return;
     }
 
     //TODO: We need a new submission status type

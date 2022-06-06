@@ -156,6 +156,13 @@ export class SubmissionService extends DBService {
     ).transform_precompile_key;
   }
 
+  /**
+   *
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<any>}
+   * @memberof SubmissionService
+   */
   async getStylesheetFromS3(submissionId: number): Promise<any> {
     try {
       const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
@@ -177,5 +184,44 @@ export class SubmissionService extends DBService {
       defaultLog.error({ label: 'getS3File', message: 'error', error });
       throw error;
     }
+  }
+  /**
+   * Inserts both the status and message of a submission
+   *
+   * @param {number} submissionId
+   * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
+   * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
+   * @param {string} submissionMessage
+   * @return {*}  {Promise<{
+   *     submission_status_id: number;
+   *     submission_message_id: number;
+   *   }>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionStatusAndMessage(
+    submissionId: number,
+    submissionStatusType: SUBMISSION_STATUS_TYPE,
+    submissionMessageType: SUBMISSION_MESSAGE_TYPE,
+    submissionMessage: string
+  ): Promise<{
+    submission_status_id: number;
+    submission_message_id: number;
+  }> {
+    const submission_status_id = (
+      await this.submissionRepository.insertSubmissionStatus(submissionId, submissionStatusType)
+    ).submission_status_id;
+
+    const submission_message_id = (
+      await this.submissionRepository.insertSubmissionMessage(
+        submission_status_id,
+        submissionMessageType,
+        submissionMessage
+      )
+    ).submission_message_id;
+
+    return {
+      submission_status_id,
+      submission_message_id
+    };
   }
 }
