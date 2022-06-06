@@ -48,7 +48,7 @@ describe('MapPage', () => {
         properties: {},
         geometry: {
           type: 'Point',
-          coordinates:  [-129.083298513, 55.40257311]
+          coordinates: [-129.083298513, 55.40257311]
         }
       } as Feature,
       observations: [
