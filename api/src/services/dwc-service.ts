@@ -5,6 +5,7 @@ import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
+import { parseS3File } from '../utils/media-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
@@ -170,13 +171,13 @@ export class DarwinCoreService extends DBService {
 
     const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
-    const parsedStylesheet = parseUnknownMedia(stylesheetfromS3);
+    const parsedStylesheet = parseS3File(stylesheetfromS3);
 
-    if (!parsedStylesheet) {
+    const stylesheetBuffer = parsedStylesheet.buffer;
+
+    if (!stylesheetBuffer) {
       throw new ApiGeneralError('Failed to parse the stylesheet');
     }
-
-    const stylesheetBuffer = parsedStylesheet?.buffer;
 
     const styleSheetBufferConvertedToString = stylesheetBuffer.toString();
 
@@ -236,9 +237,7 @@ export class DarwinCoreService extends DBService {
       destination: 'serialized'
     });
 
-    const jsonDoc = JSON.parse(result.principalResult);
-
-    return jsonDoc;
+    return JSON.parse(result.principalResult);
   }
 
   /**
