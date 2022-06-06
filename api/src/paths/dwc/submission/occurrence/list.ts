@@ -104,7 +104,7 @@ GET.apiDoc = {
                               nullable: true
                             },
                             individualcount: {
-                              oneOf: [
+                              anyOf: [
                                 {
                                   type: 'number',
                                   nullable: true
@@ -113,10 +113,11 @@ GET.apiDoc = {
                                   type: 'string',
                                   nullable: true
                                 }
-                              ]
+                              ],
+                              nullable: true
                             },
                             organismquantity: {
-                              oneOf: [
+                              anyOf: [
                                 {
                                   type: 'number',
                                   nullable: true
@@ -125,7 +126,8 @@ GET.apiDoc = {
                                   type: 'string',
                                   nullable: true
                                 }
-                              ]
+                              ],
+                              nullable: true
                             },
                             organismquantitytype: {
                               type: 'string',

@@ -110,7 +110,7 @@ const MapPage: React.FC = () => {
         <Box>
           <Box mb={4}>
             <Grid item xs={12}>
-              <Box mt={2} height={750}>
+              <Box mt={2} height={750} data-testid='MapContainer' >
                 <MapContainer
                   mapId="boundary_map"
                   onBoundsChange={getOccurrenceData}
