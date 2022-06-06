@@ -55,9 +55,11 @@ export interface ISourceTransformModel {
   source_transform_id: number;
   system_user_id: number;
   version: number;
-  metadata_transform: string;
-  metadata_transform_precompile: string | null;
-  metadata_index: string;
+  transform_filename: string | null;
+  transform_key: string | null;
+  transform_precompile_filename: string | null;
+  transform_precompile_key: string | null;
+  metadata_index: string | null;
   record_effective_date: string;
   record_end_date: string | null;
   create_date: string;

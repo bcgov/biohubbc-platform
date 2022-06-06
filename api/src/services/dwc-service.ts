@@ -168,18 +168,28 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('The eml source is not available');
     }
 
-    const stylesheet = await submissionService.getEMLStyleSheet(submissionId);
+    const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
-    if (!stylesheet) {
-      throw new ApiGeneralError('The stylesheet is not available');
+    const parsedStylesheet = parseUnknownMedia(stylesheetfromS3);
+
+    if (!parsedStylesheet) {
+      throw new ApiGeneralError('Failed to parse the stylesheet');
     }
+
+    const stylesheetContent = parsedStylesheet?.buffer;
+
+    const styleSheetBufferConvertedToString = stylesheetContent.toString();
 
     let transformedEML;
     let response;
 
     //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
-      transformedEML = await this.transformEMLtoJSON(submissionId, submissionRecord.eml_source, stylesheet);
+      transformedEML = await this.transformEMLtoJSON(
+        submissionId,
+        submissionRecord.eml_source,
+        styleSheetBufferConvertedToString
+      );
     } catch (error) {
       const submissionStatusId = await submissionService.insertSubmissionStatus(
         submissionId,
@@ -236,7 +246,7 @@ export class DarwinCoreService extends DBService {
       stylesheetInternal: Record<string, unknown>;
       masterDocument: unknown;
     } = SaxonJS2N.transform({
-      stylesheetNode: stylesheet,
+      stylesheetText: stylesheet,
       sourceText: emlSource,
       destination: 'serialized'
     });

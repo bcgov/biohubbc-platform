@@ -1,4 +1,6 @@
 import { IDBConnection } from '../database/db';
+import { ApiExecuteSQLError } from '../errors/api-error';
+import { HTTP500 } from '../errors/http-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -9,7 +11,11 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { getFileFromS3 } from '../utils/file-utils';
+import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
+
+const defaultLog = getLogger('paths/dwc/validate');
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -144,12 +150,32 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<ISourceTransformModel['metadata_transform_precompile']>}
    * @memberof SubmissionService
    */
-  async getEMLStyleSheet(submissionId: number): Promise<ISourceTransformModel['metadata_transform_precompile']> {
-    return await (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId))
-      .metadata_transform_precompile;
+  async getEMLStyleSheetKey(submissionId: number): Promise<ISourceTransformModel['transform_precompile_key']> {
+    return await (
+      await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)
+    ).transform_precompile_key;
   }
 
-  async getRawEMLStyleSheet(submissionId: number): Promise<ISourceTransformModel['metadata_transform_precompile']> {
-    return await (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)).metadata_transform;
+  async getStylesheetFromS3(submissionId: number): Promise<any> {
+    try {
+      const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
+
+      if (!stylesheet_key) {
+        throw new ApiExecuteSQLError('Failed to retrieve stylesheet key', [
+          'SubmissionRepository->getStyleSheetKey',
+          'stylesheet_key was null'
+        ]);
+      }
+
+      const s3File = await getFileFromS3(stylesheet_key);
+
+      if (!s3File) {
+        throw new HTTP500('Failed to get file from S3');
+      }
+      return s3File;
+    } catch (error) {
+      defaultLog.error({ label: 'getS3File', message: 'error', error });
+      throw error;
+    }
   }
 }
