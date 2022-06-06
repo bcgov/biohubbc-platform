@@ -186,7 +186,7 @@ export class DarwinCoreService extends DBService {
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, compiledTemplate);
     } catch (error) {
-      return await submissionService.insertSubmissionStatusAndMessage(
+      return submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
@@ -198,7 +198,7 @@ export class DarwinCoreService extends DBService {
     try {
       response = await this.uploadtoElasticSearch(dataPackageId, transformedEML);
     } catch (error) {
-      return await submissionService.insertSubmissionStatusAndMessage(
+      return submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
@@ -287,7 +287,7 @@ export class DarwinCoreService extends DBService {
   async uploadtoElasticSearch(dataPackageId: string, convertedEML: string) {
     const esClient = await this.getEsClient();
 
-    return await esClient.create({
+    return esClient.create({
       id: dataPackageId,
       index: ES_INDEX.EML,
       document: convertedEML
