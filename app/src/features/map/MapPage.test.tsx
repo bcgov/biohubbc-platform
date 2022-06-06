@@ -59,7 +59,7 @@ describe('MapPage', () => {
               lifestage: 'string',
               vernacularname: 'string',
               sex: 'string',
-              individualcount: '2',
+              individualcount: '1',
               organismquantity: '1',
               organismquantitytype: 'string'
             }
