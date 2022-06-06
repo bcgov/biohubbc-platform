@@ -42,7 +42,6 @@ GET.apiDoc = {
               type: 'object',
               required: [
                 'submission_id',
-                'source',
                 'uuid',
                 'event_timestamp',
                 'create_date',
@@ -66,11 +65,9 @@ GET.apiDoc = {
                   format: 'uuid'
                 },
                 event_timestamp: {
-                  type: 'string',
                   oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                 },
                 delete_timestamp: {
-                  type: 'string',
                   oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                   nullable: true
                 },
@@ -91,14 +88,12 @@ GET.apiDoc = {
                   nullable: true
                 },
                 create_date: {
-                  type: 'string',
                   oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                 },
                 create_user: {
                   type: 'integer'
                 },
                 update_date: {
-                  type: 'string',
                   oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                   nullable: true
                 },
