@@ -271,8 +271,6 @@ objects:
               terminationMessagePath: "/dev/termination-log"
               terminationMessagePolicy: File
           dnsPolicy: ClusterFirst
-          imagePullSecrets:
-            - name: artifacts-pull-default-opbofo
           restartPolicy: Always
           schedulerName: default-scheduler
           securityContext: {}
@@ -287,7 +285,7 @@ parameters:
     required: true
     value: metabase
   - name: NAMESPACE
-    description: Namespace reference (i.e. '9f0fbe')
+    description: Namespace reference (i.e. '9f0fbe') for Metabase installation
     displayName: Namespace
     required: true
   - name: TARGET_NS

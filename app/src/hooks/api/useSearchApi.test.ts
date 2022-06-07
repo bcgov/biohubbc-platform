@@ -29,6 +29,23 @@ describe('useSearchApi', () => {
 
     expect(result[0].id).toEqual('1');
   });
+
+  it('getMapOccurrenceData works as expected', async () => {
+    const res = [
+      {
+        id: '1',
+        taxonid: 'name',
+        geometry: 'geometry',
+        observations: []
+      }
+    ];
+
+    mock.onGet('/api/dwc/submission/occurrence/list').reply(200, res);
+
+    const result = await useSearchApi(axios).getMapOccurrenceData();
+
+    expect(result[0].id).toEqual('1');
+  });
 });
 
 describe('usePublicSearchApi', () => {

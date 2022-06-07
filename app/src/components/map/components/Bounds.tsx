@@ -1,11 +1,11 @@
-import { LatLngBoundsExpression } from 'leaflet';
-import { useMap } from 'react-leaflet';
+import { LatLngBounds, LatLngBoundsExpression } from 'leaflet';
+import { useMap, useMapEvents } from 'react-leaflet';
 
 export interface IMapBoundsProps {
   bounds?: LatLngBoundsExpression;
 }
 
-const MapBounds: React.FC<IMapBoundsProps> = (props) => {
+export const SetMapBounds: React.FC<IMapBoundsProps> = (props) => {
   const map = useMap();
 
   if (props.bounds) {
@@ -15,4 +15,21 @@ const MapBounds: React.FC<IMapBoundsProps> = (props) => {
   return null;
 };
 
-export default MapBounds;
+export const GetMapBounds: React.FC<{ onChange: (bounds: LatLngBounds) => void }> = (props) => {
+  const { onChange } = props;
+
+  const map = useMapEvents({
+    zoomend() {
+      const bounds = map.getBounds();
+      map.closePopup();
+      onChange(bounds);
+    },
+    moveend() {
+      const bounds = map.getBounds();
+      map.closePopup();
+      onChange(bounds);
+    }
+  });
+
+  return null;
+};

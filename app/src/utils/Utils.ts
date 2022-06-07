@@ -1,5 +1,7 @@
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
+import { Feature } from 'geojson';
+import { LatLngBounds } from 'leaflet';
 import moment from 'moment';
 
 /**
@@ -147,4 +149,28 @@ export const getFormattedFileSize = (fileSize: number) => {
  */
 export function getKeyByValue(object: any, value: any) {
   return Object.keys(object).find((key) => object[key] === value);
+}
+
+export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds) {
+  const southWest = bounds.getSouthWest();
+  const northEast = bounds.getNorthEast();
+
+  const spatialBounds = {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [southWest.lng, southWest.lat],
+          [southWest.lng, northEast.lat],
+          [northEast.lng, northEast.lat],
+          [northEast.lng, southWest.lat],
+          [southWest.lng, southWest.lat]
+        ]
+      ]
+    }
+  } as Feature;
+
+  return spatialBounds;
 }
