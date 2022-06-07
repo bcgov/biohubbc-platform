@@ -1,7 +1,6 @@
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
-import { HTTP500 } from '../errors/http-error';
+import { ApiGeneralError } from '../errors/api-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -145,11 +144,20 @@ export class SubmissionService extends DBService {
    * Gets the S3key of the EMLStyleSheet from the DB.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISourceTransformModel['metadata_transform_precompile']>}
+   * @return {*}  {Promise<string>}
    * @memberof SubmissionService
    */
-  async getEMLStyleSheetKey(submissionId: number): Promise<ISourceTransformModel['transform_precompile_key']> {
-    return (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)).transform_precompile_key;
+  async getEMLStyleSheetKey(submissionId: number): Promise<string> {
+    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
+
+    if (!transformRecord.transform_precompile_key) {
+      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
+        'SubmissionRepository->getStyleSheetKey',
+        'stylesheet_key was null'
+      ]);
+    }
+
+    return transformRecord.transform_precompile_key;
   }
 
   /**
@@ -162,18 +170,12 @@ export class SubmissionService extends DBService {
   async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
     const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
 
-    if (!stylesheet_key) {
-      throw new ApiExecuteSQLError('Failed to retrieve stylesheet key', [
-        'SubmissionRepository->getStyleSheetKey',
-        'stylesheet_key was null'
-      ]);
-    }
-
     const s3File = await getFileFromS3(stylesheet_key);
 
     if (!s3File) {
-      throw new HTTP500('Failed to get file from S3');
+      throw new ApiGeneralError('Failed to get file from S3');
     }
+
     return s3File;
   }
 
