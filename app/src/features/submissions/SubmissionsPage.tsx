@@ -12,11 +12,12 @@ import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
 
+import { IListSubmissionsResponse } from 'interfaces/useSubmissionsApi.interface';
 import { useApi } from 'hooks/useApi';
 
 const SubmissionsPage = () => {
 
-  const [submissions, setSubmissions] = React.useState<any[]>([])
+  const [submissions, setSubmissions] = React.useState<IListSubmissionsResponse>([])
   const [loading, setLoading] = React.useState<boolean>(false)
 
   const biohubApi = useApi()
