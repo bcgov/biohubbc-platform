@@ -8,6 +8,7 @@ import RequestSubmitted from 'features/access/RequestSubmitted';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import LogOutPage from 'features/logout/LogOutPage';
+import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
 import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
 import BaseLayout from 'layouts/BaseLayout';
@@ -34,8 +35,13 @@ const AppRouter: React.FC = () => {
         <SearchRouter />
       </AppRoute>
 
+<<<<<<< HEAD
       <AppRoute path="/submissions" title={getTitle('Submissions')} layout={BaseLayout}>
         <SubmissionsRouter />
+=======
+      <AppRoute path="/map" title={getTitle('Map')} layout={BaseLayout}>
+        <MapRouter />
+>>>>>>> dev
       </AppRoute>
 
       <AppRoute path="/page-not-found" title={getTitle('Page Not Found')} layout={BaseLayout}>

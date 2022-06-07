@@ -5,7 +5,7 @@ import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
 import useN8NApi from './api/useN8NApi';
 import useSubmissionsApi from './api/useSubmissionsApi'
-import { usePublicSearchApi } from './api/useSearchApi';
+import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
 import useUserApi from './api/useUserApi';
 
 /**
@@ -32,12 +32,15 @@ export const useApi = () => {
     search: usePublicSearchApi(apiAxios)
   };
 
+  const search = useSearchApi(apiAxios);
+
   return {
     codes,
     user,
     admin,
     n8n,
     submissions,
-    public: publicApis
+    public: publicApis,
+    search
   };
 };
