@@ -1,3 +1,4 @@
+import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTP500 } from '../errors/http-error';
@@ -12,10 +13,7 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { getFileFromS3 } from '../utils/file-utils';
-import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
-
-const defaultLog = getLogger('paths/dwc/validate');
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -144,7 +142,7 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *
+   * Gets the S3key of the EMLStyleSheet from the DB.
    *
    * @param {number} submissionId
    * @return {*}  {Promise<ISourceTransformModel['metadata_transform_precompile']>}
@@ -155,34 +153,30 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *
+   * Returns the EML stylesheet from S3
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<any>}
+   * @return {*}  {Promise<GetObjectOutput>}
    * @memberof SubmissionService
    */
-  async getStylesheetFromS3(submissionId: number): Promise<any> {
-    try {
-      const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
+  async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
+    const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
 
-      if (!stylesheet_key) {
-        throw new ApiExecuteSQLError('Failed to retrieve stylesheet key', [
-          'SubmissionRepository->getStyleSheetKey',
-          'stylesheet_key was null'
-        ]);
-      }
-
-      const s3File = await getFileFromS3(stylesheet_key);
-
-      if (!s3File) {
-        throw new HTTP500('Failed to get file from S3');
-      }
-      return s3File;
-    } catch (error) {
-      defaultLog.error({ label: 'getS3File', message: 'error', error });
-      throw error;
+    if (!stylesheet_key) {
+      throw new ApiExecuteSQLError('Failed to retrieve stylesheet key', [
+        'SubmissionRepository->getStyleSheetKey',
+        'stylesheet_key was null'
+      ]);
     }
+
+    const s3File = await getFileFromS3(stylesheet_key);
+
+    if (!s3File) {
+      throw new HTTP500('Failed to get file from S3');
+    }
+    return s3File;
   }
+
   /**
    * Inserts both the status and message of a submission
    *
