@@ -28,7 +28,7 @@ export interface IAddSystemUsersForm {
 export const AddSystemUsersFormArrayItemInitialValues: IAddSystemUsersFormArrayItem = {
   userIdentifier: '',
   identitySource: '',
-  system_role: ('' as unknown) as number
+  system_role: '' as unknown as number
 };
 
 export const AddSystemUsersFormInitialValues: IAddSystemUsersForm = {

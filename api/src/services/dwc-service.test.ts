@@ -229,7 +229,7 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe.skip('transformAndUploadMetaData', () => {
+  describe('transformAndUploadMetaData', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -246,7 +246,7 @@ describe('DarwinCoreService', () => {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
         expect.fail();
       } catch (actualError) {
-        expect((actualError as Error).message).to.equal('The eml source is not available');
+        expect((actualError as Error).message).to.equal('The submission record is not available');
       }
     });
 
@@ -266,7 +266,45 @@ describe('DarwinCoreService', () => {
       }
     });
 
-    it('throws an error when getting the Elastic Search service fails', async () => {
+    it('throws an error if the function is not able to get the stylesheet', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
+
+      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(null);
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('The transformation stylesheet is not available');
+      }
+    });
+
+    it.skip('throws an error if the function is not able to parse the file', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
+
+      const s3File: MediaFile = new MediaFile('fileName', 'mimetype', Buffer.from('{"id": "myId"}'));
+
+      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('Failed to parse the stylesheet');
+      }
+    });
+
+    it.skip('throws an error when getting the Elastic Search service fails', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
@@ -284,7 +322,7 @@ describe('DarwinCoreService', () => {
       }
     });
 
-    it('inserts a record in elastic search with valid data and connection', async () => {
+    it.skip('inserts a record in elastic search with valid data and connection', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 

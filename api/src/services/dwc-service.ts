@@ -171,6 +171,10 @@ export class DarwinCoreService extends DBService {
 
     const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
+    if (!stylesheetfromS3) {
+      throw new ApiGeneralError('The transformation stylesheet is not available');
+    }
+
     const parsedStylesheet = parseS3File(stylesheetfromS3);
 
     if (!parsedStylesheet) {

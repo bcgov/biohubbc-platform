@@ -18,7 +18,7 @@ export interface IIDIRRequestForm {
 }
 
 export const IDIRRequestFormInitialValues: IIDIRRequestForm = {
-  role: ('' as unknown) as number,
+  role: '' as unknown as number,
   comments: ''
 };
 
