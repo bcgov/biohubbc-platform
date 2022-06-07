@@ -10,6 +10,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { LatLngBounds } from 'leaflet';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
+import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
 const MapPage: React.FC = () => {
   const platformApi = useApi();
@@ -41,25 +42,7 @@ const MapPage: React.FC = () => {
         let spatialBounds: Feature = {} as unknown as Feature;
 
         if (bounds) {
-          const southWest = bounds.getSouthWest();
-          const northEast = bounds.getNorthEast();
-
-          spatialBounds = {
-            type: 'Feature',
-            properties: {},
-            geometry: {
-              type: 'Polygon',
-              coordinates: [
-                [
-                  [southWest.lng, southWest.lat],
-                  [southWest.lng, northEast.lat],
-                  [northEast.lng, northEast.lat],
-                  [northEast.lng, southWest.lat],
-                  [southWest.lng, southWest.lat]
-                ]
-              ]
-            }
-          } as Feature;
+          spatialBounds = getFeatureObjectFromLatLngBounds(bounds);
         }
 
         const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
