@@ -282,7 +282,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Validate Security rules of submission record
+   * Validate Security rules of submission record and set status
    *
    * @param {number} submissionId
    * @param {number} securityId
