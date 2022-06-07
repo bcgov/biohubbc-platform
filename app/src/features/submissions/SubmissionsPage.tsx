@@ -23,11 +23,9 @@ const SubmissionsPage = () => {
   const biohubApi = useApi()
 
   React.useState(() => {
-    console.log('Fetching submissions')
     setLoading(true)
     biohubApi.submissions.listSubmissions().then((res) => {
       setSubmissions(res)
-      console.log('res:', res)
       setLoading(false)
     })
   })
