@@ -161,10 +161,6 @@ export class DarwinCoreService extends DBService {
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord) {
-      throw new ApiGeneralError('The submission record is not available');
-    }
-
     if (!submissionRecord.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
     }
@@ -175,7 +171,21 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('The transformation stylesheet is not available');
     }
 
-    const parsedStylesheet = parseS3File(stylesheetfromS3);
+    console.log('stylesheetfromS3: ', stylesheetfromS3);
+
+    let parsedStylesheet;
+
+    try {
+      parsedStylesheet = parseS3File(stylesheetfromS3);
+
+      console.log('parsedStylesheet: ', parsedStylesheet);
+    } catch (error) {
+      console.log('error in parsing: ', error);
+    }
+
+    // const parsedStylesheet = parseS3File(stylesheetfromS3);
+
+    // console.log('parsedStylesheet: ', parsedStylesheet);
 
     if (!parsedStylesheet) {
       throw new ApiGeneralError('Failed to parse the stylesheet');

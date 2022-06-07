@@ -1,7 +1,6 @@
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { HTTP500 } from '../errors/http-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -171,9 +170,6 @@ export class SubmissionService extends DBService {
 
     const s3File = await getFileFromS3(stylesheet_key);
 
-    if (!s3File) {
-      throw new HTTP500('Failed to get file from S3');
-    }
     return s3File;
   }
 
