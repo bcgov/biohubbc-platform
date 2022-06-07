@@ -386,7 +386,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSourceTransformIdBySubmissionId', () => {
+  describe('getSourceTransformRecordBySubmissionId', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -399,7 +399,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getSourceTransformIdBySubmissionId(1);
+        await submissionRepository.getSourceTransformRecordBySubmissionId(1);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission source transform record');
@@ -417,7 +417,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSourceTransformIdBySubmissionId(1);
+      const response = await submissionRepository.getSourceTransformRecordBySubmissionId(1);
 
       expect(response).to.eql(mockResponse);
     });

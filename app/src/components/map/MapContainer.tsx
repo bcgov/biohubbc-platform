@@ -1,6 +1,6 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import { Feature } from 'geojson';
-import L, { LeafletEventHandlerFnMap } from 'leaflet';
+import L, { LatLngBounds, LeafletEventHandlerFnMap } from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
 import 'leaflet-fullscreen/dist/Leaflet.fullscreen.js';
@@ -11,7 +11,7 @@ import 'leaflet/dist/leaflet.css';
 import React from 'react';
 import { FeatureGroup, LayersControl, MapContainer as LeafletMapContainer } from 'react-leaflet';
 import BaseLayerControls from './components/BaseLayerControls';
-import MapBounds from './components/Bounds';
+import { GetMapBounds, SetMapBounds } from './components/Bounds';
 import DrawControls from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
@@ -48,6 +48,7 @@ export interface IMapContainerProps {
   zoom?: number;
   eventHandlers?: LeafletEventHandlerFnMap;
   LeafletMapContainerProps?: Partial<React.ComponentProps<typeof LeafletMapContainer>>;
+  onBoundsChange?: (bounds: LatLngBounds) => void;
 }
 
 const MapContainer: React.FC<IMapContainerProps> = (props) => {
@@ -63,7 +64,8 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
     bounds,
     zoom,
     eventHandlers,
-    LeafletMapContainerProps
+    LeafletMapContainerProps,
+    onBoundsChange
   } = props;
 
   const fullscreenControlProp = (fullScreenControl && { pseudoFullscreen: true }) || undefined;
@@ -85,7 +87,14 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       {...LeafletMapContainerProps}>
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
-      <MapBounds bounds={bounds} />
+      <SetMapBounds bounds={bounds} />
+      <GetMapBounds
+        onChange={(getBounds: LatLngBounds) => {
+          if (onBoundsChange) {
+            onBoundsChange(getBounds);
+          }
+        }}
+      />
 
       {drawControls && (
         <FeatureGroup>

@@ -171,21 +171,7 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('The transformation stylesheet is not available');
     }
 
-    console.log('stylesheetfromS3: ', stylesheetfromS3);
-
-    let parsedStylesheet;
-
-    try {
-      parsedStylesheet = parseS3File(stylesheetfromS3);
-
-      console.log('parsedStylesheet: ', parsedStylesheet);
-    } catch (error) {
-      console.log('error in parsing: ', error);
-    }
-
-    // const parsedStylesheet = parseS3File(stylesheetfromS3);
-
-    // console.log('parsedStylesheet: ', parsedStylesheet);
+    const parsedStylesheet = parseS3File(stylesheetfromS3);
 
     if (!parsedStylesheet) {
       throw new ApiGeneralError('Failed to parse the stylesheet');

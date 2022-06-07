@@ -433,7 +433,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<ISourceTransformModel>}
    * @memberof SubmissionRepository
    */
-  async getSourceTransformIdBySubmissionId(submissionId: number): Promise<ISourceTransformModel> {
+  async getSourceTransformRecordBySubmissionId(submissionId: number): Promise<ISourceTransformModel> {
     const sqlStatement = SQL`
           SELECT
             *
