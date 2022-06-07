@@ -61,7 +61,7 @@ export class SecurityRepository extends BaseRepository {
     const response = await this.connection.sql<ISecurityModel>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get style schema', [
+      throw new ApiExecuteSQLError('Failed to get security schema', [
         'SecurityRepository->getSecuritySchemaBySecurityId',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
