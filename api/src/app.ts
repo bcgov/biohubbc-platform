@@ -150,7 +150,6 @@ function validateAllResponses(req: Request, res: Response, next: NextFunction) {
       let errorList = [];
 
       if (validationResult?.errors) {
-        console.log("BDY:", body)
         validationMessage = `Invalid response for status code ${res.statusCode}`;
 
         errorList = Array.from(validationResult.errors);
