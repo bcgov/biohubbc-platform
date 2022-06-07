@@ -11,6 +11,7 @@ import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
+import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -260,6 +261,47 @@ export class DarwinCoreService extends DBService {
       await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
     } else {
       await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+    }
+
+    return response;
+  }
+
+  /**
+   *  Temp replacement for secure until more requirements are set
+   *
+   * @param {number} submissionId
+   * @return {*} //TODO RETURN TYPE
+   * @memberof DarwinCoreService
+   */
+  async tempSecureSubmission(submissionId: number) {
+    const submissionService = new SubmissionService(this.connection);
+
+    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
+
+    return { secure: true };
+  }
+
+  /**
+   * Validate Security rules of submission record
+   *
+   * @param {number} submissionId
+   * @param {number} securityId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async secureSubmission(submissionId: number, securityId: number) {
+    const securityService = new SecurityService(this.connection);
+
+    const securitySchema = await securityService.getSecuritySchemaBySecurityId(securityId); //TODO Hard coded
+
+    const response = await securityService.validateSecurityOfSubmission(submissionId, securitySchema);
+
+    const submissionService = new SubmissionService(this.connection);
+
+    if (!response.secure) {
+      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
+    } else {
+      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
     }
 
     return response;
