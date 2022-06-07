@@ -39,7 +39,7 @@ const MapPage: React.FC = () => {
   const getOccurrenceData = useCallback(
     async (bounds?: LatLngBounds) => {
       try {
-        let spatialBounds: Feature = {} as unknown as Feature;
+        let spatialBounds: Feature = ({} as unknown) as Feature;
 
         if (bounds) {
           spatialBounds = getFeatureObjectFromLatLngBounds(bounds);

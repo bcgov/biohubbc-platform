@@ -16,7 +16,7 @@ const renderContainer = () => {
   return render(<MapPage />);
 };
 
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 describe('MapPage', () => {
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe('MapPage', () => {
   });
 
   it('shows `Map` and map container with data points when there is occurrences', async () => {
-    const vaildDataObject = {
+    const vaildDataObject = ({
       id: '1',
       taxonid: 'string',
       geometry: {
@@ -66,7 +66,7 @@ describe('MapPage', () => {
           ]
         }
       ]
-    } as unknown as IGetMapOccurrenceData;
+    } as unknown) as IGetMapOccurrenceData;
 
     mockBiohubApi().search.getMapOccurrenceData.mockReturnValue([vaildDataObject]);
 
