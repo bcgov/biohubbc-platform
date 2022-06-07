@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import { Feature } from 'geojson';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
@@ -8,13 +9,281 @@ import { CSVWorksheet } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, MediaFile } from '../utils/media/media-file';
 import { getMockDBConnection } from '../__mocks__/db';
-import { DwCAOccurrenceHeaders, DwCAOccurrenceRows, OccurrenceService } from './occurrence-service';
+import {
+  DwCAOccurrenceHeaders,
+  DwCAOccurrenceRows,
+  IGetMapOccurrenceData,
+  IGetOrganismData,
+  OccurrenceService
+} from './occurrence-service';
 
 chai.use(sinonChai);
 
 describe('OccurrenceService', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  describe('getMapOccurrences', () => {
+    it('should return curated Occurrence Submission on get', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const occurrenceService = new OccurrenceService(mockDBConnection);
+
+      const repo = sinon
+        .stub(OccurrenceRepository.prototype, 'getMapOccurrences')
+        .resolves([{ occurrence_id: 1 } as unknown as IGetOccurrenceData]);
+
+      const formatOccurrenceDataForMapStub = sinon
+        .stub(OccurrenceService.prototype, 'formatOccurrenceDataForMap')
+        .returns([{ id: 1 } as unknown as IGetMapOccurrenceData]);
+
+      const response = await occurrenceService.getMapOccurrences();
+
+      expect(repo).to.be.calledOnceWith(undefined);
+      expect(formatOccurrenceDataForMapStub).to.be.calledOnce;
+      expect(response).to.be.eql([{ id: 1 }]);
+    });
+
+    describe('formatOccurrenceDataForMap', () => {
+      it('should append single object and return', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const occurrenceService = new OccurrenceService(mockDBConnection);
+
+        const mockInput = [
+          {
+            occurrence_id: 1,
+            submission_id: 2,
+            occurrenceid: 'string',
+            taxonid: 'string',
+            lifestage: 'string',
+            sex: 'string',
+            eventdate: 'string',
+            vernacularname: 'string',
+            individualcount: 1,
+            organismquantity: 1,
+            organismquantitytype: 'string',
+            geometry: {}
+          } as IGetOccurrenceData
+        ];
+
+        const mockResponse = {
+          id: 1,
+          taxonid: 'string',
+          geometry: {} as Feature,
+          observations: [
+            {
+              eventdate: 'string',
+              data: [
+                {
+                  lifestage: 'string',
+                  vernacularname: 'string',
+                  sex: 'string',
+                  individualcount: 1,
+                  organismquantity: 1,
+                  organismquantitytype: 'string'
+                }
+              ]
+            }
+          ]
+        } as IGetMapOccurrenceData;
+
+        const formatObservationByDateStub = sinon
+          .stub(OccurrenceService.prototype, 'formatObservationByDate')
+          .resolves([mockResponse]);
+
+        const response = await occurrenceService.formatOccurrenceDataForMap(mockInput);
+
+        expect(formatObservationByDateStub).to.not.be.called;
+        expect(response).to.be.eql([mockResponse]);
+      });
+
+      it('should update object increment count and return', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const occurrenceService = new OccurrenceService(mockDBConnection);
+
+        const mockInput = [
+          {
+            occurrence_id: 1,
+            submission_id: 2,
+            occurrenceid: 'string',
+            taxonid: 'string',
+            lifestage: 'string',
+            sex: 'string',
+            eventdate: 'string',
+            vernacularname: 'string',
+            individualcount: 1,
+            organismquantity: 1,
+            organismquantitytype: 'string',
+            geometry: '{}'
+          } as unknown as IGetOccurrenceData,
+          {
+            occurrence_id: 1,
+            submission_id: 2,
+            occurrenceid: 'string',
+            taxonid: 'string',
+            lifestage: 'string',
+            sex: 'string',
+            eventdate: 'string',
+            vernacularname: 'string',
+            individualcount: 1,
+            organismquantity: 1,
+            organismquantitytype: 'string',
+            geometry: '{}'
+          } as unknown as IGetOccurrenceData
+        ];
+
+        const expectedReturn = {
+          id: 1,
+          taxonid: 'string',
+          geometry: '{}',
+          observations: [
+            {
+              eventdate: 'string',
+              data: [
+                {
+                  lifestage: 'string',
+                  vernacularname: 'string',
+                  sex: 'string',
+                  individualcount: 2,
+                  organismquantity: 1,
+                  organismquantitytype: 'string'
+                }
+              ]
+            }
+          ]
+        } as unknown as IGetMapOccurrenceData;
+
+        const response = await occurrenceService.formatOccurrenceDataForMap(mockInput);
+
+        expect(response).to.be.eql([expectedReturn]);
+      });
+    });
+
+    describe('formatObservationByDate', () => {
+      it('should append single object and return', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const occurrenceService = new OccurrenceService(mockDBConnection);
+
+        const mockOccurrenceInput = {
+          occurrence_id: 1,
+          submission_id: 2,
+          occurrenceid: 'string',
+          taxonid: 'string',
+          lifestage: 'string',
+          sex: 'string',
+          eventdate: 'string2',
+          vernacularname: 'string',
+          individualcount: 1,
+          organismquantity: 1,
+          organismquantitytype: 'string',
+          geometry: {}
+        } as IGetOccurrenceData;
+
+        const mockInput = [
+          {
+            eventdate: 'string',
+            data: [
+              {
+                lifestage: 'string',
+                vernacularname: 'string',
+                sex: 'string',
+                individualcount: 1,
+                organismquantity: 1,
+                organismquantitytype: 'string'
+              } as IGetOrganismData
+            ]
+          }
+        ] as IGetMapOccurrenceData['observations'];
+
+        const mockResponse = [
+          {
+            eventdate: 'string',
+            data: [
+              {
+                lifestage: 'string',
+                vernacularname: 'string',
+                sex: 'string',
+                individualcount: 1,
+                organismquantity: 1,
+                organismquantitytype: 'string'
+              }
+            ]
+          },
+          {
+            eventdate: 'string2',
+            data: [
+              {
+                lifestage: 'string',
+                vernacularname: 'string',
+                sex: 'string',
+                individualcount: 1,
+                organismquantity: 1,
+                organismquantitytype: 'string'
+              }
+            ]
+          }
+        ] as unknown as IGetMapOccurrenceData;
+
+        const response = await occurrenceService.formatObservationByDate(mockInput, mockOccurrenceInput);
+
+        expect(response).to.be.eql(mockResponse);
+      });
+    });
+    describe('formatObservationByLifestageSex', () => {
+      it('should append single object and return', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const occurrenceService = new OccurrenceService(mockDBConnection);
+
+        const mockOccurrenceInput = {
+          occurrence_id: 1,
+          submission_id: 2,
+          occurrenceid: 'string',
+          taxonid: 'string',
+          lifestage: 'string2',
+          sex: 'string',
+          eventdate: 'string',
+          vernacularname: 'string',
+          individualcount: 1,
+          organismquantity: 1,
+          organismquantitytype: 'string',
+          geometry: {}
+        } as IGetOccurrenceData;
+
+        const mockInput = [
+          {
+            lifestage: 'string',
+            vernacularname: 'string',
+            sex: 'string',
+            individualcount: 1,
+            organismquantity: 1,
+            organismquantitytype: 'string'
+          } as IGetOrganismData
+        ];
+        const mockResponse = [
+          {
+            lifestage: 'string',
+            vernacularname: 'string',
+            sex: 'string',
+            individualcount: 1,
+            organismquantity: 1,
+            organismquantitytype: 'string'
+          },
+
+          {
+            lifestage: 'string2',
+            vernacularname: 'string',
+            sex: 'string',
+            individualcount: 1,
+            organismquantity: 1,
+            organismquantitytype: 'string'
+          }
+        ];
+
+        const response = await occurrenceService.formatObservationByLifestageSex(mockInput, mockOccurrenceInput);
+
+        expect(response).to.be.eql(mockResponse);
+      });
+    });
   });
 
   describe('getOccurrenceSubmission', () => {

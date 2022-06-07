@@ -1,3 +1,4 @@
+import { Feature } from 'geojson';
 import { IDBConnection } from '../database/db';
 import { IGetOccurrenceData, IPostOccurrenceData, OccurrenceRepository } from '../repositories/occurrence-repository';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -26,12 +27,178 @@ export interface DwCAOccurrenceHeaders {
   taxonIdHeader: number;
   vernacularNameHeader: number;
 }
+
+//Interface for Occurrence feature popup
+export interface IGetMapOccurrenceData {
+  id: number;
+  taxonid: string | undefined;
+  geometry: Feature | undefined;
+  observations: [
+    {
+      eventdate: string | undefined;
+      data: IGetOrganismData[];
+    }
+  ];
+}
+
+export interface IGetOrganismData {
+  lifestage: string | undefined;
+  vernacularname: string | undefined;
+  sex: string | undefined;
+  individualcount: number | undefined;
+  organismquantity: number | undefined;
+  organismquantitytype: string | undefined;
+}
+
 export class OccurrenceService extends DBService {
   occurrenceRepository: OccurrenceRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
     this.occurrenceRepository = new OccurrenceRepository(connection);
+  }
+
+  /**
+   * Get all occurrences within map bounds and format the results
+   *
+   * @param {(string | undefined)} [mapView]
+   * @return {*}  {Promise<IGetMapOccurrenceData[]>}
+   * @memberof OccurrenceService
+   */
+  async getMapOccurrences(mapView?: Feature | undefined): Promise<IGetMapOccurrenceData[]> {
+    const allOccurrences = await this.occurrenceRepository.getMapOccurrences(mapView);
+
+    return this.formatOccurrenceDataForMap(allOccurrences);
+  }
+
+  /**
+   * Format and curate raw data from occurrences
+   * First sort by same taxonid and geometry
+   *
+   * @param {IGetOccurrenceData[]} occurrenceData
+   * @return {*}  {IGetMapOccurrenceData[]}
+   * @memberof OccurrenceService
+   */
+  formatOccurrenceDataForMap(occurrenceData: IGetOccurrenceData[]): IGetMapOccurrenceData[] {
+    const curatedOccurrences: IGetMapOccurrenceData[] = [];
+
+    //For each occurrence row in the table
+    for (const occurrence of occurrenceData) {
+      //Find index by same taxonid and geometry
+      const findByTaxonGeometry = curatedOccurrences.findIndex((check) => {
+        return check.taxonid == occurrence.taxonid && occurrence.geometry == check.geometry;
+      });
+
+      //If index exists sort further by date
+      if (findByTaxonGeometry != -1) {
+        curatedOccurrences[findByTaxonGeometry].observations = this.formatObservationByDate(
+          curatedOccurrences[findByTaxonGeometry].observations,
+          occurrence
+        );
+      } else {
+        //If index does not exist add new curated taxon and geometry occurrence
+        curatedOccurrences.push({
+          id: occurrence.occurrence_id,
+          taxonid: occurrence.taxonid,
+          geometry: occurrence.geometry,
+          observations: [
+            {
+              eventdate: occurrence.eventdate,
+              data: [
+                {
+                  lifestage: occurrence.lifestage,
+                  vernacularname: occurrence.vernacularname,
+                  sex: occurrence.sex,
+                  individualcount: occurrence.individualcount,
+                  organismquantity: occurrence.organismquantity,
+                  organismquantitytype: occurrence.organismquantitytype
+                }
+              ]
+            }
+          ]
+        });
+      }
+    }
+    return curatedOccurrences;
+  }
+
+  /**
+   * Format and curate raw data from occurrences
+   * Second sort by same date
+   *
+   * @param {IGetMapOccurrenceData['observations']} curatedOccurrencesObservations
+   * @param {IGetOccurrenceData} occurrence
+   * @return {*}  {IGetMapOccurrenceData['observations']}
+   * @memberof OccurrenceService
+   */
+  formatObservationByDate(
+    curatedOccurrencesObservations: IGetMapOccurrenceData['observations'],
+    occurrence: IGetOccurrenceData
+  ): IGetMapOccurrenceData['observations'] {
+    //Find index by same date
+    const findByEventDate = curatedOccurrencesObservations.findIndex((check) => {
+      return String(check.eventdate) == String(occurrence.eventdate);
+    });
+
+    //If index exists sort further by lifestage and sex
+    if (findByEventDate != -1) {
+      curatedOccurrencesObservations[findByEventDate].data = this.formatObservationByLifestageSex(
+        curatedOccurrencesObservations[findByEventDate].data,
+        occurrence
+      );
+    } else {
+      //If index does not exist add new curated date occurrence
+      curatedOccurrencesObservations.push({
+        eventdate: occurrence.eventdate,
+        data: [
+          {
+            lifestage: occurrence.lifestage,
+            vernacularname: occurrence.vernacularname,
+            sex: occurrence.sex,
+            individualcount: occurrence.individualcount,
+            organismquantity: occurrence.organismquantity,
+            organismquantitytype: occurrence.organismquantitytype
+          }
+        ]
+      });
+    }
+
+    return curatedOccurrencesObservations;
+  }
+
+  /**
+   * Format and curate raw data from occurrences
+   * Third sort by same lifestage and sex, increment individual count //TODO increment organismquantity if valid
+   *
+   * @param {IGetOrganismData[]} curatedData
+   * @param {IGetOccurrenceData} occurrence
+   * @return {*}  {IGetOrganismData[]}
+   * @memberof OccurrenceService
+   */
+  formatObservationByLifestageSex(curatedData: IGetOrganismData[], occurrence: IGetOccurrenceData): IGetOrganismData[] {
+    //Find index by same lifestage and sex
+    const findBySexLifestage = curatedData.findIndex((check) => {
+      return check.lifestage == occurrence.lifestage && check.sex == occurrence.sex;
+    });
+
+    //If index exists then increase individual count
+    if (findBySexLifestage != -1) {
+      //TODO increment organismquantity if valid
+      curatedData[findBySexLifestage].individualcount =
+        Number(curatedData[findBySexLifestage].individualcount) + Number(occurrence.individualcount);
+    } else {
+      //If index does not exist add new curated lifestage and sex occurrence
+      curatedData.push({
+        lifestage: occurrence.lifestage,
+        vernacularname: occurrence.vernacularname,
+        sex: occurrence.sex,
+        individualcount: occurrence.individualcount,
+        organismquantity: occurrence.organismquantity,
+        organismquantitytype: occurrence.organismquantitytype
+      });
+    }
+
+    return curatedData;
   }
 
   /**

@@ -1,21 +1,28 @@
 import { Feature } from 'geojson';
 import SQL, { SQLStatement } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { ILatLong, IUTM, parseLatLongString, parseUTMString } from '../utils/spatial-utils';
+import {
+  generateGeometryCollectionSQL,
+  ILatLong,
+  IUTM,
+  parseLatLongString,
+  parseUTMString
+} from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface IGetOccurrenceData {
-  occurrenceId: number;
-  submissionId: number;
-  taxonId: string | null;
-  lifeStage: string | null;
-  sex: string | null;
-  eventDate: string | null; //TODO is this a timeStamp?
-  vernacularName: string | null;
-  individualCount: number | null;
-  organismQuantity: number | null;
-  organismQuantityType: string | null;
-  geometry: Feature | null;
+  occurrence_id: number;
+  submission_id: number;
+  occurrenceid: string | undefined;
+  taxonid: string | undefined;
+  lifestage: string | undefined;
+  sex: string | undefined;
+  eventdate: string; //TODO is this a timeStamp?
+  vernacularname: string | undefined;
+  individualcount: number | undefined;
+  organismquantity: number | undefined;
+  organismquantitytype: string | undefined;
+  geometry: Feature | undefined;
 }
 
 export interface IPostOccurrenceData {
@@ -38,6 +45,63 @@ export interface IPostOccurrenceData {
  * @extends {BaseRepository}
  */
 export class OccurrenceRepository extends BaseRepository {
+  /**
+   * Get all occurrences data within mapView
+   *
+   * @return {*}  {Promise<IGetOccurrenceData[]>}
+   * @memberof OccurrenceRepository
+   */
+  async getMapOccurrences(mapView?: Feature | undefined): Promise<IGetOccurrenceData[]> {
+    const sqlStatement = SQL`
+      SELECT
+        occurrence_id,
+        submission_id,
+        occurrenceid,
+        taxonid,
+        lifestage,
+        sex,
+        vernacularname,
+        eventdate,
+        individualcount,
+        organismquantity,
+        organismquantitytype,
+        public.ST_asGeoJSON(geography) as geometry
+      FROM
+        occurrence
+    `;
+
+    if (mapView) {
+      const geometryCollectionSQL = generateGeometryCollectionSQL(mapView);
+
+      sqlStatement.append(`
+      WHERE
+      public.ST_INTERSECTS(
+        geography,
+        public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(`);
+
+      sqlStatement.append(geometryCollectionSQL);
+
+      sqlStatement.append(`,
+              4326
+            )
+          )
+        )
+      );`);
+    }
+
+    const response = await this.connection.sql<IGetOccurrenceData>(sqlStatement);
+
+    if (!response.rows) {
+      throw new ApiExecuteSQLError('Failed to get occurrence records', [
+        'OccurrenceRepository->getMapOccurrences',
+        'rowCount was null or undefined, expected rowCount = 0 or greater'
+      ]);
+    }
+
+    return response.rows;
+  }
   /**
    * Upload scraped occurrence data.
    *
