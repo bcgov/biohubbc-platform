@@ -161,10 +161,6 @@ export class DarwinCoreService extends DBService {
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord) {
-      throw new ApiGeneralError('The submission record is not available');
-    }
-
     if (!submissionRecord.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
     }
