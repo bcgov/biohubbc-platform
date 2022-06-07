@@ -155,7 +155,7 @@ export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds) {
   const southWest = bounds.getSouthWest();
   const northEast = bounds.getNorthEast();
 
-  const spatialBounds = {
+  return {
     type: 'Feature',
     properties: {},
     geometry: {
@@ -171,6 +171,4 @@ export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds) {
       ]
     }
   } as Feature;
-
-  return spatialBounds;
 }
