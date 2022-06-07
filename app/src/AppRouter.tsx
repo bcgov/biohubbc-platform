@@ -35,13 +35,12 @@ const AppRouter: React.FC = () => {
         <SearchRouter />
       </AppRoute>
 
-<<<<<<< HEAD
       <AppRoute path="/submissions" title={getTitle('Submissions')} layout={BaseLayout}>
         <SubmissionsRouter />
-=======
+      </AppRoute>
+
       <AppRoute path="/map" title={getTitle('Map')} layout={BaseLayout}>
         <MapRouter />
->>>>>>> dev
       </AppRoute>
 
       <AppRoute path="/page-not-found" title={getTitle('Page Not Found')} layout={BaseLayout}>
