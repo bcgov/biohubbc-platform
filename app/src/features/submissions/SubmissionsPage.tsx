@@ -1,15 +1,15 @@
 import React from 'react';
 
-
 import Box from '@material-ui/core/Box';
 import Container from '@material-ui/core/Container'
+import Link from '@material-ui/core/Link';
+import Paper from '@material-ui/core/Paper'
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper'
 import Typography from '@material-ui/core/Typography';
 
 import { useApi } from 'hooks/useApi';
@@ -31,9 +31,23 @@ const SubmissionsPage = () => {
     })
   })
 
-  const makeSignedUrl = (input_key: string): string => {
-    return input_key;
-  }
+  const openAttachment = async (submission: any) => {
+    const { submission_id } = submission
+    if (!submission_id) {
+      return
+    }
+    try {
+      const response = await biohubApi.submissions.getSignedUrl(submission_id);
+
+      if (!response) {
+        return;
+      }
+
+      window.open(response);
+    } catch (error) {
+      return error;
+    }
+  };
 
   return (
     <Box my={4}>
@@ -60,9 +74,9 @@ const SubmissionsPage = () => {
                     {submissions.map((submission) => (
                       <TableRow>
                         <TableCell>
-                          <a href={makeSignedUrl(submission.input_key)} target='_blank'>
+                          <Link onClick={() => openAttachment(submission)}>
                             {submission.input_file_name}
-                          </a>
+                          </Link>
                         </TableCell>
                         <TableCell>
                           <Box mb={5} display="flex">
