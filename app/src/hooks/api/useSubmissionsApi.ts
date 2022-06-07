@@ -19,8 +19,15 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSignedUrl = async (submissionId: number): Promise<string> => {
+    const { data } = await axios.get<string>(`/api/dwc/submission/${submissionId}/getSignedUrl`);
+
+    return data;
+  };
+
   return {
-    listSubmissions
+    listSubmissions,
+    getSignedUrl
   };
 };
 
