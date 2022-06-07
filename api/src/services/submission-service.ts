@@ -151,9 +151,7 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getEMLStyleSheetKey(submissionId: number): Promise<ISourceTransformModel['transform_precompile_key']> {
-    return await (
-      await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)
-    ).transform_precompile_key;
+    return (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)).transform_precompile_key;
   }
 
   /**

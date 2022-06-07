@@ -121,7 +121,6 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
-      //TODO: create a generic function that inserts the submissionStatus AND inserts a submissionMessage
       try {
         await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
       } catch (error) {
