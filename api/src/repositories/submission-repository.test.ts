@@ -385,4 +385,41 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql([mockResponse]);
     });
   });
+
+  describe('getSourceTransformIdBySubmissionId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSourceTransformIdBySubmissionId(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission source transform record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        source_transform_id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSourceTransformIdBySubmissionId(1);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
 });
