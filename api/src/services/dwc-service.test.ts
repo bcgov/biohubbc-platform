@@ -6,6 +6,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
+import { ISecurityModel } from '../repositories/security-repository';
 import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 //import { ESService } from '../services/es-service';
@@ -19,6 +20,7 @@ import { UnknownMedia } from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
 import { OccurrenceService } from './occurrence-service';
+import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -357,5 +359,47 @@ describe('DarwinCoreService', () => {
     //     _primary_term: 1
     //   });
     // });
+  });
+
+  describe('secureSubmission', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should set submission status to rejected', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SecurityService.prototype, 'getSecuritySchemaBySecurityId').resolves({} as unknown as ISecurityModel);
+
+      sinon.stub(SecurityService.prototype, 'validateSecurityOfSubmission').resolves({ secure: false });
+
+      const mockInsertStatus = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      const response = await darwinCoreService.secureSubmission(1, 1);
+
+      expect(response).to.eql({ secure: false });
+      expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.REJECTED);
+    });
+
+    it('should set submission status to Secured', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SecurityService.prototype, 'getSecuritySchemaBySecurityId').resolves({} as unknown as ISecurityModel);
+
+      sinon.stub(SecurityService.prototype, 'validateSecurityOfSubmission').resolves({ secure: true });
+
+      const mockInsertStatus = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      const response = await darwinCoreService.secureSubmission(1, 1);
+
+      expect(response).to.eql({ secure: true });
+      expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.SECURED);
+    });
   });
 });
