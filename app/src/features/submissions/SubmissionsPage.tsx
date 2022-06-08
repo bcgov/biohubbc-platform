@@ -11,21 +11,13 @@ import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
 import { useApi } from 'hooks/useApi';
 import { IListSubmissionsResponse } from 'interfaces/useSubmissionsApi.interface';
-import React from 'react';
+import React, { useEffect } from 'react';
 
 const SubmissionsPage = () => {
   const [submissions, setSubmissions] = React.useState<IListSubmissionsResponse>([]);
   const [loading, setLoading] = React.useState<boolean>(false);
 
   const biohubApi = useApi();
-
-  React.useState(() => {
-    setLoading(true);
-    biohubApi.submissions.listSubmissions().then((res) => {
-      setSubmissions(res);
-      setLoading(false);
-    });
-  });
 
   const openAttachment = async (submission: any) => {
     const { submission_id } = submission;
@@ -45,6 +37,24 @@ const SubmissionsPage = () => {
     }
   };
 
+  useEffect(() => {
+    const getSubmissions = async () => {
+      const submissionResponse = await biohubApi.submissions.listSubmissions();
+
+      if (!submissionResponse) {
+        return;
+      }
+
+      setSubmissions(submissionResponse);
+      setLoading(false);
+    };
+
+    if (!loading && submissions.length <= 0) {
+      setLoading(true);
+      getSubmissions();
+    }
+  }, [biohubApi.submissions, loading, submissions]);
+
   return (
     <Box my={4}>
       <Container maxWidth="xl">
@@ -61,24 +71,26 @@ const SubmissionsPage = () => {
                     <TableCell>Status</TableCell>
                   </TableRow>
                 </TableHead>
-                {loading ? (
-                  <TableBody>
-                    <Typography variant="body1">Loading...</Typography>
-                  </TableBody>
-                ) : (
+                {submissions ? (
                   <TableBody data-testid="submissions-table">
                     {submissions.map((submission) => (
-                      <TableRow>
+                      <TableRow key={submission.submission_id}>
                         <TableCell>
                           <Link onClick={() => openAttachment(submission)}>{submission.input_file_name}</Link>
                         </TableCell>
                         <TableCell>
                           <Box mb={5} display="flex">
-                            {submission.submission_status || <span>Unknown</span>}
+                            {submission.submission_status || 'Unknown'}
                           </Box>
                         </TableCell>
                       </TableRow>
                     ))}
+                  </TableBody>
+                ) : (
+                  <TableBody>
+                    <TableCell>
+                      <Typography variant="body1">No Data</Typography>
+                    </TableCell>
                   </TableBody>
                 )}
               </Table>
