@@ -1,4 +1,5 @@
 //import { Client } from '@elastic/elasticsearch';
+import { ShardStatistics } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
 import { GetObjectOutput, ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
@@ -268,13 +269,20 @@ describe('DarwinCoreService', () => {
       }
     });
 
-    it.skip('throws an error if the function is not able to parse the file', async () => {
+    it.only('successfully transforms EML to JSON with valid input', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        id: 1,
+        eml_source: `<?xml version="1.0" encoding="UTF-8"?>
+        <note>
+          <to>Tove</to>
+          <from>Jani</from>
+          <heading>Reminder</heading>
+          <body>Don't forget me this weekend!</body>
+        </note>`
+      } as unknown as ISubmissionModel);
 
       //todo: make this a valid s3 file
       const s3File = {
@@ -289,14 +297,27 @@ describe('DarwinCoreService', () => {
 
       sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
 
-      sinon.stub(mediaUtils, 'parseS3File').resolves({ rowCount: 1 });
+      sinon.stub(mediaUtils, 'parseS3File').resolves(null as unknown as MediaFile);
 
-      try {
-        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as Error).message).to.equal('Failed to parse the stylesheet');
-      }
+      sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves({ id: 'new_id' });
+
+      sinon.stub(DarwinCoreService.prototype, 'uploadtoElasticSearch').resolves({
+        _id: 'id',
+        _index: 'eml',
+        _primary_term: 1234,
+        result: 'created',
+        _seq_no: 1234,
+        _shards: {
+          failed: 0,
+          successful: 1,
+          total: 1
+        } as unknown as ShardStatistics,
+        _version: 3
+      });
+
+      const result = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+
+      expect(result[0].id).equal('new_id');
     });
 
     // it.skip('throws an error when getting the Elastic Search service fails', async () => {

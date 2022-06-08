@@ -161,23 +161,35 @@ export class DarwinCoreService extends DBService {
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
+    console.log('submissionRecord is: ', submissionRecord);
+
     if (!submissionRecord.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
     }
 
     const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
+    console.log('1- got here');
+
     if (!stylesheetfromS3) {
       throw new ApiGeneralError('The transformation stylesheet is not available');
     }
+    console.log('2- got here');
 
     const parsedStylesheet = parseS3File(stylesheetfromS3);
+    console.log('3- got here');
+    console.log('parsedStylesheet is: ', parsedStylesheet);
 
     if (!parsedStylesheet) {
       throw new ApiGeneralError('Failed to parse the stylesheet');
     }
+    console.log('4- got here');
 
     const compiledTemplate = parsedStylesheet.buffer.toString();
+
+    console.log('5- got here');
+
+    console.log('compiledTemplate is ', compiledTemplate);
 
     let transformedEML;
     let response;
@@ -185,7 +197,11 @@ export class DarwinCoreService extends DBService {
     //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, compiledTemplate);
+
+      console.log('6 - got here');
+      console.log('transformedEML is', transformedEML);
     } catch (error) {
+      console.log('7 - got here: error state');
       return submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
@@ -196,7 +212,10 @@ export class DarwinCoreService extends DBService {
 
     //call to the ElasticSearch API to create a record with our transformed EML
     try {
+      console.log('8 - got here');
       response = await this.uploadtoElasticSearch(dataPackageId, transformedEML);
+      console.log('9 - got here');
+      console.log('response from ES : ', response);
     } catch (error) {
       return submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -206,10 +225,15 @@ export class DarwinCoreService extends DBService {
       );
     }
 
-    //TODO: We need a new submission status type
-    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+    console.log('10 - got here');
 
-    return response;
+    //TODO: We need a new submission status type
+    const response2 = await submissionService.insertSubmissionStatus(
+      submissionId,
+      SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED
+    );
+    console.log('response from insert submission status ', response2);
+    return response2;
   }
 
   /**
