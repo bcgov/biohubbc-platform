@@ -107,8 +107,13 @@ export function searchInElasticSearch(): RequestHandler {
       const response = await elasticSearch.search({
         index: indexName.toLowerCase(),
         query: {
-          match: {
-            'projects.projectName': terms
+          multi_match: {
+            query: terms,
+            fields: [
+              'project.fundingSource',
+              'project.taxonomicCoverage.taxonRankValue',
+              'project.taxonomicCoverage.commonName'
+            ]
           }
         },
         fields: ['*']
