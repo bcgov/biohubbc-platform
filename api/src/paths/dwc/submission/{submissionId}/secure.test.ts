@@ -40,7 +40,7 @@ describe('secure', () => {
           const response = requestValidator.validateRequest(request);
 
           expect(response.status).to.equal(400);
-          expect(response.errors[0].message).to.equal('must be >= 0');
+          expect(response.errors[0].message).to.equal('must be >= 1');
         });
 
         it('has string value', async () => {
