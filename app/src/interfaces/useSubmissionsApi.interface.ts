@@ -1,6 +1,6 @@
 export type IListSubmissionsResponse = Array<{
   submission_id: number;
-  submission_status: string
+  submission_status: string;
   source_transform_id: string;
   uuid: string;
   event_timestamp: string;
@@ -14,4 +14,4 @@ export type IListSubmissionsResponse = Array<{
   update_date: string | null;
   update_user: number | null;
   revision_count: number;
-}>
+}>;

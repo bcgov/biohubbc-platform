@@ -40,14 +40,7 @@ GET.apiDoc = {
             items: {
               title: 'Darwin Core Data Packages Response Object',
               type: 'object',
-              required: [
-                'submission_id',
-                'uuid',
-                'event_timestamp',
-                'create_date',
-                'create_user',
-                'revision_count'
-              ],
+              required: ['submission_id', 'uuid', 'event_timestamp', 'create_date', 'create_user', 'revision_count'],
               properties: {
                 submission_status: {
                   type: 'string',
