@@ -186,8 +186,13 @@ describe('search', () => {
         expect(searchStub).to.have.been.calledOnceWith({
           index: 'eml',
           query: {
-            match: {
-              'projects.projectName': 'searchterm'
+            multi_match: {
+              query: 'searchterm',
+              fields: [
+                'project.fundingSource',
+                'project.taxonomicCoverage.taxonRankValue',
+                'project.taxonomicCoverage.commonName'
+              ]
             }
           },
           fields: ['*']

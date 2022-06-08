@@ -1,4 +1,3 @@
-//import { Client } from '@elastic/elasticsearch';
 import { ShardStatistics } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
 import { GetObjectOutput, ManagedUpload } from 'aws-sdk/clients/s3';
@@ -9,7 +8,6 @@ import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
 import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
-//import { ESService } from '../services/es-service';
 import * as fileUtils from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
@@ -241,7 +239,7 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
+        .resolves({ id: 1 } as unknown as ISubmissionModel);
 
       sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(null as unknown as GetObjectOutput);
 
@@ -271,7 +269,7 @@ describe('DarwinCoreService', () => {
       }
     });
 
-    it.only('successfully transforms EML to JSON with valid input', async () => {
+    it('inserts a submission status SUBMISSION_DATA_INGESTED on success', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
@@ -294,7 +292,7 @@ describe('DarwinCoreService', () => {
         VersionId: '1654548539910',
         Metadata: {},
         ContentType: 'application/json',
-        Body: Buffer.from('file1data')
+        Body: Buffer.from('{"id":"1"}')
       } as unknown as GetObjectOutput;
 
       sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
@@ -317,68 +315,13 @@ describe('DarwinCoreService', () => {
         _version: 3
       });
 
+      sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
       const result = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
 
-      expect(result[0].id).equal('new_id');
+      expect(result).to.eql({ submission_status_id: 1, submission_status_type_id: 1 });
     });
-
-    // it.skip('throws an error when getting the Elastic Search service fails', async () => {
-    //   const mockDBConnection = getMockDBConnection();
-    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-    //   sinon
-    //     .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-    //     .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
-
-    //   sinon.stub(ESService.prototype, 'getEsClient').resolves(undefined);
-
-    //   try {
-    //     await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-    //     expect.fail();
-    //   } catch (actualError) {
-    //     expect((actualError as Error).message).to.equal("Cannot read property 'rowCount' of undefined");
-    //   }
-    // });
-
-    // it.skip('inserts a record in elastic search with valid data and connection', async () => {
-    //   const mockDBConnection = getMockDBConnection();
-    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-    //   sinon
-    //     .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-    //     .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
-    //   sinon
-    //     .stub(SubmissionService.prototype, 'insertSubmissionStatus')
-    //     .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
-
-    //   sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves(`{"id": "1", "value": "some_value"}`);
-
-    //   const createStub = sinon.stub().resolves({
-    //     _index: 'eml',
-    //     _type: '_doc',
-    //     _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
-    //     _version: 1,
-    //     result: 'created',
-    //     _shards: { total: 2, successful: 2, failed: 0 },
-    //     _seq_no: 26,
-    //     _primary_term: 1
-    //   });
-
-    //   sinon.stub(ESService.prototype, 'getEsClient').resolves({
-    //     create: createStub
-    //   } as unknown as Client);
-
-    //   const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-    //   expect(response).eql({
-    //     _index: 'eml',
-    //     _type: '_doc',
-    //     _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
-    //     _version: 1,
-    //     result: 'created',
-    //     _shards: { total: 2, successful: 2, failed: 0 },
-    //     _seq_no: 26,
-    //     _primary_term: 1
-    //   });
-    // });
   });
 });
