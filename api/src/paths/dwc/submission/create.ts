@@ -121,19 +121,14 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
-      //TODO: create a generic function that inserts the submissionStatus AND inserts a submissionMessage
       try {
         await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
       } catch (error) {
         const submissionService = new SubmissionService(connection);
 
-        const submissionStatusId = await submissionService.insertSubmissionStatus(
+        await submissionService.insertSubmissionStatusAndMessage(
           submissionId,
-          SUBMISSION_STATUS_TYPE.REJECTED
-        );
-
-        await submissionService.insertSubmissionMessage(
-          submissionStatusId.submission_status_id,
+          SUBMISSION_STATUS_TYPE.REJECTED,
           SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
           'Failed to transform and upload metadata'
         );

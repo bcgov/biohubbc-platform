@@ -323,7 +323,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.INVALID_VALUE);
+        await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.INVALID_VALUE, 'some message');
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission message record');
@@ -345,7 +345,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.INVALID_VALUE);
+      const response = await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.INVALID_VALUE, '');
 
       expect(response).to.eql(mockResponse);
     });
@@ -383,6 +383,43 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.listSubmissionRecords();
 
       expect(response).to.eql([mockResponse]);
+    });
+  });
+
+  describe('getSourceTransformRecordBySubmissionId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSourceTransformRecordBySubmissionId(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission source transform record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        source_transform_id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSourceTransformRecordBySubmissionId(1);
+
+      expect(response).to.eql(mockResponse);
     });
   });
 });

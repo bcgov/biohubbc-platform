@@ -4,7 +4,12 @@ This folder contains the OpenShift templates required in order to build and depl
 
 ## Build Metabase
 
-Metabase does provide a Docker image [here](https://hub.docker.com/r/metabase/metabase), it is compatible with OpenShift. We'll retrieve/use the image from the Artifactory, this will ensure us a current version of metabase for our purposes.
+We'll retrieve/use the official docker image from the Artifactory, this will ensure us a current version of metabase for our purposes.
+In order to make this work, you have to link your artifactory pull secret (found in the tools area) to you default and builder service accounts:
+```
+oc secrets link default artifacts-pull-default-<unique id> --for=pull
+oc secrets link builder artifacts-pull-default-<unique id> --for=pull
+```
 
 ## Deploy Metabase
 
@@ -30,3 +35,42 @@ Once Metabase is up and functional (this will take between 3 to 5 minutes), you 
 ## Notes
 
 In general, Metabase should generally take up very little CPU (<0.01 cores) and float between 700 to 800mb of memory usage during operation. The template has some reasonable requests and limits set for both CPU and Memory, but you may change it should your needs be different.
+
+## Connecting to databases in other target areas
+
+It is possible to connect Metabase in one target areas (like tools) to databases in dev,test or even prod.
+
+For that we need to create a NetworkPolicy in the area where the database is installed.
+In the example below, we have metabase in tools wanting to connect to our database in dev.
+We created our database with a label 'role: db' (you have to find a label that unique identifies your database) and for metabase you just have to fill in your namespace and environment.
+
+```
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: metabase-to-db
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 5432
+      from:
+        - namespaceSelector:
+            matchLabels:
+              environment: tools
+              name: af2668
+        - podSelector:
+            matchLabels:
+              app: metabase
+  policyTypes:
+    - Ingress
+```
+### To connect Metabase to your database
+
+In the Database connection screen refer to your database server with the namespace suffixed.
+So in the example above our database server is called: 
+**biohubbc-db-postgresql-dev-deploy** and in metabase we refer to it as: 
+**biohubbc-db-postgresql-dev-deploy.af2668-dev**

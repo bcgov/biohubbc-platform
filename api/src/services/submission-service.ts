@@ -1,4 +1,6 @@
+import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
+import { ApiGeneralError } from '../errors/api-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -9,6 +11,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { getFileFromS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
 
 export class SubmissionService extends DBService {
@@ -138,18 +141,81 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *
+   * Gets the S3key of the EMLStyleSheet from the DB.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISourceTransformModel['metadata_transform_precompile']>}
+   * @return {*}  {Promise<string>}
    * @memberof SubmissionService
    */
-  async getEMLStyleSheet(submissionId: number): Promise<ISourceTransformModel['metadata_transform_precompile']> {
-    return await (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId))
-      .metadata_transform_precompile;
+  async getEMLStyleSheetKey(submissionId: number): Promise<string> {
+    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
+
+    if (!transformRecord.transform_precompile_key) {
+      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
+        'SubmissionRepository->getStyleSheetKey',
+        'stylesheet_key was null'
+      ]);
+    }
+
+    return transformRecord.transform_precompile_key;
   }
 
-  async getRawEMLStyleSheet(submissionId: number): Promise<ISourceTransformModel['metadata_transform_precompile']> {
-    return await (await this.submissionRepository.getSourceTransformIdBySubmissionId(submissionId)).metadata_transform;
+  /**
+   * Returns the EML stylesheet from S3
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<GetObjectOutput>}
+   * @memberof SubmissionService
+   */
+  async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
+    const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
+
+    const s3File = await getFileFromS3(stylesheet_key);
+
+    if (!s3File) {
+      throw new ApiGeneralError('Failed to get file from S3');
+    }
+
+    return s3File;
+  }
+
+  /**
+   * Inserts both the status and message of a submission
+   *
+   * @param {number} submissionId
+   * @param {SUBMISSION_STATUS_TYPE} submissionStatusType
+   * @param {SUBMISSION_MESSAGE_TYPE} submissionMessageType
+   * @param {string} submissionMessage
+   * @return {*}  {Promise<{
+   *     submission_status_id: number;
+   *     submission_message_id: number;
+   *   }>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionStatusAndMessage(
+    submissionId: number,
+    submissionStatusType: SUBMISSION_STATUS_TYPE,
+    submissionMessageType: SUBMISSION_MESSAGE_TYPE,
+    submissionMessage: string
+  ): Promise<{
+    submission_status_id: number;
+    submission_message_id: number;
+  }> {
+    const submission_status_id = (
+      await this.submissionRepository.insertSubmissionStatus(submissionId, submissionStatusType)
+    ).submission_status_id;
+
+    const submission_message_id = (
+      await this.submissionRepository.insertSubmissionMessage(
+        submission_status_id,
+        submissionMessageType,
+        submissionMessage
+      )
+    ).submission_message_id;
+
+    return {
+      submission_status_id,
+      submission_message_id
+    };
   }
 }

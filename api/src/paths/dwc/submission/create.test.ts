@@ -6,7 +6,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../../../repositories/submission-repository';
 import { DarwinCoreService } from '../../../services/dwc-service';
+import { SubmissionService } from '../../../services/submission-service';
 import * as fileUtils from '../../../utils/file-utils';
 import * as keycloakUtils from '../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
@@ -143,15 +145,6 @@ describe('create', () => {
             expect(response.message).to.equal('The response was not valid.');
             expect(response.errors[0].message).to.equal('must be string');
           });
-
-          // Skipped as the response validator doesn't currently seem to support format checks
-          it.skip('is invalid format', async () => {
-            const apiResponse = { data_package_id: 'not a uuid' };
-            const response = responseValidator.validateResponse(200, apiResponse);
-
-            expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal('must match format "uuid"');
-          });
         });
       });
 
@@ -210,6 +203,31 @@ describe('create', () => {
       } catch (actualError) {
         expect((actualError as HTTPError).status).to.equal(400);
         expect((actualError as HTTPError).message).to.equal('Malicious content detected, upload cancelled');
+      }
+    });
+
+    it('throws an error when getKeycloakSource returns null', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      mockReq.body = {
+        media: 'file',
+        data_package_id: '123-456-789'
+      };
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
+
+      const requestHandler = create.submitDataset();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('Failed to identify known submission source system');
       }
     });
 
@@ -275,6 +293,62 @@ describe('create', () => {
         expect((actualError as Error).message).to.equal('test error');
       }
     });
+    it('throws and error when transformAndUploadMetaData fails', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'test',
+        data_package_id: '123-456-789'
+      };
+
+      const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
+
+      const scrapeAndUploadOccurrencesStub = sinon
+        .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
+        .resolves();
+
+      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').throws(new Error('test error'));
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({
+          submission_status_id: 1,
+          submission_message_id: 1
+        });
+
+      const requestHandler = create.submitDataset();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
+        expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
+        expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.have.been.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to transform and upload metadata'
+        );
+      }
+    });
 
     it('returns 200', async () => {
       const dbConnectionObj = getMockDBConnection();
@@ -306,7 +380,9 @@ describe('create', () => {
         .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
         .resolves();
 
-      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
 
       const requestHandler = create.submitDataset();
 
@@ -315,6 +391,7 @@ describe('create', () => {
       expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
       expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
       expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
+      expect(transformAndUploadMetaDataStub).to.have.been.calledOnceWith(1, '123-456-789');
 
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({ data_package_id: '123-456-789' });
