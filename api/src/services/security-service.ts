@@ -13,7 +13,7 @@ export class SecurityService extends DBService {
   }
 
   /**
-   *Insert Security Schema into db
+   * Insert Security Schema into db
    *
    * @param {IInsertSecuritySchema} securitySchema
    * @return {*}  {Promise<{ security_id: number }>}
@@ -24,7 +24,7 @@ export class SecurityService extends DBService {
   }
 
   /**
-   *Get Security Schema from db with given id
+   * Get Security Schema from db with given id
    *
    * @param {number} securityId
    * @return {*}  {Promise<ISecurityModel>}

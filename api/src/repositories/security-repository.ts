@@ -12,7 +12,7 @@ export interface ISecurityModel {
 
 export class SecurityRepository extends BaseRepository {
   /**
-   *Insert Security Schema into db
+   * Insert Security Schema into db
    *
    * @param {IInsertSecuritySchema} securitySchema
    * @return {*}  {Promise<{ security_id: number }>}
@@ -37,12 +37,12 @@ export class SecurityRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
-    return { security_id: 1 }; //TODO hard coded
     // return response.rows[0];
+    return { security_id: 1 }; //TODO hard coded
   }
 
   /**
-   *Get Security Schema from db with given id
+   * Get Security Schema from db with given id
    *
    * @param {number} securityId
    * @return {*}  {Promise<ISecurityModel>}
@@ -67,8 +67,7 @@ export class SecurityRepository extends BaseRepository {
       ]);
     }
 
-    return { something: 'thing' }; //TODO hard coded
-
     // return response.rows[0];
+    return { something: 'thing' }; //TODO hard coded
   }
 }

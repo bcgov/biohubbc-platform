@@ -286,10 +286,10 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   *  Temp replacement for secure until more requirements are set
+   * Temp replacement for secure until more requirements are set
    *
    * @param {number} submissionId
-   * @return {*} //TODO RETURN TYPE
+   * @return {*}
    * @memberof DarwinCoreService
    */
   async tempSecureSubmission(submissionId: number) {
@@ -305,13 +305,13 @@ export class DarwinCoreService extends DBService {
    *
    * @param {number} submissionId
    * @param {number} securityId
-   * @return {*}
+   * @return {*} //TODO return type
    * @memberof DarwinCoreService
    */
   async secureSubmission(submissionId: number, securityId: number) {
     const securityService = new SecurityService(this.connection);
 
-    const securitySchema = await securityService.getSecuritySchemaBySecurityId(securityId); //TODO Hard coded
+    const securitySchema = await securityService.getSecuritySchemaBySecurityId(securityId); //TODO hardcoded return
 
     const response = await securityService.validateSecurityOfSubmission(submissionId, securitySchema);
 

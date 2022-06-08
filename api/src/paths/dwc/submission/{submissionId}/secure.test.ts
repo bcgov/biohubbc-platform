@@ -83,9 +83,7 @@ describe('secure', () => {
         });
       });
       describe('should succeed when', () => {
-        it('has valid values', async () => {
-          //
-        });
+        //
       });
     });
   });

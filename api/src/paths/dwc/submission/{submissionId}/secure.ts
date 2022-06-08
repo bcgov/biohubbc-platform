@@ -37,7 +37,7 @@ POST.apiDoc = {
       name: 'submissionId',
       schema: {
         type: 'integer',
-        minimum: 0
+        minimum: 1
       },
       required: true
     }
