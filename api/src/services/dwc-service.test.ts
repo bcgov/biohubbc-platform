@@ -241,7 +241,9 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1 } as unknown as ISubmissionModel);
+        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
+
+      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(null as unknown as GetObjectOutput);
 
       try {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
