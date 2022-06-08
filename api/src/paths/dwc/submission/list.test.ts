@@ -173,7 +173,7 @@ describe('submissions', () => {
             ];
             const response = responseValidator.validateResponse(200, apiResponse);
             expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be object');
           });
 
           it('property create_date', async () => {
@@ -190,7 +190,7 @@ describe('submissions', () => {
             ];
             const response = responseValidator.validateResponse(200, apiResponse);
             expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be object');
           });
 
           it('property create_user', async () => {
