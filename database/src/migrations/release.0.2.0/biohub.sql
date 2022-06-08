@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Tuesday, May 24, 2022 14:54:28
+-- Date Created : Thursday, June 02, 2022 10:40:29
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -117,8 +117,10 @@ CREATE TABLE source_transform(
     source_transform_id              integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     system_user_id                   integer           NOT NULL,
     version                          varchar(20)       NOT NULL,
-    metadata_transform               text              NOT NULL,
-    metadata_transform_precompile    text,
+    transform_filename               varchar(300)      NOT NULL,
+    transform_key                    varchar(1000)     NOT NULL,
+    transform_precompile_filename    varchar(300)      NOT NULL,
+    transform_precompile_key         varchar(1000)     NOT NULL,
     metadata_index                   varchar(100)      NOT NULL,
     record_effective_date            date              DEFAULT now() NOT NULL,
     record_end_date                  date,
@@ -139,9 +141,13 @@ COMMENT ON COLUMN source_transform.system_user_id IS 'System generated surrogate
 ;
 COMMENT ON COLUMN source_transform.version IS 'The version  number of the transformation data set for a specific source system. Examples include "0.1" and "2.0.1".'
 ;
-COMMENT ON COLUMN source_transform.metadata_transform IS 'The metadata transform template. This template is to be used to transform specific metadata for population of the search engine layer.'
+COMMENT ON COLUMN source_transform.transform_filename IS 'The metadata transform template file name. This template is to be used to transform specific metadata for population of the search engine layer.'
 ;
-COMMENT ON COLUMN source_transform.metadata_transform_precompile IS 'A pre-compiled XSLT transformation file. An example would be a file based on the SaxonJS Stylesheet Export File (SEF) format.'
+COMMENT ON COLUMN source_transform.transform_key IS 'The identifying key to the file in the storage system.'
+;
+COMMENT ON COLUMN source_transform.transform_precompile_filename IS 'A pre-compiled XSLT transformation filename. An example would be a file based on the SaxonJS Stylesheet Export File (SEF) format.'
+;
+COMMENT ON COLUMN source_transform.transform_precompile_key IS 'The identifying key to the file in the storage system.'
 ;
 COMMENT ON COLUMN source_transform.metadata_index IS 'The search engine layer index that the metadata transform conforms to. This attribute provides the index name that is the target for the metadata produced by the associated "metadata transform" template.'
 ;
