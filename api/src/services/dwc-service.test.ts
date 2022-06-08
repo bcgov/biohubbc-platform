@@ -1,6 +1,6 @@
-import { Client } from '@elastic/elasticsearch';
+//import { Client } from '@elastic/elasticsearch';
 import { S3 } from 'aws-sdk';
-import { ManagedUpload } from 'aws-sdk/clients/s3';
+import { GetObjectOutput, ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
@@ -9,7 +9,7 @@ import { ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
 import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
-import { ESService } from '../services/es-service';
+//import { ESService } from '../services/es-service';
 import * as fileUtils from '../utils/file-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
@@ -236,22 +236,6 @@ describe('DarwinCoreService', () => {
       sinon.restore();
     });
 
-    it('throws an error if there is no submission record', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves(null as unknown as ISubmissionModel);
-
-      try {
-        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as Error).message).to.equal('eml source is not available');
-      }
-    });
-
     it('throws an error if there is no eml_source in the submission record', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
@@ -264,68 +248,117 @@ describe('DarwinCoreService', () => {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
         expect.fail();
       } catch (actualError) {
-        expect((actualError as Error).message).to.equal('eml source is not available');
+        expect((actualError as Error).message).to.equal('The eml source is not available');
       }
     });
 
-    it('throws an error when getting the Elastic Search service fails', async () => {
+    it('throws an error if the function is not able to get the stylesheet from S3', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
+        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
 
-      sinon.stub(ESService.prototype, 'getEsClient').resolves(undefined);
+      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(null as unknown as GetObjectOutput);
 
       try {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
         expect.fail();
       } catch (actualError) {
-        expect((actualError as Error).message).to.equal("Cannot read property 'create' of undefined");
+        expect((actualError as Error).message).to.equal('The transformation stylesheet is not available');
       }
     });
 
-    it('inserts a record in elastic search with valid data and connection', async () => {
+    it.skip('throws an error if the function is not able to parse the file', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
-      sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
-        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+        .resolves({ id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
 
-      sinon.stub(DarwinCoreService.prototype, 'convertEMLtoJSON').resolves({ some_field: 'some_value' });
+      //todo: make this a valid s3 file
+      const s3File = {
+        LastModified: '2022-06-06T20:49:29.000Z',
+        ContentLength: 41760,
+        ETag: '"1312ae50d1f8004793f7f0836aa67459"',
+        VersionId: '1654548539910',
+        Metadata: {},
+        ContentType: 'application/json',
+        Body: Buffer.from('file1data')
+      } as unknown as GetObjectOutput;
 
-      const createStub = sinon.stub().resolves({
-        _index: 'eml',
-        _type: '_doc',
-        _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
-        _version: 1,
-        result: 'created',
-        _shards: { total: 2, successful: 2, failed: 0 },
-        _seq_no: 26,
-        _primary_term: 1
-      });
+      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
 
-      sinon.stub(ESService.prototype, 'getEsClient').resolves({
-        create: createStub
-      } as unknown as Client);
+      sinon.stub(mediaUtils, 'parseS3File').resolves({ rowCount: 1 });
 
-      const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-      expect(response).eql({
-        _index: 'eml',
-        _type: '_doc',
-        _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
-        _version: 1,
-        result: 'created',
-        _shards: { total: 2, successful: 2, failed: 0 },
-        _seq_no: 26,
-        _primary_term: 1
-      });
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('Failed to parse the stylesheet');
+      }
     });
+
+    // it.skip('throws an error when getting the Elastic Search service fails', async () => {
+    //   const mockDBConnection = getMockDBConnection();
+    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+    //   sinon
+    //     .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+    //     .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
+
+    //   sinon.stub(ESService.prototype, 'getEsClient').resolves(undefined);
+
+    //   try {
+    //     await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+    //     expect.fail();
+    //   } catch (actualError) {
+    //     expect((actualError as Error).message).to.equal("Cannot read property 'rowCount' of undefined");
+    //   }
+    // });
+
+    // it.skip('inserts a record in elastic search with valid data and connection', async () => {
+    //   const mockDBConnection = getMockDBConnection();
+    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+    //   sinon
+    //     .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+    //     .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
+    //   sinon
+    //     .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+    //     .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+    //   sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves(`{"id": "1", "value": "some_value"}`);
+
+    //   const createStub = sinon.stub().resolves({
+    //     _index: 'eml',
+    //     _type: '_doc',
+    //     _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
+    //     _version: 1,
+    //     result: 'created',
+    //     _shards: { total: 2, successful: 2, failed: 0 },
+    //     _seq_no: 26,
+    //     _primary_term: 1
+    //   });
+
+    //   sinon.stub(ESService.prototype, 'getEsClient').resolves({
+    //     create: createStub
+    //   } as unknown as Client);
+
+    //   const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+    //   expect(response).eql({
+    //     _index: 'eml',
+    //     _type: '_doc',
+    //     _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
+    //     _version: 1,
+    //     result: 'created',
+    //     _shards: { total: 2, successful: 2, failed: 0 },
+    //     _seq_no: 26,
+    //     _primary_term: 1
+    //   });
+    // });
   });
 
   describe('secureSubmission', () => {

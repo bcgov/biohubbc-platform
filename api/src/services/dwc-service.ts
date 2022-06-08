@@ -1,10 +1,11 @@
-import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
+import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
-import { SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
+import { parseS3File } from '../utils/media-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
@@ -156,20 +157,55 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<WriteResponseBase> {
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
     const submissionService = new SubmissionService(this.connection);
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord || !submissionRecord.eml_source) {
-      throw new ApiGeneralError('eml source is not available');
+    if (!submissionRecord.eml_source) {
+      throw new ApiGeneralError('The eml source is not available');
     }
 
-    const esClient = await this.getEsClient();
+    const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
-    const jsonDoc = this.convertEMLtoJSON(submissionRecord.eml_source);
+    if (!stylesheetfromS3) {
+      throw new ApiGeneralError('The transformation stylesheet is not available');
+    }
 
-    const response = await esClient.create({ id: dataPackageId, index: ES_INDEX.EML, document: jsonDoc });
+    const parsedStylesheet = parseS3File(stylesheetfromS3);
+
+    if (!parsedStylesheet) {
+      throw new ApiGeneralError('Failed to parse the stylesheet');
+    }
+
+    const compiledTemplate = parsedStylesheet.buffer.toString();
+
+    let transformedEML;
+    let response;
+
+    //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
+    try {
+      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, compiledTemplate);
+    } catch (error) {
+      return submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'eml transformation failed'
+      );
+    }
+
+    //call to the ElasticSearch API to create a record with our transformed EML
+    try {
+      response = await this.uploadtoElasticSearch(dataPackageId, transformedEML);
+    } catch (error) {
+      return submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'upload to elastic search failed'
+      );
+    }
 
     //TODO: We need a new submission status type
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
@@ -184,40 +220,23 @@ export class DarwinCoreService extends DBService {
    * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
-  convertEMLtoJSON(emlSource: XmlString) {
-    if (!emlSource) {
-      return;
-    }
+  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
+    // for future reference
+    // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
+    //to see the library's author respond to one of our questions
 
-    const jsonDoc = {
-      datasetName: 'Coastal Caribou',
-      publishDate: '2021-08-05',
-      projects: [
-        {
-          projectId: '78ba2b5d-252b-46dc-909f-e634aa26a402',
-          projectName: 'West Coast',
-          projectObjectives:
-            'The new Common Terms Query is designed to fix this situations, and it does so through a very clever mechanism. At a high level, Common Terms analyzes your query, identifies which words are important and performs a search using just those words. Only after documents are matched with important words are the unimportant words considered.',
-          fundingSource: 'Together for Wildlife'
-        },
-        {
-          projectId: 'd26547a9-31f3-4477-9ca4-e8a8e7edc237',
-          projectName: 'North West Coast',
-          projectObjectives:
-            'With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn’t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.',
-          fundingSource: 'Together for Wildlife'
-        },
-        {
-          projectId: 'd26547a9-31f3-4477-9ca4-e8a8e7edc236',
-          projectName: 'South West Coast',
-          projectObjectives:
-            "To be, or not to be, that is the question: Whether 'tis nobler in the mind to suffer Or to take arms against a sea of troubles The slings and arrows of outrageous fortune, And by opposing end them. To die—to sleep, No more; and by a sleep to say we end The heart-ache and the thousand natural shocks That flesh is heir to: 'tis a consummation Devoutly to be wish'd. To die, to sleep; To sleep, perchance to dream—ay, there's the rub: For in that sleep of death what dreams may come, When we have shuffled off this mortal coil, Must give us pause—there's the respect That makes calamity of so long life. For who would bear the whips and scorns of time, Th'oppressor's wrong, the proud man's contumely, The pangs of dispriz'd love, the law's delay, The insolence of office, and the spurns",
-          fundingSource: 'Some Funding'
-        }
-      ]
-    };
+    const result: {
+      principalResult: string;
+      resultDocuments: unknown;
+      stylesheetInternal: Record<string, unknown>;
+      masterDocument: unknown;
+    } = SaxonJS2N.transform({
+      stylesheetText: stylesheet,
+      sourceText: emlSource,
+      destination: 'serialized'
+    });
 
-    return jsonDoc;
+    return JSON.parse(result.principalResult);
   }
 
   /**
@@ -305,5 +324,15 @@ export class DarwinCoreService extends DBService {
     }
 
     return response;
+  }
+
+  async uploadtoElasticSearch(dataPackageId: string, convertedEML: string) {
+    const esClient = await this.getEsClient();
+
+    return esClient.create({
+      id: dataPackageId,
+      index: ES_INDEX.EML,
+      document: convertedEML
+    });
   }
 }
