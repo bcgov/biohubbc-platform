@@ -202,7 +202,6 @@ export class DarwinCoreService extends DBService {
 
     //TODO: We need a new submission status type
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
-    return;
   }
 
   /**
