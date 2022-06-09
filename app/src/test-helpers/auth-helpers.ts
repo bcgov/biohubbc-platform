@@ -3,9 +3,9 @@ import { KeycloakInstance } from 'keycloak-js';
 
 const SystemUserAuthState: IAuthState = {
   keycloakWrapper: {
-    keycloak: ({
+    keycloak: {
       authenticated: true
-    } as unknown) as KeycloakInstance,
+    } as unknown as KeycloakInstance,
     hasLoadedAllUserInfo: true,
     systemRoles: [],
     hasSystemRole: () => false,
@@ -33,7 +33,7 @@ export const getMockAuthState = (
   overrides?: Subset<IAuthState>,
   base: IAuthState = SystemUserAuthState
 ): IAuthState => {
-  return ({
+  return {
     ...base,
     ...overrides,
     keycloakWrapper: {
@@ -44,5 +44,5 @@ export const getMockAuthState = (
         ...overrides?.keycloakWrapper?.keycloak
       }
     }
-  } as unknown) as IAuthState;
+  } as unknown as IAuthState;
 };

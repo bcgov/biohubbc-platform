@@ -41,7 +41,7 @@ describe('db', () => {
   describe('getDBConnection', () => {
     it('throws an error if keycloak token is undefined', () => {
       try {
-        getDBConnection((null as unknown) as object);
+        getDBConnection(null as unknown as object);
 
         expect.fail();
       } catch (actualError) {
@@ -83,7 +83,7 @@ describe('db', () => {
       describe('open', () => {
         describe('when not previously called', () => {
           it('opens a new connection, sets the user context, and sends a `BEGIN` query', async () => {
-            const getDBPoolStub = sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            const getDBPoolStub = sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             await connection.open();
 
@@ -105,7 +105,7 @@ describe('db', () => {
 
         describe('when previously called', () => {
           it('does nothing', async () => {
-            const getDBPoolStub = sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            const getDBPoolStub = sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             // call first time
             await connection.open();
@@ -151,7 +151,7 @@ describe('db', () => {
         describe('when a connection is open', () => {
           describe('when not previously called', () => {
             it('releases the open connection', async () => {
-              sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+              sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
               await connection.open();
 
@@ -163,7 +163,7 @@ describe('db', () => {
 
           describe('when previously called', () => {
             it('does not attempt to release a connection', async () => {
-              sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+              sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
               await connection.open();
 
@@ -193,7 +193,7 @@ describe('db', () => {
       describe('commit', () => {
         describe('when a connection is open', () => {
           it('sends a `COMMIT` query', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             await connection.open();
 
@@ -205,7 +205,7 @@ describe('db', () => {
 
         describe('when a connection is not open', () => {
           it('throws an error', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             let expectedError: Error;
             try {
@@ -224,7 +224,7 @@ describe('db', () => {
       describe('rollback', () => {
         describe('when a connection is open', () => {
           it('sends a `ROLLBACK` query', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             await connection.open();
 
@@ -236,7 +236,7 @@ describe('db', () => {
 
         describe('when a connection is not open', () => {
           it('throws an error', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             let expectedError: Error;
             try {
@@ -255,7 +255,7 @@ describe('db', () => {
       describe('sql', () => {
         describe('when a connection is open', () => {
           it('sends a sql statement', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             await connection.open();
 
@@ -267,7 +267,7 @@ describe('db', () => {
           });
 
           it('sends a query with empty values', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             await connection.open();
 
@@ -281,7 +281,7 @@ describe('db', () => {
 
         describe('when a connection is not open', () => {
           it('throws an error', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns((mockPool as unknown) as pg.Pool);
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
             let expectedError: Error;
             try {
@@ -304,7 +304,7 @@ describe('db', () => {
   describe('getAPIUserDBConnection', () => {
     it('calls getDBConnection for the biohub_api user', () => {
       const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(
-        ('stubbed DBConnection object' as unknown) as IDBConnection
+        'stubbed DBConnection object' as unknown as IDBConnection
       );
 
       getAPIUserDBConnection();

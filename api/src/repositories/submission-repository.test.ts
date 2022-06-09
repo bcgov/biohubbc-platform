@@ -23,7 +23,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should return all submission_ids when no criteria is given', async () => {
-      const mockQueryResponse = ({ rows: [{ submission_id: 1 }] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => {
@@ -39,7 +39,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should append knex query if keyword is given', async () => {
-      const mockQueryResponse = ({ rows: [{ submission_id: 1 }] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async (query) => {
@@ -61,7 +61,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should append knex query if spatial is given', async () => {
-      const mockQueryResponse = ({ rows: [{ submission_id: 1 }] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         knex: async () => {
@@ -89,14 +89,14 @@ describe('SubmissionRepository', () => {
       source_transform_id: 'test',
       input_file_name: 'test',
       input_key: 'test',
-      event_timestamp: 'test',
+      record_effective_date: 'test',
       eml_source: 'test',
       darwin_core_source: 'test',
       uuid: 'test'
     };
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -107,7 +107,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecord((mockParams as unknown) as IInsertSubmissionRecord);
+        await submissionRepository.insertSubmissionRecord(mockParams as unknown as IInsertSubmissionRecord);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -115,7 +115,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ submission_id: 1 }] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -126,7 +126,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.insertSubmissionRecord(
-        (mockParams as unknown) as IInsertSubmissionRecord
+        mockParams as unknown as IInsertSubmissionRecord
       );
 
       expect(response.submission_id).to.equal(1);
@@ -139,7 +139,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -158,7 +158,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ submission_id: 1 }] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -180,7 +180,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -203,12 +203,12 @@ describe('SubmissionRepository', () => {
         source_transform_id: 'test',
         input_file_name: 'test',
         input_key: 'test',
-        event_timestamp: 'test',
+        record_effective_date: 'test',
         eml_source: 'test',
         darwin_core_source: 'test',
         uuid: 'test'
       };
-      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -230,7 +230,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
@@ -249,7 +249,7 @@ describe('SubmissionRepository', () => {
         source_transform_id: 1
       };
 
-      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
@@ -267,7 +267,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -290,7 +290,7 @@ describe('SubmissionRepository', () => {
         submission_status_id: 1,
         submission_status_type_id: 2
       };
-      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -312,7 +312,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -335,7 +335,7 @@ describe('SubmissionRepository', () => {
         submission_status_id: 1,
         submission_message_type_id: 2
       };
-      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -362,7 +362,7 @@ describe('SubmissionRepository', () => {
         submission_id: 1,
         source_transform_id: 'SIMS',
         uuid: '2267501d-c6a9-43b5-b951-2324faff6397',
-        event_timestamp: '2022-05-24T18:41:42.211Z',
+        record_effective_date: '2022-05-24T18:41:42.211Z',
         delete_timestamp: null,
         input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
         input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
@@ -374,7 +374,7 @@ describe('SubmissionRepository', () => {
         update_user: 15,
         revision_count: 1
       };
-      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
