@@ -1,29 +1,31 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SOURCE_SYSTEM } from '../../../../constants/database';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../../services/dwc-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/submission/{submissionId}/scrape-occurrences');
+const defaultLog = getLogger('paths/dwc/submission/{submissionId}/secure');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
         {
-          discriminator: 'SystemUser'
+          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC']],
+          discriminator: 'ServiceClient'
         }
       ]
     };
   }),
-  scrapeAndUploadOccurrences()
+  secureSubmission()
 ];
 
 POST.apiDoc = {
-  description: 'Scrape information from file into occurrence table.',
-  tags: ['scrape', 'occurrence'],
+  description: 'Secure submission file',
+  tags: ['secure', 'submission'],
   security: [
     {
       Bearer: []
@@ -42,21 +44,11 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Successfully scraped and uploaded occurrence information.',
+      description: 'Successfully secured submission file',
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-              type: 'object',
-              required: ['occurrence_id'],
-              properties: {
-                occurrence_id: {
-                  type: 'integer',
-                  minimum: 1
-                }
-              }
-            }
+            //
           }
         }
       }
@@ -65,10 +57,8 @@ POST.apiDoc = {
   }
 };
 
-export function scrapeAndUploadOccurrences(): RequestHandler {
+export function secureSubmission(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'scrapeAndUploadOccurrences', message: 'params', files: req.params });
-
     const submissionId = Number(req.params.submissionId);
 
     const connection = getDBConnection(req['keycloak_token']);
@@ -78,13 +68,13 @@ export function scrapeAndUploadOccurrences(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const response = await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
+      const response = await darwinCoreService.tempSecureSubmission(submissionId);
 
       await connection.commit();
 
       res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'scrapeAndUploadOccurrences', message: 'error', error });
+      defaultLog.error({ label: 'secureSubmission', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

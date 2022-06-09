@@ -56,7 +56,7 @@ GET.apiDoc = {
               properties: {
                 id: {
                   type: 'integer',
-                  minimum: 0
+                  minimum: 1
                 },
                 taxonid: {
                   type: 'string',
