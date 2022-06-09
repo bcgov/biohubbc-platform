@@ -53,6 +53,11 @@ parameters:
     name: POSTGRESQL_DATABASE
     required: true
     value: 'biohubbc'
+  - description: Set this value to override the /pgdata directory name. By default the hostname of the container is used, which does not work well in OpenShift.
+    displayName: PGDATA Path Override
+    name: PGDATA_PATH_OVERRIDE
+    required: true
+    value: 'biohubbc'
   - name: TZ
     description: Database timezone
     required: false
@@ -202,6 +207,8 @@ objects:
                   value: '-c maintenance_work_mem=128MB'
                 - name: PGTZ
                   value: '${TZ}'
+                - name: PGDATA_PATH_OVERRIDE
+                  value: '${PGDATA_PATH_OVERRIDE}'
               image: ' '
               imagePullPolicy: IfNotPresent
               livenessProbe:
