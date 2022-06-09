@@ -5,7 +5,7 @@ import { getUserIdentifier, getUserIdentitySource } from './keycloak-utils';
 
 describe('getUserIdentifier', () => {
   it('returns null response when null keycloakToken provided', () => {
-    const response = getUserIdentifier(null as unknown as object);
+    const response = getUserIdentifier((null as unknown) as object);
 
     expect(response).to.be.null;
   });
@@ -37,7 +37,7 @@ describe('getUserIdentifier', () => {
 
 describe('getUserIdentitySource', () => {
   it('returns non null  response when null keycloakToken provided', () => {
-    const response = getUserIdentitySource(null as unknown as object);
+    const response = getUserIdentitySource((null as unknown) as object);
 
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
   });

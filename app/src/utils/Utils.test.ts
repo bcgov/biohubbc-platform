@@ -48,7 +48,7 @@ describe('getFormattedAmount', () => {
   });
 
   it('returns empty string when amount is invalid', () => {
-    expect(getFormattedAmount(null as unknown as number)).toEqual('');
+    expect(getFormattedAmount((null as unknown) as number)).toEqual('');
   });
 });
 
@@ -113,7 +113,7 @@ describe('getFormattedDateRangeString', () => {
 
 describe('getLogOutUrl', () => {
   it('returns null when config is null', () => {
-    expect(getLogOutUrl(null as unknown as IConfig)).toBeUndefined();
+    expect(getLogOutUrl((null as unknown) as IConfig)).toBeUndefined();
   });
 
   it('returns null when config is missing `KEYCLOAK_CONFIG.url`', () => {

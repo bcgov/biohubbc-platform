@@ -2,12 +2,12 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Thursday, June 02, 2022 10:40:29
+-- Date Created : Friday, June 03, 2022 14:48:05
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
--- 
--- TABLE: audit_log 
+--
+-- TABLE: audit_log
 --
 
 CREATE TABLE audit_log(
@@ -41,76 +41,96 @@ COMMENT ON COLUMN audit_log.after_value IS 'The JSON representation of the after
 COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire database.'
 ;
 
--- 
--- TABLE: occurrence 
+--
+-- TABLE: security_transform
 --
 
-CREATE TABLE occurrence(
-    occurrence_id           integer                     GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    submission_id           integer                     NOT NULL,
-    occurrenceid            varchar(3000),
-    taxonid                 varchar(3000),
-    lifestage               varchar(3000),
-    sex                     varchar(3000),
-    vernacularname          varchar(3000),
-    eventdate               TIMESTAMPTZ                 NOT NULL,
-    individualcount         varchar(3000),
-    organismquantity        varchar(3000),
-    organismquantitytype    varchar(3000),
-    geometry                geometry(geometry, 3005),
-    geography               geography(geometry),
-    create_date             timestamptz(6)              DEFAULT now() NOT NULL,
-    create_user             integer                     NOT NULL,
-    update_date             timestamptz(6),
-    update_user             integer,
-    revision_count          integer                     DEFAULT 0 NOT NULL,
-    CONSTRAINT occurrence_pk PRIMARY KEY (occurrence_id)
+CREATE TABLE security_transform(
+    security_transform_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    name                     varchar(100)      NOT NULL,
+    description              varchar(3000),
+    notes                    varchar(3000),
+    transform                text              NOT NULL,
+    record_effective_date    date              NOT NULL,
+    record_end_date          date,
+    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user              integer           NOT NULL,
+    update_date              timestamptz(6),
+    update_user              integer,
+    revision_count           integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT security_transform_pk PRIMARY KEY (security_transform_id)
 )
 ;
 
 
 
-COMMENT ON COLUMN occurrence.occurrence_id IS 'System generated surrogate primary key identifier.'
+COMMENT ON COLUMN security_transform.security_transform_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN occurrence.submission_id IS 'System generated surrogate primary key identifier.'
+COMMENT ON COLUMN security_transform.name IS 'The name of the record.'
 ;
-COMMENT ON COLUMN occurrence.occurrenceid IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.description IS 'The description of the record.'
 ;
-COMMENT ON COLUMN occurrence.taxonid IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.notes IS 'Notes associated with the record.'
 ;
-COMMENT ON COLUMN occurrence.lifestage IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.transform IS 'A SQL statement or fragment suitable for the identification of spatial components from submission spatial components and subsequent population of a machine readable dataset that describes the secured map viewable attributes of that component.'
 ;
-COMMENT ON COLUMN occurrence.sex IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.record_effective_date IS 'Record level effective date.'
 ;
-COMMENT ON COLUMN occurrence.vernacularname IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.record_end_date IS 'Record level end date.'
 ;
-COMMENT ON COLUMN occurrence.eventdate IS 'A datetime representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.create_date IS 'The datetime the record was created.'
 ;
-COMMENT ON COLUMN occurrence.individualcount IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.create_user IS 'The id of the user who created the record as identified in the system user table.'
 ;
-COMMENT ON COLUMN occurrence.organismquantity IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.update_date IS 'The datetime the record was updated.'
 ;
-COMMENT ON COLUMN occurrence.organismquantitytype IS 'A string representation of the value provided for the given Darwin Core term.'
+COMMENT ON COLUMN security_transform.update_user IS 'The id of the user who updated the record as identified in the system user table.'
 ;
-COMMENT ON COLUMN occurrence.geometry IS 'The containing geometry of the record.'
+COMMENT ON COLUMN security_transform.revision_count IS 'Revision count used for concurrency control.'
 ;
-COMMENT ON COLUMN occurrence.geography IS 'The containing geography of the record.'
-;
-COMMENT ON COLUMN occurrence.create_date IS 'The datetime the record was created.'
-;
-COMMENT ON COLUMN occurrence.create_user IS 'The id of the user who created the record as identified in the system user table.'
-;
-COMMENT ON COLUMN occurrence.update_date IS 'The datetime the record was updated.'
-;
-COMMENT ON COLUMN occurrence.update_user IS 'The id of the user who updated the record as identified in the system user table.'
-;
-COMMENT ON COLUMN occurrence.revision_count IS 'Revision count used for concurrency control.'
-;
-COMMENT ON TABLE occurrence IS 'Occurrence records that have been ingested from submissions sources.'
+COMMENT ON TABLE security_transform IS 'Security transforms are SQL statements or fragments that dynamically operate on submission spatial components to provide a secure view of the component for map display.'
 ;
 
--- 
--- TABLE: source_transform 
+--
+-- TABLE: security_transform_submission
+--
+
+CREATE TABLE security_transform_submission(
+    security_transform_submission_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_spatial_component_id     integer           NOT NULL,
+    security_transform_id               integer           NOT NULL,
+    create_date                         timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                         integer           NOT NULL,
+    update_date                         timestamptz(6),
+    update_user                         integer,
+    revision_count                      integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT security_transform_submission_pk PRIMARY KEY (security_transform_submission_id)
+)
+;
+
+
+
+COMMENT ON COLUMN security_transform_submission.security_transform_submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN security_transform_submission.submission_spatial_component_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN security_transform_submission.security_transform_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN security_transform_submission.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN security_transform_submission.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN security_transform_submission.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN security_transform_submission.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN security_transform_submission.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE security_transform_submission IS 'A associative entity that joins security transforms with submission spatial components.'
+;
+
+--
+-- TABLE: source_transform
 --
 
 CREATE TABLE source_transform(
@@ -168,8 +188,96 @@ COMMENT ON COLUMN source_transform.revision_count IS 'Revision count used for co
 COMMENT ON TABLE source_transform IS 'Stores data transform information for data sources. This information is used by data ingest logic to lookup version information and transformations for processing data submissions. Note that foreign keys to system users should be restricted to users with a user identity source of "SYSTEM".'
 ;
 
--- 
--- TABLE: submission 
+--
+-- TABLE: spatial_transform
+--
+
+CREATE TABLE spatial_transform(
+    spatial_transform_id     integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    name                     varchar(100)      NOT NULL,
+    description              varchar(3000),
+    notes                    varchar(3000),
+    transform                text              NOT NULL,
+    record_effective_date    date              NOT NULL,
+    record_end_date          date,
+    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user              integer           NOT NULL,
+    update_date              timestamptz(6),
+    update_user              integer,
+    revision_count           integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT spatial_transform_pk PRIMARY KEY (spatial_transform_id)
+)
+;
+
+
+
+COMMENT ON COLUMN spatial_transform.spatial_transform_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN spatial_transform.name IS 'The name of the record.'
+;
+COMMENT ON COLUMN spatial_transform.description IS 'The description of the record.'
+;
+COMMENT ON COLUMN spatial_transform.notes IS 'Notes associated with the record.'
+;
+COMMENT ON COLUMN spatial_transform.transform IS 'A SQL statement or fragment suitable for the identification of spatial components from submission source and subsequent population of a machine readable dataset that describes the map viewable attributes of that component.'
+;
+COMMENT ON COLUMN spatial_transform.record_effective_date IS 'Record level effective date.'
+;
+COMMENT ON COLUMN spatial_transform.record_end_date IS 'Record level end date.'
+;
+COMMENT ON COLUMN spatial_transform.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN spatial_transform.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN spatial_transform.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN spatial_transform.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN spatial_transform.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE spatial_transform IS 'Spatial transforms are SQL statements that dynamically operate on submission source to extract spatial components of interest for map display.'
+;
+
+--
+-- TABLE: spatial_transform_submission
+--
+
+CREATE TABLE spatial_transform_submission(
+    spatial_transform_submission_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    spatial_transform_id               integer           NOT NULL,
+    submission_spatial_component_id    integer           NOT NULL,
+    create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                        integer           NOT NULL,
+    update_date                        timestamptz(6),
+    update_user                        integer,
+    revision_count                     integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT spatial_transform_submission_pk PRIMARY KEY (spatial_transform_submission_id)
+)
+;
+
+
+
+COMMENT ON COLUMN spatial_transform_submission.spatial_transform_submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN spatial_transform_submission.spatial_transform_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN spatial_transform_submission.submission_spatial_component_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN spatial_transform_submission.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN spatial_transform_submission.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN spatial_transform_submission.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN spatial_transform_submission.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN spatial_transform_submission.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE spatial_transform_submission IS 'A associative entity that joins spatial transforms with submission spatial components.'
+;
+
+--
+-- TABLE: submission
 --
 
 CREATE TABLE submission(
@@ -182,6 +290,7 @@ CREATE TABLE submission(
     input_file_name        varchar(300),
     eml_source             xml,
     darwin_core_source     jsonb,
+    security_timestamp     TIMESTAMPTZ,
     create_date            timestamptz(6)    DEFAULT now() NOT NULL,
     create_user            integer           NOT NULL,
     update_date            timestamptz(6),
@@ -211,6 +320,8 @@ COMMENT ON COLUMN submission.eml_source IS 'The Ecological Metadata Language sou
 ;
 COMMENT ON COLUMN submission.darwin_core_source IS 'The denormalized Darwin Core source as extracted from the submission.'
 ;
+COMMENT ON COLUMN submission.security_timestamp IS 'The timestamp of the completion of the application of security rules to the dataset after submission. Viewing of submission spatial components is restricted until security is applied and this attribute is set.'
+;
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.'
 ;
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.'
@@ -224,8 +335,8 @@ COMMENT ON COLUMN submission.revision_count IS 'Revision count used for concurre
 COMMENT ON TABLE submission IS 'Provides a historical listing of published dates and pointers to raw data versions for data submissions.'
 ;
 
--- 
--- TABLE: submission_message 
+--
+-- TABLE: submission_message
 --
 
 CREATE TABLE submission_message(
@@ -268,8 +379,8 @@ COMMENT ON COLUMN submission_message.revision_count IS 'Revision count used for 
 COMMENT ON TABLE submission_message IS 'Intersection table to track submission messages.'
 ;
 
--- 
--- TABLE: submission_message_class 
+--
+-- TABLE: submission_message_class
 --
 
 CREATE TABLE submission_message_class(
@@ -312,8 +423,8 @@ COMMENT ON COLUMN submission_message_class.revision_count IS 'Revision count use
 COMMENT ON TABLE submission_message_class IS 'The classification of submission message types available to report.'
 ;
 
--- 
--- TABLE: submission_message_type 
+--
+-- TABLE: submission_message_type
 --
 
 CREATE TABLE submission_message_type(
@@ -359,8 +470,61 @@ COMMENT ON COLUMN submission_message_type.revision_count IS 'Revision count used
 COMMENT ON TABLE submission_message_type IS 'The types of submission messages available to report. These messages may include metrics and validation concerns.'
 ;
 
--- 
--- TABLE: submission_status 
+--
+-- TABLE: submission_spatial_component
+--
+
+CREATE TABLE submission_spatial_component(
+    submission_spatial_component_id    integer                     GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_id                      integer                     NOT NULL,
+    spatial_component                  jsonb                       NOT NULL,
+    geometry                           geometry(geometry, 3005),
+    geography                          geography(geometry),
+    secured_spatial_component          jsonb,
+    secured_geometry                   geometry(geometry, 3005),
+    secured_geography                  geography(geometry),
+    create_date                        timestamptz(6)              DEFAULT now() NOT NULL,
+    create_user                        integer                     NOT NULL,
+    update_date                        timestamptz(6),
+    update_user                        integer,
+    revision_count                     integer                     DEFAULT 0 NOT NULL,
+    CONSTRAINT submission_spatial_component_pk PRIMARY KEY (submission_spatial_component_id)
+)
+;
+
+
+
+COMMENT ON COLUMN submission_spatial_component.submission_spatial_component_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_spatial_component.submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_spatial_component.spatial_component IS 'A spatial component is a JSON attribute representation of a viewable map object.'
+;
+COMMENT ON COLUMN submission_spatial_component.geometry IS 'The containing geometry of the spatial component attribute.'
+;
+COMMENT ON COLUMN submission_spatial_component.geography IS 'The containing geography of the spatial component attribute.'
+;
+COMMENT ON COLUMN submission_spatial_component.secured_spatial_component IS 'A secure spatial component is a JSON attribute representation of a viewable map object that has been adjusted by a security rule that targets that representation.'
+;
+COMMENT ON COLUMN submission_spatial_component.secured_geometry IS 'The containing geometry of the secured spatial component attribute.'
+;
+COMMENT ON COLUMN submission_spatial_component.secured_geography IS 'The containing geography of the secured spatial component attribute.'
+;
+COMMENT ON COLUMN submission_spatial_component.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN submission_spatial_component.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_spatial_component.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN submission_spatial_component.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_spatial_component.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE submission_spatial_component IS 'Submission spatial components are spatial features and their desired map representations as extracted from submission source data.'
+;
+
+--
+-- TABLE: submission_status
 --
 
 CREATE TABLE submission_status(
@@ -400,8 +564,8 @@ COMMENT ON COLUMN submission_status.revision_count IS 'Revision count used for c
 COMMENT ON TABLE submission_status IS 'Provides a history of submission statuses.'
 ;
 
--- 
--- TABLE: submission_status_type 
+--
+-- TABLE: submission_status_type
 --
 
 CREATE TABLE submission_status_type(
@@ -444,8 +608,8 @@ COMMENT ON COLUMN submission_status_type.revision_count IS 'Revision count used 
 COMMENT ON TABLE submission_status_type IS 'The status types of submissions. Typical status types are those that represent submissions being submitted or rejected.'
 ;
 
--- 
--- TABLE: system_constant 
+--
+-- TABLE: system_constant
 --
 
 CREATE TABLE system_constant(
@@ -488,8 +652,8 @@ COMMENT ON COLUMN system_constant.revision_count IS 'Revision count used for con
 COMMENT ON TABLE system_constant IS 'A list of system constants necessary for system functionality. Such constants are not editable by system administrators as they are used by internal logic.'
 ;
 
--- 
--- TABLE: system_metadata_constant 
+--
+-- TABLE: system_metadata_constant
 --
 
 CREATE TABLE system_metadata_constant(
@@ -532,8 +696,8 @@ COMMENT ON COLUMN system_metadata_constant.revision_count IS 'Revision count use
 COMMENT ON TABLE system_metadata_constant IS 'A list of system metadata constants associated with the business. Such constants are editable by system administrators and are used when publishing data.'
 ;
 
--- 
--- TABLE: system_role 
+--
+-- TABLE: system_role
 --
 
 CREATE TABLE system_role(
@@ -579,8 +743,8 @@ COMMENT ON COLUMN system_role.revision_count IS 'Revision count used for concurr
 COMMENT ON TABLE system_role IS 'Agency or Ministry funding the project.'
 ;
 
--- 
--- TABLE: system_user 
+--
+-- TABLE: system_user
 --
 
 CREATE TABLE system_user(
@@ -623,8 +787,8 @@ COMMENT ON COLUMN system_user.revision_count IS 'Revision count used for concurr
 COMMENT ON TABLE system_user IS 'Agency or Ministry funding the project.'
 ;
 
--- 
--- TABLE: system_user_role 
+--
+-- TABLE: system_user_role
 --
 
 CREATE TABLE system_user_role(
@@ -661,8 +825,55 @@ COMMENT ON COLUMN system_user_role.revision_count IS 'Revision count used for co
 COMMENT ON TABLE system_user_role IS 'A associative entity that joins system users and system role types.'
 ;
 
--- 
--- TABLE: user_identity_source 
+--
+-- TABLE: system_user_security_exception
+--
+
+CREATE TABLE system_user_security_exception(
+    system_user_security_exception_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    security_transform_id                integer           NOT NULL,
+    system_user_id                       integer           NOT NULL,
+    record_effective_date                date              NOT NULL,
+    record_end_date                      date,
+    notes                                varchar(3000),
+    create_date                          timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                          integer           NOT NULL,
+    update_date                          timestamptz(6),
+    update_user                          integer,
+    revision_count                       integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT system_user_security_exception_pk PRIMARY KEY (system_user_security_exception_id)
+)
+;
+
+
+
+COMMENT ON COLUMN system_user_security_exception.system_user_security_exception_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN system_user_security_exception.security_transform_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN system_user_security_exception.system_user_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN system_user_security_exception.record_effective_date IS 'Record level effective date.'
+;
+COMMENT ON COLUMN system_user_security_exception.record_end_date IS 'Record level end date.'
+;
+COMMENT ON COLUMN system_user_security_exception.notes IS 'Notes associated with the record.'
+;
+COMMENT ON COLUMN system_user_security_exception.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN system_user_security_exception.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN system_user_security_exception.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN system_user_security_exception.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN system_user_security_exception.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE system_user_security_exception IS 'Identifies security transforms for which particular system users are exempt, thus allowing those users to view unsecured map representations of those spatial components.'
+;
+
+--
+-- TABLE: user_identity_source
 --
 
 CREATE TABLE user_identity_source(
@@ -708,230 +919,341 @@ COMMENT ON COLUMN user_identity_source.revision_count IS 'Revision count used fo
 COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. This source is traditionally the system that authenticates the user. Example sources could include IDIR, BCEID and DATABASE.'
 ;
 
--- 
--- INDEX: "Ref165161" 
+--
+-- INDEX: security_transform_nuk1
 --
 
-CREATE INDEX "Ref165161" ON occurrence(submission_id)
+CREATE UNIQUE INDEX security_transform_nuk1 ON security_transform(name, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- INDEX: source_transform_nuk1 
+--
+-- INDEX: security_transform_submission_uk1
+--
+
+CREATE UNIQUE INDEX security_transform_submission_uk1 ON security_transform_submission(submission_spatial_component_id, security_transform_id)
+;
+--
+-- INDEX: "Ref169186"
+--
+
+CREATE INDEX "Ref169186" ON security_transform_submission(submission_spatial_component_id)
+;
+--
+-- INDEX: "Ref218187"
+--
+
+CREATE INDEX "Ref218187" ON security_transform_submission(security_transform_id)
+;
+--
+-- INDEX: source_transform_nuk1
 --
 
 CREATE UNIQUE INDEX source_transform_nuk1 ON source_transform(version, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- INDEX: "Ref191183" 
+--
+-- INDEX: "Ref191183"
 --
 
 CREATE INDEX "Ref191183" ON source_transform(system_user_id)
 ;
--- 
--- INDEX: submission_nuk1 
+--
+-- INDEX: spatial_transform_nuk1
+--
+
+CREATE UNIQUE INDEX spatial_transform_nuk1 ON spatial_transform(name, record_effective_date)
+;
+--
+-- INDEX: spatial_transform_submission_uk1
+--
+
+CREATE UNIQUE INDEX spatial_transform_submission_uk1 ON spatial_transform_submission(spatial_transform_id, submission_spatial_component_id)
+;
+--
+-- INDEX: "Ref207184"
+--
+
+CREATE INDEX "Ref207184" ON spatial_transform_submission(spatial_transform_id)
+;
+--
+-- INDEX: "Ref169185"
+--
+
+CREATE INDEX "Ref169185" ON spatial_transform_submission(submission_spatial_component_id)
+;
+--
+-- INDEX: submission_nuk1
 --
 
 CREATE UNIQUE INDEX submission_nuk1 ON submission(uuid)
 ;
--- 
--- INDEX: "Ref199182" 
+--
+-- INDEX: "Ref199182"
 --
 
 CREATE INDEX "Ref199182" ON submission(source_transform_id)
 ;
--- 
--- INDEX: "Ref184166" 
+--
+-- INDEX: "Ref184166"
 --
 
 CREATE INDEX "Ref184166" ON submission_message(submission_status_id)
 ;
--- 
--- INDEX: "Ref182167" 
+--
+-- INDEX: "Ref182167"
 --
 
 CREATE INDEX "Ref182167" ON submission_message(submission_message_type_id)
 ;
--- 
--- INDEX: submission_message_class_nuk1 
+--
+-- INDEX: submission_message_class_nuk1
 --
 
 CREATE UNIQUE INDEX submission_message_class_nuk1 ON submission_message_class(name, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- INDEX: submission_message_type_nuk1 
+--
+-- INDEX: submission_message_type_nuk1
 --
 
 CREATE UNIQUE INDEX submission_message_type_nuk1 ON submission_message_type(name, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- INDEX: "Ref189177" 
+--
+-- INDEX: "Ref189177"
 --
 
 CREATE INDEX "Ref189177" ON submission_message_type(submission_message_class_id)
 ;
--- 
--- INDEX: "Ref165163" 
+--
+-- INDEX: "Ref165161"
+--
+
+CREATE INDEX "Ref165161" ON submission_spatial_component(submission_id)
+;
+--
+-- INDEX: "Ref165163"
 --
 
 CREATE INDEX "Ref165163" ON submission_status(submission_id)
 ;
--- 
--- INDEX: "Ref183164" 
+--
+-- INDEX: "Ref183164"
 --
 
 CREATE INDEX "Ref183164" ON submission_status(submission_status_type_id)
 ;
--- 
--- INDEX: submission_status_type_nuk1 
+--
+-- INDEX: submission_status_type_nuk1
 --
 
 CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- INDEX: system_constant_uk1 
+--
+-- INDEX: system_constant_uk1
 --
 
 CREATE UNIQUE INDEX system_constant_uk1 ON system_constant(constant_name)
 ;
--- 
--- INDEX: system_metadata_constant_uk1 
+--
+-- INDEX: system_metadata_constant_uk1
 --
 
 CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(constant_name)
 ;
--- 
--- INDEX: system_role_nuk1 
+--
+-- INDEX: system_role_nuk1
 --
 
 CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- INDEX: system_user_nuk1 
+--
+-- INDEX: system_user_nuk1
 --
 
 CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, record_end_date, user_identity_source_id)
 ;
--- 
--- INDEX: "Ref190178" 
+--
+-- INDEX: "Ref190178"
 --
 
 CREATE INDEX "Ref190178" ON system_user(user_identity_source_id)
 ;
--- 
--- INDEX: system_user_role_uk1 
+--
+-- INDEX: system_user_role_uk1
 --
 
 CREATE UNIQUE INDEX system_user_role_uk1 ON system_user_role(system_user_id, system_role_id)
 ;
--- 
--- INDEX: "Ref191179" 
+--
+-- INDEX: "Ref191179"
 --
 
 CREATE INDEX "Ref191179" ON system_user_role(system_user_id)
 ;
--- 
--- INDEX: "Ref192180" 
+--
+-- INDEX: "Ref192180"
 --
 
 CREATE INDEX "Ref192180" ON system_user_role(system_role_id)
 ;
--- 
--- INDEX: user_identity_source_nuk1 
+--
+-- INDEX: system_user_security_exception_uk1
+--
+
+CREATE UNIQUE INDEX system_user_security_exception_uk1 ON system_user_security_exception(security_transform_id, system_user_id)
+;
+--
+-- INDEX: "Ref218188"
+--
+
+CREATE INDEX "Ref218188" ON system_user_security_exception(security_transform_id)
+;
+--
+-- INDEX: "Ref191189"
+--
+
+CREATE INDEX "Ref191189" ON system_user_security_exception(system_user_id)
+;
+--
+-- INDEX: user_identity_source_nuk1
 --
 
 CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null
 ;
--- 
--- TABLE: occurrence 
+--
+-- TABLE: security_transform_submission
 --
 
-ALTER TABLE occurrence ADD CONSTRAINT "Refsubmission161" 
-    FOREIGN KEY (submission_id)
-    REFERENCES submission(submission_id)
+ALTER TABLE security_transform_submission ADD CONSTRAINT "Refsubmission_spatial_component186"
+    FOREIGN KEY (submission_spatial_component_id)
+    REFERENCES submission_spatial_component(submission_spatial_component_id)
+;
+
+ALTER TABLE security_transform_submission ADD CONSTRAINT "Refsecurity_transform187"
+    FOREIGN KEY (security_transform_id)
+    REFERENCES security_transform(security_transform_id)
 ;
 
 
--- 
--- TABLE: source_transform 
+--
+-- TABLE: source_transform
 --
 
-ALTER TABLE source_transform ADD CONSTRAINT "Refsystem_user183" 
+ALTER TABLE source_transform ADD CONSTRAINT "Refsystem_user183"
     FOREIGN KEY (system_user_id)
     REFERENCES system_user(system_user_id)
 ;
 
 
--- 
--- TABLE: submission 
+--
+-- TABLE: spatial_transform_submission
 --
 
-ALTER TABLE submission ADD CONSTRAINT "Refsource_transform182" 
+ALTER TABLE spatial_transform_submission ADD CONSTRAINT "Refspatial_transform184"
+    FOREIGN KEY (spatial_transform_id)
+    REFERENCES spatial_transform(spatial_transform_id)
+;
+
+ALTER TABLE spatial_transform_submission ADD CONSTRAINT "Refsubmission_spatial_component185"
+    FOREIGN KEY (submission_spatial_component_id)
+    REFERENCES submission_spatial_component(submission_spatial_component_id)
+;
+
+
+--
+-- TABLE: submission
+--
+
+ALTER TABLE submission ADD CONSTRAINT "Refsource_transform182"
     FOREIGN KEY (source_transform_id)
     REFERENCES source_transform(source_transform_id)
 ;
 
 
--- 
--- TABLE: submission_message 
+--
+-- TABLE: submission_message
 --
 
-ALTER TABLE submission_message ADD CONSTRAINT "Refsubmission_status166" 
+ALTER TABLE submission_message ADD CONSTRAINT "Refsubmission_status166"
     FOREIGN KEY (submission_status_id)
     REFERENCES submission_status(submission_status_id)
 ;
 
-ALTER TABLE submission_message ADD CONSTRAINT "Refsubmission_message_type167" 
+ALTER TABLE submission_message ADD CONSTRAINT "Refsubmission_message_type167"
     FOREIGN KEY (submission_message_type_id)
     REFERENCES submission_message_type(submission_message_type_id)
 ;
 
 
--- 
--- TABLE: submission_message_type 
+--
+-- TABLE: submission_message_type
 --
 
-ALTER TABLE submission_message_type ADD CONSTRAINT "Refsubmission_message_class177" 
+ALTER TABLE submission_message_type ADD CONSTRAINT "Refsubmission_message_class177"
     FOREIGN KEY (submission_message_class_id)
     REFERENCES submission_message_class(submission_message_class_id)
 ;
 
 
--- 
--- TABLE: submission_status 
+--
+-- TABLE: submission_spatial_component
 --
 
-ALTER TABLE submission_status ADD CONSTRAINT "Refsubmission163" 
+ALTER TABLE submission_spatial_component ADD CONSTRAINT "Refsubmission161"
     FOREIGN KEY (submission_id)
     REFERENCES submission(submission_id)
 ;
 
-ALTER TABLE submission_status ADD CONSTRAINT "Refsubmission_status_type164" 
+
+--
+-- TABLE: submission_status
+--
+
+ALTER TABLE submission_status ADD CONSTRAINT "Refsubmission163"
+    FOREIGN KEY (submission_id)
+    REFERENCES submission(submission_id)
+;
+
+ALTER TABLE submission_status ADD CONSTRAINT "Refsubmission_status_type164"
     FOREIGN KEY (submission_status_type_id)
     REFERENCES submission_status_type(submission_status_type_id)
 ;
 
 
--- 
--- TABLE: system_user 
+--
+-- TABLE: system_user
 --
 
-ALTER TABLE system_user ADD CONSTRAINT "Refuser_identity_source178" 
+ALTER TABLE system_user ADD CONSTRAINT "Refuser_identity_source178"
     FOREIGN KEY (user_identity_source_id)
     REFERENCES user_identity_source(user_identity_source_id)
 ;
 
 
--- 
--- TABLE: system_user_role 
+--
+-- TABLE: system_user_role
 --
 
-ALTER TABLE system_user_role ADD CONSTRAINT "Refsystem_user179" 
+ALTER TABLE system_user_role ADD CONSTRAINT "Refsystem_user179"
     FOREIGN KEY (system_user_id)
     REFERENCES system_user(system_user_id)
 ;
 
-ALTER TABLE system_user_role ADD CONSTRAINT "Refsystem_role180" 
+ALTER TABLE system_user_role ADD CONSTRAINT "Refsystem_role180"
     FOREIGN KEY (system_role_id)
     REFERENCES system_role(system_role_id)
+;
+
+
+--
+-- TABLE: system_user_security_exception
+--
+
+ALTER TABLE system_user_security_exception ADD CONSTRAINT "Refsecurity_transform188"
+    FOREIGN KEY (security_transform_id)
+    REFERENCES security_transform(security_transform_id)
+;
+
+ALTER TABLE system_user_security_exception ADD CONSTRAINT "Refsystem_user189"
+    FOREIGN KEY (system_user_id)
+    REFERENCES system_user(system_user_id)
 ;
 
 

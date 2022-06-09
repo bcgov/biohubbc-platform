@@ -16,7 +16,7 @@ chai.use(sinonChai);
 describe('scrape-occurrences', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
 
       const basicRequest = {
         headers: {
@@ -71,7 +71,7 @@ describe('scrape-occurrences', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator(POST.apiDoc as unknown as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator((POST.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         it('has null value', async () => {
@@ -151,7 +151,7 @@ describe('scrape-occurrences', () => {
 
       sinon
         .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
-        .throws('error' as unknown as ApiGeneralError);
+        .throws(('error' as unknown) as ApiGeneralError);
 
       try {
         const requestHandler = scrapeOccurrences.scrapeAndUploadOccurrences();

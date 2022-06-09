@@ -39,8 +39,8 @@ describe('updateAccessRequest', () => {
 
       await result(
         { ...sampleReq, body: { ...sampleReq.body, userIdentifier: null } },
-        null as unknown as any,
-        null as unknown as any
+        (null as unknown) as any,
+        (null as unknown) as any
       );
       expect.fail();
     } catch (actualError) {
@@ -55,8 +55,8 @@ describe('updateAccessRequest', () => {
 
       await result(
         { ...sampleReq, body: { ...sampleReq.body, identitySource: null } },
-        null as unknown as any,
-        null as unknown as any
+        (null as unknown) as any,
+        (null as unknown) as any
       );
       expect.fail();
     } catch (actualError) {
@@ -71,8 +71,8 @@ describe('updateAccessRequest', () => {
 
       await result(
         { ...sampleReq, body: { ...sampleReq.body, requestId: null } },
-        null as unknown as any,
-        null as unknown as any
+        (null as unknown) as any,
+        (null as unknown) as any
       );
       expect.fail();
     } catch (actualError) {
@@ -87,8 +87,8 @@ describe('updateAccessRequest', () => {
 
       await result(
         { ...sampleReq, body: { ...sampleReq.body, requestStatusTypeId: null } },
-        null as unknown as any,
-        null as unknown as any
+        (null as unknown) as any,
+        (null as unknown) as any
       );
       expect.fail();
     } catch (actualError) {
@@ -173,7 +173,7 @@ describe('updateAccessRequest', () => {
 
   it('checks If Access request if approval is false', async () => {
     const mockResponseRow = { name: 'Rejected' };
-    const mockQueryResponse = { rows: [mockResponseRow] } as unknown as QueryResult<any>;
+    const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
     const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
     const queriesSpy = sinon.spy(AdministrativeActivityQueries, 'getAdministrativeActivityById');
@@ -186,7 +186,7 @@ describe('updateAccessRequest', () => {
 
   it('checks If Access request if approval is true', async () => {
     const mockResponseRow = { name: 'Actioned' };
-    const mockQueryResponse = { rows: [mockResponseRow] } as unknown as QueryResult<any>;
+    const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
     const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
     const queriesSpy = sinon.spy(AdministrativeActivityQueries, 'getAdministrativeActivityById');
@@ -199,7 +199,7 @@ describe('updateAccessRequest', () => {
 
   it('attempts to send approval email', async () => {
     const mockResponseRow = { name: 'Actioned' };
-    const mockQueryResponse = { rows: [mockResponseRow] } as unknown as QueryResult<any>;
+    const mockQueryResponse = ({ rows: [mockResponseRow] } as unknown) as QueryResult<any>;
     const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
     const queriesSpy = sinon.spy(AdministrativeActivityQueries, 'getAdministrativeActivityById');

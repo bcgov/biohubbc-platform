@@ -20,7 +20,7 @@ chai.use(sinonChai);
 describe('create', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
 
       describe('should throw an error when', () => {
         describe('media', () => {
@@ -102,7 +102,7 @@ describe('create', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator(POST.apiDoc as unknown as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator((POST.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         it('returns a null response', async () => {
@@ -187,7 +187,7 @@ describe('create', () => {
     it('throws an error when media file is detected to be malicious', async () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      mockReq.files = [({ originalname: 'file' } as unknown) as Express.Multer.File];
       mockReq.body = {
         media: 'file',
         data_package_id: '123-456-789'
@@ -237,7 +237,7 @@ describe('create', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      mockReq.files = [({ originalname: 'file' } as unknown) as Express.Multer.File];
       mockReq.body = {
         media: 'file',
         data_package_id: '123-456-789'
@@ -264,7 +264,7 @@ describe('create', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      mockReq.files = [({ originalname: 'file' } as unknown) as Express.Multer.File];
       mockReq.body = {
         media: 'test',
         data_package_id: '123-456-789'
@@ -356,7 +356,7 @@ describe('create', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
+      const mockFile = ({ originalname: 'file' } as unknown) as Express.Multer.File;
 
       mockReq.files = [mockFile];
       mockReq.body = {

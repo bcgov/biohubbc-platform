@@ -14,7 +14,7 @@ chai.use(sinonChai);
 describe('submissions', () => {
   describe('openApiSchema', () => {
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator((GET.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         describe('required return properties is missing', () => {
@@ -272,7 +272,7 @@ describe('submissions', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      sinon.stub(SubmissionService.prototype, 'listSubmissionRecords').throws('error' as unknown as ApiGeneralError);
+      sinon.stub(SubmissionService.prototype, 'listSubmissionRecords').throws(('error' as unknown) as ApiGeneralError);
 
       try {
         const requestHandler = listDataset();

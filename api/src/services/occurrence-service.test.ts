@@ -293,7 +293,7 @@ describe('OccurrenceService', () => {
 
       const repo = sinon
         .stub(OccurrenceRepository.prototype, 'getOccurrenceSubmission')
-        .resolves({ occurrenceId: 1 } as unknown as IGetOccurrenceData);
+        .resolves(({ occurrenceId: 1 } as unknown) as IGetOccurrenceData);
 
       const response = await occurrenceService.getOccurrenceSubmission(1);
 
@@ -309,7 +309,7 @@ describe('OccurrenceService', () => {
 
       const repo = sinon.stub(OccurrenceRepository.prototype, 'insertScrapedOccurrence').resolves({ occurrence_id: 1 });
 
-      const response = await occurrenceService.insertScrapedOccurrence(1, {} as unknown as IPostOccurrenceData);
+      const response = await occurrenceService.insertScrapedOccurrence(1, ({} as unknown) as IPostOccurrenceData);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ occurrence_id: 1 });
@@ -329,7 +329,7 @@ describe('OccurrenceService', () => {
 
       const insertOccurrenceStub = sinon.stub(OccurrenceService.prototype, 'insertScrapedOccurrence').resolves();
 
-      const response = await occurrenceService.scrapeAndUploadOccurrences(1, {} as unknown as DWCArchive);
+      const response = await occurrenceService.scrapeAndUploadOccurrences(1, ({} as unknown) as DWCArchive);
 
       expect(getHeadersAndRowsFromFileStub).to.have.been.calledOnce;
       expect(scrapeOccurrencesStub).to.have.been.calledOnce;
@@ -360,7 +360,7 @@ describe('OccurrenceService', () => {
         .onCall(3)
         .resolves({ occurrence_id: 4 });
 
-      const response = await occurrenceService.scrapeAndUploadOccurrences(1, {} as unknown as DWCArchive);
+      const response = await occurrenceService.scrapeAndUploadOccurrences(1, ({} as unknown) as DWCArchive);
 
       expect(getHeadersAndRowsFromFileStub).to.have.been.calledOnce;
       expect(scrapeOccurrencesStub).to.have.been.calledOnce;
@@ -375,8 +375,8 @@ describe('OccurrenceService', () => {
       const occurrenceService = new OccurrenceService(mockDBConnection);
 
       const response = occurrenceService.scrapeOccurrences(
-        { occurrenceRows: [] } as unknown as DwCAOccurrenceRows,
-        {} as unknown as DwCAOccurrenceHeaders
+        ({ occurrenceRows: [] } as unknown) as DwCAOccurrenceRows,
+        ({} as unknown) as DwCAOccurrenceHeaders
       );
 
       expect(response).to.eql([]);

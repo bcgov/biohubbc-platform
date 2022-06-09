@@ -25,10 +25,10 @@ const mockUseApi = {
     getUsersList: jest.fn()
   }
 };
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+const mockBiohubApi = ((useApi as unknown) as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 jest.mock('../../../hooks/useCodes');
-const mockUseCodes = (useCodes as unknown as jest.Mock).mockReturnValue({
+const mockUseCodes = ((useCodes as unknown) as jest.Mock).mockReturnValue({
   codes: {
     system_roles: [{ id: 1, name: 'Role 1' }],
     administrative_activity_status_type: [
