@@ -6,7 +6,7 @@ import { generateGeometryCollectionSQL, parseLatLongString, parseUTMString } fro
 
 describe('parseUTMString', () => {
   it('returns null when no UTM string provided', async () => {
-    expect(parseUTMString((null as unknown) as string)).to.be.null;
+    expect(parseUTMString(null as unknown as string)).to.be.null;
     expect(parseUTMString('')).to.be.null;
   });
 
@@ -99,7 +99,7 @@ describe('parseUTMString', () => {
 
 describe('parseLatLongString', () => {
   it('returns null when no LatLong string provided', async () => {
-    expect(parseLatLongString((null as unknown) as string)).to.be.null;
+    expect(parseLatLongString(null as unknown as string)).to.be.null;
     expect(parseLatLongString('')).to.be.null;
   });
 

@@ -22,7 +22,7 @@ describe('ValidationService', () => {
 
       const repo = sinon.stub(ValidationRepository.prototype, 'insertStyleSchema').resolves({ style_id: 1 });
 
-      const response = await validationService.insertStyleSchema(({} as unknown) as IInsertStyleSchema);
+      const response = await validationService.insertStyleSchema({} as unknown as IInsertStyleSchema);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ style_id: 1 });
@@ -36,7 +36,7 @@ describe('ValidationService', () => {
 
       const repo = sinon
         .stub(ValidationRepository.prototype, 'getStyleSchemaByStyleId')
-        .resolves(({ style_id: 1 } as unknown) as IStyleModel);
+        .resolves({ style_id: 1 } as unknown as IStyleModel);
 
       const response = await validationService.getStyleSchemaByStyleId(1);
 
@@ -52,7 +52,7 @@ describe('ValidationService', () => {
 
       sinon
         .stub(validatorParser, 'ValidationSchemaParser')
-        .returns(({} as unknown) as validatorParser.ValidationSchemaParser);
+        .returns({} as unknown as validatorParser.ValidationSchemaParser);
 
       const mockMediaState = { fileName: 'string', fileErrors: ['error'], isValid: false };
 
@@ -63,8 +63,8 @@ describe('ValidationService', () => {
       };
 
       const response = await validationService.validateDWCArchiveWithStyleSchema(
-        (mockDWC as unknown) as DWCArchive,
-        ({} as unknown) as IStyleModel
+        mockDWC as unknown as DWCArchive,
+        {} as unknown as IStyleModel
       );
 
       expect(response.validation).to.eql(false);
@@ -78,7 +78,7 @@ describe('ValidationService', () => {
 
       sinon
         .stub(validatorParser, 'ValidationSchemaParser')
-        .returns(({} as unknown) as validatorParser.ValidationSchemaParser);
+        .returns({} as unknown as validatorParser.ValidationSchemaParser);
 
       const mockMediaState = { fileName: 'string', fileErrors: [], isValid: true };
       const mockCsvState = [{ headerErrors: [], rowErrors: [] }];
@@ -93,8 +93,8 @@ describe('ValidationService', () => {
       };
 
       const response = await validationService.validateDWCArchiveWithStyleSchema(
-        (mockDWC as unknown) as DWCArchive,
-        ({} as unknown) as IStyleModel
+        mockDWC as unknown as DWCArchive,
+        {} as unknown as IStyleModel
       );
 
       expect(response.validation).to.eql(true);

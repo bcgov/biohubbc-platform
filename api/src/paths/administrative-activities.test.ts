@@ -47,7 +47,7 @@ describe('getAdministrativeActivities', () => {
 
     const result = administrative_activities.getAdministrativeActivities();
 
-    await result(sampleReq, sampleRes as any, (null as unknown) as any);
+    await result(sampleReq, sampleRes as any, null as unknown as any);
 
     expect(actualResult).to.eql([]);
   });
@@ -76,7 +76,7 @@ describe('getAdministrativeActivities', () => {
 
     const result = administrative_activities.getAdministrativeActivities();
 
-    await result(sampleReq, sampleRes as any, (null as unknown) as any);
+    await result(sampleReq, sampleRes as any, null as unknown as any);
 
     expect(actualResult).to.eql([data]);
   });

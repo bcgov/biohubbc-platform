@@ -361,7 +361,7 @@ describe('DarwinCoreService', () => {
     // });
   });
 
-  describe.only('convertEMLtoJSON', () => {
+  describe('convertEMLtoJSON', () => {
     // it('throws an error if there is no emlSource', async () => {
     //   const mockDBConnection = getMockDBConnection();
     //   const darwinCoreService = new DarwinCoreService(mockDBConnection);

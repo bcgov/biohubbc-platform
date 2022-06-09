@@ -175,9 +175,8 @@ export async function checkIfAccessRequestIsApproval(
   adminActivityTypeId: number,
   connection: IDBConnection
 ): Promise<boolean> {
-  const adminActivityStatusTypeSQLStatment = AdministrativeActivityQueries.getAdministrativeActivityById(
-    adminActivityTypeId
-  );
+  const adminActivityStatusTypeSQLStatment =
+    AdministrativeActivityQueries.getAdministrativeActivityById(adminActivityTypeId);
 
   const response = await connection.sql(adminActivityStatusTypeSQLStatment);
 

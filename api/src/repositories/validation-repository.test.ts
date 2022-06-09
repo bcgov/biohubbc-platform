@@ -18,7 +18,7 @@ describe('ValidationRepository', () => {
     const mockParams = { something: 'thing' };
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -29,7 +29,7 @@ describe('ValidationRepository', () => {
       const validationRepository = new ValidationRepository(mockDBConnection);
 
       try {
-        await validationRepository.insertStyleSchema((mockParams as unknown) as IInsertStyleSchema);
+        await validationRepository.insertStyleSchema(mockParams as unknown as IInsertStyleSchema);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert style schema');
@@ -37,7 +37,7 @@ describe('ValidationRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = ({ rowCount: 1, rows: [{ style_id: 1 }] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [{ style_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -47,7 +47,7 @@ describe('ValidationRepository', () => {
 
       const validationRepository = new ValidationRepository(mockDBConnection);
 
-      const response = await validationRepository.insertStyleSchema((mockParams as unknown) as IInsertStyleSchema);
+      const response = await validationRepository.insertStyleSchema(mockParams as unknown as IInsertStyleSchema);
 
       expect(response.style_id).to.equal(1);
     });
@@ -59,7 +59,7 @@ describe('ValidationRepository', () => {
     });
 
     it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = ({ rowCount: 0 } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -79,7 +79,7 @@ describe('ValidationRepository', () => {
 
     it('should succeed with valid data', async () => {
       const mockResponse = { something: 'thing' };
-      const mockQueryResponse = ({ rowCount: 1, rows: [mockResponse] } as any) as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {

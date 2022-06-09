@@ -16,7 +16,7 @@ chai.use(sinonChai);
 describe('search', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator((GET.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       const basicRequest = {
         headers: {
@@ -69,7 +69,7 @@ describe('search', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator((GET.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         it('has null value', async () => {
@@ -154,9 +154,7 @@ describe('search', () => {
 
       mockReq.query = {};
 
-      sinon
-        .stub(SubmissionService.prototype, 'findSubmissionByCriteria')
-        .throws(('error' as unknown) as ApiGeneralError);
+      sinon.stub(SubmissionService.prototype, 'findSubmissionByCriteria').throws('error' as unknown as ApiGeneralError);
 
       try {
         const requestHandler = search.searchSubmission();

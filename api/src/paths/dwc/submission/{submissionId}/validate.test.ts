@@ -16,7 +16,7 @@ chai.use(sinonChai);
 describe('validate', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator((POST.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       const basicRequest = {
         headers: {
@@ -71,7 +71,7 @@ describe('validate', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator((POST.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator(POST.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         describe('required return properties is missing', () => {
@@ -220,7 +220,7 @@ describe('validate', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'validateSubmission').throws(('error' as unknown) as ApiGeneralError);
+      sinon.stub(DarwinCoreService.prototype, 'validateSubmission').throws('error' as unknown as ApiGeneralError);
 
       try {
         const requestHandler = validate.validateSubmission();

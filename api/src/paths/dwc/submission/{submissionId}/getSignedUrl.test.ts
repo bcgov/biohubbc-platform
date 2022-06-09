@@ -22,7 +22,7 @@ describe('getSubmissionSignedUrl', () => {
 
   describe('openApiSchema', () => {
     describe('request validation', () => {
-      const requestValidator = new OpenAPIRequestValidator((GET.apiDoc as unknown) as OpenAPIRequestValidatorArgs);
+      const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       const basicRequest = {
         headers: {
@@ -77,7 +77,7 @@ describe('getSubmissionSignedUrl', () => {
     });
 
     describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator((GET.apiDoc as unknown) as OpenAPIResponseValidatorArgs);
+      const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
         it('has null value', async () => {
@@ -115,9 +115,9 @@ describe('getSubmissionSignedUrl', () => {
 
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const mockServiceResponse = ({
+      const mockServiceResponse = {
         input_key: null
-      } as unknown) as ISubmissionModel;
+      } as unknown as ISubmissionModel;
 
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves(mockServiceResponse);
 
@@ -138,9 +138,9 @@ describe('getSubmissionSignedUrl', () => {
 
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const mockServiceResponse = ({
+      const mockServiceResponse = {
         input_key: 'test-signed-url'
-      } as unknown) as ISubmissionModel;
+      } as unknown as ISubmissionModel;
 
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves(mockServiceResponse);
       sinon.stub(fileUtils, 'getS3SignedURL').resolves(null);
@@ -171,7 +171,7 @@ describe('getSubmissionSignedUrl', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .throws(('error' as unknown) as ApiGeneralError);
+        .throws('error' as unknown as ApiGeneralError);
 
       try {
         const requestHandler = getSubmissionSignedUrl();
