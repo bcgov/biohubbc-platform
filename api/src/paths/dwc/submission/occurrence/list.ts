@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { Feature } from 'geojson';
-import qs from 'qs';
+// import { Feature } from 'geojson';
+// import qs from 'qs';
 import { getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { OccurrenceService } from '../../../../services/occurrence-service';
+// import { OccurrenceService } from '../../../../services/occurrence-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/occurrence/list');
@@ -149,35 +149,35 @@ GET.apiDoc = {
   }
 };
 
-function isFeature(test: any): test is Feature {
-  if (test?.type == 'Feature' && test?.geometry) {
-    return true;
-  }
-  return false;
-}
+// function isFeature(test: any): test is Feature {
+//   if (test?.type == 'Feature' && test?.geometry) {
+//     return true;
+//   }
+//   return false;
+// }
 
 export function listOccurrences(): RequestHandler {
   return async (req, res) => {
-    const inputQuery = qs.parse(req.query.spatial as string) || {};
+    // const inputQuery = qs.parse(req.query.spatial as string) || {};
 
-    let searchCriteria = undefined;
+    // let searchCriteria = undefined;
 
-    if (isFeature(inputQuery)) {
-      searchCriteria = inputQuery;
-    }
+    // if (isFeature(inputQuery)) {
+    //   searchCriteria = inputQuery;
+    // }
 
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
       await connection.open();
 
-      const occurrenceService = new OccurrenceService(connection);
+      // const occurrenceService = new OccurrenceService(connection);
 
-      const submissions = await occurrenceService.getMapOccurrences(searchCriteria);
+      // const submissions = await occurrenceService.getMapOccurrences(searchCriteria);
 
       await connection.commit();
 
-      res.status(200).json(submissions);
+      res.status(200).json([]);
     } catch (error) {
       defaultLog.error({ label: 'listOccurrences', message: 'error', error });
       await connection.rollback();
