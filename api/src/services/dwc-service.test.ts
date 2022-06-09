@@ -273,16 +273,18 @@ describe('DarwinCoreService', () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
-        id: 1,
-        eml_source: `<?xml version="1.0" encoding="UTF-8"?>
+      const getSubmissionRecord = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves({
+          id: 1,
+          eml_source: `<?xml version="1.0" encoding="UTF-8"?>
         <note>
           <to>Tove</to>
           <from>Jani</from>
           <heading>Reminder</heading>
           <body>Don't forget me this weekend!</body>
         </note>`
-      } as unknown as ISubmissionModel);
+        } as unknown as ISubmissionModel);
 
       //todo: make this a valid s3 file
       const s3File = {
@@ -295,13 +297,11 @@ describe('DarwinCoreService', () => {
         Body: Buffer.from('{"id":"1"}')
       } as unknown as GetObjectOutput;
 
-      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
+      const getStyleSheet = sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
 
-      sinon.stub(mediaUtils, 'parseS3File').resolves(null as unknown as MediaFile);
+      const transformEML = sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves(`{ id: '1' }`);
 
-      sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves({ id: 'new_id' });
-
-      sinon.stub(DarwinCoreService.prototype, 'uploadtoElasticSearch').resolves({
+      const uploadToEs = sinon.stub(DarwinCoreService.prototype, 'uploadtoElasticSearch').resolves({
         _id: 'id',
         _index: 'eml',
         _primary_term: 1234,
@@ -315,13 +315,18 @@ describe('DarwinCoreService', () => {
         _version: 3
       });
 
-      sinon
+      const insertStatus = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatus')
         .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
 
       const result = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
 
-      expect(result).to.eql({ submission_status_id: 1, submission_status_type_id: 1 });
+      expect(getSubmissionRecord).to.be.calledOnce;
+      expect(getStyleSheet).to.be.calledOnce;
+      expect(transformEML).to.be.calledOnce;
+      expect(uploadToEs).to.be.calledOnce;
+      expect(insertStatus).to.be.calledOnce;
+      expect(result).to.be.eql(undefined);
     });
   });
 });

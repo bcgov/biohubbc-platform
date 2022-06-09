@@ -5,7 +5,6 @@ import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
-import { parseS3File } from '../utils/media-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
@@ -149,14 +148,14 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * transform submission record eml to json and upload metadata
+   *  transform submission record eml to json and upload metadata
    *
    * @param {number} submissionId
    * @param {string} dataPackageId
-   * @return {*}  {Promise<WriteResponseBase>}
+   * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     const submissionService = new SubmissionService(this.connection);
 
     const submissionRecord = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
@@ -171,44 +170,39 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('The transformation stylesheet is not available');
     }
 
-    const parsedStylesheet = parseS3File(stylesheetfromS3);
+    const compiledTemplate = (stylesheetfromS3.Body as Buffer).toString();
 
-    if (!parsedStylesheet) {
-      throw new ApiGeneralError('Failed to parse the stylesheet');
-    }
-
-    const compiledTemplate = parsedStylesheet.buffer.toString();
     let transformedEML;
 
     //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, compiledTemplate);
     } catch (error) {
-      return submissionService.insertSubmissionStatusAndMessage(
+      await submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'eml transformation failed'
       );
+      return;
     }
 
     //call to the ElasticSearch API to create a record with our transformed EML
     try {
       await this.uploadtoElasticSearch(dataPackageId, transformedEML);
     } catch (error) {
-      return submissionService.insertSubmissionStatusAndMessage(
+      await submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'upload to elastic search failed'
       );
+      return;
     }
 
     //TODO: We need a new submission status type
-    return await submissionService.insertSubmissionStatus(
-      submissionId,
-      SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED
-    );
+    await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+    return;
   }
 
   /**
@@ -218,7 +212,7 @@ export class DarwinCoreService extends DBService {
    * @return {*} //TODO RETURN TYPE
    * @memberof DarwinCoreService
    */
-  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
+  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<string> {
     // for future reference
     // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
     //to see the library's author respond to one of our questions
