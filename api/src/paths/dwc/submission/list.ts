@@ -48,7 +48,7 @@ GET.apiDoc = {
                 },
                 submission_id: {
                   type: 'integer',
-                  minimum: 0
+                  minimum: 1
                 },
                 source: {
                   type: 'string'

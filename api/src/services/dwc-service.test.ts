@@ -6,6 +6,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
+import { ISecurityModel } from '../repositories/security-repository';
 import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 //import { ESService } from '../services/es-service';
@@ -19,6 +20,7 @@ import { UnknownMedia } from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
 import { OccurrenceService } from './occurrence-service';
+import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -36,7 +38,7 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves((null as unknown) as ISubmissionModel);
+        .resolves(null as unknown as ISubmissionModel);
 
       try {
         await darwinCoreService.scrapeAndUploadOccurrences(1);
@@ -52,9 +54,9 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves(({ input_key: 1 } as unknown) as ISubmissionModel);
+        .resolves({ input_key: 1 } as unknown as ISubmissionModel);
 
-      sinon.stub(fileUtils, 'getFileFromS3').resolves((null as unknown) as S3.GetObjectOutput);
+      sinon.stub(fileUtils, 'getFileFromS3').resolves(null as unknown as S3.GetObjectOutput);
 
       try {
         await darwinCoreService.scrapeAndUploadOccurrences(1);
@@ -70,10 +72,10 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves(({ input_key: 1 } as unknown) as ISubmissionModel);
+        .resolves({ input_key: 1 } as unknown as ISubmissionModel);
 
-      sinon.stub(fileUtils, 'getFileFromS3').resolves(('test' as unknown) as S3.GetObjectOutput);
-      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves(('test' as unknown) as DWCArchive);
+      sinon.stub(fileUtils, 'getFileFromS3').resolves('test' as unknown as S3.GetObjectOutput);
+      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves('test' as unknown as DWCArchive);
       sinon.stub(OccurrenceService.prototype, 'scrapeAndUploadOccurrences').resolves([{ occurrence_id: 1 }]);
 
       sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
@@ -96,7 +98,7 @@ describe('DarwinCoreService', () => {
       sinon.stub(mediaUtils, 'parseUnknownMedia').returns(null);
 
       try {
-        await darwinCoreService.prepDWCArchive(('test' as unknown) as UnknownMedia);
+        await darwinCoreService.prepDWCArchive('test' as unknown as UnknownMedia);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to parse submission');
@@ -107,10 +109,10 @@ describe('DarwinCoreService', () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      sinon.stub(mediaUtils, 'parseUnknownMedia').returns(('test' as unknown) as MediaFile);
+      sinon.stub(mediaUtils, 'parseUnknownMedia').returns('test' as unknown as MediaFile);
 
       try {
-        await darwinCoreService.prepDWCArchive(('test' as unknown) as UnknownMedia);
+        await darwinCoreService.prepDWCArchive('test' as unknown as UnknownMedia);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to parse submission');
@@ -127,7 +129,7 @@ describe('DarwinCoreService', () => {
       sinon.stub(mediaUtils, 'parseUnknownMedia').returns(archiveStub);
       sinon.stub(dwcUtils, 'DWCArchive').returns(dwcStub);
 
-      const response = await darwinCoreService.prepDWCArchive(('test' as unknown) as UnknownMedia);
+      const response = await darwinCoreService.prepDWCArchive('test' as unknown as UnknownMedia);
 
       expect(response).to.equal(dwcStub);
     });
@@ -153,19 +155,19 @@ describe('DarwinCoreService', () => {
         }
       };
 
-      sinon.stub(fileUtils, 'uploadFileToS3').resolves(('test' as unknown) as ManagedUpload.SendData);
-      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns((mockArchiveFile as unknown) as DWCArchive);
+      sinon.stub(fileUtils, 'uploadFileToS3').resolves('test' as unknown as ManagedUpload.SendData);
+      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns(mockArchiveFile as unknown as DWCArchive);
       sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
       sinon
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
-        .resolves(({ source_transform_id: 1 } as unknown) as ISourceTransformModel);
+        .resolves({ source_transform_id: 1 } as unknown as ISourceTransformModel);
       sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordInputKey').resolves({ submission_id: 1 });
       sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatus')
         .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
 
       const response = await darwinCoreService.ingestNewDwCADataPackage(
-        ({ originalname: 'name' } as unknown) as Express.Multer.File,
+        { originalname: 'name' } as unknown as Express.Multer.File,
         { dataPackageId: 'string' }
       );
 
@@ -184,11 +186,11 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves(({} as unknown) as DWCArchive);
-      sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves(({} as unknown) as IStyleModel);
+        .resolves({} as unknown as DWCArchive);
+      sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves({} as unknown as IStyleModel);
       sinon
         .stub(ValidationService.prototype, 'validateDWCArchiveWithStyleSchema')
-        .resolves({ validation: false, mediaState: ({} as unknown) as IMediaState });
+        .resolves({ validation: false, mediaState: {} as unknown as IMediaState });
 
       const mockInsertStatus = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatus')
@@ -196,7 +198,7 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.validateSubmission(1, 1);
 
-      expect(response).to.eql({ validation: false, mediaState: ({} as unknown) as IMediaState });
+      expect(response).to.eql({ validation: false, mediaState: {} as unknown as IMediaState });
       expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.REJECTED);
     });
 
@@ -206,12 +208,12 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves(({} as unknown) as DWCArchive);
-      sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves(({} as unknown) as IStyleModel);
+        .resolves({} as unknown as DWCArchive);
+      sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves({} as unknown as IStyleModel);
       sinon.stub(ValidationService.prototype, 'validateDWCArchiveWithStyleSchema').resolves({
         validation: true,
-        mediaState: ({} as unknown) as IMediaState,
-        csvState: ({} as unknown) as ICsvState
+        mediaState: {} as unknown as IMediaState,
+        csvState: {} as unknown as ICsvState
       });
 
       const mockInsertStatus = sinon
@@ -222,8 +224,8 @@ describe('DarwinCoreService', () => {
 
       expect(response).to.eql({
         validation: true,
-        mediaState: ({} as unknown) as IMediaState,
-        csvState: ({} as unknown) as ICsvState
+        mediaState: {} as unknown as IMediaState,
+        csvState: {} as unknown as ICsvState
       });
       expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
     });
@@ -360,32 +362,23 @@ describe('DarwinCoreService', () => {
   });
 
   describe.only('convertEMLtoJSON', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('throws an error if there is no emlSource', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getEMLStyleSheet')
-        .resolves((null as unknown) as ISourceTransformModel['metadata_transform_precompile']);
-
-      try {
-        await darwinCoreService.convertEMLtoJSON(1, `<?xml version="1.0" encoding="UTF-8"?>`);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as Error).message).to.equal('eml stylesheet is not available');
-      }
-    });
-
+    // it('throws an error if there is no emlSource', async () => {
+    //   const mockDBConnection = getMockDBConnection();
+    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
+    //   sinon
+    //     .stub(SubmissionService.prototype, 'getEMLStyleSheetKey')
+    //     .resolves(null as unknown as ISourceTransformModel['metadata_transform_precompile']);
+    //   try {
+    //     await darwinCoreService.convertEMLtoJSON(1, `<?xml version="1.0" encoding="UTF-8"?>`);
+    //     expect.fail();
+    //   } catch (actualError) {
+    //     expect((actualError as Error).message).to.equal('eml stylesheet is not available');
+    //   }
+    // });
     // it('throws an error when getting the SaxonJs transformation fails', async () => {
     //   const mockDBConnection = getMockDBConnection();
     //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
     //   sinon.stub(SubmissionService.prototype, 'getEMLStyleSheet').resolves(`<?xml version="1.0" encoding="UTF-8"?>`);
-
     //   try {
     //     await darwinCoreService.convertEMLtoJSON(1, `<?xml version="1.0" encoding="UTF-8"?>`);
     //     expect.fail();
@@ -393,20 +386,16 @@ describe('DarwinCoreService', () => {
     //     expect((actualError as Error).message).to.equal("Cannot read property 'rowCount' of undefined");
     //   }
     // });
-
     // it('inserts a record in elastic search with valid data and connection', async () => {
     //   const mockDBConnection = getMockDBConnection();
     //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
     //   sinon
     //     .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
     //     .resolves(({ id: 1, eml_source: {} } as unknown) as ISubmissionModel);
     //   sinon
     //     .stub(SubmissionService.prototype, 'insertSubmissionStatus')
     //     .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
-
     //   sinon.stub(DarwinCoreService.prototype, 'convertEMLtoJSON').resolves(`{"id": "1", "value": "some_value"}`);
-
     //   const createStub = sinon.stub().resolves({
     //     _index: 'eml',
     //     _type: '_doc',
@@ -417,11 +406,9 @@ describe('DarwinCoreService', () => {
     //     _seq_no: 26,
     //     _primary_term: 1
     //   });
-
     //   sinon.stub(ESService.prototype, 'getEsClient').resolves(({
     //     create: createStub
     //   } as unknown) as Client);
-
     //   const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
     //   expect(response).eql({
     //     _index: 'eml',
@@ -434,5 +421,46 @@ describe('DarwinCoreService', () => {
     //     _primary_term: 1
     //   });
     // });
+  });
+
+  describe('secureSubmission', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+    it('should set submission status to rejected', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SecurityService.prototype, 'getSecuritySchemaBySecurityId').resolves({} as unknown as ISecurityModel);
+
+      sinon.stub(SecurityService.prototype, 'validateSecurityOfSubmission').resolves({ secure: false });
+
+      const mockInsertStatus = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      const response = await darwinCoreService.secureSubmission(1, 1);
+
+      expect(response).to.eql({ secure: false });
+      expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.REJECTED);
+    });
+
+    it('should set submission status to Secured', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SecurityService.prototype, 'getSecuritySchemaBySecurityId').resolves({} as unknown as ISecurityModel);
+
+      sinon.stub(SecurityService.prototype, 'validateSecurityOfSubmission').resolves({ secure: true });
+
+      const mockInsertStatus = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      const response = await darwinCoreService.secureSubmission(1, 1);
+
+      expect(response).to.eql({ secure: true });
+      expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.SECURED);
+    });
   });
 });
