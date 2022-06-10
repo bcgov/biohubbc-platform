@@ -335,4 +335,9 @@ export class DarwinCoreService extends DBService {
       document: convertedEML
     });
   }
+
+  async normalizeSubmission(dwcArchiveFile: DWCArchive) {
+    console.log(dwcArchiveFile);
+    return { asd: 1 };
+  }
 }
