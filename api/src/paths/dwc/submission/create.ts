@@ -119,7 +119,7 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.tempValidateSubmission(submissionId);
 
-      await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
+      // await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
       try {
         await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
