@@ -167,7 +167,7 @@ export class SubmissionRepository extends BaseRepository {
       INSERT INTO submission (
         source_transform_id,
         uuid,
-        event_timestamp,
+        record_effective_date,
         input_key,
         input_file_name,
         eml_source,
