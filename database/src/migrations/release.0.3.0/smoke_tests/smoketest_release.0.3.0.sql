@@ -624,7 +624,7 @@ begin
 
 	-- source transform
 	insert into source_transform (system_user_id, version, metadata_index, transform_filename, transform_key, transform_precompile_filename, transform_precompile_key) 
-		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '1.0', 'biohub_metadata', 'sims_eml_transform.1.xsl', 'sims_eml_transform.1.key', 'sims_eml_transform.1.xsl.sef', 'sims_eml_transform.1.sef.key') returning source_transform_id into _source_transform_id;
+		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'sims_eml_transform.1.xsl', 'sims_eml_transform.1.key', 'sims_eml_transform.1.xsl.sef', 'sims_eml_transform.1.sef.key') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
 	-- security transform
@@ -633,7 +633,7 @@ begin
 	insert into system_user (user_identity_source_id, user_identifier, record_effective_date) values((select user_identity_source_id from user_identity_source where name = 'IDIR'), 'CHUCK', now());
 
   -- submission 1
-  insert into submission (source_transform_id, event_timestamp, eml_source) values (_source_transform_id, now()-interval '1 day', _eml_source) returning submission_id into _submission_id;
+  insert into submission (source_transform_id, record_effective_date, eml_source) values (_source_transform_id, now()-interval '1 day', _eml_source) returning submission_id into _submission_id;
   select count(1) into _count from submission;
   assert _count = 1, 'FAIL submission';
   insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;
@@ -649,7 +649,7 @@ begin
 	insert into system_user_security_exception (security_transform_id, system_user_id, record_effective_date) values (_security_transform_id, (select system_user_id from system_user where user_identifier = 'CHUCK'), now());
   
   -- submission 2
-  insert into submission (source_transform_id, event_timestamp) values (_source_transform_id, now()) returning submission_id into _submission_id;
+  insert into submission (source_transform_id, record_effective_date) values (_source_transform_id, now()) returning submission_id into _submission_id;
   select count(1) into _count from submission;
   assert _count = 2, 'FAIL submission';
   insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}');
