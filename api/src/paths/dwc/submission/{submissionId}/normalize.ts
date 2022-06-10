@@ -1,10 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SOURCE_SYSTEM } from '../../../../constants/database';
-import { getDBConnection } from '../../../../database/db';
+import { getServiceAccountDBConnection } from '../../../../database/db';
+import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../../services/dwc-service';
+import { getKeycloakSource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/{submissionId}/normalize');
@@ -61,7 +63,15 @@ export function normalizeSubmission(): RequestHandler {
   return async (req, res) => {
     const submissionId = Number(req.params.submissionId);
 
-    const connection = getDBConnection(req['keycloak_token']);
+    const sourceSystem = getKeycloakSource(req['keycloak_token']);
+
+    if (!sourceSystem) {
+      throw new HTTP400('Failed to identify known submission source system', [
+        'token did not contain a clientId/azp or clientId/azp value is unknown'
+      ]);
+    }
+
+    const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
       await connection.open();
