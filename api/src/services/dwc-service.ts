@@ -336,8 +336,31 @@ export class DarwinCoreService extends DBService {
     });
   }
 
-  async normalizeSubmission(dwcArchiveFile: DWCArchive) {
-    console.log(dwcArchiveFile);
-    return { asd: 1 };
+  /**
+   * Normalize all worksheets in dwcArchive file and update submission record
+   *
+   * @param {number} submissionId
+   * @param {DWCArchive} dwcArchiveFile
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof DarwinCoreService
+   */
+  async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<{ submission_id: number }> {
+    const normalized = {};
+
+    Object.entries(dwcArchiveFile.worksheets).forEach((entry) => {
+      const [key, value] = entry;
+
+      if (value) {
+        normalized[key] = value.getRowObjects();
+      }
+    });
+
+    const normailzedString = JSON.stringify(normalized);
+
+    const submissionService = new SubmissionService(this.connection);
+
+    const submissionUpdated = await submissionService.updateSubmissionRecordDWCSource(submissionId, normailzedString);
+
+    return submissionUpdated;
   }
 }

@@ -50,7 +50,14 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            //
+            type: 'object',
+            required: ['submission_id'],
+            properties: {
+              submission_id: {
+                type: 'integer',
+                minimum: 1
+              }
+            }
           }
         }
       }
@@ -80,7 +87,7 @@ export function normalizeSubmission(): RequestHandler {
 
       const dwcArchiveFile = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-      const response = await darwinCoreService.normalizeSubmission(dwcArchiveFile);
+      const response = await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
 
       await connection.commit();
 
