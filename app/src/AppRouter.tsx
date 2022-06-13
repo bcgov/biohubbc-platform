@@ -10,7 +10,7 @@ import HomeRouter from 'features/home/HomeRouter';
 import LogOutPage from 'features/logout/LogOutPage';
 import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
-import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
+import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import BaseLayout from 'layouts/BaseLayout';
 import React from 'react';
 import { Redirect, Switch, useLocation } from 'react-router-dom';
@@ -35,8 +35,8 @@ const AppRouter: React.FC = () => {
         <SearchRouter />
       </AppRoute>
 
-      <AppRoute path="/submissions" title={getTitle('Submissions')} layout={BaseLayout}>
-        <SubmissionsRouter />
+      <AppRoute path="/datasets" title={getTitle('Datasets')} layout={BaseLayout}>
+        <DatasetsRouter />
       </AppRoute>
 
       <AppRoute path="/map" title={getTitle('Map')} layout={BaseLayout}>

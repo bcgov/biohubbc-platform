@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { IGetMapOccurrenceData } from 'components/map/OccurrenceFeaturePopup';
 import { Feature } from 'geojson';
-import { IGetSearchResultsResponse } from 'interfaces/useSearchApi.interface';
+import { IGetSearchResultsResponse, ISearchResponse } from 'interfaces/useSearchApi.interface';
 import qs from 'qs';
 
 /**
@@ -35,9 +35,20 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const listAllDatasets = async (): Promise<ISearchResponse<{datasetTitle: string[]}>> => {
+    const { data } = await axios.get(`api/dwc/eml/search`, {
+      params: {
+        index: 'EML'
+      }
+    })
+
+    return data
+  }
+
   return {
     getSearchResults,
-    getMapOccurrenceData
+    getMapOccurrenceData,
+    listAllDatasets
   };
 };
 
