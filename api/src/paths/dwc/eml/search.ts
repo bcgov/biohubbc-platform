@@ -103,7 +103,7 @@ export function searchInElasticSearch(): RequestHandler {
     try {
       const elasticSearch = await new ESService();
 
-      const response = await elasticSearch.search<{datasetTitle: string[]}>(indexName, ['datasetTitle']);
+      const response = await elasticSearch.search<{ datasetTitle: string[] }>(indexName, ['datasetTitle']);
 
       const result = response
         ? response.map((item) => {

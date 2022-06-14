@@ -35,15 +35,15 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const listAllDatasets = async (): Promise<ISearchResponse<{datasetTitle: string[]}>> => {
+  const listAllDatasets = async (): Promise<ISearchResponse<{ datasetTitle: string[] }>> => {
     const { data } = await axios.get(`api/dwc/eml/search`, {
       params: {
         index: 'EML'
       }
-    })
+    });
 
-    return data
-  }
+    return data;
+  };
 
   return {
     getSearchResults,

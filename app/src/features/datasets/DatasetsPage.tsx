@@ -12,7 +12,7 @@ import { useApi } from 'hooks/useApi';
 import React, { useEffect } from 'react';
 
 const SubmissionsPage = () => {
-  const [datasets, setDatasets] = React.useState<{id: string, datasetTitle: string}[]>([]);
+  const [datasets, setDatasets] = React.useState<{ id: string; datasetTitle: string }[]>([]);
 
   const biohubApi = useApi();
 
@@ -24,14 +24,16 @@ const SubmissionsPage = () => {
         return;
       }
 
-      setDatasets(response.map((dataset) => ({
-        id: dataset.id,
-        datasetTitle: dataset.fields.datasetTitle[0]
-      })));
+      setDatasets(
+        response.map((dataset) => ({
+          id: dataset.id,
+          datasetTitle: dataset.fields.datasetTitle[0]
+        }))
+      );
     };
 
     getSubmissions();
-  }, []);
+  }, [biohubApi.search]);
 
   return (
     <Box my={4}>
@@ -56,9 +58,7 @@ const SubmissionsPage = () => {
                         <TableCell>
                           <pre>...{dataset.id.substring(dataset.id.length - 6)}</pre>
                         </TableCell>
-                        <TableCell>
-                          {dataset.datasetTitle}
-                        </TableCell>
+                        <TableCell>{dataset.datasetTitle}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

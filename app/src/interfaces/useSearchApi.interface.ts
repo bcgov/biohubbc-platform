@@ -44,7 +44,7 @@ export interface IGetOccurrenceData {
 }
 
 export type ISearchResponse<T = unknown, S = unknown> = Array<{
-  id: string
-  fields: T
-  source?: S
-}>
+  id: string;
+  fields: T;
+  source?: S;
+}>;
