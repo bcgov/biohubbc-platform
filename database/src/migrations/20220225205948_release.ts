@@ -5,7 +5,7 @@ import path from 'path';
 const DB_USER_API_PASS = process.env.DB_USER_API_PASS;
 const DB_USER_API = process.env.DB_USER_API;
 
-const DB_RELEASE = 'release.0.2.0';
+const DB_RELEASE = 'release.0.3.0';
 
 /**
  * Apply biohub-platform release changes.
