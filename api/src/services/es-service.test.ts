@@ -21,7 +21,7 @@ describe('ESService', () => {
       await esClient.search();
       expect.fail();
     } catch (actualError) {
-      expect((actualError as Error).message).to.equal("Cannot read properties of undefined (reading 'search')");
+      expect((actualError as Error).message).to.equal("Cannot read property 'search' of undefined");
     }
   });
 });
