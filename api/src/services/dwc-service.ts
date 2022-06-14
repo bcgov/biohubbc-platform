@@ -5,11 +5,10 @@ import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
-import { parseS3File } from '../utils/media-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
-import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { parseS3File, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
@@ -168,10 +167,6 @@ export class DarwinCoreService extends DBService {
 
     const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
-    if (!stylesheetfromS3) {
-      throw new ApiGeneralError('The transformation stylesheet is not available');
-    }
-
     const parsedStylesheet = parseS3File(stylesheetfromS3);
 
     if (!parsedStylesheet) {
@@ -235,6 +230,10 @@ export class DarwinCoreService extends DBService {
       sourceText: emlSource,
       destination: 'serialized'
     });
+
+    if (!result.principalResult) {
+      throw new ApiGeneralError('Failed to transform eml with stylesheet');
+    }
 
     return JSON.parse(result.principalResult);
   }
