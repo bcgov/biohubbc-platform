@@ -11,13 +11,13 @@ import Typography from '@material-ui/core/Typography';
 import { useApi } from 'hooks/useApi';
 import React, { useEffect } from 'react';
 
-const SubmissionsPage = () => {
+const DatasetsPage = () => {
   const [datasets, setDatasets] = React.useState<{ id: string; datasetTitle: string }[]>([]);
 
   const biohubApi = useApi();
 
   useEffect(() => {
-    const getSubmissions = async () => {
+    const getDatasets = async () => {
       const response = await biohubApi.search.listAllDatasets();
 
       if (!response) {
@@ -32,7 +32,7 @@ const SubmissionsPage = () => {
       );
     };
 
-    getSubmissions();
+    getDatasets();
   }, [biohubApi.search]);
 
   return (
@@ -78,4 +78,4 @@ const SubmissionsPage = () => {
   );
 };
 
-export default SubmissionsPage;
+export default DatasetsPage;
