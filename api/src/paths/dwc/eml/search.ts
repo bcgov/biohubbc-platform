@@ -99,11 +99,16 @@ export function searchInElasticSearch(): RequestHandler {
     });
 
     const indexName = String(req.query.index) || '';
+    const match = req.query.terms ? { 'project.projectTitle': String(req.query.terms) || '' } : undefined;
 
     try {
       const elasticSearch = await new ESService();
 
-      const response = await elasticSearch.search<{ datasetTitle: string[] }>(indexName, ['datasetTitle']);
+      const response = await elasticSearch.elasticsearch<{ datasetTitle: string[] }>(
+        indexName,
+        [match ? '*' : 'datasetTitle'],
+        match
+      );
 
       const result = response
         ? response.map((item) => {

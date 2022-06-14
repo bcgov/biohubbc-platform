@@ -32,7 +32,7 @@ export class ESService {
    * @param source Optional `_source` argument
    * @returns {*} {Promise<SearchHit<T>[]>}
    */
-  async search<T = unknown>(
+  async elasticsearch<T = unknown>(
     indexName: string,
     fields: string[],
     match?: Record<string, string>,
