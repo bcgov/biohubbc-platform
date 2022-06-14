@@ -24,10 +24,4 @@ describe('ESService', () => {
       expect((actualError as Error).message).to.equal("Cannot read properties of undefined (reading 'search')");
     }
   });
-
-  describe('Elastic Search', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-  });
 });
