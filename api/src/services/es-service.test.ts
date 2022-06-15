@@ -6,7 +6,7 @@ import { ESService } from './es-service';
 
 chai.use(sinonChai);
 
-describe.only('ESService', () => {
+describe('ESService', () => {
   describe('getEsClient', () => {
     afterEach(() => {
       sinon.restore();
