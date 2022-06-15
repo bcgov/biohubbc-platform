@@ -1,16 +1,19 @@
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
+import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { GetObjectOutput, ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import SaxonJS2N from 'saxon-js';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
 import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 import * as fileUtils from '../utils/file-utils';
-import { ICsvState } from '../utils/media/csv/csv-file';
+import { CSVWorksheet, ICsvState } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState, MediaFile } from '../utils/media/media-file';
@@ -368,66 +371,52 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe('convertEMLtoJSON', () => {
-    // it('throws an error if there is no emlSource', async () => {
-    //   const mockDBConnection = getMockDBConnection();
-    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-    //   sinon
-    //     .stub(SubmissionService.prototype, 'getEMLStyleSheet')
-    //     .resolves(null as unknown as ISourceTransformModel['metadata_transform_precompile']);
-    //   try {
-    //     await darwinCoreService.convertEMLtoJSON(1, `<?xml version="1.0" encoding="UTF-8"?>`);
-    //     expect.fail();
-    //   } catch (actualError) {
-    //     expect((actualError as Error).message).to.equal('eml stylesheet is not available');
-    //   }
-    // });
-    // it('throws an error when getting the SaxonJs transformation fails', async () => {
-    //   const mockDBConnection = getMockDBConnection();
-    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-    //   sinon.stub(SubmissionService.prototype, 'getEMLStyleSheet').resolves(`<?xml version="1.0" encoding="UTF-8"?>`);
-    //   try {
-    //     await darwinCoreService.convertEMLtoJSON(1, `<?xml version="1.0" encoding="UTF-8"?>`);
-    //     expect.fail();
-    //   } catch (actualError) {
-    //     expect((actualError as Error).message).to.equal("Cannot read property 'rowCount' of undefined");
-    //   }
-    // });
-    // it('inserts a record in elastic search with valid data and connection', async () => {
-    //   const mockDBConnection = getMockDBConnection();
-    //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
-    //   sinon
-    //     .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-    //     .resolves({ id: 1, eml_source: {} } as unknown as ISubmissionModel);
-    //   sinon
-    //     .stub(SubmissionService.prototype, 'insertSubmissionStatus')
-    //     .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
-    //   sinon.stub(DarwinCoreService.prototype, 'convertEMLtoJSON').resolves(`{"id": "1", "value": "some_value"}`);
-    //   const createStub = sinon.stub().resolves({
-    //     _index: 'eml',
-    //     _type: '_doc',
-    //     _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
-    //     _version: 1,
-    //     result: 'created',
-    //     _shards: { total: 2, successful: 2, failed: 0 },
-    //     _seq_no: 26,
-    //     _primary_term: 1
-    //   });
-    //   sinon.stub(ESService.prototype, 'getEsClient').resolves({
-    //     create: createStub
-    //   } as unknown as Client);
-    //   const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-    //   expect(response).eql({
-    //     _index: 'eml',
-    //     _type: '_doc',
-    //     _id: '7fbcbd82-a6c4-4127-982e-dc72b4d166b4',
-    //     _version: 1,
-    //     result: 'created',
-    //     _shards: { total: 2, successful: 2, failed: 0 },
-    //     _seq_no: 26,
-    //     _primary_term: 1
-    //   });
-    // });
+  describe('transformEMLtoJSON', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('throws an error when Failed to transform eml with stylesheet', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const saxonjsTransformStub = sinon.stub(SaxonJS2N, 'transform').returns({
+        principalResult: null
+      });
+
+      try {
+        await darwinCoreService.transformEMLtoJSON('xmlString' as unknown as XmlString, 'stylesheet');
+        expect.fail();
+      } catch (actualError) {
+        expect(saxonjsTransformStub).to.be.calledOnceWith({
+          stylesheetText: 'stylesheet',
+          sourceText: 'xmlString' as unknown as XmlString,
+          destination: 'serialized'
+        });
+        expect((actualError as Error).message).to.equal('Failed to transform eml with stylesheet');
+      }
+    });
+
+    it('succeeds with valid values', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const saxonjsTransformStub = sinon.stub(SaxonJS2N, 'transform').returns({
+        principalResult: '{"test":"string"}',
+        resultDocuments: 'unknown;',
+        stylesheetInternal: 'Record' as unknown as Record<string, unknown>,
+        masterDocument: 'unknown;'
+      });
+
+      const response = await darwinCoreService.transformEMLtoJSON('xmlString' as unknown as XmlString, 'stylesheet');
+
+      expect(saxonjsTransformStub).to.be.calledOnceWith({
+        stylesheetText: 'stylesheet',
+        sourceText: 'xmlString' as unknown as XmlString,
+        destination: 'serialized'
+      });
+      expect(response).to.eql({ test: 'string' });
+    });
   });
 
   describe('validateSubmission', () => {
@@ -525,6 +514,82 @@ describe('DarwinCoreService', () => {
 
       expect(response).to.eql({ secure: true });
       expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.SECURED);
+    });
+  });
+
+  describe('uploadtoElasticSearch', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('succeeds with valid values', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const createStub = sinon.stub().returns('string');
+
+      sinon.stub(DarwinCoreService.prototype, 'getEsClient').resolves({
+        create: createStub
+      } as any);
+
+      const response = await darwinCoreService.uploadtoElasticSearch('dataPackageId', 'convertedEML');
+
+      expect(createStub).to.be.calledOnceWith({ id: 'dataPackageId', index: ES_INDEX.EML, document: 'convertedEML' });
+      expect(response).equals('string');
+    });
+  });
+
+  describe('normalizeSubmissionDWCA', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should set submission status to rejected', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const inputParams = {
+        worksheets: {
+          test1: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet,
+          test2: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet
+        }
+      } as unknown as DWCArchive;
+
+      const normailizedInputParams = {
+        test1: [
+          { id: 1, name: 'test' },
+          { id: 2, name: 'test' }
+        ],
+        test2: [
+          { id: 1, name: 'test' },
+          { id: 2, name: 'test' }
+        ]
+      };
+
+      const updateSubmissionRecordDWCSourceStub = sinon
+        .stub(SubmissionService.prototype, 'updateSubmissionRecordDWCSource')
+        .resolves({ submission_id: 1 });
+
+      const jsonNormalized = JSON.stringify(normailizedInputParams);
+
+      const response = await darwinCoreService.normalizeSubmissionDWCA(1, inputParams);
+
+      expect(response).to.eql({ submission_id: 1 });
+      expect(updateSubmissionRecordDWCSourceStub).to.be.calledOnceWith(1, jsonNormalized);
     });
   });
 });

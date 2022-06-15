@@ -358,8 +358,6 @@ export class DarwinCoreService extends DBService {
 
     const submissionService = new SubmissionService(this.connection);
 
-    const submissionUpdated = await submissionService.updateSubmissionRecordDWCSource(submissionId, normailzedString);
-
-    return submissionUpdated;
+    return await submissionService.updateSubmissionRecordDWCSource(submissionId, normailzedString);
   }
 }
