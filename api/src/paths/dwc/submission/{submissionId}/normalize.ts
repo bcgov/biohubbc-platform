@@ -51,9 +51,9 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['submission_id'],
+            required: ['submission_status_id'],
             properties: {
-              submission_id: {
+              submission_status_id: {
                 type: 'integer',
                 minimum: 1
               }

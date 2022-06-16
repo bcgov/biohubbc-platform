@@ -63,6 +63,7 @@ export class DarwinCoreService extends DBService {
 
     const submissionService = new SubmissionService(this.connection);
 
+    //TODO: if fail post failure status
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
     return response;
@@ -343,7 +344,27 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof DarwinCoreService
    */
-  async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<{ submission_id: number }> {
+  async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<void> {
+    const normalized = this.normalizeDWCA(dwcArchiveFile);
+
+    const submissionService = new SubmissionService(this.connection);
+
+    try {
+      await submissionService.updateSubmissionRecordDWCSource(submissionId, normalized);
+
+      //TODO: We need a new submission status type
+      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+    } catch (error) {
+      await submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'update submission record failed'
+      );
+    }
+  }
+
+  normalizeDWCA(dwcArchiveFile: DWCArchive): string {
     const normalized = {};
 
     Object.entries(dwcArchiveFile.worksheets).forEach((entry) => {
@@ -354,10 +375,6 @@ export class DarwinCoreService extends DBService {
       }
     });
 
-    const normailzedString = JSON.stringify(normalized);
-
-    const submissionService = new SubmissionService(this.connection);
-
-    return submissionService.updateSubmissionRecordDWCSource(submissionId, normailzedString);
+    return JSON.stringify(normalized);
   }
 }
