@@ -9,31 +9,19 @@ import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
 import { useApi } from 'hooks/useApi';
-import React, { useEffect } from 'react';
+import useDataLoader from 'hooks/useDataLoader';
+import React from 'react';
 
 const DatasetsPage = () => {
-  const [datasets, setDatasets] = React.useState<{ id: string; datasetTitle: string }[]>([]);
-
   const biohubApi = useApi();
 
-  useEffect(() => {
-    const getDatasets = async () => {
-      const response = await biohubApi.search.listAllDatasets();
+  const datasetsDataLoader = useDataLoader(() => biohubApi.search.listAllDatasets());
 
-      if (!response) {
-        return;
-      }
-
-      setDatasets(
-        response.map((dataset) => ({
-          id: dataset.id,
-          datasetTitle: dataset.fields.datasetTitle[0]
-        }))
-      );
-    };
-
-    getDatasets();
-  }, [biohubApi.search]);
+  const datasets =
+    datasetsDataLoader?.data?.map((item) => ({
+      id: item.id,
+      datasetTitle: item.fields.datasetTitle[0]
+    })) || [];
 
   return (
     <Box my={4}>
