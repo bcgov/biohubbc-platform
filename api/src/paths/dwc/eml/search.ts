@@ -33,7 +33,7 @@ GET.apiDoc = {
       description: 'submission search parameters.',
       in: 'query',
       name: 'terms',
-      required: true,
+      required: false,
       schema: {
         type: 'string'
       }
@@ -48,7 +48,7 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['id', 'source', 'fields'],
+              required: ['id'],
               nullable: true,
               properties: {
                 id: {
@@ -98,32 +98,27 @@ export function searchInElasticSearch(): RequestHandler {
       index: req.query.index
     });
 
-    const terms = String(req.query.terms) || '';
     const indexName = String(req.query.index) || '';
+    const match = req.query.terms ? { 'project.projectTitle': String(req.query.terms) || '' } : undefined;
 
     try {
-      const elasticSearch = await new ESService().getEsClient();
+      const elasticSearch = new ESService();
 
-      const response = await elasticSearch.search({
-        index: indexName.toLowerCase(),
-        query: {
-          match: {
-            'projects.projectName': terms
-          }
-        },
-        fields: ['*']
-      });
+      const response = await elasticSearch.elasticsearch<{ datasetTitle: string[] }>(
+        indexName,
+        [match ? '*' : 'datasetTitle'],
+        match
+      );
 
-      const result =
-        (response &&
-          response.hits.hits.map((item) => {
+      const result = response
+        ? response.map((item) => {
             return {
               id: item._id,
-              source: item._source,
-              fields: item.fields
+              fields: item.fields,
+              source: item._source
             };
-          })) ||
-        [];
+          })
+        : [];
 
       res.status(200).json(result);
     } catch (error) {
