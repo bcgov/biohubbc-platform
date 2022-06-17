@@ -2,7 +2,7 @@ import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import useSearchApi, { usePublicSearchApi } from './useSearchApi';
 
-describe('useSearchApi', () => {
+describe.only('useSearchApi', () => {
   let mock: any;
 
   beforeEach(() => {
@@ -31,7 +31,7 @@ describe('useSearchApi', () => {
   });
 
   it('listAllDatasets works as expected', async () => {
-    const res = [
+    const response = [
       {
         id: 'a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf',
         fields: {
@@ -40,12 +40,12 @@ describe('useSearchApi', () => {
       }
     ];
 
-    mock.onGet('api/dwc/eml/search').reply(200, res);
+    mock.onGet('api/dwc/eml/search').reply(200, response);
 
-    const result = await useSearchApi(axios).listAllDatasets();
+    const actualResult = await useSearchApi(axios).listAllDatasets();
 
-    expect(result[0].id).toEqual('a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf');
-    expect(result[0].fields[0]).toEqual({ datasetTitle: ["Coastal Caribou"] });
+    expect(actualResult[0].id).toEqual('a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf');
+    expect(actualResult[0].fields).toEqual({ datasetTitle: ["Coastal Caribou"] });
   });
 
   it('getMapOccurrenceData works as expected', async () => {
