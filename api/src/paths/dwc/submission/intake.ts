@@ -101,6 +101,9 @@ export function submitDataset(): RequestHandler {
       ]);
     }
 
+    const dataPackageId = req.body.data_package_id;
+    res.status(200).json({ data_package_id: dataPackageId });
+
     const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
@@ -108,9 +111,7 @@ export function submitDataset(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const { dataPackageId } = await darwinCoreService.intake(file, req.body.data_package_id);
-
-      res.status(200).json({ data_package_id: dataPackageId });
+      await darwinCoreService.intake(file, dataPackageId);
 
       await connection.commit();
     } catch (error) {
