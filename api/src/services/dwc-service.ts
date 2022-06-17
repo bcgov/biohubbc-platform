@@ -5,6 +5,7 @@ import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
+import { getLogger } from '../utils/logger';
 import { parseS3File } from '../utils/media-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -16,7 +17,69 @@ import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
+const defaultLog = getLogger('services/dwc-service');
+
 export class DarwinCoreService extends DBService {
+  /**
+   * intake dwca file
+   *
+   * @param {Express.Multer.File} file
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+    const submissionService = new SubmissionService(this.connection);
+
+    const submissionExists = await submissionService.getSubmissionIdByUUID(dataPackageId);
+
+    if (submissionExists) {
+      await submissionService.setSubmissionIdEndDate(submissionExists.submission_id);
+      await this.deleteEmlFormElasticSearchByDataPackageId(dataPackageId);
+      //TODO: Delete scraped spatial components table details when its filled
+    }
+
+    return this.create(file, dataPackageId);
+  }
+
+  async create(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+    const { submissionId } = await this.ingestNewDwCADataPackage(file, {
+      dataPackageId: dataPackageId
+    });
+
+    try {
+      await this.tempValidateSubmission(submissionId);
+    } catch (error) {
+      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
+
+      const submissionService = new SubmissionService(this.connection);
+
+      await submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to validate submission record'
+      );
+    }
+
+    try {
+      await this.transformAndUploadMetaData(submissionId, dataPackageId);
+    } catch (error) {
+      defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
+
+      const submissionService = new SubmissionService(this.connection);
+
+      await submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to transform and upload metadata'
+      );
+    }
+
+    return { dataPackageId };
+  }
+
   /**
    * Parse submission record to DWCArchive file
    *
@@ -187,6 +250,8 @@ export class DarwinCoreService extends DBService {
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, compiledTemplate);
     } catch (error) {
+      defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
+
       return submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
@@ -199,6 +264,8 @@ export class DarwinCoreService extends DBService {
     try {
       response = await this.uploadtoElasticSearch(dataPackageId, transformedEML);
     } catch (error) {
+      defaultLog.debug({ label: 'uploadtoElasticSearch', message: 'error', error });
+
       return submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
@@ -329,10 +396,21 @@ export class DarwinCoreService extends DBService {
   async uploadtoElasticSearch(dataPackageId: string, convertedEML: string) {
     const esClient = await this.getEsClient();
 
-    return esClient.create({
+    const response = await esClient.create({
       id: dataPackageId,
       index: ES_INDEX.EML,
       document: convertedEML
     });
+
+    return response;
+  }
+
+  async deleteEmlFormElasticSearchByDataPackageId(dataPackageId: string) {
+    const esClient = await this.getEsClient();
+
+    const response = await esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
+
+    console.log('response', response);
+    return response;
   }
 }

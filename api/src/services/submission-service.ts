@@ -72,6 +72,28 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get submission record by uuid.
+   *
+   * @param {number} uuid
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+    return this.submissionRepository.getSubmissionIdByUUID(uuid);
+  }
+
+  /**
+   * Set record_end_date of submission id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async setSubmissionIdEndDate(submissionId: number): Promise<{ submission_id: number }> {
+    return this.submissionRepository.setSubmissionIdEndDate(submissionId);
+  }
+
+  /**
    * Get source transform record by its associated source system user id.
    *
    * @param {number} systemUserId

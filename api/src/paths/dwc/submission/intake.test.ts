@@ -12,12 +12,12 @@ import { SubmissionService } from '../../../services/submission-service';
 import * as fileUtils from '../../../utils/file-utils';
 import * as keycloakUtils from '../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import * as create from './create';
-import { POST } from './create';
+import * as intake from './intake';
+import { POST } from './intake';
 
 chai.use(sinonChai);
 
-describe('create', () => {
+describe('intake', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
@@ -173,7 +173,7 @@ describe('create', () => {
         data_package_id: '123-456-789'
       };
 
-      const requestHandler = create.submitDataset();
+      const requestHandler = intake.submitDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -195,7 +195,7 @@ describe('create', () => {
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(false);
 
-      const requestHandler = create.submitDataset();
+      const requestHandler = intake.submitDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -221,7 +221,7 @@ describe('create', () => {
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
 
-      const requestHandler = create.submitDataset();
+      const requestHandler = intake.submitDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -248,7 +248,7 @@ describe('create', () => {
 
       sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').throws(new Error('test error'));
 
-      const requestHandler = create.submitDataset();
+      const requestHandler = intake.submitDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -284,7 +284,7 @@ describe('create', () => {
 
     //   sinon.stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences').throws(new Error('test error'));
 
-    //   const requestHandler = create.submitDataset();
+    //   const requestHandler = intake.submitDataset();
 
     //   try {
     //     await requestHandler(mockReq, mockRes, mockNext);
@@ -333,7 +333,7 @@ describe('create', () => {
           submission_message_id: 1
         });
 
-      const requestHandler = create.submitDataset();
+      const requestHandler = intake.submitDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -385,7 +385,7 @@ describe('create', () => {
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
         .resolves();
 
-      const requestHandler = create.submitDataset();
+      const requestHandler = intake.submitDataset();
 
       await requestHandler(mockReq, mockRes, mockNext);
 

@@ -4,15 +4,13 @@ import { SOURCE_SYSTEM } from '../../../constants/database';
 import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../services/dwc-service';
-import { SubmissionService } from '../../../services/submission-service';
 import { scanFileForVirus } from '../../../utils/file-utils';
 import { getKeycloakSource } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/submission/create');
+const defaultLog = getLogger('paths/dwc/submission/intake');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -110,29 +108,9 @@ export function submitDataset(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const { dataPackageId, submissionId } = await darwinCoreService.ingestNewDwCADataPackage(file, {
-        dataPackageId: req.body.data_package_id
-      });
+      const { dataPackageId } = await darwinCoreService.intake(file, req.body.data_package_id);
 
-      // return after creating the submission
       res.status(200).json({ data_package_id: dataPackageId });
-
-      await darwinCoreService.tempValidateSubmission(submissionId);
-
-      // await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
-
-      try {
-        await darwinCoreService.transformAndUploadMetaData(submissionId, dataPackageId);
-      } catch (error) {
-        const submissionService = new SubmissionService(connection);
-
-        await submissionService.insertSubmissionStatusAndMessage(
-          submissionId,
-          SUBMISSION_STATUS_TYPE.REJECTED,
-          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-          'Failed to transform and upload metadata'
-        );
-      }
 
       await connection.commit();
     } catch (error) {

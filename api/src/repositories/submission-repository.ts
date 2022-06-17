@@ -262,6 +262,61 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Fetch a submission_id from uuid.
+   *
+   * @param {number} uuid
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+    const sqlStatement = SQL`
+      SELECT
+        submission_id
+      FROM
+        submission
+      WHERE
+        uuid = ${uuid}
+      AND
+        record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update record_end_date of submission id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async setSubmissionIdEndDate(submissionId: number): Promise<{ submission_id: number }> {
+    const sqlStatement = SQL`
+    UPDATE
+      submission
+    SET
+      record_end_date = now()
+    WHERE
+      submission_id = ${submissionId}
+    RETURNING
+      submission_id;
+  `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update enddate in submission record', [
+        'SubmissionRepository->setSubmissionIdEndDate',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Fetch a submission source transform record by associated source system user id.
    *
    * @param {number} submissionId
