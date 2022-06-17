@@ -8,9 +8,14 @@ import SaxonJS2N from 'saxon-js';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ES_INDEX } from '../constants/database';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
-import { ISourceTransformModel, ISubmissionModel, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import {
+  ISourceTransformModel,
+  ISubmissionModel,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE
+} from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet, ICsvState } from '../utils/media/csv/csv-file';
@@ -548,6 +553,57 @@ describe('DarwinCoreService', () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
+      const inputParams = { test: 'test' } as unknown as DWCArchive;
+
+      sinon.stub(DarwinCoreService.prototype, 'normalizeDWCA').returns('validstring');
+
+      sinon
+        .stub(SubmissionService.prototype, 'updateSubmissionRecordDWCSource')
+        .throws('error' as unknown as ApiExecuteSQLError);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      await darwinCoreService.normalizeSubmissionDWCA(1, inputParams);
+
+      expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+        1,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'update submission record failed'
+      );
+    });
+
+    it('should set submission status to ingested', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const inputParams = { test: 'test' } as unknown as DWCArchive;
+
+      sinon.stub(DarwinCoreService.prototype, 'normalizeDWCA').returns('validstring');
+
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordDWCSource').resolves({ submission_id: 1 });
+
+      const insertSubmissionStatusStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+
+      await darwinCoreService.normalizeSubmissionDWCA(1, inputParams);
+
+      expect(insertSubmissionStatusStub).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+    });
+  });
+
+  describe('normalizeDWCA', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should normalize dwca and return json string', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
       const inputParams = {
         worksheets: {
           test1: {
@@ -580,16 +636,11 @@ describe('DarwinCoreService', () => {
         ]
       };
 
-      const updateSubmissionRecordDWCSourceStub = sinon
-        .stub(SubmissionService.prototype, 'updateSubmissionRecordDWCSource')
-        .resolves({ submission_id: 1 });
-
       const jsonNormalized = JSON.stringify(normailizedInputParams);
 
-      const response = await darwinCoreService.normalizeSubmissionDWCA(1, inputParams);
+      const response = await darwinCoreService.normalizeDWCA(inputParams);
 
-      expect(response).to.eql({ submission_id: 1 });
-      expect(updateSubmissionRecordDWCSourceStub).to.be.calledOnceWith(1, jsonNormalized);
+      expect(response).to.eql(jsonNormalized);
     });
   });
 });

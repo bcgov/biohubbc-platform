@@ -11,6 +11,7 @@ import { DarwinCoreService } from '../../../services/dwc-service';
 import { SubmissionService } from '../../../services/submission-service';
 import * as fileUtils from '../../../utils/file-utils';
 import * as keycloakUtils from '../../../utils/keycloak-utils';
+import { DWCArchive } from '../../../utils/media/dwc/dwc-archive-file';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as create from './create';
 import { POST } from './create';
@@ -325,6 +326,11 @@ describe('create', () => {
       //   .resolves();
 
       sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').throws(new Error('test error'));
+      sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves({ test: 'test' } as unknown as DWCArchive);
+
+      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
       const insertSubmissionStatusAndMessageStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
@@ -347,6 +353,68 @@ describe('create', () => {
           SUBMISSION_STATUS_TYPE.REJECTED,
           SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
           'Failed to transform and upload metadata'
+        );
+      }
+    });
+
+    it('throws and error when getSubmissionRecordAndConvertToDWCArchive fails', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'test',
+        data_package_id: '123-456-789'
+      };
+
+      const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
+
+      // const scrapeAndUploadOccurrencesStub = sinon
+      //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
+      //   .resolves();
+
+      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+      sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves({ test: 'test' } as unknown as DWCArchive);
+
+      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').throws(new Error('test error'));
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({
+          submission_status_id: 1,
+          submission_message_id: 1
+        });
+
+      const requestHandler = create.submitDataset();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
+        expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
+        // expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.have.been.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to normalize dwca file'
         );
       }
     });
@@ -384,6 +452,12 @@ describe('create', () => {
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
         .resolves();
+
+      sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves({ test: 'test' } as unknown as DWCArchive);
+
+      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
       const requestHandler = create.submitDataset();
 

@@ -367,9 +367,7 @@ export class DarwinCoreService extends DBService {
   normalizeDWCA(dwcArchiveFile: DWCArchive): string {
     const normalized = {};
 
-    Object.entries(dwcArchiveFile.worksheets).forEach((entry) => {
-      const [key, value] = entry;
-
+    Object.entries(dwcArchiveFile.worksheets).forEach(([key, value]) => {
       if (value) {
         normalized[key] = value.getRowObjects();
       }

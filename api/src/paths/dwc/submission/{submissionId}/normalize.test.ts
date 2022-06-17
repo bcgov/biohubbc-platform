@@ -1,7 +1,6 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
-import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
@@ -20,42 +19,58 @@ describe('normalize', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
-      const basicRequest = {
-        headers: {
-          'content-type': 'application/json'
-        },
-        body: {},
-        params: {}
-      };
-
       describe('should throw an error when', () => {
         it('has null value', async () => {
-          const request = { ...basicRequest, params: { submissionId: null } };
-          const response = requestValidator.validateRequest(request);
+          const { mockReq } = getRequestHandlerMocks();
+
+          mockReq.params = { submissionId: null as unknown as string };
+          mockReq.headers = {
+            'content-type': 'application/json'
+          };
+
+          const response = requestValidator.validateRequest(mockReq);
 
           expect(response.status).to.equal(400);
           expect(response.errors[0].message).to.equal('must be integer');
         });
 
         it('has negative value', async () => {
-          const request = { ...basicRequest, params: { submissionId: -1 } };
-          const response = requestValidator.validateRequest(request);
+          const { mockReq } = getRequestHandlerMocks();
+
+          mockReq.params = { submissionId: -1 as unknown as string };
+          mockReq.headers = {
+            'content-type': 'application/json'
+          };
+
+          const response = requestValidator.validateRequest(mockReq);
 
           expect(response.status).to.equal(400);
           expect(response.errors[0].message).to.equal('must be >= 1');
         });
 
         it('has string value', async () => {
-          const request = { ...basicRequest, params: { submissionId: 'string' } };
-          const response = requestValidator.validateRequest(request);
+          const { mockReq } = getRequestHandlerMocks();
+
+          mockReq.params = { submissionId: 'string' as unknown as string };
+          mockReq.headers = {
+            'content-type': 'application/json'
+          };
+
+          const response = requestValidator.validateRequest(mockReq);
 
           expect(response.status).to.equal(400);
           expect(response.errors[0].message).to.equal('must be integer');
         });
 
         it('has invalid key', async () => {
-          const request = { ...basicRequest, params: { id: 1 } };
-          const response = requestValidator.validateRequest(request);
+          const { mockReq } = getRequestHandlerMocks();
+
+          mockReq.params = { id: 1 as unknown as string };
+          mockReq.headers = {
+            'content-type': 'application/json'
+          };
+
+          const response = requestValidator.validateRequest(mockReq);
 
           expect(response.status).to.equal(400);
           expect(response.errors[0].message).to.equal("must have required property 'submissionId'");
@@ -64,47 +79,14 @@ describe('normalize', () => {
 
       describe('should succeed when', () => {
         it('has valid values', async () => {
-          const request = { ...basicRequest, params: { submissionId: 1 } };
-          const response = requestValidator.validateRequest(request);
+          const { mockReq } = getRequestHandlerMocks();
 
-          expect(response).to.equal(undefined);
-        });
-      });
-    });
+          mockReq.params = { submissionId: 1 as unknown as string };
+          mockReq.headers = {
+            'content-type': 'application/json'
+          };
 
-    describe('response validation', () => {
-      const responseValidator = new OpenAPIResponseValidator(POST.apiDoc as unknown as OpenAPIResponseValidatorArgs);
-
-      describe('should throw an error when', () => {
-        it('has null value', async () => {
-          const apiResponse = null;
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
-        });
-
-        it('has array with invalid key value', async () => {
-          const apiResponse = { id: 1 };
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal("must have required property 'submission_id'");
-        });
-
-        it('has array with invalid value', async () => {
-          const apiResponse = { submission_id: 'test' };
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be integer');
-        });
-      });
-
-      describe('should succeed when', () => {
-        it('has valid values', async () => {
-          const apiResponse = { submission_id: 1 };
-          const response = responseValidator.validateResponse(200, apiResponse);
+          const response = requestValidator.validateRequest(mockReq);
 
           expect(response).to.equal(undefined);
         });
@@ -186,14 +168,14 @@ describe('normalize', () => {
         .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
         .resolves('valid' as unknown as DWCArchive);
 
-      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves({ submission_id: 1 });
+      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
       const requestHandler = normalize.normalizeSubmission();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql({ submission_id: 1 });
+      expect(mockRes.jsonValue).to.eql(undefined);
     });
   });
 });
