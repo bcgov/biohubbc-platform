@@ -8,9 +8,7 @@ export enum DWC_CLASS {
   OCCURRENCE = 'occurrence',
   MEASUREMENTORFACT = 'measurementorfact',
   RESOURCERELATIONSHIP = 'resourcerelationship',
-  TAXON = 'taxon',
-  EML = 'eml',
-  META = 'meta'
+  TAXON = 'taxon'
 }
 
 export enum DWC_EXTRA {

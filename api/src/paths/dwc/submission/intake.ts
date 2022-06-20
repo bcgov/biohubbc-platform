@@ -113,6 +113,20 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.intake(file, dataPackageId);
 
+      try {
+        const dwcArchive = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+        await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchive);
+      } catch (error) {
+        const submissionService = new SubmissionService(connection);
+
+        await submissionService.insertSubmissionStatusAndMessage(
+          submissionId,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to normalize dwca file'
+        );
+      }
+
       await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'submitDataset', message: 'error', error });

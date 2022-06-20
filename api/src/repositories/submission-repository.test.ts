@@ -422,4 +422,43 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql(mockResponse);
     });
   });
+
+  describe('updateSubmissionRecordDWCSource', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when update sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.updateSubmissionRecordDWCSource(1, 'string');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to update submission record darwin core source'
+        );
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        submission_id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionRecordDWCSource(1, 'string');
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
 });

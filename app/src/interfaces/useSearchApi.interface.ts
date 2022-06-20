@@ -42,3 +42,9 @@ export interface IGetOccurrenceData {
   organismQuantityType: string | null;
   geometry: Feature | null;
 }
+
+export type ISearchResponse<T = unknown, S = unknown> = Array<{
+  id: string;
+  fields: T;
+  source?: S;
+}>;

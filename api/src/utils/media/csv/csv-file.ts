@@ -175,7 +175,7 @@ export class CSVWorksheet {
         const rowObject = {};
 
         headers.forEach((header: string, index: number) => {
-          rowObject[header] = row[index];
+          rowObject[header] = row[index] || null;
         });
 
         rowObjectsArray.push(rowObject);
