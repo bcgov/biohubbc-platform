@@ -23,7 +23,7 @@ export const POST: Operation = [
       ]
     };
   }),
-  submitDataset()
+  intakeDataset()
 ];
 
 POST.apiDoc = {
@@ -81,7 +81,7 @@ POST.apiDoc = {
   }
 };
 
-export function submitDataset(): RequestHandler {
+export function intakeDataset(): RequestHandler {
   return async (req, res) => {
     if (!req?.files?.length) {
       throw new HTTP400('Missing required `media`');
@@ -102,6 +102,7 @@ export function submitDataset(): RequestHandler {
     }
 
     const dataPackageId = req.body.data_package_id;
+
     res.status(200).json({ data_package_id: dataPackageId });
 
     const connection = getServiceAccountDBConnection(sourceSystem);
@@ -113,23 +114,9 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.intake(file, dataPackageId);
 
-      try {
-        const dwcArchive = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-        await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchive);
-      } catch (error) {
-        const submissionService = new SubmissionService(connection);
-
-        await submissionService.insertSubmissionStatusAndMessage(
-          submissionId,
-          SUBMISSION_STATUS_TYPE.REJECTED,
-          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-          'Failed to normalize dwca file'
-        );
-      }
-
       await connection.commit();
     } catch (error) {
-      defaultLog.error({ label: 'submitDataset', message: 'error', error });
+      defaultLog.error({ label: 'intakeDataset', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

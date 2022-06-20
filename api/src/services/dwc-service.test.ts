@@ -226,7 +226,7 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
         .resolves({ submission_id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
 
-      //todo: make this a valid s3 file
+      // TODO make this a valid s3 file
       const s3File = {
         LastModified: '2022-06-06T20:49:29.000Z',
         ContentLength: 41760,
@@ -279,9 +279,11 @@ describe('DarwinCoreService', () => {
       } as unknown as MediaFile);
 
       sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').throws('error' as unknown as ApiGeneralError);
+
       const insertSubmissionStatusAndMessageStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
         .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
       try {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
         expect.fail();
@@ -320,7 +322,7 @@ describe('DarwinCoreService', () => {
       } as unknown as MediaFile);
 
       sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves({ valid: 'return' });
-      sinon.stub(DarwinCoreService.prototype, 'uploadtoElasticSearch').throws('error' as unknown as ApiGeneralError);
+      sinon.stub(DarwinCoreService.prototype, 'uploadToElasticSearch').throws('error' as unknown as ApiGeneralError);
       const insertSubmissionStatusAndMessageStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
         .resolves({ submission_status_id: 1, submission_message_id: 1 });
@@ -368,7 +370,7 @@ describe('DarwinCoreService', () => {
       sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves({ id: '1', value: 'some_value' });
 
       sinon
-        .stub(DarwinCoreService.prototype, 'uploadtoElasticSearch')
+        .stub(DarwinCoreService.prototype, 'uploadToElasticSearch')
         .resolves('valid' as unknown as WriteResponseBase);
 
       const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
@@ -522,7 +524,7 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe('uploadtoElasticSearch', () => {
+  describe('uploadToElasticSearch', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -537,7 +539,7 @@ describe('DarwinCoreService', () => {
         create: createStub
       } as any);
 
-      const response = await darwinCoreService.uploadtoElasticSearch('dataPackageId', 'convertedEML');
+      const response = await darwinCoreService.uploadToElasticSearch('dataPackageId', 'convertedEML');
 
       expect(createStub).to.be.calledOnceWith({ id: 'dataPackageId', index: ES_INDEX.EML, document: 'convertedEML' });
       expect(response).equals('string');

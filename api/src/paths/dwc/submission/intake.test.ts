@@ -6,12 +6,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../../../repositories/submission-repository';
 import { DarwinCoreService } from '../../../services/dwc-service';
-import { SubmissionService } from '../../../services/submission-service';
 import * as fileUtils from '../../../utils/file-utils';
 import * as keycloakUtils from '../../../utils/keycloak-utils';
-import { DWCArchive } from '../../../utils/media/dwc/dwc-archive-file';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as intake from './intake';
 import { POST } from './intake';
@@ -160,7 +157,7 @@ describe('intake', () => {
     });
   });
 
-  describe('submitDataset', () => {
+  describe('intakeDataset', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -174,7 +171,7 @@ describe('intake', () => {
         data_package_id: '123-456-789'
       };
 
-      const requestHandler = intake.submitDataset();
+      const requestHandler = intake.intakeDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -196,7 +193,7 @@ describe('intake', () => {
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(false);
 
-      const requestHandler = intake.submitDataset();
+      const requestHandler = intake.intakeDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -209,7 +206,7 @@ describe('intake', () => {
 
     it('throws an error when getKeycloakSource returns null', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -222,7 +219,7 @@ describe('intake', () => {
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
 
-      const requestHandler = intake.submitDataset();
+      const requestHandler = intake.intakeDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -232,242 +229,64 @@ describe('intake', () => {
       }
     });
 
-    it('throws an error when ingestNewDwCADataPackage fails', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    it('catches and re-throws an error', async () => {
+      const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
+      sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
+      mockReq.files = [mockFile];
       mockReq.body = {
         media: 'file',
         data_package_id: '123-456-789'
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').throws(new Error('test error'));
+      sinon.stub(DarwinCoreService.prototype, 'intake').throws(new Error('test error'));
 
-      const requestHandler = intake.submitDataset();
+      const requestHandler = intake.intakeDataset();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();
       } catch (actualError) {
         expect((actualError as Error).message).to.equal('test error');
-      }
-    });
-
-    // it('throws an error when scrapeAndUploadOccurrences fails', async () => {
-    //   const dbConnectionObj = getMockDBConnection();
-    //   sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-    //   const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    //   mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
-    //   mockReq.body = {
-    //     media: 'test',
-    //     data_package_id: '123-456-789'
-    //   };
-
-    //   sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-
-    //   sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
-
-    //   sinon
-    //     .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
-    //     .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
-
-    //   sinon
-    //     .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
-    //     .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
-
-    //   sinon.stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences').throws(new Error('test error'));
-
-    //   const requestHandler = intake.submitDataset();
-
-    //   try {
-    //     await requestHandler(mockReq, mockRes, mockNext);
-    //     expect.fail();
-    //   } catch (actualError) {
-    //     expect((actualError as Error).message).to.equal('test error');
-    //   }
-    // });
-
-    it('throws and error when transformAndUploadMetaData fails', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
-
-      mockReq.files = [mockFile];
-      mockReq.body = {
-        media: 'test',
-        data_package_id: '123-456-789'
-      };
-
-      const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
-
-      sinon
-        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
-        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
-
-      const ingestNewDwCADataPackageStub = sinon
-        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
-        .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
-
-      // const scrapeAndUploadOccurrencesStub = sinon
-      //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
-      //   .resolves();
-
-      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').throws(new Error('test error'));
-      sinon
-        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves({ test: 'test' } as unknown as DWCArchive);
-
-      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
-
-      const insertSubmissionStatusAndMessageStub = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
-        .resolves({
-          submission_status_id: 1,
-          submission_message_id: 1
-        });
-
-      const requestHandler = intake.submitDataset();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (actualError) {
-        expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
-        expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
-        // expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
-        expect(insertSubmissionStatusAndMessageStub).to.have.been.calledOnceWith(
-          1,
-          SUBMISSION_STATUS_TYPE.REJECTED,
-          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-          'Failed to transform and upload metadata'
-        );
-      }
-    });
-
-    it('throws and error when getSubmissionRecordAndConvertToDWCArchive fails', async () => {
-      const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
-
-      mockReq.files = [mockFile];
-      mockReq.body = {
-        media: 'test',
-        data_package_id: '123-456-789'
-      };
-
-      const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
-
-      sinon
-        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
-        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
-
-      const ingestNewDwCADataPackageStub = sinon
-        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
-        .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
-
-      // const scrapeAndUploadOccurrencesStub = sinon
-      //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
-      //   .resolves();
-
-      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
-      sinon
-        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves({ test: 'test' } as unknown as DWCArchive);
-
-      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').throws(new Error('test error'));
-
-      const insertSubmissionStatusAndMessageStub = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
-        .resolves({
-          submission_status_id: 1,
-          submission_message_id: 1
-        });
-
-      const requestHandler = create.submitDataset();
-
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (actualError) {
-        expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
-        expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
-        // expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
-        expect(insertSubmissionStatusAndMessageStub).to.have.been.calledOnceWith(
-          1,
-          SUBMISSION_STATUS_TYPE.REJECTED,
-          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-          'Failed to normalize dwca file'
-        );
+        expect(dbConnectionObj.release).to.have.been.calledOnce;
+        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
       }
     });
 
     it('returns 200', async () => {
       const dbConnectionObj = getMockDBConnection();
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
+      const dataPackageId = '123-456-789';
 
       mockReq.files = [mockFile];
       mockReq.body = {
         media: 'test',
-        data_package_id: '123-456-789'
+        data_package_id: dataPackageId
       };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
 
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      sinon
-        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
-        .resolves({ validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] });
+      const intakeStub = sinon.stub(DarwinCoreService.prototype, 'intake').resolves();
 
-      const ingestNewDwCADataPackageStub = sinon
-        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
-        .resolves({ dataPackageId: '123-456-789', submissionId: 1 });
-
-      // const scrapeAndUploadOccurrencesStub = sinon
-      //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
-      //   .resolves();
-
-      const transformAndUploadMetaDataStub = sinon
-        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
-        .resolves();
-
-      sinon
-        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves({ test: 'test' } as unknown as DWCArchive);
-
-      sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
-
-      const requestHandler = intake.submitDataset();
+      const requestHandler = intake.intakeDataset();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
-      expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
-      // expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
-      expect(transformAndUploadMetaDataStub).to.have.been.calledOnceWith(1, '123-456-789');
-
+      expect(intakeStub).to.have.been.calledOnceWith(mockFile, dataPackageId);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({ data_package_id: '123-456-789' });
     });

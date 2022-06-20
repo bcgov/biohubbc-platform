@@ -89,8 +89,8 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async setSubmissionIdEndDate(submissionId: number): Promise<{ submission_id: number }> {
-    return this.submissionRepository.setSubmissionIdEndDate(submissionId);
+  async setSubmissionEndDateById(submissionId: number): Promise<{ submission_id: number }> {
+    return this.submissionRepository.setSubmissionEndDateById(submissionId);
   }
 
   /**
