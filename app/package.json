@@ -36,6 +36,7 @@
     "@mdi/react": "~1.4.0",
     "@react-keycloak/web": "~2.1.0",
     "@react-leaflet/core": "~1.0.2",
+    "@testing-library/react-hooks": "^8.0.1",
     "@tmcw/togeojson": "~4.2.0",
     "@turf/bbox": "~6.3.0",
     "@turf/boolean-equal": "~6.3.0",
