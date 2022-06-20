@@ -65,9 +65,9 @@ export class OccurrenceService extends DBService {
    * @return {*}  {Promise<IGetMapOccurrenceData[]>}
    * @memberof OccurrenceService
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getMapOccurrences(mapView?: Feature | undefined): Promise<IGetMapOccurrenceData[]> {
     // const allOccurrences = await this.occurrenceRepository.getMapOccurrences(mapView);
-    console.log(mapView);
     return []; // this.formatOccurrenceDataForMap(allOccurrences);
   }
 

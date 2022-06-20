@@ -244,8 +244,6 @@ export class DarwinCoreService extends DBService {
 
     const s3File = await this.submissionService.getStylesheetFromS3(submissionId);
 
-    console.log(parseS3File);
-
     const stylesheet = parseS3File(s3File)?.buffer?.toString();
 
     if (!stylesheet) {
@@ -253,8 +251,6 @@ export class DarwinCoreService extends DBService {
     }
 
     let transformedEML;
-    let response;
-
     //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
@@ -269,6 +265,7 @@ export class DarwinCoreService extends DBService {
       );
     }
 
+    let response;
     //call to the ElasticSearch API to create a record with our transformed EML
     try {
       response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
@@ -456,7 +453,6 @@ export class DarwinCoreService extends DBService {
 
     const response = await esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
 
-    console.log('response', response);
     return response;
   }
 }
