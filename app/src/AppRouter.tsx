@@ -6,6 +6,7 @@ import NotFoundPage from 'features/404/NotFoundPage';
 import AccessRequestPage from 'features/access/AccessRequestPage';
 import RequestSubmitted from 'features/access/RequestSubmitted';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
+import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import LogOutPage from 'features/logout/LogOutPage';
 import MapRouter from 'features/map/MapRouter';
@@ -32,6 +33,10 @@ const AppRouter: React.FC = () => {
 
       <AppRoute path="/search" title={getTitle('Search')} layout={BaseLayout}>
         <SearchRouter />
+      </AppRoute>
+
+      <AppRoute path="/datasets" title={getTitle('Datasets')} layout={BaseLayout}>
+        <DatasetsRouter />
       </AppRoute>
 
       <AppRoute path="/map" title={getTitle('Map')} layout={BaseLayout}>

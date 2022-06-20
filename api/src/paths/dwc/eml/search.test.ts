@@ -80,21 +80,6 @@ describe('search', () => {
           expect(response.errors[0].message).to.equal("must have required property 'id'");
         });
 
-        it('has array with invalid key value: source', async () => {
-          const apiResponse = [{ id: 'test', source1: 1 }];
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal("must have required property 'source'");
-        });
-
-        it('has array with invalid key value: fields', async () => {
-          const apiResponse = [{ id: 'test', source: {}, fields1: {} }];
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal("must have required property 'fields'");
-        });
         it('has array with invalid value: id', async () => {
           const apiResponse = [{ id: 14, source: {}, fields: {} }];
           const response = responseValidator.validateResponse(200, apiResponse);
@@ -142,31 +127,11 @@ describe('search', () => {
       afterEach(() => {
         sinon.restore();
       });
-      it('throws an error when getting the Elastic Search service fails', async () => {
-        const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-        mockReq.body = {
-          terms: 'test'
-        };
-
-        sinon.stub(ESService.prototype, 'getEsClient').resolves(undefined);
-
-        const requestHandler = search.searchInElasticSearch();
-
-        try {
-          await requestHandler(mockReq, mockRes, mockNext);
-          expect.fail();
-        } catch (actualError) {
-          expect((actualError as Error).message).to.equal("Cannot read property 'search' of undefined");
-        }
-      });
-
       it('returns search results when Elastic Search service succeeds with valid data', async () => {
         const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
         mockReq.query = {
-          index: 'EML',
-          terms: 'searchterm'
+          index: 'EML'
         };
 
         const searchStub = sinon.stub().resolves({
@@ -185,12 +150,9 @@ describe('search', () => {
         expect(mockRes.jsonValue).eql([{ id: 'testid', source: {}, fields: {} }]);
         expect(searchStub).to.have.been.calledOnceWith({
           index: 'eml',
-          query: {
-            match: {
-              'projects.projectName': 'searchterm'
-            }
-          },
-          fields: ['*']
+          fields: ['datasetTitle'],
+          query: undefined,
+          _source: false
         });
       });
     });
