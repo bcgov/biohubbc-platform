@@ -1,0 +1,103 @@
+import { RequestHandler } from 'express';
+import { Operation } from 'express-openapi';
+import { SOURCE_SYSTEM } from '../../../../constants/database';
+import { getServiceAccountDBConnection } from '../../../../database/db';
+import { HTTP400 } from '../../../../errors/http-error';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
+import { DarwinCoreService } from '../../../../services/dwc-service';
+import { getKeycloakSource } from '../../../../utils/keycloak-utils';
+import { getLogger } from '../../../../utils/logger';
+
+const defaultLog = getLogger('paths/dwc/submission/{submissionId}/normalize');
+
+export const POST: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC']],
+          discriminator: 'ServiceClient'
+        }
+      ]
+    };
+  }),
+  normalizeSubmission()
+];
+
+POST.apiDoc = {
+  description: 'normalize and save data of submission file',
+  tags: ['normalize', 'submission'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
+  parameters: [
+    {
+      in: 'path',
+      name: 'submissionId',
+      schema: {
+        type: 'integer',
+        minimum: 1
+      },
+      required: true
+    }
+  ],
+  responses: {
+    200: {
+      description: 'Successfully normalized and saved data of submission file',
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            required: ['submission_status_id'],
+            properties: {
+              submission_status_id: {
+                type: 'integer',
+                minimum: 1
+              }
+            }
+          }
+        }
+      }
+    },
+    ...defaultErrorResponses
+  }
+};
+
+export function normalizeSubmission(): RequestHandler {
+  return async (req, res) => {
+    const submissionId = Number(req.params.submissionId);
+
+    const sourceSystem = getKeycloakSource(req['keycloak_token']);
+
+    if (!sourceSystem) {
+      throw new HTTP400('Failed to identify known submission source system', [
+        'token did not contain a clientId/azp or clientId/azp value is unknown'
+      ]);
+    }
+
+    const connection = getServiceAccountDBConnection(sourceSystem);
+
+    try {
+      await connection.open();
+
+      const darwinCoreService = new DarwinCoreService(connection);
+
+      const dwcArchiveFile = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
+      const response = await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
+
+      await connection.commit();
+
+      res.status(200).json(response);
+    } catch (error) {
+      defaultLog.error({ label: 'secureSubmission', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  };
+}

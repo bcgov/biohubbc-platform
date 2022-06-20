@@ -92,6 +92,39 @@ describe('CSVWorksheet', () => {
     });
   });
 
+  describe('getRowObjects', () => {
+    it('returns empty array if the worksheet is null', () => {
+      const xlsxWorkSheet = null as unknown as xlsx.WorkSheet;
+
+      const csvWorksheet = new CSVWorksheet('Sheet1', xlsxWorkSheet);
+
+      expect(csvWorksheet).not.to.be.null;
+      expect(csvWorksheet.getRowObjects()).to.eql([]);
+    });
+
+    it('returns an array of rows data arrays', () => {
+      const xlsxWorkSheet = xlsx.utils.aoa_to_sheet([
+        ['Header1', 'Header2'],
+        ['Header1Data1', 'Header2Data1'],
+        ['Header1Data2', 'Header2Data2']
+      ]);
+
+      const csvWorksheet = new CSVWorksheet('Sheet1', xlsxWorkSheet);
+
+      expect(csvWorksheet).not.to.be.null;
+      expect(csvWorksheet.getRowObjects()).to.eql([
+        {
+          Header1: 'Header1Data1',
+          Header2: 'Header2Data1'
+        },
+        {
+          Header1: 'Header1Data2',
+          Header2: 'Header2Data2'
+        }
+      ]);
+    });
+  });
+
   describe('validate', () => {
     it('calls all provided validator functions', () => {
       const xlsxWorkSheet = xlsx.utils.aoa_to_sheet([
