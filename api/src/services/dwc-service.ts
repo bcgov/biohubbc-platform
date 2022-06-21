@@ -47,7 +47,7 @@ export class DarwinCoreService extends DBService {
 
     if (submissionExists?.submission_id) {
       await this.submissionService.setSubmissionEndDateById(submissionExists.submission_id);
-      await this.deleteEmlFormElasticSearchByDataPackageId(dataPackageId);
+      await this.deleteEmlFromElasticSearchByDataPackageId(dataPackageId);
       //TODO: Delete scraped spatial components table details when its filled
     }
 
@@ -448,7 +448,7 @@ export class DarwinCoreService extends DBService {
     return JSON.stringify(normalized);
   }
 
-  async deleteEmlFormElasticSearchByDataPackageId(dataPackageId: string) {
+  async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
     const esClient = await this.getEsClient();
 
     const response = await esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
