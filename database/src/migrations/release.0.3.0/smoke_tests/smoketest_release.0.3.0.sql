@@ -635,17 +635,10 @@ begin
   -- submission 1
   insert into submission (source_transform_id, record_effective_date, eml_source) values (_source_transform_id, now()-interval '1 day', _eml_source) returning submission_id into _submission_id;
   select count(1) into _count from submission;
-<<<<<<< HEAD
   assert _count = 1, 'FAIL submission(1)';
   insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;
   select count(1) into _count from submission_spatial_component;
   assert _count = 1, 'FAIL submission_spatial_component(1)';
-=======
-  assert _count = 1, 'FAIL submission';
-  insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;
-  select count(1) into _count from submission_spatial_component;
-  assert _count = 1, 'FAIL submission_spatial_component';
->>>>>>> origin
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   -- transpose comments on next three lines to test deletion of published surveys by system administrator
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Awaiting Curration'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
@@ -658,17 +651,10 @@ begin
   -- submission 2
   insert into submission (source_transform_id, record_effective_date) values (_source_transform_id, now()) returning submission_id into _submission_id;
   select count(1) into _count from submission;
-<<<<<<< HEAD
   assert _count = 2, 'FAIL submission(2)';
   insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}');
   select count(1) into _count from submission_spatial_component;
   assert _count = 2, 'FAIL submission_spatial_component(2)';
-=======
-  assert _count = 2, 'FAIL submission';
-  insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}');
-  select count(1) into _count from submission_spatial_component;
-  assert _count = 2, 'FAIL submission_spatial_component';
->>>>>>> origin
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()) returning submission_status_id into _submission_status_id;
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Rejected'), now()) returning submission_status_id into _submission_status_id;
   insert into submission_message (submission_status_id, submission_message_type_id, event_timestamp, message) values (_submission_status_id, (select submission_message_type_id from submission_message_type where name = 'Missing Required Field'), now(), 'Some required field was not supplied.');

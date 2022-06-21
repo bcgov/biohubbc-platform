@@ -2,11 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
-<<<<<<< HEAD:database/src/migrations/release.0.3.0/biohub.sql
 -- Date Created : Tuesday, June 14, 2022 10:50:21
-=======
--- Date Created : Thursday, June 09, 2022 14:41:01
->>>>>>> origin:database/src/migrations/release.0.2.0/biohub.sql
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -290,12 +286,8 @@ CREATE TABLE submission(
     uuid                     uuid              DEFAULT public.gen_random_uuid() NOT NULL,
     input_key                varchar(1000),
     input_file_name          varchar(300),
-<<<<<<< HEAD:database/src/migrations/release.0.3.0/biohub.sql
     eml_source               text,
     eml_json_source          jsonb,
-=======
-    eml_source               xml,
->>>>>>> origin:database/src/migrations/release.0.2.0/biohub.sql
     darwin_core_source       jsonb,
     security_timestamp       TIMESTAMPTZ,
     record_effective_date    date              NOT NULL,
