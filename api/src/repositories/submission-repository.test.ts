@@ -266,7 +266,7 @@ describe('SubmissionRepository', () => {
         await submissionRepository.setSubmissionEndDateById(1);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record key');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update end date in submission record');
       }
     });
 
