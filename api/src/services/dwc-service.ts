@@ -43,6 +43,8 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+    console.log('file is: ', file);
+    console.log('datapackageId is', dataPackageId);
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {

@@ -645,4 +645,68 @@ describe('DarwinCoreService', () => {
       expect(response).to.eql(jsonNormalized);
     });
   });
+
+  describe('intake', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should replace an existing file if the dataPackageId has previously been submitted', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const getSubmissionStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .resolves({ submission_id: 1 });
+
+      const submissionEndDateStub = sinon
+        .stub(SubmissionService.prototype, 'setSubmissionEndDateById')
+        .resolves({ submission_id: 1 });
+
+      const deleteEmlStub = sinon
+        .stub(DarwinCoreService.prototype, 'deleteEmlFromElasticSearchByDataPackageId')
+        .resolves();
+
+      const createStub = sinon.stub(DarwinCoreService.prototype, 'create').resolves({ dataPackageId: 'dataPackageId' });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      await darwinCoreService.intake(multerFile, 'dataPackageId');
+      expect(getSubmissionStub).to.be.calledWith('dataPackageId');
+      expect(submissionEndDateStub).to.be.calledWith(1);
+      expect(deleteEmlStub).to.be.calledWith('dataPackageId');
+      expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
+    });
+
+    it('should create a new submission if the dataPackageId has not previously been submitted', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const getSubmissionStub = sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves();
+
+      const submissionEndDateStub = sinon
+        .stub(SubmissionService.prototype, 'setSubmissionEndDateById')
+        .resolves({ submission_id: 1 });
+
+      const deleteEmlStub = sinon
+        .stub(DarwinCoreService.prototype, 'deleteEmlFromElasticSearchByDataPackageId')
+        .resolves();
+
+      const createStub = sinon.stub(DarwinCoreService.prototype, 'create').resolves({ dataPackageId: 'dataPackageId' });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      await darwinCoreService.intake(multerFile, 'dataPackageId');
+      expect(getSubmissionStub).to.be.calledWith('dataPackageId');
+      expect(submissionEndDateStub).not.to.be.called;
+      expect(deleteEmlStub).not.to.be.called;
+      expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
+    });
+  });
 });
