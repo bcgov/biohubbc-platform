@@ -16,6 +16,7 @@ export interface IInsertSubmissionRecord {
   input_key: string;
   input_file_name: string;
   eml_source: string;
+  eml_json_source: string;
   darwin_core_source: string;
 }
 
@@ -34,6 +35,7 @@ export interface ISubmissionModel {
   input_key: string | null;
   input_file_name: string | null;
   eml_source: string | null;
+  eml_json_source: string | null;
   darwin_core_source: string | null;
   create_date: string;
   create_user: number;
@@ -225,6 +227,41 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to update submission record key', [
         'SubmissionRepository->updateSubmissionRecordInputKey',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update the `eml_json_source` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {IInsertSubmissionRecord['eml_json_source']} EMLJSONSource
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionRecordEMLJSONSource(
+    submissionId: number,
+    EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
+  ): Promise<{ submission_id: number }> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission
+      SET
+      eml_json_source = ${EMLJSONSource}
+      WHERE
+        submission_id = ${submissionId}
+      RETURNING
+        submission_id;
+    `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission record key', [
+        'SubmissionRepository->updateSubmissionRecordEMLJSONSource',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

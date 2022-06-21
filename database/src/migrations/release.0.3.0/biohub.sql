@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Thursday, June 09, 2022 14:41:01
+-- Date Created : Tuesday, June 14, 2022 10:50:21
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -286,7 +286,8 @@ CREATE TABLE submission(
     uuid                     uuid              DEFAULT public.gen_random_uuid() NOT NULL,
     input_key                varchar(1000),
     input_file_name          varchar(300),
-    eml_source               xml,
+    eml_source               text,
+    eml_json_source          jsonb,
     darwin_core_source       jsonb,
     security_timestamp       TIMESTAMPTZ,
     record_effective_date    date              NOT NULL,
@@ -313,6 +314,8 @@ COMMENT ON COLUMN submission.input_key IS 'The identifying key to the file in th
 COMMENT ON COLUMN submission.input_file_name IS 'The name of the file submitted. The target is the input data file or template. For example, a custom data submission template.'
 ;
 COMMENT ON COLUMN submission.eml_source IS 'The Ecological Metadata Language source as extracted from the submission.'
+;
+COMMENT ON COLUMN submission.eml_json_source IS 'The JSON representation of the Ecological Metadata Language source for the submission.'
 ;
 COMMENT ON COLUMN submission.darwin_core_source IS 'The denormalized Darwin Core source as extracted from the submission.'
 ;

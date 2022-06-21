@@ -325,6 +325,8 @@ describe('create', () => {
       //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
       //   .resolves();
 
+      sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
+
       sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').throws(new Error('test error'));
       sinon
         .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
@@ -387,6 +389,7 @@ describe('create', () => {
       //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
       //   .resolves();
 
+      sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
       sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
       sinon
         .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
@@ -449,6 +452,9 @@ describe('create', () => {
       //   .stub(DarwinCoreService.prototype, 'scrapeAndUploadOccurrences')
       //   .resolves();
 
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .resolves();
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
         .resolves();
@@ -466,6 +472,7 @@ describe('create', () => {
       expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
       expect(ingestNewDwCADataPackageStub).to.have.been.calledOnceWith(mockFile);
       // expect(scrapeAndUploadOccurrencesStub).to.have.been.calledOnceWith(1);
+      expect(convertSubmissionEMLtoJSONStub).to.have.been.calledOnceWith(1);
       expect(transformAndUploadMetaDataStub).to.have.been.calledOnceWith(1, '123-456-789');
 
       expect(mockRes.statusValue).to.equal(200);

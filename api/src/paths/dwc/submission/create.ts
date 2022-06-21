@@ -119,6 +119,8 @@ export function submitDataset(): RequestHandler {
 
       await darwinCoreService.tempValidateSubmission(submissionId);
 
+      await darwinCoreService.convertSubmissionEMLtoJSON(submissionId);
+
       // await darwinCoreService.scrapeAndUploadOccurrences(submissionId);
 
       try {
