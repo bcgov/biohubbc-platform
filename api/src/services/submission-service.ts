@@ -61,6 +61,21 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Update the `eml_json_source` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {IInsertSubmissionRecord['eml_json_source']} EMLJSONSource
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionEMLJSONSource(
+    submissionId: number,
+    EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.updateSubmissionRecordEMLJSONSource(submissionId, EMLJSONSource);
+  }
+
+  /**
    * Get submission record by id.
    *
    * @param {number} submissionId
