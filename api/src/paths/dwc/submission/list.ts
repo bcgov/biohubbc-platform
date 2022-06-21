@@ -40,15 +40,7 @@ GET.apiDoc = {
             items: {
               title: 'Darwin Core Data Packages Response Object',
               type: 'object',
-              required: [
-                'submission_id',
-                'source',
-                'uuid',
-                'event_timestamp',
-                'create_date',
-                'create_user',
-                'revision_count'
-              ],
+              required: ['submission_id', 'uuid', 'event_timestamp', 'create_date', 'create_user', 'revision_count'],
               properties: {
                 submission_status: {
                   type: 'string',
@@ -56,7 +48,7 @@ GET.apiDoc = {
                 },
                 submission_id: {
                   type: 'integer',
-                  minimum: 0
+                  minimum: 1
                 },
                 source: {
                   type: 'string'
@@ -66,12 +58,10 @@ GET.apiDoc = {
                   format: 'uuid'
                 },
                 event_timestamp: {
-                  type: 'string',
-                  format: 'date-time'
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                 },
                 delete_timestamp: {
-                  type: 'string',
-                  format: 'date-time',
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                   nullable: true
                 },
                 input_key: {
@@ -87,19 +77,17 @@ GET.apiDoc = {
                   nullable: true
                 },
                 darwin_core_source: {
-                  type: 'string',
+                  oneOf: [{ type: 'object' }, { type: 'string' }],
                   nullable: true
                 },
                 create_date: {
-                  type: 'string',
-                  format: 'date-time'
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                 },
                 create_user: {
                   type: 'integer'
                 },
                 update_date: {
-                  type: 'string',
-                  format: 'date-time',
+                  oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                   nullable: true
                 },
                 update_user: {

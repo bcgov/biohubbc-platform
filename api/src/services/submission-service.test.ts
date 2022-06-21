@@ -266,4 +266,20 @@ describe('SubmissionService', () => {
       });
     });
   });
+
+  describe('updateSubmissionRecordDWCSource', () => {
+    it('should return submission id', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordDWCSource')
+        .resolves({ submission_id: 1 });
+
+      const response = await submissionService.updateSubmissionRecordDWCSource(1, 'string');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
 });

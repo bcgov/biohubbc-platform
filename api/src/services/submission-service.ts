@@ -233,4 +233,19 @@ export class SubmissionService extends DBService {
       submission_message_id
     };
   }
+
+  /**
+   *  Update darwin_core_source field in submission table
+   *
+   * @param {number} submissionId
+   * @param {string} normalizedData
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionRecordDWCSource(
+    submissionId: number,
+    normalizedData: string
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.updateSubmissionRecordDWCSource(submissionId, normalizedData);
+  }
 }

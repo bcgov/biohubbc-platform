@@ -493,4 +493,39 @@ export class SubmissionRepository extends BaseRepository {
 
     return response.rows[0];
   }
+
+  /**
+   * Update darwin_core_source field in submission table
+   *
+   * @param {number} submissionId
+   * @param {string} normalizedData
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionRecordDWCSource(
+    submissionId: number,
+    normalizedData: string
+  ): Promise<{ submission_id: number }> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission
+      SET
+        darwin_core_source = ${normalizedData}
+      WHERE
+        submission_id = ${submissionId}
+      RETURNING
+        submission_id;
+    `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission record darwin core source', [
+        'SubmissionRepository->updateSubmissionRecordDWCSource',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
 }

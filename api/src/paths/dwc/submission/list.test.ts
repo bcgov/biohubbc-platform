@@ -26,14 +26,6 @@ describe('submissions', () => {
             expect(response.errors[0].message).to.equal("must have required property 'submission_id'");
           });
 
-          it('property source', async () => {
-            const apiResponse = [{ submission_id: 1 }];
-            const response = responseValidator.validateResponse(200, apiResponse);
-
-            expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal("must have required property 'source'");
-          });
-
           it('property uuid', async () => {
             const apiResponse = [{ submission_id: 1, source: 'SIMS' }];
             const response = responseValidator.validateResponse(200, apiResponse);
@@ -181,7 +173,7 @@ describe('submissions', () => {
             ];
             const response = responseValidator.validateResponse(200, apiResponse);
             expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be object');
           });
 
           it('property create_date', async () => {
@@ -198,7 +190,7 @@ describe('submissions', () => {
             ];
             const response = responseValidator.validateResponse(200, apiResponse);
             expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be object');
           });
 
           it('property create_user', async () => {
