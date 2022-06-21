@@ -5,11 +5,10 @@ import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
-import { parseS3File } from '../utils/media-utils';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
-import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { parseS3File, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
@@ -64,6 +63,7 @@ export class DarwinCoreService extends DBService {
 
     const submissionService = new SubmissionService(this.connection);
 
+    //TODO: if fail post failure status
     await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
     return response;
@@ -168,10 +168,6 @@ export class DarwinCoreService extends DBService {
 
     const stylesheetfromS3 = await submissionService.getStylesheetFromS3(submissionId);
 
-    if (!stylesheetfromS3) {
-      throw new ApiGeneralError('The transformation stylesheet is not available');
-    }
-
     const parsedStylesheet = parseS3File(stylesheetfromS3);
 
     if (!parsedStylesheet) {
@@ -235,6 +231,10 @@ export class DarwinCoreService extends DBService {
       sourceText: emlSource,
       destination: 'serialized'
     });
+
+    if (!result.principalResult) {
+      throw new ApiGeneralError('Failed to transform eml with stylesheet');
+    }
 
     return JSON.parse(result.principalResult);
   }
@@ -334,5 +334,45 @@ export class DarwinCoreService extends DBService {
       index: ES_INDEX.EML,
       document: convertedEML
     });
+  }
+
+  /**
+   * Normalize all worksheets in dwcArchive file and update submission record
+   *
+   * @param {number} submissionId
+   * @param {DWCArchive} dwcArchiveFile
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof DarwinCoreService
+   */
+  async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<void> {
+    const normalized = this.normalizeDWCA(dwcArchiveFile);
+
+    const submissionService = new SubmissionService(this.connection);
+
+    try {
+      await submissionService.updateSubmissionRecordDWCSource(submissionId, normalized);
+
+      //TODO: We need a new submission status type
+      await submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+    } catch (error) {
+      await submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'update submission record failed'
+      );
+    }
+  }
+
+  normalizeDWCA(dwcArchiveFile: DWCArchive): string {
+    const normalized = {};
+
+    Object.entries(dwcArchiveFile.worksheets).forEach(([key, value]) => {
+      if (value) {
+        normalized[key] = value.getRowObjects();
+      }
+    });
+
+    return JSON.stringify(normalized);
   }
 }

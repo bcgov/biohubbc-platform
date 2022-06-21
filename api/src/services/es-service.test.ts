@@ -1,5 +1,5 @@
+import { Client } from '@elastic/elasticsearch';
 import chai, { expect } from 'chai';
-import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ESService } from './es-service';
@@ -7,21 +7,23 @@ import { ESService } from './es-service';
 chai.use(sinonChai);
 
 describe('ESService', () => {
-  it('constructs', () => {
-    const esService = new ESService();
+  describe('getEsClient', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
 
-    expect(esService).to.be.instanceof(ESService);
-  });
+    it('should return new elastic search client', async () => {
+      const esService = new ESService();
 
-  it('throws an error when getting the Elastic Search client fails', async () => {
-    sinon.stub(ESService.prototype, 'getEsClient').resolves(undefined);
-    const esClient = await new ESService().getEsClient();
+      const clientStub = sinon.stub().callsFake(() => {
+        return 'test';
+      });
 
-    try {
-      await esClient.search();
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as Error).message).to.equal("Cannot read property 'search' of undefined");
-    }
+      Object.setPrototypeOf(Client, clientStub);
+
+      esService.getEsClient();
+
+      expect(clientStub).to.be.calledOnce;
+    });
   });
 });
