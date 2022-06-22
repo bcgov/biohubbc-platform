@@ -69,16 +69,62 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('updateSubmissionRecordEMLJSONSource', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordEMLJSONSource')
+        .resolves({ submission_id: 1 });
+
+      const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 'test');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
   describe('getSubmissionRecordBySubmissionId', () => {
-    it('should return submission row object', async () => {
+    it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ submission_id: 1 } as unknown as ISubmissionModel);
+        .resolves({ test: 'test' } as unknown as ISubmissionModel);
 
       const response = await submissionService.getSubmissionRecordBySubmissionId(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ test: 'test' });
+    });
+  });
+
+  describe('getSubmissionIdByUUID', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 1 });
+
+      const response = await submissionService.getSubmissionIdByUUID('test');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('setSubmissionEndDateById', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'setSubmissionEndDateById')
+        .resolves({ submission_id: 1 });
+
+      const response = await submissionService.setSubmissionEndDateById(1);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
@@ -152,6 +198,7 @@ describe('SubmissionService', () => {
           input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
           input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
           eml_source: null,
+          eml_json_source: null,
           darwin_core_source: 'test',
           create_date: '2022-05-24T18:41:42.056Z',
           create_user: 15,

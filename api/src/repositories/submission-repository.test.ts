@@ -224,6 +224,69 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('getSubmissionIdByRecordByUUID', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionIdByUUID('test_uuid');
+
+      expect(response.submission_id).to.equal(1);
+    });
+  });
+
+  describe('setSubmissionEndDateById', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.setSubmissionEndDateById(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update end date in submission record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.setSubmissionEndDateById(1);
+
+      expect(response.submission_id).to.equal(1);
+    });
+  });
+
   describe('getSourceTransformRecordBySystemUserId', () => {
     afterEach(() => {
       sinon.restore();
@@ -367,6 +430,7 @@ describe('SubmissionRepository', () => {
         input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
         input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
         eml_source: null,
+        eml_json_source: null,
         darwin_core_source: 'test',
         create_date: '2022-05-24T18:41:42.056Z',
         create_user: 15,

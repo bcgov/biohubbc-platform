@@ -76,6 +76,10 @@ GET.apiDoc = {
                   type: 'string',
                   nullable: true
                 },
+                eml_json_source: {
+                  type: 'string',
+                  nullable: true
+                },
                 darwin_core_source: {
                   oneOf: [{ type: 'object' }, { type: 'string' }],
                   nullable: true
