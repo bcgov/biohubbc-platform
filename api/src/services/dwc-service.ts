@@ -1,15 +1,10 @@
-import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { XMLParser } from 'fast-xml-parser';
 import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import {
-  ISubmissionModel,
-  SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
-} from '../repositories/submission-repository';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
@@ -40,7 +35,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * intake dwca file
+   * Process an incoming DwCA Submission.
    *
    * @param {Express.Multer.File} file
    * @param {string} dataPackageId
@@ -48,8 +43,6 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
-    console.log('file is: ', file);
-    console.log('datapackageId is', dataPackageId);
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
@@ -61,6 +54,14 @@ export class DarwinCoreService extends DBService {
     return this.create(file, dataPackageId);
   }
 
+  /**
+   * Process a new DwCA submission.
+   *
+   * @param {Express.Multer.File} file
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<{ dataPackageId: string }>}
+   * @memberof DarwinCoreService
+   */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
     const { submissionId } = await this.ingestNewDwCADataPackage(file, {
       dataPackageId: dataPackageId
@@ -157,20 +158,17 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
-    const submissionService = new SubmissionService(this.connection);
-
-    const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+    const submission = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
     const options = {
       ignoreAttributes: false,
       attributeNamePrefix: '@_'
     };
     const parser = new XMLParser(options);
+
     const eml_json_source = parser.parse(submission.eml_source as string);
 
-    await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
-
-    console.log('eml_json_source', eml_json_source);
+    await this.submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
 
     return eml_json_source;
   }
@@ -297,8 +295,8 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('Failed to parse the stylesheet');
     }
 
+    // call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     let transformedEML;
-    //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
     try {
       transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
     } catch (error) {
@@ -312,8 +310,8 @@ export class DarwinCoreService extends DBService {
       );
     }
 
+    // call to the ElasticSearch API to create a record with our transformed EML
     let response;
-    //call to the ElasticSearch API to create a record with our transformed EML
     try {
       response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
     } catch (error) {
@@ -336,15 +334,15 @@ export class DarwinCoreService extends DBService {
   /**
    * Conversion of eml to JSON
    *
-   * @param {XmlString} emlSource
-   * @return {*} //TODO RETURN TYPE
+   * Note: See https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766 to see the library's author
+   * respond to one of our questions
+   *
+   * @param {string} emlSource
+   * @param {*} stylesheet
+   * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
-    // for future reference
-    // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
-    //to see the library's author respond to one of our questions
-
+  async transformEMLtoJSON(emlSource: string, stylesheet: any): Promise<any> {
     const result: {
       principalResult: string;
       resultDocuments: unknown;
