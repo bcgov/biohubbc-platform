@@ -719,12 +719,235 @@ describe('DarwinCoreService', () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      const ingestStub = sinon
+      const ingestNewDwCADataPackageStub = sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon
         .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .throws('error' as unknown as ApiGeneralError);
+
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to validate submission record'
+        );
+      }
+    });
+
+    it('should set submission status to rejected and insert an error message when converting EML to JSON fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .throws('error' as unknown as ApiGeneralError);
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to convert EML to JSON'
+        );
+      }
+    });
+
+    it('should set submission status to rejected and insert an error message when transforming metadata fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .throws('error' as unknown as ApiGeneralError);
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to transform and upload metadata'
+        );
+      }
+    });
+
+    it('should set submission status to rejected and insert an error message when normalizing DwCA fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .throws('error' as unknown as ApiGeneralError);
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(normalizeSubmissionDWCAStub).not.to.have.been.called;
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to normalize dwca file'
+        );
+      }
+    });
+
+    it('should set submission status to rejected and insert an error message when normalizing DwCA fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+      const normalizeSubmissionDWCAStub = sinon
+        .stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA')
         .throws('error' as unknown as ApiGeneralError);
 
       const errorStatusAndMessageStub = sinon
@@ -738,15 +961,19 @@ describe('DarwinCoreService', () => {
 
       try {
         await darwinCoreService.create(multerFile, 'dataPackageId');
-        expect(ingestStub).to.be.calledWith(multerFile, 'dataPackageId');
-        expect(tempValidationStub).to.be.calledWith(1);
         expect.fail();
       } catch (actualError) {
-        expect(errorStatusAndMessageStub).to.be.calledWith(
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
           SUBMISSION_STATUS_TYPE.REJECTED,
           SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-          'Failed to validate submission record'
+          'Failed to normalize dwca file'
         );
       }
     });
