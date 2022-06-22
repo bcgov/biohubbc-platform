@@ -50,8 +50,6 @@ export class Deferred<R = void, Q extends any = void> {
       this.resolve = resolve;
       this.reject = reject;
     });
-
-    return this;
   }
 
   /**
