@@ -709,4 +709,46 @@ describe('DarwinCoreService', () => {
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
     });
   });
+
+  describe('create', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should set submission status to rejected and insert an error message when validation fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .throws('error' as unknown as ApiGeneralError);
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect(ingestStub).to.be.calledWith(multerFile, 'dataPackageId');
+        expect(tempValidationStub).to.be.calledWith(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(errorStatusAndMessageStub).to.be.calledWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to validate submission record'
+        );
+      }
+    });
+  });
 });
