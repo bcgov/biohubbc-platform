@@ -24,14 +24,14 @@ export class Deferred<R = void, Q extends any = void> {
    * @default
    * @returns {void}
    */
-  resolve: (value: R) => void = () => {};
+  resolve: (value: R) => void = () => null;
 
   /**
    * Rejects the deferred promise with the given reason.
    * @param {Q extends any = void} [reason] The reason that the promise rejects.
    * @returns {void}
    */
-  reject: (reason?: Q) => void = () => {};
+  reject: (reason?: Q) => void = () => null;
 
   /**
    * @property The promise being deferred.
@@ -63,5 +63,5 @@ export class Deferred<R = void, Q extends any = void> {
     });
 
     return this;
-  };
+  }
 }
