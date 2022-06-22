@@ -977,5 +977,55 @@ describe('DarwinCoreService', () => {
         );
       }
     });
+
+    it('should succeeed and return the data package id', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const convertSubmissionEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        const response = await darwinCoreService.create(multerFile, 'dataPackageId');
+
+        expect(response.dataPackageId).to.equal('dataPackageId');
+
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+        expect(errorStatusAndMessageStub).not.to.have.been.called;
+      } catch (actualError) {
+        expect.fail();
+      }
+    });
   });
 });
