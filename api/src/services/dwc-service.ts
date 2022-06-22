@@ -1,10 +1,15 @@
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
+import { XMLParser } from 'fast-xml-parser';
 import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import {
+  ISubmissionModel,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE
+} from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
@@ -116,31 +121,6 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Converts submission EML to JSON and persists with submission record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ occurrence_id: number }[]>}
-   * @memberof DarwinCoreService
-   */
-  async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
-    const submissionService = new SubmissionService(this.connection);
-    console.log(submissionId, submissionService);
-
-    // const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
-
-    // const options = {
-    //   ignoreAttributes: false,
-    //   attributeNamePrefix: '@_'
-    // };
-    // const parser = new XMLParser(options);
-    // const eml_json_source = parser.parse(submission.eml_source as string);
-
-    // await submissionService.updateSubmissionEMLJSONSource(submissionId, eml_json_source);
-
-    return [{ eml_json_source: 'eml_json_source' }];
-  }
-
-  /**
    * Parse submission record to DWCArchive file
    *
    * @param {number} submissionId
@@ -167,6 +147,32 @@ export class DarwinCoreService extends DBService {
     }
 
     return this.prepDWCArchive(s3File);
+  }
+
+  /**
+   * Converts submission EML to JSON and persists with submission record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ occurrence_id: number }[]>}
+   * @memberof DarwinCoreService
+   */
+  async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
+    const submissionService = new SubmissionService(this.connection);
+
+    const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+    const options = {
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_'
+    };
+    const parser = new XMLParser(options);
+    const eml_json_source = parser.parse(submission.eml_source as string);
+
+    await submissionService.updateSubmissionEMLJSONSource(submissionId, eml_json_source);
+
+    console.log('eml_json_source', eml_json_source);
+
+    return eml_json_source;
   }
 
   /**
@@ -245,6 +251,7 @@ export class DarwinCoreService extends DBService {
       input_key: '',
       event_timestamp: new Date().toISOString(),
       eml_source: dwcArchive.extra.eml?.buffer?.toString() || '',
+      eml_json_source: '',
       darwin_core_source: '{}', // TODO populate
       uuid: dataPackageId
     });
