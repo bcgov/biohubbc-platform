@@ -1,56 +1,10 @@
-import { renderHook, act, cleanup, RenderResult } from '@testing-library/react-hooks';
+import { renderHook, act } from '@testing-library/react-hooks';
 import { Deferred } from 'test-helpers/promises';
-// import React from 'react';
-import useDataLoader, { DataLoader } from './useDataLoader';
+import useDataLoader from './useDataLoader';
 
-interface ITestComponentProps {
-  callback: () => Promise<any>
-  onError: (error: unknown) => void 
-}
-/*
-const TestComponent: React.FC<ITestComponentProps> = (props) => {
-  const {
-    data,
-    error,
-    isLoading,
-    isReady,
-    refresh
-  } = useDataLoader(props.callback, props.onError);
-  
-  return <></>;
-};
-*/
-
-const testError = 'promise-did-not-resolve';
-const testResponse = {
-  teststring: 'string'
-};
-
-
-
-describe('useDataLoader', () => {
-  // jest.useFakeTimers();
-  // jest.spyOn(global, 'setTimeout')
-
-  const makeSampleErrorHandler = () => (error: unknown) => {
-    return;
-  }
-
-  // let result: RenderResult<DataLoader<unknown, unknown>>
-
-  /*
-  beforeAll(() => {
-    jest.useFakeTimers();
-  });
-  
-  afterAll(() => {
-    jest.useRealTimers();
-  });
-  */
-  
+describe('useDataLoader', () => {  
   describe('mounting conditions', () => {
     const deferred = new Deferred();
-
     const { result } = renderHook(() => useDataLoader(() => deferred.promise));
 
     it('should mount with an empty data property', () => {
@@ -121,7 +75,7 @@ describe('useDataLoader', () => {
   });
   
   describe('refreshing', () => {
-    it('should begin loading and clear errors when refresh is called', async () => {
+    it('should clear errors when refresh is called', async () => {
       const deferred = new Deferred<string>();
       const { result, waitForValueToChange, waitForNextUpdate } = renderHook(() => useDataLoader(() => deferred.promise));
       
@@ -129,38 +83,32 @@ describe('useDataLoader', () => {
       await waitForValueToChange(() => result.current.data);
       expect(result.current.data).toEqual('test1');
       
-      act(() => {
-        result.current.refresh();
-      })
-      // await waitForNextUpdate();
-      /*
-      expect(result.current.isLoading).toBe(true);
+      act(() => result.current.refresh());
+      await waitForValueToChange(() => result.current.isLoading);
       expect(result.current.error).toBeUndefined();
-      expect(result.current.isReady).toBe(false);
-      */
     });
     
-    /*
-
+    
     it('should still expose its old data after refresh is called', async () => {
       const deferred = new Deferred<string>();
-      const { result, waitForValueToChange, waitForNextUpdate } = renderHook(() => useDataLoader(() => deferred.promise));
+      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
       deferred.resolve('test2');
       await waitForValueToChange(() => result.current.data);
       expect(result.current.data).toEqual('test2');
-      expect
 
       act(() => {
         result.current.refresh();
       })
+      await waitForValueToChange(() => result.current.isLoading);
       expect(result.current.data).toBe('test2');
     });
     
+
     describe('resolves a successful refresh', () => {
       it('should update the data after refresh callback resolves', async () => {
         const deferred = new Deferred<string>();
-        const { result, waitForValueToChange, waitForNextUpdate } = renderHook(() => useDataLoader(() => deferred.promise));
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
         
         deferred.resolve('test3');
         await waitForValueToChange(() => result.current.data);
@@ -168,7 +116,7 @@ describe('useDataLoader', () => {
 
         act(() => {
           
-          deferred.recycle()
+          deferred.reset()
           result.current.refresh();
         })
         deferred.resolve('test3-refreshed');
@@ -177,21 +125,65 @@ describe('useDataLoader', () => {
         expect(result.current.data).toEqual('test3-refreshed');
       });
     
-      
       it('should be in a ready state after refresh resolves', async () => {
-        expect(0).toBe(1);
-      });
-      
+        const deferred = new Deferred<string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+        
+        deferred.resolve('test3');
+        await waitForValueToChange(() => result.current.data);
+        expect(result.current.data).toEqual('test3');
+
+        act(() => {
+          
+          deferred.reset()
+          result.current.refresh();
+        })
+        deferred.resolve('test3-refreshed');
+        await waitForValueToChange(() => result.current.data);
+
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.error).toBeUndefined();
+        expect(result.current.isReady).toBe(true);
+      });      
     });
-    */
     
-    /*
     describe('rejects an unsuccessful refresh', () => {
-      it('should not update the data after refresh callback rejects');
-      it('should not be loading after refresh rejects');
-      it('should be ready after the refresh rejects');
-      it('should have a defined error property');
+      it('should not update the data after refresh callback rejects', async () => {
+        const deferred = new Deferred<string, string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+        
+        deferred.resolve('resolve1');
+        await waitForValueToChange(() => result.current.data);
+        expect(result.current.data).toEqual('resolve1');
+
+        act(() => {
+          deferred.reset()
+          result.current.refresh();
+        })
+        deferred.reject('reject1');
+        await waitForValueToChange(() => result.current.error);
+
+        expect(result.current.data).toEqual('resolve1');
+      });
+    
+      it('should be in a ready state after refresh callback rejects', async () => {
+        const deferred = new Deferred<string, string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+        
+        deferred.resolve('resolve2');
+        await waitForValueToChange(() => result.current.data);
+        expect(result.current.data).toEqual('resolve2');
+
+        act(() => {
+          deferred.reset()
+          result.current.refresh();
+        })
+        deferred.reject('reject2');
+        await waitForValueToChange(() => result.current.error);
+
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.isReady).toBe(true);
+      });
     });
-    */
   });
 });
