@@ -75,6 +75,19 @@ export class DarwinCoreService extends DBService {
     }
 
     try {
+      await this.convertSubmissionEMLtoJSON(submissionId);
+    } catch (error) {
+      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to convert EML to JSON'
+      );
+    }
+
+    try {
       await this.transformAndUploadMetaData(submissionId, dataPackageId);
     } catch (error) {
       defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
@@ -100,6 +113,31 @@ export class DarwinCoreService extends DBService {
     }
 
     return { dataPackageId };
+  }
+
+  /**
+   * Converts submission EML to JSON and persists with submission record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ occurrence_id: number }[]>}
+   * @memberof DarwinCoreService
+   */
+  async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
+    const submissionService = new SubmissionService(this.connection);
+    console.log(submissionId, submissionService);
+
+    // const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+    // const options = {
+    //   ignoreAttributes: false,
+    //   attributeNamePrefix: '@_'
+    // };
+    // const parser = new XMLParser(options);
+    // const eml_json_source = parser.parse(submission.eml_source as string);
+
+    // await submissionService.updateSubmissionEMLJSONSource(submissionId, eml_json_source);
+
+    return [{ eml_json_source: 'eml_json_source' }];
   }
 
   /**
