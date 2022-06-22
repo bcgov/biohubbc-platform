@@ -1,6 +1,4 @@
-import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { XMLParser } from 'fast-xml-parser';
-import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
@@ -15,7 +13,7 @@ import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
-import { parseS3File, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
@@ -48,8 +46,6 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
-    console.log('file is: ', file);
-    console.log('datapackageId is', dataPackageId);
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
@@ -61,6 +57,14 @@ export class DarwinCoreService extends DBService {
     return this.create(file, dataPackageId);
   }
 
+  /**
+   *
+   *
+   * @param {Express.Multer.File} file
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<{ dataPackageId: string }>}
+   * @memberof DarwinCoreService
+   */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
     const { submissionId } = await this.ingestNewDwCADataPackage(file, {
       dataPackageId: dataPackageId
@@ -76,19 +80,6 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to validate submission record'
-      );
-    }
-
-    try {
-      await this.convertSubmissionEMLtoJSON(submissionId);
-    } catch (error) {
-      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'Failed to convert EML to JSON'
       );
     }
 
@@ -147,32 +138,6 @@ export class DarwinCoreService extends DBService {
     }
 
     return this.prepDWCArchive(s3File);
-  }
-
-  /**
-   * Converts submission EML to JSON and persists with submission record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ occurrence_id: number }[]>}
-   * @memberof DarwinCoreService
-   */
-  async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
-    const submissionService = new SubmissionService(this.connection);
-
-    const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
-
-    const options = {
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_'
-    };
-    const parser = new XMLParser(options);
-    const eml_json_source = parser.parse(submission.eml_source as string);
-
-    await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
-
-    console.log('eml_json_source', eml_json_source);
-
-    return eml_json_source;
   }
 
   /**
@@ -283,24 +248,27 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
-    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+    const submissionService = new SubmissionService(this.connection);
 
-    if (!submissionRecord.eml_source) {
+    const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
+    if (!submission.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
     }
 
-    const s3File = await this.submissionService.getStylesheetFromS3(submissionId);
-
-    const stylesheet = parseS3File(s3File)?.buffer?.toString();
-
-    if (!stylesheet) {
-      throw new ApiGeneralError('Failed to parse the stylesheet');
-    }
-
     let transformedEML;
-    //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
+
+    const options = {
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_'
+    };
+    const parser = new XMLParser(options);
+
     try {
-      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
+      transformedEML = parser.parse(submission.eml_source as string);
+
+      console.log('transformedEML is: ', transformedEML);
+      await submissionService.updateSubmissionEMLJSONSource(submissionId, transformedEML);
     } catch (error) {
       defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
 
@@ -311,11 +279,12 @@ export class DarwinCoreService extends DBService {
         'eml transformation failed'
       );
     }
-
     let response;
     //call to the ElasticSearch API to create a record with our transformed EML
     try {
       response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
+
+      console.log('response from ES upload: ', response);
     } catch (error) {
       defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
 
@@ -331,36 +300,6 @@ export class DarwinCoreService extends DBService {
     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
     return response;
-  }
-
-  /**
-   * Conversion of eml to JSON
-   *
-   * @param {XmlString} emlSource
-   * @return {*} //TODO RETURN TYPE
-   * @memberof DarwinCoreService
-   */
-  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
-    // for future reference
-    // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
-    //to see the library's author respond to one of our questions
-
-    const result: {
-      principalResult: string;
-      resultDocuments: unknown;
-      stylesheetInternal: Record<string, unknown>;
-      masterDocument: unknown;
-    } = SaxonJS2N.transform({
-      stylesheetText: stylesheet,
-      sourceText: emlSource,
-      destination: 'serialized'
-    });
-
-    if (!result.principalResult) {
-      throw new ApiGeneralError('Failed to transform eml with stylesheet');
-    }
-
-    return JSON.parse(result.principalResult);
   }
 
   /**
