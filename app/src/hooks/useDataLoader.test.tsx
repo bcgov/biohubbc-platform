@@ -75,9 +75,7 @@ describe('useDataLoader', () => {
   describe('refreshing', () => {
     it('should clear errors when refresh is called', async () => {
       const deferred = new Deferred<string>();
-      const { result, waitForValueToChange, waitForNextUpdate } = renderHook(() =>
-        useDataLoader(() => deferred.promise)
-      );
+      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
       deferred.resolve('test1');
       await waitForValueToChange(() => result.current.data);
