@@ -68,7 +68,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionEMLJSONSource(
+  async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
     EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
   ): Promise<{ submission_id: number }> {
@@ -84,6 +84,28 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRecordBySubmissionId(submissionId: number): Promise<ISubmissionModel> {
     return this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+  }
+
+  /**
+   * Get submission record by uuid.
+   *
+   * @param {number} uuid
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+    return this.submissionRepository.getSubmissionIdByUUID(uuid);
+  }
+
+  /**
+   * Set record_end_date of submission id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async setSubmissionEndDateById(submissionId: number): Promise<{ submission_id: number }> {
+    return this.submissionRepository.setSubmissionEndDateById(submissionId);
   }
 
   /**
