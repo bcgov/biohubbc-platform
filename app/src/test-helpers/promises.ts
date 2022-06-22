@@ -56,7 +56,7 @@ export class Deferred<R = void, Q extends any = void> {
    * Resets the Deferred instance with a new unfulfilled promise.
    * @returns {Deferred} The deferred promise.
    */
-  reset = () => {
+  reset() {
     this.promise = new Promise<R>((resolve, reject) => {
       this.resolve = resolve;
       this.reject = reject;
