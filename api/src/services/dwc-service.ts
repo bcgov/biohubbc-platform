@@ -168,7 +168,7 @@ export class DarwinCoreService extends DBService {
     const parser = new XMLParser(options);
     const eml_json_source = parser.parse(submission.eml_source as string);
 
-    await submissionService.updateSubmissionEMLJSONSource(submissionId, eml_json_source);
+    await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
 
     console.log('eml_json_source', eml_json_source);
 

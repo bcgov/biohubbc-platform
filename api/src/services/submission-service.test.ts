@@ -69,16 +69,62 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('updateSubmissionRecordEMLJSONSource', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordEMLJSONSource')
+        .resolves({ submission_id: 1 });
+
+      const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 'test');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
   describe('getSubmissionRecordBySubmissionId', () => {
-    it('should return submission row object', async () => {
+    it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ submission_id: 1 } as unknown as ISubmissionModel);
+        .resolves({ test: 'test' } as unknown as ISubmissionModel);
 
       const response = await submissionService.getSubmissionRecordBySubmissionId(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ test: 'test' });
+    });
+  });
+
+  describe('getSubmissionIdByUUID', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 1 });
+
+      const response = await submissionService.getSubmissionIdByUUID('test');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('setSubmissionEndDateById', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'setSubmissionEndDateById')
+        .resolves({ submission_id: 1 });
+
+      const response = await submissionService.setSubmissionEndDateById(1);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
