@@ -68,7 +68,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionEMLJSONSource(
+  async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
     EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
   ): Promise<{ submission_id: number }> {
