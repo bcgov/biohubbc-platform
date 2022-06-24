@@ -1,6 +1,7 @@
-import SQL from 'sql-template-strings';
+import { Feature } from 'geojson';
+import SQL, { SQLStatement } from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
+import { ILatLong, IUTM, parseLatLongString, parseUTMString } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertSpatialTransform {
@@ -115,7 +116,10 @@ export class SpatialRepository extends BaseRepository {
     return response.rows[0];
   }
 
-  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<any> {
+  async runSpatialTransformOnSubmissionId(
+    submissionId: number,
+    transform: string
+  ): Promise<{ json_build_object: { type: string; features: Feature[] } }> {
     const response = await this.connection.query(transform, [submissionId]);
 
     console.log('response', response);
@@ -133,29 +137,32 @@ export class SpatialRepository extends BaseRepository {
         geography
       ) VALUES (
         ${submissionId},
-        ${transformedData},`;
+        ${transformedData}
+    `;
 
-    if (transformedData) {
-      const geometryCollectionSQL = generateGeometryCollectionSQL(transformedData);
+    const utm = parseUTMString(transformedData[0].geometry.coordinates.toString() || '');
+    const latLong = parseLatLongString(transformedData[0].geometry.coordinates.toString() || '');
+    console.log('utm', utm);
+    console.log('latLong', latLong);
 
-      sqlStatement.append(`
-        public.ST_INTERSECTS(
-          geography,
-          public.geography(
-            public.ST_Force2D(
-              public.ST_SetSRID(`);
-
-      sqlStatement.append(geometryCollectionSQL);
-
-      sqlStatement.append(`,
-                4326
-              )
-            )
-          )
-        )
-      RETURNING
-        submission_spatial_component_id;`);
+    if (utm) {
+      // transform utm string into point, if it is not null
+      sqlStatement.append(',');
+      sqlStatement.append(this.getGeographySqlFromUtm(utm));
+    } else if (latLong) {
+      // transform latLong string into point, if it is not null
+      sqlStatement.append(',');
+      sqlStatement.append(this.getGeographySqlFromLatLong(latLong));
+    } else {
+      // insert null geography
+      sqlStatement.append(',');
+      sqlStatement.append('null');
     }
+
+    sqlStatement.append(`
+    ) RETURNING
+      submission_spatial_component_id;
+    `);
 
     console.log('sqlStatement', sqlStatement);
 
@@ -170,5 +177,27 @@ export class SpatialRepository extends BaseRepository {
       ]);
     }
     return response.rows[0];
+  }
+
+  getGeographySqlFromUtm(utm: IUTM): SQLStatement {
+    return SQL`
+      public.ST_Transform(
+        public.ST_SetSRID(
+          public.ST_MakePoint(${utm.easting}, ${utm.northing}),
+          ${utm.zone_srid}
+        ),
+        4326
+      )`;
+  }
+
+  getGeographySqlFromLatLong(latLong: ILatLong): SQLStatement {
+    return SQL`
+      public.ST_Transform(
+        public.ST_SetSRID(
+          public.ST_MakePoint(${latLong.long}, ${latLong.lat}),
+          4326
+        ),
+        4326
+      )`;
   }
 }
