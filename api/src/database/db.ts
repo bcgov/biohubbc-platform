@@ -387,5 +387,5 @@ export const getKnexQueryBuilder = <
   TRecord extends Record<string, any> = any,
   TResult = Record<string, any>[]
 >(): Knex.QueryBuilder<TRecord, TResult> => {
-  return knex({ client: DB_CLIENT }).queryBuilder();
+  return knex<TRecord, TResult>({ client: DB_CLIENT }).queryBuilder();
 };
