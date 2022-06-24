@@ -45,10 +45,22 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const searchSpecies = async (searchQuery: string): Promise<ISearchResponse<{ datasetTitle: string[] }>> => {
+    const { data } = await axios.get(`api/dwc/eml/search?q=${searchQuery}`, {
+      params: {
+        index: 'EML',
+        // searchQuery
+      }
+    });
+
+    return data;
+  }
+
   return {
     getSearchResults,
     getMapOccurrenceData,
-    listAllDatasets
+    listAllDatasets,
+    searchSpecies
   };
 };
 
