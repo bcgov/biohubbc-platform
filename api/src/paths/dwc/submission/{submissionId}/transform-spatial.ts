@@ -5,11 +5,11 @@ import { getServiceAccountDBConnection } from '../../../../database/db';
 import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { DarwinCoreService } from '../../../../services/dwc-service';
+import { SpatialService } from '../../../../services/spatial-service';
 import { getKeycloakSource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/submission/{submissionId}/normalize');
+const defaultLog = getLogger('paths/dwc/submission/{submissionId}/transform-spatial');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -22,12 +22,12 @@ export const POST: Operation = [
       ]
     };
   }),
-  normalizeSubmission()
+  transformSpatialSubmission()
 ];
 
 POST.apiDoc = {
-  description: 'normalize and save data of submission file',
-  tags: ['normalize', 'submission'],
+  description: 'Secure submission file',
+  tags: ['transform', 'spatial', 'submission'],
   security: [
     {
       Bearer: []
@@ -46,19 +46,11 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Successfully normalized and saved data of submission file',
+      description: 'Successfully transformed spatial submission file',
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            required: ['submission_status_id'],
-            properties: {
-              submission_status_id: {
-                type: 'integer',
-                minimum: 1
-              }
-            },
-            nullable: true
+            //
           }
         }
       }
@@ -67,7 +59,7 @@ POST.apiDoc = {
   }
 };
 
-export function normalizeSubmission(): RequestHandler {
+export function transformSpatialSubmission(): RequestHandler {
   return async (req, res) => {
     const submissionId = Number(req.params.submissionId);
 
@@ -84,17 +76,15 @@ export function normalizeSubmission(): RequestHandler {
     try {
       await connection.open();
 
-      const darwinCoreService = new DarwinCoreService(connection);
+      const spatialService = new SpatialService(connection);
 
-      const dwcArchiveFile = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-
-      const response = await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
+      const response = await spatialService.runTransform(submissionId, 1);
 
       await connection.commit();
 
       res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'secureSubmission', message: 'error', error });
+      defaultLog.error({ label: 'transformSpatialSubmission', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

@@ -48,8 +48,6 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
-    console.log('file is: ', file);
-    console.log('datapackageId is', dataPackageId);
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
@@ -169,8 +167,6 @@ export class DarwinCoreService extends DBService {
     const eml_json_source = parser.parse(submission.eml_source as string);
 
     await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
-
-    console.log('eml_json_source', eml_json_source);
 
     return eml_json_source;
   }
