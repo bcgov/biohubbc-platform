@@ -1,88 +1,116 @@
 import { Container, Grid, Typography } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
-import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
-import { IMarker } from 'components/map/components/MarkerCluster';
 import MapContainer from 'components/map/MapContainer';
-import { IGetMapOccurrenceData, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
-import { DialogContext } from 'contexts/dialogContext';
-import { Feature } from 'geojson';
-import { APIError } from 'hooks/api/useAxios';
+import { OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
+import { FeatureCollection, GeoJSON } from 'geojson';
 import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
+import useDataLoaderError from 'hooks/useDataLoaderError';
 import { LatLngBounds } from 'leaflet';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
+import React, { useState } from 'react';
 
 const MapPage: React.FC = () => {
-  const platformApi = useApi();
+  const api = useApi();
 
-  const [performSearch, setPerformSearch] = useState<boolean>(true);
-  const [geometries, setGeometries] = useState<any[]>([]);
-
-  const dialogContext = useContext(DialogContext);
-
-  const showFilterErrorDialog = useCallback(
-    (textDialogProps?: Partial<IErrorDialogProps>) => {
-      dialogContext.setErrorDialog({
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        ...textDialogProps,
-        open: true
-      });
-    },
-    [dialogContext]
+  const mapDataLoader = useDataLoader(
+    () => api.search.getSpatialData({ boundary: {}, type: 'Boundary' }),
+    undefined,
+    false
   );
 
-  const getOccurrenceData = useCallback(
-    async (bounds?: LatLngBounds) => {
-      try {
-        let spatialBounds: Feature = {} as unknown as Feature;
+  useDataLoaderError(mapDataLoader, () => {
+    return {};
+  });
 
-        if (bounds) {
-          spatialBounds = getFeatureObjectFromLatLngBounds(bounds);
-        }
+  const [markers, setMarkers] = useState<any[]>([]);
 
-        const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
+  const processFeatureCollection (featureCollection: FeatureCollection) {
+    for(item of featureCollection) {
+      geoJSONMarkers.concat(processSpatialResponse([item])
+    }
+  }
 
-        if (!response) {
-          return;
-        }
+  const processSpatialResponse = (objs: GeoJSON[]) => {
+    const geoJSONMarkers = [];
 
-        const markers: IMarker[] = [];
-
-        response.forEach((result: IGetMapOccurrenceData) => {
-          if (result?.geometry) {
-            const geo = JSON.parse(result?.geometry);
-
-            markers.push({
-              position: geo.coordinates,
-              popup: <OccurrenceFeaturePopup featureData={result} />
-            });
-          }
+    for (const item of objs) {
+      if (item.type === 'Feature') {
+        const geo = JSON.parse(item.geometry);
+        geoJSONMarkers.push({
+          position: geo.coordinates,
+          popup: <OccurrenceFeaturePopup featureData={item} />
         });
-
-        setGeometries(markers);
-      } catch (error) {
-        const apiError = error as APIError;
-        showFilterErrorDialog({
-          dialogTitle: 'Error Searching For Results',
-          dialogError: apiError?.message,
-          dialogErrorDetails: apiError?.errors
+      } else if (item.type === 'FeatureCollection') {
+        for (const feature of item.features) {
+          geoJSONMarkers.push({
+            position: feature.geometry,
+            popup: <OccurrenceFeaturePopup featureData={feature} />
+          });
+        }
+      } else if (item.type === 'GeometryCollection') {
+        // const geo = JSON.parse(item.geometry);
+        // geoJSONMarkers.push({
+        //   position: geo.coordinates,
+        //   popup: <OccurrenceFeaturePopup featureData={item} />
+        // });
+      } else {
+        geoJSONMarkers.push({
+          position: item.coordinates,
+          popup: <OccurrenceFeaturePopup featureData={item} />
         });
       }
-    },
-    [platformApi.search, showFilterErrorDialog]
-  );
 
-  useEffect(() => {
-    if (performSearch) {
-      getOccurrenceData();
-      setPerformSearch(false);
+      setMarkers(geoJSONMarkers);
     }
-  }, [performSearch, getOccurrenceData]);
+  };
+
+  // const getOccurrenceData = useCallback(
+  //   async (bounds?: LatLngBounds) => {
+  //     try {
+  //       let spatialBounds: Feature = {} as unknown as Feature;
+
+  //       if (bounds) {
+  //         spatialBounds = getFeatureObjectFromLatLngBounds(bounds);
+  //       }
+
+  //       const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
+
+  //       if (!response) {
+  //         return;
+  //       }
+
+  //       const markers: IMarker[] = [];
+
+  //       response.forEach((result: IGetMapOccurrenceData) => {
+  //         if (result?.geometry) {
+  //           const geo = JSON.parse(result?.geometry);
+
+  //           markers.push({
+  //             position: geo.coordinates,
+  //             popup: <OccurrenceFeaturePopup featureData={result} />
+  //           });
+  //         }
+  //       });
+
+  //       setGeometries(markers);
+  //     } catch (error) {
+  //       const apiError = error as APIError;
+  //       showFilterErrorDialog({
+  //         dialogTitle: 'Error Searching For Results',
+  //         dialogError: apiError?.message,
+  //         dialogErrorDetails: apiError?.errors
+  //       });
+  //     }
+  //   },
+  //   [platformApi.search, showFilterErrorDialog]
+  // );
+
+  // useEffect(() => {
+  //   if (performSearch) {
+  //     getOccurrenceData();
+  //     setPerformSearch(false);
+  //   }
+  // }, [performSearch, getOccurrenceData]);
 
   return (
     <Box my={4}>
@@ -96,9 +124,9 @@ const MapPage: React.FC = () => {
               <Box mt={2} height={750} data-testid="MapContainer">
                 <MapContainer
                   mapId="boundary_map"
-                  onBoundsChange={getOccurrenceData}
+                  onBoundsChange={(bounds: LatLngBounds) => mapDataLoader.refresh()}
                   scrollWheelZoom={true}
-                  markers={geometries}
+                  markers={markers}
                 />
               </Box>
             </Grid>

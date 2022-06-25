@@ -44,11 +44,16 @@ export type DataLoader<T = unknown, R = unknown> = {
  * @param {() => Promise<T>} fetchData An async function.
  * @param {((error: R | unknown) => void)} [onError] An optional error handler function that will be called if the
  * `fetchData` function throws an error.
+ * @param {boolean} [runImmediately=true] An optional flag to dictate whether or not the `fetchData` function is called
+ * on initial load.
+ * - If set to `true`, the `fetchData` function will run on initial load, and each time `refresh` is called.
+ * - If set to `false` the `fetchData` function will run each time `refresh` is called.
  * @return {*}  {DataLoader<T, R>}
  */
 export default function useDataLoader<T = unknown, R = unknown>(
   fetchData: () => Promise<T>,
-  onError?: (error: R | unknown) => void
+  onError?: (error: R | unknown) => void,
+  runImmediately: boolean = true
 ): DataLoader<T, R> {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<R | unknown>();
@@ -85,7 +90,7 @@ export default function useDataLoader<T = unknown, R = unknown>(
   }, [getData, onError, isMounted]);
 
   useEffect(() => {
-    if (data || error) {
+    if (data || error || !runImmediately) {
       return;
     }
 

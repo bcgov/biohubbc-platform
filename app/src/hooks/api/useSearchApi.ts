@@ -22,6 +22,13 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSpatialData = async (criteria: { boundary: Feature; type: string }): Promise<IGetMapOccurrenceData[]> => {
+    const { data } = await axios.get(`/api/dwc/spatial/search`, {
+      params: { boundary: qs.stringify(criteria?.boundary), type: criteria.type }
+    });
+    return data;
+  };
+
   /**
    * Get occurrence map data
    *
@@ -48,6 +55,7 @@ const useSearchApi = (axios: AxiosInstance) => {
   return {
     getSearchResults,
     getMapOccurrenceData,
+    getSpatialData,
     listAllDatasets
   };
 };
