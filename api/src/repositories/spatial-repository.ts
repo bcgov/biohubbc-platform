@@ -1,7 +1,7 @@
-import { Feature } from 'geojson';
-import SQL, { SQLStatement } from 'sql-template-strings';
+import { Feature, FeatureCollection } from 'geojson';
+import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { ILatLong, IUTM, parseLatLongString, parseUTMString } from '../utils/spatial-utils';
+import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface IInsertSpatialTransform {
@@ -116,20 +116,16 @@ export class SpatialRepository extends BaseRepository {
     return response.rows[0];
   }
 
-  async runSpatialTransformOnSubmissionId(
-    submissionId: number,
-    transform: string
-  ): Promise<{ json_build_object: { type: string; features: Feature[] } }> {
+  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<FeatureCollection> {
     const response = await this.connection.query(transform, [submissionId]);
 
     console.log('response', response);
 
-    return response.rows[0];
+    return response.rows[0].json_build_object;
+    //TODO: subject to change .json_build_object name
   }
 
-  async insertSubmissionSpatialComponent(submissionId: number, transformedData: any): Promise<any> {
-    console.log('transformedData', transformedData);
-
+  async insertSubmissionSpatialComponent(submissionId: number, transformedData: Feature[]): Promise<any> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
         submission_id,
@@ -137,38 +133,36 @@ export class SpatialRepository extends BaseRepository {
         geography
       ) VALUES (
         ${submissionId},
-        ${transformedData}
+        ${JSON.stringify(transformedData)}
     `;
 
-    const utm = parseUTMString(transformedData[0].geometry.coordinates.toString() || '');
-    const latLong = parseLatLongString(transformedData[0].geometry.coordinates.toString() || '');
-    console.log('utm', utm);
-    console.log('latLong', latLong);
+    if (transformedData.length > 0) {
+      const geoCollection = generateGeometryCollectionSQL(transformedData);
 
-    if (utm) {
-      // transform utm string into point, if it is not null
-      sqlStatement.append(',');
-      sqlStatement.append(this.getGeographySqlFromUtm(utm));
-    } else if (latLong) {
-      // transform latLong string into point, if it is not null
-      sqlStatement.append(',');
-      sqlStatement.append(this.getGeographySqlFromLatLong(latLong));
+      sqlStatement.append(SQL`
+        ,public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(
+      `);
+
+      sqlStatement.append(geoCollection);
+
+      sqlStatement.append(SQL`
+        , 4326)))
+      `);
     } else {
-      // insert null geography
-      sqlStatement.append(',');
-      sqlStatement.append('null');
+      sqlStatement.append(SQL`
+        ,null
+      `);
     }
 
-    sqlStatement.append(`
-    ) RETURNING
-      submission_spatial_component_id;
+    sqlStatement.append(SQL`
+      )
+      RETURNING
+        submission_spatial_component_id;
     `);
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql<{ submission_spatial_component_id: number }>(sqlStatement);
-
-    console.log('response', response);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission spatial component details', [
@@ -177,27 +171,5 @@ export class SpatialRepository extends BaseRepository {
       ]);
     }
     return response.rows[0];
-  }
-
-  getGeographySqlFromUtm(utm: IUTM): SQLStatement {
-    return SQL`
-      public.ST_Transform(
-        public.ST_SetSRID(
-          public.ST_MakePoint(${utm.easting}, ${utm.northing}),
-          ${utm.zone_srid}
-        ),
-        4326
-      )`;
-  }
-
-  getGeographySqlFromLatLong(latLong: ILatLong): SQLStatement {
-    return SQL`
-      public.ST_Transform(
-        public.ST_SetSRID(
-          public.ST_MakePoint(${latLong.long}, ${latLong.lat}),
-          4326
-        ),
-        4326
-      )`;
   }
 }
