@@ -116,16 +116,33 @@ export class SpatialRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Run Spatial Transform with transform string on submissionId
+   *
+   * @param {number} submissionId
+   * @param {string} transform
+   * @return {*}  {Promise<FeatureCollection>}
+   * @memberof SpatialRepository
+   */
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<FeatureCollection> {
     const response = await this.connection.query(transform, [submissionId]);
-
-    console.log('response', response);
 
     return response.rows[0].json_build_object;
     //TODO: subject to change .json_build_object name
   }
 
-  async insertSubmissionSpatialComponent(submissionId: number, transformedData: Feature[]): Promise<any> {
+  /**
+   * Insert given transformed data into Spatial Component Table
+   *
+   * @param {number} submissionId
+   * @param {Feature[]} transformedData
+   * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
+   * @memberof SpatialRepository
+   */
+  async insertSubmissionSpatialComponent(
+    submissionId: number,
+    transformedData: Feature[]
+  ): Promise<{ submission_spatial_component_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
         submission_id,
