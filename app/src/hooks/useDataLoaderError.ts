@@ -1,6 +1,7 @@
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { useContext, useEffect } from 'react';
+import { APIError } from './api/useAxios';
 import { DataLoader } from './useDataLoader';
 
 /**
@@ -13,9 +14,9 @@ import { DataLoader } from './useDataLoader';
  * @param {(dataLoader: DataLoader<T, R>) => Partial<IErrorDialogProps>} getErrorDialogProps A function that receives
  * the dataLoader and returns an `IErrorDialogProps` object, which will be passed to the rendered error dialog.
  */
-export default function useDataLoaderError<T = unknown, R = unknown>(
-  dataLoader: DataLoader<T, R>,
-  getErrorDialogProps: (dataLoader: DataLoader<T, R>) => Partial<IErrorDialogProps>
+export default function useDataLoaderError<Q extends any[], T = unknown, R = unknown>(
+  dataLoader: DataLoader<Q, T, R>,
+  getErrorDialogProps: (dataLoader: DataLoader<Q, T, R>) => Partial<IErrorDialogProps>
 ) {
   const dialogContext = useContext(DialogContext);
 
@@ -26,8 +27,19 @@ export default function useDataLoaderError<T = unknown, R = unknown>(
 
     dialogContext.setErrorDialog({
       open: true,
-      onOk: () => dialogContext.setErrorDialog({ open: false }),
-      onClose: () => dialogContext.setErrorDialog({ open: false }),
+      dialogTitle: 'Error Loading Data',
+      dialogText:
+        'An unexpected error has occurred while attempting to load data, please try again. If the error persists, please contact your system administrator.',
+      dialogError: (dataLoader.error as APIError).message,
+      dialogErrorDetails: (dataLoader.error as APIError).errors,
+      onOk: () => {
+        dataLoader.clear();
+        dialogContext.setErrorDialog({ open: false });
+      },
+      onClose: () => {
+        dataLoader.clear();
+        dialogContext.setErrorDialog({ open: false });
+      },
       ...getErrorDialogProps(dataLoader)
     });
   }, [dataLoader.error, dialogContext, dataLoader, getErrorDialogProps]);

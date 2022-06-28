@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { IGetMapOccurrenceData } from 'components/map/OccurrenceFeaturePopup';
-import { Feature } from 'geojson';
+import { Feature, FeatureCollection } from 'geojson';
 import { IGetSearchResultsResponse, ISearchResponse } from 'interfaces/useSearchApi.interface';
 import qs from 'qs';
 
@@ -22,9 +22,9 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialData = async (criteria: { boundary: Feature; type: string }): Promise<IGetMapOccurrenceData[]> => {
+  const getSpatialData = async (criteria: { boundary: Feature; type: string }): Promise<FeatureCollection[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
-      params: { boundary: qs.stringify(criteria?.boundary), type: criteria.type }
+      params: { boundary: criteria.boundary, type: criteria.type }
     });
     return data;
   };

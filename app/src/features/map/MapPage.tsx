@@ -1,116 +1,143 @@
-import { Container, Grid, Typography } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
+import Container from '@material-ui/core/Container';
+import Grid from '@material-ui/core/Grid';
+import Typography from '@material-ui/core/Typography';
+import { FeaturePopup, OccurrenceFeatureProperties } from 'components/map/FeaturePopup';
 import MapContainer from 'components/map/MapContainer';
-import { OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
-import { FeatureCollection, GeoJSON } from 'geojson';
+import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import { LatLngBounds } from 'leaflet';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
+
+export const ALL_OF_BC_FEATURE: Feature = {
+  type: 'Feature',
+  properties: {},
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [-146.95401365536304, 44.62175409623327],
+        [-146.95401365536304, 63.528970541102794],
+        [-105.07413084286304, 63.528970541102794],
+        [-105.07413084286304, 44.62175409623327],
+        [-146.95401365536304, 44.62175409623327]
+      ]
+    ]
+  }
+};
 
 const MapPage: React.FC = () => {
   const api = useApi();
 
-  const mapDataLoader = useDataLoader(
-    () => api.search.getSpatialData({ boundary: {}, type: 'Boundary' }),
-    undefined,
-    false
+  const mapDataLoader = useDataLoader((boundary: Feature, type: string) =>
+    api.search.getSpatialData({ boundary: boundary, type: type })
   );
 
   useDataLoaderError(mapDataLoader, () => {
-    return {};
+    return {
+      dialogTitle: 'Error Loading Map Data',
+      dialogText:
+        'An error has occurred while attempting to load the map data, please try again. If the error persists, please contact your system administrator.'
+    };
   });
 
   const [markers, setMarkers] = useState<any[]>([]);
 
-  const processFeatureCollection (featureCollection: FeatureCollection) {
-    for(item of featureCollection) {
-      geoJSONMarkers.concat(processSpatialResponse([item])
-    }
-  }
-
-  const processSpatialResponse = (objs: GeoJSON[]) => {
-    const geoJSONMarkers = [];
-
-    for (const item of objs) {
-      if (item.type === 'Feature') {
-        const geo = JSON.parse(item.geometry);
-        geoJSONMarkers.push({
-          position: geo.coordinates,
-          popup: <OccurrenceFeaturePopup featureData={item} />
-        });
-      } else if (item.type === 'FeatureCollection') {
-        for (const feature of item.features) {
-          geoJSONMarkers.push({
-            position: feature.geometry,
-            popup: <OccurrenceFeaturePopup featureData={feature} />
-          });
-        }
-      } else if (item.type === 'GeometryCollection') {
-        // const geo = JSON.parse(item.geometry);
-        // geoJSONMarkers.push({
-        //   position: geo.coordinates,
-        //   popup: <OccurrenceFeaturePopup featureData={item} />
-        // });
-      } else {
-        geoJSONMarkers.push({
-          position: item.coordinates,
-          popup: <OccurrenceFeaturePopup featureData={item} />
-        });
-      }
-
-      setMarkers(geoJSONMarkers);
-    }
+  const isOccurrenceFeature = (feature: Feature) => {
+    return feature?.properties?.['type'] === 'Occurrence';
   };
 
-  // const getOccurrenceData = useCallback(
-  //   async (bounds?: LatLngBounds) => {
-  //     try {
-  //       let spatialBounds: Feature = {} as unknown as Feature;
+  useEffect(() => {
+    if (!mapDataLoader.data?.length) {
+      return;
+    }
 
-  //       if (bounds) {
-  //         spatialBounds = getFeatureObjectFromLatLngBounds(bounds);
-  //       }
+    let responseMarkers = [];
+    for (const featureCollection of mapDataLoader.data) {
+      for (const feature of featureCollection.features) {
+        if (isOccurrenceFeature(feature)) {
+          if (feature.geometry.type === 'GeometryCollection') {
+            return;
+          }
 
-  //       const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
+          responseMarkers.push({
+            position: feature.geometry.coordinates,
+            popup: <FeaturePopup properties={feature.properties as OccurrenceFeatureProperties} />
+          });
+        }
+      }
+    }
 
-  //       if (!response) {
-  //         return;
-  //       }
+    setMarkers(responseMarkers);
+  }, [mapDataLoader.data]);
 
-  //       const markers: IMarker[] = [];
+  // const processFeatureCollection (featureCollection: FeatureCollection) {
+  //   for(item of featureCollection) {
+  //     geoJSONMarkers.concat(processSpatialResponse([item])
+  //   }
+  // }
 
-  //       response.forEach((result: IGetMapOccurrenceData) => {
-  //         if (result?.geometry) {
-  //           const geo = JSON.parse(result?.geometry);
+  // const processSpatialResponse = (objs: GeoJSON[]) => {
+  //   const geoJSONMarkers = [];
 
-  //           markers.push({
-  //             position: geo.coordinates,
-  //             popup: <OccurrenceFeaturePopup featureData={result} />
-  //           });
-  //         }
+  //   for (const item of objs) {
+  //     if (item.type === 'Feature') {
+  //       const geo = JSON.parse(item.geometry);
+  //       geoJSONMarkers.push({
+  //         position: geo.coordinates,
+  //         popup: <OccurrenceFeaturePopup featureData={item} />
   //       });
-
-  //       setGeometries(markers);
-  //     } catch (error) {
-  //       const apiError = error as APIError;
-  //       showFilterErrorDialog({
-  //         dialogTitle: 'Error Searching For Results',
-  //         dialogError: apiError?.message,
-  //         dialogErrorDetails: apiError?.errors
+  //     } else if (item.type === 'FeatureCollection') {
+  //       for (const feature of item.features) {
+  //         geoJSONMarkers.push({
+  //           position: feature.geometry,
+  //           popup: <OccurrenceFeaturePopup featureData={feature} />
+  //         });
+  //       }
+  //     } else if (item.type === 'GeometryCollection') {
+  //       // const geo = JSON.parse(item.geometry);
+  //       // geoJSONMarkers.push({
+  //       //   position: geo.coordinates,
+  //       //   popup: <OccurrenceFeaturePopup featureData={item} />
+  //       // });
+  //     } else {
+  //       geoJSONMarkers.push({
+  //         position: item.coordinates,
+  //         popup: <OccurrenceFeaturePopup featureData={item} />
   //       });
   //     }
-  //   },
-  //   [platformApi.search, showFilterErrorDialog]
-  // );
 
-  // useEffect(() => {
-  //   if (performSearch) {
-  //     getOccurrenceData();
-  //     setPerformSearch(false);
+  //     setMarkers(geoJSONMarkers);
   //   }
-  // }, [performSearch, getOccurrenceData]);
+  // };
+
+  // const fetchSpatialData = async (boundary: Feature, type: string) => {
+  // const response = await
+
+  // if (!response) {
+  //   return;
+  // }
+
+  // const markers: IMarker[] = [];
+
+  // response.forEach((result: IGetMapOccurrenceData) => {
+  //   if (result?.geometry) {
+  //     const geo = JSON.parse(result?.geometry);
+
+  //     markers.push({
+  //       position: geo.coordinates,
+  //       popup: <OccurrenceFeaturePopup featureData={result} />
+  //     });
+  //   }
+  // });
+
+  // setGeometries(markers);
+  // };
+
+  mapDataLoader.load(ALL_OF_BC_FEATURE, 'Boundary');
 
   return (
     <Box my={4}>
@@ -124,7 +151,10 @@ const MapPage: React.FC = () => {
               <Box mt={2} height={750} data-testid="MapContainer">
                 <MapContainer
                   mapId="boundary_map"
-                  onBoundsChange={(bounds: LatLngBounds) => mapDataLoader.refresh()}
+                  onBoundsChange={(bounds: LatLngBounds) => {
+                    const boundary = getFeatureObjectFromLatLngBounds(bounds);
+                    mapDataLoader.refresh(boundary, 'Boundary');
+                  }}
                   scrollWheelZoom={true}
                   markers={markers}
                 />

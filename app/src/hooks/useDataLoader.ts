@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useAsync } from './useAsync';
+import { useState } from 'react';
+import { AsyncFunction, useAsync } from './useAsync';
 import useIsMounted from './useIsMounted';
 
-export type DataLoader<T = unknown, R = unknown> = {
+export type DataLoader<Q extends any[], T = unknown, R = unknown> = {
   /**
    * The response of the `fetchData` call.
    *
@@ -28,47 +28,55 @@ export type DataLoader<T = unknown, R = unknown> = {
    */
   isReady: boolean;
   /**
+   * Executes the `fetchData` function once, only if it has never been called before. Does nothing if called again.
+   */
+  load: (...args: Q) => void;
+  /**
    * Executes the `fetchData` function again.
    */
-  refresh: () => void;
+  refresh: (...args: Q) => void;
+  /**
+   * Clears any errors caught from a failed `fetchData` call.
+   */
+  clear: () => void;
 };
 
 /**
  * Hook that wraps an async function.
+ *
+ * Note: Runs each time `refresh` is called.
  *
  * Note: This hook will prevent additional calls to `fetchData` if an existing call is in progress.
  *
  * @export
  * @template T
  * @template R
- * @param {() => Promise<T>} fetchData An async function.
+ * @param {AsyncFunction<Q, T>} fetchData An async function.
  * @param {((error: R | unknown) => void)} [onError] An optional error handler function that will be called if the
  * `fetchData` function throws an error.
- * @param {boolean} [runImmediately=true] An optional flag to dictate whether or not the `fetchData` function is called
- * on initial load.
  * - If set to `true`, the `fetchData` function will run on initial load, and each time `refresh` is called.
  * - If set to `false` the `fetchData` function will run each time `refresh` is called.
- * @return {*}  {DataLoader<T, R>}
+ * @return {*}  {DataLoader<Q, T, R>}
  */
-export default function useDataLoader<T = unknown, R = unknown>(
-  fetchData: () => Promise<T>,
-  onError?: (error: R | unknown) => void,
-  runImmediately: boolean = true
-): DataLoader<T, R> {
+export default function useDataLoader<Q extends any[], T = unknown, R = unknown>(
+  fetchData: AsyncFunction<Q, T>,
+  onError?: (error: R | unknown) => void
+): DataLoader<Q, T, R> {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<R | unknown>();
   const [isLoading, setIsLoading] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isOneTimeLoad, setOneTimeLoad] = useState(false);
 
   const isMounted = useIsMounted();
 
   const getData = useAsync(fetchData);
 
-  const loadData = useCallback(async () => {
+  const loadData = async (...args: Q) => {
     try {
       setIsLoading(true);
 
-      const response = await getData();
+      const response = await getData(...args);
 
       if (!isMounted) {
         return;
@@ -87,22 +95,27 @@ export default function useDataLoader<T = unknown, R = unknown>(
       setIsLoading(false);
       setIsReady(true);
     }
-  }, [getData, onError, isMounted]);
+  };
 
-  useEffect(() => {
-    if (data || error || !runImmediately) {
+  const load = (...args: Q) => {
+    if (isOneTimeLoad) {
       return;
     }
 
-    loadData();
-  }, [data, error, getData, loadData]);
+    setOneTimeLoad(true);
+    loadData(...args);
+  };
 
-  const refresh = () => {
+  const refresh = (...args: Q) => {
     setError(undefined);
     setIsLoading(false);
     setIsReady(false);
-    loadData();
+    loadData(...args);
   };
 
-  return { data, error, isLoading, isReady, refresh };
+  const clear = () => {
+    setError(undefined);
+  };
+
+  return { data, error, isLoading, isReady, load, refresh, clear };
 }

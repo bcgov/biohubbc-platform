@@ -17,6 +17,8 @@ const DatasetsPage = () => {
 
   const datasetsDataLoader = useDataLoader(() => biohubApi.search.listAllDatasets());
 
+  datasetsDataLoader.load();
+
   const datasets =
     datasetsDataLoader?.data?.map((item) => ({
       id: item.id,
