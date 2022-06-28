@@ -127,6 +127,13 @@ export class SpatialRepository extends BaseRepository {
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<FeatureCollection> {
     const response = await this.connection.query(transform, [submissionId]);
 
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to run transform on submission id', [
+        'SpatialRepository->runSpatialTransformOnSubmissionId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
     return response.rows[0].json_build_object;
     //TODO: subject to change .json_build_object name
   }

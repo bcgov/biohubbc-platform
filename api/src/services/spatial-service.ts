@@ -58,10 +58,13 @@ export class SpatialService extends DBService {
    *
    * @param {number} submissionId
    * @param {number} spatialTransformId
-   * @return {*}  {Promise<any>}
+   * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
    * @memberof SpatialService
    */
-  async runTransform(submissionId: number, spatialTransformId: number): Promise<any> {
+  async runTransform(
+    submissionId: number,
+    spatialTransformId: number
+  ): Promise<{ submission_spatial_component_id: number }> {
     const spatialTransform = await this.getSpatialTransformBySpatialTransformId(spatialTransformId);
 
     const transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
