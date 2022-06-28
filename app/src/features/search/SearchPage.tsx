@@ -7,23 +7,50 @@ import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
-import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
+import AdvancedSearch, { advancedSearchFiltersInitialValues, IAdvancedSearchFilters } from 'components/search-filter/AdvancedSearch';
+import { Formik, FormikProps } from 'formik';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import React from 'react';
+import qs from 'qs'
+import React, { useCallback, useRef, useState } from 'react';
+import { useLocation } from 'react-router'
 
 const SearchPage = () => {
   const biohubApi = useApi();
-  const [searchQuery, setSearchQuery] = React.useState<string>('')
-
+  const location = useLocation();
   const searchDataLoader = useDataLoader(() => biohubApi.search.searchSpecies(searchQuery));
 
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { value } = event.target
-    setSearchQuery(value)
-    searchDataLoader.refresh();
-  }
+  const [searchQuery] = useState<string>('')
+
+  const formikRef = useRef<FormikProps<IAdvancedSearchFilters>>(null);
+
+  //collection of params from url location.search
+  const collectFilterParams = useCallback((): IAdvancedSearchFilters => {
+    if (location.search) {
+      const urlParams = qs.parse(location.search.replace('?', ''));
+      const values = {
+        keyword: urlParams.keyword,
+        project_name: urlParams.project_name,
+        species: urlParams.species,
+      } as IAdvancedSearchFilters;
+
+
+      if (values.species === undefined) {
+        values.species = [];
+      }
+
+      return values;
+    }
+    return advancedSearchFiltersInitialValues;
+  }, [location.search]);
+
+  const [formikValues, /*setFormikValues*/] = useState<IAdvancedSearchFilters>(collectFilterParams);
+  const [filterChipValues, /*setFilterChipValues*/] = useState<IAdvancedSearchFilters>(collectFilterParams);
+
+
+
+
 
   const results: any[] =
     searchDataLoader?.data?.map((item) => ({
@@ -33,23 +60,35 @@ const SearchPage = () => {
 
   console.log('results:', results);
 
+  
+
   return (
     <Box my={4}>
       <Container maxWidth="xl">
-        <Box mb={5} display="flex" justifyContent="space-between">
-          <Typography variant="h1">Search</Typography>
+        <Box mb={5}>
+          <Box mb={1}>
+            <Typography variant="h1">Search</Typography>
+          </Box>
+          <Typography variant="body1" color="textSecondary">
+            BioHubBC Platform search.
+          </Typography>
         </Box>
-        <Box mb={2}>
-          <TextField
-            label='Search Species'
-            name='search-species'
-            variant='filled'
-            value={searchQuery}
-            onChange={handleSearchChange}
-            fullWidth
-            // margin='normal'
-          />
+        
+        <Box mb={5}>
+          <Formik<IAdvancedSearchFilters>
+            innerRef={formikRef}
+            initialValues={formikValues}
+            onSubmit={() => new Promise<void>((resolve, reject) => resolve())}
+            onReset={() => null}
+            enableReinitialize={true}>
+              <AdvancedSearch
+              
+                filterChipParams={filterChipValues}
+              />
+          </Formik>
         </Box>
+
+
         <Box>
           <Paper>
             <TableContainer>

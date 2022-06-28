@@ -48,3 +48,9 @@ export type ISearchResponse<T = unknown, S = unknown> = Array<{
   fields: T;
   source?: S;
 }>;
+
+export interface IAdvancedSearch {
+  keyword: string
+  projectName: string
+  species: number | number[]
+}
