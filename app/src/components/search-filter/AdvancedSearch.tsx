@@ -13,7 +13,7 @@ import { Icon } from '@mdi/react';
 // import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import { useFormikContext } from 'formik';
 import React, { useEffect, useState } from 'react';
-import AdvancedSearchFilters from './AdvancedSearchFilters';
+import AdvancedSearchFilters from './AdvancedSearchFilters__NEW' //'./AdvancedSearchFilters';
 
 const useStyles = makeStyles((theme: Theme) => ({
   actionButton: {

@@ -6,6 +6,7 @@ import useCodesApi from './api/useCodesApi';
 import useN8NApi from './api/useN8NApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
+import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
 
 /**
@@ -28,6 +29,8 @@ export const useApi = () => {
 
   const submissions = useSubmissionsApi(apiAxios);
 
+  const taxonomy = useTaxonomyApi(apiAxios);
+
   const publicApis = {
     search: usePublicSearchApi(apiAxios)
   };
@@ -41,6 +44,7 @@ export const useApi = () => {
     n8n,
     submissions,
     public: publicApis,
-    search
+    search,
+    taxonomy
   };
 };
