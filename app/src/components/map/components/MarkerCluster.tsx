@@ -1,18 +1,29 @@
 import L, { LatLngExpression } from 'leaflet';
 import React, { ReactElement } from 'react';
-import { Marker } from 'react-leaflet';
+import { LayersControl, Marker, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster';
+
 export interface IMarker {
   position: LatLngExpression;
+  key?: string | number;
+  MarkerProps?: Partial<MarkerProps>;
   popup?: ReactElement;
+  PopupProps?: Partial<PopupProps>;
+  tooltip?: ReactElement;
+  TooltipProps?: Partial<TooltipProps>;
 }
 
-export interface IMarkerClusterProps {
-  markers?: IMarker[];
+export interface IMarkerLayer {
+  layerName: string;
+  markers: IMarker[];
 }
 
-const MarkerClusterGroup: React.FC<IMarkerClusterProps> = (props) => {
-  if (!props.markers?.length) {
+export interface IMarkerLayersProps {
+  layers?: IMarkerLayer[];
+}
+
+const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
+  if (!props.layers?.length) {
     return null;
   }
 
@@ -32,16 +43,50 @@ const MarkerClusterGroup: React.FC<IMarkerClusterProps> = (props) => {
     popupAnchor: [0, -28]
   });
 
-  return (
-    <ReactLeafletMarkerClusterGroup chunkedLoading>
-      {props.markers.map((item, index: number) => (
-        // Reverse the position (coordinates) from [lng, lat] to [lat, lng]
-        <Marker icon={divIcon} key={index} position={[item.position[1], item.position[0]]}>
-          {item.popup}
-        </Marker>
-      ))}
-    </ReactLeafletMarkerClusterGroup>
-  );
+  const layerControls: ReactElement[] = [];
+
+  props.layers.forEach((layer, layerIndex) => {
+    if (!layer.markers?.length) {
+      return;
+    }
+
+    layerControls.push(
+      <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layerIndex}`}>
+        <ReactLeafletMarkerClusterGroup chunkedLoading>
+          {layer.markers.map((item, index: number) => {
+            const id = item.key || index;
+
+            // Reverse the position (coordinates) from [lng, lat] to [lat, lng]
+            return (
+              <Marker
+                icon={divIcon}
+                key={`marker-cluster-${id}-${index}`}
+                position={[item.position[1], item.position[0]]}
+                {...item.MarkerProps}>
+                {item.tooltip && (
+                  <Tooltip key={`marker-cluster-tooltip-${id}-${index}`} direction="top" {...item.TooltipProps}>
+                    {item.tooltip}
+                  </Tooltip>
+                )}
+                {item.popup && (
+                  <Popup
+                    key={`marker-cluster-popup-${id}-${index}`}
+                    keepInView={false}
+                    closeButton={false}
+                    autoPan={false}
+                    {...item.PopupProps}>
+                    {item.popup}
+                  </Popup>
+                )}
+              </Marker>
+            );
+          })}
+        </ReactLeafletMarkerClusterGroup>
+      </LayersControl.Overlay>
+    );
+  });
+
+  return <>{layerControls}</>;
 };
 
 export default MarkerClusterGroup;

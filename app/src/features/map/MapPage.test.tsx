@@ -1,6 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { IGetMapOccurrenceData } from 'components/map/OccurrenceFeaturePopup';
-import { Feature } from 'geojson';
+import { FeatureCollection } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import React from 'react';
 import MapPage from './MapPage';
@@ -8,7 +7,7 @@ import MapPage from './MapPage';
 jest.mock('../../hooks/useApi');
 const mockUseApi = {
   search: {
-    getMapOccurrenceData: jest.fn()
+    getSpatialData: jest.fn()
   }
 };
 
@@ -21,7 +20,7 @@ const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockRe
 describe('MapPage', () => {
   beforeEach(() => {
     // clear mocks before each test
-    mockBiohubApi().search.getMapOccurrenceData.mockClear();
+    mockBiohubApi().search.getSpatialData.mockClear();
   });
 
   afterEach(() => {
@@ -29,7 +28,7 @@ describe('MapPage', () => {
   });
 
   it('shows `Map` and map container when there are no occurrences', async () => {
-    mockBiohubApi().search.getMapOccurrenceData.mockReturnValue([]);
+    mockBiohubApi().search.getSpatialData.mockReturnValue([]);
 
     const { getByText, getByTestId } = renderContainer();
 
@@ -40,35 +39,24 @@ describe('MapPage', () => {
   });
 
   it('shows `Map` and map container with data points when there is occurrences', async () => {
-    const vaildDataObject = {
-      id: '1',
-      taxonid: 'string',
-      geometry: {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'Point',
-          coordinates: [-129.083298513, 55.40257311]
-        }
-      } as Feature,
-      observations: [
+    const vaildFeatureCollection: FeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
         {
-          eventdate: 'string',
-          data: [
-            {
-              lifestage: 'string',
-              vernacularname: 'string',
-              sex: 'string',
-              individualcount: '1',
-              organismquantity: '1',
-              organismquantitytype: 'string'
-            }
-          ]
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [-129.083298513, 55.40257311]
+          },
+          properties: {
+            type: 'Occurrence',
+            eventDate: 'string'
+          }
         }
       ]
-    } as unknown as IGetMapOccurrenceData;
+    };
 
-    mockBiohubApi().search.getMapOccurrenceData.mockReturnValue([vaildDataObject]);
+    mockBiohubApi().search.getSpatialData.mockReturnValue(vaildFeatureCollection);
 
     const { getByText, getByTestId } = renderContainer();
 

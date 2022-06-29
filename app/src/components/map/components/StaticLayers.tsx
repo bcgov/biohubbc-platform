@@ -1,21 +1,30 @@
 import { Feature } from 'geojson';
 import * as L from 'leaflet';
 import React, { ReactElement } from 'react';
-import { FeatureGroup, GeoJSON, LayersControl, Popup, Tooltip } from 'react-leaflet';
+import {
+  FeatureGroup,
+  GeoJSON,
+  GeoJSONProps,
+  LayersControl,
+  Popup,
+  PopupProps,
+  Tooltip,
+  TooltipProps
+} from 'react-leaflet';
 
 export interface IStaticLayerFeature {
-  key?: string | number;
   geoJSON: Feature;
-  GeoJSONProps?: Partial<React.ComponentProps<typeof GeoJSON>>;
+  key?: string | number;
+  GeoJSONProps?: Partial<GeoJSONProps>;
   popup?: ReactElement;
-  PopupProps?: Partial<React.ComponentProps<typeof Popup>>;
+  PopupProps?: Partial<PopupProps>;
   tooltip?: ReactElement;
-  TooltipProps?: Partial<React.ComponentProps<typeof Tooltip>>;
+  TooltipProps?: Partial<TooltipProps>;
 }
 
 export interface IStaticLayer {
   layerName: string;
-  features?: IStaticLayerFeature[];
+  features: IStaticLayerFeature[];
 }
 
 export interface IStaticLayersProps {
@@ -38,7 +47,7 @@ const StaticLayers: React.FC<IStaticLayersProps> = (props) => {
       <LayersControl.Overlay checked name={layer.layerName} key={`static-layer-${layerIndex}`}>
         <FeatureGroup key={`static-feature-group-${layerIndex}`}>
           {layer.features.map((item, index) => {
-            const id = item.key || item.geoJSON.id;
+            const id = item.key || item.geoJSON.id || index;
 
             return (
               <GeoJSON
