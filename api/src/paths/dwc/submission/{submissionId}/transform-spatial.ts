@@ -59,7 +59,14 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            //TODO: Return type? just ID probably
+            type: 'object',
+            properties: {
+              submission_spatial_component_id: {
+                type: 'integer',
+                minimum: 1
+              }
+            },
+            nullable: true
           }
         }
       }
