@@ -8,49 +8,133 @@ import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
-import AdvancedSearch, { advancedSearchFiltersInitialValues, IAdvancedSearchFilters } from 'components/search-filter/AdvancedSearch';
+// import AdvancedSearch, { advancedSearchFiltersInitialValues, IAdvancedSearchFilters } from 'components/search-filter/AdvancedSearch';
 import { Formik, FormikProps } from 'formik';
+import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import qs from 'qs'
-import React, { useCallback, useRef, useState } from 'react';
-import { useLocation } from 'react-router'
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useHistory, useLocation } from 'react-router'
+import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
+
+import { DialogContext } from 'contexts/dialogContext';
+import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
+import SearchComponent from './SearchComponent';
+
+const advancedSearchInitialValues: IAdvancedSearch = {
+  keywords: ''
+}
 
 const SearchPage = () => {
+  // const classes = useStyles();
   const biohubApi = useApi();
+  const history = useHistory();
   const location = useLocation();
+  const dialogContext = useContext(DialogContext);
   const searchDataLoader = useDataLoader(() => biohubApi.search.searchSpecies(searchQuery));
 
   const [searchQuery] = useState<string>('')
-
-  const formikRef = useRef<FormikProps<IAdvancedSearchFilters>>(null);
-
+  const [isLoading, setIsLoading] = useState(true);
+  
   //collection of params from url location.search
-  const collectFilterParams = useCallback((): IAdvancedSearchFilters => {
+  const collectFilterParams = useCallback((): IAdvancedSearch => {
     if (location.search) {
       const urlParams = qs.parse(location.search.replace('?', ''));
-      const values = {
-        keyword: urlParams.keyword,
-        project_name: urlParams.project_name,
-        species: urlParams.species,
-      } as IAdvancedSearchFilters;
 
-
-      if (values.species === undefined) {
-        values.species = [];
-      }
-
-      return values;
+      return { keywords: urlParams.keywords } as IAdvancedSearch
     }
-    return advancedSearchFiltersInitialValues;
+    return advancedSearchInitialValues;
   }, [location.search]);
 
-  const [formikValues, /*setFormikValues*/] = useState<IAdvancedSearchFilters>(collectFilterParams);
-  const [filterChipValues, /*setFilterChipValues*/] = useState<IAdvancedSearchFilters>(collectFilterParams);
+  const [formikValues, setFormikValues] = useState<IAdvancedSearch>(collectFilterParams);
+  const formikRef = useRef<FormikProps<IAdvancedSearch>>(null);
 
+  //Search Params
+  useEffect(() => {
+    const getParams = async () => {
+      const params = await collectFilterParams();
+      setFormikValues(params);
+    };
 
+    if (isLoading) {
+      setIsLoading(false);
+      getParams();
+    }
+  }, [isLoading, location.search, formikValues, collectFilterParams]);
 
+  /**
+   * Determines if the search parameters are empty
+   */
+  const isDefaultState = (): boolean => {
+    return JSON.stringify(!formikRef?.current || formikRef.current.values) === JSON.stringify(advancedSearchInitialValues)
+  }
 
+  /**
+   * Updates URL search params to reflect formikRef values
+   */
+  const updateSearchParams = () => {
+    const urlParams = qs.stringify(formikRef.current?.values);
+    history.push({
+      search: `?${urlParams}`
+    });
+  };
+
+  const handleResetSearchParams = () => {
+    history.push({
+      search: ``
+    });
+  };
+
+  const handleReset = async () => {
+    // const projectsResponse = null // await restorationTrackerApi.project.getProjectsList();
+    // setProjects(projectsResponse);
+    setFormikValues(advancedSearchInitialValues);
+    handleResetSearchParams();
+  };
+
+  const handleSubmit = async () => {
+    if (!formikRef?.current) {
+      return;
+    }
+
+    //empty Filters
+    if (isDefaultState()) {
+      return;
+    }
+
+    try {
+      /*
+      const response = null // await restorationTrackerApi.project.getProjectsList(formikRef.current.values);
+
+      if (!response) {
+        return;
+      }
+      */
+
+      updateSearchParams();
+    } catch (error) {
+      const apiError = error as APIError;
+      showFilterErrorDialog({
+        dialogTitle: 'Error Filtering Projects',
+        dialogError: apiError?.message,
+        dialogErrorDetails: apiError?.errors
+      });
+    }
+  };
+
+  const showFilterErrorDialog = (textDialogProps?: Partial<IErrorDialogProps>) => {
+    dialogContext.setErrorDialog({
+      onClose: () => {
+        dialogContext.setErrorDialog({ open: false });
+      },
+      onOk: () => {
+        dialogContext.setErrorDialog({ open: false });
+      },
+      ...textDialogProps,
+      open: true
+    });
+  };
 
   const results: any[] =
     searchDataLoader?.data?.map((item) => ({
@@ -75,16 +159,13 @@ const SearchPage = () => {
         </Box>
         
         <Box mb={5}>
-          <Formik<IAdvancedSearchFilters>
+          <Formik<IAdvancedSearch>
             innerRef={formikRef}
             initialValues={formikValues}
-            onSubmit={() => new Promise<void>((resolve, reject) => resolve())}
-            onReset={() => null}
+            onSubmit={handleSubmit}
+            onReset={handleReset}
             enableReinitialize={true}>
-              <AdvancedSearch
-              
-                filterChipParams={filterChipValues}
-              />
+              <SearchComponent />
           </Formik>
         </Box>
 

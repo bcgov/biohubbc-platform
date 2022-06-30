@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
 import { IGetMapOccurrenceData } from 'components/map/OccurrenceFeaturePopup';
 import { Feature } from 'geojson';
-import { IGetSearchResultsResponse, ISearchResponse } from 'interfaces/useSearchApi.interface';
+import { IGetSearchResultsResponse, IElasticsearchResponse } from 'interfaces/useSearchApi.interface';
 import qs from 'qs';
 
 /**
@@ -35,7 +35,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const listAllDatasets = async (): Promise<ISearchResponse<{ datasetTitle: string[] }>> => {
+  const listAllDatasets = async (): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
     const { data } = await axios.get(`api/dwc/eml/search`, {
       params: {
         index: 'EML'
@@ -45,7 +45,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const searchSpecies = async (searchQuery: string): Promise<ISearchResponse<{ datasetTitle: string[] }>> => {
+  const searchSpecies = async (searchQuery: string): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
     const { data } = await axios.get(`api/dwc/eml/search?q=${searchQuery}`, {
       params: {
         index: 'EML',

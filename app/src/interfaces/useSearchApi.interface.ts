@@ -43,14 +43,12 @@ export interface IGetOccurrenceData {
   geometry: Feature | null;
 }
 
-export type ISearchResponse<T = unknown, S = unknown> = Array<{
+export type IElasticsearchResponse<T = unknown, S = unknown> = Array<{
   id: string;
   fields: T;
   source?: S;
 }>;
 
 export interface IAdvancedSearch {
-  keyword: string
-  projectName: string
-  species: number | number[]
+  keywords: string
 }
