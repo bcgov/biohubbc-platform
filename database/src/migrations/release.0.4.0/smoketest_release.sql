@@ -1,5 +1,5 @@
 -- run as db super user
--- smoketest_release.0.3.0.sql
+-- smoketest_release.sql
 \c biohub
 set role postgres;
 set search_path=biohub;
@@ -623,8 +623,8 @@ begin
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
 
 	-- source transform
-	insert into source_transform (system_user_id, version, metadata_index, transform_filename, transform_key, transform_precompile_filename, transform_precompile_key) 
-		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'sims_eml_transform.1.xsl', 'sims_eml_transform.1.key', 'sims_eml_transform.1.xsl.sef', 'sims_eml_transform.1.sef.key') returning source_transform_id into _source_transform_id;
+	insert into source_transform (system_user_id, version, metadata_index, metadata_transform) 
+		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
 	-- security transform

@@ -12,7 +12,7 @@ export interface ISearchSubmissionCriteria {
 export interface IInsertSubmissionRecord {
   source_transform_id: number;
   uuid: string;
-  event_timestamp: string;
+  record_effective_date: string;
   input_key: string;
   input_file_name: string;
   eml_source: string;
@@ -28,7 +28,7 @@ export interface IInsertSubmissionRecord {
  */
 export interface ISubmissionModel {
   submission_id: number;
-  source_transform_id: string;
+  source_transform_id: number;
   uuid: string;
   event_timestamp: string;
   delete_timestamp: string | null;
@@ -57,10 +57,7 @@ export interface ISourceTransformModel {
   source_transform_id: number;
   system_user_id: number;
   version: number;
-  transform_filename: string | null;
-  transform_key: string | null;
-  transform_precompile_filename: string | null;
-  transform_precompile_key: string | null;
+  metadata_transform: string | null;
   metadata_index: string | null;
   record_effective_date: string;
   record_end_date: string | null;
@@ -78,7 +75,7 @@ export enum SUBMISSION_STATUS_TYPE {
   'TEMPLATE_TRANSFORMED' = 'Template Transformed',
   'SUBMISSION_DATA_INGESTED' = 'Submission Data Ingested',
   'SECURED' = 'Secured',
-  'AWAITING_CURATION' = 'Awaiting Curration',
+  'AWAITING_CURATION' = 'Awaiting Curation',
   'PUBLISHED' = 'Published',
   'REJECTED' = 'Rejected',
   'ON_HOLD' = 'On Hold',
@@ -177,7 +174,7 @@ export class SubmissionRepository extends BaseRepository {
       ) VALUES (
         ${submissionData.source_transform_id},
         ${submissionData.uuid},
-        ${submissionData.event_timestamp},
+        ${submissionData.record_effective_date},
         ${submissionData.input_key},
         ${submissionData.input_file_name},
         ${submissionData.eml_source},
@@ -337,6 +334,7 @@ export class SubmissionRepository extends BaseRepository {
       record_end_date = now()
     WHERE
       submission_id = ${submissionId}
+      and record_end_date is null
     RETURNING
       submission_id;
   `;
@@ -360,21 +358,94 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<ISourceTransformModel>}
    * @memberof SubmissionRepository
    */
-  async getSourceTransformRecordBySystemUserId(systemUserId: number): Promise<ISourceTransformModel> {
-    const sqlStatement = SQL`
+  async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
+    let sqlStatement;
+    if (version) {
+      sqlStatement = SQL`
         SELECT
           *
         FROM
           source_transform
         WHERE
-          system_user_id = ${systemUserId};
+          system_user_id = ${systemUserId}
+          and version = ${version}        
       `;
+    } else {
+      sqlStatement = SQL`
+        SELECT
+          *
+        FROM
+          source_transform
+        WHERE
+          system_user_id = ${systemUserId}
+          and record_end_date is null
+      `;
+    }
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySystemUserId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Fetch a submissions metadata json representation.
+   *
+   * @param {number} sourceTransformId
+   * @param {string} metadataTransform
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionMetadataJson(submissionId: number, metadataTransform: string): Promise<string> {
+    const sqlStatement = SQL`
+        SELECT
+          *
+        FROM
+          source_transform
+        WHERE
+          source_transform_id = ${submissionId}
+      `;
+
+    const response = await this.connection.sql<any>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission source transform record', [
+        'SubmissionRepository->getSourceTransformRecordBySourceTransformId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Fetch a submission source transform record by associated source transform id.
+   *
+   * @param {number} sourceTransformId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionRepository
+   */
+   async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
+    const sqlStatement = SQL`
+        SELECT
+          *
+        FROM
+          source_transform
+        WHERE
+          source_transform_id = ${sourceTransformId}
+      `;
+
+    const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission source transform record', [
+        'SubmissionRepository->getSourceTransformRecordBySourceTransformId',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

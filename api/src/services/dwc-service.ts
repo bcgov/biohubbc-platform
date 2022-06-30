@@ -15,7 +15,7 @@ import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
-import { parseS3File, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
@@ -48,13 +48,12 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
-    console.log('file is: ', file);
-    console.log('datapackageId is', dataPackageId);
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
       await this.submissionService.setSubmissionEndDateById(submissionExists.submission_id);
-      await this.deleteEmlFromElasticSearchByDataPackageId(dataPackageId);
+      //TODO fails if index does not exist. can we do an upsert or ignore errors?
+      //await this.deleteEmlFromElasticSearchByDataPackageId(dataPackageId);
       //TODO: Delete scraped spatial components table details when its filled
     }
 
@@ -170,8 +169,6 @@ export class DarwinCoreService extends DBService {
 
     await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
 
-    console.log('eml_json_source', eml_json_source);
-
     return eml_json_source;
   }
 
@@ -240,16 +237,20 @@ export class DarwinCoreService extends DBService {
 
     const dwcArchive = this.prepDWCArchive(file);
 
+    dwcArchive;
+
     // Fetch the source transform record for this submission based on the source system user id
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
       this.connection.systemUserId()
     );
 
+    sourceTransformRecord;
+
     const response = await this.submissionService.insertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
       input_file_name: dwcArchive.rawFile.fileName,
       input_key: '',
-      event_timestamp: new Date().toISOString(),
+      record_effective_date: new Date().toISOString(),
       eml_source: dwcArchive.extra.eml?.buffer?.toString() || '',
       eml_json_source: '',
       darwin_core_source: '{}', // TODO populate
@@ -282,50 +283,54 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
+  //TODO: BHBC-1812
   async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+    console.log(submissionId)
 
     if (!submissionRecord.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
     }
 
-    const s3File = await this.submissionService.getStylesheetFromS3(submissionId);
+    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
+      submissionRecord.source_transform_id
+    );
 
-    const stylesheet = parseS3File(s3File)?.buffer?.toString();
-
-    if (!stylesheet) {
-      throw new ApiGeneralError('Failed to parse the stylesheet');
+    if (!sourceTransformRecord.metadata_transform) {
+      throw new ApiGeneralError('The source metadata transform is not available');
     }
 
-    let transformedEML;
-    //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
-    try {
-      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
-    } catch (error) {
-      defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
+    dataPackageId;
 
-      return this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'eml transformation failed'
-      );
-    }
+    // let transformedEML;
+    // //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
+    // try {
+    //   transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
+    // } catch (error) {
+    //   defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
+
+    //   return this.submissionService.insertSubmissionStatusAndMessage(
+    //     submissionId,
+    //     SUBMISSION_STATUS_TYPE.REJECTED,
+    //     SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+    //     'eml transformation failed'
+    //   );
+    // }
 
     let response;
-    //call to the ElasticSearch API to create a record with our transformed EML
-    try {
-      response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
-    } catch (error) {
-      defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
+    // //call to the ElasticSearch API to create a record with our transformed EML
+    // try {
+    //   response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
+    // } catch (error) {
+    //   defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
 
-      return this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'upload to elastic search failed'
-      );
-    }
+    //   return this.submissionService.insertSubmissionStatusAndMessage(
+    //     submissionId,
+    //     SUBMISSION_STATUS_TYPE.REJECTED,
+    //     SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+    //     'upload to elastic search failed'
+    //   );
+    // }
 
     //TODO: We need a new submission status type
     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);

@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Tuesday, June 14, 2022 10:50:21
+-- Date Created : Thursday, June 30, 2022 10:26:30
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -11,11 +11,11 @@
 --
 
 CREATE TABLE audit_log(
-    audit_log_id      integer         GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    system_user_id    integer         NOT NULL,
-    create_date       TIMESTAMPTZ     DEFAULT now() NOT NULL,
-    table_name        varchar(200)    NOT NULL,
-    operation         varchar(20)     NOT NULL,
+    audit_log_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    system_user_id    integer           NOT NULL,
+    create_date       timestamptz(6)    DEFAULT now() NOT NULL,
+    table_name        varchar(200)      NOT NULL,
+    operation         varchar(20)       NOT NULL,
     before_value      json,
     after_value       json,
     CONSTRAINT audit_log_pk PRIMARY KEY (audit_log_id)
@@ -51,11 +51,11 @@ CREATE TABLE security_transform(
     description              varchar(3000),
     notes                    varchar(3000),
     transform                text              NOT NULL,
-    record_effective_date    date              NOT NULL,
-    record_end_date          date,
-    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+    record_effective_date    timestamptz(6)    NOT NULL,
+    record_end_date          timestamptz(6),
+    create_date              timestamptz       DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
-    update_date              timestamptz(6),
+    update_date              timestamptz,
     update_user              integer,
     revision_count           integer           DEFAULT 0 NOT NULL,
     CONSTRAINT security_transform_pk PRIMARY KEY (security_transform_id)
@@ -96,14 +96,14 @@ COMMENT ON TABLE security_transform IS 'Security transforms are SQL statements o
 --
 
 CREATE TABLE security_transform_submission(
-    security_transform_submission_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    submission_spatial_component_id     integer           NOT NULL,
-    security_transform_id               integer           NOT NULL,
-    create_date                         timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                         integer           NOT NULL,
-    update_date                         timestamptz(6),
+    security_transform_submission_id    integer        GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_spatial_component_id     integer        NOT NULL,
+    security_transform_id               integer        NOT NULL,
+    create_date                         timestamptz    DEFAULT now() NOT NULL,
+    create_user                         integer        NOT NULL,
+    update_date                         timestamptz,
     update_user                         integer,
-    revision_count                      integer           DEFAULT 0 NOT NULL,
+    revision_count                      integer        DEFAULT 0 NOT NULL,
     CONSTRAINT security_transform_submission_pk PRIMARY KEY (security_transform_submission_id)
 )
 ;
@@ -134,21 +134,18 @@ COMMENT ON TABLE security_transform_submission IS 'A associative entity that joi
 --
 
 CREATE TABLE source_transform(
-    source_transform_id              integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    system_user_id                   integer           NOT NULL,
-    version                          varchar(20)       NOT NULL,
-    transform_filename               varchar(300)      NOT NULL,
-    transform_key                    varchar(1000)     NOT NULL,
-    transform_precompile_filename    varchar(300)      NOT NULL,
-    transform_precompile_key         varchar(1000)     NOT NULL,
-    metadata_index                   varchar(100)      NOT NULL,
-    record_effective_date            date              DEFAULT now() NOT NULL,
-    record_end_date                  date,
-    create_date                      timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                      integer           NOT NULL,
-    update_date                      timestamptz(6),
-    update_user                      integer,
-    revision_count                   integer           DEFAULT 0 NOT NULL,
+    source_transform_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    system_user_id           integer           NOT NULL,
+    version                  varchar(20)       NOT NULL,
+    metadata_transform       text              NOT NULL,
+    metadata_index           varchar(100)      NOT NULL,
+    record_effective_date    timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date          timestamptz(6),
+    create_date              timestamptz       DEFAULT now() NOT NULL,
+    create_user              integer           NOT NULL,
+    update_date              timestamptz,
+    update_user              integer,
+    revision_count           integer           DEFAULT 0 NOT NULL,
     CONSTRAINT source_transform_pk PRIMARY KEY (source_transform_id)
 )
 ;
@@ -161,13 +158,7 @@ COMMENT ON COLUMN source_transform.system_user_id IS 'System generated surrogate
 ;
 COMMENT ON COLUMN source_transform.version IS 'The version  number of the transformation data set for a specific source system. Examples include "0.1" and "2.0.1".'
 ;
-COMMENT ON COLUMN source_transform.transform_filename IS 'The metadata transform template file name. This template is to be used to transform specific metadata for population of the search engine layer.'
-;
-COMMENT ON COLUMN source_transform.transform_key IS 'The identifying key to the file in the storage system.'
-;
-COMMENT ON COLUMN source_transform.transform_precompile_filename IS 'A pre-compiled XSLT transformation filename. An example would be a file based on the SaxonJS Stylesheet Export File (SEF) format.'
-;
-COMMENT ON COLUMN source_transform.transform_precompile_key IS 'The identifying key to the file in the storage system.'
+COMMENT ON COLUMN source_transform.metadata_transform IS 'Describes a SQL statement that transforms the JSON representation of the source submissions EML data for indexing in Elastic Search.'
 ;
 COMMENT ON COLUMN source_transform.metadata_index IS 'The search engine layer index that the metadata transform conforms to. This attribute provides the index name that is the target for the metadata produced by the associated "metadata transform" template.'
 ;
@@ -198,11 +189,11 @@ CREATE TABLE spatial_transform(
     description              varchar(3000),
     notes                    varchar(3000),
     transform                text              NOT NULL,
-    record_effective_date    date              NOT NULL,
-    record_end_date          date,
-    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+    record_effective_date    timestamptz(6)    NOT NULL,
+    record_end_date          timestamptz(6),
+    create_date              timestamptz       DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
-    update_date              timestamptz(6),
+    update_date              timestamptz,
     update_user              integer,
     revision_count           integer           DEFAULT 0 NOT NULL,
     CONSTRAINT spatial_transform_pk PRIMARY KEY (spatial_transform_id)
@@ -243,14 +234,14 @@ COMMENT ON TABLE spatial_transform IS 'Spatial transforms are SQL statements tha
 --
 
 CREATE TABLE spatial_transform_submission(
-    spatial_transform_submission_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    spatial_transform_id               integer           NOT NULL,
-    submission_spatial_component_id    integer           NOT NULL,
-    create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                        integer           NOT NULL,
-    update_date                        timestamptz(6),
+    spatial_transform_submission_id    integer        GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    spatial_transform_id               integer        NOT NULL,
+    submission_spatial_component_id    integer        NOT NULL,
+    create_date                        timestamptz    DEFAULT now() NOT NULL,
+    create_user                        integer        NOT NULL,
+    update_date                        timestamptz,
     update_user                        integer,
-    revision_count                     integer           DEFAULT 0 NOT NULL,
+    revision_count                     integer        DEFAULT 0 NOT NULL,
     CONSTRAINT spatial_transform_submission_pk PRIMARY KEY (spatial_transform_submission_id)
 )
 ;
@@ -289,12 +280,11 @@ CREATE TABLE submission(
     eml_source               text,
     eml_json_source          jsonb,
     darwin_core_source       jsonb,
-    security_timestamp       TIMESTAMPTZ,
-    record_effective_date    date              NOT NULL,
-    record_end_date          date,
-    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+    record_effective_date    timestamptz(6)    NOT NULL,
+    record_end_date          timestamptz(6),
+    create_date              timestamptz       DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
-    update_date              timestamptz(6),
+    update_date              timestamptz,
     update_user              integer,
     revision_count           integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_pk PRIMARY KEY (submission_id)
@@ -318,8 +308,6 @@ COMMENT ON COLUMN submission.eml_source IS 'The Ecological Metadata Language sou
 COMMENT ON COLUMN submission.eml_json_source IS 'The JSON representation of the Ecological Metadata Language source for the submission.'
 ;
 COMMENT ON COLUMN submission.darwin_core_source IS 'The denormalized Darwin Core source as extracted from the submission.'
-;
-COMMENT ON COLUMN submission.security_timestamp IS 'The timestamp of the completion of the application of security rules to the dataset after submission. Viewing of submission spatial components is restricted until security is applied and this attribute is set.'
 ;
 COMMENT ON COLUMN submission.record_effective_date IS 'Record level effective date.'
 ;
@@ -346,11 +334,11 @@ CREATE TABLE submission_message(
     submission_message_id         integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     submission_message_type_id    integer           NOT NULL,
     submission_status_id          integer           NOT NULL,
-    event_timestamp               TIMESTAMPTZ       NOT NULL,
+    event_timestamp               timestamptz(6)    NOT NULL,
     message                       varchar(3000),
-    create_date                   timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                   timestamptz       DEFAULT now() NOT NULL,
     create_user                   integer           NOT NULL,
-    update_date                   timestamptz(6),
+    update_date                   timestamptz,
     update_user                   integer,
     revision_count                integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_message_pk PRIMARY KEY (submission_message_id)
@@ -389,12 +377,12 @@ COMMENT ON TABLE submission_message IS 'Intersection table to track submission m
 CREATE TABLE submission_message_class(
     submission_message_class_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                           varchar(50)       NOT NULL,
-    record_end_date                date,
-    record_effective_date          date              DEFAULT now() NOT NULL,
+    record_end_date                timestamptz(6),
+    record_effective_date          timestamptz(6)    DEFAULT now() NOT NULL,
     description                    varchar(250),
-    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                    timestamptz       DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
-    update_date                    timestamptz(6),
+    update_date                    timestamptz,
     update_user                    integer,
     revision_count                 integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_message_class_pk PRIMARY KEY (submission_message_class_id)
@@ -434,12 +422,12 @@ CREATE TABLE submission_message_type(
     submission_message_type_id     integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     submission_message_class_id    integer           NOT NULL,
     name                           varchar(50)       NOT NULL,
-    record_end_date                date,
-    record_effective_date          date              DEFAULT now() NOT NULL,
+    record_end_date                timestamptz(6),
+    record_effective_date          timestamptz(6)    DEFAULT now() NOT NULL,
     description                    varchar(250),
-    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                    timestamptz       DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
-    update_date                    timestamptz(6),
+    update_date                    timestamptz,
     update_user                    integer,
     revision_count                 integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_message_type_pk PRIMARY KEY (submission_message_type_id)
@@ -486,9 +474,9 @@ CREATE TABLE submission_spatial_component(
     secured_spatial_component          jsonb,
     secured_geometry                   geometry(geometry, 3005),
     secured_geography                  geography(geometry),
-    create_date                        timestamptz(6)              DEFAULT now() NOT NULL,
+    create_date                        timestamptz                 DEFAULT now() NOT NULL,
     create_user                        integer                     NOT NULL,
-    update_date                        timestamptz(6),
+    update_date                        timestamptz,
     update_user                        integer,
     revision_count                     integer                     DEFAULT 0 NOT NULL,
     CONSTRAINT submission_spatial_component_pk PRIMARY KEY (submission_spatial_component_id)
@@ -534,10 +522,10 @@ CREATE TABLE submission_status(
     submission_status_id         integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     submission_id                integer           NOT NULL,
     submission_status_type_id    integer           NOT NULL,
-    event_timestamp              TIMESTAMPTZ       NOT NULL,
-    create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
+    event_timestamp              timestamptz(6)    NOT NULL,
+    create_date                  timestamptz       DEFAULT now() NOT NULL,
     create_user                  integer           NOT NULL,
-    update_date                  timestamptz(6),
+    update_date                  timestamptz,
     update_user                  integer,
     revision_count               integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_status_pk PRIMARY KEY (submission_status_id)
@@ -574,12 +562,12 @@ COMMENT ON TABLE submission_status IS 'Provides a history of submission statuses
 CREATE TABLE submission_status_type(
     submission_status_type_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                         varchar(50)       NOT NULL,
-    record_end_date              date,
-    record_effective_date        date              DEFAULT now() NOT NULL,
+    record_end_date              timestamptz(6),
+    record_effective_date        timestamptz(6)    DEFAULT now() NOT NULL,
     description                  varchar(250),
-    create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                  timestamptz       DEFAULT now() NOT NULL,
     create_user                  integer           NOT NULL,
-    update_date                  timestamptz(6),
+    update_date                  timestamptz,
     update_user                  integer,
     revision_count               integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_status_type_pk PRIMARY KEY (submission_status_type_id)
@@ -621,9 +609,9 @@ CREATE TABLE system_constant(
     character_value       varchar(300),
     numeric_value         numeric(10, 0),
     description           varchar(250),
-    create_date           timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date           timestamptz       DEFAULT now() NOT NULL,
     create_user           integer           NOT NULL,
-    update_date           timestamptz(6),
+    update_date           timestamptz,
     update_user           integer,
     revision_count        integer           DEFAULT 0 NOT NULL,
     CONSTRAINT system_constant_pk PRIMARY KEY (system_constant_id)
@@ -665,9 +653,9 @@ CREATE TABLE system_metadata_constant(
     character_value                varchar(300),
     numeric_value                  numeric(10, 0),
     description                    varchar(250),
-    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                    timestamptz       DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
-    update_date                    timestamptz(6),
+    update_date                    timestamptz,
     update_user                    integer,
     revision_count                 integer           DEFAULT 0 NOT NULL,
     CONSTRAINT system_metadata_constant_pk PRIMARY KEY (system_metadata_constant_id)
@@ -706,13 +694,13 @@ COMMENT ON TABLE system_metadata_constant IS 'A list of system metadata constant
 CREATE TABLE system_role(
     system_role_id           integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                     varchar(50)       NOT NULL,
-    record_effective_date    date              DEFAULT now() NOT NULL,
-    record_end_date          date,
+    record_effective_date    timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date          timestamptz(6),
     description              varchar(250)      NOT NULL,
     notes                    varchar(3000),
-    create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date              timestamptz       DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
-    update_date              timestamptz(6),
+    update_date              timestamptz,
     update_user              integer,
     revision_count           integer           DEFAULT 0 NOT NULL,
     CONSTRAINT system_role_pk PRIMARY KEY (system_role_id)
@@ -754,11 +742,11 @@ CREATE TABLE system_user(
     system_user_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     user_identity_source_id    integer           NOT NULL,
     user_identifier            varchar(200)      NOT NULL,
-    record_effective_date      date              DEFAULT now() NOT NULL,
-    record_end_date            date,
-    create_date                timestamptz(6)    DEFAULT now() NOT NULL,
+    record_effective_date      timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date            timestamptz(6),
+    create_date                timestamptz       DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
-    update_date                timestamptz(6),
+    update_date                timestamptz,
     update_user                integer,
     revision_count             integer           DEFAULT 0 NOT NULL,
     CONSTRAINT system_user_pk PRIMARY KEY (system_user_id)
@@ -795,14 +783,14 @@ COMMENT ON TABLE system_user IS 'Agency or Ministry funding the project.'
 --
 
 CREATE TABLE system_user_role(
-    system_user_role_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    system_user_id         integer           NOT NULL,
-    system_role_id         integer           NOT NULL,
-    create_date            timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user            integer           NOT NULL,
-    update_date            timestamptz(6),
+    system_user_role_id    integer        GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    system_user_id         integer        NOT NULL,
+    system_role_id         integer        NOT NULL,
+    create_date            timestamptz    DEFAULT now() NOT NULL,
+    create_user            integer        NOT NULL,
+    update_date            timestamptz,
     update_user            integer,
-    revision_count         integer           DEFAULT 0 NOT NULL,
+    revision_count         integer        DEFAULT 0 NOT NULL,
     CONSTRAINT system_user_role_pk PRIMARY KEY (system_user_role_id)
 )
 ;
@@ -836,12 +824,12 @@ CREATE TABLE system_user_security_exception(
     system_user_security_exception_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     security_transform_id                integer           NOT NULL,
     system_user_id                       integer           NOT NULL,
-    record_effective_date                date              NOT NULL,
-    record_end_date                      date,
+    record_effective_date                timestamptz(6)    NOT NULL,
+    record_end_date                      timestamptz(6),
     notes                                varchar(3000),
-    create_date                          timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                          timestamptz       DEFAULT now() NOT NULL,
     create_user                          integer           NOT NULL,
-    update_date                          timestamptz(6),
+    update_date                          timestamptz,
     update_user                          integer,
     revision_count                       integer           DEFAULT 0 NOT NULL,
     CONSTRAINT system_user_security_exception_pk PRIMARY KEY (system_user_security_exception_id)
@@ -882,13 +870,13 @@ COMMENT ON TABLE system_user_security_exception IS 'Identifies security transfor
 CREATE TABLE user_identity_source(
     user_identity_source_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                       varchar(50)       NOT NULL,
-    record_effective_date      date              DEFAULT now() NOT NULL,
-    record_end_date            date,
+    record_effective_date      timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date            timestamptz(6),
     description                varchar(250),
     notes                      varchar(3000),
-    create_date                timestamptz(6)    DEFAULT now() NOT NULL,
+    create_date                timestamptz       DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
-    update_date                timestamptz(6),
+    update_date                timestamptz,
     update_user                integer,
     revision_count             integer           DEFAULT 0 NOT NULL,
     CONSTRAINT user_identity_source_pk PRIMARY KEY (user_identity_source_id)

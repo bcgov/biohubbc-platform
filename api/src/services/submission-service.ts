@@ -1,6 +1,4 @@
-import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -11,7 +9,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { getFileFromS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
 
 export class SubmissionService extends DBService {
@@ -115,9 +112,33 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<ISourceTransformModel>}
    * @memberof SubmissionService
    */
-  async getSourceTransformRecordBySystemUserId(systemUserId: number): Promise<ISourceTransformModel> {
-    return this.submissionRepository.getSourceTransformRecordBySystemUserId(systemUserId);
+  async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
+    return this.submissionRepository.getSourceTransformRecordBySystemUserId(systemUserId, version);
   }
+
+  /**
+   * Get source transform record by its associated source transform id.
+   *
+   * @param {number} sourceTransformId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionService
+   */
+  async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
+    return this.submissionRepository.getSourceTransformRecordBySourceTransformId(sourceTransformId);
+  }
+
+  /**
+   * Get json representation of eml source from submission.
+   *
+   * @param {number} submissionId
+   * @param {string} metadataTransform
+   * @return {string}
+   * @memberof SubmissionService
+   */
+  async getSubmissionMetadataJson(submissionId: number, metadataTransform: string): Promise<string> {
+    return this.submissionRepository.getSubmissionMetadataJson(submissionId, metadataTransform);
+  }
+
 
   /**
    * Insert a submission status record.
@@ -175,45 +196,6 @@ export class SubmissionService extends DBService {
    */
   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
-  }
-
-  /**
-   * Gets the S3key of the EMLStyleSheet from the DB.
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<string>}
-   * @memberof SubmissionService
-   */
-  async getEMLStyleSheetKey(submissionId: number): Promise<string> {
-    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
-
-    if (!transformRecord.transform_precompile_key) {
-      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
-        'SubmissionRepository->getStyleSheetKey',
-        'stylesheet_key was null'
-      ]);
-    }
-
-    return transformRecord.transform_precompile_key;
-  }
-
-  /**
-   * Returns the EML stylesheet from S3
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<GetObjectOutput>}
-   * @memberof SubmissionService
-   */
-  async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
-    const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
-
-    const s3File = await getFileFromS3(stylesheet_key);
-
-    if (!s3File) {
-      throw new ApiGeneralError('Failed to get file from S3');
-    }
-
-    return s3File;
   }
 
   /**
