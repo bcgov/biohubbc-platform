@@ -1,78 +1,145 @@
+import { Feature, FeatureCollection } from 'geojson';
 import SQL, { SQLStatement } from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
+import { SPATIAL_COMPONENT_TYPE } from '../paths/dwc/spatial/search';
 import { BaseRepository } from './base-repository';
 
+export interface ISubmissionSpatialComponent {
+  submission_spatial_component_id: number;
+  submission_id: number;
+  spatial_component: FeatureCollection;
+  geometry: null;
+  geography: string;
+  secured_spatial_component: FeatureCollection;
+  secured_geometry: null;
+  secured_geography: string;
+}
+
+export interface ISubmissionSpatialComponentsCluster {
+  spatial_component: FeatureCollection;
+}
+
 export interface ISpatialComponentsSearchCriteria {
-  type?: string;
+  type: string[];
+  boundary: Feature;
 }
 
 export class SpatialRepository extends BaseRepository {
-  async findSpatialComponentsByCriteria(criteria: ISpatialComponentsSearchCriteria): Promise<any[]> {
-    // const sqlStatement = SQL`
-    //   SELECT
-    //     *
-    //   FROM
-    //     submission_spatial_component
-    //   WHERE
-    //     1 = 1
-    //   AND
-    //     (
-    //       (
-    //         jsonb_path_query_first(spatial_component,'$.type') #>> '{}' = 'Feature'
-    //         AND
-    //         jsonb_path_query_first(spatial_component,'$.properties.type') #>> '{}' = ${criteria.type}
-    //       )
-    //       OR
-    //       (
-    //         jsonb_path_query_first(spatial_component,'$.type') #>> '{}' = 'FeatureCollection'
-    //         AND
-    //         jsonb_path_exists(spatial_component,'$.features[*] \? (@.properties.description == `;
+  async getSpatialComponentsCountByCriteria(criteria: ISpatialComponentsSearchCriteria): Promise<{ count: number }> {
+    const sqlStatement = SQL`
+      select
+        count(*) as count
+      from
+        submission_spatial_component
+      where
+        jsonb_path_exists(spatial_component, '$.features[*] ? (@.properties.type == "`
+      .append(`${criteria.type[1]}`)
+      .append(
+        `")')
+      and`
+      )
+      .append(this._whereBoundaryIntersects(criteria.boundary, 'geography'))
+      .append(`;`);
 
-    // sqlStatement.append(`"${criteria.type}"`);
+    const response = await this.connection.sql<{ count: number }>(sqlStatement);
 
-    // sqlStatement.append(`)')
-    //       )
-    //     );
-    // `);
+    return response.rows[0];
+  }
 
-    const queryBuilder = getKnexQueryBuilder().select().from('submission_spatial_component');
+  async findSpatialComponentsByCriteriaWithClustering(
+    criteria: ISpatialComponentsSearchCriteria
+  ): Promise<ISubmissionSpatialComponentsCluster[]> {
+    const sqlStatement = SQL`
+      with
+        total_count as (
+        select
+          count(*) as count
+        from
+          submission_spatial_component
+      )
+      select
+        json_build_object('type','FeatureCollection','features', array[public.ST_AsGeoJSON(tsub2, 'cluster_geom')::jsonb]) as spatial_component
+      from (
+        select
+          ${SPATIAL_COMPONENT_TYPE.OCCURRENCE}::text as cluster_type,
+          count(*) as cluster_count,
+          public.ST_Centroid(public.ST_Union(geom)) AS cluster_geom`;
 
-    if (criteria.type) {
-      const sqlStatement1 = this._whereSpatialType('Feature');
-      const sqlStatement2 = this._whereFeaturePropertyType(criteria.type);
-
-      queryBuilder.or.where((qb) => {
-        qb.and.whereRaw(sqlStatement1.sql, sqlStatement1.values);
-        qb.and.whereRaw(sqlStatement2.sql, sqlStatement2.values);
-      });
-
-      const sqlStatement3 = this._whereSpatialType('FeatureCollection');
-      const sqlStatement4 = this._whereFeatureCollectionPropertyType(criteria.type);
-
-      queryBuilder.or.where((qb) => {
-        qb.and.whereRaw(sqlStatement3.sql, sqlStatement3.values);
-        qb.and.whereRaw(sqlStatement4.sql, sqlStatement4.values);
-      });
+    if (criteria.type[1] === SPATIAL_COMPONENT_TYPE.OCCURRENCE) {
+      sqlStatement.append(SQL`,array_agg(distinct(properties->>'taxon')) as cluster_taxon`);
     }
 
-    const response = await this.connection.knex<any>(queryBuilder);
+    sqlStatement
+      .append(
+        SQL`
+        from (
+          select
+            public.ST_ClusterKMeans(geography::public.geometry, least(total_count.count, 3)::int) OVER() AS cluster_id,
+            geography::public.geometry geom,
+            spatial_component->'features'->0->'properties' as properties
+          from
+            submission_spatial_component,
+            total_count
+          where
+            jsonb_path_exists(spatial_component, '$.features[*] ? (@.properties.type == "`
+      )
+      .append(`${criteria.type?.[1]}`)
+      .append(
+        SQL`")')
+          and`
+      )
+      .append(this._whereBoundaryIntersects(criteria.boundary, 'geography')).append(SQL`
+        ) tsub
+        group by cluster_id
+      ) tsub2;
+    `);
+
+    const response = await this.connection.sql<ISubmissionSpatialComponentsCluster>(sqlStatement);
 
     return response.rows;
   }
 
-  _whereSpatialType(type: string): SQLStatement {
-    return SQL`jsonb_path_query_first(spatial_component,'$.type') #>> '{}' = ${type}`;
-    // return SQL`select jsonb_path_query(spatial_component,'$.features[*]') from submission_spatial_component where jsonb_path_query_first(spatial_component,'$.type') #>> '{}' = 'FeatureCollection';`;
-    // return SQL`select jsonb_path_query(spatial_component,'$.features[*] ? (@.properties.description == "Not provided")') from submission_spatial_component where jsonb_path_query_first(spatial_component,'$.type') #>> '{}' = 'FeatureCollection';`;
-    // select * from submission_spatial_component where jsonb_path_query_first(spatial_component,'$.type') #>> '{}' = 'FeatureCollection' and jsonb_path_exists(spatial_component,'$.features[*] ? (@.properties.description == "Not provided")') ;
+  async findSpatialComponentsByCriteria(
+    criteria: ISpatialComponentsSearchCriteria
+  ): Promise<ISubmissionSpatialComponent[]> {
+    const queryBuilder = getKnexQueryBuilder().select().from('submission_spatial_component');
+
+    if (criteria.type?.length) {
+      // Append OR where clauses for each criteria.type
+      queryBuilder.where((qb1) => {
+        for (const type of criteria.type) {
+          qb1.or.where((qb2) => {
+            qb2.whereRaw(`jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`);
+          });
+        }
+      });
+
+      // Append AND where clause for criteria.boundary
+      const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
+      queryBuilder.where((qb3) => {
+        qb3.whereRaw(sqlStatement1.sql, sqlStatement1.values);
+      });
+    }
+
+    const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
+
+    return response.rows;
   }
 
-  _whereFeaturePropertyType(type: string): SQLStatement {
-    return SQL`jsonb_path_query_first(spatial_component,'$.properties.type') #>> '{}' = ${type}`;
-  }
-
-  _whereFeatureCollectionPropertyType(type: string): SQLStatement {
-    // Unable to parameterize `type` due to its nesting inside the single quotes of the json patch argument.
-    return SQL``.append(`jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`);
+  _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
+    return SQL`
+      public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
+        public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(
+              public.ST_Force2D(
+                public.ST_GeomFromGeoJSON('${JSON.stringify(boundary.geometry)}')
+              ),
+              4326
+            )
+          )
+        )
+      )
+    `);
   }
 }

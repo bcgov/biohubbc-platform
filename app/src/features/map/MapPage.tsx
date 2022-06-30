@@ -2,11 +2,12 @@ import Box from '@material-ui/core/Box';
 import Container from '@material-ui/core/Container';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
-import { BoundaryFeaturePopup, BoundaryFeatureProperties } from 'components/map/BoundaryFeaturePopup';
+import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFeaturePopup';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { OccurrenceFeaturePopup, OccurrenceFeatureProperties } from 'components/map/OccurrenceFeaturePopup';
+import { OccurrenceClusterFeature, OccurrenceClusterFeaturePopup } from 'components/map/OccurrenceClusterFeaturePopup';
+import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -15,7 +16,7 @@ import { LatLngBounds, LatLngTuple } from 'leaflet';
 import React, { useEffect, useState } from 'react';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
-export const ALL_OF_BC_FEATURE: Feature = {
+export const ALL_OF_BC_BOUNDARY: Feature = {
   type: 'Feature',
   properties: {},
   geometry: {
@@ -45,7 +46,7 @@ export enum LAYER_NAME {
 const MapPage: React.FC = () => {
   const api = useApi();
 
-  const mapDataLoader = useDataLoader((boundary: Feature, type: string) =>
+  const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
     api.search.getSpatialData({ boundary: boundary, type: type })
   );
 
@@ -57,18 +58,8 @@ const MapPage: React.FC = () => {
     };
   });
 
-  // @ts-ignore
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
-  // @ts-ignore
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
-
-  const isOccurrenceFeature = (feature: Feature) => {
-    return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE;
-  };
-
-  const isBoundaryFeature = (feature: Feature) => {
-    return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY;
-  };
 
   useEffect(() => {
     if (!mapDataLoader.data?.length) {
@@ -76,23 +67,34 @@ const MapPage: React.FC = () => {
     }
 
     let occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
+
+    let occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
     let boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
     for (const featureCollection of mapDataLoader.data) {
       for (const feature of featureCollection.features) {
+        if (isOccurrenceClusterFeature(feature)) {
+          if (feature.geometry.type === 'GeometryCollection') {
+            continue;
+          }
+
+          occurrenceStaticLayer.features.push({
+            geoJSON: feature,
+            key: feature.id,
+            popup: <OccurrenceClusterFeaturePopup properties={feature.properties} />
+          });
+        }
+
         if (isOccurrenceFeature(feature)) {
           if (feature.geometry.type === 'GeometryCollection') {
             continue;
           }
 
-          if (feature.geometry.type === 'Point') {
-            occurrencesMarkerLayer.markers.push({
-              position: feature.geometry.coordinates as LatLngTuple,
-              key: feature.id,
-              popup: <OccurrenceFeaturePopup properties={feature.properties as OccurrenceFeatureProperties} />
-            });
-            continue;
-          }
+          occurrencesMarkerLayer.markers.push({
+            position: feature.geometry.coordinates as LatLngTuple,
+            key: feature.id,
+            popup: <OccurrenceFeaturePopup properties={feature.properties} />
+          });
         }
 
         if (isBoundaryFeature(feature)) {
@@ -103,57 +105,17 @@ const MapPage: React.FC = () => {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
             key: feature.id,
-            popup: <BoundaryFeaturePopup properties={feature.properties as BoundaryFeatureProperties} />
+            popup: <BoundaryFeaturePopup properties={feature.properties} />
           });
         }
       }
     }
 
-    setStaticLayers([boundaryStaticLayer]);
+    setStaticLayers([occurrenceStaticLayer, boundaryStaticLayer]);
     setMarkerLayers([occurrencesMarkerLayer]);
   }, [mapDataLoader.data]);
 
-  // const processFeatureCollection = (featureCollection: FeatureCollection) {
-  //   for(const feature of featureCollection) {
-  //     geoJSONMarkers.concat(processSpatialResponse([item])
-  //   }
-  // }
-
-  // const processSpatialResponse = (feature: Feature) => {
-  //   const geoJSONMarkers = [];
-
-  //   for (const item of objs) {
-  //     if (item.type === 'Feature') {
-  //       const geo = JSON.parse(item.geometry);
-  //       geoJSONMarkers.push({
-  //         position: geo.coordinates,
-  //         popup: <OccurrenceFeaturePopup featureData={item} />
-  //       });
-  //     } else if (item.type === 'FeatureCollection') {
-  //       for (const feature of item.features) {
-  //         geoJSONMarkers.push({
-  //           position: feature.geometry,
-  //           popup: <OccurrenceFeaturePopup featureData={feature} />
-  //         });
-  //       }
-  //     } else if (item.type === 'GeometryCollection') {
-  //       const geo = JSON.parse(item.geometry);
-  //       geoJSONMarkers.push({
-  //         position: geo.coordinates,
-  //         popup: <OccurrenceFeaturePopup featureData={item} />
-  //       });
-  //     } else {
-  //       geoJSONMarkers.push({
-  //         position: item.coordinates,
-  //         popup: <OccurrenceFeaturePopup featureData={item} />
-  //       });
-  //     }
-
-  //     setMarkers(geoJSONMarkers);
-  //   }
-  // };
-
-  mapDataLoader.load(ALL_OF_BC_FEATURE, 'Boundary');
+  mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
 
   return (
     <Box my={4}>
@@ -169,7 +131,10 @@ const MapPage: React.FC = () => {
                   mapId="boundary_map"
                   onBoundsChange={(bounds: LatLngBounds) => {
                     const boundary = getFeatureObjectFromLatLngBounds(bounds);
-                    mapDataLoader.refresh(boundary, 'Boundary');
+                    mapDataLoader.refresh(boundary, [
+                      SPATIAL_COMPONENT_TYPE.BOUNDARY,
+                      SPATIAL_COMPONENT_TYPE.OCCURRENCE
+                    ]);
                   }}
                   scrollWheelZoom={true}
                   markerLayers={markerLayers}
@@ -185,3 +150,17 @@ const MapPage: React.FC = () => {
 };
 
 export default MapPage;
+
+export const isOccurrenceClusterFeature = (feature: Feature): feature is OccurrenceClusterFeature => {
+  return (
+    feature.geometry.type === 'Point' && feature.properties?.['cluster_type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE
+  );
+};
+
+export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeature => {
+  return feature.geometry.type === 'Point' && feature.properties?.['type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE;
+};
+
+export const isBoundaryFeature = (feature: Feature): feature is BoundaryFeature => {
+  return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY;
+};

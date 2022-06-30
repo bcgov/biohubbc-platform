@@ -3,6 +3,20 @@ import React, { ReactElement } from 'react';
 import { LayersControl, Marker, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster';
 
+const MARKER_SVG = {
+  DOT: '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path fill="{color}" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>'
+};
+
+export const MARKER_ICON = {
+  DOT: L.divIcon({
+    className: 'leaflet-data-marker',
+    html: L.Util.template(MARKER_SVG.DOT, { color: '#2F5982' }),
+    iconAnchor: [12, 32],
+    iconSize: [25, 30],
+    popupAnchor: [0, -28]
+  })
+};
+
 export interface IMarker {
   position: LatLngExpression;
   key?: string | number;
@@ -27,22 +41,6 @@ const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
     return null;
   }
 
-  //TODO needs improvment for dynamic icons and colours
-  const iconSettings = {
-    mapIconUrl:
-      '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path fill="#2F5982" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>',
-    pinInnerCircleRadius: 48
-  };
-
-  // icon normal state
-  const divIcon = L.divIcon({
-    className: 'leaflet-data-marker',
-    html: L.Util.template(iconSettings.mapIconUrl, iconSettings),
-    iconAnchor: [12, 32],
-    iconSize: [25, 30],
-    popupAnchor: [0, -28]
-  });
-
   const layerControls: ReactElement[] = [];
 
   props.layers.forEach((layer, layerIndex) => {
@@ -56,10 +54,9 @@ const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
           {layer.markers.map((item, index: number) => {
             const id = item.key || index;
 
-            // Reverse the position (coordinates) from [lng, lat] to [lat, lng]
             return (
               <Marker
-                icon={divIcon}
+                icon={MARKER_ICON.DOT}
                 key={`marker-cluster-${id}-${index}`}
                 position={[item.position[1], item.position[0]]}
                 {...item.MarkerProps}>

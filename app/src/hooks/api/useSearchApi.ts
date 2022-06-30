@@ -20,7 +20,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialData = async (criteria: { boundary: Feature; type: string }): Promise<FeatureCollection[]> => {
+  const getSpatialData = async (criteria: { boundary: Feature; type: string[] }): Promise<FeatureCollection[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type }
     });
