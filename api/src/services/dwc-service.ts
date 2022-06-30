@@ -274,6 +274,18 @@ export class DarwinCoreService extends DBService {
     return { dataPackageId, submissionId };
   }
 
+  async ingestNewDwcaEML(submissionId: number): Promise<any> {
+    console.log('submissionId', submissionId);
+
+    const submissionRecordFile = await this.submissionService.getIngestFileFromS3(submissionId);
+
+    const parsedMedia = parseUnknownMedia(submissionRecordFile);
+
+    console.log('parsedMedia', parsedMedia);
+
+    return {};
+  }
+
   /**
    * transform submission record eml to json and upload metadata
    *

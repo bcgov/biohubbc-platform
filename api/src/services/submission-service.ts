@@ -207,7 +207,30 @@ export class SubmissionService extends DBService {
   async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
     const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
 
-    const s3File = await getFileFromS3(stylesheet_key);
+    return this.getFileFromS3(stylesheet_key);
+  }
+
+  async getIngestFileFromS3(submissionId: number): Promise<GetObjectOutput> {
+    const input_key = await this.getInputFileNameKey(submissionId);
+
+    return this.getFileFromS3(input_key);
+  }
+
+  async getInputFileNameKey(submissionId: number): Promise<string> {
+    const transformRecord = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+
+    if (!transformRecord.input_key) {
+      throw new ApiGeneralError('Failed to retrieve input file name', [
+        'SubmissionRepository->getInputFileNameKey',
+        'input file name was null'
+      ]);
+    }
+
+    return transformRecord.input_key;
+  }
+
+  async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
+    const s3File = await getFileFromS3(fileName);
 
     if (!s3File) {
       throw new ApiGeneralError('Failed to get file from S3');
