@@ -72,6 +72,6 @@ export class SpatialService extends DBService {
       spatialTransform.transform
     );
 
-    return this.spatialRepository.insertSubmissionSpatialComponent(submissionId, transformed.features);
+    return this.spatialRepository.insertSubmissionSpatialComponent(submissionId, transformed);
   }
 }

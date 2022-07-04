@@ -1,4 +1,4 @@
-import { Feature, FeatureCollection } from 'geojson';
+import { FeatureCollection } from 'geojson';
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
@@ -148,7 +148,7 @@ export class SpatialRepository extends BaseRepository {
    */
   async insertSubmissionSpatialComponent(
     submissionId: number,
-    transformedData: Feature[]
+    transformedData: FeatureCollection
   ): Promise<{ submission_spatial_component_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
@@ -160,8 +160,8 @@ export class SpatialRepository extends BaseRepository {
         ${JSON.stringify(transformedData)}
     `;
 
-    if (transformedData.length > 0) {
-      const geoCollection = generateGeometryCollectionSQL(transformedData);
+    if (transformedData.features.length > 0) {
+      const geoCollection = generateGeometryCollectionSQL(transformedData.features);
 
       sqlStatement.append(SQL`
         ,public.geography(
