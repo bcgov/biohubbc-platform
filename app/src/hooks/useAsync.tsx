@@ -38,24 +38,18 @@ export const useAsync = <Q extends any[], R>(asyncFunction: AsyncFunction<Q, R>)
 
     isPending.current = true;
 
-    ref.current = asyncFunction(...args)
-      .then(
-        (response: R) => {
-          isPending.current = false;
+    ref.current = asyncFunction(...args).then(
+      (response: R) => {
+        isPending.current = false;
 
-          return response;
-        },
-        (error) => {
-          isPending.current = false;
-
-          throw error;
-        }
-      )
-      .catch((error) => {
+        return response;
+      },
+      (error) => {
         isPending.current = false;
 
         throw error;
-      });
+      }
+    );
 
     return ref.current;
   };
