@@ -76,16 +76,7 @@ export function searchSpatialComponents(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const { count } = await spatialService.getSpatialComponentsCountByCriteria(criteria);
-
-      let response;
-
-      if (count > 500) {
-        // TODO WIP cluster example - investigate GeoServer as alternative option
-        response = await spatialService.findSpatialComponentsByCriteriaWithClustering(criteria);
-      } else {
-        response = await spatialService.findSpatialComponentsByCriteria(criteria);
-      }
+      const response = await spatialService.findSpatialComponentsByCriteria(criteria);
 
       await connection.commit();
 
