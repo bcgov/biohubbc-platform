@@ -221,6 +221,53 @@ describe('db', () => {
         });
       });
 
+      describe('query', () => {
+        describe('when a connection is open', () => {
+          it('sends a query statement', async () => {
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+
+            await connection.open();
+
+            const queryStatement = `query`;
+
+            await connection.query(queryStatement);
+
+            expect(queryStub).to.have.been.calledWith('query');
+          });
+
+          it('sends a query with empty values', async () => {
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+
+            await connection.open();
+
+            const queryStatement = `query`;
+
+            await connection.query(queryStatement);
+
+            expect(queryStub).to.have.been.calledWith('query', []);
+          });
+        });
+
+        describe('when a connection is not open', () => {
+          it('throws an error', async () => {
+            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
+
+            let expectedError: Error;
+            try {
+              const queryStatement = `query ${123}`;
+
+              await connection.query(queryStatement);
+
+              expect.fail('Expected an error to be thrown');
+            } catch (error) {
+              expectedError = error as Error;
+            }
+
+            expect(expectedError.message).to.equal('DBConnection is not open');
+          });
+        });
+      });
+
       describe('rollback', () => {
         describe('when a connection is open', () => {
           it('sends a `ROLLBACK` query', async () => {
