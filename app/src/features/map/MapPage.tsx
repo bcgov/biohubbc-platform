@@ -6,7 +6,6 @@ import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFe
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { OccurrenceClusterFeature, OccurrenceClusterFeaturePopup } from 'components/map/OccurrenceClusterFeaturePopup';
 import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -73,20 +72,9 @@ const MapPage: React.FC = () => {
 
     for (const featureCollection of mapDataLoader.data) {
       for (const feature of featureCollection.features) {
-        if (isOccurrenceClusterFeature(feature)) {
-          if (feature.geometry.type === 'GeometryCollection') {
-            continue;
-          }
-
-          occurrenceStaticLayer.features.push({
-            geoJSON: feature,
-            key: feature.id,
-            popup: <OccurrenceClusterFeaturePopup properties={feature.properties} />
-          });
-        }
-
         if (isOccurrenceFeature(feature)) {
           if (feature.geometry.type === 'GeometryCollection') {
+            // Not expecting or supporting geometry collections
             continue;
           }
 
@@ -150,12 +138,6 @@ const MapPage: React.FC = () => {
 };
 
 export default MapPage;
-
-export const isOccurrenceClusterFeature = (feature: Feature): feature is OccurrenceClusterFeature => {
-  return (
-    feature.geometry.type === 'Point' && feature.properties?.['cluster_type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE
-  );
-};
 
 export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeature => {
   return feature.geometry.type === 'Point' && feature.properties?.['type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE;
