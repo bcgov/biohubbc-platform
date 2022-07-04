@@ -214,7 +214,7 @@ describe('SpatialRepository', () => {
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
       try {
-        await spatialRepository.insertSubmissionSpatialComponent(1, []);
+        await spatialRepository.insertSubmissionSpatialComponent(1, {} as FeatureCollection);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal(
@@ -236,7 +236,7 @@ describe('SpatialRepository', () => {
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
-      const response = await spatialRepository.insertSubmissionSpatialComponent(1, []);
+      const response = await spatialRepository.insertSubmissionSpatialComponent(1, {} as FeatureCollection);
 
       expect(response.submission_spatial_component_id).to.equal(1);
     });
@@ -258,16 +258,18 @@ describe('SpatialRepository', () => {
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
-      const response = await spatialRepository.insertSubmissionSpatialComponent(1, [
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [125.6, 10.1]
-          },
-          properties: {}
-        }
-      ]);
+      const response = await spatialRepository.insertSubmissionSpatialComponent(1, {
+        features: [
+          {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: [125.6, 10.1]
+            },
+            properties: {}
+          }
+        ]
+      } as FeatureCollection);
 
       expect(response.submission_spatial_component_id).to.equal(1);
       expect(generateGeometryCollectionSQLStub).to.be.calledOnce;

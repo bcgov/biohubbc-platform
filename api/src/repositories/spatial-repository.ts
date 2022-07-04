@@ -160,7 +160,7 @@ export class SpatialRepository extends BaseRepository {
         ${JSON.stringify(transformedData)}
     `;
 
-    if (transformedData.features.length > 0) {
+    if (transformedData.features && transformedData.features.length > 0) {
       const geoCollection = generateGeometryCollectionSQL(transformedData.features);
 
       sqlStatement.append(SQL`
