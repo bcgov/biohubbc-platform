@@ -259,6 +259,7 @@ describe('SpatialRepository', () => {
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
       const response = await spatialRepository.insertSubmissionSpatialComponent(1, {
+        type: 'FeatureCollection',
         features: [
           {
             type: 'Feature',
