@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 
-export type AsyncFunction<Q extends any[], R> = (...args: Q) => Promise<R>;
+export type AsyncFunction<AFArgs extends any[], AFResponse> = (...args: AFArgs) => Promise<AFResponse>;
 
 /**
  * Wraps an async function to prevent duplicate calls if the previous call is still pending.
@@ -21,17 +21,19 @@ export type AsyncFunction<Q extends any[], R> = (...args: Q) => Promise<R>;
  * // call 2 is pending
  * ```
  *
- * @template Q
- * @template R
- * @param {AsyncFunction<Q, R>} asyncFunction the async function to wrap
- * @return {*}  {AsyncFunction<Q, R>}
+ * @template AFArgs `AsyncFunction` argument types.
+ * @template AFResponse `AsyncFunction` response type.
+ * @param {AsyncFunction<AFArgs, AFResponse>} asyncFunction the async function to wrap
+ * @return {*}  {AsyncFunction<AFArgs, AFResponse>}
  */
-export const useAsync = <Q extends any[], R>(asyncFunction: AsyncFunction<Q, R>): AsyncFunction<Q, R> => {
-  const ref = useRef<Promise<R>>();
+export const useAsync = <AFArgs extends any[], AFResponse>(
+  asyncFunction: AsyncFunction<AFArgs, AFResponse>
+): AsyncFunction<AFArgs, AFResponse> => {
+  const ref = useRef<Promise<AFResponse>>();
 
   const isPending = useRef(false);
 
-  const wrappedAsyncFunction: AsyncFunction<Q, R> = async (...args) => {
+  const wrappedAsyncFunction: AsyncFunction<AFArgs, AFResponse> = async (...args) => {
     if (ref.current && isPending.current) {
       return ref.current;
     }
@@ -39,7 +41,7 @@ export const useAsync = <Q extends any[], R>(asyncFunction: AsyncFunction<Q, R>)
     isPending.current = true;
 
     ref.current = asyncFunction(...args).then(
-      (response: R) => {
+      (response: AFResponse) => {
         isPending.current = false;
 
         return response;

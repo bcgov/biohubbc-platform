@@ -8,15 +8,17 @@ import { DataLoader } from './useDataLoader';
  * Hook that renders an error dialog if the `dataLoader` throws an error.
  *
  * @export
- * @template T
- * @template R
- * @param {DataLoader<T, R>} dataLoader A `DataLoader`.
- * @param {(dataLoader: DataLoader<T, R>) => Partial<IErrorDialogProps>} getErrorDialogProps A function that receives
- * the dataLoader and returns an `IErrorDialogProps` object, which will be passed to the rendered error dialog.
+ * @template AFArgs `AsyncFunction` argument types.
+ * @template AFResponse `AsyncFunction` response type.
+ * @template AFError `AsyncFunction` error type.
+ * @param {DataLoader<AFArgs, AFResponse, AFError>} dataLoader A `DataLoader`.
+ * @param {(dataLoader: DataLoader<AFArgs, AFResponse, AFError>) => Partial<IErrorDialogProps>} getErrorDialogProps A
+ * function that receives the dataLoader and returns an `IErrorDialogProps` object, which will be passed to the
+ * rendered error dialog.
  */
-export default function useDataLoaderError<Q extends any[], T = unknown, R = unknown>(
-  dataLoader: DataLoader<Q, T, R>,
-  getErrorDialogProps: (dataLoader: DataLoader<Q, T, R>) => Partial<IErrorDialogProps>
+export default function useDataLoaderError<AFArgs extends any[], AFResponse = unknown, AFError = unknown>(
+  dataLoader: DataLoader<AFArgs, AFResponse, AFError>,
+  getErrorDialogProps: (dataLoader: DataLoader<AFArgs, AFResponse, AFError>) => Partial<IErrorDialogProps>
 ) {
   const dialogContext = useContext(DialogContext);
 
