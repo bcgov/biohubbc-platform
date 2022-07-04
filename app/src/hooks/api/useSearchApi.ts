@@ -36,22 +36,19 @@ const useSearchApi = (axios: AxiosInstance) => {
   };
 
   const listAllDatasets = async (): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
-    const { data } = await axios.get(`api/dwc/eml/search`, {
-      params: {
-        index: 'EML'
-      }
-    });
+    const { data } = await axios.get(`api/dwc/eml/search`);
 
     return data;
   };
 
-  const searchSpecies = async (searchQuery: string): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
-    const { data } = await axios.get(`api/dwc/eml/search?q=${searchQuery}`, {
-      params: {
-        index: 'EML',
-        // searchQuery
-      }
-    });
+  /**
+   * Get keyword search results
+   *
+   * @param searchQuery The keywords to search for
+   * @returns {*} {Promise<>}
+   */
+  const keywordSearch = async (searchQuery: string): Promise<IElasticsearchResponse<unknown>> => {
+    const { data } = await axios.get(`api/dwc/eml/search?q=${searchQuery}`);
 
     return data;
   }
@@ -60,7 +57,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     getSearchResults,
     getMapOccurrenceData,
     listAllDatasets,
-    searchSpecies
+    keywordSearch
   };
 };
 
