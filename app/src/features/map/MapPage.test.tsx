@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, waitFor } from '@testing-library/react';
 import { FeatureCollection } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import React from 'react';
@@ -60,7 +60,6 @@ describe('MapPage', () => {
 
     const { getByText, getByTestId } = renderContainer();
 
-    screen.debug();
     await waitFor(() => {
       expect(getByText('Map')).toBeVisible();
       expect(getByTestId('MapContainer')).toBeVisible();
