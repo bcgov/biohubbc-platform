@@ -6,7 +6,6 @@ export type OccurrenceFeature = Feature & { properties: OccurrenceFeaturePropert
 
 export type OccurrenceFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.OCCURRENCE;
-  taxon: string;
 };
 
 export const OccurrenceFeaturePopup: React.FC<{ properties: OccurrenceFeatureProperties }> = (props) => {
