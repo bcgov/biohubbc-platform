@@ -120,13 +120,6 @@ describe('transform-spatial', () => {
 
           expect(response).to.equal(undefined);
         });
-
-        it('has valid values', async () => {
-          const apiResponse = { submission_spatial_component_id: 1 };
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response).to.equal(undefined);
-        });
       });
     });
   });
@@ -203,7 +196,7 @@ describe('transform-spatial', () => {
 
       expect(runTransformStub).to.have.been.calledOnceWith(1, 1);
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql({ submission_spatial_component_id: 1 });
+      expect(mockRes.jsonValue).to.eql(undefined);
     });
   });
 });

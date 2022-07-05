@@ -46,22 +46,7 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Successfully normalized and saved data of submission file',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'object',
-            required: ['submission_status_id'],
-            properties: {
-              submission_status_id: {
-                type: 'integer',
-                minimum: 1
-              }
-            },
-            nullable: true
-          }
-        }
-      }
+      description: 'Successfully normalized and saved data of submission file'
     },
     ...defaultErrorResponses
   }
@@ -88,11 +73,11 @@ export function normalizeSubmission(): RequestHandler {
 
       const dwcArchiveFile = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-      const response = await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
+      await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
 
       await connection.commit();
 
-      res.status(200).json(response);
+      res.status(200).send();
     } catch (error) {
       defaultLog.error({ label: 'secureSubmission', message: 'error', error });
       await connection.rollback();

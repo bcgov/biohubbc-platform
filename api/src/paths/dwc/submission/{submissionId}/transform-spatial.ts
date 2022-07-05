@@ -55,21 +55,7 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Successfully transformed spatial submission file',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'object',
-            properties: {
-              submission_spatial_component_id: {
-                type: 'integer',
-                minimum: 1
-              }
-            },
-            nullable: true
-          }
-        }
-      }
+      description: 'Successfully transformed spatial submission file'
     },
     ...defaultErrorResponses
   }
@@ -95,11 +81,11 @@ export function transformSpatialSubmission(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const response = await spatialService.runTransform(submissionId, transformId);
+      await spatialService.runTransform(submissionId, transformId);
 
       await connection.commit();
 
-      res.status(200).json(response);
+      res.status(200).send();
     } catch (error) {
       defaultLog.error({ label: 'transformSpatialSubmission', message: 'error', error });
       await connection.rollback();
