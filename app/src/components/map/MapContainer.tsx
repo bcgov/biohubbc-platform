@@ -15,7 +15,7 @@ import { GetMapBounds, SetMapBounds } from './components/Bounds';
 import DrawControls from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
-import MarkerClusterGroup, { IMarker } from './components/MarkerCluster';
+import MarkerClusterGroup, { IMarkerLayer } from './components/MarkerCluster';
 import StaticLayers, { IStaticLayer } from './components/StaticLayers';
 
 const useStyles = makeStyles(() => ({
@@ -43,7 +43,7 @@ export interface IMapContainerProps {
   drawControls?: IMapDrawControlsProps;
   scrollWheelZoom?: boolean;
   fullScreenControl?: boolean;
-  markers?: IMarker[];
+  markerLayers?: IMarkerLayer[];
   bounds?: any;
   zoom?: number;
   eventHandlers?: LeafletEventHandlerFnMap;
@@ -60,7 +60,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
     drawControls,
     scrollWheelZoom,
     fullScreenControl,
-    markers,
+    markerLayers,
     bounds,
     zoom,
     eventHandlers,
@@ -108,12 +108,12 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
         </FeatureGroup>
       )}
 
-      <MarkerClusterGroup markers={markers} />
-
       <EventHandler eventHandlers={eventHandlers} />
 
       <LayersControl position="bottomright">
         <StaticLayers layers={staticLayers} />
+
+        <MarkerClusterGroup layers={markerLayers} />
 
         <BaseLayerControls />
       </LayersControl>

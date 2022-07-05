@@ -151,7 +151,7 @@ export function getKeyByValue(object: any, value: any) {
   return Object.keys(object).find((key) => object[key] === value);
 }
 
-export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds) {
+export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature {
   const southWest = bounds.getSouthWest();
   const northEast = bounds.getNorthEast();
 
