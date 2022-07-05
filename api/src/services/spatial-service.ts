@@ -1,5 +1,10 @@
 import { IDBConnection } from '../database/db';
-import { IInsertSpatialTransform, SpatialRepository } from '../repositories/spatial-repository';
+import {
+  IInsertSpatialTransform,
+  ISpatialComponentsSearchCriteria,
+  ISubmissionSpatialComponent,
+  SpatialRepository
+} from '../repositories/spatial-repository';
 import { DBService } from './db-service';
 
 export class SpatialService extends DBService {
@@ -73,5 +78,11 @@ export class SpatialService extends DBService {
     );
 
     return this.spatialRepository.insertSubmissionSpatialComponent(submissionId, transformed);
+  }
+
+  async findSpatialComponentsByCriteria(
+    criteria: ISpatialComponentsSearchCriteria
+  ): Promise<ISubmissionSpatialComponent[]> {
+    return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
   }
 }

@@ -1,47 +1,89 @@
 import L, { LatLngExpression } from 'leaflet';
 import React, { ReactElement } from 'react';
-import { Marker } from 'react-leaflet';
+import { LayersControl, Marker, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster';
-export interface IMarker {
-  position: LatLngExpression;
-  popup?: ReactElement;
-}
 
-export interface IMarkerClusterProps {
-  markers?: IMarker[];
-}
+const MARKER_SVG = {
+  DOT: '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path fill="{color}" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>'
+};
 
-const MarkerClusterGroup: React.FC<IMarkerClusterProps> = (props) => {
-  if (!props.markers?.length) {
-    return null;
-  }
-
-  //TODO needs improvment for dynamic icons and colours
-  const iconSettings = {
-    mapIconUrl:
-      '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path fill="#2F5982" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>',
-    pinInnerCircleRadius: 48
-  };
-
-  // icon normal state
-  const divIcon = L.divIcon({
+export const MARKER_ICON = {
+  DOT: L.divIcon({
     className: 'leaflet-data-marker',
-    html: L.Util.template(iconSettings.mapIconUrl, iconSettings),
+    html: L.Util.template(MARKER_SVG.DOT, { color: '#2F5982' }),
     iconAnchor: [12, 32],
     iconSize: [25, 30],
     popupAnchor: [0, -28]
+  })
+};
+
+export interface IMarker {
+  position: LatLngExpression;
+  key?: string | number;
+  MarkerProps?: Partial<MarkerProps>;
+  popup?: ReactElement;
+  PopupProps?: Partial<PopupProps>;
+  tooltip?: ReactElement;
+  TooltipProps?: Partial<TooltipProps>;
+}
+
+export interface IMarkerLayer {
+  layerName: string;
+  markers: IMarker[];
+}
+
+export interface IMarkerLayersProps {
+  layers?: IMarkerLayer[];
+}
+
+const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
+  if (!props.layers?.length) {
+    return null;
+  }
+
+  const layerControls: ReactElement[] = [];
+
+  props.layers.forEach((layer, layerIndex) => {
+    if (!layer.markers?.length) {
+      return;
+    }
+
+    layerControls.push(
+      <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layerIndex}`}>
+        <ReactLeafletMarkerClusterGroup chunkedLoading>
+          {layer.markers.map((item, index: number) => {
+            const id = item.key || index;
+
+            return (
+              <Marker
+                icon={MARKER_ICON.DOT}
+                key={`marker-cluster-${id}-${index}`}
+                position={[item.position[1], item.position[0]]}
+                {...item.MarkerProps}>
+                {item.tooltip && (
+                  <Tooltip key={`marker-cluster-tooltip-${id}-${index}`} direction="top" {...item.TooltipProps}>
+                    {item.tooltip}
+                  </Tooltip>
+                )}
+                {item.popup && (
+                  <Popup
+                    key={`marker-cluster-popup-${id}-${index}`}
+                    keepInView={false}
+                    closeButton={false}
+                    autoPan={false}
+                    {...item.PopupProps}>
+                    {item.popup}
+                  </Popup>
+                )}
+              </Marker>
+            );
+          })}
+        </ReactLeafletMarkerClusterGroup>
+      </LayersControl.Overlay>
+    );
   });
 
-  return (
-    <ReactLeafletMarkerClusterGroup chunkedLoading>
-      {props.markers.map((item, index: number) => (
-        // Reverse the position (coordinates) from [lng, lat] to [lat, lng]
-        <Marker icon={divIcon} key={index} position={[item.position[1], item.position[0]]}>
-          {item.popup}
-        </Marker>
-      ))}
-    </ReactLeafletMarkerClusterGroup>
-  );
+  return <>{layerControls}</>;
 };
 
 export default MarkerClusterGroup;

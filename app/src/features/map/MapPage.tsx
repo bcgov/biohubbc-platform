@@ -1,88 +1,109 @@
-import { Container, Grid, Typography } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
-import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
-import { IMarker } from 'components/map/components/MarkerCluster';
+import Container from '@material-ui/core/Container';
+import Grid from '@material-ui/core/Grid';
+import Typography from '@material-ui/core/Typography';
+import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFeaturePopup';
+import { IMarkerLayer } from 'components/map/components/MarkerCluster';
+import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { IGetMapOccurrenceData, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
-import { DialogContext } from 'contexts/dialogContext';
+import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
 import { Feature } from 'geojson';
-import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { LatLngBounds } from 'leaflet';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
+import useDataLoader from 'hooks/useDataLoader';
+import useDataLoaderError from 'hooks/useDataLoaderError';
+import { LatLngBounds, LatLngTuple } from 'leaflet';
+import React, { useEffect, useState } from 'react';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
+export const ALL_OF_BC_BOUNDARY: Feature = {
+  type: 'Feature',
+  properties: {},
+  geometry: {
+    type: 'Polygon',
+    coordinates: [
+      [
+        [-146.95401365536304, 44.62175409623327],
+        [-146.95401365536304, 63.528970541102794],
+        [-105.07413084286304, 63.528970541102794],
+        [-105.07413084286304, 44.62175409623327],
+        [-146.95401365536304, 44.62175409623327]
+      ]
+    ]
+  }
+};
+
+export enum SPATIAL_COMPONENT_TYPE {
+  OCCURRENCE = 'Occurrence',
+  BOUNDARY = 'Boundary'
+}
+
+export enum LAYER_NAME {
+  OCCURRENCES = 'Occurrences',
+  BOUNDARIES = 'Boundaries'
+}
+
 const MapPage: React.FC = () => {
-  const platformApi = useApi();
+  const api = useApi();
 
-  const [performSearch, setPerformSearch] = useState<boolean>(true);
-  const [geometries, setGeometries] = useState<any[]>([]);
-
-  const dialogContext = useContext(DialogContext);
-
-  const showFilterErrorDialog = useCallback(
-    (textDialogProps?: Partial<IErrorDialogProps>) => {
-      dialogContext.setErrorDialog({
-        onClose: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        onOk: () => {
-          dialogContext.setErrorDialog({ open: false });
-        },
-        ...textDialogProps,
-        open: true
-      });
-    },
-    [dialogContext]
+  const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
+    api.search.getSpatialData({ boundary: boundary, type: type })
   );
 
-  const getOccurrenceData = useCallback(
-    async (bounds?: LatLngBounds) => {
-      try {
-        let spatialBounds: Feature = {} as unknown as Feature;
+  useDataLoaderError(mapDataLoader, () => {
+    return {
+      dialogTitle: 'Error Loading Map Data',
+      dialogText:
+        'An error has occurred while attempting to load the map data, please try again. If the error persists, please contact your system administrator.'
+    };
+  });
 
-        if (bounds) {
-          spatialBounds = getFeatureObjectFromLatLngBounds(bounds);
-        }
-
-        const response = await platformApi.search.getMapOccurrenceData(bounds ? spatialBounds : undefined);
-
-        if (!response) {
-          return;
-        }
-
-        const markers: IMarker[] = [];
-
-        response.forEach((result: IGetMapOccurrenceData) => {
-          if (result?.geometry) {
-            const geo = JSON.parse(result?.geometry);
-
-            markers.push({
-              position: geo.coordinates,
-              popup: <OccurrenceFeaturePopup featureData={result} />
-            });
-          }
-        });
-
-        setGeometries(markers);
-      } catch (error) {
-        const apiError = error as APIError;
-        showFilterErrorDialog({
-          dialogTitle: 'Error Searching For Results',
-          dialogError: apiError?.message,
-          dialogErrorDetails: apiError?.errors
-        });
-      }
-    },
-    [platformApi.search, showFilterErrorDialog]
-  );
+  const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
+  const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
   useEffect(() => {
-    if (performSearch) {
-      getOccurrenceData();
-      setPerformSearch(false);
+    if (!mapDataLoader.data?.length) {
+      return;
     }
-  }, [performSearch, getOccurrenceData]);
+
+    const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
+
+    const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
+    const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
+
+    for (const featureCollection of mapDataLoader.data) {
+      for (const feature of featureCollection.features) {
+        if (isOccurrenceFeature(feature)) {
+          if (feature.geometry.type === 'GeometryCollection') {
+            // Not expecting or supporting geometry collections
+            continue;
+          }
+
+          occurrencesMarkerLayer.markers.push({
+            position: feature.geometry.coordinates as LatLngTuple,
+            key: feature.id,
+            popup: <OccurrenceFeaturePopup properties={feature.properties} />
+          });
+        }
+
+        if (isBoundaryFeature(feature)) {
+          if (feature.geometry.type === 'GeometryCollection') {
+            continue;
+          }
+
+          boundaryStaticLayer.features.push({
+            geoJSON: feature,
+            key: feature.id,
+            popup: <BoundaryFeaturePopup properties={feature.properties} />
+          });
+        }
+      }
+    }
+
+    setStaticLayers([occurrenceStaticLayer, boundaryStaticLayer]);
+    setMarkerLayers([occurrencesMarkerLayer]);
+  }, [mapDataLoader.data]);
+
+  mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
 
   return (
     <Box my={4}>
@@ -96,9 +117,16 @@ const MapPage: React.FC = () => {
               <Box mt={2} height={750} data-testid="MapContainer">
                 <MapContainer
                   mapId="boundary_map"
-                  onBoundsChange={getOccurrenceData}
+                  onBoundsChange={(bounds: LatLngBounds) => {
+                    const boundary = getFeatureObjectFromLatLngBounds(bounds);
+                    mapDataLoader.refresh(boundary, [
+                      SPATIAL_COMPONENT_TYPE.BOUNDARY,
+                      SPATIAL_COMPONENT_TYPE.OCCURRENCE
+                    ]);
+                  }}
                   scrollWheelZoom={true}
-                  markers={geometries}
+                  markerLayers={markerLayers}
+                  staticLayers={staticLayers}
                 />
               </Box>
             </Grid>
@@ -110,3 +138,11 @@ const MapPage: React.FC = () => {
 };
 
 export default MapPage;
+
+export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeature => {
+  return feature.geometry.type === 'Point' && feature.properties?.['type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE;
+};
+
+export const isBoundaryFeature = (feature: Feature): feature is BoundaryFeature => {
+  return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY;
+};

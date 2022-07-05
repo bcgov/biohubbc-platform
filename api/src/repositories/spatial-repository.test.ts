@@ -8,7 +8,12 @@ import SQL from 'sql-template-strings';
 import { ApiGeneralError } from '../errors/api-error';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
-import { IInsertSpatialTransform, SpatialRepository } from './spatial-repository';
+import {
+  IInsertSpatialTransform,
+  ISpatialComponentsSearchCriteria,
+  ISubmissionSpatialComponent,
+  SpatialRepository
+} from './spatial-repository';
 
 chai.use(sinonChai);
 
@@ -274,6 +279,33 @@ describe('SpatialRepository', () => {
 
       expect(response.submission_spatial_component_id).to.equal(1);
       expect(generateGeometryCollectionSQLStub).to.be.calledOnce;
+    });
+  });
+
+  describe('findSpatialComponentsByCriteria', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponseRow1 = { submission_spatial_component_id: 1 } as unknown as ISubmissionSpatialComponent;
+      const mockResponseRow2 = { submission_spatial_component_id: 2 } as unknown as ISubmissionSpatialComponent;
+      const mockQueryResponse = { rowCount: 2, rows: [mockResponseRow1, mockResponseRow2] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
+        type: ['Occurrence'],
+        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+      };
+
+      const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
+
+      expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
   });
 });
