@@ -1,3 +1,4 @@
+import { Client } from '@elastic/elasticsearch';
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
 import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
@@ -992,6 +993,24 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect.fail();
       }
+    });
+  });
+
+  describe('deleteEmlFromElasticSearchByDataPackageId', () => {
+    it('should succeed and delete old es file', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const getEsClientStub = sinon.stub(SubmissionService.prototype, 'getEsClient').resolves({
+        delete: (id: string, index: string) => {
+          return `${id} ${index}`;
+        }
+      } as unknown as Client);
+
+      const response = await darwinCoreService.deleteEmlFromElasticSearchByDataPackageId('dataPackageId');
+
+      expect(getEsClientStub).to.be.calledOnce;
+      expect(response).to.equal('dataPackageId eml');
     });
   });
 });

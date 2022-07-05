@@ -61,6 +61,14 @@ export class SubmissionService extends DBService {
     return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
   }
 
+  /**
+   * Update the `eml_source` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {EMLFile} file
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
   async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordEMLSource(submissionId, file);
   }
