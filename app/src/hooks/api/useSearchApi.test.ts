@@ -1,5 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
+import { Feature, FeatureCollection } from 'geojson';
 import useSearchApi, { usePublicSearchApi } from './useSearchApi';
 
 describe('useSearchApi', () => {
@@ -30,6 +31,19 @@ describe('useSearchApi', () => {
     expect(result[0].id).toEqual('1');
   });
 
+  it('getSpatialData works as expected', async () => {
+    const res = [{ type: 'FeatureCollection' } as FeatureCollection];
+
+    mock.onGet('/api/dwc/spatial/search').reply(200, res);
+
+    const result = await useSearchApi(axios).getSpatialData({
+      boundary: { type: 'Feature' } as Feature,
+      type: ['type']
+    });
+
+    expect(result[0]).toEqual({ type: 'FeatureCollection' });
+  });
+
   it('listAllDatasets works as expected', async () => {
     const response = [
       {
@@ -46,23 +60,6 @@ describe('useSearchApi', () => {
 
     expect(actualResult[0].id).toEqual('a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf');
     expect(actualResult[0].fields).toEqual({ datasetTitle: ['Coastal Caribou'] });
-  });
-
-  it('getMapOccurrenceData works as expected', async () => {
-    const res = [
-      {
-        id: '1',
-        taxonid: 'name',
-        geometry: 'geometry',
-        observations: []
-      }
-    ];
-
-    mock.onGet('/api/dwc/submission/occurrence/list').reply(200, res);
-
-    const result = await useSearchApi(axios).getMapOccurrenceData();
-
-    expect(result[0].id).toEqual('1');
   });
 });
 

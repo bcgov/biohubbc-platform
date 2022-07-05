@@ -15,8 +15,8 @@ describe('useDataLoader', () => {
       expect(result.current.error).toBeUndefined();
     });
 
-    it('should mount and begin loading', () => {
-      expect(result.current.isLoading).toEqual(true);
+    it('should mount and not be loading', () => {
+      expect(result.current.isLoading).toEqual(false);
     });
 
     it('should mount and not be ready', () => {
@@ -24,65 +24,76 @@ describe('useDataLoader', () => {
     });
   });
 
-  describe('with rejecting promise', () => {
-    it('should expose an error when the promise rejects', async () => {
-      const deferred = new Deferred<string, string>();
-      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+  describe('load', () => {
+    describe('with rejecting promise', () => {
+      it('should expose an error when the promise rejects', async () => {
+        const deferred = new Deferred<string, string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
-      deferred.reject('promise-rejected');
-      await waitForValueToChange(() => result.current.error);
+        act(() => result.current.load());
+        deferred.reject('promise-rejected');
+        await waitForValueToChange(() => result.current.error);
 
-      expect(result.current.error).toEqual('promise-rejected');
+        expect(result.current.error).toEqual('promise-rejected');
+      });
+
+      it('should be in a ready state once the promise rejects', async () => {
+        const deferred = new Deferred<string, string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+
+        act(() => result.current.load());
+        deferred.reject('promise-rejected');
+        await waitForValueToChange(() => result.current.error);
+
+        expect(result.current.data).toBeUndefined();
+        expect(result.current.isLoading).toEqual(false);
+        expect(result.current.isReady).toEqual(true);
+      });
     });
 
-    it('should be in a ready state once the promise rejects', async () => {
-      const deferred = new Deferred<string, string>();
-      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+    describe('with resolved promise', () => {
+      it('should expose data when the promise resolves', async () => {
+        const deferred = new Deferred<string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
-      deferred.reject('promise-rejected');
-      await waitForValueToChange(() => result.current.error);
+        act(() => result.current.load());
+        deferred.resolve('promise-resolved');
+        await waitForValueToChange(() => result.current.data);
 
-      expect(result.current.data).toBeUndefined();
-      expect(result.current.isLoading).toEqual(false);
-      expect(result.current.isReady).toEqual(true);
+        expect(result.current.data).toEqual('promise-resolved');
+      });
+
+      it('should be in a ready state once the promise resolves', async () => {
+        const deferred = new Deferred<string>();
+        const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+
+        act(() => result.current.load());
+        deferred.resolve('promise-resolved');
+        await waitForValueToChange(() => result.current.data);
+
+        expect(result.current.error).toBeUndefined();
+        expect(result.current.isLoading).toEqual(false);
+        expect(result.current.isReady).toEqual(true);
+      });
     });
   });
 
-  describe('with resolved promise', () => {
-    it('should expose data when the promise resolves', async () => {
-      const deferred = new Deferred<string>();
-      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
-
-      deferred.resolve('promise-resolved');
-      await waitForValueToChange(() => result.current.data);
-
-      expect(result.current.data).toEqual('promise-resolved');
-    });
-
-    it('should be in a ready state once the promise resolves', async () => {
-      const deferred = new Deferred<string>();
-      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
-
-      deferred.resolve('promise-resolved');
-      await waitForValueToChange(() => result.current.data);
-
-      expect(result.current.error).toBeUndefined();
-      expect(result.current.isLoading).toEqual(false);
-      expect(result.current.isReady).toEqual(true);
-    });
-  });
-
-  describe('refreshing', () => {
+  describe('refresh', () => {
     it('should clear errors when refresh is called', async () => {
-      const deferred = new Deferred<string>();
+      const deferred = new Deferred<string, string>();
       const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
-      deferred.resolve('test1');
-      await waitForValueToChange(() => result.current.data);
-      expect(result.current.data).toEqual('test1');
+      act(() => result.current.load());
+      deferred.reject('reject1');
+      await waitForValueToChange(() => result.current.error);
 
-      act(() => result.current.refresh());
-      await waitForValueToChange(() => result.current.isLoading);
+      expect(result.current.error).toEqual('reject1');
+
+      act(() => {
+        deferred.reset();
+        result.current.refresh();
+      });
+
       expect(result.current.error).toBeUndefined();
     });
 
@@ -90,14 +101,16 @@ describe('useDataLoader', () => {
       const deferred = new Deferred<string>();
       const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
+      act(() => result.current.load());
       deferred.resolve('test2');
       await waitForValueToChange(() => result.current.data);
       expect(result.current.data).toEqual('test2');
 
       act(() => {
+        deferred.reset();
         result.current.refresh();
       });
-      await waitForValueToChange(() => result.current.isLoading);
+
       expect(result.current.data).toBe('test2');
     });
 
@@ -106,6 +119,7 @@ describe('useDataLoader', () => {
         const deferred = new Deferred<string>();
         const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
+        act(() => result.current.load());
         deferred.resolve('test3');
         await waitForValueToChange(() => result.current.data);
         expect(result.current.data).toEqual('test3');
@@ -124,9 +138,14 @@ describe('useDataLoader', () => {
         const deferred = new Deferred<string>();
         const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
+        act(() => result.current.load());
         deferred.resolve('test3');
         await waitForValueToChange(() => result.current.data);
         expect(result.current.data).toEqual('test3');
+
+        expect(result.current.error).toBeUndefined();
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.isReady).toBe(true);
 
         act(() => {
           deferred.reset();
@@ -135,8 +154,8 @@ describe('useDataLoader', () => {
         deferred.resolve('test3-refreshed');
         await waitForValueToChange(() => result.current.data);
 
-        expect(result.current.isLoading).toBe(false);
         expect(result.current.error).toBeUndefined();
+        expect(result.current.isLoading).toBe(false);
         expect(result.current.isReady).toBe(true);
       });
     });
@@ -146,6 +165,7 @@ describe('useDataLoader', () => {
         const deferred = new Deferred<string, string>();
         const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
+        act(() => result.current.load());
         deferred.resolve('resolve1');
         await waitForValueToChange(() => result.current.data);
         expect(result.current.data).toEqual('resolve1');
@@ -156,7 +176,6 @@ describe('useDataLoader', () => {
         });
         deferred.reject('reject1');
         await waitForValueToChange(() => result.current.error);
-
         expect(result.current.data).toEqual('resolve1');
       });
 
@@ -164,9 +183,12 @@ describe('useDataLoader', () => {
         const deferred = new Deferred<string, string>();
         const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
 
+        act(() => result.current.load());
         deferred.resolve('resolve2');
         await waitForValueToChange(() => result.current.data);
-        expect(result.current.data).toEqual('resolve2');
+        expect(result.current.error).toBeUndefined();
+        expect(result.current.isLoading).toBe(false);
+        expect(result.current.isReady).toBe(true);
 
         act(() => {
           deferred.reset();
@@ -175,9 +197,46 @@ describe('useDataLoader', () => {
         deferred.reject('reject2');
         await waitForValueToChange(() => result.current.error);
 
+        expect(result.current.error).toEqual('reject2');
         expect(result.current.isLoading).toBe(false);
         expect(result.current.isReady).toBe(true);
       });
+    });
+  });
+
+  describe('clear', () => {
+    it('should clear errors when clear is called', async () => {
+      const deferred = new Deferred<string, string>();
+      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+
+      act(() => result.current.load());
+      deferred.reject('reject1');
+      await waitForValueToChange(() => result.current.error);
+      expect(result.current.error).toEqual('reject1');
+
+      act(() => {
+        deferred.reset();
+        result.current.clear();
+      });
+      expect(result.current.error).toBeUndefined();
+    });
+
+    it('should be in a ready state after clear is called', async () => {
+      const deferred = new Deferred<string, string>();
+      const { result, waitForValueToChange } = renderHook(() => useDataLoader(() => deferred.promise));
+
+      act(() => result.current.load());
+      deferred.reject('reject1');
+      await waitForValueToChange(() => result.current.error);
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
+
+      act(() => {
+        deferred.reset();
+        result.current.clear();
+      });
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.isReady).toBe(true);
     });
   });
 });
