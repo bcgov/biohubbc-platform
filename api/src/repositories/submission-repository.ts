@@ -359,11 +359,11 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
-    // let sqlStatement;
     const queryBuilder = getKnexQueryBuilder()
       .select('*')
       .from('source_transform')
-      .where('system_user_id', systemUserId);
+      .where('system_user_id', systemUserId)
+      .and.where('record_end_date', null);
 
     if (version) {
       queryBuilder.and.where('version', version);
@@ -393,7 +393,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.query(transform, [submissionId]);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get submission source transform record', [
+      throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
         'SubmissionRepository->getSubmissionMetadataJson',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);

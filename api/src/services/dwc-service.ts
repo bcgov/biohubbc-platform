@@ -4,7 +4,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import {
+  ISubmissionModel,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE
+} from '../repositories/submission-repository';
 import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
@@ -82,7 +86,7 @@ export class DarwinCoreService extends DBService {
     try {
       await this.transformEMLtoJSON(submissionId);
     } catch (error) {
-      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
+      defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -169,6 +173,8 @@ export class DarwinCoreService extends DBService {
     const parser = new XMLParser(options);
 
     const eml_json_source = parser.parse(submission.eml_source as string);
+
+    await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
 
     return eml_json_source;
   }
@@ -277,7 +283,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * transform submission record eml to json and upload metadata
+   * transform submission record eml to metadata json and upload to search engine
    *
    * @param {number} submissionId
    * @param {string} dataPackageId
