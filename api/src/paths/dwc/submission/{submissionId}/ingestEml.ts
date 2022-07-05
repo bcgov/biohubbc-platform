@@ -46,14 +46,7 @@ POST.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Submission EML ingested ',
-      content: {
-        'application/json': {
-          schema: {
-            //
-          }
-        }
-      }
+      description: 'Submission EML ingested '
     },
     ...defaultErrorResponses
   }
@@ -78,11 +71,13 @@ export function ingestEmlSubmission(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      const response = await darwinCoreService.ingestNewDwcaEML(submissionId);
+      await darwinCoreService.ingestNewDwcaEML(submissionId);
+
+      await darwinCoreService.convertSubmissionEMLtoJSON(submissionId);
 
       await connection.commit();
 
-      res.status(200).json(response);
+      res.status(200).send();
     } catch (error) {
       defaultLog.error({ label: 'secureSubmission', message: 'error', error });
       await connection.rollback();

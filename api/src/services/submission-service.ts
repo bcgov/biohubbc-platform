@@ -12,6 +12,7 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { getFileFromS3 } from '../utils/file-utils';
+import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
 export class SubmissionService extends DBService {
@@ -58,6 +59,10 @@ export class SubmissionService extends DBService {
     inputKey: IInsertSubmissionRecord['input_key']
   ): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
+  }
+
+  async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
+    return this.submissionRepository.updateSubmissionRecordEMLSource(submissionId, file);
   }
 
   /**
@@ -178,26 +183,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Gets the S3key of the EMLStyleSheet from the DB.
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<string>}
-   * @memberof SubmissionService
-   */
-  async getEMLStyleSheetKey(submissionId: number): Promise<string> {
-    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
-
-    if (!transformRecord.transform_precompile_key) {
-      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
-        'SubmissionRepository->getStyleSheetKey',
-        'stylesheet_key was null'
-      ]);
-    }
-
-    return transformRecord.transform_precompile_key;
-  }
-
-  /**
    * Returns the EML stylesheet from S3
    *
    * @param {number} submissionId
@@ -205,18 +190,26 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
-    const stylesheet_key = await this.getEMLStyleSheetKey(submissionId);
+    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
 
-    return this.getFileFromS3(stylesheet_key);
+    if (!transformRecord.transform_precompile_key) {
+      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
+        'SubmissionRepository->getStylesheetFromS3',
+        'stylesheet_key was null'
+      ]);
+    }
+
+    return this.getFileFromS3(transformRecord.transform_precompile_key);
   }
 
-  async getIngestFileFromS3(submissionId: number): Promise<GetObjectOutput> {
-    const input_key = await this.getInputFileNameKey(submissionId);
-
-    return this.getFileFromS3(input_key);
-  }
-
-  async getInputFileNameKey(submissionId: number): Promise<string> {
+  /**
+   * Returns Intake file from S3
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<GetObjectOutput>}
+   * @memberof SubmissionService
+   */
+  async getIntakeFileFromS3(submissionId: number): Promise<GetObjectOutput> {
     const transformRecord = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
 
     if (!transformRecord.input_key) {
@@ -226,9 +219,16 @@ export class SubmissionService extends DBService {
       ]);
     }
 
-    return transformRecord.input_key;
+    return this.getFileFromS3(transformRecord.input_key);
   }
 
+  /**
+   * Collect filename from S3
+   *
+   * @param {string} fileName
+   * @return {*}  {Promise<GetObjectOutput>}
+   * @memberof SubmissionService
+   */
   async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
     const s3File = await getFileFromS3(fileName);
 
