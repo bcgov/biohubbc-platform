@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 /* eslint-disable @typescript-eslint/no-unused-vars */
-=======
->>>>>>> e3ac64ea2a068967e130c0f667aeacffef64d49a
 import { XMLParser } from 'fast-xml-parser';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
@@ -159,15 +156,10 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<{ occurrence_id: number }[]>}
    * @memberof DarwinCoreService
    */
-<<<<<<< HEAD
   async transformEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }> {
     const submissionService = new SubmissionService(this.connection);
 
     const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
-=======
-  async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
-    const submission = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
->>>>>>> e3ac64ea2a068967e130c0f667aeacffef64d49a
 
     const options = {
       ignoreAttributes: false,
@@ -178,11 +170,6 @@ export class DarwinCoreService extends DBService {
 
     const eml_json_source = parser.parse(submission.eml_source as string);
 
-<<<<<<< HEAD
-=======
-    await this.submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
-
->>>>>>> e3ac64ea2a068967e130c0f667aeacffef64d49a
     return eml_json_source;
   }
 
@@ -343,39 +330,6 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-<<<<<<< HEAD
-=======
-   * Conversion of eml to JSON
-   *
-   * Note: See https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766 to see the library's author
-   * respond to one of our questions
-   *
-   * @param {string} emlSource
-   * @param {*} stylesheet
-   * @return {*}  {Promise<any>}
-   * @memberof DarwinCoreService
-   */
-  async transformEMLtoJSON(emlSource: string, stylesheet: any): Promise<any> {
-    const result: {
-      principalResult: string;
-      resultDocuments: unknown;
-      stylesheetInternal: Record<string, unknown>;
-      masterDocument: unknown;
-    } = SaxonJS2N.transform({
-      stylesheetText: stylesheet,
-      sourceText: emlSource,
-      destination: 'serialized'
-    });
-
-    if (!result.principalResult) {
-      throw new ApiGeneralError('Failed to transform eml with stylesheet');
-    }
-
-    return JSON.parse(result.principalResult);
-  }
-
-  /**
->>>>>>> e3ac64ea2a068967e130c0f667aeacffef64d49a
    *  Temp replacement for validation until more requirements are set
    *
    * @param {number} submissionId

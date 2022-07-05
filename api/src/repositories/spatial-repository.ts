@@ -1,10 +1,6 @@
 import { Feature, FeatureCollection } from 'geojson';
-<<<<<<< HEAD
-import SQL from 'sql-template-strings';
-=======
 import SQL, { SQLStatement } from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
@@ -16,8 +12,6 @@ export interface IInsertSpatialTransform {
   transform: string;
 }
 
-<<<<<<< HEAD
-=======
 export interface ISubmissionSpatialComponent {
   submission_spatial_component_id: number;
   submission_id: number;
@@ -34,7 +28,6 @@ export interface ISpatialComponentsSearchCriteria {
   boundary: Feature;
 }
 
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 export class SpatialRepository extends BaseRepository {
   /**
    * Insert new spatial transform record
@@ -158,12 +151,7 @@ export class SpatialRepository extends BaseRepository {
       ]);
     }
 
-<<<<<<< HEAD
     return response.rows[0][Object.keys(response.rows[0])[0]];
-=======
-    return response.rows[0].json_build_object;
-    //TODO: subject to change .json_build_object name
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
   }
 
   /**
@@ -176,11 +164,7 @@ export class SpatialRepository extends BaseRepository {
    */
   async insertSubmissionSpatialComponent(
     submissionId: number,
-<<<<<<< HEAD
-    transformedData: Feature[]
-=======
     transformedData: FeatureCollection
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
   ): Promise<{ submission_spatial_component_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
@@ -192,13 +176,8 @@ export class SpatialRepository extends BaseRepository {
         ${JSON.stringify(transformedData)}
     `;
 
-<<<<<<< HEAD
-    if (transformedData.length > 0) {
-      const geoCollection = generateGeometryCollectionSQL(transformedData);
-=======
     if (transformedData.features && transformedData.features.length > 0) {
       const geoCollection = generateGeometryCollectionSQL(transformedData.features);
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 
       sqlStatement.append(SQL`
         ,public.geography(

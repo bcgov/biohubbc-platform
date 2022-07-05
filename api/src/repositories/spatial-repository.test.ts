@@ -8,16 +8,12 @@ import SQL from 'sql-template-strings';
 import { ApiGeneralError } from '../errors/api-error';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
-<<<<<<< HEAD
-import { IInsertSpatialTransform, SpatialRepository } from './spatial-repository';
-=======
 import {
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
   ISubmissionSpatialComponent,
   SpatialRepository
 } from './spatial-repository';
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 
 chai.use(sinonChai);
 
@@ -223,11 +219,7 @@ describe('SpatialRepository', () => {
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
       try {
-<<<<<<< HEAD
-        await spatialRepository.insertSubmissionSpatialComponent(1, []);
-=======
         await spatialRepository.insertSubmissionSpatialComponent(1, {} as FeatureCollection);
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal(
@@ -249,11 +241,7 @@ describe('SpatialRepository', () => {
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
-<<<<<<< HEAD
-      const response = await spatialRepository.insertSubmissionSpatialComponent(1, []);
-=======
       const response = await spatialRepository.insertSubmissionSpatialComponent(1, {} as FeatureCollection);
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 
       expect(response.submission_spatial_component_id).to.equal(1);
     });
@@ -275,18 +263,6 @@ describe('SpatialRepository', () => {
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
-<<<<<<< HEAD
-      const response = await spatialRepository.insertSubmissionSpatialComponent(1, [
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [125.6, 10.1]
-          },
-          properties: {}
-        }
-      ]);
-=======
       const response = await spatialRepository.insertSubmissionSpatialComponent(1, {
         type: 'FeatureCollection',
         features: [
@@ -300,14 +276,11 @@ describe('SpatialRepository', () => {
           }
         ]
       } as FeatureCollection);
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 
       expect(response.submission_spatial_component_id).to.equal(1);
       expect(generateGeometryCollectionSQLStub).to.be.calledOnce;
     });
   });
-<<<<<<< HEAD
-=======
 
   describe('findSpatialComponentsByCriteria', () => {
     afterEach(() => {
@@ -335,5 +308,4 @@ describe('SpatialRepository', () => {
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
   });
->>>>>>> 12e78bf6fa5cab7bc32ed6f0f8a541c881b087a5
 });
