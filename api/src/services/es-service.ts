@@ -1,8 +1,8 @@
 import { Client } from '@elastic/elasticsearch';
-import { AggregationsAggregate, SearchHit, SearchResponse, SearchRequest } from '@elastic/elasticsearch/lib/api/types';
+import { AggregationsAggregate, SearchHit, SearchRequest, SearchResponse } from '@elastic/elasticsearch/lib/api/types';
 
 enum ElasticSearchIndices {
-  EML = "eml"
+  EML = 'eml'
 }
 
 /**
@@ -34,16 +34,15 @@ export class ESService {
    * @returns {Promise<SearchHit<T>>} The results of the search
    */
   async _elasticSearch<T = unknown>(searchRequest: SearchRequest): Promise<SearchHit<T>[]> {
-    const { index, ...request } = searchRequest
+    const { index, ...request } = searchRequest;
     const esClient = await this.getEsClient();
 
     const response: SearchResponse<T, Record<string, AggregationsAggregate>> = await esClient.search<T>({
       index: String(index).toLowerCase(),
       ...request
-    })
+    });
 
     return response.hits.hits;
-
   }
 
   /**
@@ -57,14 +56,11 @@ export class ESService {
 
       query: {
         multi_match: {
-          fields: [
-            "project.taxonomicCoverage.commonName",
-            "project.taxonomicCoverage.taxonRankValue"
-          ],
-          type: "phrase_prefix",
+          fields: ['project.taxonomicCoverage.commonName', 'project.taxonomicCoverage.taxonRankValue'],
+          type: 'phrase_prefix',
           query
         }
       }
-    })
+    });
   }
 }

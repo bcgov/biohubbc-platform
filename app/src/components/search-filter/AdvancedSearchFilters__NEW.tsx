@@ -14,10 +14,10 @@ import CustomTextField from 'components/fields/CustomTextField';
 import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import MultiAutocompleteFieldVariableSize from 'components/fields/MultiAutocompleteFieldVariableSize__NEW';
 import { useFormikContext } from 'formik';
+import { useApi } from 'hooks/useApi';
 import { debounce } from 'lodash-es';
 import React, { useCallback } from 'react';
 import { IAdvancedSearchFilters } from './AdvancedSearch';
-import { useApi } from 'hooks/useApi';
 
 /**
  * Project - Advanced filters
@@ -27,9 +27,9 @@ import { useApi } from 'hooks/useApi';
 const ProjectAdvancedFilters: React.FC = (props) => {
   const formikProps = useFormikContext<IAdvancedSearchFilters>();
   const biohubApi = useApi();
-  
+
   // const { handleChange, values } = formikProps;
-  console.log('formikProps:', formikProps)
+  console.log('formikProps:', formikProps);
 
   const convertOptions = (value: any): IMultiAutocompleteFieldOption[] =>
     value.map((item: any) => {
@@ -72,7 +72,7 @@ const ProjectAdvancedFilters: React.FC = (props) => {
             <Grid item xs={12}>
               <CustomTextField name="project_name" label="Project Name" />
             </Grid>
-            
+
             <Grid item xs={12}>
               <MultiAutocompleteFieldVariableSize
                 id="species"
@@ -86,7 +86,6 @@ const ProjectAdvancedFilters: React.FC = (props) => {
           </Grid>
         </Grid>
       </Grid>
-
     </Box>
   );
 };

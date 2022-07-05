@@ -89,7 +89,7 @@ export function searchInElasticSearch(): RequestHandler {
     try {
       const elasticService = new ESService();
 
-      const response = await elasticService.keywordSearchEml(queryString)
+      const response = await elasticService.keywordSearchEml(queryString);
 
       const result = response.map((item) => {
         return {

@@ -10,25 +10,23 @@ import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
 */
 import Typography from '@material-ui/core/Typography';
+import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
+import { DialogContext } from 'contexts/dialogContext';
 // import AdvancedSearch, { advancedSearchFiltersInitialValues, IAdvancedSearchFilters } from 'components/search-filter/AdvancedSearch';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import qs from 'qs'
+import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
+import { truncate } from 'lodash';
+import qs from 'qs';
 import React, { useCallback, useContext, useRef, useState } from 'react';
-import { useHistory, useLocation } from 'react-router'
-import { truncate } from 'lodash'
-import { IAdvancedSearch, /*IElasticsearchResponse, IKeywordSearchResult*/ } from 'interfaces/useSearchApi.interface';
-
-import { DialogContext } from 'contexts/dialogContext';
-import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
+import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
-
 
 const advancedSearchInitialValues: IAdvancedSearch = {
   keywords: ''
-}
+};
 
 const SearchPage = () => {
   // const classes = useStyles();
@@ -36,29 +34,29 @@ const SearchPage = () => {
   const history = useHistory();
   const location = useLocation();
   const dialogContext = useContext(DialogContext);
-  
+
   // const [isLoading, setIsLoading] = useState(false); // Use dataloader.isLoading
   const searchDataLoader = useDataLoader((query: string) => {
-    return biohubApi.search.keywordSearch(query)
-  })
-//  const { isLoading } = searchDataLoader
+    return biohubApi.search.keywordSearch(query);
+  });
+  //  const { isLoading } = searchDataLoader
 
-  console.log('searchDataLoader', searchDataLoader)
-  
+  console.log('searchDataLoader', searchDataLoader);
+
   //collection of params from url location.search
   const collectFilterParams = useCallback((): IAdvancedSearch => {
     if (location.search) {
       const urlParams = qs.parse(location.search.replace('?', ''));
 
-      return { keywords: urlParams.keywords } as IAdvancedSearch
+      return { keywords: urlParams.keywords } as IAdvancedSearch;
     }
     return advancedSearchInitialValues;
   }, [location.search]);
 
   const [formikValues, setFormikValues] = useState<IAdvancedSearch>(collectFilterParams);
   const formikRef = useRef<FormikProps<IAdvancedSearch>>(null);
-  
-  console.log('formikValues:', formikValues)
+
+  console.log('formikValues:', formikValues);
 
   //Search Params
   /*
@@ -82,8 +80,10 @@ const SearchPage = () => {
    * Determines if the search parameters are empty
    */
   const isDefaultState = (): boolean => {
-    return JSON.stringify(!formikRef?.current || formikRef.current.values) === JSON.stringify(advancedSearchInitialValues)
-  }
+    return (
+      JSON.stringify(!formikRef?.current || formikRef.current.values) === JSON.stringify(advancedSearchInitialValues)
+    );
+  };
 
   /**
    * Updates URL search params to reflect formikRef values
@@ -107,7 +107,7 @@ const SearchPage = () => {
   };
 
   const handleSubmit = async () => {
-    console.log('handleSubmit()')
+    console.log('handleSubmit()');
     if (!formikRef?.current) {
       return;
     }
@@ -118,7 +118,7 @@ const SearchPage = () => {
     }
 
     try {
-      searchDataLoader.refresh(formikRef.current?.values.keywords)
+      searchDataLoader.refresh(formikRef.current?.values.keywords);
 
       updateSearchParams();
     } catch (error) {
@@ -152,12 +152,9 @@ const SearchPage = () => {
     })) || [];
 
     */
-  //const data = 
+  //const data =
   const results = (searchDataLoader.data || []).reduce((acc: any, item) => {
-    return [
-      ...acc,
-      ...item.source.project
-    ]
+    return [...acc, ...item.source.project];
   }, []);
 
   /*
@@ -179,8 +176,8 @@ const SearchPage = () => {
     },
   ];
   */
-  
-  searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords)
+
+  searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
   return (
     <Box my={4}>
@@ -193,7 +190,7 @@ const SearchPage = () => {
             BioHubBC Platform search.
           </Typography>
         </Box>
-        
+
         <Box>
           <Formik<IAdvancedSearch>
             innerRef={formikRef}
@@ -201,10 +198,10 @@ const SearchPage = () => {
             onSubmit={handleSubmit}
             onReset={handleReset}
             enableReinitialize={true}>
-              <SearchComponent />
+            <SearchComponent />
           </Formik>
         </Box>
-        
+
         <Box my={4}>
           <Typography variant="h2">
             {searchDataLoader.isLoading ? (
@@ -212,18 +209,20 @@ const SearchPage = () => {
             ) : (
               <>
                 {`${results.length} result${results.length !== 1 && 's'}`}
-                <Typography variant='inherit' component='span' color='textSecondary'>{` for '${formikRef.current?.values.keywords}'`}</Typography>
+                <Typography
+                  variant="inherit"
+                  component="span"
+                  color="textSecondary">{` for '${formikRef.current?.values.keywords}'`}</Typography>
               </>
             )}
           </Typography>
-  
         </Box>
 
         <Box>
           {results.map((result: any) => (
             <Box mb={3} p={2} key={result.id} borderRadius={4} border={1}>
-              <Typography variant='h4'>{result.projectTitle}</Typography>
-              <Typography variant='body1' color='textSecondary'>
+              <Typography variant="h4">{result.projectTitle}</Typography>
+              <Typography variant="body1" color="textSecondary">
                 {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
               </Typography>
             </Box>

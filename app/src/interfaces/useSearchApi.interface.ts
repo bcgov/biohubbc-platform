@@ -47,16 +47,18 @@ export type IElasticsearchResponse<T = unknown, S = unknown> = Array<{
   id: string;
   fields: T;
   source: S;
-}>
+}>;
 
 export interface IKeywordSearchResult {
-  project: [{
-    projectId: string
-    projectTitle: string
-    projectObjectives: string
-  }]
+  project: [
+    {
+      projectId: string;
+      projectTitle: string;
+      projectObjectives: string;
+    }
+  ];
 }
 
 export interface IAdvancedSearch {
-  keywords: string
+  keywords: string;
 }

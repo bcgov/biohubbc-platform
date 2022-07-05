@@ -13,7 +13,7 @@ import { Icon } from '@mdi/react';
 // import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import { useFormikContext } from 'formik';
 import React, { useEffect, useState } from 'react';
-import AdvancedSearchFilters from './AdvancedSearchFilters__NEW' //'./AdvancedSearchFilters';
+import AdvancedSearchFilters from './AdvancedSearchFilters__NEW'; //'./AdvancedSearchFilters';
 
 const useStyles = makeStyles((theme: Theme) => ({
   actionButton: {
@@ -69,7 +69,7 @@ export interface IAdvancedSearchFilters {
   species?: number | number[];
 }
 
-export const advancedSearchFiltersKeyLabels: Record<string, { label: string, codeSet?: string }> = {
+export const advancedSearchFiltersKeyLabels: Record<string, { label: string; codeSet?: string }> = {
   keyword: { label: 'Keyword' },
   project_name: { label: 'Project Name' },
   species: { label: 'Species' }
@@ -101,8 +101,8 @@ const AdvancedSearch: React.FC<IAdvancedSearchFiltersProps> = (props) => {
   const { handleSubmit, handleChange, handleReset, values, setFieldValue } = formikProps;
 
   const isInDefaultState = (): boolean => {
-    return JSON.stringify(values) === JSON.stringify(advancedSearchFiltersInitialValues)
-  }
+    return JSON.stringify(values) === JSON.stringify(advancedSearchFiltersInitialValues);
+  };
 
   const handleDelete = (key: string, value: string | number) => {
     if (Array.isArray(values[key]) && values[key].length !== 1) {
@@ -159,7 +159,7 @@ const AdvancedSearch: React.FC<IAdvancedSearchFiltersProps> = (props) => {
 
   const getChipLabel = (key: string, value: string) => {
     const filterKeyLabel = advancedSearchFiltersKeyLabels[key].label;
-    const filterValueLabel = value
+    const filterValueLabel = value;
 
     return (
       <>
@@ -223,9 +223,11 @@ const AdvancedSearch: React.FC<IAdvancedSearchFiltersProps> = (props) => {
                 variant="outlined"
                 disableRipple={true}
                 endIcon={
-                  isAdvancedSearchFiltersOpen
-                    ? <Icon path={mdiMenuUp} size={1} />
-                    : <Icon path={mdiMenuDown} size={1} />
+                  isAdvancedSearchFiltersOpen ? (
+                    <Icon path={mdiMenuUp} size={1} />
+                  ) : (
+                    <Icon path={mdiMenuDown} size={1} />
+                  )
                 }
                 onClick={() => setIsAdvancedSearchFiltersOpen(!isAdvancedSearchFiltersOpen)}>
                 Advanced
@@ -263,7 +265,7 @@ const AdvancedSearch: React.FC<IAdvancedSearchFiltersProps> = (props) => {
           {isAdvancedSearchFiltersOpen && (
             <Box my={5}>
               <AdvancedSearchFilters
-                /*
+              /*
                   contact_agency={contact_agency}
                   funding_agency={funding_agency}
                   ranges={ranges}

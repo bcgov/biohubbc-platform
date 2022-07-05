@@ -1,6 +1,10 @@
 import { AxiosInstance } from 'axios';
-import { IGetSearchResultsResponse, IElasticsearchResponse, IKeywordSearchResult } from 'interfaces/useSearchApi.interface';
 import { Feature, FeatureCollection } from 'geojson';
+import {
+  IElasticsearchResponse,
+  IGetSearchResultsResponse,
+  IKeywordSearchResult
+} from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with search functionality
@@ -43,7 +47,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     const { data } = await axios.get(`api/dwc/eml/search?q=${searchQuery}`);
 
     return data;
-  }
+  };
 
   return {
     getSearchResults,
