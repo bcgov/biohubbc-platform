@@ -134,8 +134,7 @@ export class SpatialRepository extends BaseRepository {
       ]);
     }
 
-    return response.rows[0].json_build_object;
-    //TODO: subject to change .json_build_object name
+    return response.rows[0][Object.keys(response.rows[0])[0]];
   }
 
   /**

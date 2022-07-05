@@ -23,13 +23,13 @@ export async function up(knex: Knex): Promise<void> {
     , related_projects as (select p.proj_n, 'survey' project_type, p.project from datasets, jsonb_path_query(dataset, '$.**.relatedProject[*]') with ordinality p(project, proj_n))
     , all_projects as (select * from projects union select * from related_projects)
     , funding as (select ap.proj_n, ap.project_type, f.fund_n, f.funding from all_projects ap, jsonb_path_query(project, '$.funding.section') with ordinality f(funding, fund_n))
-    , fundings as (select f.proj_n, f.project_type, f.fund_n, fs.funds_n, jsonb_build_object('agencyName', fs.fundings->'para', 'fundingStartDate', jsonb_path_query(fs.fundings, '$.section[*] ? (@.title == "Funding Start Date").para'), 'fundingEndDate', jsonb_path_query(fs.fundings, '$.section[*] ? (@.title == "Funding End Date").para')) funding_object from funding f, jsonb_array_elements(funding) with ordinality fs(fundings, funds_n))
+    , fundings as (select f.proj_n, f.project_type, f.fund_n, fs.funds_n, jsonb_build_object('agencyName', fs.fundings->'para', 'fundingStartDate', jsonb_path_query(fs.fundings, '$.section[*] \\? (@.title == "Funding Start Date").para'), 'fundingEndDate', jsonb_path_query(fs.fundings, '$.section[*] \\? (@.title == "Funding End Date").para')) funding_object from funding f, jsonb_array_elements(funding) with ordinality fs(fundings, funds_n))
     , funding_arrs as (select proj_n, project_type, jsonb_agg(funding_object) funding_arr from fundings group by project_type, proj_n)
     , project_objects as (select jsonb_build_object('projectId', aps.project->'@_id'
       , 'projectType', aps.project_type
       , 'projectTitle', aps.project->'title'
       , 'projectOrganizationName', aps.project->'personnel'->'organizationName'
-      , 'projectObjectives', jsonb_path_query(aps.project, '$.abstract.section[*] ? (@.title == "Objectives").para')
+      , 'projectObjectives', jsonb_path_query(aps.project, '$.abstract.section[*] \\? (@.title == "Objectives").para')
         , 'taxonomicCoverage', (select jsonb_build_object('taxonRankName', taxon->'taxonRankName', 'taxonRankValue', taxon->'taxonRankValue', 'commonName', taxon->'commonName', 'taxonId', taxon->'taxonId'->'#text') from jsonb_path_query(aps.project, '$.studyAreaDescription.coverage.taxonomicCoverage.taxonomicClassification') taxon)
       , 'fundingSource', fas.funding_arr) project_object from all_projects aps left join funding_arrs fas 
       on fas.proj_n = aps.proj_n and fas.project_type = aps.project_type)
@@ -41,9 +41,9 @@ export async function up(knex: Knex): Promise<void> {
       , 'projectStakeholderPartnerships', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.stakeholderPartnerships.stakeholderPartnership')
       , 'projectActivities', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectActivities.projectActivity')	
       , 'projectClimateChangeInitiatives', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectClimateChangeInitiatives.projectClimateChangeInitiative')
-      , 'projectFirtNations', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.firstNationPartnerships.firstNationPartnership')
+      , 'projectFirstNations', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.firstNationPartnerships.firstNationPartnership')
       , 'projectSurveyProprietors', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectSurveyProprietors.projectSurveyProprietor')
-      ) from eml e, datasets d, project_arr p$transform$);
+      ) result_data from eml e, datasets d, project_arr p$transform$);
 
   `);
 }

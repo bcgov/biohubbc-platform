@@ -30,8 +30,8 @@ export interface ISubmissionModel {
   submission_id: number;
   source_transform_id: number;
   uuid: string;
-  event_timestamp: string;
-  delete_timestamp: string | null;
+  record_effective_date: string;
+  record_end_date: string | null;
   input_key: string | null;
   input_file_name: string | null;
   eml_source: string | null;
@@ -354,35 +354,22 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Fetch a submission source transform record by associated source system user id.
    *
-   * @param {number} submissionId
+   * @param {number} systemUserId
    * @return {*}  {Promise<ISourceTransformModel>}
    * @memberof SubmissionRepository
    */
   async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
-    let sqlStatement;
+    // let sqlStatement;
+    const queryBuilder = getKnexQueryBuilder()
+      .select('*')
+      .from('source_transform')
+      .where('system_user_id', systemUserId);
+
     if (version) {
-      sqlStatement = SQL`
-        SELECT
-          *
-        FROM
-          source_transform
-        WHERE
-          system_user_id = ${systemUserId}
-          and version = ${version}        
-      `;
-    } else {
-      sqlStatement = SQL`
-        SELECT
-          *
-        FROM
-          source_transform
-        WHERE
-          system_user_id = ${systemUserId}
-          and record_end_date is null
-      `;
+      queryBuilder.and.where('version', version);
     }
 
-    const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
+    const response = await this.connection.knex<ISourceTransformModel>(queryBuilder);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
@@ -398,30 +385,21 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submissions metadata json representation.
    *
    * @param {number} sourceTransformId
-   * @param {string} metadataTransform
+   * @param {string} transform
    * @return {*}  {Promise<ISourceTransformModel>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionMetadataJson(submissionId: number, metadataTransform: string): Promise<string> {
-    const sqlStatement = SQL`
-        SELECT
-          *
-        FROM
-          source_transform
-        WHERE
-          source_transform_id = ${submissionId}
-      `;
-
-    const response = await this.connection.sql<any>(sqlStatement);
+  async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
+    const response = await this.connection.query(transform, [submissionId]);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
-        'SubmissionRepository->getSourceTransformRecordBySourceTransformId',
+        'SubmissionRepository->getSubmissionMetadataJson',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
 
-    return response.rows[0];
+    return response.rows[0][Object.keys(response.rows[0])[0]];
   }
 
   /**
@@ -612,7 +590,7 @@ export class SubmissionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
-        'SubmissionRepository->getSourceTransformRecordBySystemUserId',
+        'SubmissionRepository->getSourceTransformRecordBySubmissionId',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

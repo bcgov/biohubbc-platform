@@ -1,13 +1,9 @@
-import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
-import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
-import { GetObjectOutput, ManagedUpload } from 'aws-sdk/clients/s3';
+import { ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
-import SaxonJS2N from 'saxon-js';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ES_INDEX } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
 import {
@@ -217,212 +213,11 @@ describe('DarwinCoreService', () => {
         expect((actualError as Error).message).to.equal('The eml source is not available');
       }
     });
-
-    it('throws an error if the function is not able to parse the file', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ submission_id: 1, eml_source: 'some eml source' } as unknown as ISubmissionModel);
-
-      // TODO make this a valid s3 file
-      const s3File = {
-        LastModified: '2022-06-06T20:49:29.000Z',
-        ContentLength: 41760,
-        ETag: '"1312ae50d1f8004793f7f0836aa67459"',
-        VersionId: '1654548539910',
-        Metadata: {},
-        ContentType: 'application/json',
-        Body: Buffer.from('file1data')
-      } as unknown as GetObjectOutput;
-
-      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
-
-      sinon.stub(mediaUtils, 'parseS3File').returns(undefined as unknown as MediaFile);
-
-      try {
-        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as Error).message).to.equal('Failed to parse the stylesheet');
-      }
-    });
-
-    it('throws an error when transforming eml to json', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: 'valid eml' } as unknown as ISubmissionModel);
-
-      const s3File = {
-        LastModified: '2022-06-06T20:49:29.000Z',
-        ContentLength: 41760,
-        ETag: '"1312ae50d1f8004793f7f0836aa67459"',
-        VersionId: '1654548539910',
-        Metadata: {},
-        ContentType: 'application/json',
-        Body: Buffer.from('file1data')
-      } as unknown as GetObjectOutput;
-
-      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
-
-      sinon.stub(mediaUtils, 'parseS3File').returns({
-        name: 'valid return',
-        buffer: {
-          toString: () => {
-            return 'asd';
-          }
-        }
-      } as unknown as MediaFile);
-
-      sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').throws('error' as unknown as ApiGeneralError);
-
-      const insertSubmissionStatusAndMessageStub = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
-        .resolves({ submission_status_id: 1, submission_message_id: 1 });
-
-      try {
-        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-        expect.fail();
-      } catch (actualError) {
-        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnce;
-      }
-    });
-
-    it('throws an error when getting the Elastic Search service fails', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: 'valid eml' } as unknown as ISubmissionModel);
-
-      const s3File = {
-        LastModified: '2022-06-06T20:49:29.000Z',
-        ContentLength: 41760,
-        ETag: '"1312ae50d1f8004793f7f0836aa67459"',
-        VersionId: '1654548539910',
-        Metadata: {},
-        ContentType: 'application/json',
-        Body: Buffer.from('file1data')
-      } as unknown as GetObjectOutput;
-
-      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
-
-      sinon.stub(mediaUtils, 'parseS3File').returns({
-        name: 'valid return',
-        buffer: {
-          toString: () => {
-            return 'asd';
-          }
-        }
-      } as unknown as MediaFile);
-
-      sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves({ valid: 'return' });
-      sinon.stub(DarwinCoreService.prototype, 'uploadToElasticSearch').throws('error' as unknown as ApiGeneralError);
-      const insertSubmissionStatusAndMessageStub = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
-        .resolves({ submission_status_id: 1, submission_message_id: 1 });
-      try {
-        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-        expect.fail();
-      } catch (actualError) {
-        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnce;
-      }
-    });
-
-    it('inserts a record in elastic search with valid data and connection', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, eml_source: 'valid eml' } as unknown as ISubmissionModel);
-
-      const s3File = {
-        LastModified: '2022-06-06T20:49:29.000Z',
-        ContentLength: 41760,
-        ETag: '"1312ae50d1f8004793f7f0836aa67459"',
-        VersionId: '1654548539910',
-        Metadata: {},
-        ContentType: 'application/json',
-        Body: Buffer.from('file1data')
-      } as unknown as GetObjectOutput;
-
-      sinon.stub(SubmissionService.prototype, 'getStylesheetFromS3').resolves(s3File);
-
-      sinon.stub(mediaUtils, 'parseS3File').returns({
-        name: 'valid return',
-        buffer: {
-          toString: () => {
-            return 'asd';
-          }
-        }
-      } as unknown as MediaFile);
-
-      sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
-        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
-
-      sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves({ id: '1', value: 'some_value' });
-
-      sinon
-        .stub(DarwinCoreService.prototype, 'uploadToElasticSearch')
-        .resolves('valid' as unknown as WriteResponseBase);
-
-      const response = await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
-      expect(response).eql('valid');
-    });
   });
 
   describe('transformEMLtoJSON', () => {
     afterEach(() => {
       sinon.restore();
-    });
-
-    it('throws an error when Failed to transform eml with stylesheet', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      const saxonjsTransformStub = sinon.stub(SaxonJS2N, 'transform').returns({
-        principalResult: null
-      });
-
-      try {
-        await darwinCoreService.transformEMLtoJSON('xmlString' as unknown as XmlString, 'stylesheet');
-        expect.fail();
-      } catch (actualError) {
-        expect(saxonjsTransformStub).to.be.calledOnceWith({
-          stylesheetText: 'stylesheet',
-          sourceText: 'xmlString' as unknown as XmlString,
-          destination: 'serialized'
-        });
-        expect((actualError as Error).message).to.equal('Failed to transform eml with stylesheet');
-      }
-    });
-
-    it('succeeds with valid values', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      const saxonjsTransformStub = sinon.stub(SaxonJS2N, 'transform').returns({
-        principalResult: '{"test":"string"}',
-        resultDocuments: 'unknown;',
-        stylesheetInternal: 'Record' as unknown as Record<string, unknown>,
-        masterDocument: 'unknown;'
-      });
-
-      const response = await darwinCoreService.transformEMLtoJSON('xmlString' as unknown as XmlString, 'stylesheet');
-
-      expect(saxonjsTransformStub).to.be.calledOnceWith({
-        stylesheetText: 'stylesheet',
-        sourceText: 'xmlString' as unknown as XmlString,
-        destination: 'serialized'
-      });
-      expect(response).to.eql({ test: 'string' });
     });
   });
 
@@ -527,22 +322,6 @@ describe('DarwinCoreService', () => {
   describe('uploadToElasticSearch', () => {
     afterEach(() => {
       sinon.restore();
-    });
-
-    it('succeeds with valid values', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      const createStub = sinon.stub().returns('string');
-
-      sinon.stub(DarwinCoreService.prototype, 'getEsClient').resolves({
-        create: createStub
-      } as any);
-
-      const response = await darwinCoreService.uploadToElasticSearch('dataPackageId', 'convertedEML');
-
-      expect(createStub).to.be.calledOnceWith({ id: 'dataPackageId', index: ES_INDEX.EML, document: 'convertedEML' });
-      expect(response).equals('string');
     });
   });
 
@@ -663,10 +442,6 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'setSubmissionEndDateById')
         .resolves({ submission_id: 1 });
 
-      const deleteEmlStub = sinon
-        .stub(DarwinCoreService.prototype, 'deleteEmlFromElasticSearchByDataPackageId')
-        .resolves();
-
       const createStub = sinon.stub(DarwinCoreService.prototype, 'create').resolves({ dataPackageId: 'dataPackageId' });
 
       const multerFile = {
@@ -677,7 +452,6 @@ describe('DarwinCoreService', () => {
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
       expect(submissionEndDateStub).to.be.calledWith(1);
-      expect(deleteEmlStub).to.be.calledWith('dataPackageId');
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
     });
 
@@ -691,10 +465,6 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'setSubmissionEndDateById')
         .resolves({ submission_id: 1 });
 
-      const deleteEmlStub = sinon
-        .stub(DarwinCoreService.prototype, 'deleteEmlFromElasticSearchByDataPackageId')
-        .resolves();
-
       const createStub = sinon.stub(DarwinCoreService.prototype, 'create').resolves({ dataPackageId: 'dataPackageId' });
 
       const multerFile = {
@@ -705,7 +475,6 @@ describe('DarwinCoreService', () => {
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
       expect(submissionEndDateStub).not.to.be.called;
-      expect(deleteEmlStub).not.to.be.called;
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
     });
   });
@@ -727,9 +496,7 @@ describe('DarwinCoreService', () => {
         .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
         .throws('error' as unknown as ApiGeneralError);
 
-      const convertSubmissionEMLtoJSONStub = sinon
-        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
-        .resolves();
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves();
 
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
@@ -756,7 +523,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
@@ -779,8 +546,8 @@ describe('DarwinCoreService', () => {
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
 
-      const convertSubmissionEMLtoJSONStub = sinon
-        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+      const transformEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformEMLtoJSON')
         .throws('error' as unknown as ApiGeneralError);
 
       const transformAndUploadMetaDataStub = sinon
@@ -808,7 +575,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
@@ -831,9 +598,7 @@ describe('DarwinCoreService', () => {
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
 
-      const convertSubmissionEMLtoJSONStub = sinon
-        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
-        .resolves();
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves();
 
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
@@ -860,7 +625,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
@@ -883,9 +648,7 @@ describe('DarwinCoreService', () => {
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
 
-      const convertSubmissionEMLtoJSONStub = sinon
-        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
-        .resolves();
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves();
 
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
@@ -911,7 +674,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
         expect(normalizeSubmissionDWCAStub).not.to.have.been.called;
@@ -934,9 +697,7 @@ describe('DarwinCoreService', () => {
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
 
-      const convertSubmissionEMLtoJSONStub = sinon
-        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
-        .resolves();
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves();
 
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
@@ -965,7 +726,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
@@ -988,9 +749,7 @@ describe('DarwinCoreService', () => {
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
 
-      const convertSubmissionEMLtoJSONStub = sinon
-        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
-        .resolves();
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'transformEMLtoJSON').resolves();
 
       const transformAndUploadMetaDataStub = sinon
         .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
@@ -1018,7 +777,7 @@ describe('DarwinCoreService', () => {
 
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);

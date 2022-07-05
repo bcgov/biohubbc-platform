@@ -1,6 +1,5 @@
-import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { XMLParser } from 'fast-xml-parser';
-import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
@@ -52,8 +51,6 @@ export class DarwinCoreService extends DBService {
 
     if (submissionExists?.submission_id) {
       await this.submissionService.setSubmissionEndDateById(submissionExists.submission_id);
-      //TODO fails if index does not exist. can we do an upsert or ignore errors?
-      //await this.deleteEmlFromElasticSearchByDataPackageId(dataPackageId);
       //TODO: Delete scraped spatial components table details when its filled
     }
 
@@ -79,7 +76,7 @@ export class DarwinCoreService extends DBService {
     }
 
     try {
-      await this.convertSubmissionEMLtoJSON(submissionId);
+      await this.transformEMLtoJSON(submissionId);
     } catch (error) {
       defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
 
@@ -155,14 +152,15 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<{ occurrence_id: number }[]>}
    * @memberof DarwinCoreService
    */
-  async convertSubmissionEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }[]> {
+  async transformEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }> {
     const submissionService = new SubmissionService(this.connection);
 
     const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
     const options = {
       ignoreAttributes: false,
-      attributeNamePrefix: '@_'
+      attributeNamePrefix: '@_',
+      parseTagValue: false //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
     };
     const parser = new XMLParser(options);
     const eml_json_source = parser.parse(submission.eml_source as string);
@@ -283,10 +281,8 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  //TODO: BHBC-1812
   async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
-    console.log(submissionId)
 
     if (!submissionRecord.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
@@ -300,72 +296,34 @@ export class DarwinCoreService extends DBService {
       throw new ApiGeneralError('The source metadata transform is not available');
     }
 
-    dataPackageId;
+    const jsonMetadata = await this.submissionService.getSubmissionMetadataJson(
+      submissionId,
+      sourceTransformRecord.metadata_transform
+    );
 
-    // let transformedEML;
-    // //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
-    // try {
-    //   transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
-    // } catch (error) {
-    //   defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
-
-    //   return this.submissionService.insertSubmissionStatusAndMessage(
-    //     submissionId,
-    //     SUBMISSION_STATUS_TYPE.REJECTED,
-    //     SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-    //     'eml transformation failed'
-    //   );
-    // }
+    if (!jsonMetadata) {
+      throw new ApiGeneralError('The source metadata json is not available');
+    }
 
     let response;
-    // //call to the ElasticSearch API to create a record with our transformed EML
-    // try {
-    //   response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
-    // } catch (error) {
-    //   defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
+    //call to the ElasticSearch API to create a record with our transformed EML
+    try {
+      response = await this.uploadToElasticSearch(dataPackageId, jsonMetadata);
+    } catch (error) {
+      defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
 
-    //   return this.submissionService.insertSubmissionStatusAndMessage(
-    //     submissionId,
-    //     SUBMISSION_STATUS_TYPE.REJECTED,
-    //     SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-    //     'upload to elastic search failed'
-    //   );
-    // }
+      return this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'upload to elastic search failed'
+      );
+    }
 
     //TODO: We need a new submission status type
     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
     return response;
-  }
-
-  /**
-   * Conversion of eml to JSON
-   *
-   * @param {XmlString} emlSource
-   * @return {*} //TODO RETURN TYPE
-   * @memberof DarwinCoreService
-   */
-  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
-    // for future reference
-    // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
-    //to see the library's author respond to one of our questions
-
-    const result: {
-      principalResult: string;
-      resultDocuments: unknown;
-      stylesheetInternal: Record<string, unknown>;
-      masterDocument: unknown;
-    } = SaxonJS2N.transform({
-      stylesheetText: stylesheet,
-      sourceText: emlSource,
-      destination: 'serialized'
-    });
-
-    if (!result.principalResult) {
-      throw new ApiGeneralError('Failed to transform eml with stylesheet');
-    }
-
-    return JSON.parse(result.principalResult);
   }
 
   /**
@@ -450,7 +408,7 @@ export class DarwinCoreService extends DBService {
   async uploadToElasticSearch(dataPackageId: string, convertedEML: string) {
     const esClient = await this.getEsClient();
 
-    const response = await esClient.create({
+    const response = await esClient.index({
       id: dataPackageId,
       index: ES_INDEX.EML,
       document: convertedEML
@@ -498,13 +456,5 @@ export class DarwinCoreService extends DBService {
     });
 
     return JSON.stringify(normalized);
-  }
-
-  async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
-    const esClient = await this.getEsClient();
-
-    const response = await esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
-
-    return response;
   }
 }

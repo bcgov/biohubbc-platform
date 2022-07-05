@@ -131,14 +131,13 @@ export class SubmissionService extends DBService {
    * Get json representation of eml source from submission.
    *
    * @param {number} submissionId
-   * @param {string} metadataTransform
+   * @param {string} transform
    * @return {string}
    * @memberof SubmissionService
    */
-  async getSubmissionMetadataJson(submissionId: number, metadataTransform: string): Promise<string> {
-    return this.submissionRepository.getSubmissionMetadataJson(submissionId, metadataTransform);
+  async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
+    return this.submissionRepository.getSubmissionMetadataJson(submissionId, transform);
   }
-
 
   /**
    * Insert a submission status record.
