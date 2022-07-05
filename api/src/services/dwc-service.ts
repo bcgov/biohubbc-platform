@@ -244,14 +244,10 @@ export class DarwinCoreService extends DBService {
 
     const dwcArchive = this.prepDWCArchive(file);
 
-    dwcArchive;
-
     // Fetch the source transform record for this submission based on the source system user id
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
       this.connection.systemUserId()
     );
-
-    sourceTransformRecord;
 
     const response = await this.submissionService.insertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
