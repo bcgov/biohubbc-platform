@@ -39,47 +39,13 @@ describe('DarwinCoreService', () => {
       sinon.restore();
     });
 
-    it('should throw an error when no s3Key received', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves(null as unknown as ISubmissionModel);
-
-      try {
-        await darwinCoreService.scrapeAndUploadOccurrences(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('submission record s3Key unavailable');
-      }
-    });
-
-    it('should throw an error when no s3File exists', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ input_key: 1 } as unknown as ISubmissionModel);
-
-      sinon.stub(fileUtils, 'getFileFromS3').resolves(null as unknown as S3.GetObjectOutput);
-
-      try {
-        await darwinCoreService.scrapeAndUploadOccurrences(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('s3 file unavailable');
-      }
-    });
-
     it('should succeed', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
       sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ input_key: 1 } as unknown as ISubmissionModel);
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves({ input_key: 1 } as unknown as DWCArchive);
 
       sinon.stub(fileUtils, 'getFileFromS3').resolves('test' as unknown as S3.GetObjectOutput);
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves('test' as unknown as DWCArchive);
@@ -758,7 +724,7 @@ describe('DarwinCoreService', () => {
         expect(tempValidationStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
-        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
@@ -810,7 +776,7 @@ describe('DarwinCoreService', () => {
         expect(tempValidationStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
-        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
@@ -862,7 +828,7 @@ describe('DarwinCoreService', () => {
         expect(tempValidationStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
-        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
@@ -913,9 +879,9 @@ describe('DarwinCoreService', () => {
         expect(tempValidationStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
-        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).not.to.have.been.called;
-        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+        expect(errorStatusAndMessageStub).to.be.calledWith(
           1,
           SUBMISSION_STATUS_TYPE.REJECTED,
           SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
@@ -967,7 +933,7 @@ describe('DarwinCoreService', () => {
         expect(tempValidationStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
-        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
@@ -1020,7 +986,7 @@ describe('DarwinCoreService', () => {
         expect(tempValidationStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
-        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledOnceWith(1);
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
         expect(errorStatusAndMessageStub).not.to.have.been.called;
       } catch (actualError) {

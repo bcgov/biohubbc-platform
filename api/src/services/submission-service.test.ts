@@ -217,55 +217,21 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getEMLStyleSheetKey', () => {
-    it('should throw an error if no styleSheetKey available', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-      const mockResponse = { transform_precompile_key: '' } as unknown as ISourceTransformModel;
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
-        .resolves(mockResponse);
-
-      try {
-        await submissionService.getEMLStyleSheetKey(1);
-        expect.fail();
-      } catch (actualError) {
-        expect(repo).to.be.calledOnce;
-
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve stylesheet key');
-      }
-    });
-
-    it('should return S3key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-      const mockResponse = { transform_precompile_key: 's3key_return' } as unknown as ISourceTransformModel;
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
-        .resolves(mockResponse);
-
-      const response = await submissionService.getEMLStyleSheetKey(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql('s3key_return');
-    });
-  });
-
   describe('getStylesheetFromS3', () => {
     it('should throw an error if file could not be fetched from s3', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const service = sinon.stub(SubmissionService.prototype, 'getEMLStyleSheetKey').resolves('validString');
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
+        .resolves({ transform_precompile_key: 'validString' } as ISourceTransformModel);
       sinon.stub(FileUtils, 'getFileFromS3').resolves();
 
       try {
         await submissionService.getStylesheetFromS3(1);
         expect.fail();
       } catch (actualError) {
-        expect(service).to.be.calledOnce;
+        expect(repo).to.be.calledOnce;
         expect((actualError as ApiGeneralError).message).to.equal('Failed to get file from S3');
       }
     });
@@ -274,11 +240,13 @@ describe('SubmissionService', () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const service = sinon.stub(SubmissionService.prototype, 'getEMLStyleSheetKey').resolves('validString');
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
+        .resolves({ transform_precompile_key: 'validString' } as ISourceTransformModel);
       sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
 
       const response = await submissionService.getStylesheetFromS3(1);
-      expect(service).to.be.calledOnce;
+      expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ Body: 'valid' });
     });
   });
