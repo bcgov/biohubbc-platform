@@ -100,7 +100,7 @@ export default () => {
                         color="primary"
                         className={classes.filterApplyBtn}
                         onClick={() => handleSubmit()}>
-                    Apply
+                      Search
                     </Button>
                 </Box>
                 </Box>

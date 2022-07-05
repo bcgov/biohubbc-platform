@@ -1,5 +1,6 @@
 import Box from '@material-ui/core/Box';
 import Container from '@material-ui/core/Container';
+/*
 import Paper from '@material-ui/core/Paper';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
@@ -7,6 +8,7 @@ import TableCell from '@material-ui/core/TableCell';
 import TableContainer from '@material-ui/core/TableContainer';
 import TableHead from '@material-ui/core/TableHead';
 import TableRow from '@material-ui/core/TableRow';
+*/
 import Typography from '@material-ui/core/Typography';
 // import AdvancedSearch, { advancedSearchFiltersInitialValues, IAdvancedSearchFilters } from 'components/search-filter/AdvancedSearch';
 import { Formik, FormikProps } from 'formik';
@@ -14,13 +16,15 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import qs from 'qs'
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router'
-import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
+import { truncate } from 'lodash'
+import { IAdvancedSearch, /*IElasticsearchResponse, IKeywordSearchResult*/ } from 'interfaces/useSearchApi.interface';
 
 import { DialogContext } from 'contexts/dialogContext';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import SearchComponent from './SearchComponent';
+
 
 const advancedSearchInitialValues: IAdvancedSearch = {
   keywords: ''
@@ -33,9 +37,12 @@ const SearchPage = () => {
   const location = useLocation();
   const dialogContext = useContext(DialogContext);
   
-  const [searchQuery] = useState<string>('goat')
-  const [isLoading, setIsLoading] = useState(true);
-  const searchDataLoader = useDataLoader(() => biohubApi.search.keywordSearch(searchQuery));
+  // const [isLoading, setIsLoading] = useState(false); // Use dataloader.isLoading
+  const searchDataLoader = useDataLoader((query: string) => {
+    return biohubApi.search.keywordSearch(query)
+  })
+//  const { isLoading } = searchDataLoader
+
   console.log('searchDataLoader', searchDataLoader)
   
   //collection of params from url location.search
@@ -50,19 +57,26 @@ const SearchPage = () => {
 
   const [formikValues, setFormikValues] = useState<IAdvancedSearch>(collectFilterParams);
   const formikRef = useRef<FormikProps<IAdvancedSearch>>(null);
+  
+  console.log('formikValues:', formikValues)
 
   //Search Params
-  useEffect(() => {
+  /*
+  React.useEffect(() => {
     const getParams = async () => {
       const params = await collectFilterParams();
       setFormikValues(params);
     };
 
+    
     if (isLoading) {
       setIsLoading(false);
       getParams();
     }
+    
+
   }, [isLoading, location.search, formikValues, collectFilterParams]);
+  */
 
   /**
    * Determines if the search parameters are empty
@@ -88,13 +102,12 @@ const SearchPage = () => {
   };
 
   const handleReset = async () => {
-    // const projectsResponse = null // await restorationTrackerApi.project.getProjectsList();
-    // setProjects(projectsResponse);
     setFormikValues(advancedSearchInitialValues);
     handleResetSearchParams();
   };
 
   const handleSubmit = async () => {
+    console.log('handleSubmit()')
     if (!formikRef?.current) {
       return;
     }
@@ -105,13 +118,7 @@ const SearchPage = () => {
     }
 
     try {
-      /*
-      const response = null // await restorationTrackerApi.project.getProjectsList(formikRef.current.values);
-
-      if (!response) {
-        return;
-      }
-      */
+      searchDataLoader.refresh(formikRef.current?.values.keywords)
 
       updateSearchParams();
     } catch (error) {
@@ -145,10 +152,35 @@ const SearchPage = () => {
     })) || [];
 
     */
-   const results: any[] = [];
-  console.log('results:', results);
+  //const data = 
+  const results = (searchDataLoader.data || []).reduce((acc: any, item) => {
+    return [
+      ...acc,
+      ...item.source.project
+    ]
+  }, []);
 
+  /*
+  const results = [
+    {
+      id: 0,
+      projectTitle: 'Lorem ipsum',
+      projectObjectives: 'Consectetur adipiscing elit. Nullam in dolor urna. Vivamus efficitur vestibulum mi, eu accumsan lectus sollicitudin venenatis.'
+    },
+    {
+      id: 1,
+      projectTitle: 'Morbi sed',
+      projectObjectives: 'Sed commodo blandit pellentesque. Proin sollicitudin, arcu sit amet tempus mollis.'
+    },
+    {
+      id: 2,
+      projectTitle: 'Duis porta',
+      projectObjectives: 'Mauris porttitor tortor vel venenatis commodo. In congue, dui vel malesuada accumsan, massa mauris rhoncus nunc, sed rhoncus tortor sem quis magna.'
+    },
+  ];
+  */
   
+  searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords)
 
   return (
     <Box my={4}>
@@ -162,7 +194,7 @@ const SearchPage = () => {
           </Typography>
         </Box>
         
-        <Box mb={5}>
+        <Box>
           <Formik<IAdvancedSearch>
             innerRef={formikRef}
             initialValues={formikValues}
@@ -173,43 +205,29 @@ const SearchPage = () => {
           </Formik>
         </Box>
         
-        <Typography variant="h2">
-          3 results for 'Moose'
-        </Typography>
+        <Box my={4}>
+          <Typography variant="h2">
+            {searchDataLoader.isLoading ? (
+              <>Loading...</>
+            ) : (
+              <>
+                {`${results.length} result${results.length !== 1 && 's'}`}
+                <Typography variant='inherit' component='span' color='textSecondary'>{` for '${formikRef.current?.values.keywords}'`}</Typography>
+              </>
+            )}
+          </Typography>
+  
+        </Box>
 
         <Box>
-          <Paper>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Search Name</TableCell>
-                  </TableRow>
-                </TableHead>
-                {results.length > 0 ? (
-                  <TableBody data-testid="search-table">
-                    {results.map((result, index) => (
-                      <TableRow key={`${result.id}-${index}`}>
-                        <TableCell>
-                          <pre>...{result.id.substring(result.id.length - 6)}</pre>
-                        </TableCell>
-                        <TableCell>{result.datasetTitle}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                ) : (
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>
-                        <Typography variant="body1">No Data</Typography>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                )}
-              </Table>
-            </TableContainer>
-          </Paper>
+          {results.map((result: any) => (
+            <Box mb={3} p={2} key={result.id} borderRadius={4} border={1}>
+              <Typography variant='h4'>{result.projectTitle}</Typography>
+              <Typography variant='body1' color='textSecondary'>
+                {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
+              </Typography>
+            </Box>
+          ))}
         </Box>
       </Container>
     </Box>
