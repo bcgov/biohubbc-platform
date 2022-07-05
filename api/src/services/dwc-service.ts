@@ -14,6 +14,7 @@ import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-
 import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseS3File, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
@@ -282,6 +283,24 @@ export class DarwinCoreService extends DBService {
     const parsedMedia = parseUnknownMedia(submissionRecordFile);
 
     console.log('parsedMedia', parsedMedia);
+
+    if (!parsedMedia) {
+      throw new ApiGeneralError('Failed to parse submission', [
+        'DarwinCoreService->prepDWCArchive',
+        'unknown media file was empty or unable to be parsed'
+      ]);
+    }
+
+    if (!(parsedMedia instanceof ArchiveFile)) {
+      throw new ApiGeneralError('Failed to parse submission', [
+        'DarwinCoreService->prepDWCArchive',
+        'unknown media file was not a valid Archive file'
+      ]);
+    }
+
+    const emlFile = new EMLFile(parsedMedia);
+
+    console.log('emlFile', emlFile);
 
     return {};
   }
