@@ -3,11 +3,11 @@ import React from 'react'
 import {
     Box,
     Button,
-    Card,
+    //Card,
     Input,
     InputAdornment,
     Theme,
-    Typography
+    //Typography
 } from '@material-ui/core'
 import { Icon } from '@mdi/react';
 import { mdiMagnify } from '@mdi/js';
@@ -72,11 +72,8 @@ export default () => {
     const { handleSubmit, handleChange, values } = formikProps;
 
     return (
-        <Card>
-            <Box m={3}>
-                <Box mb={3}>
-                <Typography variant="h2">Search Datasets</Typography>
-                </Box>
+        <div>
+            
                 <Box display="flex">
                 <Box flex="1 1 auto" display="flex">
                     <Input
@@ -90,7 +87,7 @@ export default () => {
                         </InputAdornment>
                     }
                     disableUnderline={true}
-                    placeholder="Enter Keywords"
+                    placeholder="Enter a species name or keywords"
                     onChange={handleChange}
                     value={values.keywords}
                     />
@@ -107,7 +104,7 @@ export default () => {
                     </Button>
                 </Box>
                 </Box>
-            </Box>
-        </Card>
+            
+        </div>
     )
 }

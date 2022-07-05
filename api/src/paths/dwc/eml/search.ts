@@ -55,21 +55,7 @@ GET.apiDoc = {
                   type: 'string'
                 },
                 source: {
-                  type: 'object',
-                  properties: {
-                    datasetName: {
-                      type: 'string'
-                    },
-                    publishDate: {
-                      type: 'string'
-                    },
-                    projects: {
-                      type: 'array',
-                      items: {
-                        type: 'object'
-                      }
-                    }
-                  }
+                  type: 'object'
                 },
                 fields: {
                   type: 'object'
@@ -98,31 +84,24 @@ export function searchInElasticSearch(): RequestHandler {
       index: req.query.index
     });
 
-    const indexName = String(req.query.index) || '';
-    const match = req.query.terms ? { 'project.projectTitle': String(req.query.terms) || '' } : undefined;
+    const queryString = String(req.query.q) || '*';
 
     try {
-      const elasticSearch = new ESService();
+      const elasticService = new ESService();
 
-      const response = await elasticSearch.elasticsearch<{ datasetTitle: string[] }>(
-        indexName,
-        [match ? '*' : 'datasetTitle'],
-        match
-      );
+      const response = await elasticService.keywordSearchEml(queryString)
 
-      const result = response
-        ? response.map((item) => {
-            return {
-              id: item._id,
-              fields: item.fields,
-              source: item._source
-            };
-          })
-        : [];
+      const result = response.map((item) => {
+        return {
+          id: item._id,
+          fields: item.fields,
+          source: item._source
+        };
+      });
 
       res.status(200).json(result);
     } catch (error) {
-      defaultLog.error({ label: 'getSearchResults', message: 'error', error });
+      defaultLog.error({ label: 'keywordSearchEml', message: 'error', error });
       throw error;
     }
   };

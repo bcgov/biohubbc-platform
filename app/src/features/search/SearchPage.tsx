@@ -32,10 +32,11 @@ const SearchPage = () => {
   const history = useHistory();
   const location = useLocation();
   const dialogContext = useContext(DialogContext);
-  const searchDataLoader = useDataLoader(() => biohubApi.search.searchSpecies(searchQuery));
-
-  const [searchQuery] = useState<string>('')
+  
+  const [searchQuery] = useState<string>('goat')
   const [isLoading, setIsLoading] = useState(true);
+  const searchDataLoader = useDataLoader(() => biohubApi.search.keywordSearch(searchQuery));
+  console.log('searchDataLoader', searchDataLoader)
   
   //collection of params from url location.search
   const collectFilterParams = useCallback((): IAdvancedSearch => {
@@ -136,12 +137,15 @@ const SearchPage = () => {
     });
   };
 
+  /*
   const results: any[] =
     searchDataLoader?.data?.map((item) => ({
       id: item.id,
       datasetTitle: item.fields.datasetTitle[0]
     })) || [];
 
+    */
+   const results: any[] = [];
   console.log('results:', results);
 
   
@@ -168,7 +172,10 @@ const SearchPage = () => {
               <SearchComponent />
           </Formik>
         </Box>
-
+        
+        <Typography variant="h2">
+          3 results for 'Moose'
+        </Typography>
 
         <Box>
           <Paper>
