@@ -236,7 +236,6 @@ describe('SubmissionRepository', () => {
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
-
       try {
         await submissionRepository.updateSubmissionRecordEMLJSONSource(1, 'string');
 
