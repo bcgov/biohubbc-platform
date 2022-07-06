@@ -292,7 +292,7 @@ describe('SubmissionService', () => {
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
         .resolves({ input_key: 'validString' } as ISubmissionModel);
-      sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
+      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves({ Body: 'valid' });
 
       const response = await submissionService.getIntakeFileFromS3(1);
       expect(repo).to.be.calledOnce;
@@ -322,7 +322,7 @@ describe('SubmissionService', () => {
 
       const s3Stub = sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
 
-      const response = await submissionService.getIntakeFileFromS3(1);
+      const response = await submissionService.getFileFromS3('fileName');
 
       expect(s3Stub).to.be.calledOnce;
       expect(response).to.be.eql({ Body: 'valid' });

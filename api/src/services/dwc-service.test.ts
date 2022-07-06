@@ -27,6 +27,7 @@ import * as mediaUtils from '../utils/media/media-utils';
 import { UnknownMedia } from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
+import { ESService } from './es-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
@@ -997,15 +998,21 @@ describe('DarwinCoreService', () => {
   });
 
   describe('deleteEmlFromElasticSearchByDataPackageId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
     it('should succeed and delete old es file', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      const getEsClientStub = sinon.stub(SubmissionService.prototype, 'getEsClient').resolves({
-        delete: (id: string, index: string) => {
-          return `${id} ${index}`;
-        }
-      } as unknown as Client);
+      const esClientStub = sinon.createStubInstance(Client);
+
+      esClientStub.delete.resolves('dataPackageId eml' as unknown as WriteResponseBase);
+
+      const getEsClientStub = sinon
+        .stub(ESService.prototype, 'getEsClient')
+        .resolves(esClientStub as unknown as Client);
 
       const response = await darwinCoreService.deleteEmlFromElasticSearchByDataPackageId('dataPackageId');
 

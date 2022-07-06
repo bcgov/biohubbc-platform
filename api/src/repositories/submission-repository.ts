@@ -258,7 +258,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
+      throw new ApiExecuteSQLError('Failed to update submission record source', [
         'SubmissionRepository->updateSubmissionRecordEMLSource',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
@@ -293,7 +293,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
+      throw new ApiExecuteSQLError('Failed to update submission record eml json', [
         'SubmissionRepository->updateSubmissionRecordEMLJSONSource',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);

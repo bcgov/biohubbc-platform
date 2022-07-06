@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
 import { ApiGeneralError } from '../errors/api-error';
+import { EMLFile } from '../utils/media/eml/eml-file';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import {
@@ -169,6 +170,94 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.updateSubmissionRecordInputKey(1, 'test');
+
+      expect(response.submission_id).to.equal(1);
+    });
+  });
+
+  describe('updateSubmissionRecordEMLSource', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when update sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.updateSubmissionRecordEMLSource(1, {
+          emlFile: 'MediaFile'
+        } as unknown as EMLFile);
+
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record source');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionRecordEMLSource(1, {
+        emlFile: 'MediaFile'
+      } as unknown as EMLFile);
+
+      expect(response.submission_id).to.equal(1);
+    });
+  });
+
+  describe('updateSubmissionRecordEMLJSONSource', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when update sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.updateSubmissionRecordEMLJSONSource(1, 'string');
+
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record eml json');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionRecordEMLJSONSource(1, 'string');
 
       expect(response.submission_id).to.equal(1);
     });
