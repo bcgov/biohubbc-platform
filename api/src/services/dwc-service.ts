@@ -411,13 +411,11 @@ export class DarwinCoreService extends DBService {
   async uploadToElasticSearch(dataPackageId: string, convertedEML: string) {
     const esClient = await this.getEsClient();
 
-    const response = await esClient.index({
+    return esClient.index({
       id: dataPackageId,
       index: ES_INDEX.EML,
       document: convertedEML
     });
-
-    return response;
   }
 
   /**
