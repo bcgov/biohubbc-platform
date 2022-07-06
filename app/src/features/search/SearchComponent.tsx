@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  //Card,
   Input,
   InputAdornment,
   Theme
@@ -14,13 +13,6 @@ import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import React from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
-  actionButton: {
-    minWidth: '6rem',
-    '& + button': {
-      marginLeft: '0.5rem'
-    }
-  },
-
   keywordSearch: {
     height: '52px',
     flex: '1 1 auto',
@@ -44,13 +36,7 @@ const useStyles = makeStyles((theme: Theme) => ({
       boxShadow: '0 0 0 1px #003366 inset'
     }
   },
-  filterToggleBtn: {
-    height: '100%',
-    flex: '0 0 auto',
-    borderRadius: '0 4px 4px 0',
-    marginLeft: '-1px'
-  },
-  filterApplyBtn: {
+  searchBtn: {
     height: '100%',
     minWidth: '8rem'
   },
@@ -93,7 +79,7 @@ export default () => {
             size="large"
             variant="contained"
             color="primary"
-            className={classes.filterApplyBtn}
+            className={classes.searchBtn}
             onClick={() => handleSubmit()}>
             Search
           </Button>
