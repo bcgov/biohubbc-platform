@@ -19,7 +19,6 @@ const advancedSearchInitialValues: IAdvancedSearch = {
 };
 
 const SearchPage = () => {
-  // const classes = useStyles();
   const biohubApi = useApi();
   const history = useHistory();
   const location = useLocation();
@@ -28,11 +27,11 @@ const SearchPage = () => {
   const searchDataLoader = useDataLoader((query: string) => {
     return biohubApi.search.keywordSearch(query);
   });
-  const { isLoading } = searchDataLoader
+  const { isLoading } = searchDataLoader;
 
-  console.log('searchDataLoader', searchDataLoader);
-
-  //collection of params from url location.search
+  /**
+   * collection of params from url location.search
+   */
   const collectFilterParams = useCallback((): IAdvancedSearch => {
     if (location.search) {
       const urlParams = qs.parse(location.search.replace('?', ''));
@@ -76,12 +75,11 @@ const SearchPage = () => {
   };
 
   const handleSubmit = async () => {
-    console.log('handleSubmit()');
     if (!formikRef?.current) {
       return;
     }
 
-    //empty Filters
+    // empty Filters
     if (isDefaultState()) {
       return;
     }
@@ -93,7 +91,7 @@ const SearchPage = () => {
     } catch (error) {
       const apiError = error as APIError;
       showFilterErrorDialog({
-        dialogTitle: 'Error Filtering Projects',
+        dialogTitle: 'Error Searching Datasets',
         dialogError: apiError?.message,
         dialogErrorDetails: apiError?.errors
       });

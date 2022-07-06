@@ -1,10 +1,4 @@
-import {
-  Box,
-  Button,
-  Input,
-  InputAdornment,
-  Theme
-} from '@material-ui/core';
+import { Box, Button, Input, InputAdornment, Theme } from '@material-ui/core';
 import { makeStyles } from '@material-ui/styles';
 import { mdiMagnify } from '@mdi/js';
 import { Icon } from '@mdi/react';
