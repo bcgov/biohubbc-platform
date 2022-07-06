@@ -139,19 +139,21 @@ const SearchPage = () => {
           </Formik>
         </Box>
         <Box my={4}>
-          <Typography variant="h2">
-            {isLoading ? (
-              <>Loading...</>
-            ) : (
-              <>
-                {`${results.length} result${results.length !== 1 && 's'}`}
-                <Typography
-                  variant="inherit"
-                  component="span"
-                  color="textSecondary">{` for '${formikRef.current?.values.keywords}'`}</Typography>
-              </>
-            )}
-          </Typography>
+          {formikRef.current?.values.keywords && (
+            <Typography variant="h2">
+              {isLoading ? (
+                <>Loading...</>
+              ) : (
+                <>
+                  {`${results.length} result${results.length !== 1 && 's'}`}
+                  <Typography
+                    variant="inherit"
+                    component="span"
+                    color="textSecondary">{` for '${formikRef.current?.values.keywords}'`}</Typography>
+                </>
+              )}
+            </Typography>
+          )}
         </Box>
         <Box>
           {results.map((result: any, index: number) => (
