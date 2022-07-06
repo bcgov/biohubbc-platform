@@ -48,7 +48,7 @@ export default () => {
   const { handleSubmit, handleChange, values } = formikProps;
 
   return (
-    <div>
+    <form onSubmit={handleSubmit} autoComplete='off'>
       <Box display="flex">
         <Box flex="1 1 auto" display="flex">
           <Input
@@ -79,6 +79,6 @@ export default () => {
           </Button>
         </Box>
       </Box>
-    </div>
+    </form>
   );
 };
