@@ -51,10 +51,10 @@ export type IElasticsearchResponse<T = unknown, S = unknown> = {
 
 export interface IKeywordSearchResult {
   project: {
-      projectId: string;
-      projectTitle: string;
-      projectObjectives: string;
-    }[];
+    projectId: string;
+    projectTitle: string;
+    projectObjectives: string;
+  }[];
 }
 
 export interface IAdvancedSearch {
