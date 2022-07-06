@@ -45,7 +45,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+  async intake(file: Express.Multer.File, dataPackageId: string): Promise<void> {
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
@@ -61,10 +61,10 @@ export class DarwinCoreService extends DBService {
    *
    * @param {Express.Multer.File} file
    * @param {string} dataPackageId
-   * @return {*}  {Promise<{ dataPackageId: string }>}
+   * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async create(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+  async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
     const { submissionId } = await this.ingestNewDwCADataPackage(file, {
       dataPackageId: dataPackageId
     });
@@ -80,6 +80,8 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to validate submission record'
       );
+
+      return;
     }
 
     try {
@@ -93,6 +95,8 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to convert EML to JSON'
       );
+
+      return;
     }
 
     try {
@@ -106,6 +110,8 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to transform and upload metadata'
       );
+
+      return;
     }
 
     try {
@@ -118,9 +124,9 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to normalize dwca file'
       );
-    }
 
-    return { dataPackageId };
+      return;
+    }
   }
 
   /**
