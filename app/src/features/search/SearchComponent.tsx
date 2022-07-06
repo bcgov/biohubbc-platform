@@ -41,7 +41,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-export default () => {
+const SearchComponent: React.FC = () => {
   const classes = useStyles();
 
   const formikProps = useFormikContext<IAdvancedSearch>();
@@ -82,3 +82,5 @@ export default () => {
     </form>
   );
 };
+
+export default SearchComponent
