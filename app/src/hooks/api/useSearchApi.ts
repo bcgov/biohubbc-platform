@@ -44,7 +44,7 @@ const useSearchApi = (axios: AxiosInstance) => {
    * @returns {*} {Promise<>}
    */
   const keywordSearch = async (searchQuery: string): Promise<IElasticsearchResponse<unknown, IKeywordSearchResult>> => {
-    const { data } = await axios.get(`api/dwc/eml/search?q=${searchQuery}`);
+    const { data } = await axios.get(`api/dwc/eml/search?terms=${searchQuery}`);
 
     return data;
   };

@@ -84,7 +84,7 @@ export function searchInElasticSearch(): RequestHandler {
       index: req.query.index
     });
 
-    const queryString = String(req.query.q) || '*';
+    const queryString = String(req.query.terms) || '*';
 
     try {
       const elasticService = new ESService();
