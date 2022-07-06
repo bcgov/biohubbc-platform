@@ -623,7 +623,7 @@ begin
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
 
 	-- source transform
-	insert into source_transform (system_user_id, version, metadata_index, metadata_transform) 
+	insert into source_transform (system_user_id, version, metadata_index, metadata_transform)
 		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
@@ -641,13 +641,13 @@ begin
   assert _count = 1, 'FAIL submission_spatial_component(1)';
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   -- transpose comments on next three lines to test deletion of published surveys by system administrator
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Awaiting Curration'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Awaiting Curation'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Published'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
 	-- xrefs
 	insert into spatial_transform_submission (spatial_transform_id, submission_spatial_component_id) values (_spatial_transform_id, _submission_spatial_component_id);
 	insert into security_transform_submission (submission_spatial_component_id, security_transform_id) values (_submission_spatial_component_id, _security_transform_id);
 	insert into system_user_security_exception (security_transform_id, system_user_id, record_effective_date) values (_security_transform_id, (select system_user_id from system_user where user_identifier = 'CHUCK'), now());
-  
+
   -- submission 2
   insert into submission (source_transform_id, record_effective_date) values (_source_transform_id, now()) returning submission_id into _submission_id;
   select count(1) into _count from submission;
@@ -661,7 +661,7 @@ begin
   select count(1) into _count from submission_status;
   assert _count = 5, 'FAIL submission_status';
   select count(1) into _count from submission_message;
-  assert _count = 1, 'FAIL submission_message';  
+  assert _count = 1, 'FAIL submission_message';
 
   raise notice 'smoketest_release(2): PASS';
 end

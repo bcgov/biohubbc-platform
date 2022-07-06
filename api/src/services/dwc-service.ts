@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { XMLParser } from 'fast-xml-parser';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
@@ -161,9 +160,7 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async transformEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }> {
-    const submissionService = new SubmissionService(this.connection);
-
-    const submission: ISubmissionModel = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
+    const submission: ISubmissionModel = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
     const options = {
       ignoreAttributes: false,
@@ -174,7 +171,7 @@ export class DarwinCoreService extends DBService {
 
     const eml_json_source = parser.parse(submission.eml_source as string);
 
-    await submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
+    await this.submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
 
     return eml_json_source;
   }
@@ -286,7 +283,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
     if (!submissionRecord.eml_source) {
@@ -311,24 +308,25 @@ export class DarwinCoreService extends DBService {
     }
 
     // call to the ElasticSearch API to create a record with our transformed EML
-    let response;
     try {
-      response = await this.uploadToElasticSearch(dataPackageId, jsonMetadata);
+      await this.uploadToElasticSearch(dataPackageId, jsonMetadata);
     } catch (error) {
       defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
 
-      return this.submissionService.insertSubmissionStatusAndMessage(
+      this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'upload to elastic search failed'
       );
+
+      return;
     }
 
     //TODO: We need a new submission status type
     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
-    return response;
+    return;
   }
 
   /**

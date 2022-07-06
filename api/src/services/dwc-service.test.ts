@@ -1,9 +1,12 @@
+import { Client } from '@elastic/elasticsearch';
+import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
 import { ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ES_INDEX } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
 import {
@@ -204,7 +207,7 @@ describe('DarwinCoreService', () => {
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1 } as unknown as ISubmissionModel);
+        .resolves({ id: 1, source_transform_id: 2 } as unknown as ISubmissionModel);
 
       try {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
@@ -213,11 +216,156 @@ describe('DarwinCoreService', () => {
         expect((actualError as Error).message).to.equal('The eml source is not available');
       }
     });
+
+    it('throws an error if there is no metadata_transform in the source transform record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1,
+        source_transform_id: 2,
+        eml_source: 'some eml source'
+      } as unknown as ISubmissionModel);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
+        .resolves({ source_transform_id: 2 } as unknown as ISourceTransformModel);
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('The source metadata transform is not available');
+      }
+    });
+
+    it('throws an error if the transformed metadata is null or empty', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1,
+        source_transform_id: 2,
+        eml_source: 'some eml source'
+      } as unknown as ISubmissionModel);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
+        .resolves({ source_transform_id: 2, metadata_transform: 'some transform' } as unknown as ISourceTransformModel);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionMetadataJson').resolves('');
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('The source metadata json is not available');
+      }
+    });
+
+    it('inserts an error status and message when the upload to elastic search fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1,
+        source_transform_id: 2,
+        eml_source: 'some eml source'
+      } as unknown as ISubmissionModel);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
+        .resolves({ source_transform_id: 2, metadata_transform: 'some transform' } as unknown as ISourceTransformModel);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionMetadataJson').resolves('transformed metadata');
+
+      sinon.stub(DarwinCoreService.prototype, 'uploadToElasticSearch').rejects(new Error('test error'));
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      try {
+        await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnce;
+        expect(insertSubmissionStatusStub).not.to.be.called;
+      }
+    });
+
+    it('successfully inserts a record into elastic search', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1,
+        source_transform_id: 2,
+        eml_source: 'some eml source'
+      } as unknown as ISubmissionModel);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
+        .resolves({ source_transform_id: 2, metadata_transform: 'some transform' } as unknown as ISourceTransformModel);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionMetadataJson').resolves('transformed metadata');
+
+      const uploadToElasticSearchStub = sinon
+        .stub(DarwinCoreService.prototype, 'uploadToElasticSearch')
+        .resolves('success response' as unknown as WriteResponseBase);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
+
+      expect(uploadToElasticSearchStub).to.be.calledOnceWith('dataPackageId', 'transformed metadata');
+      expect(insertSubmissionStatusAndMessageStub).not.to.be.called;
+      expect(insertSubmissionStatusStub).to.be.calledOnce;
+    });
   });
 
   describe('transformEMLtoJSON', () => {
     afterEach(() => {
       sinon.restore();
+    });
+
+    it('transforms a submission record eml (xml) to json', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const mockSubmissionRecord = {
+        submission_id: 1,
+        eml_source:
+          '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
+      };
+
+      const getSubmissionRecordBySubmissionIdStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
+        .resolves(mockSubmissionRecord as unknown as ISubmissionModel);
+
+      const updateSubmissionRecordEMLJSONSourceStub = sinon
+        .stub(SubmissionService.prototype, 'updateSubmissionRecordEMLJSONSource')
+        .resolves();
+
+      const response = await darwinCoreService.transformEMLtoJSON(1);
+
+      console.log(response);
+
+      expect(response).to.eql({
+        '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
+        'eml:eml': { '@_packageId': 'urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f' }
+      });
+      expect(getSubmissionRecordBySubmissionIdStub).to.have.been.calledOnceWith(1);
+      expect(updateSubmissionRecordEMLJSONSourceStub).to.have.been.calledOnceWith(1, {
+        '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
+        'eml:eml': { '@_packageId': 'urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f' }
+      });
     });
   });
 
@@ -322,6 +470,22 @@ describe('DarwinCoreService', () => {
   describe('uploadToElasticSearch', () => {
     afterEach(() => {
       sinon.restore();
+    });
+
+    it('succeeds with valid values', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const indexStub = sinon.stub().returns('es response');
+
+      sinon.stub(DarwinCoreService.prototype, 'getEsClient').resolves({
+        index: indexStub
+      } as unknown as Client);
+
+      const response = await darwinCoreService.uploadToElasticSearch('dataPackageId', 'convertedEML');
+
+      expect(indexStub).to.be.calledOnceWith({ id: 'dataPackageId', index: ES_INDEX.EML, document: 'convertedEML' });
+      expect(response).equals('es response');
     });
   });
 

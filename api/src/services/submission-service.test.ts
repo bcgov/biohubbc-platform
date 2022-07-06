@@ -145,6 +145,38 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('getSubmissionMetadataJson', () => {
+    it('should return submission source transform row object', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionMetadataJson')
+        .resolves('transformed metadata');
+
+      const response = await submissionService.getSubmissionMetadataJson(1, 'transform');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.equal('transformed metadata');
+    });
+  });
+
+  describe('getSourceTransformRecordBySourceTransformId', () => {
+    it('should return submission source transform row object', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySourceTransformId')
+        .resolves({ source_transform_id: 1 } as unknown as ISourceTransformModel);
+
+      const response = await submissionService.getSourceTransformRecordBySourceTransformId(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ source_transform_id: 1 });
+    });
+  });
+
   describe('insertSubmissionStatus', () => {
     it('should return submission status data', async () => {
       const mockDBConnection = getMockDBConnection();

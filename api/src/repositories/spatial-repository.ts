@@ -142,7 +142,7 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<FeatureCollection> {
-    const response = await this.connection.query(transform, [submissionId]);
+    const response = await this.connection.query<{ result_data: FeatureCollection }>(transform, [submissionId]);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to run transform on submission id', [
@@ -151,7 +151,7 @@ export class SpatialRepository extends BaseRepository {
       ]);
     }
 
-    return response.rows[0][Object.keys(response.rows[0])[0]];
+    return response.rows[0].result_data;
   }
 
   /**

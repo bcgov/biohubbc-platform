@@ -334,7 +334,8 @@ export class SubmissionRepository extends BaseRepository {
       record_end_date = now()
     WHERE
       submission_id = ${submissionId}
-      and record_end_date is null
+    AND
+      record_end_date is null
     RETURNING
       submission_id;
   `;
@@ -390,7 +391,7 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
-    const response = await this.connection.query(transform, [submissionId]);
+    const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
@@ -399,7 +400,7 @@ export class SubmissionRepository extends BaseRepository {
       ]);
     }
 
-    return response.rows[0][Object.keys(response.rows[0])[0]];
+    return response.rows[0].result_data;
   }
 
   /**
