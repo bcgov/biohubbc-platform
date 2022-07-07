@@ -9,7 +9,7 @@ export class TaxonomyService extends ESService {
     try {
       const esClient = await this.getEsClient();
 
-      return await esClient.search({
+      return esClient.search({
         index: 'taxonomy',
         ...searchRequest
       });

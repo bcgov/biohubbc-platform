@@ -177,7 +177,7 @@ describe('SpatialRepository', () => {
         rowCount: 1,
         rows: [
           {
-            json_build_object: {
+            result_data: {
               type: 'FeatureCollection',
               features: []
             } as FeatureCollection

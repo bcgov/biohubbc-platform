@@ -25,8 +25,8 @@ export async function up(knex: Knex): Promise<void> {
     , points as (select ll.cov_n, ll.project_type, ll.poly_n, ll.point_n, json_build_array(ll.long::float, ll.lat::float) point from latlongs ll)
     , polys2 as (select cov_n, project_type, poly_n, jsonb_agg(point order by point_n) poly from points group by cov_n, project_type, poly_n)
     , multipoly as (select cov_n, project_type, jsonb_agg(poly) mpoly from polys2 group by project_type, cov_n)
-    , features as (select json_build_object('type','Feature','geometry', json_build_object('type','Polygon','coordinates', f.mpoly), 'properties', json_build_object('description', f.description, 'project type', f.project_type)) feature from (select d.description, m.mpoly, m.project_type from multipoly m, descriptions d where d.cov_n = m.cov_n and d.project_type = m.project_type) f)
-    select json_build_object('type','FeatureCollection','features',jsonb_agg(feature)) from features$transform$);
+    , features as (select json_build_object('type','Feature','geometry', json_build_object('type','Polygon','coordinates', f.mpoly), 'properties', json_build_object('type', 'Boundary', 'description', f.description, 'project type', f.project_type)) feature from (select d.description, m.mpoly, m.project_type from multipoly m, descriptions d where d.cov_n = m.cov_n and d.project_type = m.project_type) f)
+    select json_build_object('type','FeatureCollection','features',jsonb_agg(feature)) result_data from features$transform$);
 
   `);
 }

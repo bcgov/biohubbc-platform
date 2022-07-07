@@ -6,7 +6,7 @@ insert into submission_status_type (name, record_effective_date, description) va
 insert into submission_status_type (name, record_effective_date, description) values ('Template Transformed', now(), 'Custom template transform has completed.');
 insert into submission_status_type (name, record_effective_date, description) values ('Submission Data Ingested', now(), 'Submission data has been ingested.');
 insert into submission_status_type (name, record_effective_date, description) values ('Secured', now(), 'The submission has had security applied.');
-insert into submission_status_type (name, record_effective_date, description) values ('Awaiting Curration', now(), 'The submission is awaiting curration.');
+insert into submission_status_type (name, record_effective_date, description) values ('Awaiting Curation', now(), 'The submission is awaiting curation.');
 insert into submission_status_type (name, record_effective_date, description) values ('Published', now(), 'The submission has been publised.');
 insert into submission_status_type (name, record_effective_date, description) values ('Rejected', now(), 'The submission has been rejected.');
 insert into submission_status_type (name, record_effective_date, description) values ('On Hold', now(), 'Submission processing has been placed on hold.');
