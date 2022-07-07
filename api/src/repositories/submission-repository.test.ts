@@ -101,9 +101,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -120,9 +118,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -144,9 +140,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -163,9 +157,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -185,9 +177,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -207,9 +197,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -231,9 +219,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -250,9 +236,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -272,9 +256,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -300,9 +282,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -322,9 +302,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -344,9 +322,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -363,9 +339,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -512,9 +486,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -535,9 +507,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -557,9 +527,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
@@ -580,9 +548,7 @@ describe('SubmissionRepository', () => {
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
+        sql: () => mockQueryResponse
       });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);

@@ -266,39 +266,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getStylesheetFromS3', () => {
-    it('should throw an error if file does not contain transform_precompile_key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
-        .resolves({ metadata_transform: 'validString' } as ISourceTransformModel);
-
-      try {
-        await submissionService.getStylesheetFromS3(1);
-        expect.fail();
-      } catch (actualError) {
-        expect(repo).to.be.calledOnce;
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve stylesheet key');
-      }
-    });
-
-    it('should return s3 file', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
-        .resolves({ metadata_index: 'validString' } as ISourceTransformModel);
-      sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
-
-      const response = await submissionService.getStylesheetFromS3(1);
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ Body: 'valid' });
-    });
-  });
-
   describe('getIntakeFileFromS3', () => {
     it('should throw an error if file does not contain input_key', async () => {
       const mockDBConnection = getMockDBConnection();
