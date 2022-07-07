@@ -71,7 +71,7 @@ export function ingestEmlSubmission(): RequestHandler {
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      await darwinCoreService.ingestNewDwcaEML(submissionId);
+      await darwinCoreService.ingestNewDwCAEML(submissionId);
 
       await darwinCoreService.convertSubmissionEMLtoJSON(submissionId);
 

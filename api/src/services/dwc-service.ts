@@ -1,6 +1,4 @@
-import { XmlString } from 'aws-sdk/clients/applicationautoscaling';
 import { XMLParser } from 'fast-xml-parser';
-import SaxonJS2N from 'saxon-js';
 import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
@@ -11,7 +9,7 @@ import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
-import { parseS3File, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
@@ -36,26 +34,33 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * intake dwca file
+   * Process an incoming DwCA Submission.
    *
    * @param {Express.Multer.File} file
    * @param {string} dataPackageId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intake(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+  async intake(file: Express.Multer.File, dataPackageId: string): Promise<void> {
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
       await this.submissionService.setSubmissionEndDateById(submissionExists.submission_id);
-      await this.deleteEmlFromElasticSearchByDataPackageId(dataPackageId);
       //TODO: Delete scraped spatial components table details when its filled
     }
 
     return this.create(file, dataPackageId);
   }
 
-  async create(file: Express.Multer.File, dataPackageId: string): Promise<{ dataPackageId: string }> {
+  /**
+   * Process a new DwCA submission.
+   *
+   * @param {Express.Multer.File} file
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
     const { submissionId } = await this.ingestNewDwCADataPackage(file, {
       dataPackageId: dataPackageId
     });
@@ -71,23 +76,29 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to validate submission record'
       );
+
+      return;
     }
 
     try {
-      await this.ingestNewDwcaEML(submissionId);
+      await this.ingestNewDwCAEML(submissionId);
     } catch (error) {
+      defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
+
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to save eml file to db'
       );
+
+      return;
     }
 
     try {
       await this.convertSubmissionEMLtoJSON(submissionId);
     } catch (error) {
-      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
+      defaultLog.debug({ label: 'convertSubmissionEMLtoJSON', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -95,6 +106,8 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to convert EML to JSON'
       );
+
+      return;
     }
 
     try {
@@ -108,21 +121,25 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to transform and upload metadata'
       );
+
+      return;
     }
 
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
     } catch (error) {
+      defaultLog.debug({ label: 'normalizeSubmissionDWCA', message: 'error', error });
+
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to normalize dwca file'
       );
-    }
 
-    return { dataPackageId };
+      return;
+    }
   }
 
   /**
@@ -172,7 +189,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async ingestNewDwcaEML(submissionId: number): Promise<void> {
+  async ingestNewDwCAEML(submissionId: number): Promise<void> {
     const dwcaFile = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
     if (dwcaFile.eml) {
@@ -195,7 +212,8 @@ export class DarwinCoreService extends DBService {
 
       const options = {
         ignoreAttributes: false,
-        attributeNamePrefix: '@_'
+        attributeNamePrefix: '@_',
+        parseTagValue: false //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
       };
       const parser = new XMLParser(options);
       const eml_json_source = parser.parse(emlmediaFile.emlFile.buffer.toString() as string);
@@ -253,7 +271,7 @@ export class DarwinCoreService extends DBService {
       source_transform_id: sourceTransformRecord.source_transform_id,
       input_file_name: dwcArchive.rawFile.fileName,
       input_key: '',
-      event_timestamp: new Date().toISOString(),
+      record_effective_date: new Date().toISOString(),
       eml_source: '',
       eml_json_source: '',
       darwin_core_source: '{}',
@@ -279,92 +297,55 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * transform submission record eml to json and upload metadata
+   * transform submission record eml to metadata json and upload to search engine
    *
    * @param {number} submissionId
    * @param {string} dataPackageId
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<any> {
+  async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
     if (!submissionRecord.eml_source) {
       throw new ApiGeneralError('The eml source is not available');
     }
 
-    const s3File = await this.submissionService.getStylesheetFromS3(submissionId);
+    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
+      submissionRecord.source_transform_id
+    );
 
-    const stylesheet = parseS3File(s3File)?.buffer?.toString();
-
-    if (!stylesheet) {
-      throw new ApiGeneralError('Failed to parse the stylesheet');
+    if (!sourceTransformRecord.metadata_transform) {
+      throw new ApiGeneralError('The source metadata transform is not available');
     }
 
-    let transformedEML;
-    //call to the SaxonJS library to transform out EML into a JSON structure using XSLT stylesheets
-    try {
-      transformedEML = await this.transformEMLtoJSON(submissionRecord.eml_source, stylesheet);
-    } catch (error) {
-      defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
+    const jsonMetadata = await this.submissionService.getSubmissionMetadataJson(
+      submissionId,
+      sourceTransformRecord.metadata_transform
+    );
 
-      return this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'eml transformation failed'
-      );
+    if (!jsonMetadata) {
+      throw new ApiGeneralError('The source metadata json is not available');
     }
 
-    let response;
-    //call to the ElasticSearch API to create a record with our transformed EML
+    // call to the ElasticSearch API to create a record with our transformed EML
     try {
-      response = await this.uploadToElasticSearch(dataPackageId, transformedEML);
+      await this.uploadToElasticSearch(dataPackageId, jsonMetadata);
     } catch (error) {
       defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
 
-      return this.submissionService.insertSubmissionStatusAndMessage(
+      this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'upload to elastic search failed'
       );
+
+      return;
     }
 
     //TODO: We need a new submission status type
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
-
-    return response;
-  }
-
-  /**
-   * Conversion of eml to JSON
-   *
-   * @param {XmlString} emlSource
-   * @return {*} //TODO RETURN TYPE
-   * @memberof DarwinCoreService
-   */
-  async transformEMLtoJSON(emlSource: XmlString, stylesheet: any): Promise<any> {
-    // for future reference
-    // https://saxonica.plan.io/boards/5/topics/8759?pn=1&r=8766#message-8766
-    //to see the library's author respond to one of our questions
-
-    const result: {
-      principalResult: string;
-      resultDocuments: unknown;
-      stylesheetInternal: Record<string, unknown>;
-      masterDocument: unknown;
-    } = SaxonJS2N.transform({
-      stylesheetText: stylesheet,
-      sourceText: emlSource,
-      destination: 'serialized'
-    });
-
-    if (!result.principalResult) {
-      throw new ApiGeneralError('Failed to transform eml with stylesheet');
-    }
-
-    return JSON.parse(result.principalResult);
+    this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
   }
 
   /**
@@ -446,16 +427,22 @@ export class DarwinCoreService extends DBService {
     return response;
   }
 
+  /**
+   * Upload file to ES
+   *
+   * @param {string} dataPackageId
+   * @param {string} convertedEML
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
   async uploadToElasticSearch(dataPackageId: string, convertedEML: string) {
     const esClient = await this.getEsClient();
 
-    const response = await esClient.create({
+    return esClient.index({
       id: dataPackageId,
       index: ES_INDEX.EML,
       document: convertedEML
     });
-
-    return response;
   }
 
   /**

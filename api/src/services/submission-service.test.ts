@@ -164,6 +164,38 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('getSubmissionMetadataJson', () => {
+    it('should return submission source transform row object', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionMetadataJson')
+        .resolves('transformed metadata');
+
+      const response = await submissionService.getSubmissionMetadataJson(1, 'transform');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.equal('transformed metadata');
+    });
+  });
+
+  describe('getSourceTransformRecordBySourceTransformId', () => {
+    it('should return submission source transform row object', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySourceTransformId')
+        .resolves({ source_transform_id: 1 } as unknown as ISourceTransformModel);
+
+      const response = await submissionService.getSourceTransformRecordBySourceTransformId(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ source_transform_id: 1 });
+    });
+  });
+
   describe('insertSubmissionStatus', () => {
     it('should return submission status data', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -208,10 +240,10 @@ describe('SubmissionService', () => {
         {
           submission_status: 'Submission Data Ingested',
           submission_id: 1,
-          source_transform_id: 'SIMS',
+          source_transform_id: 1,
           uuid: '2267501d-c6a9-43b5-b951-2324faff6397',
-          event_timestamp: '2022-05-24T18:41:42.211Z',
-          delete_timestamp: null,
+          record_effective_date: '2022-05-24T18:41:42.211Z',
+          record_end_date: null,
           input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
           input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
           eml_source: null,
@@ -241,7 +273,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
-        .resolves({ metadata_index: 'validString' } as ISourceTransformModel);
+        .resolves({ metadata_transform: 'validString' } as ISourceTransformModel);
 
       try {
         await submissionService.getStylesheetFromS3(1);
@@ -258,7 +290,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSourceTransformRecordBySubmissionId')
-        .resolves({ transform_precompile_key: 'validString' } as ISourceTransformModel);
+        .resolves({ metadata_index: 'validString' } as ISourceTransformModel);
       sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
 
       const response = await submissionService.getStylesheetFromS3(1);

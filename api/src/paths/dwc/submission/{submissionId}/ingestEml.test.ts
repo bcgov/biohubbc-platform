@@ -135,7 +135,7 @@ describe('ingestEml', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwcaEML').throws('error' as unknown as ApiGeneralError);
+      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').throws('error' as unknown as ApiGeneralError);
 
       try {
         const requestHandler = ingestEml.ingestEmlSubmission();
@@ -159,7 +159,7 @@ describe('ingestEml', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwcaEML').resolves();
+      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
       sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
 
       const requestHandler = ingestEml.ingestEmlSubmission();

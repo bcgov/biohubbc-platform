@@ -128,8 +128,31 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<ISourceTransformModel>}
    * @memberof SubmissionService
    */
-  async getSourceTransformRecordBySystemUserId(systemUserId: number): Promise<ISourceTransformModel> {
-    return this.submissionRepository.getSourceTransformRecordBySystemUserId(systemUserId);
+  async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
+    return this.submissionRepository.getSourceTransformRecordBySystemUserId(systemUserId, version);
+  }
+
+  /**
+   * Get source transform record by its associated source transform id.
+   *
+   * @param {number} sourceTransformId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionService
+   */
+  async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
+    return this.submissionRepository.getSourceTransformRecordBySourceTransformId(sourceTransformId);
+  }
+
+  /**
+   * Get json representation of eml source from submission.
+   *
+   * @param {number} submissionId
+   * @param {string} transform
+   * @return {string}
+   * @memberof SubmissionService
+   */
+  async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
+    return this.submissionRepository.getSubmissionMetadataJson(submissionId, transform);
   }
 
   /**
@@ -200,14 +223,14 @@ export class SubmissionService extends DBService {
   async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
     const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
 
-    if (!transformRecord.transform_precompile_key) {
+    if (!transformRecord.metadata_index) {
       throw new ApiGeneralError('Failed to retrieve stylesheet key', [
         'SubmissionRepository->getStylesheetFromS3',
         'stylesheet_key was null'
       ]);
     }
 
-    return this.getFileFromS3(transformRecord.transform_precompile_key);
+    return this.getFileFromS3(transformRecord.metadata_index);
   }
 
   /**
