@@ -1,6 +1,7 @@
 import xlsx from 'xlsx';
 import { CSVWorksheet, ICsvState } from '../csv/csv-file';
-import { ArchiveFile, IMediaState, MediaFile, MediaValidation } from '../media-file';
+import { EMLFile } from '../eml/eml-file';
+import { ArchiveFile, IMediaState, MediaValidation } from '../media-file';
 import { ValidationSchemaParser } from '../validation/validation-schema-parser';
 
 export enum DWC_CLASS {
@@ -8,25 +9,19 @@ export enum DWC_CLASS {
   OCCURRENCE = 'occurrence',
   MEASUREMENTORFACT = 'measurementorfact',
   RESOURCERELATIONSHIP = 'resourcerelationship',
-  TAXON = 'taxon'
-}
-
-export enum DWC_EXTRA {
-  EML = 'eml',
-  META = 'meta'
+  TAXON = 'taxon',
+  EML = 'eml'
 }
 
 export const DEFAULT_XLSX_SHEET = 'Sheet1';
 
 export type DWCWorksheets = { [name in DWC_CLASS]?: CSVWorksheet };
 
-export type DWCExtras = { [name in DWC_EXTRA]?: MediaFile };
-
 /**
  * Supports Darwin Core Archive CSV files.
  *
  * Expects an array of known named-files
- *F
+ *
  * @export
  * @class DWCArchive
  */
@@ -37,7 +32,7 @@ export class DWCArchive {
 
   worksheets: DWCWorksheets;
 
-  extra: DWCExtras;
+  eml: EMLFile | undefined;
 
   constructor(archiveFile: ArchiveFile) {
     this.rawFile = archiveFile;
@@ -45,9 +40,6 @@ export class DWCArchive {
     this.mediaValidation = new MediaValidation(this.rawFile.fileName);
 
     this.worksheets = {};
-
-    // temporary storage for other non-csv files
-    this.extra = {};
 
     // parse archive files
     this._initArchiveFiles();
@@ -86,11 +78,9 @@ export class DWCArchive {
             xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
-        case DWC_EXTRA.EML:
-          this.extra[DWC_EXTRA.EML] = rawFile;
+        case DWC_CLASS.EML:
+          this.eml = new EMLFile(rawFile);
           break;
-        case DWC_EXTRA.META:
-          this.extra[DWC_EXTRA.META] = rawFile;
       }
     }
   }

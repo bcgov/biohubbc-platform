@@ -1,4 +1,6 @@
+import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
+import { ApiGeneralError } from '../errors/api-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -9,6 +11,8 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { getFileFromS3 } from '../utils/file-utils';
+import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
 export class SubmissionService extends DBService {
@@ -55,6 +59,18 @@ export class SubmissionService extends DBService {
     inputKey: IInsertSubmissionRecord['input_key']
   ): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
+  }
+
+  /**
+   * Update the `eml_source` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {EMLFile} file
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
+    return this.submissionRepository.updateSubmissionRecordEMLSource(submissionId, file);
   }
 
   /**
@@ -195,6 +211,63 @@ export class SubmissionService extends DBService {
    */
   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
+  }
+
+  /**
+   * Returns the EML stylesheet from S3
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<GetObjectOutput>}
+   * @memberof SubmissionService
+   */
+  async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
+    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
+
+    if (!transformRecord.metadata_index) {
+      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
+        'SubmissionRepository->getStylesheetFromS3',
+        'stylesheet_key was null'
+      ]);
+    }
+
+    return this.getFileFromS3(transformRecord.metadata_index);
+  }
+
+  /**
+   * Returns Intake file from S3
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<GetObjectOutput>}
+   * @memberof SubmissionService
+   */
+  async getIntakeFileFromS3(submissionId: number): Promise<GetObjectOutput> {
+    const transformRecord = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
+
+    if (!transformRecord.input_key) {
+      throw new ApiGeneralError('Failed to retrieve input file name', [
+        'SubmissionRepository->getInputFileNameKey',
+        'input file name was null'
+      ]);
+    }
+
+    return this.getFileFromS3(transformRecord.input_key);
+  }
+
+  /**
+   * Collect filename from S3
+   *
+   * @param {string} fileName
+   * @return {*}  {Promise<GetObjectOutput>}
+   * @memberof SubmissionService
+   */
+  async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
+    const s3File = await getFileFromS3(fileName);
+
+    if (!s3File) {
+      throw new ApiGeneralError('Failed to get file from S3');
+    }
+
+    return s3File;
   }
 
   /**
