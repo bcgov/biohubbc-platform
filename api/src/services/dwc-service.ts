@@ -503,8 +503,6 @@ export class DarwinCoreService extends DBService {
   async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
     const esClient = await this.getEsClient();
 
-    const response = await esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
-
-    return response;
+    return esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
   }
 }
