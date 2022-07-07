@@ -9,6 +9,7 @@ import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import {
   IInsertSubmissionRecord,
+  ISourceTransformModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -295,7 +296,7 @@ describe('SubmissionRepository', () => {
     it('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
@@ -307,10 +308,100 @@ describe('SubmissionRepository', () => {
       }
     });
 
-    it('should succeed with valid data', async () => {
+    it('should succeed with valid data, without optional version parameter', async () => {
       const mockResponse = {
         source_transform_id: 1
+      } as unknown as ISourceTransformModel;
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSourceTransformRecordBySystemUserId(1);
+
+      expect(response).to.eql(mockResponse);
+    });
+
+    it('should succeed with valid data, with optional version parameter', async () => {
+      const mockResponse = {
+        source_transform_id: 1
+      } as unknown as ISourceTransformModel;
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSourceTransformRecordBySystemUserId(1, 'v1');
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getSubmissionMetadataJson', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ query: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionMetadataJson(1, 'transform sql');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to transform submission eml to json');
+      }
+    });
+
+    it('should succeed with valid data, without optional version parameter', async () => {
+      const mockResponse = {
+        result_data: 'transformed eml'
       };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ query: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionMetadataJson(1, 'transform sql');
+
+      expect(response).to.eql('transformed eml');
+    });
+  });
+
+  describe('getSourceTransformRecordBySourceTransformId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSourceTransformRecordBySourceTransformId(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission source transform record');
+      }
+    });
+
+    it('should succeed with valid data, without optional version parameter', async () => {
+      const mockResponse = {
+        source_transform_id: 1
+      } as unknown as ISourceTransformModel;
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -318,7 +409,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSourceTransformRecordBySystemUserId(1);
+      const response = await submissionRepository.getSourceTransformRecordBySourceTransformId(1);
 
       expect(response).to.eql(mockResponse);
     });
