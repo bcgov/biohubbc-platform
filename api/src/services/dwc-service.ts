@@ -330,9 +330,7 @@ export class DarwinCoreService extends DBService {
     }
 
     //TODO: We need a new submission status type
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
-
-    return;
+    this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
   }
 
   /**
