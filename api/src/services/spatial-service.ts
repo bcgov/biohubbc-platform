@@ -1,5 +1,6 @@
 import { IDBConnection } from '../database/db';
 import {
+  IGetSpatialTransformRecord,
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
   ISubmissionSpatialComponent,
@@ -27,6 +28,17 @@ export class SpatialService extends DBService {
     spatialTransformDetails: IInsertSpatialTransform
   ): Promise<{ spatial_transform_id: number }> {
     return this.spatialRepository.insertSpatialTransform(spatialTransformDetails);
+  }
+
+  /**
+   * get spatial transform record from name
+   *
+   * @param {string} spatialTransformName
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialService
+   */
+  async getSpatialTransformRecordByName(spatialTransformName: string): Promise<IGetSpatialTransformRecord> {
+    return this.spatialRepository.getSpatialTransformRecordByName(spatialTransformName);
   }
 
   /**
@@ -62,32 +74,29 @@ export class SpatialService extends DBService {
    * Collect transform from db, run transform on submission id, save result on spatial component table
    *
    * @param {number} submissionId
-   * @param {number} spatialTransformId
-   * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
+   * @param {string} spatialTransformName
+   * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runTransform(
-    submissionId: number,
-    spatialTransformId: number
-  ): Promise<{ submission_spatial_component_id: number }> {
-    const spatialTransform = await this.getSpatialTransformBySpatialTransformId(spatialTransformId);
+  async runTransform(submissionId: number, spatialTransformName: string): Promise<void> {
+    const spatialTransformRecord = await this.getSpatialTransformRecordByName(spatialTransformName);
 
     const transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
       submissionId,
-      spatialTransform.transform
+      spatialTransformRecord.transform
     );
 
-    const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
-      submissionId,
-      transformed
-    );
+    transformed.forEach(async (dataPoint) => {
+      const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
+        submissionId,
+        dataPoint.result_data
+      );
 
-    await this.insertSpatialTransformSubmissionRecord(
-      spatialTransformId,
-      submissionSpatialComponentId.submission_spatial_component_id
-    );
-
-    return submissionSpatialComponentId;
+      await this.insertSpatialTransformSubmissionRecord(
+        spatialTransformRecord.spatial_transform_id,
+        submissionSpatialComponentId.submission_spatial_component_id
+      );
+    });
   }
 
   /**

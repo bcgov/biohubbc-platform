@@ -21,7 +21,7 @@ export async function up(knex: Knex): Promise<void> {
 , events as (select evns from submission, jsonb_path_query(darwin_core_source, '$.event') evns)
 , event as (select jsonb_array_elements(evns) evn from events)
 , event_coord as (select st_x(pt) x, st_y(pt) y, evn from event, ST_Transform(ST_SetSRID(ST_MakePoint(split_part(evn->>'verbatimCoordinates', ' ', 2)::integer, split_part(evn->>'verbatimCoordinates', ' ', 3)::integer), split_part(evn->>'verbatimCoordinates', ' ', 1)::integer+32600), 4326) pt)
-, taxons as (select taxns from submission, jsonb_path_query(darwin_core_source, '$.taxon') taxns) 
+, taxons as (select taxns from submission, jsonb_path_query(darwin_core_source, '$.taxon') taxns)
 , taxon as (select jsonb_array_elements(taxns) taxn from taxons)
 , normal as (select distinct o.uuid, o.occ, e.*, t.taxn from occurrence o
 	left join event_coord e on (e.evn->'id' = o.occ->'id')
@@ -40,7 +40,7 @@ select jsonb_build_object('type', 'FeatureCollection'
 			, 'verbatimSRS', n.evn->'verbatimSRS'
 			, 'verbatimCoordinates', n.evn->'verbatimCoordinates'
 			, 'vernacularName', n.taxn->'vernacularName'))))
-) from normal n;$transform$);
+) result_data from normal n;$transform$);
 
   `);
 }

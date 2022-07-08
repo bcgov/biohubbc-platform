@@ -81,7 +81,9 @@ export function transformSpatialSubmission(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      await spatialService.runTransform(submissionId, transformId);
+      const spatialTransform = await spatialService.getSpatialTransformBySpatialTransformId(transformId);
+
+      await spatialService.runTransform(submissionId, spatialTransform.transform);
 
       await connection.commit();
 

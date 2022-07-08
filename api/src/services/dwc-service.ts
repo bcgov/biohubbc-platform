@@ -169,7 +169,7 @@ export class DarwinCoreService extends DBService {
     try {
       const spatialService = new SpatialService(this.connection);
 
-      await spatialService.runTransform(submissionId, 1);
+      await spatialService.runTransform(submissionId, 'EML Study Boundaries');
     } catch (error) {
       defaultLog.debug({ label: 'runTransform', message: 'error', error });
 
@@ -178,6 +178,23 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_STATUS_TYPE.REJECTED,
         SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
         'Failed to run spatial transform "EML Study Boundaries" on submissionId'
+      );
+
+      return;
+    }
+
+    try {
+      const spatialService = new SpatialService(this.connection);
+
+      await spatialService.runTransform(submissionId, 'DwC Occurrences');
+    } catch (error) {
+      defaultLog.debug({ label: 'runTransform', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to run spatial transform "DwC Occurrences" on submissionId'
       );
 
       return;

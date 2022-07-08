@@ -12,6 +12,18 @@ export interface IInsertSpatialTransform {
   transform: string;
 }
 
+export interface IGetSpatialTransformRecord {
+  spatial_transform_id: number;
+  name: string;
+  description: string | null;
+  notes: string | null;
+  transform: string;
+}
+
+export interface ITransformReturn {
+  result_data: FeatureCollection;
+}
+
 export interface ISubmissionSpatialComponent {
   submission_spatial_component_id: number;
   submission_id: number;
@@ -63,6 +75,39 @@ export class SpatialRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+    return response.rows[0];
+  }
+
+  /**
+   * get spatial transform record from name
+   *
+   * @param {string} spatialTransformName
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialRepository
+   */
+  async getSpatialTransformRecordByName(spatialTransformName: string): Promise<IGetSpatialTransformRecord> {
+    const sqlStatement = SQL`
+      SELECT
+        spatial_transform_id,
+        name,
+        description,
+        notes,
+        transform
+      FROM
+        spatial_transform
+      WHERE
+        name = ${spatialTransformName};
+    `;
+
+    const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get spatial transform record', [
+        'SpatialRepository->getSpatialTransformRecordByName',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
     return response.rows[0];
   }
 
@@ -126,7 +171,7 @@ export class SpatialRepository extends BaseRepository {
         'Failed to insert spatial transform submission id and submission spatial component id',
         [
           'SpatialRepository->insertSpatialTransformSubmissionRecord',
-          'rowCount was null or undefined, expected rowCount = 1'
+          'rowCount was null or undefined, expected rowCount >= 1'
         ]
       );
     }
@@ -138,20 +183,20 @@ export class SpatialRepository extends BaseRepository {
    *
    * @param {number} submissionId
    * @param {string} transform
-   * @return {*}  {Promise<FeatureCollection>}
+   * @return {*}  {Promise<ITransformReturn[]>}
    * @memberof SpatialRepository
    */
-  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<FeatureCollection> {
-    const response = await this.connection.query<{ result_data: FeatureCollection }>(transform, [submissionId]);
+  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformReturn[]> {
+    const response = await this.connection.query(transform, [submissionId]);
 
-    if (response.rowCount !== 1) {
+    if (response.rowCount <= 0) {
       throw new ApiExecuteSQLError('Failed to run transform on submission id', [
         'SpatialRepository->runSpatialTransformOnSubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount >= 1'
       ]);
     }
 
-    return response.rows[0].result_data;
+    return response.rows;
   }
 
   /**
