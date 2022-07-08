@@ -213,6 +213,13 @@ export class SpatialRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Query builder to find spatial component by given criteria
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @memberof SpatialRepository
+   */
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialComponent[]> {

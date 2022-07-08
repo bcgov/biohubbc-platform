@@ -77,9 +77,26 @@ export class SpatialService extends DBService {
       spatialTransform.transform
     );
 
-    return this.spatialRepository.insertSubmissionSpatialComponent(submissionId, transformed);
+    const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
+      submissionId,
+      transformed
+    );
+
+    await this.insertSpatialTransformSubmissionRecord(
+      spatialTransformId,
+      submissionSpatialComponentId.submission_spatial_component_id
+    );
+
+    return submissionSpatialComponentId;
   }
 
+  /**
+   * Query builder to find spatial component by given criteria
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @memberof SpatialService
+   */
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialComponent[]> {
