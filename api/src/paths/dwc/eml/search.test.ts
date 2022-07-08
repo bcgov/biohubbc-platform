@@ -131,7 +131,7 @@ describe('search', () => {
         const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
         mockReq.query = {
-          index: 'EML'
+          terms: 'search-term'
         };
 
         const searchStub = sinon.stub().resolves({
@@ -150,9 +150,13 @@ describe('search', () => {
         expect(mockRes.jsonValue).eql([{ id: 'testid', source: {}, fields: {} }]);
         expect(searchStub).to.have.been.calledOnceWith({
           index: 'eml',
-          fields: ['datasetTitle'],
-          query: undefined,
-          _source: false
+          query: {
+            multi_match: {
+              fields: ['project.taxonomicCoverage.commonName', 'project.taxonomicCoverage.taxonRankValue'],
+              type: 'phrase_prefix',
+              query: 'search-term'
+            }
+          }
         });
       });
     });

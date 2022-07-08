@@ -1,6 +1,7 @@
 import SQL from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { EMLFile } from '../utils/media/eml/eml-file';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -232,6 +233,38 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Update the `eml_source` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {EMLFile} file
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission
+      SET
+      eml_source = ${file.emlFile}
+      WHERE
+        submission_id = ${submissionId}
+      RETURNING
+        submission_id;
+    `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission record source', [
+        'SubmissionRepository->updateSubmissionRecordEMLSource',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Update the `eml_json_source` column of a submission record.
    *
    * @param {number} submissionId
@@ -257,7 +290,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
+      throw new ApiExecuteSQLError('Failed to update submission record eml json', [
         'SubmissionRepository->updateSubmissionRecordEMLJSONSource',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);

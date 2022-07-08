@@ -3,12 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import {
-  ISubmissionModel,
-  SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
-} from '../repositories/submission-repository';
-import { generateS3FileKey, getFileFromS3, uploadFileToS3 } from '../utils/file-utils';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -85,9 +81,24 @@ export class DarwinCoreService extends DBService {
     }
 
     try {
-      await this.transformEMLtoJSON(submissionId);
+      await this.ingestNewDwCAEML(submissionId);
     } catch (error) {
-      defaultLog.debug({ label: 'transformEMLtoJSON', message: 'error', error });
+      defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to save eml file to db'
+      );
+
+      return;
+    }
+
+    try {
+      await this.convertSubmissionEMLtoJSON(submissionId);
+    } catch (error) {
+      defaultLog.debug({ label: 'convertSubmissionEMLtoJSON', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -118,6 +129,8 @@ export class DarwinCoreService extends DBService {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
     } catch (error) {
+      defaultLog.debug({ label: 'normalizeSubmissionDWCA', message: 'error', error });
+
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
         SUBMISSION_STATUS_TYPE.REJECTED,
@@ -137,69 +150,9 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async getSubmissionRecordAndConvertToDWCArchive(submissionId: number): Promise<DWCArchive> {
-    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+    const file = await this.submissionService.getIntakeFileFromS3(submissionId);
 
-    if (!submissionRecord || !submissionRecord.input_key) {
-      throw new ApiGeneralError('submission record s3Key unavailable', [
-        'DarwinCoreService->getSubmissionRecordAndConvertToDWCArchive',
-        'submission record was invalid or did not contain input_key'
-      ]);
-    }
-
-    const s3File = await getFileFromS3(submissionRecord.input_key);
-
-    if (!s3File) {
-      throw new ApiGeneralError('s3 file unavailable', [
-        'DarwinCoreService->getSubmissionRecordAndConvertToDWCArchive',
-        's3 file is invalid or unavailable'
-      ]);
-    }
-
-    return this.prepDWCArchive(s3File);
-  }
-
-  /**
-   * Converts submission EML to JSON and persists with submission record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ occurrence_id: number }[]>}
-   * @memberof DarwinCoreService
-   */
-  async transformEMLtoJSON(submissionId: number): Promise<{ eml_json_source: string }> {
-    const submission: ISubmissionModel = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
-
-    const options = {
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-      parseTagValue: false //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
-    };
-    const parser = new XMLParser(options);
-
-    const eml_json_source = parser.parse(submission.eml_source as string);
-
-    await this.submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
-
-    return eml_json_source;
-  }
-
-  /**
-   * Scrape occurrences from submissionFile and upload to table
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ occurrence_id: number }[]>}
-   * @memberof DarwinCoreService
-   */
-  async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
-    const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-
-    const occurrenceService = new OccurrenceService(this.connection);
-
-    const response = await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
-
-    //TODO: if fail post failure status
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
-
-    return response;
+    return this.prepDWCArchive(file);
   }
 
   /**
@@ -230,6 +183,68 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
+   * Collect eml file from dwca and save to db
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async ingestNewDwCAEML(submissionId: number): Promise<void> {
+    const dwcaFile = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
+    if (dwcaFile.eml) {
+      await this.submissionService.updateSubmissionRecordEMLSource(submissionId, dwcaFile.eml);
+    }
+  }
+
+  /**
+   * Converts submission EML to JSON and persists with submission record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ occurrence_id: number }[]>}
+   * @memberof DarwinCoreService
+   */
+  async convertSubmissionEMLtoJSON(submissionId: number): Promise<void> {
+    const dwcaFile = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
+    if (dwcaFile.eml) {
+      const emlmediaFile = dwcaFile.eml;
+
+      const options = {
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+        parseTagValue: false //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
+      };
+      const parser = new XMLParser(options);
+      const eml_json_source = parser.parse(emlmediaFile.emlFile.buffer.toString() as string);
+
+      await this.submissionService.updateSubmissionRecordEMLJSONSource(submissionId, eml_json_source);
+
+      return eml_json_source;
+    }
+  }
+
+  /**
+   * Scrape occurrences from submissionFile and upload to table
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ occurrence_id: number }[]>}
+   * @memberof DarwinCoreService
+   */
+  async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
+    const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
+    const occurrenceService = new OccurrenceService(this.connection);
+
+    const response = await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
+
+    //TODO: if fail post failure status
+    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+
+    return response;
+  }
+
+  /**
    * Ingest a Darwin Core Archive (DwCA) data package.
    *
    * @param {Express.Multer.File} file
@@ -257,9 +272,9 @@ export class DarwinCoreService extends DBService {
       input_file_name: dwcArchive.rawFile.fileName,
       input_key: '',
       record_effective_date: new Date().toISOString(),
-      eml_source: dwcArchive.extra.eml?.buffer?.toString() || '',
+      eml_source: '',
       eml_json_source: '',
-      darwin_core_source: '{}', // TODO populate
+      darwin_core_source: '{}',
       uuid: dataPackageId
     });
 
@@ -412,6 +427,14 @@ export class DarwinCoreService extends DBService {
     return response;
   }
 
+  /**
+   * Upload file to ES
+   *
+   * @param {string} dataPackageId
+   * @param {string} convertedEML
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
   async uploadToElasticSearch(dataPackageId: string, convertedEML: string) {
     const esClient = await this.getEsClient();
 
@@ -451,6 +474,13 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Return normalized dwca file data
+   *
+   * @param {DWCArchive} dwcArchiveFile
+   * @return {*}  {string}
+   * @memberof DarwinCoreService
+   */
   normalizeDWCA(dwcArchiveFile: DWCArchive): string {
     const normalized = {};
 
@@ -461,5 +491,18 @@ export class DarwinCoreService extends DBService {
     });
 
     return JSON.stringify(normalized);
+  }
+
+  /**
+   * Delete old data from ES
+   *
+   * @param {string} dataPackageId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
+    const esClient = await this.getEsClient();
+
+    return esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
   }
 }
