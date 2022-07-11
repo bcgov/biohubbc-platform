@@ -66,12 +66,16 @@ export class DarwinCoreService extends DBService {
       dataPackageId: dataPackageId
     });
 
-    // const runTempValidateSubmission = this.runIntakeFunctions(
+    // const intakeRun = new intakeRunner(
     //   this.tempValidateSubmission,
     //   submissionId,
     //   'tempValidateSubmission',
-    //   'Failed to validate submission record'
+    //   'Failed to validate submission record',
+    //   [],
+    //   this.connection
     // );
+
+    // const runTempValidateSubmission = intakeRun.runIntake();
 
     // if (!runTempValidateSubmission) return;
 
@@ -200,28 +204,6 @@ export class DarwinCoreService extends DBService {
       return;
     }
   }
-
-  // async runIntakeFunctions(
-  //   func: (param: any) => any,
-  //   submissionId: number,
-  //   functionName: string,
-  //   statusText: string
-  // ): Promise<any> {
-  //   try {
-  //     return await func(submissionId);
-  //   } catch (error) {
-  //     defaultLog.debug({ label: functionName, message: 'error', error });
-
-  //     await this.submissionService.insertSubmissionStatusAndMessage(
-  //       submissionId,
-  //       SUBMISSION_STATUS_TYPE.REJECTED,
-  //       SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-  //       statusText
-  //     );
-
-  //     return null;
-  //   }
-  // }
 
   /**
    * Ingest a Darwin Core Archive (DwCA) data package.
@@ -586,5 +568,51 @@ export class DarwinCoreService extends DBService {
     const esClient = await this.getEsClient();
 
     return esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
+  }
+}
+
+class intakeRunner<F> extends DarwinCoreService {
+  private funct: F;
+  private name: string;
+  private sub: number;
+  private text: string;
+  private params: string[];
+
+  constructor(funct: F, name: string, sub: number, text: string, params: string[], connection: IDBConnection) {
+    super(connection);
+    this.funct = funct;
+    this.name = name;
+    this.sub = sub;
+    this.text = text;
+    this.params = params;
+  }
+
+  async runIntake() {
+    console.log('this.funct', this.funct);
+    console.log('this.name', this.name);
+    console.log('this.sub', this.sub);
+    console.log('this.text', this.text);
+    console.log('this.params', this.params);
+
+    if (this.params.length == 1) {
+      return this.runIntakeFunctionOneParam();
+    }
+  }
+
+  async runIntakeFunctionOneParam(): Promise<any> {
+    try {
+      return await this.funct(String(this.sub), this.params[0]);
+    } catch (error) {
+      defaultLog.debug({ label: this.name, message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        this.sub,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        this.text
+      );
+
+      return null;
+    }
   }
 }
