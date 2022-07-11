@@ -66,15 +66,6 @@ export class DarwinCoreService extends DBService {
       dataPackageId: dataPackageId
     });
 
-    // const runTempValidateSubmission = this.runIntakeFunctions(
-    //   this.tempValidateSubmission,
-    //   submissionId,
-    //   'tempValidateSubmission',
-    //   'Failed to validate submission record'
-    // );
-
-    // if (!runTempValidateSubmission) return;
-
     try {
       await this.tempValidateSubmission(submissionId);
     } catch (error) {
@@ -200,28 +191,6 @@ export class DarwinCoreService extends DBService {
       return;
     }
   }
-
-  // async runIntakeFunctions(
-  //   func: (param: any) => any,
-  //   submissionId: number,
-  //   functionName: string,
-  //   statusText: string
-  // ): Promise<any> {
-  //   try {
-  //     return await func(submissionId);
-  //   } catch (error) {
-  //     defaultLog.debug({ label: functionName, message: 'error', error });
-
-  //     await this.submissionService.insertSubmissionStatusAndMessage(
-  //       submissionId,
-  //       SUBMISSION_STATUS_TYPE.REJECTED,
-  //       SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-  //       statusText
-  //     );
-
-  //     return null;
-  //   }
-  // }
 
   /**
    * Ingest a Darwin Core Archive (DwCA) data package.

@@ -161,7 +161,7 @@ describe('transform-spatial', () => {
 
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      sinon.stub(SpatialService.prototype, 'runTransform').throws(new Error('test error'));
+      sinon.stub(SpatialService.prototype, 'getSpatialTransformBySpatialTransformId').throws(new Error('test error'));
 
       const requestHandler = transformSpatial.transformSpatialSubmission();
 
@@ -186,15 +186,18 @@ describe('transform-spatial', () => {
 
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const runTransformStub = sinon
-        .stub(SpatialService.prototype, 'runTransform')
-        .resolves({ submission_spatial_component_id: 1 });
+      const getSpatialTransformBySpatialTransformIdStub = sinon
+        .stub(SpatialService.prototype, 'getSpatialTransformBySpatialTransformId')
+        .resolves({ transform: 'string' });
+
+      const runTransformStub = sinon.stub(SpatialService.prototype, 'runTransform').resolves();
 
       const requestHandler = transformSpatial.transformSpatialSubmission();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(runTransformStub).to.have.been.calledOnceWith(1, 1);
+      expect(getSpatialTransformBySpatialTransformIdStub).to.have.been.calledOnceWith(1);
+      expect(runTransformStub).to.have.been.calledOnceWith(1, 'string');
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(undefined);
     });

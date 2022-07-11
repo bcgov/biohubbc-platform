@@ -195,10 +195,14 @@ describe('SpatialRepository', () => {
 
       const response = await spatialRepository.runSpatialTransformOnSubmissionId(1, 'string');
 
-      expect(response).to.eql({
-        type: 'FeatureCollection',
-        features: []
-      });
+      expect(response).to.eql([
+        {
+          result_data: {
+            type: 'FeatureCollection',
+            features: []
+          } as FeatureCollection
+        }
+      ]);
     });
   });
 
