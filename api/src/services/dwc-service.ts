@@ -215,7 +215,7 @@ export class DarwinCoreService extends DBService {
         attributeNamePrefix: '@_',
         parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        isArray: (tagName: string, jPath: string, isLeafNode: boolean, isAttribute: boolean) => {
+        isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
           const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
           if (tagsArray.includes(tagName)) return true;
           return false;
