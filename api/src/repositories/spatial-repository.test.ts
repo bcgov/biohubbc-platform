@@ -61,6 +61,48 @@ describe('SpatialRepository', () => {
     });
   });
 
+  describe('getSpatialTransformRecordByName', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when select sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      try {
+        await spatialRepository.getSpatialTransformRecordByName('test');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get spatial transform record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = { something: 'thing' };
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const response = await spatialRepository.getSpatialTransformRecordByName('test');
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
   describe('getSpatialTransformBySpatialTransformId', () => {
     afterEach(() => {
       sinon.restore();
@@ -195,10 +237,14 @@ describe('SpatialRepository', () => {
 
       const response = await spatialRepository.runSpatialTransformOnSubmissionId(1, 'string');
 
-      expect(response).to.eql({
-        type: 'FeatureCollection',
-        features: []
-      });
+      expect(response).to.eql([
+        {
+          result_data: {
+            type: 'FeatureCollection',
+            features: []
+          } as FeatureCollection
+        }
+      ]);
     });
   });
 

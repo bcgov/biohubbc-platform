@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
+import { SPATIAL_TRANSFORM_NAMES } from '../repositories/spatial-repository';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -13,6 +14,7 @@ import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
+import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -81,6 +83,21 @@ export class DarwinCoreService extends DBService {
     }
 
     try {
+      await this.tempSecureSubmission(submissionId);
+    } catch (error) {
+      defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to secure submission record'
+      );
+
+      return;
+    }
+
+    try {
       await this.ingestNewDwCAEML(submissionId);
     } catch (error) {
       defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
@@ -140,6 +157,93 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+
+    try {
+      const spatialService = new SpatialService(this.connection);
+
+      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
+    } catch (error) {
+      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to run spatial transform "EML Study Boundaries" on submissionId'
+      );
+
+      return;
+    }
+
+    try {
+      const spatialService = new SpatialService(this.connection);
+
+      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
+    } catch (error) {
+      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.REJECTED,
+        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        'Failed to run spatial transform "DwC Occurrences" on submissionId'
+      );
+
+      return;
+    }
+  }
+
+  /**
+   * Ingest a Darwin Core Archive (DwCA) data package.
+   *
+   * @param {Express.Multer.File} file
+   * @param {{ dataPackageId?: string }} [options]
+   * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
+   * @memberof DarwinCoreService
+   */
+  async ingestNewDwCADataPackage(
+    file: Express.Multer.File,
+    options?: { dataPackageId?: string }
+  ): Promise<{ dataPackageId: string; submissionId: number }> {
+    const dataPackageId = options?.dataPackageId || uuidv4();
+
+    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
+    //already done above in intake() maybe double check nothing else needs to be deleted or updated :) thanks!
+
+    const dwcArchive = this.prepDWCArchive(file);
+
+    // Fetch the source transform record for this submission based on the source system user id
+    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
+      this.connection.systemUserId()
+    );
+
+    const response = await this.submissionService.insertSubmissionRecord({
+      source_transform_id: sourceTransformRecord.source_transform_id,
+      input_file_name: dwcArchive.rawFile.fileName,
+      input_key: '',
+      record_effective_date: new Date().toISOString(),
+      eml_source: '',
+      eml_json_source: '',
+      darwin_core_source: '{}',
+      uuid: dataPackageId
+    });
+
+    const submissionId = response.submission_id;
+
+    const s3Key = generateS3FileKey({
+      submissionId: submissionId,
+      fileName: file.originalname
+    });
+
+    await this.submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
+
+    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMITTED);
+
+    await uploadFileToS3(file, s3Key, {
+      filename: file.originalname
+    });
+
+    return { dataPackageId, submissionId };
   }
 
   /**
@@ -198,7 +302,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Converts submission EML to JSON and persists with submission record
+   * Converts submission EML to JSON and persists with submission record.
    *
    * @param {number} submissionId
    * @return {*}  {Promise<{ occurrence_id: number }[]>}
@@ -242,58 +346,6 @@ export class DarwinCoreService extends DBService {
     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
 
     return response;
-  }
-
-  /**
-   * Ingest a Darwin Core Archive (DwCA) data package.
-   *
-   * @param {Express.Multer.File} file
-   * @param {{ dataPackageId?: string }} [options]
-   * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
-   * @memberof DarwinCoreService
-   */
-  async ingestNewDwCADataPackage(
-    file: Express.Multer.File,
-    options?: { dataPackageId?: string }
-  ): Promise<{ dataPackageId: string; submissionId: number }> {
-    const dataPackageId = options?.dataPackageId || uuidv4();
-
-    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
-
-    const dwcArchive = this.prepDWCArchive(file);
-
-    // Fetch the source transform record for this submission based on the source system user id
-    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
-      this.connection.systemUserId()
-    );
-
-    const response = await this.submissionService.insertSubmissionRecord({
-      source_transform_id: sourceTransformRecord.source_transform_id,
-      input_file_name: dwcArchive.rawFile.fileName,
-      input_key: '',
-      record_effective_date: new Date().toISOString(),
-      eml_source: '',
-      eml_json_source: '',
-      darwin_core_source: '{}',
-      uuid: dataPackageId
-    });
-
-    const submissionId = response.submission_id;
-
-    const s3Key = generateS3FileKey({
-      submissionId: submissionId,
-      fileName: file.originalname
-    });
-
-    await this.submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
-
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMITTED);
-
-    await uploadFileToS3(file, s3Key, {
-      filename: file.originalname
-    });
-
-    return { dataPackageId, submissionId };
   }
 
   /**
