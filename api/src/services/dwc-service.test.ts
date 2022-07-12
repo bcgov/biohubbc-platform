@@ -28,6 +28,7 @@ import { DarwinCoreService } from './dwc-service';
 import { ESService } from './es-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
+import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -661,6 +662,42 @@ describe('DarwinCoreService', () => {
       }
     });
 
+    it('should set submission status to rejected and insert an error message when securing file fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').throws('error' as unknown as ApiGeneralError);
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to secure submission record'
+        );
+      }
+    });
+
     it('should set submission status to rejected and insert an error message when ingesting new dwca eml fails', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
@@ -670,6 +707,8 @@ describe('DarwinCoreService', () => {
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
 
       const ingestNewDwCAEMLStub = sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCAEML')
@@ -690,6 +729,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
         expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
@@ -709,6 +749,8 @@ describe('DarwinCoreService', () => {
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
 
       const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
 
@@ -731,6 +773,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
         expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
         expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
@@ -751,6 +794,8 @@ describe('DarwinCoreService', () => {
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
 
       const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
 
@@ -777,6 +822,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
         expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
         expect(convertSubmissionEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
@@ -798,6 +844,8 @@ describe('DarwinCoreService', () => {
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
 
       const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
 
@@ -826,6 +874,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
         expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
         expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
@@ -848,6 +897,8 @@ describe('DarwinCoreService', () => {
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
 
       const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
 
@@ -880,6 +931,7 @@ describe('DarwinCoreService', () => {
       } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
         expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
         expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
@@ -894,7 +946,7 @@ describe('DarwinCoreService', () => {
       }
     });
 
-    it('should succeed', async () => {
+    it('should set submission status to rejected and insert an error message when runing transform "EML" fails', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
@@ -903,6 +955,8 @@ describe('DarwinCoreService', () => {
         .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
 
       const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
 
       const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
 
@@ -913,10 +967,16 @@ describe('DarwinCoreService', () => {
         .resolves();
 
       const dwcaStub = sinon.createStubInstance(DWCArchive);
+
       const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
         .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
         .resolves(dwcaStub);
+
       const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const runSpatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransform')
+        .throws('error' as unknown as ApiGeneralError);
 
       const errorStatusAndMessageStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
@@ -929,19 +989,148 @@ describe('DarwinCoreService', () => {
 
       try {
         await darwinCoreService.create(multerFile, 'dataPackageId');
-
+        expect.fail();
+      } catch (actualError) {
         expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
         expect(tempValidationStub).to.be.calledOnceWith(1);
-        expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
         expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
-        expect(errorStatusAndMessageStub).not.to.have.been.called;
-      } catch (actualError) {
-        console.log(actualError);
-        expect.fail();
+        expect(runSpatialTransformStub).to.be.calledOnceWith(1, 'EML Study Boundaries');
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to run spatial transform "EML Study Boundaries" on submissionId'
+        );
       }
+    });
+
+    it('should set submission status to rejected and insert an error message when runing transform "EML" fails', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
+
+      const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
+
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const runSpatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransform')
+        .onFirstCall()
+        .resolves();
+
+      runSpatialTransformStub.onSecondCall().throws('error' as unknown as ApiGeneralError);
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+        expect(tempValidationStub).to.be.calledOnceWith(1);
+        expect(tempSecureStub).to.be.calledOnceWith(1);
+        expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
+        expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
+        expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+        expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
+        expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+        expect(runSpatialTransformStub).to.be.calledWith(1, 'EML Study Boundaries');
+        expect(runSpatialTransformStub).to.be.calledWith(1, 'DwC Occurrences');
+        expect(errorStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.REJECTED,
+          SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+          'Failed to run spatial transform "DwC Occurrences" on submissionId'
+        );
+      }
+    });
+
+    it('should succeed', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDwCADataPackageStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
+
+      const tempValidationStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+
+      const tempSecureStub = sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
+
+      const ingestNewDwCAEMLStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
+
+      const transformEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
+
+      const transformAndUploadMetaDataStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .resolves();
+
+      const dwcaStub = sinon.createStubInstance(DWCArchive);
+
+      const getSubmissionRecordAndConvertToDWCArchiveStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(dwcaStub);
+
+      const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      const runSpatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransform')
+        .onFirstCall()
+        .resolves();
+
+      runSpatialTransformStub.onSecondCall().resolves();
+
+      const errorStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves({ submission_status_id: 1, submission_message_id: 1 });
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      await darwinCoreService.create(multerFile, 'dataPackageId');
+
+      expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+      expect(tempValidationStub).to.be.calledOnceWith(1);
+      expect(tempSecureStub).to.be.calledOnceWith(1);
+      expect(ingestNewDwCAEMLStub).to.be.calledOnceWith(1);
+      expect(transformEMLtoJSONStub).to.be.calledOnceWith(1);
+      expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
+      expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
+      expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
+      expect(errorStatusAndMessageStub).not.to.have.been.called;
     });
   });
 
