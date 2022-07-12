@@ -190,14 +190,14 @@ describe('transform-spatial', () => {
         .stub(SpatialService.prototype, 'getSpatialTransformBySpatialTransformId')
         .resolves({ transform: 'string' });
 
-      const runTransformStub = sinon.stub(SpatialService.prototype, 'runTransform').resolves();
+      const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').resolves();
 
       const requestHandler = transformSpatial.transformSpatialSubmission();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(getSpatialTransformBySpatialTransformIdStub).to.have.been.calledOnceWith(1);
-      expect(runTransformStub).to.have.been.calledOnceWith(1, 'string');
+      expect(runSpatialTransformStub).to.have.been.calledOnceWith(1, 'string');
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(undefined);
     });

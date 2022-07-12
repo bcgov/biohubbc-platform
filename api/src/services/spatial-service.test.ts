@@ -89,7 +89,7 @@ describe('SpatialService', () => {
     });
   });
 
-  describe('runTransform', () => {
+  describe('runSpatialTransform', () => {
     it('should return submission_spatial_component_id after running transform and inserting data', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
@@ -106,7 +106,7 @@ describe('SpatialService', () => {
         .stub(SpatialRepository.prototype, 'insertSubmissionSpatialComponent')
         .resolves({ submission_spatial_component_id: 1 });
 
-      await spatialService.runTransform(1, 'Occurrences');
+      await spatialService.runSpatialTransform(1, 'Occurrences');
 
       expect(getSpatialTransformRecordByNameStub).to.be.calledOnce;
       expect(runSpatialTransformOnSubmissionIdStub).to.be.calledOnce;

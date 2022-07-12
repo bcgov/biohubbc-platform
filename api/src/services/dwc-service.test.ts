@@ -974,8 +974,8 @@ describe('DarwinCoreService', () => {
 
       const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-      const runTransformStub = sinon
-        .stub(SpatialService.prototype, 'runTransform')
+      const runSpatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransform')
         .throws('error' as unknown as ApiGeneralError);
 
       const errorStatusAndMessageStub = sinon
@@ -999,7 +999,7 @@ describe('DarwinCoreService', () => {
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
-        expect(runTransformStub).to.be.calledOnceWith(1, 'EML Study Boundaries');
+        expect(runSpatialTransformStub).to.be.calledOnceWith(1, 'EML Study Boundaries');
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
           SUBMISSION_STATUS_TYPE.REJECTED,
@@ -1037,9 +1037,9 @@ describe('DarwinCoreService', () => {
 
       const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-      const runTransformStub = sinon.stub(SpatialService.prototype, 'runTransform').onFirstCall().resolves();
+      const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').onFirstCall().resolves();
 
-      runTransformStub.onSecondCall().throws('error' as unknown as ApiGeneralError);
+      runSpatialTransformStub.onSecondCall().throws('error' as unknown as ApiGeneralError);
 
       const errorStatusAndMessageStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
@@ -1062,8 +1062,8 @@ describe('DarwinCoreService', () => {
         expect(transformAndUploadMetaDataStub).to.be.calledOnceWith(1, 'dataPackageId');
         expect(getSubmissionRecordAndConvertToDWCArchiveStub).to.be.calledWith(1);
         expect(normalizeSubmissionDWCAStub).to.be.calledOnceWith(1, dwcaStub);
-        expect(runTransformStub).to.be.calledWith(1, 'EML Study Boundaries');
-        expect(runTransformStub).to.be.calledWith(1, 'DwC Occurrences');
+        expect(runSpatialTransformStub).to.be.calledWith(1, 'EML Study Boundaries');
+        expect(runSpatialTransformStub).to.be.calledWith(1, 'DwC Occurrences');
         expect(errorStatusAndMessageStub).to.be.calledOnceWith(
           1,
           SUBMISSION_STATUS_TYPE.REJECTED,
@@ -1101,9 +1101,9 @@ describe('DarwinCoreService', () => {
 
       const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-      const runTransformStub = sinon.stub(SpatialService.prototype, 'runTransform').onFirstCall().resolves();
+      const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').onFirstCall().resolves();
 
-      runTransformStub.onSecondCall().resolves();
+      runSpatialTransformStub.onSecondCall().resolves();
 
       const errorStatusAndMessageStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
