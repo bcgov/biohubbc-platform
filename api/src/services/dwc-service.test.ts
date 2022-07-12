@@ -1037,7 +1037,10 @@ describe('DarwinCoreService', () => {
 
       const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-      const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').onFirstCall().resolves();
+      const runSpatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransform')
+        .onFirstCall()
+        .resolves();
 
       runSpatialTransformStub.onSecondCall().throws('error' as unknown as ApiGeneralError);
 
@@ -1101,7 +1104,10 @@ describe('DarwinCoreService', () => {
 
       const normalizeSubmissionDWCAStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-      const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').onFirstCall().resolves();
+      const runSpatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransform')
+        .onFirstCall()
+        .resolves();
 
       runSpatialTransformStub.onSecondCall().resolves();
 

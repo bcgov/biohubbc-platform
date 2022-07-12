@@ -40,6 +40,11 @@ export interface ISpatialComponentsSearchCriteria {
   boundary: Feature;
 }
 
+export enum SPATIAL_TRANSFORM_NAMES {
+  EML_STUDY_BOUNDARIES = 'EML Study Boundaries',
+  DWC_OCCURRENCES = 'DwC Occurrences'
+}
+
 export class SpatialRepository extends BaseRepository {
   /**
    * Insert new spatial transform record

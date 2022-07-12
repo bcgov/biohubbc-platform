@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
+import { SPATIAL_TRANSFORM_NAMES } from '../repositories/spatial-repository';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -160,7 +161,7 @@ export class DarwinCoreService extends DBService {
     try {
       const spatialService = new SpatialService(this.connection);
 
-      await spatialService.runSpatialTransform(submissionId, 'EML Study Boundaries');
+      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
     } catch (error) {
       defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
 
@@ -177,7 +178,7 @@ export class DarwinCoreService extends DBService {
     try {
       const spatialService = new SpatialService(this.connection);
 
-      await spatialService.runSpatialTransform(submissionId, 'DwC Occurrences');
+      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
     } catch (error) {
       defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
 
