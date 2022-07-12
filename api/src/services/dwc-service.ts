@@ -301,7 +301,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Converts submission EML to JSON and persists with submission record
+   * Converts submission EML to JSON and persists with submission record.
    *
    * @param {number} submissionId
    * @return {*}  {Promise<{ occurrence_id: number }[]>}
