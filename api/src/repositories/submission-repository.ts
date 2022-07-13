@@ -70,37 +70,62 @@ export interface ISourceTransformModel {
 }
 
 export enum SUBMISSION_STATUS_TYPE {
-  'SUBMITTED' = 'Submitted',
-  'TEMPLATE_VALIDATED' = 'Template Validated',
-  'DARWIN_CORE_VALIDATED' = 'Darwin Core Validated',
-  'TEMPLATE_TRANSFORMED' = 'Template Transformed',
-  'SUBMISSION_DATA_INGESTED' = 'Submission Data Ingested',
-  'SECURED' = 'Secured',
-  'AWAITING_CURATION' = 'Awaiting Curation',
   'PUBLISHED' = 'Published',
   'REJECTED' = 'Rejected',
-  'ON_HOLD' = 'On Hold',
-  'SYSTEM_ERROR' = 'System Error'
+  'SYSTEM_ERROR' = 'System Error',
+  //Success
+  'OUT_DATED_RECORD' = 'Out Dated Record',
+  'INGESTED' = 'Ingested',
+  'UPLOADED' = 'Uploaded',
+  'VALIDATED' = 'Validated',
+  'SECURED' = 'Secured',
+  'EML_INGESTED' = 'EML Ingested',
+  'EML_TO_JSON' = 'EML To JSON',
+  'METADATA_TO_ES' = 'Metadata To ES',
+  'NORMALIZED' = 'Normalized',
+  'SPATIAL_TRANSFORM_UNSECURE' = 'Spatial Transform Unsecure',
+  'SPATIAL_TRANSFORM_SECURE' = 'Spatial Transform Secure',
+  //Failure
+  'FAILED_INGESTION' = 'Failed Ingestion',
+  'FAILED_UPLOAD' = 'Failed Upload',
+  'FAILED_VALIDATION' = 'Failed Validation',
+  'FAILED_SECURITY' = 'Failed Security',
+  'FAILED_EML_INGESTION' = 'Failed EML Ingestion',
+  'FAILED_EML_TO_JSON' = 'Failed EML To JSON',
+  'FAILED_METADATA_TO_ES' = 'Failed Metadata To ES',
+  'FAILED_NORMALIZATION' = 'Failed Normalization',
+  'FAILED_SPATIAL_TRANSFORM_UNSECURE' = 'Failed Spatial Transform Unsecure',
+  'FAILED_SPATIAL_TRANSFORM_SECURE' = 'Failed Spatial Transform Secure'
 }
 
 export enum SUBMISSION_MESSAGE_TYPE {
-  'DUPLICATE_HEADER' = 'Duplicate Header',
-  'UNKNOWN_HEADER' = 'Unknown Header',
-  'MISSING_REQUIRED_HEADER' = 'Missing Required Header',
-  'MISSING_RECOMMENDED_HEADER' = 'Missing Recommended Header',
-  'MISCELLANEOUS' = 'Miscellaneous',
-  'MISSING_REQUIRED_FIELD' = 'Missing Required Field',
-  'UNEXPECTED_FORMAT' = 'Unexpected Format',
-  'OUT_OF_RANGE' = 'Out Of Range',
-  'INVALID_VALUE' = 'Invalid Value',
-  'MISSING_VALIDATION_SCHEMA' = 'Missing Validation Schema'
-}
-
-export enum SUBMISSION_MESSAGE_CLASS {
   'NOTICE' = 'Notice',
   'ERROR' = 'Error',
-  'WARNING' = 'Warning'
+  'WARNING' = 'Warning',
+  'DEBUG' = 'Debug'
 }
+
+/*
+List of ideas for status happy path
+
+-uuid exists update endDate for previous iteration
+-submission file ingested
+-submission file saved to s3
+-submission file validated
+-submission file secured
+-eml ingested
+-transformed eml to json
+-transformed and uploaded metadata to ES
+-normalized submission data to dwc source
+-unscured spatial transform
+  -eml study boundary
+  -dwc occurrences
+-secured spatial transform
+
+List of ideas for Unhappy path
+--- all of the above + failed
+
+*/
 
 /**
  * A repository class for accessing submission data.
