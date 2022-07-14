@@ -184,7 +184,7 @@ describe('SubmissionRepository', () => {
 
       try {
         await submissionRepository.updateSubmissionRecordEMLSource(1, {
-          emlFile: 'MediaFile'
+          emlFile: Buffer.from('')
         } as unknown as EMLFile);
 
         expect.fail();
@@ -203,7 +203,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.updateSubmissionRecordEMLSource(1, {
-        emlFile: 'MediaFile'
+        emlFile: Buffer.from('')
       } as unknown as EMLFile);
 
       expect(response.submission_id).to.equal(1);
