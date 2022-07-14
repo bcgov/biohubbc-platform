@@ -270,7 +270,7 @@ export class SubmissionRepository extends BaseRepository {
       UPDATE
         submission
       SET
-      eml_source = ${file.emlFile}
+      eml_source = ${file.emlFile.buffer.toString()}
       WHERE
         submission_id = ${submissionId}
       RETURNING
