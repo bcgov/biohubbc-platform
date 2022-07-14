@@ -4,7 +4,7 @@ name: Static Deploy on OpenShift
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, closed]
+    types: [closed]
     branches:
       - dev
       - test
@@ -92,7 +92,7 @@ jobs:
       - name: Build Database Image
         working-directory: "./database/.pipeline/"
         run: |
-          npm install
+          # npm install
           DEBUG=* npm run db:build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
 
   # Build the Database Setup image
@@ -140,8 +140,8 @@ jobs:
       - name: Build Database Setup Image
         working-directory: "./database/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run db-setup:build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
 
   # Build the API image
@@ -187,8 +187,8 @@ jobs:
       - name: Build API Image
         working-directory: "./api/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
 
   # Build the web frontend app
@@ -236,8 +236,8 @@ jobs:
       - name: Build APP Image
         working-directory: "./app/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
 
   # Deploy Database image
@@ -285,11 +285,11 @@ jobs:
       - name: Deploy Database Image
         working-directory: "./database/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run db:deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
 
-  # Deploy Database image
+  # Deploy Database setup image
   deployDatabaseSetup:
     name: Deploy Database Setup Image
     runs-on: ubuntu-latest
@@ -335,8 +335,8 @@ jobs:
       - name: Deploy Database Setup Image
         working-directory: "./database/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run db-setup:deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
 
   # Deploy API image
@@ -385,8 +385,8 @@ jobs:
       - name: Deploy API Image
         working-directory: "./api/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
 
   # Deploy App image
@@ -434,8 +434,8 @@ jobs:
       - name: Deploy App Image
         working-directory: "./app/.pipeline"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
 
   cycleschemaspy:
@@ -504,8 +504,8 @@ jobs:
       - name: Clean Database Artifacts
         working-directory: "./database/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
           DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
 
@@ -513,8 +513,8 @@ jobs:
       - name: Clean API Artifacts
         working-directory: "./api/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
           DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
 
@@ -522,8 +522,8 @@ jobs:
       - name: Clean APP Artifacts
         working-directory: "./app/.pipeline/"
         run: |
-          npm install
-          # npm ci
+          # npm install
+          npm ci --only=production
           DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
           DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
 
