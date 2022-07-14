@@ -1,7 +1,7 @@
 /**
  * @description Check and delete existing resource
  */
-module.exports = (resourceName, oc) => {
+const checkAndClean = (resourceName, oc) => {
   try {
     const list = oc.get(resourceName) || [];
     if (list.length === 0) {
@@ -14,4 +14,5 @@ module.exports = (resourceName, oc) => {
     console.log(`Resource ${resourceName} not available [${excp}]`);
   }
 };
-// ---------------------------------------
+
+module.exports = { checkAndClean };

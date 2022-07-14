@@ -9,7 +9,7 @@ objects:
       annotations:
         description: Application api base image
       labels:
-        shared: "true"
+        shared: 'true'
       creationTimestamp: null
       generation: 0
       name: ${NAME}
@@ -18,8 +18,4 @@ objects:
         local: false
     status:
       dockerImageRepository: null
-    # End IS
-  # End object
 kind: Template
-# End Template
-

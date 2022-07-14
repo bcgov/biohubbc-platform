@@ -1,7 +1,8 @@
 'use strict';
+
 const { OpenShiftClientX } = require('pipeline-cli');
 
-module.exports = (resourceName, settings, countArg, timeoutArg) => {
+const wait = (resourceName, settings, countArg, timeoutArg) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
@@ -109,3 +110,5 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
 
   setTimeout(check, timeout + 10000);
 };
+
+module.exports = { wait };
