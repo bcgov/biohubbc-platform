@@ -2,15 +2,15 @@ name: Linting Checks
 
 on:
   pull_request:
-    branches:
-      - dev
+    types: [opened, reopened, synchronize, ready_for_review]
 
 jobs:
   lint:
     name: Running Linter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout Target Branch
+        uses: actions/checkout@v2
 
       - name: Setup node
         uses: actions/setup-node@v2

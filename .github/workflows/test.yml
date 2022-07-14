@@ -1,19 +1,16 @@
 name: Test Checks
 
 on:
-  push:
-    branches:
-      - dev
   pull_request:
-    branches:
-      - dev
+    types: [opened, reopened, synchronize, ready_for_review]
 
 jobs:
   test:
     name: Running Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout Target Branch
+        uses: actions/checkout@v2
 
       - name: Setup node
         uses: actions/setup-node@v2
