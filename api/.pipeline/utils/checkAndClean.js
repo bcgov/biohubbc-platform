@@ -1,7 +1,7 @@
 /**
  * @description Check and delete existing resource
  */
-module.exports = (resourceName, oc) => {
+export const checkAndClean = (resourceName, oc) => {
   try {
     const list = oc.get(resourceName) || [];
     if (list.length === 0) {

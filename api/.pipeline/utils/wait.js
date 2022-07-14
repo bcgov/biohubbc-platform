@@ -1,7 +1,8 @@
 'use strict';
+
 const { OpenShiftClientX } = require('pipeline-cli');
 
-module.exports = (resourceName, settings, countArg, timeoutArg) => {
+export const clean = (resourceName, settings, countArg, timeoutArg) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
