@@ -283,50 +283,7 @@ export const GeoJSONFeatureCollection: OpenAPIV3.SchemaObject = {
     },
     features: {
       type: 'array',
-      items: {
-        title: 'GeoJSON Feature',
-        type: 'object',
-        required: ['type', 'properties', 'geometry'],
-        properties: {
-          type: {
-            type: 'string',
-            enum: ['Feature']
-          },
-          id: {
-            oneOf: [
-              {
-                type: 'number'
-              },
-              {
-                type: 'string'
-              }
-            ]
-          },
-          properties: {
-            type: 'object',
-            nullable: true
-          },
-          geometry: {
-            oneOf: [
-              GeoJSONPoint,
-              GeoJSONLineString,
-              GeoJSONPolygon,
-              GeoJSONMultiPoint,
-              GeoJSONMultiLineString,
-              GeoJSONMultiPolygon,
-              GeoJSONGeometryCollection
-            ],
-            nullable: true
-          },
-          bbox: {
-            type: 'array',
-            minItems: 4,
-            items: {
-              type: 'number'
-            }
-          }
-        }
-      }
+      items: GeoJSONFeature
     },
     bbox: {
       type: 'array',
@@ -341,14 +298,14 @@ export const GeoJSONFeatureCollection: OpenAPIV3.SchemaObject = {
 export const GeoJSON: OpenAPIV3.SchemaObject = {
   title: 'GeoJSON',
   oneOf: [
-    GeoJSONPoint,
-    GeoJSONLineString,
-    GeoJSONPolygon,
-    GeoJSONMultiPoint,
-    GeoJSONMultiLineString,
-    GeoJSONMultiPolygon,
-    GeoJSONGeometryCollection,
     GeoJSONFeature,
-    GeoJSONGeometryCollection
+    GeoJSONFeatureCollection,
+    GeoJSONGeometryCollection,
+    GeoJSONLineString,
+    GeoJSONMultiLineString,
+    GeoJSONMultiPoint,
+    GeoJSONMultiPolygon,
+    GeoJSONPoint,
+    GeoJSONPolygon
   ]
 };

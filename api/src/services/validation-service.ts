@@ -1,64 +1,69 @@
+import Ajv, { AnySchema, ErrorObject } from 'ajv';
+import { ValidationError, XMLValidator } from 'fast-xml-parser';
 import { IDBConnection } from '../database/db';
-import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
-import { ICsvState } from '../utils/media/csv/csv-file';
-import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
-import { IMediaState } from '../utils/media/media-file';
-import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
+import { ValidationRepository } from '../repositories/validation-repository';
 import { DBService } from './db-service';
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
 
+  ajv: Ajv;
+
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.validationRepository = new ValidationRepository(connection);
+
+    this.ajv = new Ajv();
   }
 
   /**
-   * Insert Style sheet into db
+   * Check if an object is valid against a specified JSON Schema.
    *
-   * @param {IInsertStyleSchema} styleSchema
-   * @return {*}  {Promise<{ style_id: number }>}
+   * @param {*} jsonObject
+   * @param {AnySchema} jsonSchema
+   * @return {*}  {(Promise<{ isValid: boolean; errors: ErrorObject[] | null | undefined }>)}
    * @memberof ValidationService
    */
-  async insertStyleSchema(styleSchema: IInsertStyleSchema): Promise<{ style_id: number }> {
-    return this.validationRepository.insertStyleSchema(styleSchema);
+  async isJSONObjectValidAgainstJSONSchema(
+    jsonObject: any,
+    jsonSchema: AnySchema
+  ): Promise<{ isValid: boolean; errors: ErrorObject[] | null | undefined }> {
+    const isValid = await this.ajv.validate(jsonSchema, jsonObject);
+
+    return { isValid: !!isValid, errors: this.ajv.errors };
   }
 
   /**
-   * Get Style sheet from db with given id
+   * Checks if an object is a valid JSON Schema.
    *
-   * @param {number} styleId
-   * @return {*}  {Promise<IStyleModel>}
+   * @see https://json-schema.org/
+   * @param {AnySchema} jsonSchema
+   * @return {*}  {(Promise<{ isValid: boolean; errors: ErrorObject[] | null | undefined }>)}
    * @memberof ValidationService
    */
-  async getStyleSchemaByStyleId(styleId: number): Promise<IStyleModel> {
-    return this.validationRepository.getStyleSchemaByStyleId(styleId);
+  async isJSONSchemaValid(
+    jsonSchema: AnySchema
+  ): Promise<{ isValid: boolean; errors: ErrorObject[] | null | undefined }> {
+    const isValid = await this.ajv.validateSchema(jsonSchema);
+
+    return { isValid: !!isValid, errors: this.ajv.errors };
   }
 
   /**
-   * Validate DWCArchive file with given stylesheet
+   * Checks if a string is valid XML.
    *
-   * @param {DWCArchive} dwcArchive
-   * @param {IStyleModel} styleSchema
-   * @return {*}  {{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }}
+   * @param {*} xmlString
+   * @return {*}  {(Promise<{ isValid: boolean; errors: ValidationError[] | null | undefined }>)}
    * @memberof ValidationService
    */
-  validateDWCArchiveWithStyleSchema(
-    dwcArchive: DWCArchive,
-    styleSchema: IStyleModel
-  ): { validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] } {
-    const validationSchemaParser: ValidationSchemaParser = new ValidationSchemaParser(styleSchema);
+  async isXMLValid(xmlString: string): Promise<{ isValid: boolean; errors: ValidationError[] | null | undefined }> {
+    const isValid = XMLValidator.validate(xmlString);
 
-    const mediaState: IMediaState = dwcArchive.isMediaValid(validationSchemaParser);
-
-    if (!mediaState.isValid) {
-      return { validation: false, mediaState: mediaState };
+    if (isValid !== true) {
+      return { isValid: false, errors: [isValid] };
     }
 
-    const csvState: ICsvState[] = dwcArchive.isContentValid(validationSchemaParser);
-
-    return { validation: true, mediaState: mediaState, csvState: csvState };
+    return { isValid: true, errors: null };
   }
 }

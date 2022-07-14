@@ -7,16 +7,14 @@ import { SPATIAL_TRANSFORM_NAMES } from '../repositories/spatial-repository';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
-import { ArchiveFile, IMediaState } from '../utils/media/media-file';
+import { ArchiveFile } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
-import { ValidationService } from './validation-service';
 
 const defaultLog = getLogger('services/dwc-service');
 
@@ -421,26 +419,26 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }>}
    * @memberof DarwinCoreService
    */
-  async validateSubmission(
-    submissionId: number,
-    styleSheetId?: number
-  ): Promise<{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }> {
-    const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+  // async validateSubmission(
+  //   submissionId: number,
+  //   styleSheetId?: number
+  // ): Promise<{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }> {
+  //   const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-    const validationService = new ValidationService(this.connection);
+  //   const validationService = new ValidationService(this.connection);
 
-    const styleSchema = await validationService.getStyleSchemaByStyleId(styleSheetId || 1); //TODO Hard coded
+  //   const styleSchema = await validationService.getStyleSchemaByStyleId(styleSheetId || 1); //TODO Hard coded
 
-    const response = await validationService.validateDWCArchiveWithStyleSchema(dwcArchive, styleSchema);
+  //   const response = await validationService.validateDWCArchiveWithStyleSchema(dwcArchive, styleSchema);
 
-    if (!response.validation) {
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
-    } else {
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
-    }
+  //   if (!response.validation) {
+  //     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
+  //   } else {
+  //     await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+  //   }
 
-    return response;
-  }
+  //   return response;
+  // }
 
   /**
    * Temp replacement for secure until more requirements are set

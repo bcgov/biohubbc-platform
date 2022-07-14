@@ -15,12 +15,11 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { IStyleModel } from '../repositories/validation-repository';
 import * as fileUtils from '../utils/file-utils';
-import { CSVWorksheet, ICsvState } from '../utils/media/csv/csv-file';
+import { CSVWorksheet } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
-import { ArchiveFile, IMediaState, MediaFile } from '../utils/media/media-file';
+import { ArchiveFile, MediaFile } from '../utils/media/media-file';
 import * as mediaUtils from '../utils/media/media-utils';
 import { UnknownMedia } from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -30,7 +29,6 @@ import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
-import { ValidationService } from './validation-service';
 
 chai.use(sinonChai);
 
@@ -347,61 +345,61 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe('validateSubmission', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
+  // describe('validateSubmission', () => {
+  //   afterEach(() => {
+  //     sinon.restore();
+  //   });
 
-    it('should set submission status to rejected', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+  //   it('should set submission status to rejected', async () => {
+  //     const mockDBConnection = getMockDBConnection();
+  //     const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      sinon
-        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves({} as unknown as DWCArchive);
-      sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves({} as unknown as IStyleModel);
-      sinon
-        .stub(ValidationService.prototype, 'validateDWCArchiveWithStyleSchema')
-        .resolves({ validation: false, mediaState: {} as unknown as IMediaState });
+  //     sinon
+  //       .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+  //       .resolves({} as unknown as DWCArchive);
+  //     sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves({} as unknown as IStyleModel);
+  //     sinon
+  //       .stub(ValidationService.prototype, 'validateDWCArchiveWithStyleSchema')
+  //       .resolves({ validation: false, mediaState: {} as unknown as IMediaState });
 
-      const mockInsertStatus = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
-        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+  //     const mockInsertStatus = sinon
+  //       .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+  //       .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
 
-      const response = await darwinCoreService.validateSubmission(1, 1);
+  //     const response = await darwinCoreService.validateSubmission(1, 1);
 
-      expect(response).to.eql({ validation: false, mediaState: {} as unknown as IMediaState });
-      expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.REJECTED);
-    });
+  //     expect(response).to.eql({ validation: false, mediaState: {} as unknown as IMediaState });
+  //     expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.REJECTED);
+  //   });
 
-    it('should set submission status to DWC validated', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+  //   it('should set submission status to DWC validated', async () => {
+  //     const mockDBConnection = getMockDBConnection();
+  //     const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      sinon
-        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves({} as unknown as DWCArchive);
-      sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves({} as unknown as IStyleModel);
-      sinon.stub(ValidationService.prototype, 'validateDWCArchiveWithStyleSchema').resolves({
-        validation: true,
-        mediaState: {} as unknown as IMediaState,
-        csvState: {} as unknown as ICsvState
-      });
+  //     sinon
+  //       .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+  //       .resolves({} as unknown as DWCArchive);
+  //     sinon.stub(ValidationService.prototype, 'getStyleSchemaByStyleId').resolves({} as unknown as IStyleModel);
+  //     sinon.stub(ValidationService.prototype, 'validateDWCArchiveWithStyleSchema').resolves({
+  //       validation: true,
+  //       mediaState: {} as unknown as IMediaState,
+  //       csvState: {} as unknown as ICsvState
+  //     });
 
-      const mockInsertStatus = sinon
-        .stub(SubmissionService.prototype, 'insertSubmissionStatus')
-        .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
+  //     const mockInsertStatus = sinon
+  //       .stub(SubmissionService.prototype, 'insertSubmissionStatus')
+  //       .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
 
-      const response = await darwinCoreService.validateSubmission(1, 1);
+  //     const response = await darwinCoreService.validateSubmission(1, 1);
 
-      expect(response).to.eql({
-        validation: true,
-        mediaState: {} as unknown as IMediaState,
-        csvState: {} as unknown as ICsvState
-      });
-      expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
-    });
-  });
+  //     expect(response).to.eql({
+  //       validation: true,
+  //       mediaState: {} as unknown as IMediaState,
+  //       csvState: {} as unknown as ICsvState
+  //     });
+  //     expect(mockInsertStatus).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+  //   });
+  // });
 
   describe('secureSubmission', () => {
     afterEach(() => {

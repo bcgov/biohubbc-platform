@@ -220,7 +220,7 @@ describe('validate', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'validateSubmission').throws('error' as unknown as ApiGeneralError);
+      sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').throws('error' as unknown as ApiGeneralError);
 
       try {
         const requestHandler = validate.validateSubmission();
