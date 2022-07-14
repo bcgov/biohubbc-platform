@@ -1,7 +1,8 @@
 'use strict';
+
 const { OpenShiftClientX } = require('pipeline-cli');
 
-module.exports = (resourceName, settings, countArg, timeoutArg) => {
+const wait = (resourceName, settings, countArg, timeoutArg) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
@@ -17,8 +18,8 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
       const list = oc.get(resourceName) || [];
       // console.log(`${list.length}:${JSON.stringify(list, null, 2)}`)
       if (list.length === 0) {
-        console.log(`Unable to fetch Database resource: ${resourceName}`);
-        throw new Error(`Unable to fetch Database resource: ${resourceName}`);
+        console.log(`Unable to fetch API resource: ${resourceName}`);
+        throw new Error(`Unable to fetch API resource: ${resourceName}`);
       }
       // console.log(JSON.stringify(data, null, 2));
       // Get Status
@@ -26,7 +27,7 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
       const data = list[0];
       const status = data.status || { conditions: [], containerStatuses: [] };
       if (status.conditions && status.conditions.length === 0) {
-        console.log(`Unable to fetch Database resource: ${resourceName} status`);
+        console.log(`Unable to fetch API resource: ${resourceName} status`);
         console.log(`${JSON.stringify(data)}`);
 
         // Retry if count is not zero
@@ -35,12 +36,12 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
           count = count - 1;
           setTimeout(check, timeout);
         } else {
-          throw new Error(`Unable to fetch Database resource: ${resourceName} status`);
+          throw new Error(`Unable to fetch API resource: ${resourceName} status`);
         }
       }
 
       if (!status.containerStatuses) {
-        console.log(`Unable to fetch Database resource: ${resourceName} container state (not defined)`);
+        console.log(`Unable to fetch API resource: ${resourceName} container state (not defined)`);
         console.log(`${JSON.stringify(data)}`);
 
         // Retry if count is not zero
@@ -50,13 +51,13 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
           setTimeout(check, timeout);
           return;
         } else {
-          throw new Error(`Unable to fetch Database resource: ${resourceName} status`);
+          throw new Error(`Unable to fetch API resource: ${resourceName} status`);
         }
       }
 
       // Checking Container state
       if (status.containerStatuses && status.containerStatuses.length === 0) {
-        console.log(`Unable to fetch Database resource: ${resourceName} container state`);
+        console.log(`Unable to fetch API resource: ${resourceName} container state`);
         console.log(`${JSON.stringify(data)}`);
 
         // Retry if count is not zero
@@ -66,16 +67,16 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
           setTimeout(check, timeout);
           return;
         } else {
-          throw new Error(`Unable to fetch Database resource: ${resourceName} status`);
+          throw new Error(`Unable to fetch API resource: ${resourceName} status`);
         }
       }
 
       console.log(`Checking Container State: ${resourceName}`);
       const containerStatus = status.containerStatuses[0] || {};
       if (!containerStatus.state) {
-        console.log(`Unable to fetch Database resource: ${resourceName} container state`);
+        console.log(`Unable to fetch API resource: ${resourceName} container state`);
         console.log(`${JSON.stringify(data)}`);
-        throw new Error(`Unable to fetch Database resource: ${resourceName} container state`);
+        throw new Error(`Unable to fetch API resource: ${resourceName} container state`);
       }
       const state = containerStatus.state || {};
       if (state.terminated) {
@@ -86,9 +87,9 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
           // oc.delete([resourceName], {'ignore-not-found':'true', 'wait':'true'})
           return;
         } else {
-          console.log(`Unable to fetch Database resource: ${resourceName} terminated with error`);
+          console.log(`Unable to fetch API resource: ${resourceName} terminated with error`);
           console.log(JSON.stringify(data.status, null, 2));
-          throw new Error(`Unable to fetch Database resource: ${resourceName} terminated with error`);
+          throw new Error(`Unable to fetch API resource: ${resourceName} terminated with error`);
         }
       } else {
         if (count > 0) {
@@ -109,3 +110,5 @@ module.exports = (resourceName, settings, countArg, timeoutArg) => {
 
   setTimeout(check, timeout + 10000);
 };
+
+module.exports = { wait };
