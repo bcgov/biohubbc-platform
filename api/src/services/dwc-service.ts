@@ -11,7 +11,6 @@ import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
-import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
@@ -222,26 +221,6 @@ export class DarwinCoreService extends DBService {
 
       return eml_json_source;
     }
-  }
-
-  /**
-   * Scrape occurrences from submissionFile and upload to table
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ occurrence_id: number }[]>}
-   * @memberof DarwinCoreService
-   */
-  async scrapeAndUploadOccurrences(submissionId: number): Promise<{ occurrence_id: number }[]> {
-    const dwcArchive: DWCArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-
-    const occurrenceService = new OccurrenceService(this.connection);
-
-    const response = await occurrenceService.scrapeAndUploadOccurrences(submissionId, dwcArchive);
-
-    //TODO: if fail post failure status
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
-
-    return response;
   }
 
   /**

@@ -1,6 +1,5 @@
 import { Client } from '@elastic/elasticsearch';
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
-import { S3 } from 'aws-sdk';
 import { ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
@@ -26,7 +25,6 @@ import { UnknownMedia } from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
 import { ESService } from './es-service';
-import { OccurrenceService } from './occurrence-service';
 import { SecurityService } from './security-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
@@ -34,31 +32,6 @@ import { ValidationService } from './validation-service';
 chai.use(sinonChai);
 
 describe('DarwinCoreService', () => {
-  describe('scrapeAndUploadOccurrences', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      sinon
-        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-        .resolves({ input_key: 1 } as unknown as DWCArchive);
-
-      sinon.stub(fileUtils, 'getFileFromS3').resolves('test' as unknown as S3.GetObjectOutput);
-      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves('test' as unknown as DWCArchive);
-      sinon.stub(OccurrenceService.prototype, 'scrapeAndUploadOccurrences').resolves([{ occurrence_id: 1 }]);
-
-      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-
-      const response = await darwinCoreService.scrapeAndUploadOccurrences(1);
-
-      expect(response).to.eql([{ occurrence_id: 1 }]);
-    });
-  });
-
   describe('prepDWCArchive', () => {
     afterEach(() => {
       sinon.restore();
