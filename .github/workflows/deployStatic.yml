@@ -32,7 +32,7 @@ jobs:
     name: Scale down the pods for this PR
     runs-on: ubuntu-latest
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - checkEnv
     steps:
@@ -45,7 +45,7 @@ jobs:
       - name: Scale down
         run: |
           oc project a0ec71-dev
-          oc get deploymentconfig --selector env-id=$BUILD_ID -o name | awk '{print "oc scale --replicas=0  " $1}' | bash
+          oc get deploymentconfig --selector env-id=$PR_NUMBER -o name | awk '{print "oc scale --replicas=0  " $1}' | bash
 
   # Build the Database image
   buildDatabase:
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - scaleDownPods
@@ -93,7 +93,7 @@ jobs:
         working-directory: "./database/.pipeline/"
         run: |
           # npm install
-          DEBUG=* npm run db:build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
+          DEBUG=* npm run db:build -- --pr=$PR_NUMBER --branch=$BRANCH --type=static
 
   # Build the Database Setup image
   buildDatabaseSetup:
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - scaleDownPods
@@ -142,7 +142,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db-setup:build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
+          DEBUG=* npm run db-setup:build -- --pr=$PR_NUMBER --branch=$BRANCH --type=static
 
   # Build the API image
   buildAPI:
@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - scaleDownPods
@@ -189,7 +189,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
+          DEBUG=* npm run build -- --pr=$PR_NUMBER --branch=$BRANCH --type=static
 
   # Build the web frontend app
   buildAPP:
@@ -197,7 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - scaleDownPods
@@ -238,7 +238,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run build -- --pr=$BUILD_ID --branch=$BRANCH --type=static
+          DEBUG=* npm run build -- --pr=$PR_NUMBER --branch=$BRANCH --type=static
 
   # Deploy Database image
   deployDatabase:
@@ -246,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - buildDatabase
@@ -287,7 +287,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db:deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
+          DEBUG=* npm run db:deploy -- --pr=$PR_NUMBER --env=$BRANCH --branch=$BRANCH --type=static
 
   # Deploy Database setup image
   deployDatabaseSetup:
@@ -295,7 +295,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - buildDatabaseSetup
@@ -337,7 +337,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db-setup:deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
+          DEBUG=* npm run db-setup:deploy -- --pr=$PR_NUMBER --env=$BRANCH --branch=$BRANCH --type=static
 
   # Deploy API image
   deployAPI:
@@ -345,7 +345,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - buildAPI
@@ -387,7 +387,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
+          DEBUG=* npm run deploy -- --pr=$PR_NUMBER --env=$BRANCH --branch=$BRANCH --type=static
 
   # Deploy App image
   deployAPP:
@@ -395,7 +395,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     needs:
       - buildAPP
@@ -436,14 +436,14 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run deploy -- --pr=$BUILD_ID --env=$BRANCH --branch=$BRANCH --type=static
+          DEBUG=* npm run deploy -- --pr=$PR_NUMBER --env=$BRANCH --branch=$BRANCH --type=static
 
   cycleschemaspy:
     name: Cycle SchemaSpy to refresh after database update in dev
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false && github.base_ref == 'dev' }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - deployDatabaseSetup
     steps:
@@ -467,7 +467,7 @@ jobs:
     needs:
       - deployDatabaseSetup
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
     steps:
       # Checkout the PR branch
@@ -506,8 +506,8 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
 
       # Clean the api build/deployment artifacts
       - name: Clean API Artifacts
@@ -515,8 +515,8 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
 
       # Clean the app build/deployment artifacts
       - name: Clean APP Artifacts
@@ -524,13 +524,13 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
 
       # Clean the reamaining build/deployment artifacts
       - name: Clean remaining Artifacts
         run: |
           oc project a0ec71-dev
-          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $BUILD_ID | awk '{print "oc delete " $1}' | bash
+          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $PR_NUMBER | awk '{print "oc delete " $1}' | bash
           oc project a0ec71-tools
-          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $BUILD_ID | awk '{print "oc delete " $1}' | bash
+          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $PR_NUMBER | awk '{print "oc delete " $1}' | bash

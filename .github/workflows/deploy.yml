@@ -7,7 +7,7 @@ on:
     types: [opened, reopened, synchronize]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
     name: Scale down the pods for this PR
     runs-on: ubuntu-latest
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - checkEnv
     steps:
@@ -45,7 +45,7 @@ jobs:
       - name: Scale down
         run: |
           oc project a0ec71-dev
-          oc get deploymentconfig --selector env-id=$BUILD_ID -o name | awk '{print "oc scale --replicas=0  " $1}' | bash
+          oc get deploymentconfig --selector env-id=$PR_NUMBER -o name | awk '{print "oc scale --replicas=0  " $1}' | bash
 
   # Build the Database image
   buildDatabase:
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - scaleDownPods
     steps:
@@ -93,7 +93,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db:build -- --pr=$BUILD_ID
+          DEBUG=* npm run db:build -- --pr=$PR_NUMBER
 
   # Build the Database Setup image
   buildDatabaseSetup:
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - scaleDownPods
     steps:
@@ -141,7 +141,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db-setup:build -- --pr=$BUILD_ID
+          DEBUG=* npm run db-setup:build -- --pr=$PR_NUMBER
 
   # Build the API image
   buildAPI:
@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - scaleDownPods
     steps:
@@ -189,7 +189,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run build -- --pr=$BUILD_ID
+          DEBUG=* npm run build -- --pr=$PR_NUMBER
 
   # Build the web frontend app image
   buildAPP:
@@ -197,7 +197,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - scaleDownPods
     steps:
@@ -237,7 +237,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run build -- --pr=$BUILD_ID
+          DEBUG=* npm run build -- --pr=$PR_NUMBER
 
   # Deploy Database image
   deployDatabase:
@@ -245,8 +245,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
-      BRANCH: ${{ github.base_ref }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - buildDatabase
     steps:
@@ -286,7 +285,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db:deploy -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run db:deploy -- --pr=$PR_NUMBER --env=dev
 
   # Deploy Database image
   deployDatabaseSetup:
@@ -294,8 +293,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
-      BRANCH: ${{ github.base_ref }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - buildDatabaseSetup
       - deployDatabase
@@ -336,7 +334,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run db-setup:deploy -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run db-setup:deploy -- --pr=$PR_NUMBER --env=dev
 
   # Deploy API image
   deployAPI:
@@ -344,8 +342,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
-      BRANCH: ${{ github.base_ref }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - buildAPI
       - deployDatabase
@@ -386,7 +383,7 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run deploy -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run deploy -- --pr=$PR_NUMBER --env=dev
 
   # Deploy App image
   deployAPP:
@@ -394,8 +391,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
-      BRANCH: ${{ github.base_ref }}
+      PR_NUMBER: ${{ github.event.number }}
     needs:
       - buildAPP
     steps:
@@ -435,4 +431,4 @@ jobs:
         run: |
           # npm install
           npm ci --only=production
-          DEBUG=* npm run deploy -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run deploy -- --pr=$PR_NUMBER --env=dev

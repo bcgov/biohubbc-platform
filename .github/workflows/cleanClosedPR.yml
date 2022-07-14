@@ -14,7 +14,7 @@ jobs:
     # Only do this when the PR was not merged and only for dev
     if: ${{ github.event.pull_request.merged != true && github.base_ref == 'dev' && github.event.pull_request.draft == false }}
     env:
-      BUILD_ID: ${{ github.event.number }}
+      PR_NUMBER: ${{ github.event.number }}
     steps:
       # Checkout the PR branch
       - name: Checkout Dev Branch - Contains the Pipeline Code
@@ -51,8 +51,8 @@ jobs:
         working-directory: "./api/.pipeline/"
         run: |
           npm ci
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
 
       # Clean the app deployment artifacts
       - name: Clean APP Deployment
@@ -60,13 +60,13 @@ jobs:
         run: |
           npm install
           # npm ci
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=build
-          DEBUG=* npm run clean -- --pr=$BUILD_ID --env=dev
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
+          DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
 
       # Clean the reamaining build/deployment artifacts
       - name: Clean remaining Artifacts
         run: |
           oc project a0ec71-dev
-          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $BUILD_ID | awk '{print "oc delete " $1}' | bash
+          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $PR_NUMBER | awk '{print "oc delete " $1}' | bash
           oc project a0ec71-tools
-          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $BUILD_ID | awk '{print "oc delete " $1}' | bash
+          oc get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep biohubbc | grep $PR_NUMBER | awk '{print "oc delete " $1}' | bash
