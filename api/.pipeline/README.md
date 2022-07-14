@@ -38,7 +38,7 @@
 
     Contains general helper functions utilized by the task functions
 
-- ### _./api/openshift/_
+- ### _./api/.pipeline/templates/_
 
   Contains OpenShift yaml configs for builds/deployments/etc. These are utilized by the library functions when configuring pods/commands.
 
@@ -82,4 +82,4 @@
 
          1. The pacakge.json script runs, and executes the `.../.pipeline/` file it references  
             _This file may configure and execute one or more `.../.pipeline/lib/` tasks_
-         2. The `../.pipeline/lib` task will utilize the `pipeline-cli` tool and the `../openshift/` configs to configure and run OpenShift pods/commands
+         2. The `../.pipeline/lib` task will utilize the `pipeline-cli` tool and the `templates` configs to configure and run OpenShift pods/commands

@@ -77,8 +77,6 @@ objects:
     spec:
       lookupPolicy:
         local: false
-    status:
-      dockerImageRepository: null
   - apiVersion: apps.openshift.io/v1
     kind: DeploymentConfig
     metadata:

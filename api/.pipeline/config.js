@@ -1,4 +1,5 @@
 'use strict';
+
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -60,7 +61,7 @@ const phases = {
     elasticsearchURL: 'https://elasticsearch-af2668-dev.apps.silver.devops.gov.bc.ca',
     tz: config.timezone.api,
     branch: branch,
-    logLevel: isStaticDeployment && 'info' || 'debug'
+    logLevel: (isStaticDeployment && 'info') || 'debug'
   },
   dev: {
     namespace: 'a0ec71-dev',
@@ -72,19 +73,15 @@ const phases = {
     instance: `${name}-dev-${deployChangeId}`,
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
-    host:
-      (isStaticDeployment && (staticUrlsAPI.dev)) ||
-      `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
-    appHost:
-    (isStaticDeployment && (staticUrls.dev)) ||
-      `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+    host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+    appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev',
     elasticsearchURL: 'https://elasticsearch-af2668-dev.apps.silver.devops.gov.bc.ca',
     tz: config.timezone.api,
     sso: config.sso.dev,
     replicas: 1,
     maxReplicas: 2,
-    logLevel: isStaticDeployment && 'info' || 'debug'
+    logLevel: (isStaticDeployment && 'info') || 'debug'
   },
   test: {
     namespace: 'a0ec71-test',
