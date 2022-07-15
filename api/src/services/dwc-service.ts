@@ -62,12 +62,22 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
-    //Step 1: ingest dwca file and save record in db. additionally
-    const { submissionId } = await this.ingestNewDwCADataPackage(file, {
-      dataPackageId: dataPackageId
-    });
+    let submissionId = 0;
 
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
+    //Step 1: ingest dwca file and save record in db. additionally
+    try {
+      const ingest = await this.ingestNewDwCADataPackage(file, {
+        dataPackageId: dataPackageId
+      });
+
+      submissionId = ingest.submissionId;
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'ingestNewDwCADataPackage', message: 'error', error });
+
+      throw new ApiGeneralError('Ingestion failed', error.message);
+    }
 
     //Step 2: Upload file to s3
     try {

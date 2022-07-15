@@ -105,28 +105,6 @@ export enum SUBMISSION_MESSAGE_TYPE {
   'DEBUG' = 'Debug'
 }
 
-/*
-List of ideas for status happy path
-
--uuid exists update endDate for previous iteration
--submission file ingested
--submission file saved to s3
--submission file validated
--submission file secured
--eml ingested
--transformed eml to json
--transformed and uploaded metadata to ES
--normalized submission data to dwc source
--unscured spatial transform
-  -eml study boundary
-  -dwc occurrences
--secured spatial transform
-
-List of ideas for Unhappy path
---- all of the above + failed
-
-*/
-
 /**
  * A repository class for accessing submission data.
  *
