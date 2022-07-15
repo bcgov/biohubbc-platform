@@ -32,6 +32,7 @@ select jsonb_build_object('type', 'FeatureCollection'
 		, 'properties', jsonb_build_object('type', 'Occurrence', 'dwc', jsonb_build_object('type', 'PhysicalObject'
 			, 'basisOfRecord', 'Occurrence'
 			, 'datasetID', n.uuid
+			, 'occurrenceID', n.occ->'occurrenceID'
 			, 'sex', n.occ->'sex'
 			, 'lifeStage', n.occ->'lifeStage'
 			, 'associatedTaxa', n.occ->'associatedTaxa'

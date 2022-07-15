@@ -29,21 +29,25 @@ export async function up(knex: Knex): Promise<void> {
       , 'projectType', aps.project_type
       , 'projectTitle', aps.project->'title'
       , 'projectOrganizationName', aps.project->'personnel'->'organizationName'
-      , 'projectObjectives', jsonb_path_query(aps.project, '$.abstract.section[*] \\? (@.title == "Objectives").para')
-        , 'taxonomicCoverage', (select jsonb_build_object('taxonRankName', taxon->'taxonRankName', 'taxonRankValue', taxon->'taxonRankValue', 'commonName', taxon->'commonName', 'taxonId', taxon->'taxonId'->'#text') from jsonb_path_query(aps.project, '$.studyAreaDescription.coverage.taxonomicCoverage.taxonomicClassification') taxon)
-      , 'fundingSource', fas.funding_arr) project_object from all_projects aps left join funding_arrs fas
-      on fas.proj_n = aps.proj_n and fas.project_type = aps.project_type)
+      , 'projectAbstract', jsonb_path_query(aps.project, '$.abstract.section')
+      , 'taxonomicCoverage', jsonb_path_query(aps.project, '$.studyAreaDescription.coverage.taxonomicCoverage')
+      , 'fundingSource', fas.funding_arr
+		) project_object from all_projects aps
+      	left join funding_arrs fas on fas.proj_n = aps.proj_n and fas.project_type = aps.project_type
+     	)
     , project_arr as (select jsonb_agg(project_object) project_array from project_objects)
     select jsonb_build_object('datasetTitle', d.dataset->'title'
+      , 'datasetId', d.dataset->'@_id'
+      , 'sourceSystem', d.dataset->'@_system'
       , 'publishDate', d.dataset->'pubDate'
       , 'project', p.project_array
       , 'projectIUCNConservationActions', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.IUCNConservationActions.IUCNConservationAction')
       , 'projectStakeholderPartnerships', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.stakeholderPartnerships.stakeholderPartnership')
-      , 'projectActivities', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectActivities.projectActivity')
+      , 'projectActivities', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectActivities.projectActivity')	
       , 'projectClimateChangeInitiatives', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectClimateChangeInitiatives.projectClimateChangeInitiative')
       , 'projectFirstNations', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.firstNationPartnerships.firstNationPartnership')
       , 'projectSurveyProprietors', jsonb_path_query(e.eml, '$.additionalMetadata[*].metadata.projectSurveyProprietors.projectSurveyProprietor')
-      ) result_data from eml e, datasets d, project_arr p$transform$);
+      ) result_data from eml e, datasets d, project_arr p;$transform$);
 
   `);
 }
