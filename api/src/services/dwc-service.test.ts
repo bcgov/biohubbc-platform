@@ -1,5 +1,6 @@
 import { Client } from '@elastic/elasticsearch';
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
+import { ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
@@ -15,6 +16,7 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
+import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet, ICsvState } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -26,7 +28,6 @@ import { DarwinCoreService } from './dwc-service';
 import { ESService } from './es-service';
 import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
-// import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -393,6 +394,37 @@ describe('DarwinCoreService', () => {
       await darwinCoreService.normalizeSubmissionDWCA(1, inputParams);
 
       expect(updateSubmissionRecordDWCSourceStub).to.be.calledOnceWith(1, 'validstring');
+    });
+  });
+
+  describe('uploadRecordToS3', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should set submission status to ingested', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      sinon.stub(fileUtils, 'generateS3FileKey').returns('s3Key');
+
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordInputKey').resolves();
+
+      const uploadFileToS3Stub = sinon
+        .stub(fileUtils, 'uploadFileToS3')
+        .resolves({ Key: 's3Key' } as unknown as ManagedUpload.SendData);
+
+      const response = await darwinCoreService.uploadRecordToS3(1, multerFile);
+
+      expect(uploadFileToS3Stub).to.be.calledOnceWith(multerFile, 's3Key', {
+        filename: 'file1.txt'
+      });
+      expect(response).to.eql({ s3Key: 's3Key' });
     });
   });
 
