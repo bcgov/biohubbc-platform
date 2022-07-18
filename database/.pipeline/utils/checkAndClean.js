@@ -4,6 +4,10 @@
 const checkAndClean = (resourceName, oc) => {
   try {
     const list = oc.get(resourceName) || [];
+    console.log('AAAAAAAAAAAAAAAAAAA')
+    console.log(resourceName)
+    console.log(list)
+    console.log('BBBBBBBBBBBBBBBBBBBBBBBBB')
     if (list.length === 0) {
       console.log(`checkAndClean: No resource available with resource name: ${resourceName}`);
     } else {
