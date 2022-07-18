@@ -103,7 +103,7 @@ const wait = (resourceName, settings, countArg, timeoutArg) => {
         }
       }
     } catch (excp) {
-      console.log(`Pod (${resourceName}) Wait: Exception  ${excp}`);
+      console.error(`Pod (${resourceName}) Wait: Exception  ${excp}`);
       throw excp;
     }
   };

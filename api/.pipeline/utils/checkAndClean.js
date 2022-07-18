@@ -11,7 +11,7 @@ const checkAndClean = (resourceName, oc) => {
       oc.delete([resourceName], { 'ignore-not-found': 'true', wait: 'true' });
     }
   } catch (excp) {
-    console.log(`Resource ${resourceName} not available [${excp}]`);
+    console.error(`Resource ${resourceName} not available [${excp}]`);
   }
 };
 

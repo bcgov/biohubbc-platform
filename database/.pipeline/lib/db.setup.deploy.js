@@ -3,7 +3,7 @@
 const { OpenShiftClientX } = require('pipeline-cli');
 const path = require('path');
 const { checkAndClean } = require('../utils/checkAndClean');
-const { wait } = require('../utils/wait');
+// const { wait } = require('../utils/wait');
 
 const dbSetupDeploy = (settings) => {
   const phases = settings.phases;
@@ -77,7 +77,7 @@ const dbSetupDeploy = (settings) => {
   oc.applyRecommendedLabels(objects, isName, phase, `${changeId}`, instance);
   oc.applyAndDeploy(objects, phases[phase].instance);
 
-  wait(`pod/${name}`, settings, 120);
+  // wait(`pod/${name}`, settings, 120);
 };
 
 module.exports = { dbSetupDeploy };
