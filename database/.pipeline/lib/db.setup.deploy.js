@@ -53,7 +53,7 @@ const dbSetupDeploy = (settings) => {
   console.dir(dbSetupImageStream, { depth: 5 });
   console.log('3333333333333333333');
   console.log(dbSetupImageStream.image.dockerImageReference);
-  console.log('4444444444444444444444444');
+  console.log('44444444444444444444444444');
   const name = `${isName}${phases[phase].suffix}`;
 
   objects.push(
