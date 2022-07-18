@@ -28,7 +28,7 @@ const dbSetupDeploy = (settings) => {
 
   // Creating image stream for setup
   imageStreamObjects.push(
-    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/db.is.yaml`, {
+    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/db.setup.is.yaml`, {
       param: {
         NAME: `${isName}`
       }

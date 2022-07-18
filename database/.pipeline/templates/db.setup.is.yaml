@@ -8,7 +8,7 @@ objects:
     kind: ImageStream
     metadata:
       annotations:
-        description: Database image stream
+        description: Database setup image stream
       labels:
         shared: 'true'
       creationTimestamp: null
