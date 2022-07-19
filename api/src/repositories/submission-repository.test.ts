@@ -184,7 +184,7 @@ describe('SubmissionRepository', () => {
 
       try {
         await submissionRepository.updateSubmissionRecordEMLSource(1, {
-          emlFile: 'MediaFile'
+          emlFile: Buffer.from('')
         } as unknown as EMLFile);
 
         expect.fail();
@@ -203,7 +203,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.updateSubmissionRecordEMLSource(1, {
-        emlFile: 'MediaFile'
+        emlFile: Buffer.from('')
       } as unknown as EMLFile);
 
       expect(response.submission_id).to.equal(1);
@@ -492,7 +492,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionStatus(1, SUBMISSION_STATUS_TYPE.SUBMITTED);
+        await submissionRepository.insertSubmissionStatus(1, SUBMISSION_STATUS_TYPE.INGESTED);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission status record');
@@ -512,7 +512,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionStatus(1, SUBMISSION_STATUS_TYPE.SUBMITTED);
+      const response = await submissionRepository.insertSubmissionStatus(1, SUBMISSION_STATUS_TYPE.INGESTED);
 
       expect(response).to.eql(mockResponse);
     });
@@ -533,7 +533,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.INVALID_VALUE, 'some message');
+        await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.ERROR, 'some message');
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission message record');
@@ -553,7 +553,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.INVALID_VALUE, '');
+      const response = await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.ERROR, '');
 
       expect(response).to.eql(mockResponse);
     });

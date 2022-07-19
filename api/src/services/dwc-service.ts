@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
+import { SPATIAL_TRANSFORM_NAMES } from '../repositories/spatial-repository';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -12,6 +13,7 @@ import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { SecurityService } from './security-service';
+import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
 
@@ -60,85 +62,258 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
-    const { submissionId } = await this.ingestNewDwCADataPackage(file, {
-      dataPackageId: dataPackageId
-    });
+    let submissionId = 0;
 
+    //Step 1: ingest dwca file and save record in db. additionally
+    try {
+      const ingest = await this.ingestNewDwCADataPackage(file, {
+        dataPackageId: dataPackageId
+      });
+
+      submissionId = ingest.submissionId;
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'ingestNewDwCADataPackage', message: 'error', error });
+
+      throw new ApiGeneralError('Ingestion failed', error.message);
+    }
+
+    //Step 2: Upload file to s3
+    try {
+      await this.uploadRecordToS3(submissionId, file);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'uploadRecordToS3', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+
+    //Step 3: Validate submission file
     try {
       await this.tempValidateSubmission(submissionId);
-    } catch (error) {
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.VALIDATED);
+    } catch (error: any) {
       defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'Failed to validate submission record'
+        SUBMISSION_STATUS_TYPE.FAILED_VALIDATION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
       );
 
       return;
     }
 
+    //Step 4: Secure submission file
+    try {
+      await this.tempSecureSubmission(submissionId);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SECURITY,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+
+    //Step 5: Ingest EML from dwca file
     try {
       await this.ingestNewDwCAEML(submissionId);
-    } catch (error) {
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_INGESTED);
+    } catch (error: any) {
       defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'Failed to save eml file to db'
+        SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
       );
 
       return;
     }
 
+    //Step 6: Convert eml to json and save record
     try {
       await this.convertSubmissionEMLtoJSON(submissionId);
-    } catch (error) {
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_TO_JSON);
+    } catch (error: any) {
       defaultLog.debug({ label: 'convertSubmissionEMLtoJSON', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'Failed to convert EML to JSON'
+        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
       );
 
       return;
     }
 
+    //Step 7: Transform submission file and upload to ES
     try {
       await this.transformAndUploadMetaData(submissionId, dataPackageId);
-    } catch (error) {
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
+    } catch (error: any) {
       defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'Failed to transform and upload metadata'
+        SUBMISSION_STATUS_TYPE.FAILED_METADATA_TO_ES,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
       );
 
       return;
     }
 
+    //Step 8: Normalize Submission record and save json
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
-    } catch (error) {
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
+    } catch (error: any) {
       defaultLog.debug({ label: 'normalizeSubmissionDWCA', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'Failed to normalize dwca file'
+        SUBMISSION_STATUS_TYPE.FAILED_NORMALIZATION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
       );
 
       return;
     }
+
+    //Step 9: Run spatial transform for eml study boundary and save data
+    try {
+      const spatialService = new SpatialService(this.connection);
+
+      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
+
+      await this.submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
+      );
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+
+    //Step 10: Run spatial transform for dwc occurrences and save data
+    try {
+      const spatialService = new SpatialService(this.connection);
+
+      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
+
+      await this.submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
+      );
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  /**
+   * Ingest a Darwin Core Archive (DwCA) data package.
+   *
+   * @param {Express.Multer.File} file
+   * @param {{ dataPackageId?: string }} [options]
+   * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
+   * @memberof DarwinCoreService
+   */
+  async ingestNewDwCADataPackage(
+    file: Express.Multer.File,
+    options?: { dataPackageId?: string }
+  ): Promise<{ dataPackageId: string; submissionId: number }> {
+    const dataPackageId = options?.dataPackageId || uuidv4();
+
+    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
+    //already done above in intake() maybe double check nothing else needs to be deleted or updated :) thanks!
+
+    const dwcArchive = this.prepDWCArchive(file);
+
+    // Fetch the source transform record for this submission based on the source system user id
+    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
+      this.connection.systemUserId()
+    );
+
+    const response = await this.submissionService.insertSubmissionRecord({
+      source_transform_id: sourceTransformRecord.source_transform_id,
+      input_file_name: dwcArchive.rawFile.fileName,
+      input_key: '',
+      record_effective_date: new Date().toISOString(),
+      eml_source: '',
+      eml_json_source: '',
+      darwin_core_source: '{}',
+      uuid: dataPackageId
+    });
+
+    const submissionId = response.submission_id;
+
+    return { dataPackageId, submissionId };
+  }
+
+  /**
+   * Upload record to s3
+   *
+   * @param {number} submissionId
+   * @param {Express.Multer.File} file
+   * @return {*}  {Promise<{ s3Key: string }>}
+   * @memberof DarwinCoreService
+   */
+  async uploadRecordToS3(submissionId: number, file: Express.Multer.File): Promise<{ s3Key: string }> {
+    const s3Key = generateS3FileKey({
+      submissionId: submissionId,
+      fileName: file.originalname
+    });
+
+    await this.submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
+
+    const response = await uploadFileToS3(file, s3Key, {
+      filename: file.originalname
+    });
+
+    return { s3Key: response.Key };
   }
 
   /**
@@ -197,7 +372,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Converts submission EML to JSON and persists with submission record
+   * Converts submission EML to JSON and persists with submission record.
    *
    * @param {number} submissionId
    * @return {*}  {Promise<{ occurrence_id: number }[]>}
@@ -212,7 +387,13 @@ export class DarwinCoreService extends DBService {
       const options = {
         ignoreAttributes: false,
         attributeNamePrefix: '@_',
-        parseTagValue: false //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
+        parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
+          const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
+          if (tagsArray.includes(tagName)) return true;
+          return false;
+        }
       };
       const parser = new XMLParser(options);
       const eml_json_source = parser.parse(emlmediaFile.emlFile.buffer.toString() as string);
@@ -221,58 +402,6 @@ export class DarwinCoreService extends DBService {
 
       return eml_json_source;
     }
-  }
-
-  /**
-   * Ingest a Darwin Core Archive (DwCA) data package.
-   *
-   * @param {Express.Multer.File} file
-   * @param {{ dataPackageId?: string }} [options]
-   * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
-   * @memberof DarwinCoreService
-   */
-  async ingestNewDwCADataPackage(
-    file: Express.Multer.File,
-    options?: { dataPackageId?: string }
-  ): Promise<{ dataPackageId: string; submissionId: number }> {
-    const dataPackageId = options?.dataPackageId || uuidv4();
-
-    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
-
-    const dwcArchive = this.prepDWCArchive(file);
-
-    // Fetch the source transform record for this submission based on the source system user id
-    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
-      this.connection.systemUserId()
-    );
-
-    const response = await this.submissionService.insertSubmissionRecord({
-      source_transform_id: sourceTransformRecord.source_transform_id,
-      input_file_name: dwcArchive.rawFile.fileName,
-      input_key: '',
-      record_effective_date: new Date().toISOString(),
-      eml_source: '',
-      eml_json_source: '',
-      darwin_core_source: '{}',
-      uuid: dataPackageId
-    });
-
-    const submissionId = response.submission_id;
-
-    const s3Key = generateS3FileKey({
-      submissionId: submissionId,
-      fileName: file.originalname
-    });
-
-    await this.submissionService.updateSubmissionRecordInputKey(submissionId, s3Key);
-
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMITTED);
-
-    await uploadFileToS3(file, s3Key, {
-      filename: file.originalname
-    });
-
-    return { dataPackageId, submissionId };
   }
 
   /**
@@ -308,23 +437,7 @@ export class DarwinCoreService extends DBService {
     }
 
     // call to the ElasticSearch API to create a record with our transformed EML
-    try {
-      await this.uploadToElasticSearch(dataPackageId, jsonMetadata);
-    } catch (error) {
-      defaultLog.debug({ label: 'uploadToElasticSearch', message: 'error', error });
-
-      this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'upload to elastic search failed'
-      );
-
-      return;
-    }
-
-    //TODO: We need a new submission status type
-    this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED);
+    await this.uploadToElasticSearch(dataPackageId, jsonMetadata);
   }
 
   /**
@@ -335,9 +448,11 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async tempValidateSubmission(submissionId: number) {
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
-
-    return { validation: true, mediaState: { fileName: '', fileErrors: [], isValid: true }, csvState: [] };
+    return {
+      validation: true,
+      mediaState: { fileName: `${submissionId}`, fileErrors: [], isValid: true },
+      csvState: []
+    };
   }
 
   /**
@@ -361,9 +476,7 @@ export class DarwinCoreService extends DBService {
     const response = await validationService.validateDWCArchiveWithStyleSchema(dwcArchive, styleSchema);
 
     if (!response.validation) {
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
-    } else {
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.DARWIN_CORE_VALIDATED);
+      throw new ApiGeneralError('Validation failed');
     }
 
     return response;
@@ -398,9 +511,7 @@ export class DarwinCoreService extends DBService {
     const response = await securityService.validateSecurityOfSubmission(submissionId, securitySchema);
 
     if (!response.secure) {
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.REJECTED);
-    } else {
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
+      throw new ApiGeneralError('Secure submission failed');
     }
 
     return response;
@@ -435,22 +546,7 @@ export class DarwinCoreService extends DBService {
   async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<void> {
     const normalized = this.normalizeDWCA(dwcArchiveFile);
 
-    try {
-      await this.submissionService.updateSubmissionRecordDWCSource(submissionId, normalized);
-
-      //TODO: We need a new submission status type
-      await this.submissionService.insertSubmissionStatus(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.SUBMISSION_DATA_INGESTED
-      );
-    } catch (error) {
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.REJECTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
-        'update submission record failed'
-      );
-    }
+    await this.submissionService.updateSubmissionRecordDWCSource(submissionId, normalized);
   }
 
   /**
