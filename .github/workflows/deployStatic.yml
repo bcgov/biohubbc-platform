@@ -465,7 +465,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
     needs:
+      - deployDatabase
       - deployDatabaseSetup
+      - deployAPI
+      - deployAPP
     env:
       BUILD_ID: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
