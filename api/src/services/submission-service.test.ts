@@ -205,7 +205,7 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionStatus')
         .resolves({ submission_status_id: 1, submission_status_type_id: 1 });
 
-      const response = await submissionService.insertSubmissionStatus(1, SUBMISSION_STATUS_TYPE.SUBMITTED);
+      const response = await submissionService.insertSubmissionStatus(1, SUBMISSION_STATUS_TYPE.INGESTED);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_status_id: 1, submission_status_type_id: 1 });
@@ -223,7 +223,7 @@ describe('SubmissionService', () => {
 
       const response = await submissionService.insertSubmissionMessage(
         1,
-        SUBMISSION_MESSAGE_TYPE.DUPLICATE_HEADER,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
         'some message'
       );
 
@@ -346,8 +346,8 @@ describe('SubmissionService', () => {
 
       const response = await submissionService.insertSubmissionStatusAndMessage(
         1,
-        SUBMISSION_STATUS_TYPE.SUBMITTED,
-        SUBMISSION_MESSAGE_TYPE.MISCELLANEOUS,
+        SUBMISSION_STATUS_TYPE.FAILED_METADATA_TO_ES,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
         'message'
       );
       expect(repoStatus).to.be.calledOnce;
