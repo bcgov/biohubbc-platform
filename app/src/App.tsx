@@ -21,11 +21,11 @@ const App: React.FC = () => {
               return <CircularProgress className="pageProgress" size={40} />;
             }
 
-            //@ts-ignore
-            const keycloak: KeycloakInstance = new Keycloak(config.KEYCLOAK_CONFIG);
+            const keycloak: KeycloakInstance = Keycloak(config.KEYCLOAK_CONFIG);
 
             return (
               <KeycloakProvider
+                initConfig={{ pkceMethod: 'S256' }}
                 keycloak={keycloak}
                 LoadingComponent={<CircularProgress className="pageProgress" size={40} />}>
                 <AuthStateContextProvider>
