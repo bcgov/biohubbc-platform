@@ -1,5 +1,4 @@
 import { XMLParser } from 'fast-xml-parser';
-import { v4 as uuidv4 } from 'uuid';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
@@ -21,6 +20,7 @@ const defaultLog = getLogger('services/dwc-service');
 
 export class DarwinCoreService extends DBService {
   submissionService: SubmissionService;
+  spatialService: SpatialService
 
   /**
    * Creates an instance of DarwinCoreService.
@@ -31,6 +31,7 @@ export class DarwinCoreService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
 
+    this.spatialService = new SpatialService(this.connection);
     this.submissionService = new SubmissionService(this.connection);
   }
 
@@ -46,8 +47,11 @@ export class DarwinCoreService extends DBService {
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
-      await this.submissionService.setSubmissionEndDateById(submissionExists.submission_id);
-      //TODO: Delete scraped spatial components table details when its filled
+      const { submission_id } = submissionExists
+      await this.submissionService.setSubmissionEndDateById(submission_id);
+      
+      //Delete scraped spatial components table details
+      await this.spatialService.deleteSpatialComponentsBySubmissionId(submission_id)
     }
 
     return this.create(file, dataPackageId);
@@ -66,9 +70,7 @@ export class DarwinCoreService extends DBService {
 
     //Step 1: ingest dwca file and save record in db. additionally
     try {
-      const ingest = await this.ingestNewDwCADataPackage(file, {
-        dataPackageId: dataPackageId
-      });
+      const ingest = await this.ingestNewDwCADataPackage(file, dataPackageId);
 
       submissionId = ingest.submissionId;
 
@@ -208,9 +210,7 @@ export class DarwinCoreService extends DBService {
 
     //Step 9: Run spatial transform for eml study boundary and save data
     try {
-      const spatialService = new SpatialService(this.connection);
-
-      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
+      await this.spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
 
       await this.submissionService.insertSubmissionStatus(
         submissionId,
@@ -231,9 +231,7 @@ export class DarwinCoreService extends DBService {
 
     //Step 10: Run spatial transform for dwc occurrences and save data
     try {
-      const spatialService = new SpatialService(this.connection);
-
-      await spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
+      await this.spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
 
       await this.submissionService.insertSubmissionStatus(
         submissionId,
@@ -263,13 +261,8 @@ export class DarwinCoreService extends DBService {
    */
   async ingestNewDwCADataPackage(
     file: Express.Multer.File,
-    options?: { dataPackageId?: string }
+    dataPackageId: string 
   ): Promise<{ dataPackageId: string; submissionId: number }> {
-    const dataPackageId = options?.dataPackageId || uuidv4();
-
-    // TODO Check if `dataPackageId` already exists? If so, update existing record or throw error?
-    //already done above in intake() maybe double check nothing else needs to be deleted or updated :) thanks!
-
     const dwcArchive = this.prepDWCArchive(file);
 
     // Fetch the source transform record for this submission based on the source system user id

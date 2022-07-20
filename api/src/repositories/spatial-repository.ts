@@ -297,6 +297,20 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  async deleteSpatialComponentsBySubmissionId(
+    submission_id: number
+  ): Promise<ISubmissionSpatialComponent[]> {
+    const queryBuilder = getKnexQueryBuilder()
+      .delete()
+      .from('submission_spatial_component')
+      .where({ submission_id })
+      .returning('*');
+
+    const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder)
+
+    return response.rows
+  }
+
   _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
     return SQL`
       public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,

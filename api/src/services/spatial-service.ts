@@ -111,4 +111,10 @@ export class SpatialService extends DBService {
   ): Promise<ISubmissionSpatialComponent[]> {
     return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
   }
+
+  async deleteSpatialComponentsBySubmissionId(
+    submission_id: number
+  ): Promise<ISubmissionSpatialComponent[]> {
+    return this.spatialRepository.deleteSpatialComponentsBySubmissionId(submission_id)    
+  }
 }
