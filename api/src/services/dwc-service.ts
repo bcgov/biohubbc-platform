@@ -20,7 +20,7 @@ const defaultLog = getLogger('services/dwc-service');
 
 export class DarwinCoreService extends DBService {
   submissionService: SubmissionService;
-  spatialService: SpatialService
+  spatialService: SpatialService;
 
   /**
    * Creates an instance of DarwinCoreService.
@@ -47,11 +47,11 @@ export class DarwinCoreService extends DBService {
     const submissionExists = await this.submissionService.getSubmissionIdByUUID(dataPackageId);
 
     if (submissionExists?.submission_id) {
-      const { submission_id } = submissionExists
+      const { submission_id } = submissionExists;
       await this.submissionService.setSubmissionEndDateById(submission_id);
-      
+
       //Delete scraped spatial components table details
-      await this.spatialService.deleteSpatialComponentsBySubmissionId(submission_id)
+      await this.spatialService.deleteSpatialComponentsBySubmissionId(submission_id);
     }
 
     return this.create(file, dataPackageId);
@@ -261,7 +261,7 @@ export class DarwinCoreService extends DBService {
    */
   async ingestNewDwCADataPackage(
     file: Express.Multer.File,
-    dataPackageId: string 
+    dataPackageId: string
   ): Promise<{ dataPackageId: string; submissionId: number }> {
     const dwcArchive = this.prepDWCArchive(file);
 

@@ -490,7 +490,6 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
         .resolves({ submission_id: 1 });
 
-      
       const deleteSpatialComponentsStub = sinon
         .stub(SpatialService.prototype, 'deleteSpatialComponentsBySubmissionId')
         .resolves([]);
