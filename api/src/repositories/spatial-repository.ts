@@ -306,7 +306,7 @@ export class SpatialRepository extends BaseRepository {
 
     const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
 
-    return response?.rows || [];
+    return response.rows;
   }
 
   _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
