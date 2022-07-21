@@ -93,7 +93,7 @@ objects:
         requests:
           cpu: 100m
           memory: 512Mi
-      runPolicy: Serial
+      runPolicy: SerialLatestOnly
       source:
         contextDir: '${SOURCE_CONTEXT_DIR}'
         git:
