@@ -508,7 +508,6 @@ describe('DarwinCoreService', () => {
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
       expect(deleteSpatialComponentsStub).to.be.calledWith(1);
-      // expect(deleteSpatialComponentsStub).to.
       expect(submissionEndDateStub).to.be.calledWith(1);
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
     });

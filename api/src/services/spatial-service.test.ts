@@ -139,4 +139,24 @@ describe('SpatialService', () => {
       expect(response).to.be.eql(mockResponseRows);
     });
   });
+
+  describe('deleteSpatialComponentsBySubmissionId', () => {
+    it('should return submission IDs upon deleting spatial data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const mockResponseRows = [
+        { submission_id: 3 }
+      ] as unknown as { submission_id: number }[];
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'deleteSpatialComponentsBySubmissionId')
+        .resolves(mockResponseRows);
+
+      const response = await spatialService.deleteSpatialComponentsBySubmissionId(3);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(mockResponseRows);
+    });
+  })
 });

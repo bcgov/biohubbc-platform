@@ -354,4 +354,24 @@ describe('SpatialRepository', () => {
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
   });
+
+  describe('deleteSpatialComponentsBySubmissionId', () => {
+    it('should successfully return submission IDs for delete spatial data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 2 }] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const response = await spatialRepository.deleteSpatialComponentsBySubmissionId(2);
+
+      expect(response[0].submission_id).to.equal(2);
+    })
+  })
 });
