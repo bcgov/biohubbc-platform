@@ -114,7 +114,7 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.ingestNewDwCADataPackage(
         { originalname: 'name' } as unknown as Express.Multer.File,
-        { dataPackageId: 'string' }
+        'string'
       );
 
       expect(response).to.eql({ dataPackageId: 'string', submissionId: 1 });
@@ -490,6 +490,10 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
         .resolves({ submission_id: 1 });
 
+      const deleteSpatialComponentsStub = sinon
+        .stub(SpatialService.prototype, 'deleteSpatialComponentsBySubmissionId')
+        .resolves([]);
+
       const submissionEndDateStub = sinon
         .stub(SubmissionService.prototype, 'setSubmissionEndDateById')
         .resolves({ submission_id: 1 });
@@ -503,6 +507,7 @@ describe('DarwinCoreService', () => {
 
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
+      expect(deleteSpatialComponentsStub).to.be.calledWith(1);
       expect(submissionEndDateStub).to.be.calledWith(1);
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
     });
@@ -554,7 +559,7 @@ describe('DarwinCoreService', () => {
           await darwinCoreService.create(multerFile, 'dataPackageId');
           expect.fail();
         } catch (actualError) {
-          expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+          expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
           expect((actualError as ApiGeneralError).message).to.equal('Ingestion failed');
         }
       });
@@ -581,7 +586,7 @@ describe('DarwinCoreService', () => {
           await darwinCoreService.create(multerFile, 'dataPackageId');
           expect.fail();
         } catch (actualError) {
-          expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, { dataPackageId: 'dataPackageId' });
+          expect(ingestNewDwCADataPackageStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
           expect(insertSubmissionStatusStub).to.be.calledOnceWith(1, SUBMISSION_STATUS_TYPE.INGESTED);
         }
       });

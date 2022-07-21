@@ -297,6 +297,21 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {
+    const sqlStatement = SQL`
+      DELETE FROM
+        submission_spatial_component
+      WHERE
+        submission_id=${submission_id}
+      RETURNING
+        submission_id;
+    ;`;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    return response.rows;
+  }
+
   _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
     return SQL`
       public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
