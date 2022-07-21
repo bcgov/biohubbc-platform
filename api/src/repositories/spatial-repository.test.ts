@@ -357,9 +357,7 @@ describe('SpatialRepository', () => {
 
   describe('deleteSpatialComponentsBySubmissionId', () => {
     it('should successfully return submission IDs for delete spatial data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 2 }] } as any as Promise<
-        QueryResult<any>
-      >;
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 2 }] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: async () => {
@@ -372,6 +370,6 @@ describe('SpatialRepository', () => {
       const response = await spatialRepository.deleteSpatialComponentsBySubmissionId(2);
 
       expect(response[0].submission_id).to.equal(2);
-    })
-  })
+    });
+  });
 });

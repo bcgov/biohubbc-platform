@@ -145,9 +145,7 @@ describe('SpatialService', () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
 
-      const mockResponseRows = [
-        { submission_id: 3 }
-      ] as unknown as { submission_id: number }[];
+      const mockResponseRows = [{ submission_id: 3 }] as unknown as { submission_id: number }[];
 
       const repo = sinon
         .stub(SpatialRepository.prototype, 'deleteSpatialComponentsBySubmissionId')
@@ -158,5 +156,5 @@ describe('SpatialService', () => {
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(mockResponseRows);
     });
-  })
+  });
 });

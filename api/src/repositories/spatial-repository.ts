@@ -305,7 +305,7 @@ export class SpatialRepository extends BaseRepository {
         submission_id=${submission_id}
       RETURNING
         submission_id;
-    ;`
+    ;`;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
