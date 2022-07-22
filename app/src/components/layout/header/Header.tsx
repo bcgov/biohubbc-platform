@@ -1,7 +1,6 @@
 import AppBar from '@material-ui/core/AppBar';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
-import Container from '@material-ui/core/Container';
 import Dialog from '@material-ui/core/Dialog';
 import DialogActions from '@material-ui/core/DialogActions';
 import DialogContent from '@material-ui/core/DialogContent';
@@ -26,7 +25,6 @@ import { LoggedInUserControls, NotLoggedInUserControls } from './UserControls';
 
 const useStyles = makeStyles((theme: Theme) => ({
   govHeader: {
-    borderBottom: '2px solid #fcba19'
   },
   govHeaderToolbar: {
     height: '70px'
@@ -37,9 +35,9 @@ const useStyles = makeStyles((theme: Theme) => ({
     alignItems: 'center',
     color: 'inherit',
     textDecoration: 'none',
-    fontSize: '1.25rem',
-    fontWeight: 700,
+    fontSize: '1.5rem',
     '& img': {
+      marginTop: '-2px',
       verticalAlign: 'middle'
     },
     '& picture': {
@@ -125,65 +123,60 @@ const Header: React.FC = () => {
       <AppBar position="sticky" style={{ boxShadow: 'none' }}>
         <Box className={classes.govHeader}>
           <Toolbar className={classes.govHeaderToolbar}>
-            <Container maxWidth="xl">
-              <Box display="flex" justifyContent="space-between" width="100%">
-                <Link to="/" className={classes.brand} aria-label="Go to Home Page">
-                  <picture>
-                    <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
-                    <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
-                    <img src={headerImageSmall} alt={'Government of British Columbia'} />
-                  </picture>
-                  <span>
-                    BioHub Data Aggregator System
-                    <BetaLabel />
-                    <EnvironmentLabel />
-                  </span>
-                </Link>
-                <Box display="flex" className={classes.userProfile} my="auto" alignItems="center">
-                  <UnAuthGuard>
-                    <NotLoggedInUserControls />
-                  </UnAuthGuard>
-                  <AuthGuard>
-                    <LoggedInUserControls />
-                  </AuthGuard>
-                  <Box pl={2}>
-                    <Divider orientation="vertical" />
-                  </Box>
-                  <IconButton className={classes.govHeaderIconButton} onClick={showSupportDialog}>
-                    <Icon path={mdiHelpCircle} size={1.12} />
-                  </IconButton>
+            <Box display="flex" justifyContent="space-between" width="100%">
+              <Link to="/" className={classes.brand} aria-label="Go to Home Page">
+                <picture>
+                  <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
+                  <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
+                  <img src={headerImageSmall} alt={'Government of British Columbia'} />
+                </picture>
+                <span>
+                  <strong>BioHub</strong>
+                  <BetaLabel />
+                  <EnvironmentLabel />
+                </span>
+              </Link>
+              <Box display="flex" className={classes.userProfile} my="auto" alignItems="center">
+                <UnAuthGuard>
+                  <NotLoggedInUserControls />
+                </UnAuthGuard>
+                <AuthGuard>
+                  <LoggedInUserControls />
+                </AuthGuard>
+                <Box pl={2}>
+                  <Divider orientation="vertical" />
                 </Box>
+                <IconButton className={classes.govHeaderIconButton} onClick={showSupportDialog}>
+                  <Icon path={mdiHelpCircle} size={1.12} />
+                </IconButton>
               </Box>
-            </Container>
+            </Box>
           </Toolbar>
         </Box>
         <Box className={classes.mainNav}>
-          <Container maxWidth="xl">
-            <Toolbar
-              variant="dense"
-              className={classes.mainNavToolbar}
-              role="navigation"
-              aria-label="Main Navigation"
-              disableGutters>
-              <Link to="/" id="menu_home">
-                Home
+          <Toolbar
+            variant="dense"
+            className={classes.mainNavToolbar}
+            role="navigation"
+            aria-label="Main Navigation">
+            <Link to="/" id="menu_home">
+              Home
+            </Link>
+            <Link to="/search" id="menu_search">
+              Search
+            </Link>
+            <Link to="/map" id="menu_map">
+              Map
+            </Link>
+            <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+              <Link to="/datasets" id="menu_datasets">
+                Datasets
               </Link>
-              <Link to="/search" id="menu_search">
-                Search
+              <Link to="/admin/users" id="menu_admin_users">
+                Manage Users
               </Link>
-              <Link to="/map" id="menu_map">
-                Map
-              </Link>
-              <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                <Link to="/datasets" id="menu_datasets">
-                  Datasets
-                </Link>
-                <Link to="/admin/users" id="menu_admin_users">
-                  Manage Users
-                </Link>
-              </SystemRoleGuard>
-            </Toolbar>
-          </Container>
+            </SystemRoleGuard>
+          </Toolbar>
         </Box>
       </AppBar>
 
