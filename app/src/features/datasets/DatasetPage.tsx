@@ -106,33 +106,25 @@ const DatasetPage: React.FC = () => {
   mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
 
   return (
-    <Box my={4}>
-      <Container maxWidth="xl">
-        <Box mb={5} display="flex" justifyContent="space-between">
-          <Typography variant="h1">Map</Typography>
-        </Box>
-        <Box>
-          <Box mb={4}>
-            <Grid item xs={12}>
-              <Box mt={2} height={750} data-testid="MapContainer">
-                <MapContainer
-                  mapId="boundary_map"
-                  onBoundsChange={(bounds: LatLngBounds) => {
-                    const boundary = getFeatureObjectFromLatLngBounds(bounds);
-                    mapDataLoader.refresh(boundary, [
-                      SPATIAL_COMPONENT_TYPE.BOUNDARY,
-                      SPATIAL_COMPONENT_TYPE.OCCURRENCE
-                    ]);
-                  }}
-                  scrollWheelZoom={true}
-                  markerLayers={markerLayers}
-                  staticLayers={staticLayers}
-                />
-              </Box>
-            </Grid>
-          </Box>
-        </Box>
-      </Container>
+    <Box display="flex" flexDirection="column" width="100%" height="100%">
+      <Box>
+        <Typography variant="h1">Dataset Title</Typography>
+      </Box>
+      <Box data-testid="MapContainer">
+        <MapContainer
+          mapId="boundary_map"
+          onBoundsChange={(bounds: LatLngBounds) => {
+            const boundary = getFeatureObjectFromLatLngBounds(bounds);
+            mapDataLoader.refresh(boundary, [
+              SPATIAL_COMPONENT_TYPE.BOUNDARY,
+              SPATIAL_COMPONENT_TYPE.OCCURRENCE
+            ]);
+          }}
+          scrollWheelZoom={true}
+          markerLayers={markerLayers}
+          staticLayers={staticLayers}
+        />
+      </Box>
     </Box>
   );
 };
