@@ -105,10 +105,10 @@ const DatasetPage: React.FC = () => {
 
   return (
     <Box display="flex" flexDirection="column" width="100%" height="100%">
-      <Box>
+      <Box flex="0 0 auto">
         <Typography variant="h1">Dataset Title</Typography>
       </Box>
-      <Box data-testid="MapContainer">
+      <Box flex="1 1 auto" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"
           onBoundsChange={(bounds: LatLngBounds) => {
