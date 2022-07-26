@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection } from '../../../database/db';
-import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { SpatialService } from '../../../services/spatial-service';
+import { getAPIUserDBConnection } from '../../../../database/db';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
+import { SpatialService } from '../../../../services/spatial-service';
 // import { ESService } from '../../../services/es-service';
-import { getLogger } from '../../../utils/logger';
+import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
 
