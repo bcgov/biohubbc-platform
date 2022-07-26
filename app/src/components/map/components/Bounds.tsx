@@ -1,11 +1,13 @@
-import { LatLngBounds, LatLngBoundsExpression } from 'leaflet';
+import { Feature, Polygon } from 'geojson';
+import { LatLngBoundsExpression } from 'leaflet';
 import { useMap, useMapEvents } from 'react-leaflet';
+import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
-export interface IMapBoundsProps {
+export interface ISetMapBoundsProps {
   bounds?: LatLngBoundsExpression;
 }
 
-export const SetMapBounds: React.FC<IMapBoundsProps> = (props) => {
+export const SetMapBounds: React.FC<ISetMapBoundsProps> = (props) => {
   const map = useMap();
 
   if (props.bounds) {
@@ -15,19 +17,31 @@ export const SetMapBounds: React.FC<IMapBoundsProps> = (props) => {
   return null;
 };
 
-export const GetMapBounds: React.FC<{ onChange: (bounds: LatLngBounds) => void }> = (props) => {
+export type IMapBoundsOnChange = (bounds: Feature<Polygon>) => void;
+
+export interface IGetMapBoundsProps {
+  onChange: IMapBoundsOnChange;
+}
+
+export const GetMapBounds: React.FC<IGetMapBoundsProps> = (props) => {
   const { onChange } = props;
 
   const map = useMapEvents({
     zoomend() {
-      const bounds = map.getBounds();
+      const latLngBounds = map.getBounds();
       map.closePopup();
-      onChange(bounds);
+
+      const featureBounds = getFeatureObjectFromLatLngBounds(latLngBounds);
+
+      onChange(featureBounds);
     },
     moveend() {
-      const bounds = map.getBounds();
+      const latLngBounds = map.getBounds();
       map.closePopup();
-      onChange(bounds);
+
+      const featureBounds = getFeatureObjectFromLatLngBounds(latLngBounds);
+
+      onChange(featureBounds);
     }
   });
 

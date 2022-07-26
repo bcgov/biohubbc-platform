@@ -2,18 +2,17 @@ import Box from '@material-ui/core/Box';
 import Container from '@material-ui/core/Container';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
+import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
 import { ALL_OF_BC_BOUNDARY, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { Feature } from 'geojson';
+import { Feature, MultiPolygon, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
-import { LatLngBounds } from 'leaflet';
 import React, { useEffect, useState } from 'react';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
-import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
 const MapPage: React.FC = () => {
   const api = useApi();
@@ -30,6 +29,9 @@ const MapPage: React.FC = () => {
     };
   });
 
+  const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon | MultiPolygon> | undefined>();
+  const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon | MultiPolygon> | undefined>();
+
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
@@ -44,7 +46,33 @@ const MapPage: React.FC = () => {
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
 
+  // One time map data fetch, on initial page load
   mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+
+  const onMapViewChange = (bounds: Feature<Polygon>) => {
+    // Store map view boundary
+    setMapViewBoundary(bounds);
+
+    // Calculate search boundary based on drawn and map view boundaries
+    const searchBoundary = (drawnBoundary && intersect(drawnBoundary, bounds)) || bounds;
+
+    mapDataLoader.refresh(searchBoundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+  };
+
+  const onDrawChange = (features: Feature[]) => {
+    // In this case, we have disabled all draw controls except Polygons, and limited it to only 1 at a time, so
+    // assuming the type should be safe. This will need to be updated if the draw control options are changed.
+    const bounds = features?.[0] as Feature<Polygon> | undefined;
+
+    // Store user drawn boundary
+    setDrawnBoundary(bounds);
+
+    // Calculate search boundary based on drawn and map view boundaries
+    const searchBoundary =
+      (bounds && mapViewBoundary && intersect(bounds, mapViewBoundary)) || mapViewBoundary || ALL_OF_BC_BOUNDARY;
+
+    mapDataLoader.refresh(searchBoundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+  };
 
   return (
     <Box my={4}>
@@ -58,23 +86,16 @@ const MapPage: React.FC = () => {
               <Box mt={2} height={750} data-testid="MapContainer">
                 <MapContainer
                   mapId="boundary_map"
-                  onBoundsChange={(bounds: LatLngBounds) => {
-                    const boundary = getFeatureObjectFromLatLngBounds(bounds);
-                    mapDataLoader.refresh(boundary, [
-                      SPATIAL_COMPONENT_TYPE.BOUNDARY,
-                      SPATIAL_COMPONENT_TYPE.OCCURRENCE
-                    ]);
-                  }}
+                  onBoundsChange={onMapViewChange}
                   drawControls={{
                     options: {
-                      draw: { circle: false, circlemarker: false, marker: false, polyline: false },
-                      edit: { edit: false, remove: false }
+                      // Disable all controls except for Polygon (and Rectangle, which is just a type of Polygon)
+                      draw: { circle: false, circlemarker: false, marker: false, polyline: false }
                     },
-                    onChange: (features: Feature[]) => {
-                      console.log('Drawn features', features);
-                    },
+                    // Limit drawing to 1 shape at a time
                     clearOnDraw: true
                   }}
+                  onDrawChange={onDrawChange}
                   scrollWheelZoom={true}
                   markerLayers={markerLayers}
                   staticLayers={staticLayers}

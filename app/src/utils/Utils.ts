@@ -1,6 +1,6 @@
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
-import { Feature } from 'geojson';
+import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
 import moment from 'moment';
 
@@ -151,7 +151,14 @@ export function getKeyByValue(object: any, value: any) {
   return Object.keys(object).find((key) => object[key] === value);
 }
 
-export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature {
+/**
+ * Converts a `LatLngBounds` object into a GeoJSON Feature object.
+ *
+ * @export
+ * @param {LatLngBounds} bounds
+ * @return {*}  {Feature<Polygon>}
+ */
+export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature<Polygon> {
   const southWest = bounds.getSouthWest();
   const northEast = bounds.getNorthEast();
 
@@ -170,5 +177,5 @@ export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature 
         ]
       ]
     }
-  } as Feature;
+  };
 }

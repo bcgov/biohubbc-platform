@@ -43,13 +43,13 @@ const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
 
   const layerControls: ReactElement[] = [];
 
-  props.layers.forEach((layer, layerIndex) => {
+  props.layers.forEach((layer) => {
     if (!layer.markers?.length) {
       return;
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layerIndex}`}>
+      <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
         <ReactLeafletMarkerClusterGroup chunkedLoading>
           {layer.markers.map((item, index: number) => {
             const id = item.key || index;
@@ -57,17 +57,17 @@ const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
             return (
               <Marker
                 icon={MARKER_ICON.DOT}
-                key={`marker-cluster-${id}-${index}`}
+                key={`marker-cluster-${id}`}
                 position={[item.position[1], item.position[0]]}
                 {...item.MarkerProps}>
                 {item.tooltip && (
-                  <Tooltip key={`marker-cluster-tooltip-${id}-${index}`} direction="top" {...item.TooltipProps}>
+                  <Tooltip key={`marker-cluster-tooltip-${id}`} direction="top" {...item.TooltipProps}>
                     {item.tooltip}
                   </Tooltip>
                 )}
                 {item.popup && (
                   <Popup
-                    key={`marker-cluster-popup-${id}-${index}`}
+                    key={`marker-cluster-popup-${id}`}
                     keepInView={false}
                     closeButton={false}
                     autoPan={false}

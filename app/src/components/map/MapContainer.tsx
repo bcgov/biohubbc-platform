@@ -1,5 +1,5 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
-import L, { LatLngBounds, LeafletEventHandlerFnMap } from 'leaflet';
+import L, { LeafletEventHandlerFnMap } from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
 import 'leaflet-fullscreen/dist/Leaflet.fullscreen.js';
@@ -10,8 +10,8 @@ import 'leaflet/dist/leaflet.css';
 import React from 'react';
 import { FeatureGroup, LayersControl, MapContainer as LeafletMapContainer } from 'react-leaflet';
 import BaseLayerControls from './components/BaseLayerControls';
-import { GetMapBounds, SetMapBounds } from './components/Bounds';
-import DrawControls, { IDrawControlsProps } from './components/DrawControls';
+import { GetMapBounds, IMapBoundsOnChange, SetMapBounds } from './components/Bounds';
+import DrawControls, { IDrawControlsOnChange, IDrawControlsProps } from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
 import MarkerClusterGroup, { IMarkerLayer } from './components/MarkerCluster';
@@ -35,6 +35,7 @@ export interface IMapContainerProps {
   mapId: string;
   staticLayers?: IStaticLayer[];
   drawControls?: IDrawControlsProps;
+  onDrawChange?: IDrawControlsOnChange;
   scrollWheelZoom?: boolean;
   fullScreenControl?: boolean;
   markerLayers?: IMarkerLayer[];
@@ -42,7 +43,7 @@ export interface IMapContainerProps {
   zoom?: number;
   eventHandlers?: LeafletEventHandlerFnMap;
   LeafletMapContainerProps?: Partial<React.ComponentProps<typeof LeafletMapContainer>>;
-  onBoundsChange?: (bounds: LatLngBounds) => void;
+  onBoundsChange?: IMapBoundsOnChange;
 }
 
 const MapContainer: React.FC<IMapContainerProps> = (props) => {
@@ -52,6 +53,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
     mapId,
     staticLayers,
     drawControls,
+    onDrawChange,
     scrollWheelZoom,
     fullScreenControl,
     markerLayers,
@@ -82,22 +84,17 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
       <SetMapBounds bounds={bounds} />
-      <GetMapBounds
-        onChange={(getBounds: LatLngBounds) => {
-          if (onBoundsChange) {
-            onBoundsChange(getBounds);
-          }
-        }}
-      />
+      <GetMapBounds onChange={(bounds) => onBoundsChange?.(bounds)} />
 
       {drawControls && (
-        <FeatureGroup key={'draw-controls-feature-group'}>
+        <FeatureGroup key="draw-control-feature-group">
           <DrawControls
             {...props.drawControls}
             options={{
               ...props.drawControls?.options,
               draw: { ...props.drawControls?.options?.draw, circlemarker: false } // Always disable circlemarker
             }}
+            onChange={onDrawChange}
           />
         </FeatureGroup>
       )}
