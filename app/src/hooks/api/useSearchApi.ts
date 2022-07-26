@@ -4,6 +4,7 @@ import {
   IElasticsearchResponse,
   IGetSearchResultsResponse,
   IGetSpatialDataResponse,
+  IGetSpatialMetadataResponse,
   IKeywordSearchResult
 } from 'interfaces/useSearchApi.interface';
 
@@ -32,6 +33,11 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSpatialMetadata = async (submissionId: number): Promise<IGetSpatialMetadataResponse> => {
+    const { data } = await axios.get(`/api/dwc/spatial/${submissionId}/metadata`);
+    return data;
+  };
+
   const listAllDatasets = async (): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
     const { data } = await axios.get(`api/dwc/eml/search`);
 
@@ -54,7 +60,8 @@ const useSearchApi = (axios: AxiosInstance) => {
     getSearchResults,
     listAllDatasets,
     keywordSearch,
-    getSpatialData
+    getSpatialData,
+    getSpatialMetadata
   };
 };
 

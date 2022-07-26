@@ -81,7 +81,10 @@ const MapPage: React.FC = () => {
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
             key: feature.id,
-            popup: <OccurrenceFeaturePopup properties={feature.properties} />
+            popup: <OccurrenceFeaturePopup
+              
+              properties={feature.properties}
+            />
           });
         }
 
@@ -93,7 +96,9 @@ const MapPage: React.FC = () => {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
             key: feature.id,
-            popup: <BoundaryFeaturePopup properties={feature.properties} />
+            popup: <BoundaryFeaturePopup
+              properties={feature.properties}
+            />
           });
         }
       }

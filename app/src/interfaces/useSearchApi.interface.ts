@@ -20,6 +20,8 @@ export type IGetSpatialDataResponse = {
   spatial_data: FeatureCollection;
 }[];
 
+export type IGetSpatialMetadataResponse = any
+
 /**
  * An interface for an instance of filter fields for search results
  */
