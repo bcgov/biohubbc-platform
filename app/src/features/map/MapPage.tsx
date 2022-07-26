@@ -119,6 +119,8 @@ const MapPage: React.FC = () => {
                   mapId="boundary_map"
                   onBoundsChange={(bounds: LatLngBounds) => {
                     const boundary = getFeatureObjectFromLatLngBounds(bounds);
+
+                    console.log('boundary is: ', boundary);
                     mapDataLoader.refresh(boundary, [
                       SPATIAL_COMPONENT_TYPE.BOUNDARY,
                       SPATIAL_COMPONENT_TYPE.OCCURRENCE

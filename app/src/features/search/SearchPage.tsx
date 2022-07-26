@@ -1,5 +1,6 @@
 import Box from '@material-ui/core/Box';
 import Container from '@material-ui/core/Container';
+import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
@@ -111,9 +112,27 @@ const SearchPage = () => {
     });
   };
 
-  const results = (searchDataLoader.data || []).reduce((acc: any, item) => {
-    return [...acc, ...item.source.project];
-  }, []);
+  function appendProjectsWithDatasetId(searchDataLoader: { data: any }) {
+    let newList: any[] = [];
+
+    searchDataLoader.data &&
+      searchDataLoader.data.forEach((dataset: any, index: any) => {
+        const datasetId = dataset.id;
+
+        const projectList = dataset.source.project;
+
+        projectList &&
+          projectList.forEach((item: any) => {
+            const appendedItem = { ...item, datasetId: datasetId };
+
+            newList.push(appendedItem);
+          });
+      });
+
+    return newList;
+  }
+
+  const results = appendProjectsWithDatasetId(searchDataLoader);
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
@@ -162,6 +181,13 @@ const SearchPage = () => {
               <Typography variant="body1" color="textSecondary">
                 {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
               </Typography>
+              <Link
+                underline="always"
+                component="button"
+                variant="body2"
+                onClick={() => history.push(`datasets/${result.datasetId}/details`)}>
+                {result.projectTitle}
+              </Link>
             </Box>
           ))}
         </Box>

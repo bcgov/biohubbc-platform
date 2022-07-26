@@ -12,7 +12,7 @@ import {
  * @param {AxiosInstance} axios
  * @return {*} object whose properties are supported api methods.
  */
-const useSearchApi = (axios: AxiosInstance) => {
+export const useSearchApi = (axios: AxiosInstance) => {
   /**
    * Get search results (spatial)
    *
@@ -31,11 +31,6 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const listAllDatasets = async (): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
-    const { data } = await axios.get(`api/dwc/eml/search`);
-
-    return data;
-  };
 
   /**
    * Get keyword search results
@@ -51,7 +46,6 @@ const useSearchApi = (axios: AxiosInstance) => {
 
   return {
     getSearchResults,
-    listAllDatasets,
     keywordSearch,
     getSpatialData
   };

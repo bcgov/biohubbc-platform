@@ -11,6 +11,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import { LatLngBounds, LatLngTuple } from 'leaflet';
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
 export const ALL_OF_BC_BOUNDARY: Feature = {
@@ -42,6 +43,18 @@ export enum LAYER_NAME {
 
 const DatasetPage: React.FC = () => {
   const api = useApi();
+  const urlParams = useParams();
+
+  const datasetId = urlParams['id'];
+
+  console.log('datasetId is: ', datasetId);
+  const datasetDataLoader = useDataLoader(() => api.dataset.getDatasetEML(datasetId));
+
+  datasetDataLoader.load();
+
+  const dataset = datasetDataLoader?.data || [];
+
+  console.log('dataset', dataset);
 
   const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
     api.search.getSpatialData({ boundary: boundary, type: type })
@@ -106,17 +119,14 @@ const DatasetPage: React.FC = () => {
   return (
     <Box display="flex" flexDirection="column" width="100%" height="100%">
       <Box flex="0 0 auto">
-        <Typography variant="h1">Dataset Title</Typography>
+        <Typography variant="h1">data set title filler</Typography>
       </Box>
       <Box flex="1 1 auto" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"
           onBoundsChange={(bounds: LatLngBounds) => {
             const boundary = getFeatureObjectFromLatLngBounds(bounds);
-            mapDataLoader.refresh(boundary, [
-              SPATIAL_COMPONENT_TYPE.BOUNDARY,
-              SPATIAL_COMPONENT_TYPE.OCCURRENCE
-            ]);
+            mapDataLoader.refresh(boundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
           }}
           scrollWheelZoom={true}
           markerLayers={markerLayers}

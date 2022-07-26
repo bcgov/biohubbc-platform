@@ -56,11 +56,28 @@ export class ESService {
 
       query: {
         multi_match: {
-          fields: ['project.taxonomicCoverage.commonName', 'project.taxonomicCoverage.taxonRankValue'],
+          fields: ['*'],
           type: 'phrase_prefix',
           query
         }
       }
+    });
+  }
+
+  /**
+   * Searches for projects based on a datasetId.
+   * @param query The species/keywords to search for
+   * @returns {Promise<SearchHit<unknown>>} The results of the search
+   */
+  async DatasetSearchEml(datasetId: string): Promise<SearchHit<unknown>[]> {
+    return this._elasticSearch({
+      index: ElasticSearchIndices.EML,
+      query: {
+        ids: {
+          values: [datasetId]
+        }
+      },
+      fields: ['*']
     });
   }
 }
