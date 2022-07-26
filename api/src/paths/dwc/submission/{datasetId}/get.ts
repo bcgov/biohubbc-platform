@@ -1,8 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { getDBConnection } from '../../../../database/db';
+import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { ESService } from '../../../../services/es-service';
+import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
@@ -31,12 +33,12 @@ GET.apiDoc = {
   parameters: [
     {
       description: 'dataset Id.',
-      in: 'query',
-      name: 'dataset_id',
-      required: false,
+      in: 'path',
+      name: 'datasetId',
       schema: {
         type: 'string'
-      }
+      },
+      required: true
     }
   ],
   responses: {
@@ -45,23 +47,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-              type: 'object',
-              required: ['id'],
-              nullable: true,
-              properties: {
-                id: {
-                  type: 'string'
-                },
-                source: {
-                  type: 'object'
-                },
-                fields: {
-                  type: 'object'
-                }
-              }
-            }
+            type: 'object'
           }
         }
       }
@@ -71,7 +57,7 @@ GET.apiDoc = {
 };
 
 /**
- * Retreives dataset metadata from Elastic Search.
+ * Retrieves dataset metadata from the submission table.
  *
  * @returns {RequestHandler}
  */
@@ -84,24 +70,30 @@ export function getMetadataByDatasetId(): RequestHandler {
       index: req.query.index
     });
 
-    const queryString = String(req.query.terms) || '*';
+    const connection = getDBConnection(req['keycloak_token']);
+
+    console.log('reg is: ', req.params);
+
+    if (!req.params || !req.params.datasetId) {
+      throw new HTTP400('Missing required path param: datasetId');
+    }
+
+    const datasetId = String(req.params.datasetId);
+
+    console.log('datasetId is: ', datasetId);
 
     try {
-      const elasticService = new ESService();
+      await connection.open();
 
-      const response = await elasticService.DatasetSearchEml(queryString);
+      const submissionService = new SubmissionService(connection);
 
-      console.log('response: ', response);
+      const datasetMetadata: string = await submissionService.getSubmissionRecordSONByDatasetId(datasetId);
 
-      const result = response.map((item) => {
-        return {
-          id: item._id,
-          fields: item.fields,
-          source: item._source
-        };
-      });
+      console.log('datasetMetadata is: ', datasetMetadata);
 
-      res.status(200).json(result);
+      await connection.commit();
+
+      res.status(200).json(datasetMetadata);
     } catch (error) {
       defaultLog.error({ label: 'getMetadataByDatasetId', message: 'error', error });
       throw error;

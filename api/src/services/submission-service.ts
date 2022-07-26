@@ -156,6 +156,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   *Get json representation of eml source from submission by datasetId.
+   *
+   * @param {string} datasetId
+   * @return {string}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordSONByDatasetId(datasetId: string): Promise<string> {
+    return this.submissionRepository.getSubmissionRecordJSONByDatasetId(datasetId);
+  }
+
+  /**
    * Insert a submission status record.
    *
    * @param {number} submissionId

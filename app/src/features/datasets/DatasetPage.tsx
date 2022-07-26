@@ -52,9 +52,12 @@ const DatasetPage: React.FC = () => {
 
   datasetDataLoader.load();
 
-  const dataset = datasetDataLoader?.data || [];
+  const dataset = datasetDataLoader?.data;
 
   console.log('dataset', dataset);
+
+  // const datasetTitle = dataset['eml'];
+  // console.log('getting the datasetTitle: ', datasetTitle);
 
   const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
     api.search.getSpatialData({ boundary: boundary, type: type })

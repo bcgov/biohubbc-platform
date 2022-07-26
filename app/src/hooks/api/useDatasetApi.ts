@@ -19,7 +19,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
   const getDatasetEML = async (datasetId: string): Promise<any> => {
     const { data } = await axios.get(`api/dwc/submission/${datasetId}/get`);
 
-    return data[0];
+    return data;
   };
 
   //TODO: make it work for real
