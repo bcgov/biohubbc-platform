@@ -61,7 +61,7 @@ GET.apiDoc = {
                 },
                 spatial_data: {
                   ...GeoJSONFeatureCollection
-                },
+                }
               }
             }
           }
@@ -90,13 +90,15 @@ export function searchSpatialComponents(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(response.map((item) => {
-        const { spatial_component, submission_spatial_component_id } = item
-        return {
-          spatial_data: spatial_component,
-          submission_spatial_component_id
-        }
-      }));
+      res.status(200).json(
+        response.map((item) => {
+          const { spatial_component, submission_spatial_component_id } = item;
+          return {
+            spatial_data: spatial_component,
+            submission_spatial_component_id
+          };
+        })
+      );
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();

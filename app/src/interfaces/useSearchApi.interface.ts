@@ -18,7 +18,7 @@ export interface IGetSearchResultsResponse {
 export type IGetSpatialDataResponse = {
   submission_spatial_component_id: number;
   spatial_data: FeatureCollection[];
-}[]
+}[];
 
 /**
  * An interface for an instance of filter fields for search results

@@ -85,7 +85,7 @@ export function getSpatialMetadataById(): RequestHandler {
       id: null // @TODO
     });
 
-    const submissionId = Number(req.query.submission_spatial_component_id)
+    const submissionId = Number(req.query.submission_spatial_component_id);
 
     const connection = getAPIUserDBConnection();
 

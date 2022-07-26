@@ -123,10 +123,8 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
    * @memberof SpatialService
    */
-   async findSpatialMetadataBySubmissionId(
-    submissionId: number
-  ): Promise<ISubmissionSpatialComponent[]> {
-    throw new Error('findSpatialMetadataBySubmissionId not implemented.')
+  async findSpatialMetadataBySubmissionId(submissionId: number): Promise<ISubmissionSpatialComponent[]> {
+    throw new Error('findSpatialMetadataBySubmissionId not implemented.');
     // return [] // this.spatialRepository.findSpatialComponentsByCriteria(criteria);
   }
 }
