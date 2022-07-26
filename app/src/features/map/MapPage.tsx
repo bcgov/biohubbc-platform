@@ -70,7 +70,7 @@ const MapPage: React.FC = () => {
     const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
     const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
-    for (const featureCollection of mapDataLoader.data) {
+    for (const featureCollection of mapDataLoader.data.map((item) => item.spatial_data)) {
       for (const feature of featureCollection.features) {
         if (isOccurrenceFeature(feature)) {
           if (feature.geometry.type === 'GeometryCollection') {
