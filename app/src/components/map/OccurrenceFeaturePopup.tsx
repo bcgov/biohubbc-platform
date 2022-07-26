@@ -1,4 +1,4 @@
-import { SPATIAL_COMPONENT_TYPE } from 'features/map/MapPage';
+import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import React from 'react';
 
