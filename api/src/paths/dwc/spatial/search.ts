@@ -69,8 +69,6 @@ export function searchSpatialComponents(): RequestHandler {
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
 
-    console.log('the criteria is: ', criteria);
-
     const connection = getAPIUserDBConnection();
 
     try {

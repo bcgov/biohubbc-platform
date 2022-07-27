@@ -1,45 +1,22 @@
 import Box from '@material-ui/core/Box';
+import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
 import Typography from '@material-ui/core/Typography';
-import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFeaturePopup';
+import { BoundaryFeature } from 'components/map/BoundaryFeaturePopup';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
+import { OccurrenceFeature } from 'components/map/OccurrenceFeaturePopup';
+import { ALL_OF_BC_BOUNDARY, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
-import { LatLngBounds, LatLngTuple } from 'leaflet';
+import { LatLngBounds } from 'leaflet';
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
+import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
-export const ALL_OF_BC_BOUNDARY: Feature = {
-  type: 'Feature',
-  properties: {},
-  geometry: {
-    type: 'Polygon',
-    coordinates: [
-      [
-        [-146.95401365536304, 44.62175409623327],
-        [-146.95401365536304, 63.528970541102794],
-        [-105.07413084286304, 63.528970541102794],
-        [-105.07413084286304, 44.62175409623327],
-        [-146.95401365536304, 44.62175409623327]
-      ]
-    ]
-  }
-};
-
-export enum SPATIAL_COMPONENT_TYPE {
-  OCCURRENCE = 'Occurrence',
-  BOUNDARY = 'Boundary'
-}
-
-export enum LAYER_NAME {
-  OCCURRENCES = 'Occurrences',
-  BOUNDARIES = 'Boundaries'
-}
 
 const DatasetPage: React.FC = () => {
   const api = useApi();
@@ -47,17 +24,17 @@ const DatasetPage: React.FC = () => {
 
   const datasetId = urlParams['id'];
 
-  console.log('datasetId is: ', datasetId);
   const datasetDataLoader = useDataLoader(() => api.dataset.getDatasetEML(datasetId));
 
+  useDataLoaderError(datasetDataLoader, () => {
+    return {
+      dialogTitle: 'Error Loading Dataset',
+      dialogText:
+        'An error has occurred while attempting to load the dataset, please try again. If the error persists, please contact your system administrator.'
+    };
+  });
+
   datasetDataLoader.load();
-
-  const dataset = datasetDataLoader?.data;
-
-  console.log('dataset', dataset);
-
-  // const datasetTitle = dataset['eml'];
-  // console.log('getting the datasetTitle: ', datasetTitle);
 
   const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
     api.search.getSpatialData({ boundary: boundary, type: type })
@@ -79,50 +56,22 @@ const DatasetPage: React.FC = () => {
       return;
     }
 
-    const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
+    const result = parseFeatureCollectionsByType(mapDataLoader.data);
 
-    const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
-    const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
-
-    for (const featureCollection of mapDataLoader.data) {
-      for (const feature of featureCollection.features) {
-        if (isOccurrenceFeature(feature)) {
-          if (feature.geometry.type === 'GeometryCollection') {
-            // Not expecting or supporting geometry collections
-            continue;
-          }
-
-          occurrencesMarkerLayer.markers.push({
-            position: feature.geometry.coordinates as LatLngTuple,
-            key: feature.id,
-            popup: <OccurrenceFeaturePopup properties={feature.properties} />
-          });
-        }
-
-        if (isBoundaryFeature(feature)) {
-          if (feature.geometry.type === 'GeometryCollection') {
-            continue;
-          }
-
-          boundaryStaticLayer.features.push({
-            geoJSON: feature,
-            key: feature.id,
-            popup: <BoundaryFeaturePopup properties={feature.properties} />
-          });
-        }
-      }
-    }
-
-    setStaticLayers([occurrenceStaticLayer, boundaryStaticLayer]);
-    setMarkerLayers([occurrencesMarkerLayer]);
+    setStaticLayers(result.staticLayers);
+    setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
 
   mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
 
+  if (!datasetDataLoader.data) {
+    return <CircularProgress className="pageProgress" size={40} />;
+  }
+
   return (
     <Box display="flex" flexDirection="column" width="100%" height="100%">
       <Box flex="0 0 auto" p={3}>
-        <Typography variant="h1">Dataset Title</Typography>
+        <Typography variant="h1">{datasetDataLoader?.data['eml:eml'].dataset.title}</Typography>
       </Box>
       <Box flex="1 1 auto" data-testid="MapContainer">
         <MapContainer

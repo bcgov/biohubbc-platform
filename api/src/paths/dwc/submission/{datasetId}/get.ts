@@ -72,7 +72,6 @@ export function getMetadataByDatasetId(): RequestHandler {
 
     const connection = getDBConnection(req['keycloak_token']);
 
-    console.log('reg is: ', req.params);
 
     if (!req.params || !req.params.datasetId) {
       throw new HTTP400('Missing required path param: datasetId');
@@ -80,16 +79,12 @@ export function getMetadataByDatasetId(): RequestHandler {
 
     const datasetId = String(req.params.datasetId);
 
-    console.log('datasetId is: ', datasetId);
-
     try {
       await connection.open();
 
       const submissionService = new SubmissionService(connection);
 
       const datasetMetadata: string = await submissionService.getSubmissionRecordSONByDatasetId(datasetId);
-
-      console.log('datasetMetadata is: ', datasetMetadata);
 
       await connection.commit();
 
