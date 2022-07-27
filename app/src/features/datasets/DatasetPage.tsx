@@ -55,7 +55,7 @@ const DatasetPage: React.FC = () => {
       return;
     }
 
-    const result = parseFeatureCollectionsByType(mapDataLoader.data);
+    const result = parseFeatureCollectionsByType(mapDataLoader.data.map((item) => item.spatial_data));
 
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);

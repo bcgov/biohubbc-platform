@@ -1,4 +1,4 @@
-import { Feature } from 'geojson';
+import { Feature, FeatureCollection } from 'geojson';
 
 /**
  * Get search results response object.
@@ -15,10 +15,10 @@ export interface IGetSearchResultsResponse {
   geometry: Feature[];
 }
 
-export interface IGetDatasetSearchResultsResponse {
-  eml: { eml: any };
-  xml?: any;
-}
+export type IGetSpatialDataResponse = {
+  submission_spatial_component_id: number;
+  spatial_data: FeatureCollection;
+}[];
 
 /**
  * An interface for an instance of filter fields for search results

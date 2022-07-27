@@ -159,7 +159,7 @@ const SearchPage = () => {
         <Box my={4}>
           {formikRef.current?.values.keywords && (
             <Typography variant="h2">
-              {searchDataLoader ? (
+              {searchDataLoader.isLoading ? (
                 <>Loading...</>
               ) : (
                 <>
