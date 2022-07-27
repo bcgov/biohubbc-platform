@@ -387,7 +387,7 @@ export const getServiceAccountDBConnection = (sourceSystem: SOURCE_SYSTEM): IDBC
 };
 
 /**
- * Get a Knex instance.
+ * Get a Knex queryBuilder instance.
  *
  * @template TRecord
  * @template TResult
@@ -398,4 +398,18 @@ export const getKnexQueryBuilder = <
   TResult = Record<string, any>[]
 >(): Knex.QueryBuilder<TRecord, TResult> => {
   return knex<TRecord, TResult>({ client: DB_CLIENT }).queryBuilder();
+};
+
+/**
+ * Get a Knex instance.
+ *
+ * @template TRecord
+ * @template TResult
+ * @return {*}  {Knex<TRecord, TResult>}
+ */
+export const getKnex = <TRecord extends Record<string, any> = any, TResult = Record<string, any>[]>(): Knex<
+  TRecord,
+  TResult
+> => {
+  return knex<TRecord, TResult>({ client: DB_CLIENT });
 };

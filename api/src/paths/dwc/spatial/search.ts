@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
 import { getAPIUserDBConnection } from '../../../database/db';
-import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
+//import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
@@ -13,7 +13,7 @@ export const GET: Operation = [searchSpatialComponents()];
 
 export enum SPATIAL_COMPONENT_TYPE {
   OCCURRENCE = 'Occurrence',
-  BOUNDARY = 'Boundary'
+  BOUNDARY_CENTROID = 'Boundary Centroid'
 }
 
 const getAllSpatialComponentTypes = (): string[] => Object.values(SPATIAL_COMPONENT_TYPE);
@@ -36,6 +36,17 @@ GET.apiDoc = {
     },
     {
       in: 'query',
+      name: 'datasetID',
+      required: false,
+      schema: {
+        type: 'array',
+        items: {
+          type: 'string'
+        }
+      }
+    },
+    {
+      in: 'query',
       name: 'boundary',
       required: true,
       schema: {
@@ -50,10 +61,11 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-              ...GeoJSONFeatureCollection
-            }
+            //TODO provide appropriate schema
+            // type: 'array',
+            // items: {
+            //   ...GeoJSONFeatureCollection
+            // }
           }
         }
       }
@@ -66,6 +78,7 @@ export function searchSpatialComponents(): RequestHandler {
   return async (req, res) => {
     const criteria = {
       type: (req.query.type as string[]) || [],
+      datasetID: (req.query.datasetID as string[]) || [],
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
 
@@ -77,8 +90,6 @@ export function searchSpatialComponents(): RequestHandler {
       const spatialService = new SpatialService(connection);
 
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
-
-      await connection.commit();
 
       res.status(200).json(response.map((item) => item.spatial_component));
     } catch (error) {

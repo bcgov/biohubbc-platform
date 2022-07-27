@@ -1,6 +1,6 @@
 import { Feature, FeatureCollection } from 'geojson';
 import SQL, { SQLStatement } from 'sql-template-strings';
-import { getKnexQueryBuilder } from '../database/db';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
@@ -37,6 +37,7 @@ export interface ISubmissionSpatialComponent {
 
 export interface ISpatialComponentsSearchCriteria {
   type: string[];
+  datasetID?: string[];
   boundary: Feature;
 }
 
@@ -292,7 +293,15 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialComponent[]> {
-    const queryBuilder = getKnexQueryBuilder().select().from('submission_spatial_component');
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        knex.raw(
+          "jsonb_build_object('submission_spatial_component_id', submission_spatial_component_id, 'data', spatial_component) spatial_component"
+        )
+      )
+      .from('submission_spatial_component');
 
     if (criteria.type?.length) {
       // Append OR where clauses for each criteria.type
@@ -303,13 +312,24 @@ export class SpatialRepository extends BaseRepository {
           });
         }
       });
+    }
 
+    if (criteria.datasetID?.length) {
       // Append AND where clause for criteria.boundary
-      const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
       queryBuilder.where((qb3) => {
-        qb3.whereRaw(sqlStatement1.sql, sqlStatement1.values);
+        qb3.whereRaw(
+          `submission_id in (select submission_id from submission where uuid in (${
+            "'" + criteria.datasetID?.join("','") + "'"
+          }))`
+        );
       });
     }
+
+    // Append AND where clause for criteria.boundary
+    const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
+    queryBuilder.where((qb4) => {
+      qb4.whereRaw(sqlStatement1.sql, sqlStatement1.values);
+    });
 
     const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
 
