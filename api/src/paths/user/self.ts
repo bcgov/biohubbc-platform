@@ -85,14 +85,10 @@ export function getUser(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
-    console.log('connection is: ', connection);
-
     try {
       await connection.open();
 
       const userId = connection.systemUserId();
-
-      console.log('user id is: ', userId);
 
       if (!userId) {
         throw new HTTP400('Failed to identify system user ID');

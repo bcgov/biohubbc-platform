@@ -15,14 +15,10 @@ export interface IGetSearchResultsResponse {
   geometry: Feature[];
 }
 
-
-
-
 export interface IGetDatasetSearchResultsResponse {
-  eml: {eml:any};
+  eml: { eml: any };
   xml?: any;
 }
-
 
 /**
  * An interface for an instance of filter fields for search results

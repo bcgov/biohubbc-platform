@@ -17,7 +17,6 @@ import { useParams } from 'react-router';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
-
 const DatasetPage: React.FC = () => {
   const api = useApi();
   const urlParams = useParams();

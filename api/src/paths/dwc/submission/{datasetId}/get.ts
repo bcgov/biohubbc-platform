@@ -72,7 +72,6 @@ export function getMetadataByDatasetId(): RequestHandler {
 
     const connection = getDBConnection(req['keycloak_token']);
 
-
     if (!req.params || !req.params.datasetId) {
       throw new HTTP400('Missing required path param: datasetId');
     }

@@ -31,7 +31,6 @@ export const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-
   /**
    * Get keyword search results
    *

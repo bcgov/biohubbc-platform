@@ -24,8 +24,7 @@ import { Link } from 'react-router-dom';
 import { LoggedInUserControls, NotLoggedInUserControls } from './UserControls';
 
 const useStyles = makeStyles((theme: Theme) => ({
-  govHeader: {
-  },
+  govHeader: {},
   govHeaderToolbar: {
     height: '70px'
   },
@@ -154,11 +153,7 @@ const Header: React.FC = () => {
           </Toolbar>
         </Box>
         <Box className={classes.mainNav}>
-          <Toolbar
-            variant="dense"
-            className={classes.mainNavToolbar}
-            role="navigation"
-            aria-label="Main Navigation">
+          <Toolbar variant="dense" className={classes.mainNavToolbar} role="navigation" aria-label="Main Navigation">
             <Link to="/" id="menu_home">
               Home
             </Link>
