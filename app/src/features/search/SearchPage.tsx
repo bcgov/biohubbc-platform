@@ -28,7 +28,6 @@ const SearchPage = () => {
   const searchDataLoader = useDataLoader((query: string) => {
     return biohubApi.search.keywordSearch(query);
   });
-  //const { isLoading } = searchDataLoader;
 
   /**
    * collection of params from url location.search

@@ -15,7 +15,12 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  //get the eml
+  /**
+   * Hook to get the dataset metadata by datasetId
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<any>}
+   */
   const getDatasetEML = async (datasetId: string): Promise<any> => {
     const { data } = await axios.get(`api/dwc/submission/${datasetId}/get`);
 
