@@ -42,6 +42,17 @@ export class SpatialService extends DBService {
   }
 
   /**
+   * get spatial transform record from name
+   *
+   * @param {string} spatialTransformName
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialService
+   */
+  async getSpatialTransformRecords(): Promise<IGetSpatialTransformRecord[]> {
+    return this.spatialRepository.getSpatialTransformRecords();
+  }
+
+  /**
    * get spatial transform string from id
    *
    * @param {number} spatialTransformId
@@ -70,6 +81,7 @@ export class SpatialService extends DBService {
     );
   }
 
+  //TODO: not using this?
   /**
    * Collect transform from db, run transform on submission id, save result to spatial component table
    *
@@ -100,6 +112,38 @@ export class SpatialService extends DBService {
   }
 
   /**
+   * Collect transforms from db, run transformations on submission id, save result to spatial component table
+   *
+   * @param {number} submissionId
+   * @param {string} spatialTransformName
+   * @return {*}  {Promise<void>}
+   * @memberof SpatialService
+   */
+  async runSpatialTransforms(submissionId: number): Promise<void> {
+    const spatialTransformRecords = await this.getSpatialTransformRecords();
+    let transformed;
+
+    spatialTransformRecords.forEach(async (transformRecord) => {
+      transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
+        submissionId,
+        transformRecord.transform
+      );
+
+      transformed.forEach(async (dataPoint) => {
+        const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
+          submissionId,
+          dataPoint.result_data
+        );
+
+        await this.insertSpatialTransformSubmissionRecord(
+          transformRecord.spatial_transform_id,
+          submissionSpatialComponentId.submission_spatial_component_id
+        );
+      });
+    });
+  }
+
+  /**
    * Query builder to find spatial component by given criteria
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
@@ -114,5 +158,11 @@ export class SpatialService extends DBService {
 
   async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {
     return this.spatialRepository.deleteSpatialComponentsBySubmissionId(submission_id);
+  }
+
+  async deleteSpatialComponentsTransformRefsBySubmissionId(
+    submission_id: number
+  ): Promise<{ submission_id: number }[]> {
+    return this.spatialRepository.deleteSpatialComponentsTransformRefsBySubmissionId(submission_id);
   }
 }

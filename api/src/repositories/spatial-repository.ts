@@ -40,11 +40,6 @@ export interface ISpatialComponentsSearchCriteria {
   boundary: Feature;
 }
 
-export enum SPATIAL_TRANSFORM_NAMES {
-  EML_STUDY_BOUNDARIES = 'EML Study Boundaries',
-  DWC_OCCURRENCES = 'DwC Occurrences'
-}
-
 export class SpatialRepository extends BaseRepository {
   /**
    * Insert new spatial transform record
@@ -114,6 +109,30 @@ export class SpatialRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * get spatial transform records
+   *
+   * @param
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialRepository
+   */
+  async getSpatialTransformRecords(): Promise<IGetSpatialTransformRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        spatial_transform_id,
+        name,
+        description,
+        notes,
+        transform
+      FROM
+        spatial_transform;
+    `;
+
+    const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
+
+    return response.rows;
   }
 
   /**
@@ -305,6 +324,27 @@ export class SpatialRepository extends BaseRepository {
         submission_id=${submission_id}
       RETURNING
         submission_id;
+    ;`;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    return response.rows;
+  }
+
+  async deleteSpatialComponentsTransformRefsBySubmissionId(
+    submission_id: number
+  ): Promise<{ submission_id: number }[]> {
+    const sqlStatement = SQL`
+      DELETE FROM
+        spatial_transform_submission
+      WHERE
+        submission_spatial_component_id in (
+          select submission_spatial_component_id from 
+            submission_spatial_component 
+          where 
+            submission_id=${submission_id})
+      RETURNING
+        ${submission_id};
     ;`;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);

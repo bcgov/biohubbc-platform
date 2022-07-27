@@ -4,7 +4,7 @@ const DB_SCHEMA = process.env.DB_SCHEMA;
 const DB_SCHEMA_DAPI_V1 = process.env.DB_SCHEMA_DAPI_V1;
 
 /**
- * Add `survey.surveyed_all_areas` column and update `survey` view.
+ * Add spatial transform
  *
  * @export
  * @param {Knex} knex
