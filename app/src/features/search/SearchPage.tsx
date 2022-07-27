@@ -28,7 +28,7 @@ const SearchPage = () => {
   const searchDataLoader = useDataLoader((query: string) => {
     return biohubApi.search.keywordSearch(query);
   });
-  const { isLoading } = searchDataLoader;
+  //const { isLoading } = searchDataLoader;
 
   /**
    * collection of params from url location.search
@@ -116,7 +116,7 @@ const SearchPage = () => {
     let newList: any[] = [];
 
     searchDataLoader.data &&
-      searchDataLoader.data.forEach((dataset: any, index: any) => {
+      searchDataLoader.data.forEach((dataset: any) => {
         const datasetId = dataset.id;
 
         const projectList = dataset.source.project;
@@ -160,7 +160,7 @@ const SearchPage = () => {
         <Box my={4}>
           {formikRef.current?.values.keywords && (
             <Typography variant="h2">
-              {isLoading ? (
+              {searchDataLoader ? (
                 <>Loading...</>
               ) : (
                 <>
@@ -177,17 +177,16 @@ const SearchPage = () => {
         <Box>
           {results.map((result: any, index: number) => (
             <Box mb={3} p={2} key={`${result.projectId}-${index}`} borderRadius={4} border={1}>
-              <Typography variant="h4">{result.projectTitle}</Typography>
-              <Typography variant="body1" color="textSecondary">
-                {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
-              </Typography>
               <Link
-                underline="always"
-                component="button"
-                variant="body2"
+                color="primary"
+                aria-current="page"
+                variant="h4"
                 onClick={() => history.push(`datasets/${result.datasetId}/details`)}>
                 {result.projectTitle}
               </Link>
+              <Typography variant="body1" color="textSecondary">
+                {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
+              </Typography>
             </Box>
           ))}
         </Box>
