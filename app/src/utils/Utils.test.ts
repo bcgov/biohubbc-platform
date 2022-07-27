@@ -1,7 +1,9 @@
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
+import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
   ensureProtocol,
+  getFeatureObjectFromLatLngBounds,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
@@ -214,5 +216,33 @@ describe('getFormattedFileSize', () => {
   it('returns answer in GB if fileSize >= 1000000000', async () => {
     const formattedFileSize = getFormattedFileSize(1000000000);
     expect(formattedFileSize).toEqual('1.0 GB');
+  });
+});
+
+describe('getFeatureObjectFromLatLngBounds', () => {
+  it('returns a feature object', () => {
+    const southWest: LatLngLiteral = { lat: 111, lng: 222 };
+    const northEast: LatLngLiteral = { lat: 333, lng: 444 };
+
+    const bounds = new LatLngBounds(southWest, northEast);
+
+    const feature = getFeatureObjectFromLatLngBounds(bounds);
+
+    expect(feature).toEqual({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [southWest.lng, southWest.lat],
+            [southWest.lng, northEast.lat],
+            [northEast.lng, northEast.lat],
+            [northEast.lng, southWest.lat],
+            [southWest.lng, southWest.lat]
+          ]
+        ]
+      }
+    });
   });
 });
