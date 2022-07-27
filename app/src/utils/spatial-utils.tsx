@@ -1,17 +1,31 @@
 import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFeaturePopup';
-import { IMarkerLayer } from 'components/map/components/MarkerCluster';
+import { IMarker, IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature, FeatureCollection } from 'geojson';
+import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
 import { LatLngTuple } from 'leaflet';
 import React from 'react';
 
 export const parseFeatureCollectionsByType = (featureCollections: FeatureCollection[]) => {
+  const api = useApi();
+
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
 
   const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
+
+  const spatialMetaDataLoader = useDataLoader((submissionId: number) => {
+    return api.search.getSpatialMetadata(submissionId)
+  })
+
+  const makePopupProps = (submissionId: number): IMarker['PopupProps'] => ({
+    onOpen: () => {
+      spatialMetaDataLoader.refresh(submissionId)
+    }
+  })
 
   for (const featureCollection of featureCollections) {
     for (const feature of featureCollection.features) {
@@ -21,10 +35,15 @@ export const parseFeatureCollectionsByType = (featureCollections: FeatureCollect
           continue;
         }
 
+        const metadata = null
+
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id,
-          popup: <OccurrenceFeaturePopup properties={feature.properties} />
+          popup: <OccurrenceFeaturePopup
+            metadata={metadata}
+          />,
+          PopupProps: {...makePopupProps(submissionId)}
         });
       }
 
@@ -33,10 +52,15 @@ export const parseFeatureCollectionsByType = (featureCollections: FeatureCollect
           continue;
         }
 
+        const metadata = null
+
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id,
-          popup: <BoundaryFeaturePopup properties={feature.properties} />
+          popup: <BoundaryFeaturePopup
+            metadata={metadata}
+          />,
+          PopupProps: {...makePopupProps(submissionId)}
         });
       }
     }
