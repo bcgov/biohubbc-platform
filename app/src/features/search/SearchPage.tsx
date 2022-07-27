@@ -112,11 +112,11 @@ const SearchPage = () => {
     });
   };
 
-  function appendProjectsWithDatasetId(searchDataLoader: { data: any }) {
+  function appendProjectsWithDatasetId(searchLoader: { data: any }) {
     let newList: any[] = [];
 
-    searchDataLoader.data &&
-      searchDataLoader.data.forEach((dataset: any) => {
+    searchLoader.data &&
+      searchLoader.data.forEach((dataset: any) => {
         const datasetId = dataset.id;
 
         const projectList = dataset.source.project;

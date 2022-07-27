@@ -22,8 +22,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  //TODO: make it work for real
-  //get the spatial for each dataset, filter by dataset Id when ready
+  //TODO: get the spatial for each dataset, filter by datasetId when ready
   const getSpatialDatabyDatasetId = async (criteria: {
     boundary: Feature;
     type: string[];
