@@ -3,9 +3,9 @@ import { Feature } from 'geojson';
 import {
   IElasticsearchResponse,
   IGetSearchResultsResponse,
-  IGetSpatialDataResponse,
-  IGetSpatialMetadataResponse,
-  IKeywordSearchResult
+  IKeywordSearchResult,
+  ISpatialData,
+  ISpatialMetadata
 } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -26,15 +26,15 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialData = async (criteria: { boundary: Feature; type: string[] }): Promise<IGetSpatialDataResponse> => {
+  const getSpatialData = async (criteria: { boundary: Feature; type: string[] }): Promise<ISpatialData[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type }
     });
     return data;
   };
 
-  const getSpatialMetadata = async (submissionId: number): Promise<IGetSpatialMetadataResponse> => {
-    const { data } = await axios.get(`/api/dwc/spatial/${submissionId}/metadata`);
+  const getSpatialMetadata = async (submissionSpatialId: number): Promise<ISpatialMetadata> => {
+    const { data } = await axios.get(`/api/dwc/spatial/${submissionSpatialId}/metadata`);
     return data;
   };
 

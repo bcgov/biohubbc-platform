@@ -297,6 +297,14 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * TODO complete Jsdoc
+   *
+   */
+  async findSpatialMetadataBySubmissionId(submissionSpatialId: number): Promise<{something: 'anything'}> {
+    throw new Error('Not implemented yet.')
+  }
+
   async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {
     const sqlStatement = SQL`
       DELETE FROM

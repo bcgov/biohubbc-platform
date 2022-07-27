@@ -85,7 +85,7 @@ export function getSpatialMetadataById(): RequestHandler {
       id: null // @TODO
     });
 
-    const submissionId = Number(req.query.submission_spatial_component_id);
+    const submissionSpatialId = Number(req.query.submission_spatial_component_id);
 
     const connection = getAPIUserDBConnection();
 
@@ -94,7 +94,7 @@ export function getSpatialMetadataById(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const response = await spatialService.findSpatialMetadataBySubmissionId(submissionId);
+      const response = await spatialService.findSpatialMetadataBySubmissionId(submissionSpatialId);
 
       await connection.commit();
 

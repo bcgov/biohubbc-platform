@@ -10,12 +10,12 @@ export type OccurrenceFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.OCCURRENCE;
 };
 
-export const OccurrenceFeaturePopup: React.FC<{ submissionId: number }> = (props) => {
-  const { submissionId } = props;
+export const OccurrenceFeaturePopup: React.FC<{ submissionSpatialId: number }> = (props) => {
+  const { submissionSpatialId } = props;
 
   const api = useApi()
   const dataLoader = useDataLoader(() => {
-    return api.search.getSpatialMetadata(submissionId)
+    return api.search.getSpatialMetadata(submissionSpatialId)
   })
   
   dataLoader.load()
