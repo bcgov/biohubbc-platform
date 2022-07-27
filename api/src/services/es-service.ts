@@ -69,7 +69,7 @@ export class ESService {
    * @param query The species/keywords to search for
    * @returns {Promise<SearchHit<unknown>>} The results of the search
    */
-  async DatasetSearchEml(datasetId: string): Promise<SearchHit<unknown>[]> {
+  async datasetSearchEml(datasetId: string): Promise<SearchHit<unknown>[]> {
     return this._elasticSearch({
       index: ElasticSearchIndices.EML,
       query: {
