@@ -13,7 +13,7 @@ import {
  * @param {AxiosInstance} axios
  * @return {*} object whose properties are supported api methods.
  */
-export const useSearchApi = (axios: AxiosInstance) => {
+const useSearchApi = (axios: AxiosInstance) => {
   /**
    * Get search results (spatial)
    *

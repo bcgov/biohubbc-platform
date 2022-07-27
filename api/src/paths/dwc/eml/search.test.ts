@@ -123,7 +123,7 @@ describe('search', () => {
       });
     });
 
-    describe('search terms in Elastic Search', () => {
+    describe.skip('search terms in Elastic Search', () => {
       afterEach(() => {
         sinon.restore();
       });
