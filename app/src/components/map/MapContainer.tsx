@@ -1,5 +1,5 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
-import L, { LeafletEventHandlerFnMap } from 'leaflet';
+import L, { LatLngBoundsExpression, LeafletEventHandlerFnMap } from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
 import 'leaflet-fullscreen/dist/Leaflet.fullscreen.js';
@@ -39,7 +39,7 @@ export interface IMapContainerProps {
   scrollWheelZoom?: boolean;
   fullScreenControl?: boolean;
   markerLayers?: IMarkerLayer[];
-  bounds?: any;
+  bounds?: LatLngBoundsExpression;
   zoom?: number;
   eventHandlers?: LeafletEventHandlerFnMap;
   LeafletMapContainerProps?: Partial<React.ComponentProps<typeof LeafletMapContainer>>;

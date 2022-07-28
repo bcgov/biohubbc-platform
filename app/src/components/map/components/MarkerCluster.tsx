@@ -4,16 +4,16 @@ import { LayersControl, Marker, MarkerProps, Popup, PopupProps, Tooltip, Tooltip
 import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster';
 
 const MARKER_SVG = {
-  DOT: '<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path fill="{color}" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>'
+  DOT: '<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20"><path fill="{color}" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>'
 };
 
 export const MARKER_ICON = {
   DOT: L.divIcon({
     className: 'leaflet-data-marker',
     html: L.Util.template(MARKER_SVG.DOT, { color: '#2F5982' }),
-    iconAnchor: [12, 32],
-    iconSize: [25, 30],
-    popupAnchor: [0, -28]
+    iconAnchor: [10, 10],
+    iconSize: [20, 20],
+    popupAnchor: [0, -10]
   })
 };
 

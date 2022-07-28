@@ -7,15 +7,22 @@ import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
 import { ALL_OF_BC_BOUNDARY, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { Feature, MultiPolygon, Polygon } from 'geojson';
+import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
+import { useURL } from 'hooks/useURL';
 import React, { useEffect, useState } from 'react';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC = () => {
   const api = useApi();
+
+  const url = useURL<{
+    mapViewBoundary: Feature<Polygon> | undefined;
+    drawnBoundary: Feature<Polygon> | undefined;
+    type: string[] | undefined;
+  }>();
 
   const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
     api.search.getSpatialData({ boundary: boundary, type: type })
@@ -25,18 +32,20 @@ const MapPage: React.FC = () => {
     return {
       dialogTitle: 'Error Loading Map Data',
       dialogText:
-        'An error has occurred while attempting to load the map data, please try again. If the error persists, please contact your system administrator.'
+        'An error has occurred while attempting to load map data, please try again. If the error persists, please contact your system administrator.'
     };
   });
 
-  const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon | MultiPolygon> | undefined>();
-  const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon | MultiPolygon> | undefined>();
+  const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
+  const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
+
+  const [type] = useState<string[] | undefined>(url.queryParams.type);
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
   useEffect(() => {
-    if (!mapDataLoader.data?.length) {
+    if (!mapDataLoader.data) {
       return;
     }
 
@@ -46,17 +55,30 @@ const MapPage: React.FC = () => {
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
 
-  // One time map data fetch, on initial page load
-  mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+  const getSearchBoundary = (mapViewBoundary?: Feature<Polygon>, drawnBoundary?: Feature<Polygon>) => {
+    return (
+      (drawnBoundary && mapViewBoundary && intersect(drawnBoundary, mapViewBoundary)) ||
+      drawnBoundary ||
+      mapViewBoundary ||
+      ALL_OF_BC_BOUNDARY
+    );
+  };
+
+  const getSearchType = () => {
+    return type || [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE];
+  };
 
   const onMapViewChange = (bounds: Feature<Polygon>) => {
     // Store map view boundary
     setMapViewBoundary(bounds);
 
     // Calculate search boundary based on drawn and map view boundaries
-    const searchBoundary = (drawnBoundary && intersect(drawnBoundary, bounds)) || bounds;
+    const searchBoundary = getSearchBoundary(bounds, drawnBoundary);
 
-    mapDataLoader.refresh(searchBoundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+    // Store map view bounds in URL
+    url.appendQueryParams({ mapViewBoundary: bounds });
+
+    mapDataLoader.refresh(searchBoundary, getSearchType());
   };
 
   const onDrawChange = (features: Feature[]) => {
@@ -68,11 +90,16 @@ const MapPage: React.FC = () => {
     setDrawnBoundary(bounds);
 
     // Calculate search boundary based on drawn and map view boundaries
-    const searchBoundary =
-      (bounds && mapViewBoundary && intersect(bounds, mapViewBoundary)) || mapViewBoundary || ALL_OF_BC_BOUNDARY;
+    const searchBoundary = getSearchBoundary(mapViewBoundary, bounds);
 
-    mapDataLoader.refresh(searchBoundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+    // Store drawn bounds in URL
+    url.appendQueryParams({ drawnBoundary: bounds });
+
+    mapDataLoader.refresh(searchBoundary, getSearchType());
   };
+
+  // One time map data fetch, on initial page load
+  mapDataLoader.load(getSearchBoundary(mapViewBoundary, drawnBoundary), getSearchType());
 
   return (
     <Box my={4}>
@@ -88,6 +115,7 @@ const MapPage: React.FC = () => {
                   mapId="boundary_map"
                   onBoundsChange={onMapViewChange}
                   drawControls={{
+                    initialFeatures: drawnBoundary && [drawnBoundary],
                     options: {
                       // Disable all controls except for Polygon (and Rectangle, which is just a type of Polygon)
                       draw: { circle: false, circlemarker: false, marker: false, polyline: false }
