@@ -4,7 +4,6 @@ import { getAPIUserDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SpatialService } from '../../../../services/spatial-service';
-// import { ESService } from '../../../services/es-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
@@ -34,7 +33,7 @@ GET.apiDoc = {
     {
       description: 'spatial component submission id',
       in: 'query',
-      name: 'submission_spatial_component_id',
+      name: 'submissionSpatialComponentId',
       required: false,
       schema: {
         type: 'string'
@@ -47,23 +46,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-              type: 'object',
-              required: ['id'],
-              nullable: true,
-              properties: {
-                id: {
-                  type: 'string'
-                },
-                source: {
-                  type: 'object'
-                },
-                fields: {
-                  type: 'object'
-                }
-              }
-            }
+           //
           }
         }
       }
@@ -82,10 +65,10 @@ export function getSpatialMetadataById(): RequestHandler {
     defaultLog.debug({
       label: 'getSpatialMetadataById',
       message: 'request params',
-      id: null // @TODO
+      submissionSpatialComponentId: req.params.submissionSpatialComponentId
     });
 
-    const submissionSpatialId = Number(req.query.submission_spatial_component_id);
+    const submissionSpatialComponentId = Number(req.params.submissionSpatialComponentId);
 
     const connection = getAPIUserDBConnection();
 
@@ -94,7 +77,7 @@ export function getSpatialMetadataById(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const response = await spatialService.findSpatialMetadataBySubmissionId(submissionSpatialId);
+      const response = await spatialService.findSpatialMetadataBySubmissionId(submissionSpatialComponentId);
 
       await connection.commit();
 

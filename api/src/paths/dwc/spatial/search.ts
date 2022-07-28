@@ -53,7 +53,7 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['spatial_data', 'submission_spatial_component_id'],
+              required: ['featureCollection', 'submissionSpatialComponentId'],
               nullable: true,
               properties: {
                 submissionSpatialComponentId: {
