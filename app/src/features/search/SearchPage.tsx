@@ -3,6 +3,8 @@ import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
 import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
+import { makeStyles } from '@material-ui/styles';
+import { Theme } from '@material-ui/core';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
@@ -16,11 +18,22 @@ import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
 
+const useStyles = makeStyles((theme: Theme) => ({
+  datasetAbstract: {
+    display: '-webkit-box',
+    overflow: 'hidden',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    maxWidth: '92ch'
+  }
+}));
+
 const advancedSearchInitialValues: IAdvancedSearch = {
   keywords: ''
 };
 
 const SearchPage = () => {
+  const classes = useStyles();
   const biohubApi = useApi();
   const history = useHistory();
   const location = useLocation();
@@ -181,7 +194,7 @@ const SearchPage = () => {
                       {result.projectTitle}
                     </Link>
                   </Box>
-                  <Typography variant="body1" color="textSecondary">
+                  <Typography className={classes.datasetAbstract} variant="body1" color="textSecondary">
                     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
                     {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
                   </Typography>
