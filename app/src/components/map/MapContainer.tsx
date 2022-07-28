@@ -84,7 +84,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
       <SetMapBounds bounds={bounds} />
-      <GetMapBounds onChange={(bounds) => onBoundsChange?.(bounds)} />
+      <GetMapBounds onChange={(newBounds) => onBoundsChange?.(newBounds)} />
 
       {drawControls && (
         <FeatureGroup key="draw-control-feature-group">

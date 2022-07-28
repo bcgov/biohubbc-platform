@@ -10,8 +10,8 @@ import {
   getFormattedFileSize,
   getLogOutUrl,
   isObject,
-  jsonParseObjectKeys,
-  jsonStringifyObjectKeys,
+  jsonParseObjectProperties,
+  jsonStringifyObjectProperties,
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
@@ -253,40 +253,57 @@ describe('getFeatureObjectFromLatLngBounds', () => {
 });
 
 describe('isObject', () => {
-  it('identifies if object when undefined', () => {
-    expect(isObject(undefined)).toEqual(false);
+  describe('returns false', () => {
+    it('when undefined', () => {
+      expect(isObject(undefined)).toEqual(false);
+    });
+
+    it('when null', () => {
+      expect(isObject(null)).toEqual(false);
+    });
+
+    it('when an empty string', () => {
+      expect(isObject('')).toEqual(false);
+    });
+
+    it('when a string', () => {
+      expect(isObject('hello')).toEqual(false);
+    });
+
+    it('when a negative number', () => {
+      expect(isObject(-1)).toEqual(false);
+    });
+
+    it('when 0', () => {
+      expect(isObject(0)).toEqual(false);
+    });
+
+    it('when a positive number', () => {
+      expect(isObject(1)).toEqual(false);
+    });
+
+    it('when true', () => {
+      expect(isObject(true)).toEqual(false);
+    });
+
+    it('when false', () => {
+      expect(isObject(false)).toEqual(false);
+    });
   });
 
-  it('identifies if object when null', () => {
-    expect(isObject(null)).toEqual(false);
-  });
+  describe('returns true', () => {
+    it('when an array', () => {
+      expect(isObject([])).toEqual(true);
+    });
 
-  it('identifies if object when an empty string', () => {
-    expect(isObject('')).toEqual(false);
-  });
+    it('when a curly bracket object', () => {
+      expect(isObject({})).toEqual(true);
+    });
 
-  it('identifies if object when a string', () => {
-    expect(isObject('hello')).toEqual(false);
-  });
-
-  it('identifies if object when an array', () => {
-    expect(isObject([])).toEqual(true);
-  });
-
-  it('identifies if object when 0', () => {
-    expect(isObject(0)).toEqual(false);
-  });
-
-  it('identifies if object when an integer', () => {
-    expect(isObject(1)).toEqual(false);
-  });
-
-  it('identifies if object when a curly bracket object', () => {
-    expect(isObject({})).toEqual(true);
-  });
-
-  it('identifies if object when a new Object', () => {
-    expect(isObject(new Object())).toEqual(true);
+    it('when a new Object', () => {
+      // eslint-disable-next-line no-new-object
+      expect(isObject(new Object())).toEqual(true);
+    });
   });
 });
 
@@ -321,13 +338,14 @@ describe('safeJSONStringify', () => {
   });
 });
 
-describe('jsonParseObjectKeys', () => {
+describe('jsonParseObjectProperties', () => {
   it('returns parsed object', () => {
     // Prevent prettier removing escaped quotes, which are necessary to represent stringified values
     // prettier-ignore
+    // eslint-disable-next-line no-useless-escape
     const input = { array: '[\"a\",\"b\"]', obj: '{\"val\":[\"a\",\"b\"]}', str: 'a', num: 1, bool: true };
 
-    expect(jsonParseObjectKeys(input)).toEqual({
+    expect(jsonParseObjectProperties(input)).toEqual({
       array: ['a', 'b'],
       obj: { val: ['a', 'b'] },
       str: 'a',
@@ -337,14 +355,15 @@ describe('jsonParseObjectKeys', () => {
   });
 });
 
-describe('jsonStringifyObjectKeys', () => {
+describe('jsonStringifyObjectProperties', () => {
   it('returns stringified object', () => {
     // Prevent prettier removing escaped quotes, which are necessary to represent stringified values
     // prettier-ignore
+    // eslint-disable-next-line
     const output = { array: '[\"a\",\"b\"]', obj: '{\"val\":[\"a\",\"b\"]}', str: 'a', num: 1, bool: true };
 
     expect(
-      jsonStringifyObjectKeys({
+      jsonStringifyObjectProperties({
         array: ['a', 'b'],
         obj: { val: ['a', 'b'] },
         str: 'a',

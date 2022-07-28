@@ -24,8 +24,8 @@ const MapPage: React.FC = () => {
     type: string[] | undefined;
   }>();
 
-  const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
-    api.search.getSpatialData({ boundary: boundary, type: type })
+  const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[]) =>
+    api.search.getSpatialData({ boundary: searchBoundary, type: searchType })
   );
 
   useDataLoaderError(mapDataLoader, () => {
@@ -55,13 +55,8 @@ const MapPage: React.FC = () => {
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
 
-  const getSearchBoundary = (mapViewBoundary?: Feature<Polygon>, drawnBoundary?: Feature<Polygon>) => {
-    return (
-      (drawnBoundary && mapViewBoundary && intersect(drawnBoundary, mapViewBoundary)) ||
-      mapViewBoundary ||
-      drawnBoundary ||
-      ALL_OF_BC_BOUNDARY
-    );
+  const getSearchBoundary = (boundary1?: Feature<Polygon>, boundary2?: Feature<Polygon>) => {
+    return (boundary2 && boundary1 && intersect(boundary2, boundary1)) || boundary1 || boundary2 || ALL_OF_BC_BOUNDARY;
   };
 
   const getSearchType = () => {

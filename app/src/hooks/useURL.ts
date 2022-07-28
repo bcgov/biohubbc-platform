@@ -1,6 +1,6 @@
 import qs, { ParsedQs } from 'qs';
 import { useHistory, useLocation, useParams } from 'react-router';
-import { jsonParseObjectKeys, jsonStringifyObjectKeys } from 'utils/Utils';
+import { jsonParseObjectProperties, jsonStringifyObjectProperties } from 'utils/Utils';
 
 /**
  * Hook that helps with reading from and writing to the URL.
@@ -20,7 +20,7 @@ const useURL = <QueryParams extends Record<string, any> = ParsedQs>() => {
    * @param {Record<string, any>} newQueryParams
    */
   const replaceQueryParams = (newQueryParams: Record<string, any>) => {
-    const preppedNewQueryParams = jsonStringifyObjectKeys(newQueryParams);
+    const preppedNewQueryParams = jsonStringifyObjectProperties(newQueryParams);
 
     const stringifiedQueryParams = qs.stringify(preppedNewQueryParams);
 
@@ -33,7 +33,7 @@ const useURL = <QueryParams extends Record<string, any> = ParsedQs>() => {
    * @param {Record<string, any>} newQueryParams
    */
   const appendQueryParams = (newQueryParams: Record<string, any>) => {
-    const preppedNewQueryParams = jsonStringifyObjectKeys(newQueryParams);
+    const preppedNewQueryParams = jsonStringifyObjectProperties(newQueryParams);
 
     const stringifiedQueryParams = qs.stringify({ ...queryParams, ...preppedNewQueryParams });
 
@@ -43,7 +43,7 @@ const useURL = <QueryParams extends Record<string, any> = ParsedQs>() => {
   return {
     path: location.pathname,
     pathParams,
-    queryParams: jsonParseObjectKeys(queryParams) as QueryParams,
+    queryParams: jsonParseObjectProperties(queryParams) as QueryParams,
     replaceQueryParams,
     appendQueryParams
   };

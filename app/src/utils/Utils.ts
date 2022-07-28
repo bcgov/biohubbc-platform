@@ -217,7 +217,7 @@ export const safeJSONStringify = (val: any) => {
  * @param {Record<string, any>} obj
  * @return {*}
  */
-export const jsonParseObjectKeys = (obj: Record<string, any>) => {
+export const jsonParseObjectProperties = (obj: Record<string, any>) => {
   const newObj = {};
 
   Object.entries(obj).forEach(([key, value]) => {
@@ -233,7 +233,7 @@ export const jsonParseObjectKeys = (obj: Record<string, any>) => {
  * @param {Record<string, any>} obj
  * @return {*}
  */
-export const jsonStringifyObjectKeys = (obj: Record<string, any>) => {
+export const jsonStringifyObjectProperties = (obj: Record<string, any>) => {
   const newObj = {};
 
   Object.entries(obj).forEach(([key, value]) => {
