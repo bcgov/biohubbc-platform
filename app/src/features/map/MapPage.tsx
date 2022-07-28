@@ -6,7 +6,7 @@ import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { ALL_OF_BC_BOUNDARY, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -22,10 +22,11 @@ const MapPage: React.FC = () => {
     mapViewBoundary: Feature<Polygon> | undefined;
     drawnBoundary: Feature<Polygon> | undefined;
     type: string[] | undefined;
+    zoom: number | undefined;
   }>();
 
-  const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[]) =>
-    api.search.getSpatialData({ boundary: searchBoundary, type: searchType })
+  const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
+    api.search.getSpatialData({ boundary: searchBoundary, type: searchType, zoom: searchZoom })
   );
 
   useDataLoaderError(mapDataLoader, () => {
@@ -39,7 +40,10 @@ const MapPage: React.FC = () => {
   const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
-  const [type] = useState<string[] | undefined>(url.queryParams.type);
+  const [type] = useState<string[]>(
+    url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]
+  );
+  const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
@@ -59,11 +63,7 @@ const MapPage: React.FC = () => {
     return (boundary2 && boundary1 && intersect(boundary2, boundary1)) || boundary1 || boundary2 || ALL_OF_BC_BOUNDARY;
   };
 
-  const getSearchType = () => {
-    return type || [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE];
-  };
-
-  const onMapViewChange = (bounds: Feature<Polygon>) => {
+  const onMapViewChange = (bounds: Feature<Polygon>, newZoom: number) => {
     // Store map view boundary
     setMapViewBoundary(bounds);
 
@@ -71,9 +71,9 @@ const MapPage: React.FC = () => {
     const searchBoundary = getSearchBoundary(bounds, drawnBoundary);
 
     // Store map view bounds in URL
-    url.appendQueryParams({ mapViewBoundary: bounds });
+    url.appendQueryParams({ mapViewBoundary: bounds, zoom: newZoom });
 
-    mapDataLoader.refresh(searchBoundary, getSearchType());
+    mapDataLoader.refresh(searchBoundary, type, newZoom);
   };
 
   const onDrawChange = (features: Feature[]) => {
@@ -90,11 +90,11 @@ const MapPage: React.FC = () => {
     // Store drawn bounds in URL
     url.appendQueryParams({ drawnBoundary: bounds });
 
-    mapDataLoader.refresh(searchBoundary, getSearchType());
+    mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
   // One time map data fetch, on initial page load
-  mapDataLoader.load(getSearchBoundary(mapViewBoundary, drawnBoundary), getSearchType());
+  mapDataLoader.load(getSearchBoundary(mapViewBoundary, drawnBoundary), type, zoom);
 
   return (
     <Box my={4}>

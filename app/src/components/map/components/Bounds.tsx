@@ -5,19 +5,30 @@ import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
 export interface ISetMapBoundsProps {
   bounds?: LatLngBoundsExpression;
+  zoom?: number;
 }
 
 export const SetMapBounds: React.FC<ISetMapBoundsProps> = (props) => {
   const map = useMap();
 
+  // Set bounds if provided, ignore zoom
   if (props.bounds) {
     map.fitBounds(props.bounds, { padding: [30, 30] });
+
+    return null;
+  }
+
+  // Set zoom if provided
+  if (props.zoom) {
+    map.setZoom(props.zoom);
+
+    return null;
   }
 
   return null;
 };
 
-export type IMapBoundsOnChange = (bounds: Feature<Polygon>) => void;
+export type IMapBoundsOnChange = (bounds: Feature<Polygon>, zoom: number) => void;
 
 export interface IGetMapBoundsProps {
   onChange: IMapBoundsOnChange;
@@ -33,7 +44,7 @@ export const GetMapBounds: React.FC<IGetMapBoundsProps> = (props) => {
 
       const featureBounds = getFeatureObjectFromLatLngBounds(latLngBounds);
 
-      onChange(featureBounds);
+      onChange(featureBounds, map.getZoom());
     },
     moveend() {
       const latLngBounds = map.getBounds();
@@ -41,7 +52,7 @@ export const GetMapBounds: React.FC<IGetMapBoundsProps> = (props) => {
 
       const featureBounds = getFeatureObjectFromLatLngBounds(latLngBounds);
 
-      onChange(featureBounds);
+      onChange(featureBounds, map.getZoom());
     }
   });
 

@@ -1,4 +1,5 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
+import { MAP_DEFAULT_ZOOM, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from 'constants/spatial';
 import L, { LatLngBoundsExpression, LeafletEventHandlerFnMap } from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
@@ -71,9 +72,9 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       id={mapId}
       className={classes.map}
       center={[55, -128]}
-      zoom={zoom || 5}
-      minZoom={3}
-      maxZoom={17}
+      zoom={zoom || MAP_DEFAULT_ZOOM}
+      minZoom={MAP_MIN_ZOOM}
+      maxZoom={MAP_MAX_ZOOM}
       maxBounds={[
         [-90, -180],
         [90, 180]
@@ -84,7 +85,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
       <SetMapBounds bounds={bounds} />
-      <GetMapBounds onChange={(newBounds) => onBoundsChange?.(newBounds)} />
+      <GetMapBounds onChange={(newBounds, newZoom) => onBoundsChange?.(newBounds, newZoom)} />
 
       {drawControls && (
         <FeatureGroup key="draw-control-feature-group">
