@@ -1,10 +1,10 @@
+import { Theme } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
 import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
-import { Theme } from '@material-ui/core';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
@@ -163,7 +163,7 @@ const SearchPage = () => {
           enableReinitialize={true}>
           <SearchComponent />
         </Formik>
-        <Box mt={5} mb={3}>
+        <Box mt={6} mb={3}>
           {formikRef.current?.values.keywords && (
             <Typography variant="h3">
               {searchDataLoader.isLoading ? (
@@ -183,14 +183,16 @@ const SearchPage = () => {
         <Box>
           {results.map((result: any, index: number) => (
             <Box mb={2} key={`${result.projectId}-${index}`}>
-              <Card variant="outlined">
+              <Card>
                 <Box p={3}>
                   <Box mb={2}>
                     <Link
                       color="primary"
                       aria-current="page"
                       variant="h4"
-                      onClick={() => history.push(`datasets/${result.datasetId}/details`)}>
+                      href={`datasets/${result.datasetId}/details`}
+                    // onClick={() => history.push(`datasets/${result.datasetId}/details`)}
+                    >
                       {result.projectTitle}
                     </Link>
                   </Box>

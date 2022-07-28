@@ -11,7 +11,7 @@ const useStyles = makeStyles((theme: Theme) => ({
     position: 'relative'
   },
   searchInput: {
-    height: '66px',
+    height: '56px',
     paddingLeft: theme.spacing(2),
     borderRadius: '6px',
     border: '1px solid rgba(0, 0, 0, 0.23)',
@@ -29,14 +29,15 @@ const useStyles = makeStyles((theme: Theme) => ({
   searchInputBtn: {
     position: 'absolute',
     top: '50%',
-    right: '8px',
-    height: '51px',
-    marginTop: '-26px',
+    right: '6px',
+    height: '46px',
+    marginTop: '-23px',
     minWidth: '7rem',
     fontWeight: 700,
     fontSize: '16px',
     borderRadius: '5px',
     outline: '4px solid transparent',
+    outlineOffset: '-2px',
     transition: 'all ease-out 0.25s',
     '&.Mui-focusVisible': {
       outline: '3px solid #3B99FC'
