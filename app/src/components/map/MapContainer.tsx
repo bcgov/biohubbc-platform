@@ -69,7 +69,7 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       id={mapId}
       className={classes.map}
       center={[55, -128]}
-      zoom={zoom || 5}
+      zoom={zoom || 6}
       minZoom={3}
       maxZoom={17}
       maxBounds={[

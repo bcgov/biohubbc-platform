@@ -1,4 +1,5 @@
 import Box from '@material-ui/core/Box';
+import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
 import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
@@ -136,34 +137,27 @@ const SearchPage = () => {
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
   return (
-    <Box my={4}>
+    <Box py={5}>
       <Container maxWidth="xl">
         <Box mb={5}>
-          <Box mb={1}>
-            <Typography variant="h1">Search</Typography>
-          </Box>
-          <Typography variant="body1" color="textSecondary">
-            BioHubBC Platform search.
-          </Typography>
+          <Typography variant="h1">Find BioHub Datasets</Typography>
         </Box>
-        <Box>
-          <Formik<IAdvancedSearch>
-            innerRef={formikRef}
-            initialValues={formikValues}
-            onSubmit={handleSubmit}
-            onReset={handleReset}
-            enableReinitialize={true}>
-            <SearchComponent />
-          </Formik>
-        </Box>
-        <Box my={4}>
+        <Formik<IAdvancedSearch>
+          innerRef={formikRef}
+          initialValues={formikValues}
+          onSubmit={handleSubmit}
+          onReset={handleReset}
+          enableReinitialize={true}>
+          <SearchComponent />
+        </Formik>
+        <Box mt={5} mb={3}>
           {formikRef.current?.values.keywords && (
-            <Typography variant="h2">
+            <Typography variant="h3">
               {searchDataLoader.isLoading ? (
                 <>Loading...</>
               ) : (
                 <>
-                  {`${results.length} result${results.length !== 1 && 's'}`}
+                  Found {`${results.length} result${results.length !== 1 && 's'}`}
                   <Typography
                     variant="inherit"
                     component="span"
@@ -175,17 +169,24 @@ const SearchPage = () => {
         </Box>
         <Box>
           {results.map((result: any, index: number) => (
-            <Box mb={3} p={2} key={`${result.projectId}-${index}`} borderRadius={4} border={1}>
-              <Link
-                color="primary"
-                aria-current="page"
-                variant="h4"
-                onClick={() => history.push(`datasets/${result.datasetId}/details`)}>
-                {result.projectTitle}
-              </Link>
-              <Typography variant="body1" color="textSecondary">
-                {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
-              </Typography>
+            <Box mb={2} key={`${result.projectId}-${index}`}>
+              <Card variant="outlined">
+                <Box p={3}>
+                  <Box mb={2}>
+                    <Link
+                      color="primary"
+                      aria-current="page"
+                      variant="h4"
+                      onClick={() => history.push(`datasets/${result.datasetId}/details`)}>
+                      {result.projectTitle}
+                    </Link>
+                  </Box>
+                  <Typography variant="body1" color="textSecondary">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+                    {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
+                  </Typography>
+                </Box>
+              </Card>
             </Box>
           ))}
         </Box>

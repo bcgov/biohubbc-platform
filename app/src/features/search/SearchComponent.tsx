@@ -7,32 +7,46 @@ import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import React from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
-  keywordSearch: {
-    height: '52px',
-    flex: '1 1 auto',
-    paddingLeft: theme.spacing(1.25),
-    display: 'flex',
-    alignItems: 'center',
+  searchInputContainer: {
+    position: 'relative'
+  },
+  searchInput: {
+    height: '66px',
+    paddingLeft: theme.spacing(2),
+    borderRadius: '6px',
     border: '1px solid rgba(0, 0, 0, 0.23)',
-    borderRadius: '4px 0 0 4px',
-    backgroundColor: '#f6f6f6',
+    background: '#ffffff',
+    outline: '4px solid transparent',
+    outlineOffset: '-1px',
     transition: 'all ease-out 0.25s',
-    '&:hover': {
-      borderColor: theme.palette.primary.main,
-      boxShadow: '0 0 0 1px #003366 inset'
+    '&.Mui-focused': {
+      outline: '3px solid #3B99FC',
     },
-    '&:active': {
-      borderColor: theme.palette.primary.main,
-      boxShadow: '0 0 0 1px #003366 inset'
-    },
-    '&:focus': {
-      borderColor: theme.palette.primary.main,
-      boxShadow: '0 0 0 1px #003366 inset'
+    '& .MuiInputAdornment-positionStart': {
+      opacity: '0.5'
     }
   },
-  searchBtn: {
-    height: '100%',
-    minWidth: '8rem'
+  searchInputBtn: {
+    position: 'absolute',
+    top: '50%',
+    right: '8px',
+    height: '51px',
+    marginTop: '-26px',
+    minWidth: '7rem',
+    fontWeight: 700,
+    fontSize: '16px',
+    borderRadius: '5px',
+    outline: '4px solid transparent',
+    transition: 'all ease-out 0.25s',
+    '&.Mui-focusVisible': {
+      outline: '3px solid #3B99FC'
+    },
+    '&:hover': {
+      outline: '3px solid #3B99FC'
+    },
+    '&:active': {
+      outline: '3px solid #3B99FC'
+    }
   },
   chipStyle: {
     color: 'white',
@@ -49,35 +63,33 @@ const SearchComponent: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} autoComplete="off">
-      <Box display="flex">
-        <Box flex="1 1 auto" display="flex">
-          <Input
-            tabIndex={0}
-            className={classes.keywordSearch}
-            name="keywords"
-            fullWidth
-            startAdornment={
-              <InputAdornment position="start">
-                <Icon path={mdiMagnify} size={1} />
-              </InputAdornment>
-            }
-            disableUnderline={true}
-            placeholder="Enter a species name or keywords"
-            onChange={handleChange}
-            value={values.keywords}
-          />
-        </Box>
-        <Box flex="0 0 auto" ml={1}>
-          <Button
-            type="submit"
-            size="large"
-            variant="contained"
-            color="primary"
-            className={classes.searchBtn}
-            onClick={() => handleSubmit()}>
-            Search
-          </Button>
-        </Box>
+      <Box className={classes.searchInputContainer}>
+        <Input
+          tabIndex={0}
+          className={classes.searchInput}
+          name="keywords"
+          fullWidth
+          startAdornment={
+            <InputAdornment position="start">
+              <Icon path={mdiMagnify} size={1} />
+            </InputAdornment>
+          }
+          disableUnderline={true}
+          placeholder="Enter a species name or keyword"
+          onChange={handleChange}
+          value={values.keywords}
+        />
+        <Button
+          type="submit"
+          size="large"
+          variant="contained"
+          color="primary"
+          disableElevation
+          disableRipple
+          className={classes.searchInputBtn}
+          onClick={() => handleSubmit()}>
+          Search
+        </Button>
       </Box>
     </form>
   );
