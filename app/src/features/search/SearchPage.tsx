@@ -118,14 +118,11 @@ const SearchPage = () => {
       searchLoader.data.forEach((dataset: any) => {
         const datasetId = dataset.id;
 
-        const projectList = dataset.source.project;
+        const project = dataset.source.project[0];
 
-        projectList &&
-          projectList.forEach((item: any) => {
-            const appendedItem = { ...item, datasetId: datasetId };
+        const appendedItem = { ...project, datasetId: datasetId };
 
-            newList.push(appendedItem);
-          });
+        newList.push(appendedItem);
       });
 
     return newList;
