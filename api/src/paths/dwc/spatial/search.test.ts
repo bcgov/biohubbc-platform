@@ -131,7 +131,7 @@ describe('search', () => {
       });
     });
 
-    describe.skip('response validation', () => {
+    describe('response validation', () => {
       const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
 
       describe('should throw an error when', () => {
@@ -145,7 +145,7 @@ describe('search', () => {
           expect(response.errors[0].message).to.equal('must be array');
         });
 
-        it('returns invalid response (not an array of FeatureCollection)', async () => {
+        it.skip('returns invalid response (not an array of FeatureCollection)', async () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
@@ -159,13 +159,13 @@ describe('search', () => {
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].path).to.equal('0');
-          expect(response.errors[0].message).to.equal("must have required property 'features'");
+          expect(response.errors[0].message).to.equal("must have required property 'spatial_data'");
           expect(response.errors[1].path).to.equal('0/type');
           expect(response.errors[1].message).to.equal('must be equal to one of the allowed values');
         });
       });
 
-      describe('should succeed when', () => {
+      describe.skip('should succeed when', () => {
         it('required values are valid (empty)', async () => {
           const apiResponse: FeatureCollection[] = [];
 
