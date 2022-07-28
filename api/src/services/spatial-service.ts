@@ -123,7 +123,9 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
    * @memberof SpatialService
    */
-  async findSpatialMetadataBySubmissionId(submissionSpatialId: number): Promise<{something: 'anything'}> {
-    return this.spatialRepository.findSpatialMetadataBySubmissionId(submissionSpatialId);
+  async findSpatialMetadataBySubmissionId(submissionSpatialComponentId: number): Promise<Record<string, string>> {
+    const response = await this.spatialRepository.findSpatialMetadataBySubmissionId(submissionSpatialComponentId)
+    
+    return response.spatial_component?.features[0]?.properties as Record<string, string> || {}
   }
 }
