@@ -2,7 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
 import { getAPIUserDBConnection } from '../../../database/db';
-//import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
@@ -10,13 +9,6 @@ import { getLogger } from '../../../utils/logger';
 const defaultLog = getLogger('paths/dwc/eml/search');
 
 export const GET: Operation = [searchSpatialComponents()];
-
-export enum SPATIAL_COMPONENT_TYPE {
-  OCCURRENCE = 'Occurrence',
-  BOUNDARY_CENTROID = 'Boundary Centroid'
-}
-
-const getAllSpatialComponentTypes = (): string[] => Object.values(SPATIAL_COMPONENT_TYPE);
 
 GET.apiDoc = {
   description: 'Searches for spatial components.',
@@ -29,8 +21,7 @@ GET.apiDoc = {
       schema: {
         type: 'array',
         items: {
-          type: 'string',
-          enum: getAllSpatialComponentTypes()
+          type: 'string'
         }
       }
     },
@@ -61,11 +52,19 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            //TODO provide appropriate schema
-            // type: 'array',
-            // items: {
-            //   ...GeoJSONFeatureCollection
-            // }
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['submission_spatial_component_id', 'data'],
+              properties: {
+                data: {
+                  type: 'object'
+                },
+                submission_spatial_component_id: {
+                  type: 'integer'
+                }
+              }
+            }
           }
         }
       }
