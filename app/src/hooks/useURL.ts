@@ -1,71 +1,52 @@
 import qs, { ParsedQs } from 'qs';
 import { useHistory, useLocation, useParams } from 'react-router';
+import { jsonParseObjectKeys, jsonStringifyObjectKeys } from 'utils/Utils';
 
-export const useURL = <QueryParams extends Record<string, any> = ParsedQs>() => {
+/**
+ * Hook that helps with reading from and writing to the URL.
+ *
+ * @template QueryParams
+ * @return {*}
+ */
+const useURL = <QueryParams extends Record<string, any> = ParsedQs>() => {
   const history = useHistory();
   const location = useLocation();
   const pathParams = useParams();
   const queryParams = qs.parse(location.search, { ignoreQueryPrefix: true });
 
-  const _jsonParseObject = (obj: Record<string, any>) => {
-    const newObj = {};
-
-    Object.entries(obj).forEach(([key, value]) => {
-      newObj[key] = JSON.parse(value);
-    });
-
-    return newObj;
-  };
-
-  const _jsonStringifyObject = (obj: Record<string, any>) => {
-    const newObj = {};
-
-    Object.entries(obj).forEach(([key, value]) => {
-      newObj[key] = JSON.stringify(value);
-    });
-
-    return newObj;
-  };
-
-  const setQueryParams = (newQueryParams: Record<string, any>) => {
-    const preppedNewQueryParams = _jsonStringifyObject(newQueryParams);
+  /**
+   * Replaces any existing query params with new query params.
+   *
+   * @param {Record<string, any>} newQueryParams
+   */
+  const replaceQueryParams = (newQueryParams: Record<string, any>) => {
+    const preppedNewQueryParams = jsonStringifyObjectKeys(newQueryParams);
 
     const stringifiedQueryParams = qs.stringify(preppedNewQueryParams);
 
     history.replace({ search: `?${stringifiedQueryParams}` });
   };
 
-  const setQueryParamsAndNavigate = (newQueryParams: Record<string, any>) => {
-    const preppedNewQueryParams = _jsonStringifyObject(newQueryParams);
-
-    const stringifiedQueryParams = qs.stringify(preppedNewQueryParams);
-
-    history.push({ search: `?${stringifiedQueryParams}` });
-  };
-
+  /**
+   * Appends new query params to any existing query params (will overwrite duplicates).
+   *
+   * @param {Record<string, any>} newQueryParams
+   */
   const appendQueryParams = (newQueryParams: Record<string, any>) => {
-    const preppedNewQueryParams = _jsonStringifyObject(newQueryParams);
+    const preppedNewQueryParams = jsonStringifyObjectKeys(newQueryParams);
 
     const stringifiedQueryParams = qs.stringify({ ...queryParams, ...preppedNewQueryParams });
 
     history.replace({ search: `?${stringifiedQueryParams}` });
-  };
-
-  const appendQueryParamsAndNavigate = (newQueryParams: Record<string, any>) => {
-    const preppedNewQueryParams = _jsonStringifyObject(newQueryParams);
-
-    const stringifiedQueryParams = qs.stringify({ ...queryParams, ...preppedNewQueryParams });
-
-    history.push({ search: `?${stringifiedQueryParams}` });
   };
 
   return {
     path: location.pathname,
     pathParams,
-    queryParams: _jsonParseObject(queryParams) as QueryParams,
-    setQueryParams,
-    setQueryParamsAndNavigate,
-    appendQueryParams,
-    appendQueryParamsAndNavigate
+    queryParams: jsonParseObjectKeys(queryParams) as QueryParams,
+    replaceQueryParams,
+    appendQueryParams
   };
 };
+
+export default useURL;

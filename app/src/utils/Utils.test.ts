@@ -8,7 +8,12 @@ import {
   getFormattedDate,
   getFormattedDateRangeString,
   getFormattedFileSize,
-  getLogOutUrl
+  getLogOutUrl,
+  isObject,
+  jsonParseObjectKeys,
+  jsonStringifyObjectKeys,
+  safeJSONParse,
+  safeJSONStringify
 } from './Utils';
 
 describe('ensureProtocol', () => {
@@ -244,5 +249,108 @@ describe('getFeatureObjectFromLatLngBounds', () => {
         ]
       }
     });
+  });
+});
+
+describe('isObject', () => {
+  it('identifies if object when undefined', () => {
+    expect(isObject(undefined)).toEqual(false);
+  });
+
+  it('identifies if object when null', () => {
+    expect(isObject(null)).toEqual(false);
+  });
+
+  it('identifies if object when an empty string', () => {
+    expect(isObject('')).toEqual(false);
+  });
+
+  it('identifies if object when a string', () => {
+    expect(isObject('hello')).toEqual(false);
+  });
+
+  it('identifies if object when an array', () => {
+    expect(isObject([])).toEqual(true);
+  });
+
+  it('identifies if object when 0', () => {
+    expect(isObject(0)).toEqual(false);
+  });
+
+  it('identifies if object when an integer', () => {
+    expect(isObject(1)).toEqual(false);
+  });
+
+  it('identifies if object when a curly bracket object', () => {
+    expect(isObject({})).toEqual(true);
+  });
+
+  it('identifies if object when a new Object', () => {
+    expect(isObject(new Object())).toEqual(true);
+  });
+});
+
+describe('safeJSONParse', () => {
+  it('returns original value when not a stringified string', () => {
+    expect(safeJSONParse('not stringified')).toEqual('not stringified');
+  });
+
+  it('returns parsed value when a stringified string', () => {
+    expect(safeJSONParse(JSON.stringify('stringified'))).toEqual('stringified');
+  });
+
+  it('returns parsed value when a stringified object', () => {
+    expect(safeJSONParse(JSON.stringify({ val: ['a', 'b'] }))).toEqual({ val: ['a', 'b'] });
+  });
+});
+
+describe('safeJSONStringify', () => {
+  it('returns stringified object value', () => {
+    expect(safeJSONStringify({ val: ['a', 'b'] })).toEqual('{"val":["a","b"]}');
+  });
+
+  it('returns stringified array value', () => {
+    expect(safeJSONStringify(['a', 'b'])).toEqual('["a","b"]');
+  });
+
+  it('returns original value if the value cannot be stringified', () => {
+    const circle = {};
+    circle['circle'] = circle;
+
+    expect(safeJSONStringify(circle)).toEqual(circle);
+  });
+});
+
+describe('jsonParseObjectKeys', () => {
+  it('returns parsed object', () => {
+    // Prevent prettier removing escaped quotes, which are necessary to represent stringified values
+    // prettier-ignore
+    const input = { array: '[\"a\",\"b\"]', obj: '{\"val\":[\"a\",\"b\"]}', str: 'a', num: 1, bool: true };
+
+    expect(jsonParseObjectKeys(input)).toEqual({
+      array: ['a', 'b'],
+      obj: { val: ['a', 'b'] },
+      str: 'a',
+      num: 1,
+      bool: true
+    });
+  });
+});
+
+describe('jsonStringifyObjectKeys', () => {
+  it('returns stringified object', () => {
+    // Prevent prettier removing escaped quotes, which are necessary to represent stringified values
+    // prettier-ignore
+    const output = { array: '[\"a\",\"b\"]', obj: '{\"val\":[\"a\",\"b\"]}', str: 'a', num: 1, bool: true };
+
+    expect(
+      jsonStringifyObjectKeys({
+        array: ['a', 'b'],
+        obj: { val: ['a', 'b'] },
+        str: 'a',
+        num: 1,
+        bool: true
+      })
+    ).toEqual(output);
   });
 });

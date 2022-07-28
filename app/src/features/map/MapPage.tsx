@@ -11,7 +11,7 @@ import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
-import { useURL } from 'hooks/useURL';
+import useURL from 'hooks/useURL';
 import React, { useEffect, useState } from 'react';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
 
@@ -58,8 +58,8 @@ const MapPage: React.FC = () => {
   const getSearchBoundary = (mapViewBoundary?: Feature<Polygon>, drawnBoundary?: Feature<Polygon>) => {
     return (
       (drawnBoundary && mapViewBoundary && intersect(drawnBoundary, mapViewBoundary)) ||
-      drawnBoundary ||
       mapViewBoundary ||
+      drawnBoundary ||
       ALL_OF_BC_BOUNDARY
     );
   };
