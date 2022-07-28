@@ -21,7 +21,7 @@ const BaseLayout: React.FC = (props) => {
   }
 
   return (
-    <Box height="100vh" display="flex" flexDirection="column">
+    <Box display="flex" flexDirection="column" height="100vh">
       <CssBaseline />
       <DialogContextProvider>
         {!isSupportedBrowser() && (
