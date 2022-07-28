@@ -91,6 +91,8 @@ export function searchInElasticSearch(): RequestHandler {
 
       const response = await elasticService.keywordSearchEml(queryString);
 
+      console.log('response is: ', response);
+
       const result = response.map((item) => {
         return {
           id: item._id,
@@ -98,6 +100,8 @@ export function searchInElasticSearch(): RequestHandler {
           source: item._source
         };
       });
+
+      console.log('result is : ', result);
 
       res.status(200).json(result);
     } catch (error) {

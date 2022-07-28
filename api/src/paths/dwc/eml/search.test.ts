@@ -123,7 +123,7 @@ describe('search', () => {
       });
     });
 
-    describe.skip('search terms in Elastic Search', () => {
+    describe('search terms in Elastic Search', () => {
       afterEach(() => {
         sinon.restore();
       });
@@ -152,7 +152,7 @@ describe('search', () => {
           index: 'eml',
           query: {
             multi_match: {
-              fields: ['project.taxonomicCoverage.commonName', 'project.taxonomicCoverage.taxonRankValue'],
+              fields: ['*'],
               type: 'phrase_prefix',
               query: 'search-term'
             }
