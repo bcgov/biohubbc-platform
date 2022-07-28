@@ -25,7 +25,7 @@ export const parseFeatureCollectionsByType = (featureCollectionsWithId: ISpatial
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id,
-          popup: <OccurrenceFeaturePopup submissionSpatialId={submissionSpatialComponentId} />
+          popup: <OccurrenceFeaturePopup submissionSpatialComponentId={submissionSpatialComponentId} />
         });
       }
 

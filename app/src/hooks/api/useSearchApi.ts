@@ -33,8 +33,8 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialMetadata = async (submissionSpatialId: number): Promise<ISpatialMetadata> => {
-    const { data } = await axios.get(`/api/dwc/spatial/${submissionSpatialId}/metadata`);
+  const getSpatialMetadata = async (submissionSpatialComponentId: number): Promise<ISpatialMetadata> => {
+    const { data } = await axios.get(`/api/dwc/spatial/${submissionSpatialComponentId}/metadata`);
     return data;
   };
 

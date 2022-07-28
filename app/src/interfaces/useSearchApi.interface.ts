@@ -1,4 +1,4 @@
-import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
+import { Feature, FeatureCollection } from 'geojson';
 
 /**
  * Get search results response object.
@@ -20,11 +20,10 @@ export interface ISpatialData {
   featureCollection: FeatureCollection;
 }
 
-export type ISpatialMetadata = GeoJsonProperties & {
-  // type: any // @TODO
-  // data: string
-  something: 'anything'
-}
+/**
+ * An interface for Spatial Metadata. Type synonymous with `GeoJsonProperties`.
+ */
+export type ISpatialMetadata = Record<string, string>
 
 /**
  * An interface for an instance of filter fields for search results
