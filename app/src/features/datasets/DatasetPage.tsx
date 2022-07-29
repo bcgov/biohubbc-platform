@@ -1,4 +1,8 @@
 import Box from '@material-ui/core/Box';
+import Card from '@material-ui/core/Card';
+import CardHeader from '@material-ui/core/CardHeader';
+import Container from '@material-ui/core/Container';
+import Paper from '@material-ui/core/Paper';
 import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
 import Typography from '@material-ui/core/Typography';
 import { BoundaryFeature } from 'components/map/BoundaryFeaturePopup';
@@ -16,8 +20,28 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
+import { Theme } from '@material-ui/core';
+import { makeStyles } from '@material-ui/styles';
+
+const useStyles = makeStyles((theme: Theme) => ({
+  datasetTitleContainer: {
+    paddingTop: theme.spacing(5),
+    paddingBottom: theme.spacing(5),
+    background: '#ffffff',
+    '& h1': {
+      marginTop: '-4px'
+    }
+  },
+  datasetMapContainer: {
+    width: '100%',
+    aspectRatio: '1 / 0.5',
+    borderRadius: '6px',
+    paddingBottom: '16px'
+  },
+}));
 
 const DatasetPage: React.FC = () => {
+  const classes = useStyles();
   const api = useApi();
   const urlParams = useParams();
 
@@ -68,22 +92,32 @@ const DatasetPage: React.FC = () => {
   }
 
   return (
-    <Box display="flex" flexDirection="column" width="100%" height="100%">
-      <Box flex="0 0 auto" p={3}>
-        <Typography variant="h1">{datasetDataLoader?.data['eml:eml'].dataset.title}</Typography>
-      </Box>
-      <Box flex="1 1 auto" data-testid="MapContainer">
-        <MapContainer
-          mapId="boundary_map"
-          onBoundsChange={(bounds: LatLngBounds) => {
-            const boundary = getFeatureObjectFromLatLngBounds(bounds);
-            mapDataLoader.refresh(boundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
-          }}
-          scrollWheelZoom={true}
-          markerLayers={markerLayers}
-          staticLayers={staticLayers}
-        />
-      </Box>
+    <Box>
+      <Paper square elevation={0} className={classes.datasetTitleContainer}>
+        <Container maxWidth="xl">
+          <Typography variant="h1">{datasetDataLoader?.data['eml:eml'].dataset.title}</Typography>
+        </Container>
+      </Paper>
+      <Container maxWidth="xl">
+        <Box py={5}>
+          <Card data-testid="MapContainer">
+            <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+            <Box p={2} pt={0} className={classes.datasetMapContainer}>
+              <MapContainer
+                mapId="boundary_map"
+                onBoundsChange={(bounds: LatLngBounds) => {
+                  const boundary = getFeatureObjectFromLatLngBounds(bounds);
+                  mapDataLoader.refresh(boundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+                }}
+                scrollWheelZoom={true}
+                fullScreenControl={true}
+                markerLayers={markerLayers}
+                staticLayers={staticLayers}
+              />
+            </Box>
+          </Card>
+        </Box>
+      </Container>
     </Box>
   );
 };
