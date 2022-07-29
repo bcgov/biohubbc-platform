@@ -39,6 +39,8 @@ export interface IDrawControlsOptions {
   edit?: Omit<L.Control.DrawConstructorOptions['edit'], 'Feature'>;
 }
 
+export type IDrawControlsOnChange = (features: Feature[]) => void;
+
 export interface IDrawControlsProps {
   /**
    * Initial features to add to the map. These features will be editable.
@@ -57,9 +59,10 @@ export interface IDrawControlsProps {
   /**
    * Callback triggered anytime a feature is added or updated or removed.
    *
+   * @type {IDrawControlsOnChange}
    * @memberof IDrawControlsProps
    */
-  onChange?: (features: Feature[]) => void;
+  onChange?: IDrawControlsOnChange;
   /**
    * Clear any previously drawn features (layers) before drawing the next one.
    * The result is that only 1 feature will be shown at a time.
@@ -188,12 +191,18 @@ const DrawControls: React.FC<IDrawControlsProps> = (props) => {
 
   useEffect(() => {
     const { map } = context;
+
+    // Remove any existing event handlers
+    map.removeEventListener(eventHandlers.onCreated);
+    map.removeEventListener(eventHandlers.onEdited);
+    map.removeEventListener(eventHandlers.onDeleted);
+
     // Register draw event handlers
     map.on(eventHandlers.onCreated, onDrawCreate as L.LeafletEventHandlerFn);
     map.on(eventHandlers.onEdited, onDrawEditDelete);
     map.on(eventHandlers.onDeleted, onDrawEditDelete);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [props.options, props.onChange, props.clearOnDraw]);
 
   useDeepCompareEffect(() => {
     drawFeatures(props.initialFeatures);

@@ -23,7 +23,7 @@ export const parseFeatureCollectionsByType = (featureCollectionsWithId: ISpatial
 
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
-          key: feature.id,
+          key: feature.id || feature.properties.id,
           popup: <FeaturePopup submissionSpatialComponentId={submissionSpatialComponentId} />
         });
       }
@@ -35,7 +35,7 @@ export const parseFeatureCollectionsByType = (featureCollectionsWithId: ISpatial
 
         boundaryStaticLayer.features.push({
           geoJSON: feature,
-          key: feature.id,
+          key: feature.id || feature.properties.id,
           popup: <FeaturePopup submissionSpatialComponentId={submissionSpatialComponentId} />
         });
       }

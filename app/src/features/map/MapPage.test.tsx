@@ -1,7 +1,9 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { FeatureCollection } from 'geojson';
+import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
 import React from 'react';
+import { Router } from 'react-router';
 import MapPage from './MapPage';
 
 jest.mock('../../hooks/useApi');
@@ -11,8 +13,14 @@ const mockUseApi = {
   }
 };
 
+const history = createMemoryHistory();
+
 const renderContainer = () => {
-  return render(<MapPage />);
+  return render(
+    <Router history={history}>
+      <MapPage />
+    </Router>
+  );
 };
 
 const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
