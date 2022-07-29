@@ -34,7 +34,7 @@ const SearchPage = () => {
    */
   const collectFilterParams = useCallback((): IAdvancedSearch => {
     if (location.search) {
-      const urlParams = qs.parse(location.search.replace('?', ''));
+      const urlParams = qs.parse(location.search, { ignoreQueryPrefix: true });
 
       return { keywords: urlParams.keywords } as IAdvancedSearch;
     }
