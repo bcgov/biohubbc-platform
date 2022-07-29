@@ -1,6 +1,6 @@
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
-import { Feature } from 'geojson';
+import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
 import moment from 'moment';
 
@@ -140,18 +140,13 @@ export const getFormattedFileSize = (fileSize: number) => {
 };
 
 /**
- * Function to get an object key by the value
- * Ex: let obj = { 'role': 'admin' } -> getKeyByValue(obj, 'admin') will return 'role'
+ * Converts a `LatLngBounds` object into a GeoJSON Feature object.
  *
- * @param {object} object
- * @param {any} value
- * @returns {any} key for the corresponding value
+ * @export
+ * @param {LatLngBounds} bounds
+ * @return {*}  {Feature<Polygon>}
  */
-export function getKeyByValue(object: any, value: any) {
-  return Object.keys(object).find((key) => object[key] === value);
-}
-
-export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature {
+export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature<Polygon> {
   const southWest = bounds.getSouthWest();
   const northEast = bounds.getNorthEast();
 
@@ -170,5 +165,80 @@ export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature 
         ]
       ]
     }
-  } as Feature;
+  };
 }
+
+/**
+ * Check if an unknown value is an object.
+ *
+ * @param {unknown} obj
+ * @return {*}  {boolean} `true` if `obj` is an object, `false` otherwise.
+ */
+export const isObject = (obj: unknown): boolean => {
+  return typeof obj === 'object' && obj !== null;
+};
+
+/**
+ * Safely JSON.parse and return the provided `str`.
+ *
+ * Why? If `str` is not a JSON.stringified value, JSON.parse will throw an exception, which will be caught, and the
+ * original `str` will be returned instead.
+ *
+ * @param {string} str
+ * @return {*}
+ */
+export const safeJSONParse = (str: string) => {
+  try {
+    return JSON.parse(str);
+  } catch {
+    return str;
+  }
+};
+
+/**
+ * Safely JSON.stringify a value.
+ *
+ * Note: If `val` cannot be stringified, the original unaltered `val` will be returned.
+ *
+ * @param {string} str
+ * @return {*}
+ */
+export const safeJSONStringify = (val: any) => {
+  try {
+    return JSON.stringify(val);
+  } catch {
+    return val;
+  }
+};
+
+/**
+ * Parses top level object properties if they are stringified values.
+ *
+ * @param {Record<string, any>} obj
+ * @return {*}
+ */
+export const jsonParseObjectProperties = (obj: Record<string, any>) => {
+  const newObj = {};
+
+  Object.entries(obj).forEach(([key, value]) => {
+    newObj[key] = safeJSONParse(value);
+  });
+
+  return newObj;
+};
+
+/**
+ * Stringifies top level object properties if they are objects.
+ *
+ * @param {Record<string, any>} obj
+ * @return {*}
+ */
+export const jsonStringifyObjectProperties = (obj: Record<string, any>) => {
+  const newObj = {};
+
+  Object.entries(obj).forEach(([key, value]) => {
+    newObj[key] = (isObject(value) && safeJSONStringify(value)) || value;
+  });
+
+  return newObj;
+};
