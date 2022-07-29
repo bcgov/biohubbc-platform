@@ -252,8 +252,6 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.convertSubmissionEMLtoJSON(1);
 
-      console.log(response);
-
       expect(response).to.eql({
         '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
         'eml:eml': { '@_packageId': 'urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f' }

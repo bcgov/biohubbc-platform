@@ -53,18 +53,15 @@ export interface IGetOccurrenceData {
   geometry: Feature | null;
 }
 
-export type IElasticsearchResponse<T = unknown, S = unknown> = {
+export type IElasticSearchResponse<Fields = unknown, Source = unknown> = {
   id: string;
-  fields: T;
-  source: S;
-}[];
+  fields: Fields;
+  source: Source;
+};
 
-export interface IKeywordSearchResult {
-  project: {
-    projectId: string;
-    projectTitle: string;
-    projectObjectives: string;
-  }[];
+export interface IKeywordSearchResponse<Fields = Record<string, any>, Source = Record<string, any>>
+  extends IElasticSearchResponse<Fields, Source> {
+  observation_count: number;
 }
 
 export interface IAdvancedSearch {

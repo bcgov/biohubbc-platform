@@ -94,8 +94,13 @@ export function searchSpatialComponents(): RequestHandler {
         response.map((item) => {
           const { spatial_component, submission_spatial_component_id } = item;
           return {
+<<<<<<< HEAD
             featureCollection: spatial_component,
             submissionSpatialComponentId: submission_spatial_component_id
+=======
+            spatial_data: spatial_component,
+            submission_spatial_component_id
+>>>>>>> dev
           };
         })
       );

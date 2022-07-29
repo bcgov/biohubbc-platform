@@ -43,24 +43,6 @@ describe('useSearchApi', () => {
 
     expect(result[0]).toEqual({ type: 'FeatureCollection' });
   });
-
-  it('listAllDatasets works as expected', async () => {
-    const response = [
-      {
-        id: 'a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf',
-        fields: {
-          datasetTitle: ['Coastal Caribou']
-        }
-      }
-    ];
-
-    mock.onGet('api/dwc/eml/search').reply(200, response);
-
-    const actualResult = await useSearchApi(axios).listAllDatasets();
-
-    expect(actualResult[0].id).toEqual('a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf');
-    expect(actualResult[0].fields).toEqual({ datasetTitle: ['Coastal Caribou'] });
-  });
 });
 
 describe('usePublicSearchApi', () => {

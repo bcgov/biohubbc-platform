@@ -1,11 +1,10 @@
 import { AxiosInstance } from 'axios';
 import { Feature } from 'geojson';
 import {
-  IElasticsearchResponse,
   IGetSearchResultsResponse,
-  IKeywordSearchResult,
   ISpatialData,
-  ISpatialMetadata
+  ISpatialMetadata,
+  IKeywordSearchResponse
 } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -29,7 +28,7 @@ const useSearchApi = (axios: AxiosInstance) => {
   const getSpatialData = async (criteria: {
     boundary: Feature;
     type: string[];
-    zoom: number; // TODO include in request params when backend is updated to receive it
+    zoom?: number; // TODO include in request params when backend is updated to receive it
   }): Promise<ISpatialData[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type }
@@ -42,19 +41,13 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const listAllDatasets = async (): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
-    const { data } = await axios.get(`api/dwc/eml/search`);
-
-    return data;
-  };
-
   /**
    * Get keyword search results
    *
    * @param searchQuery The keywords to search for
    * @returns {*} {Promise<>}
    */
-  const keywordSearch = async (searchQuery: string): Promise<IElasticsearchResponse<unknown, IKeywordSearchResult>> => {
+  const keywordSearch = async (searchQuery: string): Promise<IKeywordSearchResponse[]> => {
     const { data } = await axios.get(`api/dwc/eml/search?terms=${searchQuery}`);
 
     return data;
@@ -62,7 +55,6 @@ const useSearchApi = (axios: AxiosInstance) => {
 
   return {
     getSearchResults,
-    listAllDatasets,
     keywordSearch,
     getSpatialData,
     getSpatialMetadata
