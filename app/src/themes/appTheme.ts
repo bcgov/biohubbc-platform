@@ -36,7 +36,7 @@ const appTheme = createMuiTheme({
       h1: {
         letterSpacing: '-0.02rem',
         fontSize: '2rem',
-        fontWeight: 700,
+        fontWeight: 700
       },
       h2: {
         letterSpacing: '-0.01rem',

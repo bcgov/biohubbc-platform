@@ -6,6 +6,8 @@ import Divider from '@material-ui/core/Divider';
 import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
+import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
@@ -18,8 +20,6 @@ import qs from 'qs';
 import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
-import { mdiEyeOutline, mdiEyeOffOutline } from '@mdi/js';
-import Icon from '@mdi/react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   searchResultTitle: {
@@ -27,7 +27,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
   datasetResultContainer: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'column'
   },
   datasetTitle: {
     fontSize: '1.25rem'
@@ -139,7 +139,7 @@ const SearchPage = () => {
   };
 
   const appendProjectsWithDatasetId = () => {
-    let newList: any[] = [];
+    const newList: any[] = [];
 
     searchDataLoader.data &&
       searchDataLoader.data.forEach((dataset) => {
@@ -215,8 +215,12 @@ const SearchPage = () => {
                     <Box display="flex" alignItems="center">
                       {result.observationCount === 0 ? (
                         <Icon path={mdiEyeOffOutline} size={1} />
-                      ) : <Icon path={mdiEyeOutline} size={1} />}
-                      <Box ml={1} component="strong">{result.observationCount} observations</Box>
+                      ) : (
+                        <Icon path={mdiEyeOutline} size={1} />
+                      )}
+                      <Box ml={1} component="strong">
+                        {result.observationCount} observations
+                      </Box>
                     </Box>
                   </Typography>
                 </Box>
