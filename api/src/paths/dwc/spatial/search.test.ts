@@ -149,9 +149,32 @@ describe('search', () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
-              type: 'Feature',
-              properties: {},
-              geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
+              featureCollection: {
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
+              },
+              submissionSpatialComponentId: 1
+            }
+          ];
+
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].path).to.equal('0/featureCollection');
+          expect(response.errors[0].message).to.equal("must have required property 'features'");
+          expect(response.errors[1].path).to.equal('0/featureCollection/type');
+          expect(response.errors[1].message).to.equal('must be equal to one of the allowed values');
+        });
+
+        it('returns invalid response (missing submissionSpatialComponentId)', async () => {
+          const apiResponse = [
+            {
+              featureCollection: {
+                type: 'FeatureCollection',
+                properties: {},
+                geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
+              }
             }
           ];
 
@@ -159,9 +182,7 @@ describe('search', () => {
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].path).to.equal('0');
-          expect(response.errors[0].message).to.equal("must have required property 'features'");
-          expect(response.errors[1].path).to.equal('0/type');
-          expect(response.errors[1].message).to.equal('must be equal to one of the allowed values');
+          expect(response.errors[0].message).to.equal("must have required property 'submissionSpatialComponentId'");
         });
       });
 
@@ -177,49 +198,55 @@ describe('search', () => {
         it('required values are valid', async () => {
           const apiResponse = [
             {
-              type: 'FeatureCollection',
-              features: [
-                {
-                  type: 'Feature',
-                  properties: {},
-                  geometry: {
-                    type: 'Polygon',
-                    coordinates: [
-                      [
-                        [-123.43785926699638, 48.634569504210184],
-                        [-123.43786899000405, 48.634561749249066],
-                        [-123.43785356730223, 48.63456285710074],
-                        [-123.43785926699638, 48.634569504210184]
+              featureCollection: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                      type: 'Polygon',
+                      coordinates: [
+                        [
+                          [-123.43785926699638, 48.634569504210184],
+                          [-123.43786899000405, 48.634561749249066],
+                          [-123.43785356730223, 48.63456285710074],
+                          [-123.43785926699638, 48.634569504210184]
+                        ]
                       ]
-                    ]
-                  }
-                },
-                {
-                  type: 'Feature',
-                  properties: {},
-                  geometry: {
-                    type: 'Polygon',
-                    coordinates: [
-                      [
-                        [-123.43785926699638, 48.634569504210184],
-                        [-123.43786899000405, 48.634561749249066],
-                        [-123.43785356730223, 48.63456285710074],
-                        [-123.43785926699638, 48.634569504210184]
+                    }
+                  },
+                  {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                      type: 'Polygon',
+                      coordinates: [
+                        [
+                          [-123.43785926699638, 48.634569504210184],
+                          [-123.43786899000405, 48.634561749249066],
+                          [-123.43785356730223, 48.63456285710074],
+                          [-123.43785926699638, 48.634569504210184]
+                        ]
                       ]
-                    ]
+                    }
                   }
-                }
-              ]
+                ]
+              },
+              submissionSpatialComponentId: 1
             },
             {
-              type: 'FeatureCollection',
-              features: [
-                {
-                  type: 'Feature',
-                  properties: {},
-                  geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
-                }
-              ]
+              featureCollection: {
+                type: 'FeatureCollection',
+                features: [
+                  {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
+                  }
+                ]
+              },
+              submissionSpatialComponentId: 2
             }
           ];
 
@@ -295,7 +322,8 @@ describe('search', () => {
                 geometry: { type: 'Polygon', coordinates: [[]] }
               }
             ]
-          }
+          },
+          submission_spatial_component_id: 1
         },
         {
           spatial_component: {
@@ -307,7 +335,8 @@ describe('search', () => {
                 geometry: { type: 'Point', coordinates: [[]] }
               }
             ]
-          }
+          },
+          submission_spatial_component_id: 2
         }
       ] as unknown as ISubmissionSpatialComponent[];
 
@@ -320,24 +349,30 @@ describe('search', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([
         {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              properties: { type: 'Boundary' },
-              geometry: { type: 'Polygon', coordinates: [[]] }
-            }
-          ]
+          featureCollection: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: { type: 'Boundary' },
+                geometry: { type: 'Polygon', coordinates: [[]] }
+              }
+            ]
+          },
+          submissionSpatialComponentId: 1
         },
         {
-          type: 'FeatureCollection',
-          features: [
-            {
-              type: 'Feature',
-              properties: { type: 'Occurrence' },
-              geometry: { type: 'Point', coordinates: [[]] }
-            }
-          ]
+          featureCollection: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                properties: { type: 'Occurrence' },
+                geometry: { type: 'Point', coordinates: [[]] }
+              }
+            ]
+          },
+          submissionSpatialComponentId: 2
         }
       ]);
       expect(dbConnectionObj.commit).to.have.been.calledOnce;
