@@ -1,8 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { ESService } from '../../../services/es-service';
+import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/search');
@@ -59,6 +61,9 @@ GET.apiDoc = {
                 },
                 fields: {
                   type: 'object'
+                },
+                observation_count: {
+                  type: 'number'
                 }
               }
             }
@@ -77,32 +82,41 @@ GET.apiDoc = {
  */
 export function searchInElasticSearch(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({
-      label: 'getSearchResults',
-      message: 'request params',
-      terms: req.query.terms,
-      index: req.query.index
-    });
-
     const queryString = String(req.query.terms) || '*';
 
+    const connection = getDBConnection(req['keycloak_token']);
+
     try {
+      await connection.open();
+
       const elasticService = new ESService();
+
+      const submissionService = new SubmissionService(connection);
 
       const response = await elasticService.keywordSearchEml(queryString);
 
-      const result = response.map((item) => {
+      const promises = response.map(async (item) => {
+        const observationCount = await submissionService.getObservationCountByDatasetId(item._id);
+
         return {
           id: item._id,
           fields: item.fields,
-          source: item._source
+          source: item._source,
+          observation_count: observationCount
         };
       });
+
+      const result = await Promise.all(promises);
+
+      await connection.commit();
 
       res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'keywordSearchEml', message: 'error', error });
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   };
 }

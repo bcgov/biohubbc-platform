@@ -8,8 +8,7 @@ const useStyles = makeStyles((theme: Theme) => ({
     marginLeft: theme.spacing(0.5),
     color: '#fcba19',
     textTransform: 'uppercase',
-    fontSize: '0.875rem',
-    fontWeight: 700
+    fontSize: '0.875rem'
   }
 }));
 

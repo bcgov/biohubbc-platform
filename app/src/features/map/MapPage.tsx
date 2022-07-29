@@ -120,6 +120,7 @@ const MapPage: React.FC = () => {
                   }}
                   onDrawChange={onDrawChange}
                   scrollWheelZoom={true}
+                  fullScreenControl={true}
                   markerLayers={markerLayers}
                   staticLayers={staticLayers}
                 />
