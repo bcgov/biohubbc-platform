@@ -1,4 +1,15 @@
-import { Box, CircularProgress, Collapse, makeStyles, Table, TableBody, TableCell, TableRow, Theme, Typography } from '@material-ui/core';
+import {
+  Box,
+  CircularProgress,
+  Collapse,
+  makeStyles,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  Theme,
+  Typography
+} from '@material-ui/core';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -17,7 +28,7 @@ export type BoundaryFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY;
 };
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles((_theme: Theme) => ({
   modalContent: {
     position: 'relative',
     width: 300,
@@ -48,42 +59,42 @@ const useStyles = makeStyles((theme: Theme) => ({
 const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
   const { submissionSpatialComponentId } = props;
 
-  const classes = useStyles()
-  const api = useApi()
+  const classes = useStyles();
+  const api = useApi();
   const dataLoader = useDataLoader(() => {
-    return api.search.getSpatialMetadata(submissionSpatialComponentId)
-  })
+    return api.search.getSpatialMetadata(submissionSpatialComponentId);
+  });
 
   /**
    * @TODO Replace this with moment/luxon date formatter
    */
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date instanceof Date && !isNaN(date as unknown as number)
-      ? date.toDateString()
-      : dateString
-  }
-  
-  dataLoader.load()
+    const d = new Date(dateString);
+    return d instanceof Date && !isNaN(d as unknown as number) ? d.toDateString() : dateString;
+  };
 
-  const { isLoading, data, isReady } = dataLoader
-  const { date, type, ...rest } = data || {}
+  dataLoader.load();
 
-  console.log('rest:', rest)
+  const { isLoading, data, isReady } = dataLoader;
+  const { date, type, ...rest } = data || {};
+
+  console.log('rest:', rest);
 
   return (
     <div className={classes.modalContent}>
       {isLoading && (
         <div className={classes.loading}>
-          <CircularProgress size={24} color='primary' />
+          <CircularProgress size={24} color="primary" />
         </div>
       )}
       <Collapse in={isReady}>
         <div>
           <Box mb={1}>
-            <Typography variant='overline' className={classes.pointType}>{type || 'Feature'}</Typography>
+            <Typography variant="overline" className={classes.pointType}>
+              {type || 'Feature'}
+            </Typography>
             {date && (
-              <Typography className={classes.date} component='h6' variant='subtitle1'>
+              <Typography className={classes.date} component="h6" variant="subtitle1">
                 {formatDate(date)}
               </Typography>
             )}
@@ -93,18 +104,16 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
               <TableBody>
                 {Object.entries(rest).map(([key, value]) => (
                   <TableRow>
-                    <TableCell className={classes.tableCell}>
-                      {key}
-                    </TableCell>
-                    <TableCell className={classes.tableCell}>
-                      {value}
-                    </TableCell>
+                    <TableCell className={classes.tableCell}>{key}</TableCell>
+                    <TableCell className={classes.tableCell}>{value}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           ) : (
-            <Typography className={classes.date} component='h6' variant='body1'>No metadata available.</Typography>
+            <Typography className={classes.date} component="h6" variant="body1">
+              No metadata available.
+            </Typography>
           )}
         </div>
       </Collapse>
@@ -112,4 +121,4 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   );
 };
 
-export default FeaturePopup
+export default FeaturePopup;

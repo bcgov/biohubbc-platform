@@ -13,7 +13,7 @@ export const parseFeatureCollectionsByType = (featureCollectionsWithId: ISpatial
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
   for (const featureCollectionWithId of featureCollectionsWithId) {
-    const { featureCollection, submissionSpatialComponentId } = featureCollectionWithId
+    const { featureCollection, submissionSpatialComponentId } = featureCollectionWithId;
     for (const feature of featureCollection.features) {
       if (isOccurrenceFeature(feature)) {
         if (feature.geometry.type === 'GeometryCollection') {

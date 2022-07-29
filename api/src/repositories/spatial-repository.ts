@@ -298,15 +298,20 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * @TODO complete Jsdoc
+   * Query spatial components by given submission ID
    *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @memberof SpatialRepository
    */
-  async findSpatialMetadataBySubmissionId(submission_spatial_component_id: number): Promise<ISubmissionSpatialComponent> {
+  async findSpatialMetadataBySubmissionId(
+    submission_spatial_component_id: number
+  ): Promise<ISubmissionSpatialComponent> {
     const queryBuilder = getKnexQueryBuilder()
       .select()
       .from('submission_spatial_component')
       .where({ submission_spatial_component_id });
-        
+
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
 
     return spatialComponentResponse.rows[0];
