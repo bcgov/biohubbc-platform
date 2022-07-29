@@ -1,7 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { Feature } from 'geojson';
 import {
-  IElasticsearchResponse,
   IGetSearchResultsResponse,
   IGetSpatialDataResponse,
   IKeywordSearchResult
@@ -38,7 +37,7 @@ const useSearchApi = (axios: AxiosInstance) => {
    * @param searchQuery The keywords to search for
    * @returns {*} {Promise<>}
    */
-  const keywordSearch = async (searchQuery: string): Promise<IElasticsearchResponse<unknown, IKeywordSearchResult>> => {
+  const keywordSearch = async (searchQuery: string): Promise<IKeywordSearchResult[]> => {
     const { data } = await axios.get(`api/dwc/eml/search?terms=${searchQuery}`);
 
     return data;

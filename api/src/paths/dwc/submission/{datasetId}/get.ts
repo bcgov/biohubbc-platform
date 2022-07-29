@@ -87,10 +87,13 @@ export function getMetadataByDatasetId(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(datasetMetadata);
+      res.status(200).json({ datasetMetadata });
     } catch (error) {
       defaultLog.error({ label: 'getMetadataByDatasetId', message: 'error', error });
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   };
 }

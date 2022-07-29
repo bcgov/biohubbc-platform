@@ -1,8 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { ESService } from '../../../services/es-service';
+import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/search');
@@ -59,6 +61,9 @@ GET.apiDoc = {
                 },
                 fields: {
                   type: 'object'
+                },
+                observation_count: {
+                  type: 'number'
                 }
               }
             }
@@ -85,19 +90,33 @@ export function searchInElasticSearch(): RequestHandler {
     });
 
     const queryString = String(req.query.terms) || '*';
+    const connection = getDBConnection(req['keycloak_token']);
 
     try {
       const elasticService = new ESService();
+      await connection.open();
+
+      const submissionService = new SubmissionService(connection);
 
       const response = await elasticService.keywordSearchEml(queryString);
 
-      const result = response.map((item) => {
+      const promises = response.map(async (item) => {
+        const observationCount = await submissionService.getObservationCountByDatasetId(item._id);
+
+        console.log(typeof observationCount);
+        console.log(isNaN(observationCount));
+
         return {
           id: item._id,
           fields: item.fields,
-          source: item._source
+          source: item._source,
+          observation_count: observationCount
         };
       });
+
+      const result = await Promise.all(promises);
+
+      console.log('search result is: ', result);
 
       res.status(200).json(result);
     } catch (error) {

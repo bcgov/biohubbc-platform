@@ -55,11 +55,11 @@ export type IElasticsearchResponse<T = unknown, S = unknown> = {
 }[];
 
 export interface IKeywordSearchResult {
-  project: {
-    projectId: string;
-    projectTitle: string;
-    projectObjectives: string;
-  }[];
+  //TODO: incorporate Promise<IElasticsearchResponse<unknown, IKeywordSearchResult>>  into the interface
+  id: string;
+  source: Record<string, any>;
+  fields: Record<string, any>;
+  observation_count: number;
 }
 
 export interface IAdvancedSearch {

@@ -20,7 +20,7 @@ const useStyles = makeStyles((theme: Theme) => ({
     outlineOffset: '-1px',
     transition: 'all ease-out 0.25s',
     '&.Mui-focused': {
-      outline: '3px solid #3B99FC',
+      outline: '3px solid #3B99FC'
     },
     '& .MuiInputAdornment-positionStart': {
       opacity: '0.5'

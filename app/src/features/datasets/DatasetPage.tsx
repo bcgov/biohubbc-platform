@@ -5,11 +5,9 @@ import Container from '@material-ui/core/Container';
 import Paper from '@material-ui/core/Paper';
 import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
 import Typography from '@material-ui/core/Typography';
-import { BoundaryFeature } from 'components/map/BoundaryFeaturePopup';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { OccurrenceFeature } from 'components/map/OccurrenceFeaturePopup';
 import { ALL_OF_BC_BOUNDARY, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -123,11 +121,3 @@ const DatasetPage: React.FC = () => {
 };
 
 export default DatasetPage;
-
-export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeature => {
-  return feature.geometry.type === 'Point' && feature.properties?.['type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE;
-};
-
-export const isBoundaryFeature = (feature: Feature): feature is BoundaryFeature => {
-  return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY;
-};

@@ -125,27 +125,24 @@ const SearchPage = () => {
     });
   };
 
-  function appendProjectsWithDatasetId(searchLoader: { data: any }) {
+  const appendProjectsWithDatasetId = () => {
     let newList: any[] = [];
 
-    searchLoader.data &&
-      searchLoader.data.forEach((dataset: any) => {
+    searchDataLoader.data &&
+      searchDataLoader.data.forEach((dataset) => {
         const datasetId = dataset.id;
 
-        const projectList = dataset.source.project;
+        const project = dataset.source.project.find((item: any) => item.projectType === 'project');
 
-        projectList &&
-          projectList.forEach((item: any) => {
-            const appendedItem = { ...item, datasetId: datasetId };
+        const appendedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
 
-            newList.push(appendedItem);
-          });
+        newList.push(appendedItem);
       });
 
     return newList;
-  }
+  };
 
-  const results = appendProjectsWithDatasetId(searchDataLoader);
+  const results = appendProjectsWithDatasetId();
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
@@ -186,19 +183,17 @@ const SearchPage = () => {
               <Card>
                 <Box p={3}>
                   <Box mb={2}>
+                    <Box>{result.observationCount} observations</Box>
                     <Link
                       color="primary"
                       aria-current="page"
                       variant="h4"
-                      href={`datasets/${result.datasetId}/details`}
-                    // onClick={() => history.push(`datasets/${result.datasetId}/details`)}
-                    >
+                      href={`datasets/${result.datasetId}/details`}>
                       {result.projectTitle}
                     </Link>
                   </Box>
                   <Typography className={classes.datasetAbstract} variant="body1" color="textSecondary">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
-                    {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
+                    {truncate(result.projectAbstract[0].para, { length: 200, separator: ' ' })}
                   </Typography>
                 </Box>
               </Card>
