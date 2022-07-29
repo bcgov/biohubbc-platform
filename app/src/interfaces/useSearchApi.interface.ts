@@ -48,17 +48,14 @@ export interface IGetOccurrenceData {
   geometry: Feature | null;
 }
 
-export type IElasticsearchResponse<T = unknown, S = unknown> = {
+export type IElasticSearchResponse<Fields = unknown, Source = unknown> = {
   id: string;
-  fields: T;
-  source: S;
-}[];
+  fields: Fields;
+  source: Source;
+};
 
-export interface IKeywordSearchResult {
-  //TODO: incorporate Promise<IElasticsearchResponse<unknown, IKeywordSearchResult>>  into the interface
-  id: string;
-  source: Record<string, any>;
-  fields: Record<string, any>;
+export interface IKeywordSearchResponse<Fields = Record<string, any>, Source = Record<string, any>>
+  extends IElasticSearchResponse<Fields, Source> {
   observation_count: number;
 }
 

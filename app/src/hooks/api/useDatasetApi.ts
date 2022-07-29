@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { IElasticsearchResponse } from 'interfaces/useSearchApi.interface';
+import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with datasets.
@@ -13,7 +13,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
    *
    * @return {*}  {Promise<IElasticsearchResponse<{ datasetTitle: string[] }>>}
    */
-  const listAllDatasets = async (): Promise<IElasticsearchResponse<{ datasetTitle: string[] }>> => {
+  const listAllDatasets = async (): Promise<IKeywordSearchResponse[]> => {
     const { data } = await axios.get(`api/dwc/eml/search`);
 
     return data;

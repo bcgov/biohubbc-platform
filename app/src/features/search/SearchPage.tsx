@@ -1,4 +1,3 @@
-import { Theme } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
@@ -21,7 +20,7 @@ import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles(() => ({
   searchResultTitle: {
     fontSize: '1.125rem'
   },
