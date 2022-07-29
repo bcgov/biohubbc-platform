@@ -1,5 +1,9 @@
 @import 'styles/fonts.scss';
 
+body {
+  overflow-y: scroll;
+}
+
 fieldset {
   border: none;
   padding: 0;

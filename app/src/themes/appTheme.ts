@@ -109,7 +109,12 @@ const appTheme = createMuiTheme({
       root: {
         textAlign: 'left',
         color: '#1a5a96',
-        cursor: 'pointer'
+        cursor: 'pointer',
+        borderRadius: '2px',
+        '&:focus': {
+          outline: '3px solid #3B99FC',
+          outlineOffset: '3px'
+        }
       }
     },
     MuiLinearProgress: {

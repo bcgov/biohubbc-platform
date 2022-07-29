@@ -356,6 +356,56 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   *
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<string>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionRecordJSONByDatasetId(datasetId: string): Promise<string> {
+    const sqlStatement = SQL`
+      SELECT
+        eml_json_source
+      FROM
+        submission
+      WHERE
+        submission.uuid = ${datasetId}
+      AND
+        record_end_date IS NULL;
+    `;
+
+    const response = await this.connection.sql<{ eml_json_source: string }>(sqlStatement);
+
+    return response.rows[0].eml_json_source;
+  }
+
+  /**
+   *
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async getObservationCountByDatasetId(datasetId: string): Promise<number> {
+    const sqlStatement = SQL`
+      SELECT
+        count(distinct submission_spatial_component_id)::integer
+      FROM
+        submission_spatial_component ssc
+      LEFT JOIN
+        submission s
+      ON
+        s.submission_id = ssc.submission_id
+      WHERE
+        s.uuid = ${datasetId}
+    `;
+
+    const response = await this.connection.sql<{ count: number }>(sqlStatement);
+
+    return response.rows[0].count;
+  }
+
+  /**
    * Update record_end_date of submission id
    *
    * @param {number} submissionId

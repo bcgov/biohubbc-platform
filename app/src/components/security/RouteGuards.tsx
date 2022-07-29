@@ -51,7 +51,7 @@ const CheckForAuthLoginParam: React.FC = ({ children }) => {
   const location = useLocation();
 
   if (!keycloakWrapper?.keycloak?.authenticated) {
-    const urlParams = qs.parse(location.search.replace('?', ''));
+    const urlParams = qs.parse(location.search, { ignoreQueryPrefix: true });
     const authLoginUrlParam = urlParams.authLogin;
     // check for urlParam to force login
     if (authLoginUrlParam) {

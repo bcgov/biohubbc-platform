@@ -38,20 +38,20 @@ const StaticLayers: React.FC<IStaticLayersProps> = (props) => {
 
   const layerControls: ReactElement[] = [];
 
-  props.layers.forEach((layer, layerIndex) => {
+  props.layers.forEach((layer) => {
     if (!layer.features?.length) {
       return;
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked name={layer.layerName} key={`static-layer-${layerIndex}`}>
-        <FeatureGroup key={`static-feature-group-${layerIndex}`}>
+      <LayersControl.Overlay checked name={layer.layerName} key={`static-layer-${layer.layerName}`}>
+        <FeatureGroup key={`static-feature-group-${layer.layerName}`}>
           {layer.features.map((item, index) => {
             const id = item.key || item.geoJSON.id || index;
 
             return (
               <GeoJSON
-                key={`static-feature-${id}-${index}`}
+                key={`static-feature-${id}`}
                 pointToLayer={(feature, latlng) => {
                   if (feature.properties?.radius) {
                     return new L.Circle([latlng.lat, latlng.lng], feature.properties.radius);
@@ -62,13 +62,13 @@ const StaticLayers: React.FC<IStaticLayersProps> = (props) => {
                 data={item.geoJSON}
                 {...item.GeoJSONProps}>
                 {item.tooltip && (
-                  <Tooltip key={`static-feature-tooltip-${id}-${index}`} direction="top" {...item.TooltipProps}>
+                  <Tooltip key={`static-feature-tooltip-${id}`} direction="top" {...item.TooltipProps}>
                     {item.tooltip}
                   </Tooltip>
                 )}
                 {item.popup && (
                   <Popup
-                    key={`static-feature-popup-${id}-${index}`}
+                    key={`static-feature-popup-${id}`}
                     keepInView={false}
                     closeButton={false}
                     autoPan={false}

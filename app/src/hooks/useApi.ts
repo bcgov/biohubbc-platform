@@ -3,6 +3,7 @@ import { useContext } from 'react';
 import useAdminApi from './api/useAdminApi';
 import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
+import useDatasetApi from './api/useDatasetApi';
 import useN8NApi from './api/useN8NApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
@@ -37,6 +38,8 @@ export const useApi = () => {
 
   const search = useSearchApi(apiAxios);
 
+  const dataset = useDatasetApi(apiAxios);
+
   return {
     codes,
     user,
@@ -45,6 +48,7 @@ export const useApi = () => {
     submissions,
     public: publicApis,
     search,
+    dataset,
     taxonomy
   };
 };
