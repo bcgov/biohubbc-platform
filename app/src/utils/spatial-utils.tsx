@@ -1,7 +1,6 @@
-import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFeaturePopup';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
-import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
+import FeaturePopup, { BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { ISpatialData } from 'interfaces/useSearchApi.interface';
@@ -25,7 +24,7 @@ export const parseFeatureCollectionsByType = (featureCollectionsWithId: ISpatial
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id,
-          popup: <OccurrenceFeaturePopup submissionSpatialComponentId={submissionSpatialComponentId} />
+          popup: <FeaturePopup submissionSpatialComponentId={submissionSpatialComponentId} />
         });
       }
 
@@ -37,7 +36,7 @@ export const parseFeatureCollectionsByType = (featureCollectionsWithId: ISpatial
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id,
-          popup: <BoundaryFeaturePopup properties={feature.properties} />
+          popup: <FeaturePopup submissionSpatialComponentId={submissionSpatialComponentId} />
         });
       }
     }
