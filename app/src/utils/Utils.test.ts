@@ -1,12 +1,19 @@
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
+import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
   ensureProtocol,
+  getFeatureObjectFromLatLngBounds,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
   getFormattedFileSize,
-  getLogOutUrl
+  getLogOutUrl,
+  isObject,
+  jsonParseObjectProperties,
+  jsonStringifyObjectProperties,
+  safeJSONParse,
+  safeJSONStringify
 } from './Utils';
 
 describe('ensureProtocol', () => {
@@ -214,5 +221,155 @@ describe('getFormattedFileSize', () => {
   it('returns answer in GB if fileSize >= 1000000000', async () => {
     const formattedFileSize = getFormattedFileSize(1000000000);
     expect(formattedFileSize).toEqual('1.0 GB');
+  });
+});
+
+describe('getFeatureObjectFromLatLngBounds', () => {
+  it('returns a feature object', () => {
+    const southWest: LatLngLiteral = { lat: 111, lng: 222 };
+    const northEast: LatLngLiteral = { lat: 333, lng: 444 };
+
+    const bounds = new LatLngBounds(southWest, northEast);
+
+    const feature = getFeatureObjectFromLatLngBounds(bounds);
+
+    expect(feature).toEqual({
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [southWest.lng, southWest.lat],
+            [southWest.lng, northEast.lat],
+            [northEast.lng, northEast.lat],
+            [northEast.lng, southWest.lat],
+            [southWest.lng, southWest.lat]
+          ]
+        ]
+      }
+    });
+  });
+});
+
+describe('isObject', () => {
+  describe('returns false', () => {
+    it('when undefined', () => {
+      expect(isObject(undefined)).toEqual(false);
+    });
+
+    it('when null', () => {
+      expect(isObject(null)).toEqual(false);
+    });
+
+    it('when an empty string', () => {
+      expect(isObject('')).toEqual(false);
+    });
+
+    it('when a string', () => {
+      expect(isObject('hello')).toEqual(false);
+    });
+
+    it('when a negative number', () => {
+      expect(isObject(-1)).toEqual(false);
+    });
+
+    it('when 0', () => {
+      expect(isObject(0)).toEqual(false);
+    });
+
+    it('when a positive number', () => {
+      expect(isObject(1)).toEqual(false);
+    });
+
+    it('when true', () => {
+      expect(isObject(true)).toEqual(false);
+    });
+
+    it('when false', () => {
+      expect(isObject(false)).toEqual(false);
+    });
+  });
+
+  describe('returns true', () => {
+    it('when an array', () => {
+      expect(isObject([])).toEqual(true);
+    });
+
+    it('when a curly bracket object', () => {
+      expect(isObject({})).toEqual(true);
+    });
+
+    it('when a new Object', () => {
+      // eslint-disable-next-line no-new-object
+      expect(isObject(new Object())).toEqual(true);
+    });
+  });
+});
+
+describe('safeJSONParse', () => {
+  it('returns original value when not a stringified string', () => {
+    expect(safeJSONParse('not stringified')).toEqual('not stringified');
+  });
+
+  it('returns parsed value when a stringified string', () => {
+    expect(safeJSONParse(JSON.stringify('stringified'))).toEqual('stringified');
+  });
+
+  it('returns parsed value when a stringified object', () => {
+    expect(safeJSONParse(JSON.stringify({ val: ['a', 'b'] }))).toEqual({ val: ['a', 'b'] });
+  });
+});
+
+describe('safeJSONStringify', () => {
+  it('returns stringified object value', () => {
+    expect(safeJSONStringify({ val: ['a', 'b'] })).toEqual('{"val":["a","b"]}');
+  });
+
+  it('returns stringified array value', () => {
+    expect(safeJSONStringify(['a', 'b'])).toEqual('["a","b"]');
+  });
+
+  it('returns original value if the value cannot be stringified', () => {
+    const circle = {};
+    circle['circle'] = circle;
+
+    expect(safeJSONStringify(circle)).toEqual(circle);
+  });
+});
+
+describe('jsonParseObjectProperties', () => {
+  it('returns parsed object', () => {
+    // Prevent prettier removing escaped quotes, which are necessary to represent stringified values
+    // prettier-ignore
+    // eslint-disable-next-line no-useless-escape
+    const input = { array: '[\"a\",\"b\"]', obj: '{\"val\":[\"a\",\"b\"]}', str: 'a', num: 1, bool: true };
+
+    expect(jsonParseObjectProperties(input)).toEqual({
+      array: ['a', 'b'],
+      obj: { val: ['a', 'b'] },
+      str: 'a',
+      num: 1,
+      bool: true
+    });
+  });
+});
+
+describe('jsonStringifyObjectProperties', () => {
+  it('returns stringified object', () => {
+    // Prevent prettier removing escaped quotes, which are necessary to represent stringified values
+    // prettier-ignore
+    // eslint-disable-next-line
+    const output = { array: '[\"a\",\"b\"]', obj: '{\"val\":[\"a\",\"b\"]}', str: 'a', num: 1, bool: true };
+
+    expect(
+      jsonStringifyObjectProperties({
+        array: ['a', 'b'],
+        obj: { val: ['a', 'b'] },
+        str: 'a',
+        num: 1,
+        bool: true
+      })
+    ).toEqual(output);
   });
 });
