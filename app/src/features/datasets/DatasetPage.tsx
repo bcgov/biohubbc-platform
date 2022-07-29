@@ -10,16 +10,14 @@ import { makeStyles } from '@material-ui/styles';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
-import { ALL_OF_BC_BOUNDARY, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { Feature } from 'geojson';
+import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
-import { LatLngBounds } from 'leaflet';
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
-import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
@@ -57,8 +55,8 @@ const DatasetPage: React.FC = () => {
 
   datasetDataLoader.load();
 
-  const mapDataLoader = useDataLoader((boundary: Feature, type: string[]) =>
-    api.search.getSpatialData({ boundary: boundary, type: type })
+  const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
+    api.search.getSpatialData({ boundary: searchBoundary, type: searchType, zoom: searchZoom })
   );
 
   useDataLoaderError(mapDataLoader, () => {
@@ -73,7 +71,7 @@ const DatasetPage: React.FC = () => {
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
   useEffect(() => {
-    if (!mapDataLoader.data?.length) {
+    if (!mapDataLoader.data) {
       return;
     }
 
@@ -83,7 +81,15 @@ const DatasetPage: React.FC = () => {
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
 
-  mapDataLoader.load(ALL_OF_BC_BOUNDARY, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
+  const onMapViewChange = (bounds: Feature<Polygon>, newZoom: number) => {
+    mapDataLoader.refresh(bounds, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE], newZoom);
+  };
+
+  mapDataLoader.load(
+    ALL_OF_BC_BOUNDARY,
+    [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+    MAP_DEFAULT_ZOOM
+  );
 
   if (!datasetDataLoader.data) {
     return <CircularProgress className="pageProgress" size={40} />;
@@ -103,10 +109,7 @@ const DatasetPage: React.FC = () => {
             <Box p={2} pt={0} className={classes.datasetMapContainer}>
               <MapContainer
                 mapId="boundary_map"
-                onBoundsChange={(bounds: LatLngBounds) => {
-                  const boundary = getFeatureObjectFromLatLngBounds(bounds);
-                  mapDataLoader.refresh(boundary, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]);
-                }}
+                onBoundsChange={onMapViewChange}
                 scrollWheelZoom={true}
                 fullScreenControl={true}
                 markerLayers={markerLayers}

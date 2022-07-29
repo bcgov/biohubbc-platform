@@ -27,7 +27,7 @@ const useSearchApi = (axios: AxiosInstance) => {
   const getSpatialData = async (criteria: {
     boundary: Feature;
     type: string[];
-    zoom: number; // TODO include in request params when backend is updated to receive it
+    zoom?: number; // TODO include in request params when backend is updated to receive it
   }): Promise<IGetSpatialDataResponse[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type }
