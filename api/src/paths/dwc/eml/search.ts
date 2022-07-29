@@ -82,19 +82,14 @@ GET.apiDoc = {
  */
 export function searchInElasticSearch(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({
-      label: 'getSearchResults',
-      message: 'request params',
-      terms: req.query.terms,
-      index: req.query.index
-    });
-
     const queryString = String(req.query.terms) || '*';
+
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
-      const elasticService = new ESService();
       await connection.open();
+
+      const elasticService = new ESService();
 
       const submissionService = new SubmissionService(connection);
 
@@ -113,10 +108,15 @@ export function searchInElasticSearch(): RequestHandler {
 
       const result = await Promise.all(promises);
 
+      await connection.commit();
+
       res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'keywordSearchEml', message: 'error', error });
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   };
 }

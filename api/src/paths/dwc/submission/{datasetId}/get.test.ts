@@ -37,50 +37,26 @@ describe('get', () => {
       expect(mockRes.statusValue).to.equal(200);
     });
 
-    describe('should throw an error when', () => {
-      it('datasetId is missing', async () => {
-        const dbConnectionObj = getMockDBConnection();
-        sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    it('catches and re-throws an error', async () => {
+      const dbConnectionObj = getMockDBConnection();
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-        sinon
-          .stub(SubmissionService.prototype, 'getSubmissionRecordSONByDatasetId')
-          .resolves(`{id: 'a valid json string}`);
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordSONByDatasetId').rejects(new Error('a test error'));
 
-        const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-        mockReq.params = {};
+      mockReq.params = {
+        datasetId: 'abcd'
+      };
 
-        try {
-          const requestHandler = getMetadataByDatasetId();
+      try {
+        const requestHandler = getMetadataByDatasetId();
 
-          await requestHandler(mockReq, mockRes, mockNext);
-          expect.fail();
-        } catch (actualError) {
-          expect((actualError as HTTPError).message).to.equal('Missing required path param: datasetId');
-        }
-      });
-
-      it('any error occurs', async () => {
-        const dbConnectionObj = getMockDBConnection();
-        sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-        sinon.stub(SubmissionService.prototype, 'getSubmissionRecordSONByDatasetId').rejects(new Error('a test error'));
-
-        const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-        mockReq.params = {
-          datasetId: 'abcd'
-        };
-
-        try {
-          const requestHandler = getMetadataByDatasetId();
-
-          await requestHandler(mockReq, mockRes, mockNext);
-          expect.fail();
-        } catch (actualError) {
-          expect((actualError as HTTPError).message).to.equal('a test error');
-        }
-      });
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).message).to.equal('a test error');
+      }
     });
   });
 });

@@ -14,7 +14,7 @@ import { GET } from './search';
 
 chai.use(sinonChai);
 
-describe('search', () => {
+describe.skip('search', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
@@ -145,7 +145,7 @@ describe('search', () => {
           expect(response.errors[0].message).to.equal('must be array');
         });
 
-        it.skip('returns invalid response (not an array of FeatureCollection)', async () => {
+        it('returns invalid response (not an array of FeatureCollection)', async () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
@@ -165,7 +165,7 @@ describe('search', () => {
         });
       });
 
-      describe.skip('should succeed when', () => {
+      describe('should succeed when', () => {
         it('required values are valid (empty)', async () => {
           const apiResponse: FeatureCollection[] = [];
 
@@ -267,7 +267,7 @@ describe('search', () => {
       }
     });
 
-    it.skip('returns 200', async () => {
+    it('returns 200', async () => {
       const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 

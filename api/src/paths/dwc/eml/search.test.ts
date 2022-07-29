@@ -1,12 +1,14 @@
-import { Client } from '@elastic/elasticsearch';
+import { SearchHit } from '@elastic/elasticsearch/lib/api/types';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import * as db from '../../../database/db';
 import { ESService } from '../../../services/es-service';
-import { getRequestHandlerMocks } from '../../../__mocks__/db';
+import { SubmissionService } from '../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './search';
 import { GET } from './search';
 
@@ -122,43 +124,68 @@ describe('search', () => {
         });
       });
     });
+  });
 
-    describe('search terms in Elastic Search', () => {
-      afterEach(() => {
-        sinon.restore();
-      });
-      it('returns search results when Elastic Search service succeeds with valid data', async () => {
-        const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+  describe('searchInElasticSearch', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
 
-        mockReq.query = {
-          terms: 'search-term'
-        };
+    it('catches and re-throws an error', async () => {
+      const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-        const searchStub = sinon.stub().resolves({
-          hits: {
-            hits: [{ _id: 'testid', _source: {}, fields: {} }]
-          }
-        });
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-        sinon.stub(ESService.prototype, 'getEsClient').resolves({
-          search: searchStub
-        } as unknown as Client);
+      mockReq.query = {
+        terms: 'search-term'
+      };
 
-        const requestHandler = search.searchInElasticSearch();
+      sinon.stub(ESService.prototype, 'keywordSearchEml').throws(new Error('test error'));
 
+      const requestHandler = search.searchInElasticSearch();
+
+      try {
         await requestHandler(mockReq, mockRes, mockNext);
-        expect(mockRes.jsonValue).eql([{ id: 'testid', source: {}, fields: {} }]);
-        expect(searchStub).to.have.been.calledOnceWith({
-          index: 'eml',
-          query: {
-            multi_match: {
-              fields: ['*'],
-              type: 'phrase_prefix',
-              query: 'search-term'
-            }
-          }
-        });
-      });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('test error');
+        expect(dbConnectionObj.release).to.have.been.calledOnce;
+        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+      }
+    });
+
+    it('returns search results when Elastic Search service succeeds with valid data', async () => {
+      const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {
+        terms: 'search-term'
+      };
+
+      sinon
+        .stub(SubmissionService.prototype, 'getObservationCountByDatasetId')
+        .onCall(0)
+        .resolves(14)
+        .onCall(1)
+        .resolves(23);
+
+      const keywordSearchEmlStub = sinon.stub(ESService.prototype, 'keywordSearchEml').resolves([
+        { _id: '123', _source: {}, fields: {} },
+        { _id: '456', _source: {}, fields: {} }
+      ] as unknown as SearchHit[]);
+
+      const requestHandler = search.searchInElasticSearch();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(keywordSearchEmlStub).to.have.been.calledOnceWith('search-term');
+      expect(mockRes.jsonValue).eql([
+        { id: '123', source: {}, fields: {}, observation_count: 14 },
+        { id: '456', source: {}, fields: {}, observation_count: 23 }
+      ]);
     });
   });
 });
