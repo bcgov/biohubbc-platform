@@ -2,6 +2,7 @@ import { Theme } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
+import Divider from '@material-ui/core/Divider';
 import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
@@ -17,21 +18,19 @@ import qs from 'qs';
 import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
+import { mdiEyeOutline, mdiEyeOffOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 
 const useStyles = makeStyles((theme: Theme) => ({
+  searchResultTitle: {
+    fontSize: '1rem'
+  },
   datasetResultContainer: {
     display: 'flex',
     flexDirection: 'column',
-    [theme.breakpoints.up('lg')]: {
-      flexDirection: 'row',
-      justifyContent: 'space-between'
-    },
   },
-  datasetResultMeta: {
-    marginBottom: theme.spacing(2),
-    [theme.breakpoints.up('lg')]: {
-      marginBottom: 0
-    },
+  datasetTitle: {
+    fontSize: '1.25rem'
   },
   datasetAbstract: {
     display: '-webkit-box',
@@ -176,7 +175,7 @@ const SearchPage = () => {
         </Formik>
         <Box mt={6} mb={4}>
           {formikRef.current?.values.keywords && (
-            <Typography variant="h2">
+            <Typography variant="h2" className={classes.searchResultTitle}>
               {searchDataLoader.isLoading ? (
                 <>Loading...</>
               ) : (
@@ -195,9 +194,10 @@ const SearchPage = () => {
           {results.map((result: any, index: number) => (
             <Box mb={2} key={`${result.projectId}-${index}`}>
               <Box p={3} component={Card} className={classes.datasetResultContainer}>
-                <Box className={classes.datasetResultMeta}>
+                <Box mb={2}>
                   <Box mb={2}>
                     <Link
+                      className={classes.datasetTitle}
                       color="primary"
                       aria-current="page"
                       variant="h3"
@@ -209,13 +209,16 @@ const SearchPage = () => {
                     {truncate(result.projectAbstract[0].para, { length: 200, separator: ' ' })}
                   </Typography>
                 </Box>
-                <Box>
-                <Link
-                  color="primary"
-                  aria-current="page"
-                  href={`datasets/${result.datasetId}/details`}>
-                  {result.observationCount} observations
-                </Link>
+                <Divider></Divider>
+                <Box mt={2}>
+                  <Typography component="span" variant="subtitle2" color="textSecondary">
+                    <Box display="flex" alignItems="center">
+                      {result.observationCount === 0 ? (
+                        <Icon path={mdiEyeOffOutline} size={1} />
+                      ) : <Icon path={mdiEyeOutline} size={1} />}
+                      <Box ml={1} component="strong">{result.observationCount} observations</Box>
+                    </Box>
+                  </Typography>
                 </Box>
               </Box>
             </Box>
