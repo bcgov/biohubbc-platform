@@ -8,7 +8,7 @@ import { IGetSpatialDataResponse } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import React from 'react';
 
-export const parseSpatialDataByType = (spatialData: IGetSpatialDataResponse) => {
+export const parseSpatialDataByType = (spatialData: IGetSpatialDataResponse[]) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
 
   const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
