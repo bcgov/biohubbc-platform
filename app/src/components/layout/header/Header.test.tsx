@@ -45,7 +45,7 @@ describe('Header', () => {
     );
 
     expect(getByText('Home')).toBeVisible();
-    expect(getByText('Search')).toBeVisible();
+    expect(getByText('Find Datasets')).toBeVisible();
     expect(getByText('Manage Users')).toBeVisible();
   });
 
@@ -83,7 +83,7 @@ describe('Header', () => {
     );
 
     expect(getByText('Home')).toBeVisible();
-    expect(getByText('Search')).toBeVisible();
+    expect(getByText('Find Datasets')).toBeVisible();
     expect(getByText('Manage Users')).toBeVisible();
   });
 

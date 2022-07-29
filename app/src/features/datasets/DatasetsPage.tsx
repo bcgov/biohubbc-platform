@@ -15,7 +15,7 @@ import React from 'react';
 const DatasetsPage = () => {
   const biohubApi = useApi();
 
-  const datasetsDataLoader = useDataLoader(() => biohubApi.search.listAllDatasets());
+  const datasetsDataLoader = useDataLoader(() => biohubApi.dataset.listAllDatasets());
 
   datasetsDataLoader.load();
 

@@ -1,4 +1,4 @@
-import { Feature } from 'geojson';
+import { Feature, FeatureCollection } from 'geojson';
 
 /**
  * Get search results response object.
@@ -14,6 +14,11 @@ export interface IGetSearchResultsResponse {
   lifestage?: string;
   geometry: Feature[];
 }
+
+export type IGetSpatialDataResponse = {
+  submission_spatial_component_id: number;
+  spatial_data: FeatureCollection;
+};
 
 /**
  * An interface for an instance of filter fields for search results
@@ -43,18 +48,15 @@ export interface IGetOccurrenceData {
   geometry: Feature | null;
 }
 
-export type IElasticsearchResponse<T = unknown, S = unknown> = {
+export type IElasticSearchResponse<Fields = unknown, Source = unknown> = {
   id: string;
-  fields: T;
-  source: S;
-}[];
+  fields: Fields;
+  source: Source;
+};
 
-export interface IKeywordSearchResult {
-  project: {
-    projectId: string;
-    projectTitle: string;
-    projectObjectives: string;
-  }[];
+export interface IKeywordSearchResponse<Fields = Record<string, any>, Source = Record<string, any>>
+  extends IElasticSearchResponse<Fields, Source> {
+  observation_count: number;
 }
 
 export interface IAdvancedSearch {

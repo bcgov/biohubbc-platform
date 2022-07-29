@@ -1,6 +1,12 @@
 import Box from '@material-ui/core/Box';
+import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
+import Divider from '@material-ui/core/Divider';
+import Link from '@material-ui/core/Link';
 import Typography from '@material-ui/core/Typography';
+import { makeStyles } from '@material-ui/styles';
+import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
@@ -14,11 +20,32 @@ import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
 
+const useStyles = makeStyles(() => ({
+  searchResultTitle: {
+    fontSize: '1.125rem'
+  },
+  datasetResultContainer: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  datasetTitle: {
+    fontSize: '1.25rem'
+  },
+  datasetAbstract: {
+    display: '-webkit-box',
+    overflow: 'hidden',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    maxWidth: '92ch'
+  }
+}));
+
 const advancedSearchInitialValues: IAdvancedSearch = {
   keywords: ''
 };
 
 const SearchPage = () => {
+  const classes = useStyles();
   const biohubApi = useApi();
   const history = useHistory();
   const location = useLocation();
@@ -27,7 +54,6 @@ const SearchPage = () => {
   const searchDataLoader = useDataLoader((query: string) => {
     return biohubApi.search.keywordSearch(query);
   });
-  const { isLoading } = searchDataLoader;
 
   /**
    * collection of params from url location.search
@@ -111,41 +137,49 @@ const SearchPage = () => {
     });
   };
 
-  const results = (searchDataLoader.data || []).reduce((acc: any, item) => {
-    return [...acc, ...item.source.project];
-  }, []);
+  const appendProjectsWithDatasetId = () => {
+    const newList: any[] = [];
+
+    searchDataLoader.data &&
+      searchDataLoader.data.forEach((dataset) => {
+        const datasetId = dataset.id;
+
+        const project = dataset.source.project.find((item: any) => item.projectType === 'project');
+
+        const appendedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
+
+        newList.push(appendedItem);
+      });
+
+    return newList;
+  };
+
+  const results = appendProjectsWithDatasetId();
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
   return (
-    <Box my={4}>
+    <Box py={5}>
       <Container maxWidth="xl">
         <Box mb={5}>
-          <Box mb={1}>
-            <Typography variant="h1">Search</Typography>
-          </Box>
-          <Typography variant="body1" color="textSecondary">
-            BioHubBC Platform search.
-          </Typography>
+          <Typography variant="h1">Find BioHub Datasets</Typography>
         </Box>
-        <Box>
-          <Formik<IAdvancedSearch>
-            innerRef={formikRef}
-            initialValues={formikValues}
-            onSubmit={handleSubmit}
-            onReset={handleReset}
-            enableReinitialize={true}>
-            <SearchComponent />
-          </Formik>
-        </Box>
-        <Box my={4}>
+        <Formik<IAdvancedSearch>
+          innerRef={formikRef}
+          initialValues={formikValues}
+          onSubmit={handleSubmit}
+          onReset={handleReset}
+          enableReinitialize={true}>
+          <SearchComponent />
+        </Formik>
+        <Box mt={6} mb={4}>
           {formikRef.current?.values.keywords && (
-            <Typography variant="h2">
-              {isLoading ? (
+            <Typography variant="h2" className={classes.searchResultTitle}>
+              {searchDataLoader.isLoading ? (
                 <>Loading...</>
               ) : (
                 <>
-                  {`${results.length} result${results.length !== 1 && 's'}`}
+                  Found {`${results.length} result${results.length !== 1 && 's'}`}
                   <Typography
                     variant="inherit"
                     component="span"
@@ -157,11 +191,39 @@ const SearchPage = () => {
         </Box>
         <Box>
           {results.map((result: any, index: number) => (
-            <Box mb={3} p={2} key={`${result.projectId}-${index}`} borderRadius={4} border={1}>
-              <Typography variant="h4">{result.projectTitle}</Typography>
-              <Typography variant="body1" color="textSecondary">
-                {truncate(result.projectObjectives, { length: 200, separator: ' ' })}
-              </Typography>
+            <Box mb={2} key={`${result.projectId}-${index}`}>
+              <Box p={3} component={Card} className={classes.datasetResultContainer}>
+                <Box mb={2}>
+                  <Box mb={2}>
+                    <Link
+                      className={classes.datasetTitle}
+                      color="primary"
+                      aria-current="page"
+                      variant="h3"
+                      href={`datasets/${result.datasetId}/details`}>
+                      {result.projectTitle}
+                    </Link>
+                  </Box>
+                  <Typography className={classes.datasetAbstract} variant="body1" color="textSecondary">
+                    {truncate(result.projectAbstract[0].para, { length: 200, separator: ' ' })}
+                  </Typography>
+                </Box>
+                <Divider></Divider>
+                <Box mt={2}>
+                  <Typography component="span" variant="subtitle2" color="textSecondary">
+                    <Box display="flex" alignItems="center">
+                      {result.observationCount === 0 ? (
+                        <Icon path={mdiEyeOffOutline} size={1} />
+                      ) : (
+                        <Icon path={mdiEyeOutline} size={1} />
+                      )}
+                      <Box ml={1} component="strong">
+                        {result.observationCount} observations
+                      </Box>
+                    </Box>
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
           ))}
         </Box>
