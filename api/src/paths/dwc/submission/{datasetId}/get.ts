@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../../services/submission-service';
@@ -63,18 +62,7 @@ GET.apiDoc = {
  */
 export function getMetadataByDatasetId(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({
-      label: 'getSearchResults',
-      message: 'request params',
-      terms: req.query.terms,
-      index: req.query.index
-    });
-
     const connection = getDBConnection(req['keycloak_token']);
-
-    if (!req.params || !req.params.datasetId) {
-      throw new HTTP400('Missing required path param: datasetId');
-    }
 
     const datasetId = String(req.params.datasetId);
 
@@ -83,11 +71,11 @@ export function getMetadataByDatasetId(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const datasetMetadata: string = await submissionService.getSubmissionRecordSONByDatasetId(datasetId);
+      const result: string = await submissionService.getSubmissionRecordSONByDatasetId(datasetId);
 
       await connection.commit();
 
-      res.status(200).json({ datasetMetadata });
+      res.status(200).json(result);
     } catch (error) {
       defaultLog.error({ label: 'getMetadataByDatasetId', message: 'error', error });
       await connection.rollback();

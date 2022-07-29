@@ -294,8 +294,6 @@ export class SpatialRepository extends BaseRepository {
 
     const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
 
-    console.log('spatial response from db is: ', response.rows);
-
     return response.rows;
   }
 

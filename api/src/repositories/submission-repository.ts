@@ -402,9 +402,6 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<{ count: number }>(sqlStatement);
 
-    console.log(response.rows[0]);
-    console.log(typeof response.rows[0].count);
-
     return response.rows[0].count;
   }
 

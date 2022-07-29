@@ -103,9 +103,6 @@ export function searchInElasticSearch(): RequestHandler {
       const promises = response.map(async (item) => {
         const observationCount = await submissionService.getObservationCountByDatasetId(item._id);
 
-        console.log(typeof observationCount);
-        console.log(isNaN(observationCount));
-
         return {
           id: item._id,
           fields: item.fields,
@@ -115,8 +112,6 @@ export function searchInElasticSearch(): RequestHandler {
       });
 
       const result = await Promise.all(promises);
-
-      console.log('search result is: ', result);
 
       res.status(200).json(result);
     } catch (error) {

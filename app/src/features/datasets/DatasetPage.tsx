@@ -1,10 +1,12 @@
+import { Theme } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
+import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
 import Container from '@material-ui/core/Container';
 import Paper from '@material-ui/core/Paper';
-import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
 import Typography from '@material-ui/core/Typography';
+import { makeStyles } from '@material-ui/styles';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
@@ -18,8 +20,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
-import { Theme } from '@material-ui/core';
-import { makeStyles } from '@material-ui/styles';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
@@ -35,7 +35,7 @@ const useStyles = makeStyles((theme: Theme) => ({
     aspectRatio: '1 / 0.5',
     borderRadius: '6px',
     paddingBottom: '16px'
-  },
+  }
 }));
 
 const DatasetPage: React.FC = () => {
@@ -93,7 +93,7 @@ const DatasetPage: React.FC = () => {
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
         <Container maxWidth="xl">
-          <Typography variant="h1">{datasetDataLoader?.data['eml:eml'].dataset.title}</Typography>
+          <Typography variant="h1">{datasetDataLoader.data['eml:eml'].dataset.title}</Typography>
         </Container>
       </Paper>
       <Container maxWidth="xl">
