@@ -3,7 +3,7 @@ import {
   IGetSpatialTransformRecord,
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
-  ISubmissionSpatialComponent,
+  ISubmissionSpatialSearchResponseRow,
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { DBService } from './db-service';
@@ -37,30 +37,8 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<IGetSpatialTransformRecord>}
    * @memberof SpatialService
    */
-  async getSpatialTransformRecordByName(spatialTransformName: string): Promise<IGetSpatialTransformRecord> {
-    return this.spatialRepository.getSpatialTransformRecordByName(spatialTransformName);
-  }
-
-  /**
-   * get spatial transform record from name
-   *
-   * @param {string} spatialTransformName
-   * @return {*}  {Promise<IGetSpatialTransformRecord>}
-   * @memberof SpatialService
-   */
   async getSpatialTransformRecords(): Promise<IGetSpatialTransformRecord[]> {
     return this.spatialRepository.getSpatialTransformRecords();
-  }
-
-  /**
-   * get spatial transform string from id
-   *
-   * @param {number} spatialTransformId
-   * @return {*}  {Promise<{ transform: string }>}
-   * @memberof SpatialService
-   */
-  async getSpatialTransformBySpatialTransformId(spatialTransformId: number): Promise<{ transform: string }> {
-    return this.spatialRepository.getSpatialTransformBySpatialTransformId(spatialTransformId);
   }
 
   /**
@@ -81,55 +59,23 @@ export class SpatialService extends DBService {
     );
   }
 
-  //TODO: not using this?
-  /**
-   * Collect transform from db, run transform on submission id, save result to spatial component table
-   *
-   * @param {number} submissionId
-   * @param {string} spatialTransformName
-   * @return {*}  {Promise<void>}
-   * @memberof SpatialService
-   */
-  async runSpatialTransform(submissionId: number, spatialTransformName: string): Promise<void> {
-    const spatialTransformRecord = await this.getSpatialTransformRecordByName(spatialTransformName);
-
-    const transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
-      submissionId,
-      spatialTransformRecord.transform
-    );
-
-    transformed.forEach(async (dataPoint) => {
-      const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
-        submissionId,
-        dataPoint.result_data
-      );
-
-      await this.insertSpatialTransformSubmissionRecord(
-        spatialTransformRecord.spatial_transform_id,
-        submissionSpatialComponentId.submission_spatial_component_id
-      );
-    });
-  }
-
   /**
    * Collect transforms from db, run transformations on submission id, save result to spatial component table
    *
    * @param {number} submissionId
-   * @param {string} spatialTransformName
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
   async runSpatialTransforms(submissionId: number): Promise<void> {
     const spatialTransformRecords = await this.getSpatialTransformRecords();
-    let transformed;
 
-    spatialTransformRecords.forEach(async (transformRecord) => {
-      transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
+    const promises1 = spatialTransformRecords.map(async (transformRecord) => {
+      const transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
         submissionId,
         transformRecord.transform
       );
 
-      transformed.forEach(async (dataPoint) => {
+      const promises2 = transformed.map(async (dataPoint) => {
         const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
           submissionId,
           dataPoint.result_data
@@ -140,19 +86,23 @@ export class SpatialService extends DBService {
           submissionSpatialComponentId.submission_spatial_component_id
         );
       });
+
+      await Promise.all(promises2);
     });
+
+    await Promise.all(promises1);
   }
 
   /**
    * Query builder to find spatial component by given criteria
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialService
    */
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
-  ): Promise<ISubmissionSpatialComponent[]> {
+  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
   }
 

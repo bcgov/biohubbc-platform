@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
 import { getAPIUserDBConnection } from '../../../database/db';
+import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
@@ -16,34 +17,36 @@ GET.apiDoc = {
   parameters: [
     {
       in: 'query',
-      name: 'type',
-      required: true,
-      schema: {
-        type: 'array',
-        items: {
-          type: 'string'
-        }
-      }
-    },
-    {
-      in: 'query',
-      name: 'datasetID',
-      required: false,
-      schema: {
-        type: 'array',
-        items: {
-          type: 'string'
-        }
-      }
-    },
-    {
-      in: 'query',
       name: 'boundary',
       required: true,
       schema: {
         type: 'string'
       },
-      description: 'A stringified GeoJSON Feature.'
+      description: 'A stringified GeoJSON Feature. Will return results that intersect the feature.'
+    },
+    {
+      in: 'query',
+      name: 'type',
+      schema: {
+        type: 'array',
+        items: {
+          type: 'string'
+        },
+        nullable: true
+      },
+      description: 'An array of spatial component types to filter on. Will return results that match any of the types.'
+    },
+    {
+      in: 'query',
+      name: 'datasetID',
+      schema: {
+        type: 'array',
+        items: {
+          type: 'string'
+        },
+        nullable: true
+      },
+      description: 'An array of dataset IDs. Will return results that belong to any of the dataset IDs.'
     }
   ],
   responses: {
@@ -55,13 +58,14 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['submission_spatial_component_id', 'data'],
+              required: ['submission_spatial_component_id', 'spatial_data'],
               properties: {
-                data: {
-                  type: 'object'
-                },
                 submission_spatial_component_id: {
-                  type: 'integer'
+                  type: 'integer',
+                  minimum: 1
+                },
+                spatial_data: {
+                  ...GeoJSONFeatureCollection
                 }
               }
             }
@@ -89,6 +93,8 @@ export function searchSpatialComponents(): RequestHandler {
       const spatialService = new SpatialService(connection);
 
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
+
+      await connection.commit();
 
       res.status(200).json(response.map((item) => item.spatial_component));
     } catch (error) {

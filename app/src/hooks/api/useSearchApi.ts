@@ -1,8 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { Feature, FeatureCollection } from 'geojson';
+import { Feature } from 'geojson';
 import {
   IElasticsearchResponse,
   IGetSearchResultsResponse,
+  IGetSpatialDataResponse,
   IKeywordSearchResult
 } from 'interfaces/useSearchApi.interface';
 
@@ -24,7 +25,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialData = async (criteria: { boundary: Feature; type: string[] }): Promise<FeatureCollection[]> => {
+  const getSpatialData = async (criteria: { boundary: Feature; type: string[] }): Promise<IGetSpatialDataResponse> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type }
     });

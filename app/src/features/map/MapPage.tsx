@@ -12,7 +12,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import { LatLngBounds } from 'leaflet';
 import React, { useEffect, useState } from 'react';
-import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
+import { parseSpatialDataByType } from 'utils/spatial-utils';
 import { getFeatureObjectFromLatLngBounds } from 'utils/Utils';
 
 const MapPage: React.FC = () => {
@@ -38,7 +38,7 @@ const MapPage: React.FC = () => {
       return;
     }
 
-    const result = parseFeatureCollectionsByType(mapDataLoader.data);
+    const result = parseSpatialDataByType(mapDataLoader.data);
 
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);

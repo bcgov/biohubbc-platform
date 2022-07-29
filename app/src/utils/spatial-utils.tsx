@@ -3,18 +3,19 @@ import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { Feature, FeatureCollection } from 'geojson';
+import { Feature } from 'geojson';
+import { IGetSpatialDataResponse } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import React from 'react';
 
-export const parseFeatureCollectionsByType = (featureCollections: FeatureCollection[]) => {
+export const parseSpatialDataByType = (spatialData: IGetSpatialDataResponse) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
 
   const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
-  for (const featureCollection of featureCollections) {
-    for (const feature of featureCollection.features) {
+  for (const item of spatialData) {
+    for (const feature of item.spatial_data.features) {
       if (isOccurrenceFeature(feature)) {
         if (feature.geometry.type === 'GeometryCollection') {
           // Not expecting or supporting geometry collections
