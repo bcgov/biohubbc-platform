@@ -26,10 +26,48 @@ const eventHandlers = {
   onMounted: 'draw:mounted'
 };
 
+/**
+ * Custom subset of `L.Control.DrawConstructorOptions` that omits `edit.Feature` as this will be added automatically
+ * by `DrawControls`.
+ *
+ * @export
+ * @interface IDrawControlsOptions
+ */
+export interface IDrawControlsOptions {
+  position?: L.Control.DrawConstructorOptions['position'];
+  draw?: L.Control.DrawConstructorOptions['draw'];
+  edit?: Omit<L.Control.DrawConstructorOptions['edit'], 'Feature'>;
+}
+
 export interface IDrawControlsProps {
-  features?: Feature[];
-  options?: L.Control.DrawConstructorOptions;
+  /**
+   * Initial features to add to the map. These features will be editable.
+   *
+   * @type {Feature[]}
+   * @memberof IDrawControlsProps
+   */
+  initialFeatures?: Feature[];
+  /**
+   * Options to control the draw/edit UI controls.
+   *
+   * @type {IDrawControlsOptions}
+   * @memberof IDrawControlsProps
+   */
+  options?: IDrawControlsOptions;
+  /**
+   * Callback triggered anytime a feature is added or updated or removed.
+   *
+   * @memberof IDrawControlsProps
+   */
   onChange?: (features: Feature[]) => void;
+  /**
+   * Clear any previously drawn features (layers) before drawing the next one.
+   * The result is that only 1 feature will be shown at a time.
+   *
+   * @type {boolean}
+   * @memberof IDrawControlsProps
+   */
+  clearOnDraw?: boolean;
 }
 
 const DrawControls: React.FC<IDrawControlsProps> = (props) => {
@@ -81,6 +119,7 @@ const DrawControls: React.FC<IDrawControlsProps> = (props) => {
     const options: L.Control.DrawConstructorOptions = {
       edit: {
         ...props.options?.edit,
+        // Add FeatureGroup automatically
         featureGroup: getFeatureGroup()
       }
     };
@@ -99,6 +138,12 @@ const DrawControls: React.FC<IDrawControlsProps> = (props) => {
    */
   const onDrawCreate = (event: L.DrawEvents.Created) => {
     const container = getFeatureGroup();
+
+    if (props.clearOnDraw) {
+      // Clear previous layers
+      container.clearLayers();
+    }
+
     container.addLayer(event.layer);
     handleFeatureUpdate();
   };
@@ -144,19 +189,16 @@ const DrawControls: React.FC<IDrawControlsProps> = (props) => {
   useEffect(() => {
     const { map } = context;
     // Register draw event handlers
-    // @ts-ignore
-    map.on(eventHandlers.onCreated, onDrawCreate);
-    // @ts-ignore
+    map.on(eventHandlers.onCreated, onDrawCreate as L.LeafletEventHandlerFn);
     map.on(eventHandlers.onEdited, onDrawEditDelete);
-    // @ts-ignore
     map.on(eventHandlers.onDeleted, onDrawEditDelete);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useDeepCompareEffect(() => {
-    drawFeatures(props.features);
+    drawFeatures(props.initialFeatures);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.features]);
+  }, [props.initialFeatures]);
 
   const drawControlsRef = useRef(getDrawControls());
 

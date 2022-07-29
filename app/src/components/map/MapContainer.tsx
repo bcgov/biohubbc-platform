@@ -1,5 +1,4 @@
 import makeStyles from '@material-ui/core/styles/makeStyles';
-import { Feature } from 'geojson';
 import L, { LatLngBounds, LeafletEventHandlerFnMap } from 'leaflet';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import 'leaflet-fullscreen/dist/leaflet.fullscreen.css';
@@ -12,7 +11,7 @@ import React from 'react';
 import { FeatureGroup, LayersControl, MapContainer as LeafletMapContainer } from 'react-leaflet';
 import BaseLayerControls from './components/BaseLayerControls';
 import { GetMapBounds, SetMapBounds } from './components/Bounds';
-import DrawControls from './components/DrawControls';
+import DrawControls, { IDrawControlsProps } from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
 import MarkerClusterGroup, { IMarkerLayer } from './components/MarkerCluster';
@@ -32,15 +31,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: iconShadow
 });
 
-export interface IMapDrawControlsProps {
-  features?: Feature[];
-  onChange?: (ref: any) => void;
-}
-
 export interface IMapContainerProps {
   mapId: string;
   staticLayers?: IStaticLayer[];
-  drawControls?: IMapDrawControlsProps;
+  drawControls?: IDrawControlsProps;
   scrollWheelZoom?: boolean;
   fullScreenControl?: boolean;
   markerLayers?: IMarkerLayer[];
@@ -97,13 +91,13 @@ const MapContainer: React.FC<IMapContainerProps> = (props) => {
       />
 
       {drawControls && (
-        <FeatureGroup>
+        <FeatureGroup key={'draw-controls-feature-group'}>
           <DrawControls
-            features={props.drawControls?.features}
-            onChange={(features: Feature[]) => {
-              props.drawControls?.onChange?.(features);
+            {...props.drawControls}
+            options={{
+              ...props.drawControls?.options,
+              draw: { ...props.drawControls?.options?.draw, circlemarker: false } // Always disable circlemarker
             }}
-            options={{ draw: { circlemarker: false } }}
           />
         </FeatureGroup>
       )}
