@@ -23,7 +23,7 @@ import Icon from '@mdi/react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   searchResultTitle: {
-    fontSize: '1rem'
+    fontSize: '1.125rem'
   },
   datasetResultContainer: {
     display: 'flex',
