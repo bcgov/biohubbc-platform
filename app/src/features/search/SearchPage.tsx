@@ -19,6 +19,20 @@ import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
 
 const useStyles = makeStyles((theme: Theme) => ({
+  datasetResultContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    [theme.breakpoints.up('lg')]: {
+      flexDirection: 'row',
+      justifyContent: 'space-between'
+    },
+  },
+  datasetResultMeta: {
+    marginBottom: theme.spacing(2),
+    [theme.breakpoints.up('lg')]: {
+      marginBottom: 0
+    },
+  },
   datasetAbstract: {
     display: '-webkit-box',
     overflow: 'hidden',
@@ -160,9 +174,9 @@ const SearchPage = () => {
           enableReinitialize={true}>
           <SearchComponent />
         </Formik>
-        <Box mt={6} mb={3}>
+        <Box mt={6} mb={4}>
           {formikRef.current?.values.keywords && (
-            <Typography variant="h3">
+            <Typography variant="h2">
               {searchDataLoader.isLoading ? (
                 <>Loading...</>
               ) : (
@@ -180,14 +194,13 @@ const SearchPage = () => {
         <Box>
           {results.map((result: any, index: number) => (
             <Box mb={2} key={`${result.projectId}-${index}`}>
-              <Card>
-                <Box p={3}>
+              <Box p={3} component={Card} className={classes.datasetResultContainer}>
+                <Box className={classes.datasetResultMeta}>
                   <Box mb={2}>
-                    <Box>{result.observationCount} observations</Box>
                     <Link
                       color="primary"
                       aria-current="page"
-                      variant="h4"
+                      variant="h3"
                       href={`datasets/${result.datasetId}/details`}>
                       {result.projectTitle}
                     </Link>
@@ -196,7 +209,15 @@ const SearchPage = () => {
                     {truncate(result.projectAbstract[0].para, { length: 200, separator: ' ' })}
                   </Typography>
                 </Box>
-              </Card>
+                <Box>
+                <Link
+                  color="primary"
+                  aria-current="page"
+                  href={`datasets/${result.datasetId}/details`}>
+                  {result.observationCount} observations
+                </Link>
+                </Box>
+              </Box>
             </Box>
           ))}
         </Box>
