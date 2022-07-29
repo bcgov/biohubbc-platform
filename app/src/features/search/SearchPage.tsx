@@ -125,24 +125,24 @@ const SearchPage = () => {
     });
   };
 
-  function appendProjectsWithDatasetId(searchLoader: { data: any }) {
+  const appendProjectsWithDatasetId = () => {
     let newList: any[] = [];
 
-    searchLoader.data &&
-      searchLoader.data.forEach((dataset: any) => {
+    searchDataLoader.data &&
+      searchDataLoader.data.forEach((dataset) => {
         const datasetId = dataset.id;
 
-        const project = dataset.source.project[0];
+        const project = dataset.source.project.find((item: any) => item.projectType === 'project');
 
-        const appendedItem = { ...project, datasetId: datasetId };
+        const appendedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
 
         newList.push(appendedItem);
       });
 
     return newList;
-  }
+  };
 
-  const results = appendProjectsWithDatasetId(searchDataLoader);
+  const results = appendProjectsWithDatasetId();
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
@@ -183,13 +183,12 @@ const SearchPage = () => {
               <Card>
                 <Box p={3}>
                   <Box mb={2}>
+                    <Box>{result.observationCount} observations</Box>
                     <Link
                       color="primary"
                       aria-current="page"
                       variant="h4"
-                      href={`datasets/${result.datasetId}/details`}
-                      // onClick={() => history.push(`datasets/${result.datasetId}/details`)}
-                    >
+                      href={`datasets/${result.datasetId}/details`}>
                       {result.projectTitle}
                     </Link>
                   </Box>

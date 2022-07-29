@@ -167,6 +167,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   *Get observation count by datasetId.
+   *
+   * @param {string} datasetId
+   * @return {string}
+   * @memberof SubmissionService
+   */
+  async getObservationCountByDatasetId(datasetId: string): Promise<number> {
+    return this.submissionRepository.getObservationCountByDatasetId(datasetId);
+  }
+
+  /**
    * Insert a submission status record.
    *
    * @param {number} submissionId
