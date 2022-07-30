@@ -22,8 +22,8 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'retreives spatial component metadata based on submission id',
-  tags: ['eml'],
+  description: 'Retrieves spatial component metadata based on submission spatial component id',
+  tags: ['spatial'],
   security: [
     {
       Bearer: []
@@ -32,7 +32,7 @@ GET.apiDoc = {
   parameters: [
     {
       description: 'spatial component submission id',
-      in: 'query',
+      in: 'path',
       name: 'submissionSpatialComponentId',
       required: false,
       schema: {
@@ -46,7 +46,8 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            //
+            type: 'object',
+            properties: {}
           }
         }
       }
@@ -56,18 +57,12 @@ GET.apiDoc = {
 };
 
 /**
- * Retreives dataset metadata from Elastic Search.
+ * Retrieves dataset metadata from Elastic Search.
  *
  * @returns {RequestHandler}
  */
 export function getSpatialMetadataById(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({
-      label: 'getSpatialMetadataById',
-      message: 'request params',
-      submissionSpatialComponentId: req.params.submissionSpatialComponentId
-    });
-
     const submissionSpatialComponentId = Number(req.params.submissionSpatialComponentId);
 
     const connection = getAPIUserDBConnection();

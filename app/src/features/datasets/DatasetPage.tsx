@@ -17,7 +17,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
-import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
+import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
@@ -75,7 +75,7 @@ const DatasetPage: React.FC = () => {
       return;
     }
 
-    const result = parseFeatureCollectionsByType(mapDataLoader.data);
+    const result = parseSpatialDataByType(mapDataLoader.data);
 
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);

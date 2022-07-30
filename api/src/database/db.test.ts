@@ -8,9 +8,11 @@ import { HTTPError } from '../errors/http-error';
 import { Queries } from '../queries';
 import * as db from './db';
 import {
+  DB_CLIENT,
   getAPIUserDBConnection,
   getDBConnection,
   getDBPool,
+  getKnex,
   getKnexQueryBuilder,
   IDBConnection,
   initDBPool
@@ -364,7 +366,15 @@ describe('db', () => {
     it('returns a Knex query builder', () => {
       const queryBuilder = getKnexQueryBuilder();
 
-      expect(queryBuilder.client.config).to.eql({ client: 'pg' });
+      expect(queryBuilder.client.config).to.eql({ client: DB_CLIENT });
+    });
+  });
+
+  describe('getKnex', () => {
+    it('returns a Knex instance', () => {
+      const knex = getKnex();
+
+      expect(knex.client.config).to.eql({ client: DB_CLIENT });
     });
   });
 });

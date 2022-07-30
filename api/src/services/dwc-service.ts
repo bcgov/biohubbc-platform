@@ -2,7 +2,6 @@ import { XMLParser } from 'fast-xml-parser';
 import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { SPATIAL_TRANSFORM_NAMES } from '../repositories/spatial-repository';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -51,6 +50,7 @@ export class DarwinCoreService extends DBService {
       await this.submissionService.setSubmissionEndDateById(submission_id);
 
       //Delete scraped spatial components table details
+      await this.spatialService.deleteSpatialComponentsTransformRefsBySubmissionId(submission_id);
       await this.spatialService.deleteSpatialComponentsBySubmissionId(submission_id);
     }
 
@@ -208,34 +208,13 @@ export class DarwinCoreService extends DBService {
       return;
     }
 
-    //Step 9: Run spatial transform for eml study boundary and save data
+    //Step 9: Run spatial transforms and save data
     try {
-      await this.spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
+      await this.spatialService.runSpatialTransforms(submissionId);
 
       await this.submissionService.insertSubmissionStatus(
         submissionId,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
-      );
-    } catch (error: any) {
-      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 10: Run spatial transform for dwc occurrences and save data
-    try {
-      await this.spatialService.runSpatialTransform(submissionId, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
-
-      await this.submissionService.insertSubmissionStatus(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
       );
     } catch (error: any) {
       defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });

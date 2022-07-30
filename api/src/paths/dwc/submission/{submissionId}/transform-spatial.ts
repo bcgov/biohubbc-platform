@@ -42,15 +42,6 @@ POST.apiDoc = {
         minimum: 1
       },
       required: true
-    },
-    {
-      in: 'query',
-      name: 'transformId',
-      schema: {
-        type: 'integer',
-        minimum: 1
-      },
-      required: true
     }
   ],
   responses: {
@@ -64,7 +55,6 @@ POST.apiDoc = {
 export function transformSpatialSubmission(): RequestHandler {
   return async (req, res) => {
     const submissionId = Number(req.params.submissionId);
-    const transformId = Number(req.query.transformId);
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
@@ -81,9 +71,7 @@ export function transformSpatialSubmission(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const spatialTransform = await spatialService.getSpatialTransformBySpatialTransformId(transformId);
-
-      await spatialService.runSpatialTransform(submissionId, spatialTransform.transform);
+      await spatialService.runSpatialTransforms(submissionId);
 
       await connection.commit();
 

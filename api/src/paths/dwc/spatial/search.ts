@@ -11,29 +11,10 @@ const defaultLog = getLogger('paths/dwc/eml/search');
 
 export const GET: Operation = [searchSpatialComponents()];
 
-export enum SPATIAL_COMPONENT_TYPE {
-  OCCURRENCE = 'Occurrence',
-  BOUNDARY = 'Boundary'
-}
-
-const getAllSpatialComponentTypes = (): string[] => Object.values(SPATIAL_COMPONENT_TYPE);
-
 GET.apiDoc = {
   description: 'Searches for spatial components.',
   tags: ['search'],
   parameters: [
-    {
-      in: 'query',
-      name: 'type',
-      required: true,
-      schema: {
-        type: 'array',
-        items: {
-          type: 'string',
-          enum: getAllSpatialComponentTypes()
-        }
-      }
-    },
     {
       in: 'query',
       name: 'boundary',
@@ -41,7 +22,31 @@ GET.apiDoc = {
       schema: {
         type: 'string'
       },
-      description: 'A stringified GeoJSON Feature.'
+      description: 'A stringified GeoJSON Feature. Will return results that intersect the feature.'
+    },
+    {
+      in: 'query',
+      name: 'type',
+      schema: {
+        type: 'array',
+        items: {
+          type: 'string'
+        },
+        nullable: true
+      },
+      description: 'An array of spatial component types to filter on. Will return results that match any of the types.'
+    },
+    {
+      in: 'query',
+      name: 'datasetID',
+      schema: {
+        type: 'array',
+        items: {
+          type: 'string'
+        },
+        nullable: true
+      },
+      description: 'An array of dataset IDs. Will return results that belong to any of the dataset IDs.'
     }
   ],
   responses: {
@@ -53,13 +58,13 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['featureCollection', 'submissionSpatialComponentId'],
-              nullable: true,
+              required: ['submission_spatial_component_id', 'spatial_data'],
               properties: {
-                submissionSpatialComponentId: {
-                  type: 'number'
+                submission_spatial_component_id: {
+                  type: 'integer',
+                  minimum: 1
                 },
-                featureCollection: {
+                spatial_data: {
                   ...GeoJSONFeatureCollection
                 }
               }
@@ -76,6 +81,7 @@ export function searchSpatialComponents(): RequestHandler {
   return async (req, res) => {
     const criteria = {
       type: (req.query.type as string[]) || [],
+      datasetID: (req.query.datasetID as string[]) || [],
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
 
@@ -90,15 +96,7 @@ export function searchSpatialComponents(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(
-        response.map((item) => {
-          const { spatial_component, submission_spatial_component_id } = item;
-          return {
-            featureCollection: spatial_component,
-            submissionSpatialComponentId: submission_spatial_component_id
-          };
-        })
-      );
+      res.status(200).json(response.map((item) => item.spatial_component));
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();

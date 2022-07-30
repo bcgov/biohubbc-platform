@@ -36,20 +36,12 @@ describe('transform-spatial', () => {
             expect(response.status).to.equal(400);
             expect(response.errors[0].message).to.equal("must have required property 'submissionId'");
           });
-
-          it('property transformId', async () => {
-            const request = { ...basicRequest, params: { submissionId: 1 } };
-            const response = requestValidator.validateRequest(request);
-
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].message).to.equal("must have required property 'transformId'");
-          });
         });
 
         describe('required properties is invalid type', () => {
           describe('submissionId', () => {
             it('has null value', async () => {
-              const request = { ...basicRequest, params: { submissionId: null }, query: { transformId: 1 } };
+              const request = { ...basicRequest, params: { submissionId: null } };
               const response = requestValidator.validateRequest(request);
 
               expect(response.status).to.equal(400);
@@ -57,7 +49,7 @@ describe('transform-spatial', () => {
             });
 
             it('has negative value', async () => {
-              const request = { ...basicRequest, params: { submissionId: -1 }, query: { transformId: 1 } };
+              const request = { ...basicRequest, params: { submissionId: -1 } };
               const response = requestValidator.validateRequest(request);
 
               expect(response.status).to.equal(400);
@@ -65,32 +57,7 @@ describe('transform-spatial', () => {
             });
 
             it('has string value', async () => {
-              const request = { ...basicRequest, params: { submissionId: 'string' }, query: { transformId: 1 } };
-              const response = requestValidator.validateRequest(request);
-
-              expect(response.status).to.equal(400);
-              expect(response.errors[0].message).to.equal('must be integer');
-            });
-          });
-          describe('transformId', () => {
-            it('has null value', async () => {
-              const request = { ...basicRequest, params: { submissionId: 1 }, query: { transformId: null } };
-              const response = requestValidator.validateRequest(request);
-
-              expect(response.status).to.equal(400);
-              expect(response.errors[0].message).to.equal('must be integer');
-            });
-
-            it('has negative value', async () => {
-              const request = { ...basicRequest, params: { submissionId: 1 }, query: { transformId: -1 } };
-              const response = requestValidator.validateRequest(request);
-
-              expect(response.status).to.equal(400);
-              expect(response.errors[0].message).to.equal('must be >= 1');
-            });
-
-            it('has string value', async () => {
-              const request = { ...basicRequest, params: { submissionId: 1 }, query: { transformId: 'string' } };
+              const request = { ...basicRequest, params: { submissionId: 'string' } };
               const response = requestValidator.validateRequest(request);
 
               expect(response.status).to.equal(400);
@@ -102,7 +69,7 @@ describe('transform-spatial', () => {
 
       describe('should succeed when', () => {
         it('has valid values', async () => {
-          const request = { ...basicRequest, params: { submissionId: 1 }, query: { transformId: 1 } };
+          const request = { ...basicRequest, params: { submissionId: 1 } };
           const response = requestValidator.validateRequest(request);
 
           expect(response).to.equal(undefined);
@@ -136,7 +103,6 @@ describe('transform-spatial', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.params = { submissionId: '1' };
-      mockReq.query = { transformId: '1' };
 
       sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
 
@@ -157,11 +123,10 @@ describe('transform-spatial', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.params = { submissionId: '1' };
-      mockReq.query = { transformId: '1' };
 
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      sinon.stub(SpatialService.prototype, 'getSpatialTransformBySpatialTransformId').throws(new Error('test error'));
+      sinon.stub(SpatialService.prototype, 'runSpatialTransforms').throws(new Error('test error'));
 
       const requestHandler = transformSpatial.transformSpatialSubmission();
 
@@ -182,22 +147,16 @@ describe('transform-spatial', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.params = { submissionId: '1' };
-      mockReq.query = { transformId: '1' };
 
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const getSpatialTransformBySpatialTransformIdStub = sinon
-        .stub(SpatialService.prototype, 'getSpatialTransformBySpatialTransformId')
-        .resolves({ transform: 'string' });
-
-      const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').resolves();
+      const runSpatialTransformsStub = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
 
       const requestHandler = transformSpatial.transformSpatialSubmission();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getSpatialTransformBySpatialTransformIdStub).to.have.been.calledOnceWith(1);
-      expect(runSpatialTransformStub).to.have.been.calledOnceWith(1, 'string');
+      expect(runSpatialTransformsStub).to.have.been.calledOnceWith(1);
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql(undefined);
     });

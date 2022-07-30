@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
+import { FeatureCollection } from 'geojson';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import {
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
-  ISubmissionSpatialComponent,
-  ITransformReturn,
+  ISubmissionSpatialSearchResponseRow,
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -35,44 +35,6 @@ describe('SpatialService', () => {
     });
   });
 
-  describe('getSpatialTransformBySpatialTransformId', () => {
-    it('should return transform row object', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const spatialService = new SpatialService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SpatialRepository.prototype, 'getSpatialTransformBySpatialTransformId')
-        .resolves({ transform: 'string' });
-
-      const response = await spatialService.getSpatialTransformBySpatialTransformId(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ transform: 'string' });
-    });
-  });
-
-  describe('getSpatialTransformRecordByName', () => {
-    it('should return transform row object', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const spatialService = new SpatialService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SpatialRepository.prototype, 'getSpatialTransformRecordByName')
-        .resolves({ spatial_transform_id: 1, name: 'Occurences', description: null, notes: null, transform: 'string' });
-
-      const response = await spatialService.getSpatialTransformRecordByName('Occurrence');
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({
-        spatial_transform_id: 1,
-        name: 'Occurences',
-        description: null,
-        notes: null,
-        transform: 'string'
-      });
-    });
-  });
-
   describe('insertSpatialTransformSubmissionRecord', () => {
     it('should return spatial_transform_submission_id after insert', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -89,28 +51,72 @@ describe('SpatialService', () => {
     });
   });
 
-  describe('runSpatialTransform', () => {
+  describe('runSpatialTransforms', () => {
     it('should return submission_spatial_component_id after running transform and inserting data', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
 
-      const getSpatialTransformRecordByNameStub = sinon
-        .stub(SpatialService.prototype, 'getSpatialTransformRecordByName')
-        .resolves({ spatial_transform_id: 1, name: 'Occurences', description: null, notes: null, transform: 'string' });
+      const getSpatialTransformRecordsStub = sinon
+        .stub(SpatialService.prototype, 'getSpatialTransformRecords')
+        .resolves([
+          {
+            spatial_transform_id: 1,
+            name: 'name1',
+            description: null,
+            notes: null,
+            transform: 'transform1'
+          },
+          {
+            spatial_transform_id: 2,
+            name: 'name2',
+            description: null,
+            notes: null,
+            transform: 'transform2'
+          }
+        ]);
 
       const runSpatialTransformOnSubmissionIdStub = sinon
         .stub(SpatialRepository.prototype, 'runSpatialTransformOnSubmissionId')
-        .resolves([{} as ITransformReturn]);
+        .onCall(0)
+        .resolves([
+          { result_data: 'result1' as unknown as FeatureCollection },
+          { result_data: 'result2' as unknown as FeatureCollection }
+        ])
+        .onCall(1)
+        .resolves([
+          { result_data: 'result3' as unknown as FeatureCollection },
+          { result_data: 'result4' as unknown as FeatureCollection }
+        ]);
 
       const insertSubmissionSpatialComponentStub = sinon
         .stub(SpatialRepository.prototype, 'insertSubmissionSpatialComponent')
-        .resolves({ submission_spatial_component_id: 1 });
+        .onCall(0)
+        .resolves({ submission_spatial_component_id: 3 })
+        .onCall(1)
+        .resolves({ submission_spatial_component_id: 4 })
+        .onCall(2)
+        .resolves({ submission_spatial_component_id: 5 })
+        .onCall(3)
+        .resolves({ submission_spatial_component_id: 6 });
 
-      await spatialService.runSpatialTransform(1, 'Occurrences');
+      const insertSpatialTransformSubmissionRecordStub = sinon
+        .stub(SpatialRepository.prototype, 'insertSpatialTransformSubmissionRecord')
+        .resolves();
 
-      expect(getSpatialTransformRecordByNameStub).to.be.calledOnce;
-      expect(runSpatialTransformOnSubmissionIdStub).to.be.calledOnce;
-      expect(insertSubmissionSpatialComponentStub).to.be.calledOnce;
+      await spatialService.runSpatialTransforms(9);
+
+      expect(getSpatialTransformRecordsStub).to.be.calledOnceWith();
+      expect(runSpatialTransformOnSubmissionIdStub).to.be.calledWith(9, 'transform1').calledWith(9, 'transform2');
+      expect(insertSubmissionSpatialComponentStub)
+        .to.be.calledWith(9, 'result1')
+        .calledWith(9, 'result2')
+        .calledWith(9, 'result3')
+        .calledWith(9, 'result4');
+      expect(insertSpatialTransformSubmissionRecordStub)
+        .to.be.calledWith(1, 3)
+        .calledWith(1, 4)
+        .calledWith(2, 5)
+        .calledWith(2, 6);
     });
   });
 
@@ -120,9 +126,19 @@ describe('SpatialService', () => {
       const spatialService = new SpatialService(mockDBConnection);
 
       const mockResponseRows = [
-        { submission_spatial_component_id: 1 },
-        { submission_spatial_component_id: 2 }
-      ] as unknown as ISubmissionSpatialComponent[];
+        {
+          spatial_component: {
+            spatial_data: {},
+            submission_spatial_component_id: 1
+          }
+        },
+        {
+          spatial_component: {
+            spatial_data: {},
+            submission_spatial_component_id: 2
+          }
+        }
+      ] as unknown as ISubmissionSpatialSearchResponseRow[];
 
       const repo = sinon
         .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteria')
