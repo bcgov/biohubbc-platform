@@ -1,10 +1,10 @@
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IGetSpatialDataResponse } from 'interfaces/useSearchApi.interface';
+import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { parseSpatialDataByType } from './spatial-utils';
 
 describe('parseSpatialDataByType', () => {
   it('returns empty responses if featureCollections param is empty', () => {
-    const spatialData: IGetSpatialDataResponse[] = [];
+    const spatialData: ISpatialData[] = [];
 
     const result = parseSpatialDataByType(spatialData);
 
@@ -17,7 +17,7 @@ describe('parseSpatialDataByType', () => {
   });
 
   it('returns empty responses if featureCollections param is has no features', () => {
-    const spatialData: IGetSpatialDataResponse[] = [
+    const spatialData: ISpatialData[] = [
       {
         submission_spatial_component_id: 1,
         spatial_data: {
@@ -38,7 +38,7 @@ describe('parseSpatialDataByType', () => {
   });
 
   it('returns non-empty responses if featureCollections has features', () => {
-    const spatialData: IGetSpatialDataResponse[] = [
+    const spatialData: ISpatialData[] = [
       {
         submission_spatial_component_id: 1,
         spatial_data: {
@@ -53,7 +53,15 @@ describe('parseSpatialDataByType', () => {
               properties: {
                 type: SPATIAL_COMPONENT_TYPE.OCCURRENCE
               }
-            },
+            }
+          ]
+        }
+      },
+      {
+        submission_spatial_component_id: 2,
+        spatial_data: {
+          type: 'FeatureCollection',
+          features: [
             {
               type: 'Feature',
               geometry: {
@@ -61,7 +69,15 @@ describe('parseSpatialDataByType', () => {
                 geometries: []
               },
               properties: {}
-            },
+            }
+          ]
+        }
+      },
+      {
+        submission_spatial_component_id: 3,
+        spatial_data: {
+          type: 'FeatureCollection',
+          features: [
             {
               type: 'Feature',
               geometry: {

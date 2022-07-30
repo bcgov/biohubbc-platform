@@ -1,21 +1,19 @@
-import { BoundaryFeature, BoundaryFeaturePopup } from 'components/map/BoundaryFeaturePopup';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
-import { OccurrenceFeature, OccurrenceFeaturePopup } from 'components/map/OccurrenceFeaturePopup';
+import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
-import { IGetSpatialDataResponse } from 'interfaces/useSearchApi.interface';
+import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import React from 'react';
 
-export const parseSpatialDataByType = (spatialData: IGetSpatialDataResponse[]) => {
+export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
-
   const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
-  for (const item of spatialData) {
-    for (const feature of item.spatial_data.features) {
+  for (const spatialRecord of spatialDataRecords) {
+    for (const feature of spatialRecord.spatial_data.features) {
       if (isOccurrenceFeature(feature)) {
         if (feature.geometry.type === 'GeometryCollection') {
           // Not expecting or supporting geometry collections
@@ -25,11 +23,11 @@ export const parseSpatialDataByType = (spatialData: IGetSpatialDataResponse[]) =
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id || feature.properties.id,
-          popup: <OccurrenceFeaturePopup properties={feature.properties} />
+          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
         });
       }
 
-      if (isBoundaryFeature(feature)) {
+      if (isBoundaryFeature(feature) || isBoundaryCentroidFeature(feature)) {
         if (feature.geometry.type === 'GeometryCollection') {
           continue;
         }
@@ -37,7 +35,7 @@ export const parseSpatialDataByType = (spatialData: IGetSpatialDataResponse[]) =
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
-          popup: <BoundaryFeaturePopup properties={feature.properties} />
+          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
         });
       }
     }
@@ -52,4 +50,8 @@ export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeat
 
 export const isBoundaryFeature = (feature: Feature): feature is BoundaryFeature => {
   return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY;
+};
+
+export const isBoundaryCentroidFeature = (feature: Feature): feature is BoundaryCentroidFeature => {
+  return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };

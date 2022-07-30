@@ -1,6 +1,6 @@
 import { Feature, FeatureCollection } from 'geojson';
 import SQL, { SQLStatement } from 'sql-template-strings';
-import { getKnex } from '../database/db';
+import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
@@ -281,6 +281,26 @@ export class SpatialRepository extends BaseRepository {
     console.log(response.rows[0]);
 
     return response.rows;
+  }
+
+  /**
+   * Query spatial components by given submission ID
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @memberof SpatialRepository
+   */
+  async findSpatialMetadataBySubmissionId(
+    submission_spatial_component_id: number
+  ): Promise<ISubmissionSpatialComponent> {
+    const queryBuilder = getKnexQueryBuilder()
+      .select()
+      .from('submission_spatial_component')
+      .where({ submission_spatial_component_id });
+
+    const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
+
+    return spatialComponentResponse.rows[0];
   }
 
   async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {

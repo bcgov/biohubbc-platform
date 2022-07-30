@@ -197,6 +197,24 @@ describe('search', () => {
           expect(response.errors[1].path).to.equal('0/spatial_data/type');
           expect(response.errors[1].message).to.equal('must be equal to one of the allowed values');
         });
+
+        it('returns invalid response (missing submission_spatial_component_id)', async () => {
+          const apiResponse = [
+            {
+              spatial_data: {
+                type: 'FeatureCollection',
+                properties: {},
+                geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
+              }
+            }
+          ];
+
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].path).to.equal('0');
+          expect(response.errors[0].message).to.equal("must have required property 'submission_spatial_component_id'");
+        });
       });
 
       describe('should succeed when', () => {

@@ -41,7 +41,11 @@ const MapPage: React.FC = () => {
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
   const [type] = useState<string[]>(
-    url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]
+    url.queryParams.type || [
+      SPATIAL_COMPONENT_TYPE.BOUNDARY,
+      SPATIAL_COMPONENT_TYPE.OCCURRENCE,
+      SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
+    ]
   );
   const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
