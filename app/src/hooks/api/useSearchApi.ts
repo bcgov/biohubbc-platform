@@ -2,9 +2,9 @@ import { AxiosInstance } from 'axios';
 import { Feature } from 'geojson';
 import {
   IGetSearchResultsResponse,
+  IKeywordSearchResponse,
   ISpatialData,
-  ISpatialMetadata,
-  IKeywordSearchResponse
+  ISpatialMetadata
 } from 'interfaces/useSearchApi.interface';
 
 /**
