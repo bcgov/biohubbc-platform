@@ -2,8 +2,9 @@ import { AxiosInstance } from 'axios';
 import { Feature } from 'geojson';
 import {
   IGetSearchResultsResponse,
-  IGetSpatialDataResponse,
-  IKeywordSearchResponse
+  IKeywordSearchResponse,
+  ISpatialData,
+  ISpatialMetadata
 } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -28,10 +29,15 @@ const useSearchApi = (axios: AxiosInstance) => {
     boundary: Feature;
     type: string[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
-  }): Promise<IGetSpatialDataResponse[]> => {
+  }): Promise<ISpatialData[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type }
     });
+    return data;
+  };
+
+  const getSpatialMetadata = async (submissionSpatialComponentId: number): Promise<ISpatialMetadata> => {
+    const { data } = await axios.get(`/api/dwc/spatial/${submissionSpatialComponentId}/metadata`);
     return data;
   };
 
@@ -50,7 +56,8 @@ const useSearchApi = (axios: AxiosInstance) => {
   return {
     getSearchResults,
     keywordSearch,
-    getSpatialData
+    getSpatialData,
+    getSpatialMetadata
   };
 };
 

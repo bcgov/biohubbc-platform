@@ -1,12 +1,12 @@
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { FeatureCollection } from 'geojson';
+import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { parseFeatureCollectionsByType } from './spatial-utils';
 
 describe('parseFeatureCollectionsByType', () => {
   it('returns empty responses if featureCollections param is empty', () => {
-    const featureCollections: FeatureCollection[] = [];
+    const spatialData: ISpatialData[] = [];
 
-    const result = parseFeatureCollectionsByType(featureCollections);
+    const result = parseFeatureCollectionsByType(spatialData);
 
     expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
 
@@ -17,14 +17,17 @@ describe('parseFeatureCollectionsByType', () => {
   });
 
   it('returns empty responses if featureCollections param is has no features', () => {
-    const featureCollections: FeatureCollection[] = [
+    const spatialData: ISpatialData[] = [
       {
-        type: 'FeatureCollection',
-        features: []
+        featureCollection: {
+          type: 'FeatureCollection',
+          features: []
+        },
+        submissionSpatialComponentId: 1
       }
     ];
 
-    const result = parseFeatureCollectionsByType(featureCollections);
+    const result = parseFeatureCollectionsByType(spatialData);
 
     expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
 
@@ -35,49 +38,58 @@ describe('parseFeatureCollectionsByType', () => {
   });
 
   it('returns non-empty responses if featureCollections has features', () => {
-    const featureCollections: FeatureCollection[] = [
+    const featureCollections: ISpatialData[] = [
       {
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [123, 456]
-            },
-            properties: {
-              type: SPATIAL_COMPONENT_TYPE.OCCURRENCE
+        featureCollection: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [123, 456]
+              },
+              properties: {
+                type: SPATIAL_COMPONENT_TYPE.OCCURRENCE
+              }
             }
-          }
-        ]
+          ]
+        },
+        submissionSpatialComponentId: 1
       },
       {
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'GeometryCollection',
-              geometries: []
-            },
-            properties: {}
-          }
-        ]
+        featureCollection: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'GeometryCollection',
+                geometries: []
+              },
+              properties: {}
+            }
+          ]
+        },
+        submissionSpatialComponentId: 2
       },
       {
-        type: 'FeatureCollection',
-        features: [
-          {
-            type: 'Feature',
-            geometry: {
-              type: 'Point',
-              coordinates: [321, 654]
-            },
-            properties: {
-              type: SPATIAL_COMPONENT_TYPE.BOUNDARY
+        featureCollection: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'Point',
+                coordinates: [321, 654]
+              },
+              properties: {
+                type: SPATIAL_COMPONENT_TYPE.BOUNDARY
+              }
             }
-          }
-        ]
+          ]
+        },
+        submissionSpatialComponentId: 3
       }
     ];
 

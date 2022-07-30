@@ -53,13 +53,13 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['spatial_data', 'submission_spatial_component_id'],
+              required: ['featureCollection', 'submissionSpatialComponentId'],
               nullable: true,
               properties: {
-                submission_spatial_component_id: {
+                submissionSpatialComponentId: {
                   type: 'number'
                 },
-                spatial_data: {
+                featureCollection: {
                   ...GeoJSONFeatureCollection
                 }
               }
@@ -94,8 +94,8 @@ export function searchSpatialComponents(): RequestHandler {
         response.map((item) => {
           const { spatial_component, submission_spatial_component_id } = item;
           return {
-            spatial_data: spatial_component,
-            submission_spatial_component_id
+            featureCollection: spatial_component,
+            submissionSpatialComponentId: submission_spatial_component_id
           };
         })
       );

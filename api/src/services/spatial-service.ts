@@ -115,4 +115,17 @@ export class SpatialService extends DBService {
   async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {
     return this.spatialRepository.deleteSpatialComponentsBySubmissionId(submission_id);
   }
+
+  /**
+   * Query builder to find spatial component by given criteria
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @memberof SpatialService
+   */
+  async findSpatialMetadataBySubmissionId(submissionSpatialComponentId: number): Promise<Record<string, string>> {
+    const response = await this.spatialRepository.findSpatialMetadataBySubmissionId(submissionSpatialComponentId);
+
+    return (response.spatial_component?.features[0]?.properties as Record<string, string>) || {};
+  }
 }
