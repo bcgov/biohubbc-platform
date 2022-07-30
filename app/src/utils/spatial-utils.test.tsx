@@ -19,7 +19,7 @@ describe('parseFeatureCollectionsByType', () => {
   it('returns empty responses if featureCollections param is has no features', () => {
     const spatialData: ISpatialData[] = [
       {
-        featureCollection:  {
+        featureCollection: {
           type: 'FeatureCollection',
           features: []
         },
