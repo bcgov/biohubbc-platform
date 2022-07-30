@@ -260,7 +260,7 @@ export class SpatialRepository extends BaseRepository {
     }
 
     if (criteria.datasetID?.length) {
-      // Append AND where clause for criteria.boundary
+      // Append AND where clause for criteria.datasetID
       queryBuilder.where((qb3) => {
         qb3.whereRaw(
           `submission_id in (select submission_id from submission where uuid in (${
