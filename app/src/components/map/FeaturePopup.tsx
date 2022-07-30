@@ -1,7 +1,6 @@
 import Box from '@material-ui/core/Box';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Collapse from '@material-ui/core/Collapse';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
@@ -32,7 +31,7 @@ export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };
 
-const useStyles = makeStyles((_theme: Theme) => ({
+const useStyles = makeStyles(() => ({
   modalContent: {
     position: 'relative',
     width: 300,
@@ -84,14 +83,14 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  const MetadataHeader: React.FC<{ type: string; date?: string }> = ({ type, date }) => (
+  const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
-        {type || 'Feature'}
+        {props.type || 'Feature'}
       </Typography>
-      {date && (
+      {props.date && (
         <Typography className={classes.date} component="h6" variant="subtitle1">
-          {formatDate(date)}
+          {formatDate(props.date)}
         </Typography>
       )}
     </Box>
@@ -136,19 +135,17 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   return (
     <ModalContentWrapper>
       <Collapse in={isReady}>
-        <div>
-          <MetadataHeader type={type} date={dwc.eventDate} />
-          <Table className={classes.table}>
-            <TableBody>
-              {Object.entries(dwc).map(([key, value]) => (
-                <TableRow key={key}>
-                  <TableCell className={classes.tableCell}>{key}</TableCell>
-                  <TableCell className={classes.tableCell}>{String(value)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <MetadataHeader type={type} date={dwc.eventDate} />
+        <Table className={classes.table}>
+          <TableBody>
+            {Object.entries(dwc).map(([key, value]) => (
+              <TableRow key={key}>
+                <TableCell className={classes.tableCell}>{key}</TableCell>
+                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </Collapse>
     </ModalContentWrapper>
   );
