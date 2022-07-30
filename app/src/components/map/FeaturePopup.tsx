@@ -84,14 +84,14 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  const MetadataHeader: React.FC<{ type: string; date?: string }> = ({ type, date }) => (
+  const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
-        {type || 'Feature'}
+        {props.type || 'Feature'}
       </Typography>
-      {date && (
+      {props.date && (
         <Typography className={classes.date} component="h6" variant="subtitle1">
-          {formatDate(date)}
+          {formatDate(props.date)}
         </Typography>
       )}
     </Box>
