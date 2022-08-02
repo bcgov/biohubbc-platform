@@ -93,15 +93,30 @@ export function searchInElasticSearch(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const response = await elasticService.keywordSearchEml(queryString);
+      const responseFromES = await elasticService.keywordSearchEml(queryString);
 
-      const promises = response.map(async (item) => {
-        const observationCount = await submissionService.getObservationCountByDatasetId(item._id);
+      const datasetIdsFromES = responseFromES.map((item) => item._id);
+
+      //console.log('datasetIdsFromES :', datasetIdsFromES);
+
+      const datasetIdsinDB = await submissionService.getDatasetIdsFromDB();
+
+      //console.log('datasetIdsinDB: ', datasetIdsinDB);
+
+      const filteredIds = datasetIdsinDB.filter((item) => datasetIdsFromES.includes(item.uuid));
+
+      //console.log('filteredIds: ', filteredIds);
+
+      const promises = filteredIds.map(async (item) => {
+        const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item.uuid);
+
+        console.log('response from DB ', responseFromDB);
+
+        const observationCount = await submissionService.getObservationCountByDatasetId(item.uuid);
 
         return {
-          id: item._id,
-          fields: item.fields,
-          source: item._source,
+          id: item.uuid,
+          source: responseFromDB,
           observation_count: observationCount
         };
       });

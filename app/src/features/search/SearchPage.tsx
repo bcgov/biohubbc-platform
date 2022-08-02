@@ -142,9 +142,15 @@ const SearchPage = () => {
 
     searchDataLoader.data &&
       searchDataLoader.data.forEach((dataset) => {
+        console.log('the dataset is: ', dataset);
         const datasetId = dataset.id;
 
-        const project = dataset.source.project.find((item: any) => item.projectType === 'project');
+        //console.log(dataset.source['eml:eml']);
+
+        const project = dataset.source.project.find((item: any) => {
+          console.log('item', item);
+          return item.projectType === 'project';
+        });
 
         const appendedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
 
