@@ -15,13 +15,9 @@ export type BoundaryCentroidFeature = Feature & { properties: BoundaryCentroidFe
 
 export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
-};
-
-interface IDatasetSpatialMetadata {
   datasetTitle: string;
   datasetID: string;
-  type: 'Boundary Centroid';
-}
+};
 
 const useStyles = makeStyles(() => ({
   modalContent: {
@@ -63,7 +59,7 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ subm
   dataLoader.load();
 
   const { isLoading, isReady } = dataLoader;
-  const data = dataLoader.data as IDatasetSpatialMetadata;
+  const data = dataLoader.data as BoundaryCentroidFeatureProperties;
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
