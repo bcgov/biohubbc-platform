@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
-import { Feature, FeatureCollection } from 'geojson';
+import { Feature } from 'geojson';
 import { describe } from 'mocha';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-request-validator';
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
-import { ISubmissionSpatialComponent } from '../../../repositories/spatial-repository';
+import { ISubmissionSpatialSearchResponseRow } from '../../../repositories/spatial-repository';
 import { SpatialService } from '../../../services/spatial-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as search from './search';
@@ -14,76 +14,19 @@ import { GET } from './search';
 
 chai.use(sinonChai);
 
-describe.skip('search', () => {
+describe('search', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       describe('should throw an error when', () => {
-        describe('type', () => {
-          it('is undefined', async () => {
-            const request = {
-              headers: {
-                'content-type': 'application/json'
-              },
-              query: {
-                boundary: 'not null'
-              }
-            };
-
-            const response = requestValidator.validateRequest(request);
-
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('type');
-            expect(response.errors[0].message).to.equal("must have required property 'type'");
-          });
-
-          it('is null', async () => {
-            const request = {
-              headers: {
-                'content-type': 'application/json'
-              },
-              query: {
-                type: null,
-                boundary: 'not null'
-              }
-            };
-
-            const response = requestValidator.validateRequest(request);
-
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('type');
-            expect(response.errors[0].message).to.equal('must be array');
-          });
-
-          it('is not an array', async () => {
-            const request = {
-              headers: {
-                'content-type': 'application/json'
-              },
-              query: {
-                type: 'not an array',
-                boundary: 'not null'
-              }
-            };
-
-            const response = requestValidator.validateRequest(request);
-
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('type');
-            expect(response.errors[0].message).to.equal('must be array');
-          });
-        });
-
         describe('boundary', () => {
           it('is undefined', async () => {
             const request = {
               headers: {
                 'content-type': 'application/json'
               },
-              query: {
-                type: [search.SPATIAL_COMPONENT_TYPE.BOUNDARY]
-              }
+              query: {}
             };
 
             const response = requestValidator.validateRequest(request);
@@ -99,7 +42,6 @@ describe.skip('search', () => {
                 'content-type': 'application/json'
               },
               query: {
-                type: [search.SPATIAL_COMPONENT_TYPE.OCCURRENCE],
                 boundary: null
               }
             };
@@ -110,18 +52,107 @@ describe.skip('search', () => {
             expect(response.errors[0].path).to.equal('boundary');
             expect(response.errors[0].message).to.equal('must be string');
           });
+
+          it('is not a string', async () => {
+            const request = {
+              headers: {
+                'content-type': 'application/json'
+              },
+              query: {
+                boundary: 123
+              }
+            };
+
+            const response = requestValidator.validateRequest(request);
+
+            expect(response.status).to.equal(400);
+            expect(response.errors[0].path).to.equal('boundary');
+            expect(response.errors[0].message).to.equal('must be string');
+          });
+        });
+
+        describe('type', () => {
+          it('is not an array', async () => {
+            const request = {
+              headers: {
+                'content-type': 'application/json'
+              },
+              query: {
+                boundary: 'not null',
+                type: 'not an array'
+              }
+            };
+
+            const response = requestValidator.validateRequest(request);
+
+            expect(response.status).to.equal(400);
+            expect(response.errors[0].path).to.equal('type');
+            expect(response.errors[0].message).to.equal('must be array');
+          });
+        });
+
+        describe('datasetID', () => {
+          it('is not an array', async () => {
+            const request = {
+              headers: {
+                'content-type': 'application/json'
+              },
+              query: {
+                boundary: 'not null',
+                type: [],
+                datasetID: 'not an array'
+              }
+            };
+
+            const response = requestValidator.validateRequest(request);
+
+            expect(response.status).to.equal(400);
+            expect(response.errors[0].path).to.equal('datasetID');
+            expect(response.errors[0].message).to.equal('must be array');
+          });
         });
       });
 
       describe('should succeed when', () => {
-        it('values are valid', async () => {
+        it('all values are provided and valid', async () => {
           const request = {
             headers: {
               'content-type': 'application/json'
             },
             query: {
-              type: [search.SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+              boundary: 'not null',
+              type: ['type'],
+              datasetID: ['id']
+            }
+          };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response).to.be.undefined;
+        });
+
+        it('required values are provided and valid', async () => {
+          const request = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            query: {
               boundary: 'not null'
+            }
+          };
+          const response = requestValidator.validateRequest(request);
+
+          expect(response).to.be.undefined;
+        });
+
+        it('optional values are provided and valid', async () => {
+          const request = {
+            headers: {
+              'content-type': 'application/json'
+            },
+            query: {
+              boundary: 'not null',
+              type: null,
+              datasetID: null
             }
           };
           const response = requestValidator.validateRequest(request);
@@ -149,28 +180,28 @@ describe.skip('search', () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
-              featureCollection: {
+              submission_spatial_component_id: 1,
+              spatial_data: {
                 type: 'Feature',
                 properties: {},
                 geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
-              },
-              submissionSpatialComponentId: 1
+              }
             }
           ];
 
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].path).to.equal('0/featureCollection');
+          expect(response.errors[0].path).to.equal('0/spatial_data');
           expect(response.errors[0].message).to.equal("must have required property 'features'");
-          expect(response.errors[1].path).to.equal('0/featureCollection/type');
+          expect(response.errors[1].path).to.equal('0/spatial_data/type');
           expect(response.errors[1].message).to.equal('must be equal to one of the allowed values');
         });
 
-        it('returns invalid response (missing submissionSpatialComponentId)', async () => {
+        it('returns invalid response (missing submission_spatial_component_id)', async () => {
           const apiResponse = [
             {
-              featureCollection: {
+              spatial_data: {
                 type: 'FeatureCollection',
                 properties: {},
                 geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
@@ -182,13 +213,13 @@ describe.skip('search', () => {
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].path).to.equal('0');
-          expect(response.errors[0].message).to.equal("must have required property 'submissionSpatialComponentId'");
+          expect(response.errors[0].message).to.equal("must have required property 'submission_spatial_component_id'");
         });
       });
 
       describe('should succeed when', () => {
         it('required values are valid (empty)', async () => {
-          const apiResponse: FeatureCollection[] = [];
+          const apiResponse: any[] = [];
 
           const response = responseValidator.validateResponse(200, apiResponse);
 
@@ -198,7 +229,8 @@ describe.skip('search', () => {
         it('required values are valid', async () => {
           const apiResponse = [
             {
-              featureCollection: {
+              submission_spatial_component_id: 1,
+              spatial_data: {
                 type: 'FeatureCollection',
                 features: [
                   {
@@ -232,11 +264,11 @@ describe.skip('search', () => {
                     }
                   }
                 ]
-              },
-              submissionSpatialComponentId: 1
+              }
             },
             {
-              featureCollection: {
+              submission_spatial_component_id: 2,
+              spatial_data: {
                 type: 'FeatureCollection',
                 features: [
                   {
@@ -245,8 +277,7 @@ describe.skip('search', () => {
                     geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
                   }
                 ]
-              },
-              submissionSpatialComponentId: 2
+              }
             }
           ];
 
@@ -276,7 +307,7 @@ describe.skip('search', () => {
       };
 
       mockReq.query = {
-        type: [search.SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+        type: ['type'],
         boundary: JSON.stringify(boundaryFeature)
       };
 
@@ -307,38 +338,42 @@ describe.skip('search', () => {
       };
 
       mockReq.query = {
-        type: [search.SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+        type: ['type'],
         boundary: JSON.stringify(boundaryFeature)
       };
 
-      const mockResponse = [
+      const mockResponse: ISubmissionSpatialSearchResponseRow[] = [
         {
           spatial_component: {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                properties: { type: 'Boundary' },
-                geometry: { type: 'Polygon', coordinates: [[]] }
-              }
-            ]
-          },
-          submission_spatial_component_id: 1
+            submission_spatial_component_id: 1,
+            spatial_data: {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  properties: { type: 'Boundary' },
+                  geometry: { type: 'Polygon', coordinates: [[]] }
+                }
+              ]
+            }
+          }
         },
         {
           spatial_component: {
-            type: 'FeatureCollection',
-            features: [
-              {
-                type: 'Feature',
-                properties: { type: 'Occurrence' },
-                geometry: { type: 'Point', coordinates: [[]] }
-              }
-            ]
-          },
-          submission_spatial_component_id: 2
+            submission_spatial_component_id: 2,
+            spatial_data: {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  properties: { type: 'Occurrence' },
+                  geometry: { type: 'Point', coordinates: [] }
+                }
+              ]
+            }
+          }
         }
-      ] as unknown as ISubmissionSpatialComponent[];
+      ];
 
       sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves(mockResponse);
 
@@ -349,7 +384,8 @@ describe.skip('search', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([
         {
-          featureCollection: {
+          submission_spatial_component_id: 1,
+          spatial_data: {
             type: 'FeatureCollection',
             features: [
               {
@@ -358,21 +394,20 @@ describe.skip('search', () => {
                 geometry: { type: 'Polygon', coordinates: [[]] }
               }
             ]
-          },
-          submissionSpatialComponentId: 1
+          }
         },
         {
-          featureCollection: {
+          submission_spatial_component_id: 2,
+          spatial_data: {
             type: 'FeatureCollection',
             features: [
               {
                 type: 'Feature',
                 properties: { type: 'Occurrence' },
-                geometry: { type: 'Point', coordinates: [[]] }
+                geometry: { type: 'Point', coordinates: [] }
               }
             ]
-          },
-          submissionSpatialComponentId: 2
+          }
         }
       ]);
       expect(dbConnectionObj.commit).to.have.been.calledOnce;

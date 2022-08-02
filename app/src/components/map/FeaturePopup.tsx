@@ -1,15 +1,12 @@
-import {
-  Box,
-  CircularProgress,
-  Collapse,
-  makeStyles,
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  Theme,
-  Typography
-} from '@material-ui/core';
+import Box from '@material-ui/core/Box';
+import CircularProgress from '@material-ui/core/CircularProgress';
+import Collapse from '@material-ui/core/Collapse';
+import makeStyles from '@material-ui/core/styles/makeStyles';
+import Table from '@material-ui/core/Table';
+import TableBody from '@material-ui/core/TableBody';
+import TableCell from '@material-ui/core/TableCell';
+import TableRow from '@material-ui/core/TableRow';
+import Typography from '@material-ui/core/Typography';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -28,7 +25,13 @@ export type BoundaryFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY;
 };
 
-const useStyles = makeStyles((_theme: Theme) => ({
+export type BoundaryCentroidFeature = Feature & { properties: BoundaryCentroidFeatureProperties };
+
+export type BoundaryCentroidFeatureProperties = {
+  type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
+};
+
+const useStyles = makeStyles(() => ({
   modalContent: {
     position: 'relative',
     width: 300,
@@ -61,6 +64,7 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
 
   const classes = useStyles();
   const api = useApi();
+
   const dataLoader = useDataLoader(() => {
     return api.search.getSpatialMetadata(submissionSpatialComponentId);
   });
@@ -76,48 +80,74 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   dataLoader.load();
 
   const { isLoading, data, isReady } = dataLoader;
-  const { date, type, ...rest } = data || {};
 
-  console.log('rest:', rest);
+  const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  return (
-    <div className={classes.modalContent}>
-      {isLoading && (
+  const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
+    <Box mb={1}>
+      <Typography variant="overline" className={classes.pointType}>
+        {props.type || 'Feature'}
+      </Typography>
+      {props.date && (
+        <Typography className={classes.date} component="h6" variant="subtitle1">
+          {formatDate(props.date)}
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const NoMetadataAvailable: React.FC = () => (
+    <Typography className={classes.date} component="h6" variant="body1">
+      No metadata available.
+    </Typography>
+  );
+
+  if (isLoading) {
+    return (
+      <ModalContentWrapper>
         <div className={classes.loading}>
           <CircularProgress size={24} color="primary" />
         </div>
-      )}
+      </ModalContentWrapper>
+    );
+  }
+
+  if (!data) {
+    return (
+      <ModalContentWrapper>
+        <NoMetadataAvailable />
+      </ModalContentWrapper>
+    );
+  }
+
+  const type = data.type;
+  const dwc = data.dwc;
+
+  if (!dwc || !Object.keys(dwc).length) {
+    return (
+      <ModalContentWrapper>
+        <MetadataHeader type={type} />
+        <NoMetadataAvailable />
+      </ModalContentWrapper>
+    );
+  }
+
+  return (
+    <ModalContentWrapper>
       <Collapse in={isReady}>
-        <div>
-          <Box mb={1}>
-            <Typography variant="overline" className={classes.pointType}>
-              {type || 'Feature'}
-            </Typography>
-            {date && (
-              <Typography className={classes.date} component="h6" variant="subtitle1">
-                {formatDate(date)}
-              </Typography>
-            )}
-          </Box>
-          {rest && Object.keys(rest).length > 0 ? (
-            <Table className={classes.table}>
-              <TableBody>
-                {Object.entries(rest).map(([key, value]) => (
-                  <TableRow>
-                    <TableCell className={classes.tableCell}>{key}</TableCell>
-                    <TableCell className={classes.tableCell}>{value}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <Typography className={classes.date} component="h6" variant="body1">
-              No metadata available.
-            </Typography>
-          )}
-        </div>
+        <MetadataHeader type={type} date={dwc.eventDate} />
+        <Table className={classes.table}>
+          <TableBody>
+            {Object.entries(dwc).map(([key, value]) => (
+              <TableRow key={key}>
+                <TableCell className={classes.tableCell}>{key}</TableCell>
+                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </Collapse>
-    </div>
+    </ModalContentWrapper>
   );
 };
 

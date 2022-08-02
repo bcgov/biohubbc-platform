@@ -1,12 +1,12 @@
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { ISpatialData } from 'interfaces/useSearchApi.interface';
-import { parseFeatureCollectionsByType } from './spatial-utils';
+import { parseSpatialDataByType } from './spatial-utils';
 
-describe('parseFeatureCollectionsByType', () => {
+describe('parseSpatialDataByType', () => {
   it('returns empty responses if featureCollections param is empty', () => {
     const spatialData: ISpatialData[] = [];
 
-    const result = parseFeatureCollectionsByType(spatialData);
+    const result = parseSpatialDataByType(spatialData);
 
     expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
 
@@ -19,15 +19,15 @@ describe('parseFeatureCollectionsByType', () => {
   it('returns empty responses if featureCollections param is has no features', () => {
     const spatialData: ISpatialData[] = [
       {
-        featureCollection: {
+        submission_spatial_component_id: 1,
+        spatial_data: {
           type: 'FeatureCollection',
           features: []
-        },
-        submissionSpatialComponentId: 1
+        }
       }
     ];
 
-    const result = parseFeatureCollectionsByType(spatialData);
+    const result = parseSpatialDataByType(spatialData);
 
     expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
 
@@ -38,9 +38,10 @@ describe('parseFeatureCollectionsByType', () => {
   });
 
   it('returns non-empty responses if featureCollections has features', () => {
-    const featureCollections: ISpatialData[] = [
+    const spatialData: ISpatialData[] = [
       {
-        featureCollection: {
+        submission_spatial_component_id: 1,
+        spatial_data: {
           type: 'FeatureCollection',
           features: [
             {
@@ -54,11 +55,11 @@ describe('parseFeatureCollectionsByType', () => {
               }
             }
           ]
-        },
-        submissionSpatialComponentId: 1
+        }
       },
       {
-        featureCollection: {
+        submission_spatial_component_id: 2,
+        spatial_data: {
           type: 'FeatureCollection',
           features: [
             {
@@ -70,11 +71,11 @@ describe('parseFeatureCollectionsByType', () => {
               properties: {}
             }
           ]
-        },
-        submissionSpatialComponentId: 2
+        }
       },
       {
-        featureCollection: {
+        submission_spatial_component_id: 3,
+        spatial_data: {
           type: 'FeatureCollection',
           features: [
             {
@@ -88,12 +89,11 @@ describe('parseFeatureCollectionsByType', () => {
               }
             }
           ]
-        },
-        submissionSpatialComponentId: 3
+        }
       }
     ];
 
-    const result = parseFeatureCollectionsByType(featureCollections);
+    const result = parseSpatialDataByType(spatialData);
 
     expect(result.markerLayers.length).toEqual(1);
     expect(result.markerLayers[0]).toMatchObject({
