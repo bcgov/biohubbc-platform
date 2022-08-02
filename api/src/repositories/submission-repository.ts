@@ -406,7 +406,7 @@ export class SubmissionRepository extends BaseRepository {
         record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql<{ uuid: string }>(sqlStatement);
+    const response = await this.connection.sql<IDatasetId>(sqlStatement);
 
     return response.rows;
   }
