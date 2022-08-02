@@ -78,9 +78,9 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   };
 
   dataLoader.load();
-  
+
   const { isLoading, data, isReady } = dataLoader;
-  console.log('data:', data)
+  console.log('data:', data);
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 

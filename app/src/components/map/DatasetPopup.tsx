@@ -1,7 +1,7 @@
 import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Collapse from '@material-ui/core/Collapse';
+import Link from '@material-ui/core/Link';
 import makeStyles from '@material-ui/core/styles/makeStyles';
 import Typography from '@material-ui/core/Typography';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
@@ -9,24 +9,19 @@ import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import React from 'react';
-
-export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
-
-export type OccurrenceFeatureProperties = {
-  type: SPATIAL_COMPONENT_TYPE.OCCURRENCE;
-};
-
-export type BoundaryFeature = Feature & { properties: BoundaryFeatureProperties };
-
-export type BoundaryFeatureProperties = {
-  type: SPATIAL_COMPONENT_TYPE.BOUNDARY;
-};
+import { useHistory } from 'react-router';
 
 export type BoundaryCentroidFeature = Feature & { properties: BoundaryCentroidFeatureProperties };
 
 export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };
+
+interface IDatasetSpatialMetadata {
+  datasetTitle: string;
+  datasetID: string;
+  type: 'Boundary Centroid';
+}
 
 const useStyles = makeStyles(() => ({
   modalContent: {
@@ -56,16 +51,12 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-interface IDatasetSpatialMetadata {
-  datasetTitle: string
-  type: 'Boundary Centroid'
-}
-
 const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
   const { submissionSpatialComponentId } = props;
 
   const classes = useStyles();
   const api = useApi();
+  const history = useHistory();
 
   const dataLoader = useDataLoader(() => {
     return api.search.getSpatialMetadata(submissionSpatialComponentId);
@@ -74,14 +65,14 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   dataLoader.load();
 
   const { isLoading, isReady } = dataLoader;
-  const data = dataLoader.data as IDatasetSpatialMetadata
+  const data = dataLoader.data as IDatasetSpatialMetadata;
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  const MetadataHeader: React.FC<{ type: string; title?: string }> = (props) => (
+  const MetadataHeader: React.FC<{ title: string }> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
-        {props.type || 'Boundary Centroid'}
+        Dataset
       </Typography>
       {props.title && (
         <Typography className={classes.date} component="h6" variant="subtitle1">
@@ -115,14 +106,16 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
     );
   }
 
-  const type = data.type;
   const datasetTitle = data.datasetTitle;
+  const datasetID = data.datasetID;
 
   return (
     <ModalContentWrapper>
       <Collapse in={isReady}>
-        <MetadataHeader type={type} title={datasetTitle} />
-        <Button color='primary' variant='contained' onClick={() => null}>Go to Dataset</Button>
+        <MetadataHeader title={datasetTitle} />
+        <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
+          Go to Dataset
+        </Link>
       </Collapse>
     </ModalContentWrapper>
   );
