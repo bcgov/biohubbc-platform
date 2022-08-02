@@ -155,7 +155,7 @@ describe('search', () => {
       }
     });
 
-    it.skip('returns search results when Elastic Search service succeeds with valid data', async () => {
+    it('returns search results when Elastic Search service succeeds with valid data', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
@@ -177,14 +177,21 @@ describe('search', () => {
         { _id: '456', _source: {}, fields: {} }
       ] as unknown as SearchHit[]);
 
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordJSONByDatasetId')
+        .onCall(0)
+        .resolves('a valid json string')
+        .onCall(1)
+        .resolves('another valid json string');
+
       const requestHandler = search.searchInElasticSearch();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(keywordSearchEmlStub).to.have.been.calledOnceWith('search-term');
       expect(mockRes.jsonValue).eql([
-        { id: '123', source: {}, observation_count: 14 },
-        { id: '456', source: {}, observation_count: 23 }
+        { id: '123', source: 'a valid json string', observation_count: 14 },
+        { id: '456', source: 'another valid json string', observation_count: 23 }
       ]);
     });
   });
