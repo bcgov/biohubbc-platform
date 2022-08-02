@@ -103,8 +103,6 @@ export function searchInElasticSearch(): RequestHandler {
         try {
           const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item);
 
-          console.log('response from DB ', responseFromDB);
-
           const observationCount = await submissionService.getObservationCountByDatasetId(item);
 
           return {
@@ -120,7 +118,6 @@ export function searchInElasticSearch(): RequestHandler {
       const result = await Promise.all(promises);
 
       //remove items returned from the DB that are undefined
-
       const filteredResult = result.filter((item) => !!item);
 
       await connection.commit();

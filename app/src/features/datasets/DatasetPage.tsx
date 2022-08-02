@@ -56,7 +56,12 @@ const DatasetPage: React.FC = () => {
   datasetDataLoader.load();
 
   const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
-    biohubApi.search.getSpatialData({ boundary: searchBoundary, type: searchType, zoom: searchZoom, datasetID: datasetId  })
+    biohubApi.search.getSpatialData({
+      boundary: searchBoundary,
+      type: searchType,
+      zoom: searchZoom,
+      datasetID: datasetId
+    })
   );
 
   useDataLoaderError(mapDataLoader, () => {

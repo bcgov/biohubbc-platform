@@ -142,18 +142,11 @@ const SearchPage = () => {
 
     searchDataLoader.data &&
       searchDataLoader.data.forEach((dataset) => {
-        console.log('the dataset is: ', dataset);
         const datasetId = dataset.id;
-
-        console.log(dataset.source['eml:eml'].dataset.project);
 
         const project = dataset.source['eml:eml'].dataset.project;
 
-        console.log('project is : ', project);
-
         const parsedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
-
-        console.log('appended item: ', parsedItem);
 
         newList.push(parsedItem);
       });
@@ -162,8 +155,6 @@ const SearchPage = () => {
   };
 
   const results = parseResult();
-
-  console.log('the results object is: ', results);
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
