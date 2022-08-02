@@ -1,5 +1,6 @@
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
+import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
@@ -14,12 +15,12 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
 
   for (const spatialRecord of spatialDataRecords) {
     for (const feature of spatialRecord.spatial_data.features) {
-      if (isOccurrenceFeature(feature)) {
-        if (feature.geometry.type === 'GeometryCollection') {
-          // Not expecting or supporting geometry collections
-          continue;
-        }
+      if (feature.geometry.type === 'GeometryCollection') {
+        // Not expecting or supporting geometry collections
+        continue;
+      }
 
+      if (isOccurrenceFeature(feature)) {
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id || feature.properties.id,
@@ -27,15 +28,19 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
         });
       }
 
-      if (isBoundaryFeature(feature) || isBoundaryCentroidFeature(feature)) {
-        if (feature.geometry.type === 'GeometryCollection') {
-          continue;
-        }
-
+      if (isBoundaryFeature(feature)) {
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
           popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+        });
+      }
+
+      if (isBoundaryCentroidFeature(feature)) {
+        boundaryStaticLayer.features.push({
+          geoJSON: feature,
+          key: feature.id || feature.properties.id,
+          popup: <DatasetPopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
         });
       }
     }
