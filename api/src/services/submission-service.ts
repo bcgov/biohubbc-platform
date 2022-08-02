@@ -184,8 +184,8 @@ export class SubmissionService extends DBService {
    * @return {string}
    * @memberof SubmissionService
    */
-  async getObservationCountByDatasetId(datasetId: string): Promise<number> {
-    return this.submissionRepository.getObservationCountByDatasetId(datasetId);
+  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<number> {
+    return this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId);
   }
 
   /**

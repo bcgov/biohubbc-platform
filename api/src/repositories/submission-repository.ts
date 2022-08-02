@@ -418,7 +418,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<number>}
    * @memberof SubmissionRepository
    */
-  async getObservationCountByDatasetId(datasetId: string): Promise<number> {
+  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<number> {
     const sqlStatement = SQL`
       SELECT
         count(distinct submission_spatial_component_id)::integer
@@ -429,7 +429,7 @@ export class SubmissionRepository extends BaseRepository {
       ON
         s.submission_id = ssc.submission_id
       WHERE
-        s.uuid = ${datasetId}
+        s.uuid = ${datasetId};
     `;
 
     const response = await this.connection.sql<{ count: number }>(sqlStatement);

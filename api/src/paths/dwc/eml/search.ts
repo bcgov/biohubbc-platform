@@ -50,16 +50,12 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['id'],
-              nullable: true,
+              required: ['id', 'source', 'observation_count'],
               properties: {
                 id: {
                   type: 'string'
                 },
                 source: {
-                  type: 'object'
-                },
-                fields: {
                   type: 'object'
                 },
                 observation_count: {
@@ -102,8 +98,7 @@ export function searchInElasticSearch(): RequestHandler {
         // We are therefore checking to see if the DB has the ID, and if so, we return the eml_JSON_source
         try {
           const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item);
-
-          const observationCount = await submissionService.getObservationCountByDatasetId(item);
+          const observationCount = await submissionService.getSpatialComponentCountByDatasetId(item);
 
           return {
             id: item,
@@ -111,13 +106,14 @@ export function searchInElasticSearch(): RequestHandler {
             observation_count: observationCount
           };
         } catch {
+          // No result found for provided datasetId, return undefined.
           return;
         }
       });
 
       const result = await Promise.all(promises);
 
-      //remove items returned from the DB that are undefined
+      // Remove items returned from the DB that are undefined
       const filteredResult = result.filter((item) => !!item);
 
       await connection.commit();
