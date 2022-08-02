@@ -1,11 +1,8 @@
 import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import Collapse from '@material-ui/core/Collapse';
 import makeStyles from '@material-ui/core/styles/makeStyles';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableRow from '@material-ui/core/TableRow';
 import Typography from '@material-ui/core/Typography';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
@@ -59,6 +56,11 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
+interface IDatasetSpatialMetadata {
+  datasetTitle: string
+  type: 'Boundary Centroid'
+}
+
 const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
   const { submissionSpatialComponentId } = props;
 
@@ -71,19 +73,19 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
 
   dataLoader.load();
 
-  const { isLoading, data, isReady } = dataLoader;
-  console.log('dat:', data)
+  const { isLoading, isReady } = dataLoader;
+  const data = dataLoader.data as IDatasetSpatialMetadata
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
+  const MetadataHeader: React.FC<{ type: string; title?: string }> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
-        {props.type || 'Dataset'}
+        {props.type || 'Boundary Centroid'}
       </Typography>
-      {props.date && (
+      {props.title && (
         <Typography className={classes.date} component="h6" variant="subtitle1">
-          formatDate(props.date)
+          {props.title}
         </Typography>
       )}
     </Box>
@@ -114,31 +116,13 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   }
 
   const type = data.type;
-  const dwc = data.dwc;
-
-  if (!dwc || !Object.keys(dwc).length) {
-    return (
-      <ModalContentWrapper>
-        <MetadataHeader type={type} />
-        <NoMetadataAvailable />
-      </ModalContentWrapper>
-    );
-  }
+  const datasetTitle = data.datasetTitle;
 
   return (
     <ModalContentWrapper>
       <Collapse in={isReady}>
-        <MetadataHeader type={type} date={dwc.eventDate} />
-        <Table className={classes.table}>
-          <TableBody>
-            {Object.entries(dwc).map(([key, value]) => (
-              <TableRow key={key}>
-                <TableCell className={classes.tableCell}>{key}</TableCell>
-                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <MetadataHeader type={type} title={datasetTitle} />
+        <Button color='primary' variant='contained' onClick={() => null}>Go to Dataset</Button>
       </Collapse>
     </ModalContentWrapper>
   );
