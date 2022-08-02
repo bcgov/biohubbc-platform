@@ -38,7 +38,7 @@ parameters:
   - name: ELASTICSEARCH_URL
     description: Platform Elasticsearch URL
     required: true
-    value: 'https://elasticsearch-af2668-dev.apps.silver.devops.gov.bc.ca'
+    value: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca'
   - name: TZ
     description: Application timezone
     required: false

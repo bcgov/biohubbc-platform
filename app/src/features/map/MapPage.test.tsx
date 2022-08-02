@@ -38,10 +38,9 @@ describe('MapPage', () => {
   it('shows `Map` and map container when there are no occurrences', async () => {
     mockBiohubApi().search.getSpatialData.mockReturnValue([]);
 
-    const { getByText, getByTestId } = renderContainer();
+    const { getByTestId } = renderContainer();
 
     await waitFor(() => {
-      expect(getByText('Map')).toBeVisible();
       expect(getByTestId('MapContainer')).toBeVisible();
     });
   });
@@ -66,10 +65,9 @@ describe('MapPage', () => {
 
     mockBiohubApi().search.getSpatialData.mockReturnValue(vaildFeatureCollection);
 
-    const { getByText, getByTestId } = renderContainer();
+    const { getByTestId } = renderContainer();
 
     await waitFor(() => {
-      expect(getByText('Map')).toBeVisible();
       expect(getByTestId('MapContainer')).toBeVisible();
     });
   });

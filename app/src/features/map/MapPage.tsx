@@ -1,6 +1,4 @@
 import Box from '@material-ui/core/Box';
-import Container from '@material-ui/core/Container';
-import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
@@ -40,13 +38,7 @@ const MapPage: React.FC = () => {
   const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
-  const [type] = useState<string[]>(
-    url.queryParams.type || [
-      SPATIAL_COMPONENT_TYPE.BOUNDARY,
-      SPATIAL_COMPONENT_TYPE.OCCURRENCE,
-      SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
-    ]
-  );
+  const [type] = useState<string[]>(url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID]);
   const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
@@ -71,13 +63,8 @@ const MapPage: React.FC = () => {
     // Store map view boundary
     setMapViewBoundary(bounds);
 
-    // Calculate search boundary based on drawn and map view boundaries
-    const searchBoundary = getSearchBoundary(bounds, drawnBoundary);
-
     // Store map view bounds in URL
     url.appendQueryParams({ mapViewBoundary: bounds, zoom: newZoom });
-
-    mapDataLoader.refresh(searchBoundary, type, newZoom);
   };
 
   const onDrawChange = (features: Feature[]) => {
@@ -97,42 +84,31 @@ const MapPage: React.FC = () => {
     mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
-  // One time map data fetch, on initial page load
-  mapDataLoader.load(getSearchBoundary(mapViewBoundary, drawnBoundary), type, zoom);
-
   return (
-    <Box my={4}>
-      <Container maxWidth="xl">
-        <Box mb={5} display="flex" justifyContent="space-between">
-          <Typography variant="h1">Map</Typography>
-        </Box>
-        <Box>
-          <Box mb={4}>
-            <Grid item xs={12}>
-              <Box mt={2} height={750} data-testid="MapContainer">
-                <MapContainer
-                  mapId="boundary_map"
-                  onBoundsChange={onMapViewChange}
-                  drawControls={{
-                    initialFeatures: drawnBoundary && [drawnBoundary],
-                    options: {
-                      // Disable all controls except for Polygon (and Rectangle, which is just a type of Polygon)
-                      draw: { circle: false, circlemarker: false, marker: false, polyline: false }
-                    },
-                    // Limit drawing to 1 shape at a time
-                    clearOnDraw: true
-                  }}
-                  onDrawChange={onDrawChange}
-                  scrollWheelZoom={true}
-                  fullScreenControl={true}
-                  markerLayers={markerLayers}
-                  staticLayers={staticLayers}
-                />
-              </Box>
-            </Grid>
-          </Box>
-        </Box>
-      </Container>
+    <Box width="100%" height="100%">
+      <Typography variant="h1" hidden>
+        Map
+      </Typography>
+      <Box width="100%" height="100%" data-testid="MapContainer">
+        <MapContainer
+          mapId="boundary_map"
+          onBoundsChange={onMapViewChange}
+          drawControls={{
+            initialFeatures: drawnBoundary && [drawnBoundary],
+            options: {
+              // Disable all controls except for Polygon (and Rectangle, which is just a type of Polygon)
+              draw: { circle: false, circlemarker: false, marker: false, polyline: false }
+            },
+            // Limit drawing to 1 shape at a time
+            clearOnDraw: true
+          }}
+          onDrawChange={onDrawChange}
+          scrollWheelZoom={true}
+          fullScreenControl={true}
+          markerLayers={markerLayers}
+          staticLayers={staticLayers}
+        />
+      </Box>
     </Box>
   );
 };
