@@ -1,6 +1,6 @@
 import { Feature, FeatureCollection } from 'geojson';
 import SQL, { SQLStatement } from 'sql-template-strings';
-import { getKnexQueryBuilder } from '../database/db';
+import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
@@ -20,7 +20,7 @@ export interface IGetSpatialTransformRecord {
   transform: string;
 }
 
-export interface ITransformReturn {
+export interface ITransformRow {
   result_data: FeatureCollection;
 }
 
@@ -37,12 +37,15 @@ export interface ISubmissionSpatialComponent {
 
 export interface ISpatialComponentsSearchCriteria {
   type: string[];
+  datasetID?: string[];
   boundary: Feature;
 }
 
-export enum SPATIAL_TRANSFORM_NAMES {
-  EML_STUDY_BOUNDARIES = 'EML Study Boundaries',
-  DWC_OCCURRENCES = 'DwC Occurrences'
+export interface ISubmissionSpatialSearchResponseRow {
+  spatial_component: {
+    spatial_data: FeatureCollection;
+    submission_spatial_component_id: number;
+  };
 }
 
 export class SpatialRepository extends BaseRepository {
@@ -84,13 +87,13 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * get spatial transform record from name
+   * get spatial transform records
    *
-   * @param {string} spatialTransformName
+   * @param
    * @return {*}  {Promise<IGetSpatialTransformRecord>}
    * @memberof SpatialRepository
    */
-  async getSpatialTransformRecordByName(spatialTransformName: string): Promise<IGetSpatialTransformRecord> {
+  async getSpatialTransformRecords(): Promise<IGetSpatialTransformRecord[]> {
     const sqlStatement = SQL`
       SELECT
         spatial_transform_id,
@@ -99,50 +102,12 @@ export class SpatialRepository extends BaseRepository {
         notes,
         transform
       FROM
-        spatial_transform
-      WHERE
-        name = ${spatialTransformName};
+        spatial_transform;
     `;
 
     const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get spatial transform record', [
-        'SpatialRepository->getSpatialTransformRecordByName',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * get spatial transform from id
-   *
-   * @param {number} spatialTransformId
-   * @return {*}  {Promise<{ transform: string }>}
-   * @memberof SpatialRepository
-   */
-  async getSpatialTransformBySpatialTransformId(spatialTransformId: number): Promise<{ transform: string }> {
-    const sqlStatement = SQL`
-      SELECT
-        transform
-      FROM
-        spatial_transform
-      WHERE
-        spatial_transform_id = ${spatialTransformId};
-    `;
-
-    const response = await this.connection.sql<{ transform: string }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get spatial transform', [
-        'SpatialRepository->getSpatialTransformBySpatialTransformId',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
+    return response.rows;
   }
 
   /**
@@ -188,10 +153,10 @@ export class SpatialRepository extends BaseRepository {
    *
    * @param {number} submissionId
    * @param {string} transform
-   * @return {*}  {Promise<ITransformReturn[]>}
+   * @return {*}  {Promise<ITransformRow[]>}
    * @memberof SpatialRepository
    */
-  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformReturn[]> {
+  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
     if (response.rowCount <= 0) {
@@ -267,13 +232,21 @@ export class SpatialRepository extends BaseRepository {
    * Query builder to find spatial component by given criteria
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialRepository
    */
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
-  ): Promise<ISubmissionSpatialComponent[]> {
-    const queryBuilder = getKnexQueryBuilder().select().from('submission_spatial_component');
+  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        knex.raw(
+          "jsonb_build_object('submission_spatial_component_id', submission_spatial_component_id, 'spatial_data', spatial_component) spatial_component"
+        )
+      )
+      .from('submission_spatial_component');
 
     if (criteria.type?.length) {
       // Append OR where clauses for each criteria.type
@@ -284,17 +257,50 @@ export class SpatialRepository extends BaseRepository {
           });
         }
       });
+    }
 
-      // Append AND where clause for criteria.boundary
-      const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
+    if (criteria.datasetID?.length) {
+      // Append AND where clause for criteria.datasetID
       queryBuilder.where((qb3) => {
-        qb3.whereRaw(sqlStatement1.sql, sqlStatement1.values);
+        qb3.whereRaw(
+          `submission_id in (select submission_id from submission where uuid in (${
+            "'" + criteria.datasetID?.join("','") + "'"
+          }))`
+        );
       });
     }
 
-    const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
+    // Append AND where clause for criteria.boundary
+    const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
+    queryBuilder.where((qb4) => {
+      qb4.whereRaw(sqlStatement1.sql, sqlStatement1.values);
+    });
+
+    const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+
+    console.log(response.rows[0]);
 
     return response.rows;
+  }
+
+  /**
+   * Query spatial components by given submission ID
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @memberof SpatialRepository
+   */
+  async findSpatialMetadataBySubmissionId(
+    submission_spatial_component_id: number
+  ): Promise<ISubmissionSpatialComponent> {
+    const queryBuilder = getKnexQueryBuilder()
+      .select()
+      .from('submission_spatial_component')
+      .where({ submission_spatial_component_id });
+
+    const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
+
+    return spatialComponentResponse.rows[0];
   }
 
   async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {
@@ -306,6 +312,30 @@ export class SpatialRepository extends BaseRepository {
       RETURNING
         submission_id;
     ;`;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    return response.rows;
+  }
+
+  async deleteSpatialComponentsTransformRefsBySubmissionId(
+    submission_id: number
+  ): Promise<{ submission_id: number }[]> {
+    const sqlStatement = SQL`
+      DELETE FROM
+        spatial_transform_submission
+      WHERE
+        submission_spatial_component_id IN (
+          SELECT
+            submission_spatial_component_id
+          FROM
+            submission_spatial_component
+          WHERE
+            submission_id=${submission_id}
+        )
+      RETURNING
+        ${submission_id};
+    `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 

@@ -15,10 +15,15 @@ export interface IGetSearchResultsResponse {
   geometry: Feature[];
 }
 
-export type IGetSpatialDataResponse = {
+export interface ISpatialData {
   submission_spatial_component_id: number;
   spatial_data: FeatureCollection;
-};
+}
+
+/**
+ * An interface for Spatial Metadata. Type synonymous with `GeoJsonProperties`.
+ */
+export type ISpatialMetadata = Record<string, any>;
 
 /**
  * An interface for an instance of filter fields for search results

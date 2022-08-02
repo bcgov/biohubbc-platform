@@ -8,7 +8,6 @@ import sinonChai from 'sinon-chai';
 import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
-import { SPATIAL_TRANSFORM_NAMES } from '../repositories/spatial-repository';
 import {
   ISourceTransformModel,
   ISubmissionModel,
@@ -488,6 +487,9 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
         .resolves({ submission_id: 1 });
 
+      const deleteSpatialComponentsTransformRefsBySubmissionIdStub = sinon
+        .stub(SpatialService.prototype, 'deleteSpatialComponentsTransformRefsBySubmissionId')
+        .resolves([]);
       const deleteSpatialComponentsStub = sinon
         .stub(SpatialService.prototype, 'deleteSpatialComponentsBySubmissionId')
         .resolves([]);
@@ -505,6 +507,7 @@ describe('DarwinCoreService', () => {
 
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
+      expect(deleteSpatialComponentsTransformRefsBySubmissionIdStub).to.be.calledWith(1);
       expect(deleteSpatialComponentsStub).to.be.calledWith(1);
       expect(submissionEndDateStub).to.be.calledWith(1);
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
@@ -1143,7 +1146,7 @@ describe('DarwinCoreService', () => {
       });
     });
 
-    describe('Step 9: Run spatial transform for eml study boundary and save data', () => {
+    describe('Step 9: Run spatial transforms and save data', () => {
       afterEach(() => {
         sinon.restore();
       });
@@ -1178,15 +1181,15 @@ describe('DarwinCoreService', () => {
           .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
         sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-        const runSpatialTransformStub = sinon
-          .stub(SpatialService.prototype, 'runSpatialTransform')
+        const runSpatialTransformsStub = sinon
+          .stub(SpatialService.prototype, 'runSpatialTransforms')
           .throws(new ApiGeneralError('error'));
 
         try {
           await darwinCoreService.create(multerFile, 'dataPackageId');
           expect.fail();
         } catch (actualError) {
-          expect(runSpatialTransformStub).to.have.been.calledWith(1, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
+          expect(runSpatialTransformsStub).to.have.been.calledWith(1);
           expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
             1,
             SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
@@ -1224,114 +1227,13 @@ describe('DarwinCoreService', () => {
           .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
         sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
 
-        const runSpatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransform').resolves();
+        const runSpatialTransformsStub = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
 
         try {
           await darwinCoreService.create(multerFile, 'dataPackageId');
           expect.fail();
         } catch (actualError) {
-          expect(runSpatialTransformStub).to.be.calledWith(1, SPATIAL_TRANSFORM_NAMES.EML_STUDY_BOUNDARIES);
-          expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE);
-        }
-      });
-    });
-
-    describe('Step 10: Run spatial transform for dwc occurrences and save data', () => {
-      afterEach(() => {
-        sinon.restore();
-      });
-
-      it('should throw an error', async () => {
-        const mockDBConnection = getMockDBConnection();
-        const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-        const multerFile = {
-          originalname: 'file1.txt',
-          buffer: Buffer.from('file1data')
-        } as unknown as Express.Multer.File;
-
-        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').resolves({
-          dataPackageId: 'dataPackageId',
-          submissionId: 1
-        });
-
-        const insertSubmissionStatusAndMessageStub = sinon
-          .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
-          .resolves();
-        sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-
-        sinon.stub(DarwinCoreService.prototype, 'uploadRecordToS3').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
-        sinon
-          .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-          .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
-        sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
-
-        const runSpatialTransformStub = sinon
-          .stub(SpatialService.prototype, 'runSpatialTransform')
-          .onFirstCall()
-          .resolves()
-          .onSecondCall()
-          .throws(new ApiGeneralError('error'));
-
-        try {
-          await darwinCoreService.create(multerFile, 'dataPackageId');
-          expect.fail();
-        } catch (actualError) {
-          expect(runSpatialTransformStub).to.have.been.calledWith(1, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
-          expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
-            1,
-            SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
-            SUBMISSION_MESSAGE_TYPE.ERROR,
-            'error'
-          );
-        }
-      });
-
-      it('should set submission status', async () => {
-        const mockDBConnection = getMockDBConnection();
-        const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-        const multerFile = {
-          originalname: 'file1.txt',
-          buffer: Buffer.from('file1data')
-        } as unknown as Express.Multer.File;
-
-        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').resolves({
-          dataPackageId: 'dataPackageId',
-          submissionId: 1
-        });
-
-        sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
-        const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-
-        sinon.stub(DarwinCoreService.prototype, 'uploadRecordToS3').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
-        sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
-        sinon
-          .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
-          .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
-        sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
-
-        const runSpatialTransformStub = sinon
-          .stub(SpatialService.prototype, 'runSpatialTransform')
-          .onFirstCall()
-          .resolves()
-          .onSecondCall()
-          .resolves();
-
-        try {
-          await darwinCoreService.create(multerFile, 'dataPackageId');
-          expect.fail();
-        } catch (actualError) {
-          expect(runSpatialTransformStub).to.be.calledWith(1, SPATIAL_TRANSFORM_NAMES.DWC_OCCURRENCES);
+          expect(runSpatialTransformsStub).to.be.calledWith(1);
           expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE);
         }
       });

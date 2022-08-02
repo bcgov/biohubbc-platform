@@ -13,7 +13,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import useURL from 'hooks/useURL';
 import React, { useEffect, useState } from 'react';
-import { parseFeatureCollectionsByType } from 'utils/spatial-utils';
+import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC = () => {
   const api = useApi();
@@ -41,7 +41,11 @@ const MapPage: React.FC = () => {
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
   const [type] = useState<string[]>(
-    url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE]
+    url.queryParams.type || [
+      SPATIAL_COMPONENT_TYPE.BOUNDARY,
+      SPATIAL_COMPONENT_TYPE.OCCURRENCE,
+      SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
+    ]
   );
   const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
@@ -53,7 +57,7 @@ const MapPage: React.FC = () => {
       return;
     }
 
-    const result = parseFeatureCollectionsByType(mapDataLoader.data.map((item) => item.spatial_data));
+    const result = parseSpatialDataByType(mapDataLoader.data);
 
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);
