@@ -51,9 +51,7 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
-  const { submissionSpatialComponentId } = props;
-
+const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ submissionSpatialComponentId }) => {
   const classes = useStyles();
   const api = useApi();
   const history = useHistory();
