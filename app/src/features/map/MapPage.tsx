@@ -38,11 +38,7 @@ const MapPage: React.FC = () => {
   const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
-  const [type] = useState<string[]>(
-    url.queryParams.type || [
-      SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
-    ]
-  );
+  const [type] = useState<string[]>(url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID]);
   const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
@@ -90,7 +86,9 @@ const MapPage: React.FC = () => {
 
   return (
     <Box width="100%" height="100%">
-      <Typography variant="h1" hidden>Map</Typography>
+      <Typography variant="h1" hidden>
+        Map
+      </Typography>
       <Box width="100%" height="100%" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"

@@ -14,35 +14,33 @@ const useStyles = makeStyles((theme: Theme) => ({
     flexDirection: 'column',
     justifyContent: 'center'
   }
-}))
+}));
 
 const HomePage = () => {
-  const classes = useStyles()
+  const classes = useStyles();
   const formikRef = useRef<FormikProps<IAdvancedSearch>>(null);
-  const history = useHistory()
-  
+  const history = useHistory();
+
   const handleSubmit = () => {
-    const query = formikRef.current?.values?.keywords || ''
+    const query = formikRef.current?.values?.keywords || '';
 
     if (!query) {
-      return
+      return;
     }
 
-    history.push(`/search?keywords=${query}`)
-  }
+    history.push(`/search?keywords=${query}`);
+  };
 
   return (
     <Paper square elevation={0}>
       <Container maxWidth="md" className={classes.heroBannerContainer}>
         <Box display="flex" alignContent="center" mt={-2} mb={8}>
-          <Typography variant="h1">British Columbia's open-access source for terrestrial, aquatic species and habitat inventory data</Typography>
+          <Typography variant="h1">
+            British Columbia's open-access source for terrestrial, aquatic species and habitat inventory data
+          </Typography>
         </Box>
         <Box mx={10}>
-          <Formik
-            innerRef={formikRef}
-            initialValues={{ keywords:'' }}
-            onSubmit={handleSubmit}
-          >
+          <Formik innerRef={formikRef} initialValues={{ keywords: '' }} onSubmit={handleSubmit}>
             <SearchComponent />
           </Formik>
         </Box>

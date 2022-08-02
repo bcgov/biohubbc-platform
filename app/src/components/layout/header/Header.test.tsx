@@ -46,7 +46,7 @@ describe('Header', () => {
 
     expect(getByText('Home')).toBeVisible();
     expect(getByText('Find Datasets')).toBeVisible();
-    expect(getByText('Manage Users')).toBeVisible();
+    // expect(getByText('Manage Users')).toBeVisible(); // TODO uncomment when manage users is made visible again
   });
 
   it('renders correctly with system admin role', () => {
@@ -84,7 +84,7 @@ describe('Header', () => {
 
     expect(getByText('Home')).toBeVisible();
     expect(getByText('Find Datasets')).toBeVisible();
-    expect(getByText('Manage Users')).toBeVisible();
+    // expect(getByText('Manage Users')).toBeVisible(); // TODO uncomment when manage users is made visible again
   });
 
   it('renders the username and logout button', () => {
