@@ -87,21 +87,14 @@ describe('search', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be string');
+          expect(response.errors[0].message).to.equal("must have required property 'observation_count'");
         });
         it('has array with invalid value: source', async () => {
           const apiResponse = [{ id: 'test', source: 1, fields: {} }];
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
-        });
-        it('has array with invalid value: fields', async () => {
-          const apiResponse = [{ id: 'test', source: {}, fields: 1 }];
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
+          expect(response.errors[0].message).to.equal("must have required property 'observation_count'");
         });
       });
 
@@ -115,8 +108,8 @@ describe('search', () => {
 
         it('has valid values', async () => {
           const apiResponse = [
-            { id: 'test1', source: {}, fields: {} },
-            { id: 'test2', source: {}, fields: {} }
+            { id: 'test1', source: {}, observation_count: 1 },
+            { id: 'test2', source: {}, observation_count: 2 }
           ];
           const response = responseValidator.validateResponse(200, apiResponse);
 
