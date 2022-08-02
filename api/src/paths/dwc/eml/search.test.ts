@@ -166,7 +166,7 @@ describe('search', () => {
       };
 
       sinon
-        .stub(SubmissionService.prototype, 'getObservationCountByDatasetId')
+        .stub(SubmissionService.prototype, 'getSpatialComponentCountByDatasetId')
         .onCall(0)
         .resolves(14)
         .onCall(1)
