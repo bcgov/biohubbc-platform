@@ -97,35 +97,35 @@ export function searchInElasticSearch(): RequestHandler {
 
       const datasetIdsFromES = responseFromES.map((item) => item._id);
 
-      //console.log('datasetIdsFromES :', datasetIdsFromES);
+      const promises = datasetIdsFromES.map(async (item) => {
+        // It is possible for ElasticSearch to have ids that don't exist in the Database.
+        // We are therefore checking to see if the DB has the ID, and if so, we return the eml_JSON_source
+        try {
+          const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item);
 
-      const datasetIdsinDB = await submissionService.getDatasetIdsFromDB();
+          console.log('response from DB ', responseFromDB);
 
-      //console.log('datasetIdsinDB: ', datasetIdsinDB);
+          const observationCount = await submissionService.getObservationCountByDatasetId(item);
 
-      const filteredIds = datasetIdsinDB.filter((item) => datasetIdsFromES.includes(item.uuid));
-
-      //console.log('filteredIds: ', filteredIds);
-
-      const promises = filteredIds.map(async (item) => {
-        const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item.uuid);
-
-        console.log('response from DB ', responseFromDB);
-
-        const observationCount = await submissionService.getObservationCountByDatasetId(item.uuid);
-
-        return {
-          id: item.uuid,
-          source: responseFromDB,
-          observation_count: observationCount
-        };
+          return {
+            id: item,
+            source: responseFromDB,
+            observation_count: observationCount
+          };
+        } catch {
+          return;
+        }
       });
 
       const result = await Promise.all(promises);
 
+      //remove items returned from the DB that are undefined
+
+      const filteredResult = result.filter((item) => !!item);
+
       await connection.commit();
 
-      res.status(200).json(result);
+      res.status(200).json(filteredResult);
     } catch (error) {
       defaultLog.error({ label: 'keywordSearchEml', message: 'error', error });
       await connection.rollback();

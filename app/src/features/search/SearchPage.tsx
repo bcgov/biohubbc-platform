@@ -137,7 +137,7 @@ const SearchPage = () => {
     });
   };
 
-  const appendProjectsWithDatasetId = () => {
+  const parseResult = () => {
     const newList: any[] = [];
 
     searchDataLoader.data &&
@@ -145,22 +145,25 @@ const SearchPage = () => {
         console.log('the dataset is: ', dataset);
         const datasetId = dataset.id;
 
-        //console.log(dataset.source['eml:eml']);
+        console.log(dataset.source['eml:eml'].dataset.project);
 
-        const project = dataset.source.project.find((item: any) => {
-          console.log('item', item);
-          return item.projectType === 'project';
-        });
+        const project = dataset.source['eml:eml'].dataset.project;
 
-        const appendedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
+        console.log('project is : ', project);
 
-        newList.push(appendedItem);
+        const parsedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
+
+        console.log('appended item: ', parsedItem);
+
+        newList.push(parsedItem);
       });
 
     return newList;
   };
 
-  const results = appendProjectsWithDatasetId();
+  const results = parseResult();
+
+  console.log('the results object is: ', results);
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
@@ -207,11 +210,11 @@ const SearchPage = () => {
                       aria-current="page"
                       variant="h3"
                       href={`datasets/${result.datasetId}/details`}>
-                      {result.projectTitle}
+                      {result.title}
                     </Link>
                   </Box>
                   <Typography className={classes.datasetAbstract} variant="body1" color="textSecondary">
-                    {truncate(result.projectAbstract[0].para, { length: 200, separator: ' ' })}
+                    {truncate(result.abstract.section[0].para, { length: 200, separator: ' ' })}
                   </Typography>
                 </Box>
                 <Divider></Divider>
