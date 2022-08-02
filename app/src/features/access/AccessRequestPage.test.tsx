@@ -3,7 +3,6 @@ import { AuthStateContext } from 'contexts/authStateContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import useCodes from 'hooks/useCodes';
 import React from 'react';
 import { Router } from 'react-router';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
@@ -19,12 +18,6 @@ const mockUseApi = {
 };
 const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
-jest.mock('../../hooks/useCodes');
-const mockUseCodes = (useCodes as unknown as jest.Mock).mockReturnValue({
-  codes: {
-    system_roles: [{ id: 1, name: 'Creator' }]
-  }
-});
 
 const renderContainer = () => {
   const authState = getMockAuthState({
@@ -64,7 +57,6 @@ describe('AccessRequestPage', () => {
     // clear mocks before each test
     mockBiohubApi().admin.createAdministrativeActivity.mockClear();
 
-    mockUseCodes.mockClear();
   });
 
   afterEach(() => {

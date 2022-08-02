@@ -22,7 +22,6 @@ import { DeleteSystemUserI18N } from 'constants/i18n';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useContext, useState } from 'react';
 import { useHistory } from 'react-router';
@@ -44,7 +43,6 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 export interface IActiveUsersListProps {
   activeUsers: IGetUserResponse[];
-  codes: IGetAllCodeSetsResponse;
   refresh: () => void;
 }
 
@@ -57,8 +55,15 @@ export interface IActiveUsersListProps {
 const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
-  const { activeUsers, codes } = props;
+  const { activeUsers } = props;
   const history = useHistory();
+
+  //TODO: Temp fix with hard code values to replace codes
+  const systemRoles = [
+    { name: 'System Administrator', id: 1 },
+    { name: 'Creator', id: 2 },
+    { name: 'Data Administrator', id: 3 }
+  ];
 
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [page, setPage] = useState(0);
@@ -282,16 +287,12 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
                           buttonLabel={row.role_names.join(', ') || 'Not Applicable'}
                           buttonTitle={'Change User Permissions'}
                           buttonProps={{ variant: 'text' }}
-                          menuItems={codes.system_roles
-                            .sort((item1, item2) => {
-                              return item1.name.localeCompare(item2.name);
-                            })
-                            .map((item) => {
-                              return {
-                                menuLabel: item.name,
-                                menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.id)
-                              };
-                            })}
+                          menuItems={systemRoles.map((item) => {
+                            return {
+                              menuLabel: item.name,
+                              menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.id)
+                            };
+                          })}
                           buttonEndIcon={<Icon path={mdiMenuDown} size={1} />}
                         />
                       </Box>
@@ -348,7 +349,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
           element: (
             <AddSystemUsersForm
               system_roles={
-                props.codes?.system_roles?.map((item) => {
+                systemRoles.map((item) => {
                   return { value: item.id, label: item.name };
                 }) || []
               }

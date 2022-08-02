@@ -11,12 +11,13 @@ import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { DialogContext } from 'contexts/dialogContext';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
-import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import React, { useContext, useEffect, useState } from 'react';
+import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -40,6 +41,8 @@ const DatasetPage: React.FC = () => {
   const classes = useStyles();
   const api = useApi();
   const urlParams = useParams();
+  const dialogContext = useContext(DialogContext);
+  const history = useHistory();
 
   const datasetId = urlParams['id'];
 
@@ -49,7 +52,17 @@ const DatasetPage: React.FC = () => {
     return {
       dialogTitle: 'Error Loading Dataset',
       dialogText:
-        'An error has occurred while attempting to load the dataset, please try again. If the error persists, please contact your system administrator.'
+        'An error has occurred while attempting to load the dataset, please try again. If the error persists, please contact your system administrator.',
+      onOk: () => {
+        datasetDataLoader.clear();
+        dialogContext.setErrorDialog({ open: false });
+        history.replace('/search');
+      },
+      onClose: () => {
+        datasetDataLoader.clear();
+        dialogContext.setErrorDialog({ open: false });
+        history.replace('/search');
+      }
     };
   });
 

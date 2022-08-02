@@ -51,7 +51,7 @@ GET.apiDoc = {
                 role_ids: {
                   type: 'array',
                   items: {
-                    type: 'string'
+                    oneOf: [{ type: 'number' }, { type: 'string' }]
                   }
                 },
                 role_names: {

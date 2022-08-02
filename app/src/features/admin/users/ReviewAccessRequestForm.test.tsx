@@ -6,7 +6,6 @@ import { Formik } from 'formik';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
 import React from 'react';
-import { codes } from 'test-helpers/code-helpers';
 
 const renderContainer = (accessRequest: IGetAccessRequestsListResponse) => {
   return render(
@@ -20,9 +19,7 @@ const renderContainer = (accessRequest: IGetAccessRequestsListResponse) => {
       {() => (
         <ReviewAccessRequestForm
           request={accessRequest}
-          system_roles={codes.system_roles.map((item) => {
-            return { value: item.id, label: item.name };
-          })}
+          system_roles={[]}
         />
       )}
     </Formik>

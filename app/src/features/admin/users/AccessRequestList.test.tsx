@@ -3,9 +3,7 @@ import AccessRequestList from 'features/admin/users/AccessRequestList';
 import { useApi } from 'hooks/useApi';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IAccessRequestDataObject, IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import React from 'react';
-import { codes } from 'test-helpers/code-helpers';
 
 jest.mock('../../../hooks/useApi');
 const mockUseApi = {
@@ -16,12 +14,8 @@ const mockUseApi = {
 
 const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
-const renderContainer = (
-  accessRequests: IGetAccessRequestsListResponse[],
-  codes: IGetAllCodeSetsResponse,
-  refresh: () => void
-) => {
-  return render(<AccessRequestList accessRequests={accessRequests} codes={codes} refresh={refresh} />);
+const renderContainer = (accessRequests: IGetAccessRequestsListResponse[], refresh: () => void) => {
+  return render(<AccessRequestList accessRequests={accessRequests} refresh={refresh} />);
 };
 
 describe('AccessRequestList', () => {
@@ -35,7 +29,7 @@ describe('AccessRequestList', () => {
   });
 
   it('shows `No Access Requests` when there are no access requests', async () => {
-    const { getByText } = renderContainer([], codes, () => {});
+    const { getByText } = renderContainer([], () => {});
 
     await waitFor(() => {
       expect(getByText('No Access Requests')).toBeVisible();
@@ -66,7 +60,6 @@ describe('AccessRequestList', () => {
           create_date: '2020-04-20'
         }
       ],
-      codes,
       () => {}
     );
 
@@ -102,7 +95,6 @@ describe('AccessRequestList', () => {
           create_date: '2020-04-20'
         }
       ],
-      codes,
       () => {}
     );
 
@@ -138,7 +130,6 @@ describe('AccessRequestList', () => {
           create_date: '2020-04-20'
         }
       ],
-      codes,
       () => {}
     );
 
@@ -165,7 +156,6 @@ describe('AccessRequestList', () => {
           create_date: '2020-04-20'
         }
       ],
-      codes,
       () => {}
     );
 
@@ -201,7 +191,6 @@ describe('AccessRequestList', () => {
           create_date: '2020-04-20'
         }
       ],
-      codes,
       refresh
     );
 
@@ -254,7 +243,6 @@ describe('AccessRequestList', () => {
           create_date: '2020-04-20'
         }
       ],
-      codes,
       refresh
     );
 

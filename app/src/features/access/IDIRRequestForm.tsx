@@ -8,7 +8,6 @@ import Select from '@material-ui/core/Select';
 import Typography from '@material-ui/core/Typography';
 import CustomTextField from 'components/fields/CustomTextField';
 import { useFormikContext } from 'formik';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import React from 'react';
 import yup from 'utils/YupSchema';
 
@@ -27,9 +26,7 @@ export const IDIRRequestFormYupSchema = yup.object().shape({
   comments: yup.string().max(300, 'Maximum 300 characters')
 });
 
-export interface IIDIRRequestFormProps {
-  codes?: IGetAllCodeSetsResponse;
-}
+export interface IIDIRRequestFormProps {}
 
 /**
  * Access Request - IDIR request fields
@@ -38,7 +35,6 @@ export interface IIDIRRequestFormProps {
  */
 const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
   const { values, touched, errors, handleChange } = useFormikContext<IIDIRRequestForm>();
-  const { codes } = props;
 
   return (
     <Box>
@@ -59,11 +55,9 @@ const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
                 error={touched.role && Boolean(errors.role)}
                 displayEmpty
                 inputProps={{ 'aria-label': 'Role' }}>
-                {codes?.system_roles.map((item) => (
-                  <MenuItem key={item.id} value={item.id}>
-                    {item.name}
-                  </MenuItem>
-                ))}
+                <MenuItem key={'item.id'} value={'item.id'}>
+                  {'item.name'}
+                </MenuItem>
               </Select>
               <FormHelperText>{errors.role}</FormHelperText>
             </FormControl>

@@ -1,11 +1,13 @@
 import { AxiosInstance } from 'axios';
-import { AdministrativeActivityStatusType, AdministrativeActivityType } from 'constants/misc';
+import { AdministrativeActivityStatusType,
+  // AdministrativeActivityType
+} from 'constants/misc';
 import {
   IgcNotifyGenericMessage,
   IgcNotifyRecipient,
   IGetAccessRequestsListResponse
 } from 'interfaces/useAdminApi.interface';
-import qs from 'qs';
+// import qs from 'qs';
 
 /**
  * Returns a set of supported api methods for working with admin functions.
@@ -42,14 +44,16 @@ const useAdminApi = (axios: AxiosInstance) => {
   const getAccessRequests = async (
     status: AdministrativeActivityStatusType[] = []
   ): Promise<IGetAccessRequestsListResponse[]> => {
-    const { data } = await axios.get(`/api/administrative-activities`, {
-      params: { type: AdministrativeActivityType.SYSTEM_ACCESS, status },
-      paramsSerializer: (params) => {
-        return qs.stringify(params);
-      }
-    });
 
-    return data;
+    return [];
+    // const { data } = await axios.get(`/api/administrative-activities`, {
+    //   params: { type: AdministrativeActivityType.SYSTEM_ACCESS, status },
+    //   paramsSerializer: (params) => {
+    //     return qs.stringify(params);
+    //   }
+    // });
+
+    // return data;
   };
 
   /**
