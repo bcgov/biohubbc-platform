@@ -59,7 +59,7 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
+const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
   const { submissionSpatialComponentId } = props;
 
   const classes = useStyles();
@@ -69,29 +69,21 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
     return api.search.getSpatialMetadata(submissionSpatialComponentId);
   });
 
-  /**
-   * @TODO Replace this with moment/luxon date formatter
-   */
-  const formatDate = (dateString: string) => {
-    const d = new Date(dateString);
-    return d instanceof Date && !isNaN(d as unknown as number) ? d.toDateString() : dateString;
-  };
-
   dataLoader.load();
-  
+
   const { isLoading, data, isReady } = dataLoader;
-  console.log('data:', data)
+  console.log('dat:', data)
 
   const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
   const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
-        {props.type || 'Feature'}
+        {props.type || 'Dataset'}
       </Typography>
       {props.date && (
         <Typography className={classes.date} component="h6" variant="subtitle1">
-          {formatDate(props.date)}
+          formatDate(props.date)
         </Typography>
       )}
     </Box>
@@ -152,4 +144,4 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
   );
 };
 
-export default FeaturePopup;
+export default DatasetPopup;
