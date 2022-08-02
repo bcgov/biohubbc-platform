@@ -179,7 +179,7 @@ const SearchPage = () => {
                 <>Loading...</>
               ) : (
                 <>
-                  Found {`${results.length} result${results.length !== 1 && 's'}`}
+                  Found {`${results.length} result${results.length !== 1 ? 's' : ''}`}
                   <Typography
                     variant="inherit"
                     component="span"
