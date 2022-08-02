@@ -1,4 +1,4 @@
-import { Container, makeStyles, Theme, Typography } from '@material-ui/core';
+import { Container, makeStyles, Paper, Theme, Typography } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
 import SearchComponent from 'features/search/SearchComponent';
 import { Formik, FormikProps } from 'formik';
@@ -7,10 +7,12 @@ import React, { useRef } from 'react';
 import { useHistory } from 'react-router';
 
 const useStyles = makeStyles((theme: Theme) => ({
-  heroSearch: {
-    background: 'rgb(247, 248, 250)',
-    borderBottom: '1px solid rgb(140, 140, 140)',
-    textAlign: 'center'
+  heroBannerContainer: {
+    textAlign: 'center',
+    height: '26rem',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center'
   }
 }))
 
@@ -18,7 +20,6 @@ const HomePage = () => {
   const classes = useStyles()
   const formikRef = useRef<FormikProps<IAdvancedSearch>>(null);
   const history = useHistory()
-  
   
   const handleSubmit = () => {
     const query = formikRef.current?.values?.keywords || ''
@@ -31,9 +32,9 @@ const HomePage = () => {
   }
 
   return (
-    <Box className={classes.heroSearch} p={10}>
-      <Container maxWidth="md">
-        <Box mb={10}>
+    <Paper square elevation={0}>
+      <Container maxWidth="md" className={classes.heroBannerContainer}>
+        <Box display="flex" alignContent="center" mt={-2} mb={8}>
           <Typography variant="h1">British Columbia's open-access source for terrestrial, aquatic species and habitat inventory data</Typography>
         </Box>
         <Box mx={10}>
@@ -46,7 +47,7 @@ const HomePage = () => {
           </Formik>
         </Box>
       </Container>
-    </Box>
+    </Paper>
   );
 };
 
