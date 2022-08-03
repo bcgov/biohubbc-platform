@@ -413,7 +413,7 @@ export class SubmissionRepository extends BaseRepository {
       )
       SELECT
         features_array #> '{properties, type}' spatial_type,
-        count(b#>'{properties, type}')::integer count
+        count(features_array #> '{properties, type}')::integer count
       FROM
         submission_spatial_component,
         jsonb_array_elements(spatial_component->'features') features_array,
