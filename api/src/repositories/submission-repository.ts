@@ -411,7 +411,7 @@ export class SubmissionRepository extends BaseRepository {
       )
       SELECT
         b #> '{properties, type}' spatial_type,
-        count(b#>'{properties, type}') count
+        count(b#>'{properties, type}')::integer count
       FROM
         submission_spatial_component,
         jsonb_array_elements(spatial_component->'features') b
@@ -420,8 +420,14 @@ export class SubmissionRepository extends BaseRepository {
       GROUP BY
         spatial_type;
     `;
-
     const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get spatial component count', [
+        'SubmissionRepository-> getSpatialComponentCountByDatasetId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
 
     return response.rows;
   }

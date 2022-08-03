@@ -313,6 +313,87 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('getSubmissionRecordJSONByDatasetId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when select sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionRecordJSONByDatasetId('test_uuid');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get dataset');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ eml_json_source: 'a valid json string' }] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionRecordJSONByDatasetId('test_uuid');
+
+      expect(response).to.equal('a valid json string');
+    });
+  });
+
+  //Add test for getSpatialComponentCountByDatasetId
+
+  describe('getSpatialComponentCountByDatasetId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when select sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSpatialComponentCountByDatasetId('test_uuid');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get spatial component count');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ spatial_type: 'occurrence', count: 10 }] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSpatialComponentCountByDatasetId('test_uuid');
+
+      expect(response[0].spatial_type).to.equal('occurrence');
+      expect(response[0].count).to.equal(10);
+    });
+  });
+
   describe('setSubmissionEndDateById', () => {
     afterEach(() => {
       sinon.restore();

@@ -124,7 +124,7 @@ describe('search', () => {
       sinon.restore();
     });
 
-    it('catches and re-throws an error', async () => {
+    it('catches and re-throws an error on a keyword search', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
