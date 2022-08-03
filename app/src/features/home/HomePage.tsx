@@ -1,4 +1,4 @@
-import { Container, makeStyles, Paper, Theme, Typography } from '@material-ui/core';
+import { Container, makeStyles, Paper, Typography } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
 import SearchComponent from 'features/search/SearchComponent';
 import { Formik, FormikProps } from 'formik';
@@ -6,7 +6,7 @@ import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import React, { useRef } from 'react';
 import { useHistory } from 'react-router';
 
-const useStyles = makeStyles((theme: Theme) => ({
+const useStyles = makeStyles(() => ({
   heroBannerContainer: {
     textAlign: 'center',
     height: '26rem',

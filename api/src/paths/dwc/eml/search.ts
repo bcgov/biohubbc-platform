@@ -50,16 +50,12 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['id'],
-              nullable: true,
+              required: ['id', 'source', 'observation_count'],
               properties: {
                 id: {
                   type: 'string'
                 },
                 source: {
-                  type: 'object'
-                },
-                fields: {
                   type: 'object'
                 },
                 observation_count: {
@@ -93,24 +89,37 @@ export function searchInElasticSearch(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const response = await elasticService.keywordSearchEml(queryString);
+      const responseFromES = await elasticService.keywordSearchEml(queryString);
 
-      const promises = response.map(async (item) => {
-        const observationCount = await submissionService.getObservationCountByDatasetId(item._id);
+      const datasetIdsFromES = responseFromES.map((item) => item._id);
 
-        return {
-          id: item._id,
-          fields: item.fields,
-          source: item._source,
-          observation_count: observationCount
-        };
+      const promises = datasetIdsFromES.map(async (item) => {
+        // It is possible for ElasticSearch to have ids that don't exist in the Database.
+        // We are therefore checking to see if the DB has the ID, and if so, we return the eml_json_source, etc.
+        try {
+          const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item);
+          const spatialComponentCounts = await submissionService.getSpatialComponentCountByDatasetId(item);
+
+          return {
+            id: item,
+            source: responseFromDB,
+            observation_count:
+              spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
+          };
+        } catch {
+          // No result found for provided datasetId, return undefined.
+          return;
+        }
       });
 
       const result = await Promise.all(promises);
 
+      // Remove items returned from the DB that are undefined
+      const filteredResult = result.filter((item) => !!item);
+
       await connection.commit();
 
-      res.status(200).json(result);
+      res.status(200).json(filteredResult);
     } catch (error) {
       defaultLog.error({ label: 'keywordSearchEml', message: 'error', error });
       await connection.rollback();

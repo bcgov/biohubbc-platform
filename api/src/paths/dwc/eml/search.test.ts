@@ -87,21 +87,14 @@ describe('search', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be string');
+          expect(response.errors[0].message).to.equal("must have required property 'observation_count'");
         });
         it('has array with invalid value: source', async () => {
           const apiResponse = [{ id: 'test', source: 1, fields: {} }];
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
-        });
-        it('has array with invalid value: fields', async () => {
-          const apiResponse = [{ id: 'test', source: {}, fields: 1 }];
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
+          expect(response.errors[0].message).to.equal("must have required property 'observation_count'");
         });
       });
 
@@ -115,8 +108,8 @@ describe('search', () => {
 
         it('has valid values', async () => {
           const apiResponse = [
-            { id: 'test1', source: {}, fields: {} },
-            { id: 'test2', source: {}, fields: {} }
+            { id: 'test1', source: {}, observation_count: 1 },
+            { id: 'test2', source: {}, observation_count: 2 }
           ];
           const response = responseValidator.validateResponse(200, apiResponse);
 
@@ -166,16 +159,29 @@ describe('search', () => {
       };
 
       sinon
-        .stub(SubmissionService.prototype, 'getObservationCountByDatasetId')
+        .stub(SubmissionService.prototype, 'getSpatialComponentCountByDatasetId')
         .onCall(0)
-        .resolves(14)
+        .resolves([
+          { spatial_type: 'Boundary', count: 2 },
+          { spatial_type: 'Occurrence', count: 14 }
+        ])
         .onCall(1)
-        .resolves(23);
+        .resolves([
+          { spatial_type: 'Boundary', count: 1 },
+          { spatial_type: 'Occurrence', count: 23 }
+        ]);
 
       const keywordSearchEmlStub = sinon.stub(ESService.prototype, 'keywordSearchEml').resolves([
         { _id: '123', _source: {}, fields: {} },
         { _id: '456', _source: {}, fields: {} }
       ] as unknown as SearchHit[]);
+
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordJSONByDatasetId')
+        .onCall(0)
+        .resolves('a valid json string')
+        .onCall(1)
+        .resolves('another valid json string');
 
       const requestHandler = search.searchInElasticSearch();
 
@@ -183,8 +189,8 @@ describe('search', () => {
 
       expect(keywordSearchEmlStub).to.have.been.calledOnceWith('search-term');
       expect(mockRes.jsonValue).eql([
-        { id: '123', source: {}, fields: {}, observation_count: 14 },
-        { id: '456', source: {}, fields: {}, observation_count: 23 }
+        { id: '123', source: 'a valid json string', observation_count: 14 },
+        { id: '456', source: 'another valid json string', observation_count: 23 }
       ]);
     });
   });

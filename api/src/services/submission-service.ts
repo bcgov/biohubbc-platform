@@ -5,6 +5,7 @@ import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
   ISourceTransformModel,
+  ISpatialComponentCount,
   ISubmissionModel,
   ISubmissionModelWithStatus,
   SubmissionRepository,
@@ -162,7 +163,7 @@ export class SubmissionService extends DBService {
    * @return {string}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordSONByDatasetId(datasetId: string): Promise<string> {
+  async getSubmissionRecordJSONByDatasetId(datasetId: string): Promise<string> {
     return this.submissionRepository.getSubmissionRecordJSONByDatasetId(datasetId);
   }
 
@@ -170,11 +171,11 @@ export class SubmissionService extends DBService {
    *Get observation count by datasetId.
    *
    * @param {string} datasetId
-   * @return {string}
+   * @return {ISpatialComponentCount[]}
    * @memberof SubmissionService
    */
-  async getObservationCountByDatasetId(datasetId: string): Promise<number> {
-    return this.submissionRepository.getObservationCountByDatasetId(datasetId);
+  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
+    return this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId);
   }
 
   /**

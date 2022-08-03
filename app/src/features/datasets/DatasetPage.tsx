@@ -38,12 +38,12 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 const DatasetPage: React.FC = () => {
   const classes = useStyles();
-  const api = useApi();
+  const biohubApi = useApi();
   const urlParams = useParams();
 
   const datasetId = urlParams['id'];
 
-  const datasetDataLoader = useDataLoader(() => api.dataset.getDatasetEML(datasetId));
+  const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
 
   useDataLoaderError(datasetDataLoader, () => {
     return {
@@ -56,7 +56,12 @@ const DatasetPage: React.FC = () => {
   datasetDataLoader.load();
 
   const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
-    api.search.getSpatialData({ boundary: searchBoundary, type: searchType, zoom: searchZoom })
+    biohubApi.search.getSpatialData({
+      boundary: searchBoundary,
+      type: searchType,
+      zoom: searchZoom,
+      datasetID: datasetId
+    })
   );
 
   useDataLoaderError(mapDataLoader, () => {
