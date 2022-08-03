@@ -95,15 +95,15 @@ export function searchInElasticSearch(): RequestHandler {
 
       const promises = datasetIdsFromES.map(async (item) => {
         // It is possible for ElasticSearch to have ids that don't exist in the Database.
-        // We are therefore checking to see if the DB has the ID, and if so, we return the eml_JSON_source
+        // We are therefore checking to see if the DB has the ID, and if so, we return the eml_json_source, etc.
         try {
           const responseFromDB = await submissionService.getSubmissionRecordJSONByDatasetId(item);
-          const observationCount = await submissionService.getSpatialComponentCountByDatasetId(item);
+          const spatialComponentCounts = await submissionService.getSpatialComponentCountByDatasetId(item);
 
           return {
             id: item,
             source: responseFromDB,
-            observation_count: observationCount
+            observation_count: spatialComponentCounts.find((item) => item.spatial_type === 'Occurrence')?.count || 0
           };
         } catch {
           // No result found for provided datasetId, return undefined.

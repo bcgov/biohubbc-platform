@@ -5,6 +5,11 @@ import { EMLFile } from '../utils/media/eml/eml-file';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
+export interface ISpatialComponentCount {
+  spatial_type: string;
+  count: number;
+}
+
 export interface ISearchSubmissionCriteria {
   keyword?: string;
   spatial?: string;
@@ -415,26 +420,34 @@ export class SubmissionRepository extends BaseRepository {
    *
    *
    * @param {string} datasetId
-   * @return {*}  {Promise<number>}
+   * @return {*}  {Promise<ISpatialComponentCount[]>}
    * @memberof SubmissionRepository
    */
-  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<number> {
+  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
     const sqlStatement = SQL`
+      WITH submission_id as (
+        SELECT
+          submission.submission_id
+        FROM
+          submission
+        WHERE
+          submission.uuid = ${datasetId}
+      )
       SELECT
-        count(distinct submission_spatial_component_id)::integer
+        b #> '{properties, type}' spatial_type,
+        count(b#>'{properties, type}') count
       FROM
-        submission_spatial_component ssc
-      LEFT JOIN
-        submission s
-      ON
-        s.submission_id = ssc.submission_id
+        submission_spatial_component,
+        jsonb_array_elements(spatial_component->'features') b
       WHERE
-        s.uuid = ${datasetId};
+        submission_spatial_component.submission_id = submission_id
+      GROUP BY
+        spatial_type;
     `;
 
-    const response = await this.connection.sql<{ count: number }>(sqlStatement);
+    const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
 
-    return response.rows[0].count;
+    return response.rows;
   }
 
   /**
