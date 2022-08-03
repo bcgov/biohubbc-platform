@@ -103,7 +103,8 @@ export function searchInElasticSearch(): RequestHandler {
           return {
             id: item,
             source: responseFromDB,
-            observation_count: spatialComponentCounts.find((item) => item.spatial_type === 'Occurrence')?.count || 0
+            observation_count:
+              spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
           };
         } catch {
           // No result found for provided datasetId, return undefined.
