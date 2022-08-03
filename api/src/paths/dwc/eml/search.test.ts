@@ -161,9 +161,15 @@ describe('search', () => {
       sinon
         .stub(SubmissionService.prototype, 'getSpatialComponentCountByDatasetId')
         .onCall(0)
-        .resolves(14)
+        .resolves([
+          { spatial_type: 'Boundary', count: 2 },
+          { spatial_type: 'Occurrence', count: 14 }
+        ])
         .onCall(1)
-        .resolves(23);
+        .resolves([
+          { spatial_type: 'Boundary', count: 1 },
+          { spatial_type: 'Occurrence', count: 23 }
+        ]);
 
       const keywordSearchEmlStub = sinon.stub(ESService.prototype, 'keywordSearchEml').resolves([
         { _id: '123', _source: {}, fields: {} },

@@ -54,9 +54,6 @@ export interface ISubmissionModelWithStatus extends ISubmissionModel {
   submission_status: string;
 }
 
-export interface IDatasetId {
-  uuid: string;
-}
 /**
  * Submission source transform table model.
  *
@@ -393,27 +390,6 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].eml_json_source;
-  }
-
-  /**
-   * return the list of valid datasetIds from the DB
-   *
-   * @return {*}  {Promise<string>}
-   * @memberof SubmissionRepository
-   */
-  async getDatasetIdsFromDB(): Promise<IDatasetId[]> {
-    const sqlStatement = SQL`
-      SELECT
-        uuid
-      FROM
-        submission
-      WHERE
-        record_end_date IS NULL;
-    `;
-
-    const response = await this.connection.sql<IDatasetId>(sqlStatement);
-
-    return response.rows;
   }
 
   /**
