@@ -2,7 +2,6 @@ import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import {
-  IDatasetId,
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
   ISourceTransformModel,
@@ -166,16 +165,6 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRecordJSONByDatasetId(datasetId: string): Promise<string> {
     return this.submissionRepository.getSubmissionRecordJSONByDatasetId(datasetId);
-  }
-
-  /**
-   *
-   *
-   * @return {*}  {Promise<string>}
-   * @memberof SubmissionService
-   */
-  async getDatasetIdsFromDB(): Promise<IDatasetId[]> {
-    return this.submissionRepository.getDatasetIdsFromDB();
   }
 
   /**

@@ -87,21 +87,14 @@ describe('search', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be string');
+          expect(response.errors[0].message).to.equal("must have required property 'observation_count'");
         });
         it('has array with invalid value: source', async () => {
           const apiResponse = [{ id: 'test', source: 1, fields: {} }];
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
-        });
-        it('has array with invalid value: fields', async () => {
-          const apiResponse = [{ id: 'test', source: {}, fields: 1 }];
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
+          expect(response.errors[0].message).to.equal("must have required property 'observation_count'");
         });
       });
 
@@ -115,8 +108,8 @@ describe('search', () => {
 
         it('has valid values', async () => {
           const apiResponse = [
-            { id: 'test1', source: {}, fields: {} },
-            { id: 'test2', source: {}, fields: {} }
+            { id: 'test1', source: {}, observation_count: 1 },
+            { id: 'test2', source: {}, observation_count: 2 }
           ];
           const response = responseValidator.validateResponse(200, apiResponse);
 
@@ -155,7 +148,7 @@ describe('search', () => {
       }
     });
 
-    it.skip('returns search results when Elastic Search service succeeds with valid data', async () => {
+    it('returns search results when Elastic Search service succeeds with valid data', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
@@ -177,14 +170,21 @@ describe('search', () => {
         { _id: '456', _source: {}, fields: {} }
       ] as unknown as SearchHit[]);
 
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordJSONByDatasetId')
+        .onCall(0)
+        .resolves('a valid json string')
+        .onCall(1)
+        .resolves('another valid json string');
+
       const requestHandler = search.searchInElasticSearch();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(keywordSearchEmlStub).to.have.been.calledOnceWith('search-term');
       expect(mockRes.jsonValue).eql([
-        { id: '123', source: {}, observation_count: 14 },
-        { id: '456', source: {}, observation_count: 23 }
+        { id: '123', source: 'a valid json string', observation_count: 14 },
+        { id: '456', source: 'another valid json string', observation_count: 23 }
       ]);
     });
   });
