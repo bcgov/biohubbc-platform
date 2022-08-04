@@ -43,6 +43,10 @@ parameters:
     description: Platform Elasticsearch index for EML data
     required: true
     value: 'eml'
+  - name: S3_KEY_PREFIX
+    description: S3 key optional prefix
+    required: false
+    value: 'platform'
   - name: TZ
     description: Application timezone
     required: false
