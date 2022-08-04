@@ -382,8 +382,8 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<{ eml_json_source: string }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get dataset', [
+    if (response.rowCount !== 1 || !response.rows[0].eml_json_source) {
+      throw new ApiExecuteSQLError('Failed to get submission record by Dataset Id', [
         'SubmissionRepository->getSubmissionRecordJSONByDatasetId',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);

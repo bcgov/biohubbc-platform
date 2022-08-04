@@ -12,7 +12,7 @@ import TablePagination from '@material-ui/core/TablePagination';
 import TableRow from '@material-ui/core/TableRow';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
-import { mdiDotsVertical, mdiInformationOutline, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import EditDialog from 'components/dialog/EditDialog';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
@@ -23,7 +23,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useContext, useState } from 'react';
-import { useHistory } from 'react-router';
+// import { useHistory } from 'react-router';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
@@ -55,7 +55,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
   const { activeUsers } = props;
-  const history = useHistory();
+  // const history = useHistory();
 
   //TODO: Temp fix with hard code values to replace codes
   const systemRoles = [
@@ -296,21 +296,23 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
                         />
                       </Box>
                     </TableCell>
+
                     <TableCell align="center">
                       <Box my={-1}>
                         <CustomMenuIconButton
                           buttonTitle="Actions"
                           buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
                           menuItems={[
-                            {
-                              menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
-                              menuLabel: 'View Users Details',
-                              menuOnClick: () =>
-                                history.push({
-                                  pathname: `/admin/users/${row.id}`,
-                                  state: row
-                                })
-                            },
+                            //TODO: disabled view details button, page and router does not exist
+                            // {
+                            //   menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
+                            //   menuLabel: 'View Users Details',
+                            //   menuOnClick: () =>
+                            //     history.push({
+                            //       pathname: `/admin/users/${row.id}`,
+                            //       state: row
+                            //     })
+                            // },
                             {
                               menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
                               menuLabel: 'Remove User',
