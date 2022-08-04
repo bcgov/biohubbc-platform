@@ -359,23 +359,6 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when select sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.getSpatialComponentCountByDatasetId('test_uuid');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get spatial component count');
-      }
-    });
-
     it('should succeed with valid data', async () => {
       const mockQueryResponse = { rowCount: 1, rows: [{ spatial_type: 'occurrence', count: 10 }] } as any as Promise<
         QueryResult<any>
