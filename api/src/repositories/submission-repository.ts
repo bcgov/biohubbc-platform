@@ -401,22 +401,25 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
     const sqlStatement = SQL`
-      WITH submission_id as (
+      WITH with_submission as (
         SELECT
           submission.submission_id
         FROM
           submission
         WHERE
           submission.uuid = ${datasetId}
+        AND
+          submission.record_end_date is NULL
       )
       SELECT
-        b #> '{properties, type}' spatial_type,
-        count(b#>'{properties, type}')::integer count
+        features_array #> '{properties, type}' spatial_type,
+        count(features_array #> '{properties, type}')::integer count
       FROM
         submission_spatial_component,
-        jsonb_array_elements(spatial_component->'features') b
+        jsonb_array_elements(submission_spatial_component.spatial_component -> 'features') features_array,
+        with_submission
       WHERE
-        submission_spatial_component.submission_id = submission_id
+        submission_spatial_component.submission_id = with_submission.submission_id
       GROUP BY
         spatial_type;
     `;
