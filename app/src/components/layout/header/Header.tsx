@@ -161,13 +161,15 @@ const Header: React.FC = () => {
               Find Datasets
             </Link>
             <Link to="/map" id="menu_map">
-              Map
+              Map Search
             </Link>
-            <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-              <Link to="/admin/users" id="menu_admin_users">
-                Manage Users
-              </Link>
-            </SystemRoleGuard>
+            <Box display="none">
+              <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                <Link to="/admin/users" id="menu_admin_users">
+                  Manage Users
+                </Link>
+              </SystemRoleGuard>
+            </Box>
           </Toolbar>
         </Box>
       </AppBar>

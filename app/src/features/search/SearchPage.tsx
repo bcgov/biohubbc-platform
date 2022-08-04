@@ -137,24 +137,24 @@ const SearchPage = () => {
     });
   };
 
-  const appendProjectsWithDatasetId = () => {
+  const parseResult = () => {
     const newList: any[] = [];
 
     searchDataLoader.data &&
       searchDataLoader.data.forEach((dataset) => {
         const datasetId = dataset.id;
 
-        const project = dataset.source.project.find((item: any) => item.projectType === 'project');
+        const project = dataset.source['eml:eml'].dataset.project;
 
-        const appendedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
+        const parsedItem = { ...project, datasetId: datasetId, observationCount: dataset.observation_count };
 
-        newList.push(appendedItem);
+        newList.push(parsedItem);
       });
 
     return newList;
   };
 
-  const results = appendProjectsWithDatasetId();
+  const results = parseResult();
 
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
@@ -179,7 +179,7 @@ const SearchPage = () => {
                 <>Loading...</>
               ) : (
                 <>
-                  Found {`${results.length} result${results.length !== 1 && 's'}`}
+                  Found {`${results.length} result${results.length !== 1 ? 's' : ''}`}
                   <Typography
                     variant="inherit"
                     component="span"
@@ -201,11 +201,11 @@ const SearchPage = () => {
                       aria-current="page"
                       variant="h3"
                       href={`datasets/${result.datasetId}/details`}>
-                      {result.projectTitle}
+                      {result.title}
                     </Link>
                   </Box>
                   <Typography className={classes.datasetAbstract} variant="body1" color="textSecondary">
-                    {truncate(result.projectAbstract[0].para, { length: 200, separator: ' ' })}
+                    {truncate(result.abstract.section[0].para, { length: 200, separator: ' ' })}
                   </Typography>
                 </Box>
                 <Divider></Divider>
