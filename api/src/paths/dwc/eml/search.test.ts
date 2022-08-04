@@ -159,16 +159,11 @@ describe('search', () => {
       };
 
       sinon
-        .stub(SubmissionService.prototype, 'getSpatialComponentCountByDatasetId')
+        .stub(SubmissionService.prototype, 'getSubmissionRecordsWithSpatialCount')
         .onCall(0)
         .resolves([
-          { spatial_type: 'Boundary', count: 2 },
-          { spatial_type: 'Occurrence', count: 14 }
-        ])
-        .onCall(1)
-        .resolves([
-          { spatial_type: 'Boundary', count: 1 },
-          { spatial_type: 'Occurrence', count: 23 }
+          { id: 'test_uuid1', source: 'valid_json_string_1', observation_count: 14 },
+          { id: 'test_uuid2', source: 'valid_json_string_2', observation_count: 23 }
         ]);
 
       const keywordSearchEmlStub = sinon.stub(ESService.prototype, 'keywordSearchEml').resolves([
@@ -176,21 +171,14 @@ describe('search', () => {
         { _id: '456', _source: {}, fields: {} }
       ] as unknown as SearchHit[]);
 
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordJSONByDatasetId')
-        .onCall(0)
-        .resolves('a valid json string')
-        .onCall(1)
-        .resolves('another valid json string');
-
       const requestHandler = search.searchInElasticSearch();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(keywordSearchEmlStub).to.have.been.calledOnceWith('search-term');
       expect(mockRes.jsonValue).eql([
-        { id: '123', source: 'a valid json string', observation_count: 14 },
-        { id: '456', source: 'another valid json string', observation_count: 23 }
+        { id: 'test_uuid1', source: 'valid_json_string_1', observation_count: 14 },
+        { id: 'test_uuid2', source: 'valid_json_string_2', observation_count: 23 }
       ]);
     });
   });
