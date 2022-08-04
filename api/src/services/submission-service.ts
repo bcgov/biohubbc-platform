@@ -1,6 +1,6 @@
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -158,14 +158,41 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *Get json representation of eml source from submission by datasetId.
+   * Get json representation of eml source from submission by datasetId.
    *
    * @param {string} datasetId
    * @return {string}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordJSONByDatasetId(datasetId: string): Promise<string> {
-    return this.submissionRepository.getSubmissionRecordJSONByDatasetId(datasetId);
+  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string> {
+    const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get dataset', [
+        'SubmissionRepository->getSubmissionRecordEMLJSONByDatasetId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0].eml_json_source;
+  }
+
+  /**
+   * Find json representation of eml source from submission by datasetId. May return null if `datasetId` does not match
+   * any existing records.
+   *
+   * @param {string} datasetId
+   * @return {string | null}
+   * @memberof SubmissionService
+   */
+  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string | null> {
+    const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
+
+    if (response.rowCount !== 1) {
+      return null;
+    }
+
+    return response.rows[0].eml_json_source;
   }
 
   /**
@@ -350,32 +377,36 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *Retrieves an array of submission records with the spatial data
+   * Retrieves an array of submission records with spatial count by dataset id.
    *
    * @param {string[]} datasetIds
-   * @return {*}  {Promise<ISubmissionRecordWithSpatial[]>}
+   * @return {*}  {(Promise<(ISubmissionRecordWithSpatial | null)[]>)}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordsWithSpatialCount(datasetIds: string[]): Promise<ISubmissionRecordWithSpatial[]> {
-    return Promise.all(datasetIds.map(async (datasetId) => this.getSubmissionRecordWithSpatialCount(datasetId)));
+  async findSubmissionRecordsWithSpatialCount(datasetIds: string[]): Promise<(ISubmissionRecordWithSpatial | null)[]> {
+    return Promise.all(datasetIds.map(async (datasetId) => this.findSubmissionRecordWithSpatialCount(datasetId)));
   }
 
   /**
-   *Retrieves a submission record with the spatial data
+   * Retrieves a submission record with spatial count by dataset id.
    *
    * @param {string} datasetId
-   * @return {*}  {Promise<ISubmissionRecordWithSpatial>}
+   * @return {*}  {(Promise<ISubmissionRecordWithSpatial | null>)}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial> {
-    const [responseFromDB, spatialComponentCounts] = await Promise.all([
-      this.getSubmissionRecordJSONByDatasetId(datasetId),
+  async findSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial | null> {
+    const [submissionEMLJSON, spatialComponentCounts] = await Promise.all([
+      this.findSubmissionRecordEMLJSONByDatasetId(datasetId),
       this.getSpatialComponentCountByDatasetId(datasetId)
     ]);
 
+    if (!submissionEMLJSON) {
+      return null;
+    }
+
     return {
       id: datasetId,
-      source: responseFromDB,
+      source: submissionEMLJSON,
       observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
     };
   }

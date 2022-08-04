@@ -313,7 +313,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSubmissionRecordJSONByDatasetId', () => {
+  describe('getSubmissionRecordEMLJSONByDatasetId', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -328,7 +328,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getSubmissionRecordJSONByDatasetId('test_uuid');
+        await submissionRepository.getSubmissionRecordEMLJSONByDatasetId('test_uuid');
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to get dataset');
@@ -346,7 +346,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSubmissionRecordJSONByDatasetId('test_uuid');
+      const response = await submissionRepository.getSubmissionRecordEMLJSONByDatasetId('test_uuid');
 
       expect(response).to.equal('a valid json string');
     });

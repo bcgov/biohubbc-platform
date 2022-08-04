@@ -93,11 +93,7 @@ export function searchInElasticSearch(): RequestHandler {
 
       const datasetIdsFromES = responseFromES.map((item) => item._id);
 
-      const submissionRecordWithSpatialCount = await submissionService.getSubmissionRecordsWithSpatialCount(
-        datasetIdsFromES
-      );
-
-      const result = await Promise.all(submissionRecordWithSpatialCount);
+      const result = await submissionService.findSubmissionRecordsWithSpatialCount(datasetIdsFromES);
 
       // Remove items returned from the DB that are undefined
       const filteredResult = result.filter((item: any) => !!item);
