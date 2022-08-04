@@ -224,6 +224,11 @@ objects:
                     secretKeyRef:
                       name: biohubbc-object-store
                       key: object_store_bucket_name
+                - name: S3_KEY_PREFIX
+                  valueFrom:
+                    secretKeyRef:
+                      key: s3_key_prefix
+                      name: ${S3_KEY_PREFIX}
               resources:
                 requests:
                   cpu: ${CPU_REQUEST}
@@ -477,3 +482,6 @@ parameters:
   - name: OBJECT_STORE_BUCKET_NAME
     displayName: Bucket name
     description: Object Store Bucket Name
+  - name: S3_KEY_PREFIX
+    displayName: S3 Key Prefix
+    description: Optional prefix for S3 file keys

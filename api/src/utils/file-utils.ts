@@ -13,6 +13,7 @@ const ClamAVScanner =
 const OBJECT_STORE_BUCKET_NAME = process.env.OBJECT_STORE_BUCKET_NAME || '';
 const OBJECT_STORE_URL = process.env.OBJECT_STORE_URL || 'nrs.objectstore.gov.bc.ca';
 const AWS_ENDPOINT = new AWS.Endpoint(OBJECT_STORE_URL);
+const S3_KEY_PREFIX = process.env.S3_KEY_PREFIX || 'platform'
 const S3 = new AWS.S3({
   endpoint: AWS_ENDPOINT.href,
   accessKeyId: process.env.OBJECT_STORE_ACCESS_KEY_ID,
@@ -127,8 +128,8 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 }
 
 export interface IS3FileKey {
-  submissionId: number;
   fileName: string;
+  submissionId?: number;
 }
 
 /**
@@ -139,7 +140,7 @@ export interface IS3FileKey {
  * @return {*}  {string}
  */
 export function generateS3FileKey(options: IS3FileKey): string {
-  const keyParts: (string | number)[] = ['platform'];
+  const keyParts: (string | number)[] = [S3_KEY_PREFIX];
 
   if (options.submissionId) {
     keyParts.push(options.submissionId);
