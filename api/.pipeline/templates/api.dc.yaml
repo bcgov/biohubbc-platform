@@ -39,6 +39,10 @@ parameters:
     description: Platform Elasticsearch URL
     required: true
     value: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca'
+  - name: ELASTICSEARCH_EML_INDEX
+    description: Platform Elasticsearch index for EML data
+    required: true
+    value: 'eml'
   - name: TZ
     description: Application timezone
     required: false
@@ -201,6 +205,8 @@ objects:
                   value: ${NODE_ENV}
                 - name: ELASTICSEARCH_URL
                   value: ${ELASTICSEARCH_URL}
+                - name: ELASTICSEARCH_EML_INDEX
+                  value: ${ELASTICSEARCH_EML_INDEX}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ

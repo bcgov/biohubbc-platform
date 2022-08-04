@@ -1,9 +1,9 @@
 import { Client } from '@elastic/elasticsearch';
 import { AggregationsAggregate, SearchHit, SearchRequest, SearchResponse } from '@elastic/elasticsearch/lib/api/types';
 
-enum ElasticSearchIndices {
-  EML = 'eml'
-}
+export const elasticSearchIndices = {
+  EML: process.env.ELASTICSEARCH_EML_INDEX || 'eml'
+};
 
 /**
  * Base class for services that require a elastic search connection.
@@ -52,7 +52,7 @@ export class ESService {
    */
   async keywordSearchEml(query: string): Promise<SearchHit<unknown>[]> {
     return this._elasticSearch({
-      index: ElasticSearchIndices.EML,
+      index: elasticSearchIndices.EML,
 
       query: {
         multi_match: {
@@ -71,7 +71,7 @@ export class ESService {
    */
   async datasetSearchEml(datasetId: string): Promise<SearchHit<unknown>[]> {
     return this._elasticSearch({
-      index: ElasticSearchIndices.EML,
+      index: elasticSearchIndices.EML,
       query: {
         ids: {
           values: [datasetId]
