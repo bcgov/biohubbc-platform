@@ -8,6 +8,7 @@ import {
   ISpatialComponentCount,
   ISubmissionModel,
   ISubmissionModelWithStatus,
+  ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -175,7 +176,7 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
-    return this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId);
+    return await this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId);
   }
 
   /**
@@ -346,5 +347,36 @@ export class SubmissionService extends DBService {
     normalizedData: string
   ): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordDWCSource(submissionId, normalizedData);
+  }
+
+  /**
+   *Retrieves an array of submission records with the spatial data
+   *
+   * @param {string[]} datasetIds
+   * @return {*}  {Promise<ISubmissionRecordWithSpatial[]>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordsWithSpatialCount(datasetIds: string[]): Promise<ISubmissionRecordWithSpatial[]> {
+    return Promise.all(datasetIds.map(async (datasetId) => this.getSubmissionRecordWithSpatialCount(datasetId)));
+  }
+
+  /**
+   *Retrieves a submission record with the spatial data
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<ISubmissionRecordWithSpatial>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial> {
+    const [responseFromDB, spatialComponentCounts] = await Promise.all([
+      this.getSubmissionRecordJSONByDatasetId(datasetId),
+      this.getSpatialComponentCountByDatasetId(datasetId)
+    ]);
+
+    return {
+      id: datasetId,
+      source: responseFromDB,
+      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
+    };
   }
 }

@@ -26,6 +26,12 @@ export interface IInsertSubmissionRecord {
   darwin_core_source: string;
 }
 
+export interface ISubmissionRecordWithSpatial {
+  id: string;
+  source: string;
+  observation_count: number;
+}
+
 /**
  * Submission table model.
  *
@@ -424,13 +430,6 @@ export class SubmissionRepository extends BaseRepository {
         spatial_type;
     `;
     const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get spatial component count', [
-        'SubmissionRepository-> getSpatialComponentCountByDatasetId',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
 
     return response.rows;
   }
