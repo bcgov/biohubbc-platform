@@ -201,6 +201,8 @@ objects:
                   value: ${NODE_ENV}
                 - name: ELASTICSEARCH_URL
                   value: ${ELASTICSEARCH_URL}
+                - name: S3_KEY_PREFIX
+                  value: ${S3_KEY_PREFIX}
                 - name: TZ
                   value: ${TZ}
                 - name: VERSION
@@ -225,11 +227,6 @@ objects:
                     secretKeyRef:
                       key: object_store_bucket_name
                       name: ${OBJECT_STORE_SECRETS}
-                - name: S3_KEY_PREFIX
-                  valueFrom:
-                    secretKeyRef:
-                      key: s3_key_prefix
-                      name: ${S3_KEY_PREFIX}
                 - name: LOG_LEVEL
                   value: ${LOG_LEVEL}
                 - name: GCNOTIFY_SECRET_API_KEY
