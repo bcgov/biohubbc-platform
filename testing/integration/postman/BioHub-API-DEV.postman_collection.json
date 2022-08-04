@@ -1,374 +1,424 @@
 {
-	"info": {
-		"_postman_id": "57bdcb56-dc22-4e1a-be0f-542ff412aef0",
-		"name": "BioHub-API-DEV",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "4169714"
-	},
-	"item": [
-		{
-			"name": "dwc",
-			"item": [
-				{
-					"name": "spatial",
-					"item": [
-						{
-							"name": "{submissionSpatialComponentId}",
-							"item": [
-								{
-									"name": "metadata",
-									"request": {
-										"method": "GET",
-										"header": [],
-										"url": {
-											"raw": "{{API_BASE_URL}}/dwc/spatial/:submissionSpatialComponentId/metadata",
-											"host": [
-												"{{API_BASE_URL}}"
-											],
-											"path": [
-												"dwc",
-												"spatial",
-												":submissionSpatialComponentId",
-												"metadata"
-											],
-											"variable": [
-												{
-													"key": "submissionSpatialComponentId",
-													"value": "1",
-													"description": "Required. A submission spatial component ID."
-												}
-											]
-										}
-									},
-									"response": []
-								}
-							]
-						},
-						{
-							"name": "search",
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/spatial/search?boundary={\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[-140.450008,47.803322],[-112.677655,47.803322],[-112.677655,60.408259],[-140.450008,60.408259],[-140.450008,47.803322]]]}}",
-									"host": [
-										"{{API_BASE_URL}}"
-									],
-									"path": [
-										"dwc",
-										"spatial",
-										"search"
-									],
-									"query": [
-										{
-											"key": "boundary",
-											"value": "{\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[-140.450008,47.803322],[-112.677655,47.803322],[-112.677655,60.408259],[-140.450008,60.408259],[-140.450008,47.803322]]]}}",
-											"description": "Required. A single stringified Feature<Polygon>."
-										},
-										{
-											"key": "type",
-											"value": "",
-											"description": "Optional. A spatial component type. To include multiple types, add additional `type` keys.",
-											"disabled": true
-										},
-										{
-											"key": "datasetID",
-											"value": "",
-											"description": "Optional. A dataset uuid. To include multiple dataset ids, add additional `datasetID` keys.",
-											"disabled": true
-										}
-									]
-								}
-							},
-							"response": []
-						}
-					]
-				},
-				{
-					"name": "submission",
-					"item": [
-						{
-							"name": "intake",
-							"protocolProfileBehavior": {
-								"disableBodyPruning": true
-							},
-							"request": {
-								"method": "GET",
-								"header": [],
-								"body": {
-									"mode": "formdata",
-									"formdata": [
-										{
-											"key": "media",
-											"description": "Required. A DwCA zip file.",
-											"type": "file",
-											"src": []
-										},
-										{
-											"key": "data_package_id",
-											"value": "",
-											"description": "Required. A UUID V4 dataset ID.",
-											"type": "text"
-										}
-									]
-								},
-								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/submission/intake",
-									"host": [
-										"{{API_BASE_URL}}"
-									],
-									"path": [
-										"dwc",
-										"submission",
-										"intake"
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "list",
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/submission/list",
-									"host": [
-										"{{API_BASE_URL}}"
-									],
-									"path": [
-										"dwc",
-										"submission",
-										"list"
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "search",
-							"request": {
-								"method": "GET",
-								"header": [],
-								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/submission/search?keyword",
-									"host": [
-										"{{API_BASE_URL}}"
-									],
-									"path": [
-										"dwc",
-										"submission",
-										"search"
-									],
-									"query": [
-										{
-											"key": "keyword",
-											"value": null,
-											"description": "Optional. Zero or many search keywords."
-										}
-									]
-								}
-							},
-							"response": []
-						}
-					]
-				},
-				{
-					"name": "eml",
-					"item": [
-						{
-							"name": "search",
-							"request": {
-								"method": "GET",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "multipart/form-data"
-									},
-									{
-										"key": "Accept",
-										"value": "application/json"
-									}
-								],
-								"url": {
-									"raw": "{{API_BASE_URL}}/dwc/eml/search/?terms=moose",
-									"host": [
-										"{{API_BASE_URL}}"
-									],
-									"path": [
-										"dwc",
-										"eml",
-										"search",
-										""
-									],
-									"query": [
-										{
-											"key": "terms",
-											"value": "moose"
-										}
-									]
-								},
-								"description": "Submit a new Darwin Core Archive (DwCA) data package."
-							},
-							"response": []
-						}
-					]
-				}
-			]
-		},
-		{
-			"name": "/version",
-			"request": {
-				"method": "GET",
-				"header": [
-					{
-						"key": "Accept",
-						"value": "application/json"
-					}
-				],
-				"url": {
-					"raw": "{{API_BASE_URL}}/version",
-					"host": [
-						"{{API_BASE_URL}}"
-					],
-					"path": [
-						"version"
-					]
-				},
-				"description": "Get API information"
-			},
-			"response": []
-		},
-		{
-			"name": "/logger",
-			"request": {
-				"method": "GET",
-				"header": [
-					{
-						"key": "Accept",
-						"value": "application/json"
-					}
-				],
-				"url": {
-					"raw": "{{API_BASE_URL}}/logger?level=info",
-					"host": [
-						"{{API_BASE_URL}}"
-					],
-					"path": [
-						"logger"
-					],
-					"query": [
-						{
-							"key": "level",
-							"value": "info",
-							"description": "(Required) "
-						}
-					]
-				},
-				"description": "Update the log level for the API's default logger"
-			},
-			"response": []
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{KEYCLOAK_TOKEN}}",
-				"type": "string"
-			}
-		]
-	},
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					"const fetchUserToken = {",
-					"    url: pm.environment.get(\"KEYCLOAK_URL\"),",
-					"    method: \"POST\",",
-					"    header: \"Content-Type:application/x-www-form-urlencoded\",",
-					"    body: {",
-					"        mode: \"urlencoded\",",
-					"        urlencoded: [",
-					"            { key: \"scope\", value: \"openid\" },",
-					"            { key: \"grant_type\", value: \"password\" },",
-					"            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_CLIENT_ID\") },",
-					"            { key: \"username\", value: pm.environment.get(\"KEYCLOAK_USER_NAME\") },",
-					"            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_USER_PASSWORD\") },",
-					"        ],",
-					"    },",
-					"};",
-					"",
-					"const fetchServiceAccountToken = {",
-					"    url: pm.environment.get(\"KEYCLOAK_URL\"),",
-					"    method: \"POST\",",
-					"    header: \"Content-Type:application/x-www-form-urlencoded\",",
-					"    auth: {",
-					"        type: \"basic\",",
-					"        basic: [",
-					"            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_PASSWORD\") }",
-					"        ],",
-					"    },",
-					"    body: {",
-					"        mode: \"urlencoded\",",
-					"        urlencoded: [",
-					"            { key: \"scope\", value: \"openid\" },",
-					"            { key: \"grant_type\", value: \"client_credentials\" },",
-					"            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_ID\") },",
-					"        ],",
-					"    },",
-					"};",
-					"",
-					"if (pm.environment.get('KEYCLOAK_TOKEN_EXPIRY') > new Date().getTime()) {",
-					"    return;",
-					"}",
-					"",
-					"let fetchTokenFunction = fetchUserToken;",
-					"if (pm.environment.get(\"KEYCLOAK_AUTH_TYPE\") === \"service\") {",
-					"    fetchTokenFunction = fetchServiceAccountToken;",
-					"}",
-					"",
-					"pm.sendRequest(fetchTokenFunction, function (err, res) {",
-					"    if (err) {",
-					"        console.log(\"Failed to fetch token:\", err);",
-					"        return;",
-					"    }",
-					"",
-					"    const responseJson = res.json();",
-					"",
-					"    if (responseJson.error) {",
-					"        console.log(\"keycloak responded with an error\");",
-					"        console.log(\"response: \", res.json());",
-					"        return;",
-					"    }",
-					"",
-					"    console.log(\"keycloak returned successfully\");",
-					"    console.log(\"response: \", res.json());",
-					"",
-					"    console.log(\"Saving keycloak token and expiry date\");",
-					"",
-					"    pm.environment.set(\"KEYCLOAK_TOKEN\", responseJson.access_token);",
-					"",
-					"    const expiryDate = new Date();",
-					"    expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
-					"    pm.environment.set(\"KEYCLOAK_TOKEN_EXPIRY\", expiryDate.getTime());",
-					"});",
-					"",
-					""
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		}
-	]
+  "info": {
+    "_postman_id": "57bdcb56-dc22-4e1a-be0f-542ff412aef0",
+    "name": "BioHub-API-DEV",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "4169714"
+  },
+  "item": [
+    {
+      "name": "api",
+      "item": [
+        {
+          "name": "dwc",
+          "item": [
+            {
+              "name": "spatial",
+              "item": [
+                {
+                  "name": "{submissionSpatialComponentId}",
+                  "item": [
+                    {
+                      "name": "metadata",
+                      "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                          "raw": "{{API_BASE_URL}}/dwc/spatial/:submissionSpatialComponentId/metadata",
+                          "host": ["{{API_BASE_URL}}"],
+                          "path": [
+                            "dwc",
+                            "spatial",
+                            ":submissionSpatialComponentId",
+                            "metadata"
+                          ],
+                          "variable": [
+                            {
+                              "key": "submissionSpatialComponentId",
+                              "value": "1",
+                              "description": "Required. A submission spatial component ID."
+                            }
+                          ]
+                        }
+                      },
+                      "response": []
+                    }
+                  ]
+                },
+                {
+                  "name": "search",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/spatial/search?boundary={\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[-140.450008,47.803322],[-112.677655,47.803322],[-112.677655,60.408259],[-140.450008,60.408259],[-140.450008,47.803322]]]}}",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "spatial", "search"],
+                      "query": [
+                        {
+                          "key": "boundary",
+                          "value": "{\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[-140.450008,47.803322],[-112.677655,47.803322],[-112.677655,60.408259],[-140.450008,60.408259],[-140.450008,47.803322]]]}}",
+                          "description": "Required. A single stringified Feature<Polygon>."
+                        },
+                        {
+                          "key": "type",
+                          "value": "",
+                          "description": "Optional. A spatial component type. To include multiple types, add additional `type` keys.",
+                          "disabled": true
+                        },
+                        {
+                          "key": "datasetID",
+                          "value": "",
+                          "description": "Optional. A dataset uuid. To include multiple dataset ids, add additional `datasetID` keys.",
+                          "disabled": true
+                        }
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "submission",
+              "item": [
+                {
+                  "name": "intake",
+                  "protocolProfileBehavior": {
+                    "disableBodyPruning": true
+                  },
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "body": {
+                      "mode": "formdata",
+                      "formdata": [
+                        {
+                          "key": "media",
+                          "description": "Required. A DwCA zip file.",
+                          "type": "file",
+                          "src": []
+                        },
+                        {
+                          "key": "data_package_id",
+                          "value": "",
+                          "description": "Required. A UUID V4 dataset ID.",
+                          "type": "text"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/submission/intake",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "submission", "intake"]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "list",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/submission/list",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "submission", "list"]
+                    }
+                  },
+                  "response": []
+                },
+                {
+                  "name": "search",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/submission/search?keyword",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "submission", "search"],
+                      "query": [
+                        {
+                          "key": "keyword",
+                          "value": null,
+                          "description": "Optional. Zero or many search keywords."
+                        }
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "eml",
+              "item": [
+                {
+                  "name": "search",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "multipart/form-data"
+                      },
+                      {
+                        "key": "Accept",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/eml/search/?terms=moose",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "eml", "search", ""],
+                      "query": [
+                        {
+                          "key": "terms",
+                          "value": "moose"
+                        }
+                      ]
+                    },
+                    "description": "Submit a new Darwin Core Archive (DwCA) data package."
+                  },
+                  "response": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "/version",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{API_BASE_URL}}/version",
+              "host": ["{{API_BASE_URL}}"],
+              "path": ["version"]
+            },
+            "description": "Get API information"
+          },
+          "response": []
+        },
+        {
+          "name": "/logger",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{API_BASE_URL}}/logger?level=info",
+              "host": ["{{API_BASE_URL}}"],
+              "path": ["logger"],
+              "query": [
+                {
+                  "key": "level",
+                  "value": "info",
+                  "description": "(Required) "
+                }
+              ]
+            },
+            "description": "Update the log level for the API's default logger"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "elastic search",
+      "item": [
+        {
+          "name": "eml",
+          "item": [
+            {
+              "name": "{id}",
+              "item": [
+                {
+                  "name": "get",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca/eml/_doc/:id",
+                      "protocol": "https",
+                      "host": [
+                        "elasticsearch-a0ec71-dev",
+                        "apps",
+                        "silver",
+                        "devops",
+                        "gov",
+                        "bc",
+                        "ca"
+                      ],
+                      "path": ["eml", "_doc", ":id"],
+                      "variable": [
+                        {
+                          "key": "id",
+                          "value": null,
+                          "description": "Required. Document ID."
+                        }
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "list",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca/eml/_search",
+                  "protocol": "https",
+                  "host": [
+                    "elasticsearch-a0ec71-dev",
+                    "apps",
+                    "silver",
+                    "devops",
+                    "gov",
+                    "bc",
+                    "ca"
+                  ],
+                  "path": ["eml", "_search"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca/eml",
+                  "protocol": "https",
+                  "host": [
+                    "elasticsearch-a0ec71-dev",
+                    "apps",
+                    "silver",
+                    "devops",
+                    "gov",
+                    "bc",
+                    "ca"
+                  ],
+                  "path": ["eml"]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{KEYCLOAK_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const fetchUserToken = {",
+          "    url: pm.environment.get(\"KEYCLOAK_URL\"),",
+          "    method: \"POST\",",
+          "    header: \"Content-Type:application/x-www-form-urlencoded\",",
+          "    body: {",
+          "        mode: \"urlencoded\",",
+          "        urlencoded: [",
+          "            { key: \"scope\", value: \"openid\" },",
+          "            { key: \"grant_type\", value: \"password\" },",
+          "            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_CLIENT_ID\") },",
+          "            { key: \"username\", value: pm.environment.get(\"KEYCLOAK_USER_NAME\") },",
+          "            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_USER_PASSWORD\") },",
+          "        ],",
+          "    },",
+          "};",
+          "",
+          "const fetchServiceAccountToken = {",
+          "    url: pm.environment.get(\"KEYCLOAK_URL\"),",
+          "    method: \"POST\",",
+          "    header: \"Content-Type:application/x-www-form-urlencoded\",",
+          "    auth: {",
+          "        type: \"basic\",",
+          "        basic: [",
+          "            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_PASSWORD\") }",
+          "        ],",
+          "    },",
+          "    body: {",
+          "        mode: \"urlencoded\",",
+          "        urlencoded: [",
+          "            { key: \"scope\", value: \"openid\" },",
+          "            { key: \"grant_type\", value: \"client_credentials\" },",
+          "            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_ID\") },",
+          "        ],",
+          "    },",
+          "};",
+          "",
+          "if (pm.environment.get('KEYCLOAK_TOKEN_EXPIRY') > new Date().getTime()) {",
+          "    return;",
+          "}",
+          "",
+          "let fetchTokenFunction = fetchUserToken;",
+          "if (pm.environment.get(\"KEYCLOAK_AUTH_TYPE\") === \"service\") {",
+          "    fetchTokenFunction = fetchServiceAccountToken;",
+          "}",
+          "",
+          "pm.sendRequest(fetchTokenFunction, function (err, res) {",
+          "    if (err) {",
+          "        console.log(\"Failed to fetch token:\", err);",
+          "        return;",
+          "    }",
+          "",
+          "    const responseJson = res.json();",
+          "",
+          "    if (responseJson.error) {",
+          "        console.log(\"keycloak responded with an error\");",
+          "        console.log(\"response: \", res.json());",
+          "        return;",
+          "    }",
+          "",
+          "    console.log(\"keycloak returned successfully\");",
+          "    console.log(\"response: \", res.json());",
+          "",
+          "    console.log(\"Saving keycloak token and expiry date\");",
+          "",
+          "    pm.environment.set(\"KEYCLOAK_TOKEN\", responseJson.access_token);",
+          "",
+          "    const expiryDate = new Date();",
+          "    expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
+          "    pm.environment.set(\"KEYCLOAK_TOKEN_EXPIRY\", expiryDate.getTime());",
+          "});",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ]
 }
