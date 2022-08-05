@@ -71,7 +71,7 @@ export function getMetadataByDatasetId(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.getSubmissionRecordJSONByDatasetId(datasetId);
+      const result = await submissionService.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
       await connection.commit();
 

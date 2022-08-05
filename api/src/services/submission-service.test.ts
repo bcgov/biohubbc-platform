@@ -1,8 +1,9 @@
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -196,6 +197,77 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('getSubmissionRecordEMLJSONByDatasetId', () => {
+    describe('with no matching submission', () => {
+      it('should return eml string', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const getSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+          .resolves({ rowCount: 0, rows: [] } as unknown as QueryResult);
+
+        try {
+          await submissionService.getSubmissionRecordEMLJSONByDatasetId('333-333-333');
+          expect.fail();
+        } catch (error) {
+          expect(getSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+          expect((error as ApiExecuteSQLError).message).to.equal('Failed to get dataset');
+        }
+      });
+    });
+
+    describe('with matching submission', () => {
+      it('should return eml string', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const getSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+          .resolves({ rowCount: 1, rows: [{ eml_json_source: 'eml string' }] } as unknown as QueryResult);
+
+        const response = await submissionService.getSubmissionRecordEMLJSONByDatasetId('333-333-333');
+
+        expect(getSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(response).to.equal('eml string');
+      });
+    });
+  });
+
+  describe('findSubmissionRecordEMLJSONByDatasetId', () => {
+    describe('with no matching submission', () => {
+      it('should return eml string', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const getSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+          .resolves({ rowCount: 0, rows: [] } as unknown as QueryResult);
+
+        const response = await submissionService.findSubmissionRecordEMLJSONByDatasetId('333-333-333');
+
+        expect(getSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(response).to.be.null;
+      });
+    });
+
+    describe('with matching submission', () => {
+      it('should return eml string', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const getSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+          .resolves({ rowCount: 1, rows: [{ eml_json_source: 'eml string' }] } as unknown as QueryResult);
+
+        const response = await submissionService.findSubmissionRecordEMLJSONByDatasetId('333-333-333');
+
+        expect(getSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(response).to.equal('eml string');
+      });
+    });
+  });
+
   describe('insertSubmissionStatus', () => {
     it('should return submission status data', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -372,6 +444,102 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('findSubmissionRecordsWithSpatialCount', () => {
+    it('should return array of records', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const findSubmissionRecordWithSpatialCountStub = sinon
+        .stub(SubmissionService.prototype, 'findSubmissionRecordWithSpatialCount')
+        .onCall(0)
+        .resolves({ id: '111-111-111', source: 'source string 1', observation_count: 0 })
+        .onCall(1)
+        .resolves({ id: '222-222-222', source: 'source string 2', observation_count: 200 })
+        .onCall(2)
+        .resolves(null);
+
+      const response = await submissionService.findSubmissionRecordsWithSpatialCount([
+        '111-111-111',
+        '222-222-222',
+        '333-333-333'
+      ]);
+
+      expect(findSubmissionRecordWithSpatialCountStub).to.be.calledThrice;
+      expect(response).to.be.eql([
+        { id: '111-111-111', source: 'source string 1', observation_count: 0 },
+        { id: '222-222-222', source: 'source string 2', observation_count: 200 },
+        null
+      ]);
+    });
+  });
+
+  describe('findSubmissionRecordWithSpatialCount', () => {
+    describe('with no occurrence spatial components', () => {
+      it('should return submission with count object', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
+          .resolves('source string 1');
+
+        const getSpatialComponentCountByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
+          .resolves([{ spatial_type: 'Occurrence', count: 0 }]);
+
+        const response = await submissionService.findSubmissionRecordWithSpatialCount('111-111-111');
+
+        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
+        expect(response).to.be.eql({ id: '111-111-111', source: 'source string 1', observation_count: 0 });
+      });
+    });
+
+    describe('with a non-zero number of occurrence spatial components', () => {
+      it('should return submission with count object', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
+          .resolves('source string 1')
+          .resolves('source string 2');
+
+        const getSpatialComponentCountByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
+
+          .resolves([{ spatial_type: 'Occurrence', count: 200 }]);
+
+        const response = await submissionService.findSubmissionRecordWithSpatialCount('222-222-222');
+
+        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
+        expect(response).to.be.eql({ id: '222-222-222', source: 'source string 2', observation_count: 200 });
+      });
+    });
+
+    describe('with no matching submission', () => {
+      it('should return null', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+
+        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
+          .resolves(null);
+
+        const getSpatialComponentCountByDatasetIdStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
+          .resolves([]);
+
+        const response = await submissionService.findSubmissionRecordWithSpatialCount('333-333-333');
+
+        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
+        expect(response).to.be.null;
+      });
     });
   });
 });
