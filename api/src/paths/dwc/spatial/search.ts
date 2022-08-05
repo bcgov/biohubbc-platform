@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
-import { getAPIUserDBConnection } from '../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
@@ -13,7 +13,12 @@ export const GET: Operation = [searchSpatialComponents()];
 
 GET.apiDoc = {
   description: 'Searches for spatial components.',
-  tags: ['search'],
+  tags: ['spatial', 'search'],
+  security: [
+    {
+      OptionalBearer: []
+    }
+  ],
   parameters: [
     {
       in: 'query',
@@ -85,7 +90,13 @@ export function searchSpatialComponents(): RequestHandler {
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
 
-    const connection = getAPIUserDBConnection();
+    let connection;
+
+    if (req['keycloak_token']) {
+      connection = getDBConnection(req['keycloak_token']);
+    } else {
+      connection = getAPIUserDBConnection();
+    }
 
     try {
       await connection.open();
