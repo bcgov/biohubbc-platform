@@ -5,7 +5,6 @@ import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
   ISourceTransformModel,
-  ISpatialComponentCount,
   ISubmissionModel,
   ISubmissionModelWithStatus,
   ISubmissionRecordWithSpatial,
@@ -135,17 +134,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Get source transform record by its associated source transform id.
-   *
-   * @param {number} sourceTransformId
-   * @return {*}  {Promise<ISourceTransformModel>}
-   * @memberof SubmissionService
-   */
-  async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
-    return this.submissionRepository.getSourceTransformRecordBySourceTransformId(sourceTransformId);
-  }
-
-  /**
    * Get json representation of eml source from submission.
    *
    * @param {number} submissionId
@@ -155,6 +143,17 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
     return this.submissionRepository.getSubmissionMetadataJson(submissionId, transform);
+  }
+
+  /**
+   * Get source transform record by its associated source transform id.
+   *
+   * @param {number} sourceTransformId
+   * @return {*}  {Promise<ISourceTransformModel>}
+   * @memberof SubmissionService
+   */
+  async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
+    return this.submissionRepository.getSourceTransformRecordBySourceTransformId(sourceTransformId);
   }
 
   /**
@@ -193,17 +192,6 @@ export class SubmissionService extends DBService {
     }
 
     return response.rows[0].eml_json_source;
-  }
-
-  /**
-   *Get observation count by datasetId.
-   *
-   * @param {string} datasetId
-   * @return {ISpatialComponentCount[]}
-   * @memberof SubmissionService
-   */
-  async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
-    return await this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId);
   }
 
   /**
@@ -262,26 +250,6 @@ export class SubmissionService extends DBService {
    */
   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
-  }
-
-  /**
-   * Returns the EML stylesheet from S3
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<GetObjectOutput>}
-   * @memberof SubmissionService
-   */
-  async getStylesheetFromS3(submissionId: number): Promise<GetObjectOutput> {
-    const transformRecord = await this.submissionRepository.getSourceTransformRecordBySubmissionId(submissionId);
-
-    if (!transformRecord.metadata_index) {
-      throw new ApiGeneralError('Failed to retrieve stylesheet key', [
-        'SubmissionRepository->getStylesheetFromS3',
-        'stylesheet_key was null'
-      ]);
-    }
-
-    return this.getFileFromS3(transformRecord.metadata_index);
   }
 
   /**
@@ -397,7 +365,7 @@ export class SubmissionService extends DBService {
   async findSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial | null> {
     const [submissionEMLJSON, spatialComponentCounts] = await Promise.all([
       this.findSubmissionRecordEMLJSONByDatasetId(datasetId),
-      this.getSpatialComponentCountByDatasetId(datasetId)
+      this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
     ]);
 
     if (!submissionEMLJSON) {

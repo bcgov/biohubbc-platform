@@ -95,7 +95,7 @@ export function searchInElasticSearch(): RequestHandler {
 
       const result = await submissionService.findSubmissionRecordsWithSpatialCount(datasetIdsFromES);
 
-      // Remove items returned from the DB that are undefined
+      // Remove null items, which indicates the provided elastic search dataset id had no matching database record.
       const filteredResult = result.filter((item: any) => !!item);
 
       await connection.commit();

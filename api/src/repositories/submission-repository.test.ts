@@ -318,8 +318,8 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when select sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+    it('should return a query result', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse
@@ -327,28 +327,9 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      try {
-        await submissionRepository.getSubmissionRecordEMLJSONByDatasetId('test_uuid');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get dataset');
-      }
-    });
+      const response = await submissionRepository.getSubmissionRecordEMLJSONByDatasetId('111-222-333');
 
-    it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ eml_json_source: 'a valid json string' }] } as any as Promise<
-        QueryResult<any>
-      >;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSubmissionRecordEMLJSONByDatasetId('test_uuid');
-
-      expect(response).to.equal('a valid json string');
+      expect(response).to.equal(mockQueryResponse);
     });
   });
 
@@ -370,7 +351,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSpatialComponentCountByDatasetId('test_uuid');
+      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
 
       expect(response[0].spatial_type).to.equal('occurrence');
       expect(response[0].count).to.equal(10);

@@ -124,7 +124,7 @@ describe('search', () => {
       sinon.restore();
     });
 
-    it('catches and re-throws an error on a keyword search', async () => {
+    it('catches and re-throws an error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
@@ -159,7 +159,7 @@ describe('search', () => {
       };
 
       sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordsWithSpatialCount')
+        .stub(SubmissionService.prototype, 'findSubmissionRecordsWithSpatialCount')
         .onCall(0)
         .resolves([
           { id: 'test_uuid1', source: 'valid_json_string_1', observation_count: 14 },
