@@ -41,9 +41,11 @@ GET.apiDoc = {
             items: {
               title: 'Role Response Object',
               type: 'object',
+              required: ['system_role_id', 'name'],
               properties: {
                 system_role_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 },
                 name: {
                   type: 'string'
@@ -59,7 +61,7 @@ GET.apiDoc = {
 };
 
 /**
- * Get all users.
+ * Get all roles.
  *
  * @returns {RequestHandler}
  */
@@ -79,6 +81,7 @@ export function getRoleList(): RequestHandler {
       return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'getRoleList', message: 'error', error });
+      await connection.rollback();
       throw error;
     } finally {
       connection.release();

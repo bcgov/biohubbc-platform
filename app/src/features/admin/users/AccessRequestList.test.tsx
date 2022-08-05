@@ -211,7 +211,7 @@ describe('AccessRequestList', () => {
         'testusername',
         SYSTEM_IDENTITY_SOURCE.IDIR,
         1,
-        2,
+        1,
         [2]
       );
     });
@@ -263,7 +263,7 @@ describe('AccessRequestList', () => {
         'testusername',
         SYSTEM_IDENTITY_SOURCE.IDIR,
         1,
-        3
+        2
       );
     });
   });

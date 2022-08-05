@@ -12,7 +12,9 @@ import { DialogContext } from 'contexts/dialogContext';
 import { Formik } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
+import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import React, { useContext, useState } from 'react';
 import { Redirect, useHistory } from 'react-router';
 import BCeIDRequestForm, { BCeIDRequestFormInitialValues, BCeIDRequestFormYupSchema } from './BCeIDRequestForm';
@@ -45,6 +47,17 @@ export const AccessRequestPage: React.FC = () => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const dialogContext = useContext(DialogContext);
+
+  const searchDataLoader = useDataLoader(() => {
+    return biohubApi.user.getRoles();
+  });
+
+  searchDataLoader.load();
+
+  let systemRoles: IGetRoles[] = [];
+  if (searchDataLoader.data) {
+    systemRoles = searchDataLoader.data;
+  }
 
   const defaultErrorDialogProps = {
     dialogTitle: AccessRequestI18N.requestTitle,
@@ -128,7 +141,7 @@ export const AccessRequestPage: React.FC = () => {
   } else {
     initialValues = IDIRRequestFormInitialValues;
     validationSchema = IDIRRequestFormYupSchema;
-    requestForm = <IDIRRequestForm />;
+    requestForm = <IDIRRequestForm roles={systemRoles} />;
   }
 
   return (

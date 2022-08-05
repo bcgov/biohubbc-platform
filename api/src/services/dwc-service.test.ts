@@ -128,19 +128,19 @@ describe('DarwinCoreService', () => {
       sinon.restore();
     });
 
-    it('throws an error if there is no eml_source in the submission record', async () => {
+    it('throws an error if there is no source_transform_id in the submission record', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ id: 1, source_transform_id: 2 } as unknown as ISubmissionModel);
+        .resolves({ id: 1 } as unknown as ISubmissionModel);
 
       try {
         await darwinCoreService.transformAndUploadMetaData(1, 'dataPackageId');
         expect.fail();
       } catch (actualError) {
-        expect((actualError as Error).message).to.equal('The eml source is not available');
+        expect((actualError as Error).message).to.equal('The source_transform_id is not available');
       }
     });
 

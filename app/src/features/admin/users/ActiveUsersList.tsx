@@ -25,7 +25,6 @@ import useDataLoader from 'hooks/useDataLoader';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useContext, useState } from 'react';
-// import { useHistory } from 'react-router';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
@@ -57,7 +56,6 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
   const { activeUsers } = props;
-  // const history = useHistory();
 
   const searchDataLoader = useDataLoader(() => {
     return biohubApi.user.getRoles();
@@ -69,7 +67,6 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   if (searchDataLoader.data) {
     systemRoles = searchDataLoader.data;
   }
-  console.log('systemRoles', systemRoles);
 
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [page, setPage] = useState(0);

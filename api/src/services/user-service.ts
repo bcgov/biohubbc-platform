@@ -19,9 +19,7 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async getRoles(): Promise<IGetRoles[]> {
-    const response = await this.userRepository.getRoles();
-
-    return response;
+    return await this.userRepository.getRoles();
   }
 
   /**
@@ -34,7 +32,11 @@ export class UserService extends DBService {
   async getUserById(systemUserId: number): Promise<Models.user.UserObject | null> {
     const response = await this.userRepository.getUserById(systemUserId);
 
-    return new Models.user.UserObject(response) || null;
+    if (!response) {
+      return null;
+    }
+
+    return new Models.user.UserObject(response);
   }
 
   /**

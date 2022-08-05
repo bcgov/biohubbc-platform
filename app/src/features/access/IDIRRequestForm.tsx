@@ -8,6 +8,7 @@ import Select from '@material-ui/core/Select';
 import Typography from '@material-ui/core/Typography';
 import CustomTextField from 'components/fields/CustomTextField';
 import { useFormikContext } from 'formik';
+import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import React from 'react';
 import yup from 'utils/YupSchema';
 
@@ -26,7 +27,9 @@ export const IDIRRequestFormYupSchema = yup.object().shape({
   comments: yup.string().max(300, 'Maximum 300 characters')
 });
 
-export interface IIDIRRequestFormProps {}
+export interface IIDIRRequestFormProps {
+  roles: IGetRoles[];
+}
 
 /**
  * Access Request - IDIR request fields
@@ -36,6 +39,7 @@ export interface IIDIRRequestFormProps {}
 const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
   const { values, touched, errors, handleChange } = useFormikContext<IIDIRRequestForm>();
 
+  const { roles } = props;
   return (
     <Box>
       <Grid container spacing={3}>
@@ -55,9 +59,11 @@ const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
                 error={touched.role && Boolean(errors.role)}
                 displayEmpty
                 inputProps={{ 'aria-label': 'Role' }}>
-                <MenuItem key={'item.id'} value={'item.id'}>
-                  {'item.name'}
-                </MenuItem>
+                {roles.map((item) => (
+                  <MenuItem key={item.system_role_id} value={item.name}>
+                    {item.name}
+                  </MenuItem>
+                ))}
               </Select>
               <FormHelperText>{errors.role}</FormHelperText>
             </FormControl>
