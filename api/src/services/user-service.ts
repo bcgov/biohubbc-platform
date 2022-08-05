@@ -1,7 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Models } from '../models';
-import { UserRepository } from '../repositories/user-repository';
+import { IGetRoles, UserRepository } from '../repositories/user-repository';
 import { DBService } from './db-service';
 
 export class UserService extends DBService {
@@ -12,6 +12,18 @@ export class UserService extends DBService {
 
     this.userRepository = new UserRepository(connection);
   }
+  /**
+   * Get all system roles in db
+   *
+   * @return {*}  {Promise<IGetRoles[]>}
+   * @memberof UserService
+   */
+  async getRoles(): Promise<IGetRoles[]> {
+    const response = await this.userRepository.getRoles();
+
+    return response;
+  }
+
   /**
    * Fetch a single system user by their ID.
    *

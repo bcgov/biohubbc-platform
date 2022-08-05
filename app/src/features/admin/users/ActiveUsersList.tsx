@@ -21,6 +21,8 @@ import { DeleteSystemUserI18N } from 'constants/i18n';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
+import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useContext, useState } from 'react';
 // import { useHistory } from 'react-router';
@@ -57,12 +59,17 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const { activeUsers } = props;
   // const history = useHistory();
 
-  //TODO: Temp fix with hard code values to replace codes
-  const systemRoles = [
-    { name: 'System Administrator', id: 1 },
-    { name: 'Creator', id: 2 },
-    { name: 'Data Administrator', id: 3 }
-  ];
+  const searchDataLoader = useDataLoader(() => {
+    return biohubApi.user.getRoles();
+  });
+
+  searchDataLoader.load();
+
+  let systemRoles: IGetRoles[] = [];
+  if (searchDataLoader.data) {
+    systemRoles = searchDataLoader.data;
+  }
+  console.log('systemRoles', systemRoles);
 
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [page, setPage] = useState(0);
@@ -289,7 +296,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
                           menuItems={systemRoles.map((item) => {
                             return {
                               menuLabel: item.name,
-                              menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.id)
+                              menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.system_role_id)
                             };
                           })}
                           buttonEndIcon={<Icon path={mdiMenuDown} size={1} />}
@@ -351,7 +358,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
             <AddSystemUsersForm
               system_roles={
                 systemRoles.map((item) => {
-                  return { value: item.id, label: item.name };
+                  return { value: item.system_role_id, label: item.name };
                 }) || []
               }
             />

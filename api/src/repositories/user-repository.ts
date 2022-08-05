@@ -18,7 +18,32 @@ export interface IInsertUser {
   record_end_date: string;
 }
 
+export interface IGetRoles {
+  system_role_id: number;
+  name: string;
+}
+
 export class UserRepository extends BaseRepository {
+  /**
+   * Get all system roles in db
+   *
+   * @return {*}  {Promise<IGetRoles[]>}
+   * @memberof UserRepository
+   */
+  async getRoles(): Promise<IGetRoles[]> {
+    const sqlStatement = SQL`
+    SELECT
+      sr.system_role_id,
+      sr.name
+    FROM
+      system_role sr
+    `;
+
+    const response = await this.connection.sql<IGetRoles>(sqlStatement);
+
+    return response.rows;
+  }
+
   /**
    * Fetch a single system user by their ID.
    *
