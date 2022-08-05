@@ -34,10 +34,11 @@ GET.apiDoc = {
       description: 'spatial component submission id',
       in: 'path',
       name: 'submissionSpatialComponentId',
-      required: false,
       schema: {
-        type: 'string'
-      }
+        type: 'integer',
+        minimum: 1
+      },
+      required: true
     }
   ],
   responses: {
@@ -72,7 +73,9 @@ export function getSpatialMetadataById(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const response = await spatialService.findSpatialMetadataBySubmissionId(submissionSpatialComponentId);
+      const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(
+        submissionSpatialComponentId
+      );
 
       await connection.commit();
 

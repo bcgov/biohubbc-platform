@@ -313,6 +313,51 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('getSubmissionRecordEMLJSONByDatasetId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return a query result', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionRecordEMLJSONByDatasetId('111-222-333');
+
+      expect(response).to.equal(mockQueryResponse);
+    });
+  });
+
+  //Add test for getSpatialComponentCountByDatasetId
+
+  describe('getSpatialComponentCountByDatasetId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ spatial_type: 'occurrence', count: 10 }] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
+
+      expect(response[0].spatial_type).to.equal('occurrence');
+      expect(response[0].count).to.equal(10);
+    });
+  });
+
   describe('setSubmissionEndDateById', () => {
     afterEach(() => {
       sinon.restore();

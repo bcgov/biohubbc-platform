@@ -1,3 +1,4 @@
+import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -24,6 +25,12 @@ export interface IInsertSubmissionRecord {
   eml_source: string;
   eml_json_source: string;
   darwin_core_source: string;
+}
+
+export interface ISubmissionRecordWithSpatial {
+  id: string;
+  source: string;
+  observation_count: number;
 }
 
 /**
@@ -362,13 +369,13 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   *
+   * Get submission eml json by dataset id.
    *
    * @param {string} datasetId
    * @return {*}  {Promise<string>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionRecordJSONByDatasetId(datasetId: string): Promise<string> {
+  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<QueryResult<{ eml_json_source: string }>> {
     const sqlStatement = SQL`
       SELECT
         eml_json_source
@@ -380,20 +387,11 @@ export class SubmissionRepository extends BaseRepository {
         record_end_date IS NULL;
     `;
 
-    const response = await this.connection.sql<{ eml_json_source: string }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get dataset', [
-        'SubmissionRepository->getSubmissionRecordJSONByDatasetId',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0].eml_json_source;
+    return this.connection.sql<{ eml_json_source: string }>(sqlStatement);
   }
 
   /**
-   *
+   * Get spatial component counts by dataset id.
    *
    * @param {string} datasetId
    * @return {*}  {Promise<ISpatialComponentCount[]>}
