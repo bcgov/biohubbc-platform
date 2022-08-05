@@ -5,7 +5,6 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ES_INDEX } from '../constants/database';
 import { ApiGeneralError } from '../errors/api-error';
 import { ISecurityModel } from '../repositories/security-repository';
 import {
@@ -15,6 +14,7 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
+import { ElasticSearchIndices } from '../services/es-service';
 import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet, ICsvState } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
@@ -366,7 +366,11 @@ describe('DarwinCoreService', () => {
 
       const response = await darwinCoreService.uploadToElasticSearch('dataPackageId', 'convertedEML');
 
-      expect(indexStub).to.be.calledOnceWith({ id: 'dataPackageId', index: ES_INDEX.EML, document: 'convertedEML' });
+      expect(indexStub).to.be.calledOnceWith({
+        id: 'dataPackageId',
+        index: ElasticSearchIndices.EML,
+        document: 'convertedEML'
+      });
       expect(response).equals('es response');
     });
   });
