@@ -18,7 +18,6 @@ const mockUseApi = {
 };
 const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
-
 const renderContainer = () => {
   const authState = getMockAuthState({
     keycloakWrapper: {
@@ -56,7 +55,6 @@ describe('AccessRequestPage', () => {
   beforeEach(() => {
     // clear mocks before each test
     mockBiohubApi().admin.createAdministrativeActivity.mockClear();
-
   });
 
   afterEach(() => {

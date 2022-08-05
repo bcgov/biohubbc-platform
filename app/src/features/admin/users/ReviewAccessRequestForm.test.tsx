@@ -16,12 +16,7 @@ const renderContainer = (accessRequest: IGetAccessRequestsListResponse) => {
       validateOnBlur={true}
       validateOnChange={false}
       onSubmit={() => {}}>
-      {() => (
-        <ReviewAccessRequestForm
-          request={accessRequest}
-          system_roles={[]}
-        />
-      )}
+      {() => <ReviewAccessRequestForm request={accessRequest} system_roles={[]} />}
     </Formik>
   );
 };

@@ -19,7 +19,7 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async getRoles(): Promise<IGetRoles[]> {
-    return await this.userRepository.getRoles();
+    return this.userRepository.getRoles();
   }
 
   /**
