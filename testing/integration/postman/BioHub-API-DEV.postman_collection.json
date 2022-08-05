@@ -235,6 +235,9 @@
                 {
                   "name": "get",
                   "request": {
+                    "auth": {
+                      "type": "noauth"
+                    },
                     "method": "GET",
                     "header": [],
                     "url": {
@@ -244,7 +247,7 @@
                       "variable": [
                         {
                           "key": "id",
-                          "value": null,
+                          "value": "552538d7-d889-4a27-852e-30681462ba4d",
                           "description": "Required. Document ID."
                         }
                       ]
@@ -252,11 +255,33 @@
                   },
                   "response": []
                 }
+              ],
+              "auth": {
+                "type": "noauth"
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [""]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [""]
+                  }
+                }
               ]
             },
             {
               "name": "list",
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "GET",
                 "header": [],
                 "url": {
@@ -270,6 +295,9 @@
             {
               "name": "delete",
               "request": {
+                "auth": {
+                  "type": "noauth"
+                },
                 "method": "DELETE",
                 "header": [],
                 "url": {
@@ -280,11 +308,33 @@
               },
               "response": []
             }
+          ],
+          "auth": {
+            "type": "noauth"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [""]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [""]
+              }
+            }
           ]
         },
         {
           "name": "indices",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -294,6 +344,25 @@
             }
           },
           "response": []
+        }
+      ],
+      "auth": {
+        "type": "noauth"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
         }
       ]
     }
