@@ -1,9 +1,9 @@
 import { Client } from '@elastic/elasticsearch';
 import { AggregationsAggregate, SearchHit, SearchRequest, SearchResponse } from '@elastic/elasticsearch/lib/api/types';
 
-enum ElasticSearchIndices {
-  EML = 'eml'
-}
+export const ElasticSearchIndices = {
+  EML: process.env.ELASTICSEARCH_EML_INDEX || 'eml'
+};
 
 /**
  * Base class for services that require a elastic search connection.
