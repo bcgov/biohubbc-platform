@@ -72,7 +72,9 @@ export function getSpatialMetadataById(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const response = await spatialService.findSpatialMetadataBySubmissionId(submissionSpatialComponentId);
+      const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(
+        submissionSpatialComponentId
+      );
 
       await connection.commit();
 
