@@ -143,6 +143,7 @@ export function generateS3FileKey(options: IS3FileKey): string {
   const keyParts: (string | number)[] = [S3_KEY_PREFIX];
 
   if (options.submissionId) {
+    keyParts.push('submissions');
     keyParts.push(options.submissionId);
   }
 
