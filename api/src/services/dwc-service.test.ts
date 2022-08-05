@@ -14,7 +14,7 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
-import { elasticSearchIndices } from '../services/es-service';
+import { ElasticSearchIndices } from '../services/es-service';
 import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet, ICsvState } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
@@ -368,7 +368,7 @@ describe('DarwinCoreService', () => {
 
       expect(indexStub).to.be.calledOnceWith({
         id: 'dataPackageId',
-        index: elasticSearchIndices.EML,
+        index: ElasticSearchIndices.EML,
         document: 'convertedEML'
       });
       expect(response).equals('es response');

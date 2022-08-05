@@ -9,7 +9,7 @@ import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
-import { elasticSearchIndices } from './es-service';
+import { ElasticSearchIndices } from './es-service';
 import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
@@ -502,7 +502,7 @@ export class DarwinCoreService extends DBService {
 
     return esClient.index({
       id: dataPackageId,
-      index: elasticSearchIndices.EML,
+      index: ElasticSearchIndices.EML,
       document: convertedEML
     });
   }
@@ -550,6 +550,6 @@ export class DarwinCoreService extends DBService {
   async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
     const esClient = await this.getEsClient();
 
-    return esClient.delete({ id: dataPackageId, index: elasticSearchIndices.EML });
+    return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
   }
 }
