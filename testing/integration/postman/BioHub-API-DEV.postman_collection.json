@@ -84,11 +84,34 @@
               "item": [
                 {
                   "name": "intake",
-                  "protocolProfileBehavior": {
-                    "disableBodyPruning": true
-                  },
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "exec": [""],
+                        "type": "text/javascript"
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [""],
+                        "type": "text/javascript"
+                      }
+                    }
+                  ],
                   "request": {
-                    "method": "GET",
+                    "auth": {
+                      "type": "bearer",
+                      "bearer": [
+                        {
+                          "key": "token",
+                          "value": "{{_KEYCLOAK_SERVICE_CLIENT_TOKEN}}",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "method": "POST",
                     "header": [],
                     "body": {
                       "mode": "formdata",
@@ -111,39 +134,6 @@
                       "raw": "{{API_BASE_URL}}/dwc/submission/intake",
                       "host": ["{{API_BASE_URL}}"],
                       "path": ["dwc", "submission", "intake"]
-                    }
-                  },
-                  "response": []
-                },
-                {
-                  "name": "list",
-                  "request": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{API_BASE_URL}}/dwc/submission/list",
-                      "host": ["{{API_BASE_URL}}"],
-                      "path": ["dwc", "submission", "list"]
-                    }
-                  },
-                  "response": []
-                },
-                {
-                  "name": "search",
-                  "request": {
-                    "method": "GET",
-                    "header": [],
-                    "url": {
-                      "raw": "{{API_BASE_URL}}/dwc/submission/search?keyword",
-                      "host": ["{{API_BASE_URL}}"],
-                      "path": ["dwc", "submission", "search"],
-                      "query": [
-                        {
-                          "key": "keyword",
-                          "value": null,
-                          "description": "Optional. Zero or many search keywords."
-                        }
-                      ]
                     }
                   },
                   "response": []
@@ -223,7 +213,7 @@
                 {
                   "key": "level",
                   "value": "info",
-                  "description": "(Required) "
+                  "description": "Required. Supported values: error, warn, info, debug, silly"
                 }
               ]
             },
@@ -248,18 +238,9 @@
                     "method": "GET",
                     "header": [],
                     "url": {
-                      "raw": "https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca/eml/_doc/:id",
-                      "protocol": "https",
-                      "host": [
-                        "elasticsearch-a0ec71-dev",
-                        "apps",
-                        "silver",
-                        "devops",
-                        "gov",
-                        "bc",
-                        "ca"
-                      ],
-                      "path": ["eml", "_doc", ":id"],
+                      "raw": "{{ELASTIC_SEARCH_BASE_URL}}/{{ELASTIC_SEARCH_EML_INDEX}}/_doc/:id",
+                      "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+                      "path": ["{{ELASTIC_SEARCH_EML_INDEX}}", "_doc", ":id"],
                       "variable": [
                         {
                           "key": "id",
@@ -279,18 +260,9 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca/eml/_search",
-                  "protocol": "https",
-                  "host": [
-                    "elasticsearch-a0ec71-dev",
-                    "apps",
-                    "silver",
-                    "devops",
-                    "gov",
-                    "bc",
-                    "ca"
-                  ],
-                  "path": ["eml", "_search"]
+                  "raw": "{{ELASTIC_SEARCH_BASE_URL}}/{{ELASTIC_SEARCH_EML_INDEX}}/_search",
+                  "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+                  "path": ["{{ELASTIC_SEARCH_EML_INDEX}}", "_search"]
                 }
               },
               "response": []
@@ -301,23 +273,27 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca/eml",
-                  "protocol": "https",
-                  "host": [
-                    "elasticsearch-a0ec71-dev",
-                    "apps",
-                    "silver",
-                    "devops",
-                    "gov",
-                    "bc",
-                    "ca"
-                  ],
-                  "path": ["eml"]
+                  "raw": "{{ELASTIC_SEARCH_BASE_URL}}/{{ELASTIC_SEARCH_EML_INDEX}}",
+                  "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+                  "path": ["{{ELASTIC_SEARCH_EML_INDEX}}"]
                 }
               },
               "response": []
             }
           ]
+        },
+        {
+          "name": "indices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ELASTIC_SEARCH_BASE_URL}}/_aliases",
+              "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+              "path": ["_aliases"]
+            }
+          },
+          "response": []
         }
       ]
     }
@@ -327,7 +303,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{KEYCLOAK_TOKEN}}",
+        "value": "{{_KEYCLOAK_USER_TOKEN}}",
         "type": "string"
       }
     ]
@@ -338,7 +314,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "const fetchUserToken = {",
+          "const userTokenRequest = {",
           "    url: pm.environment.get(\"KEYCLOAK_URL\"),",
           "    method: \"POST\",",
           "    header: \"Content-Type:application/x-www-form-urlencoded\",",
@@ -354,7 +330,7 @@
           "    },",
           "};",
           "",
-          "const fetchServiceAccountToken = {",
+          "const serviceClientTokenRequest = {",
           "    url: pm.environment.get(\"KEYCLOAK_URL\"),",
           "    method: \"POST\",",
           "    header: \"Content-Type:application/x-www-form-urlencoded\",",
@@ -374,40 +350,61 @@
           "    },",
           "};",
           "",
-          "if (pm.environment.get('KEYCLOAK_TOKEN_EXPIRY') > new Date().getTime()) {",
-          "    return;",
+          "const fetchUserToken = () => {",
+          "    pm.sendRequest(userTokenRequest, function (err, res) {",
+          "        if (err) {",
+          "            console.log(\"Failed to fetch user token: \", err);",
+          "            return;",
+          "        }",
+          "",
+          "        const responseJson = res.json();",
+          "",
+          "        if (responseJson.error) {",
+          "            console.log(\"User token error: \", res.json());",
+          "            return;",
+          "        }",
+          "",
+          "        pm.environment.set(\"_KEYCLOAK_USER_TOKEN\", responseJson.access_token);",
+          "",
+          "        const expiryDate = new Date();",
+          "        expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
+          "        pm.environment.set(\"_KEYCLOAK_USER_TOKEN_EXPIRY\", expiryDate.getTime());",
+          "    });",
           "}",
           "",
-          "let fetchTokenFunction = fetchUserToken;",
-          "if (pm.environment.get(\"KEYCLOAK_AUTH_TYPE\") === \"service\") {",
-          "    fetchTokenFunction = fetchServiceAccountToken;",
+          "const fetchServiceClientToken = () => {",
+          "    pm.sendRequest(serviceClientTokenRequest, function (err, res) {",
+          "        if (err) {",
+          "            console.log(\"Failed to fetch service client token: \", err);",
+          "            return;",
+          "        }",
+          "",
+          "        const responseJson = res.json();",
+          "",
+          "        if (responseJson.error) {",
+          "            console.log(\"Service client token error: \", res.json());",
+          "            return;",
+          "        }",
+          "",
+          "        pm.environment.set(\"_KEYCLOAK_SERVICE_CLIENT_TOKEN\", responseJson.access_token);",
+          "",
+          "        const expiryDate = new Date();",
+          "        expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
+          "        pm.environment.set(\"_KEYCLOAK_SERVICE_CLIENT_TOKEN_EXPIRY\", expiryDate.getTime());",
+          "    });",
           "}",
           "",
-          "pm.sendRequest(fetchTokenFunction, function (err, res) {",
-          "    if (err) {",
-          "        console.log(\"Failed to fetch token:\", err);",
-          "        return;",
+          "const fetchTokens = () => {",
+          "    if (pm.environment.get('_KEYCLOAK_USER_TOKEN_EXPIRY') <= new Date().getTime()) {",
+          "        fetchUserToken();",
           "    }",
           "",
-          "    const responseJson = res.json();",
-          "",
-          "    if (responseJson.error) {",
-          "        console.log(\"keycloak responded with an error\");",
-          "        console.log(\"response: \", res.json());",
-          "        return;",
+          "    if (pm.environment.get('_KEYCLOAK_SERVICE_CLIENT_TOKEN_EXPIRY') <= new Date().getTime()) {",
+          "        fetchServiceClientToken();",
           "    }",
+          "}",
           "",
-          "    console.log(\"keycloak returned successfully\");",
-          "    console.log(\"response: \", res.json());",
-          "",
-          "    console.log(\"Saving keycloak token and expiry date\");",
-          "",
-          "    pm.environment.set(\"KEYCLOAK_TOKEN\", responseJson.access_token);",
-          "",
-          "    const expiryDate = new Date();",
-          "    expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
-          "    pm.environment.set(\"KEYCLOAK_TOKEN_EXPIRY\", expiryDate.getTime());",
-          "});",
+          "fetchTokens();",
           "",
           ""
         ]
