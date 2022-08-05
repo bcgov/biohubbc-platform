@@ -21,7 +21,7 @@ describe('get', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordJSONByDatasetId')
+        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
         .resolves(`{id: 'a valid json string}`);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -41,7 +41,9 @@ describe('get', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordJSONByDatasetId').rejects(new Error('a test error'));
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+        .rejects(new Error('a test error'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
