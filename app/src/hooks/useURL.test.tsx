@@ -1,5 +1,4 @@
-import { cleanup } from '@testing-library/react';
-import { act, renderHook } from '@testing-library/react-hooks';
+import { act, cleanup, renderHook } from '@testing-library/react';
 import { createMemoryHistory, MemoryHistory } from 'history';
 import React from 'react';
 import { Route, Router } from 'react-router';

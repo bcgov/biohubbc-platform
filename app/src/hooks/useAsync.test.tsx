@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook } from '@testing-library/react';
 import { Deferred } from 'test-helpers/promises';
 import { useAsync } from './useAsync';
 
