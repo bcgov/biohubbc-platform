@@ -20,7 +20,6 @@ import { AdministrativeActivityStatusType } from 'constants/misc';
 import { DialogContext } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
 import React, { useContext, useState } from 'react';
 import { getFormattedDate } from 'utils/Utils';
 import ReviewAccessRequestForm, {
@@ -52,7 +51,6 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 export interface IAccessRequestListProps {
   accessRequests: IGetAccessRequestsListResponse[];
-  codes: IGetAllCodeSetsResponse;
   refresh: () => void;
 }
 
@@ -63,18 +61,11 @@ export interface IAccessRequestListProps {
  * @return {*}
  */
 const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
-  const { accessRequests, codes, refresh } = props;
+  const { accessRequests, refresh } = props;
 
   const classes = useStyles();
 
   const biohubApi = useApi();
-
-  const approvedCodeId = codes?.administrative_activity_status_type.find(
-    (item) => item.name === AdministrativeActivityStatusType.ACTIONED
-  )?.id as any;
-  const rejectedCodeId = codes?.administrative_activity_status_type.find(
-    (item) => item.name === AdministrativeActivityStatusType.REJECTED
-  )?.id as any;
 
   const [activeReviewDialog, setActiveReviewDialog] = useState<{
     open: boolean;
@@ -108,12 +99,12 @@ const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
         updatedRequest.data.username,
         updatedRequest.data.identitySource,
         updatedRequest.id,
-        approvedCodeId,
+        1,
         values.system_roles
       );
 
       refresh();
-    } catch (error) {
+    } catch (error: any) {
       dialogContext.setErrorDialog({ ...defaultErrorDialogProps, open: true, dialogErrorDetails: error });
     }
   };
@@ -128,11 +119,11 @@ const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
         updatedRequest.data.username,
         updatedRequest.data.identitySource,
         updatedRequest.id,
-        rejectedCodeId
+        2
       );
 
       refresh();
-    } catch (error) {
+    } catch (error: any) {
       dialogContext.setErrorDialog({ ...defaultErrorDialogProps, open: true, dialogErrorDetails: error });
     }
   };
@@ -169,16 +160,7 @@ const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
             system_roles: [activeReviewDialog.request?.data?.role]
           },
           validationSchema: ReviewAccessRequestFormYupSchema,
-          element: (
-            <ReviewAccessRequestForm
-              request={activeReviewDialog.request}
-              system_roles={
-                codes?.system_roles?.map((item) => {
-                  return { value: item.id, label: item.name };
-                }) || []
-              }
-            />
-          )
+          element: <ReviewAccessRequestForm request={activeReviewDialog.request} system_roles={[]} />
         }}
       />
       <Paper>

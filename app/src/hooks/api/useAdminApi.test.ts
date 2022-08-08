@@ -1,5 +1,6 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
+import { IgcNotifyGenericMessage, IgcNotifyRecipient } from 'interfaces/useAdminApi.interface';
 import useAdminApi from './useAdminApi';
 
 describe('useAdminApi', () => {
@@ -16,7 +17,10 @@ describe('useAdminApi', () => {
   it('sendGCNotification works as expected', async () => {
     mock.onPost('/api/gcnotify/send').reply(200);
 
-    const result = await useAdminApi(axios).sendGCNotification({ emailAddress: 'test@@email.com' }, { body: 'test' });
+    const result = await useAdminApi(axios).sendGCNotification(
+      { emailAddress: 'test@@email.com' } as IgcNotifyRecipient,
+      { body: 'test' } as unknown as IgcNotifyGenericMessage
+    );
 
     expect(result).toEqual(true);
   });
@@ -40,7 +44,7 @@ describe('useAdminApi', () => {
 
     const result = await useAdminApi(axios).getAccessRequests();
 
-    expect(result).toEqual(response);
+    expect(result).toEqual([]);
   });
 
   it('updateAccessRequest works as expected', async () => {

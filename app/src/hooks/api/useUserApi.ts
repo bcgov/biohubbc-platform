@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 
 /**
@@ -8,6 +9,17 @@ import { IGetUserResponse } from 'interfaces/useUserApi.interface';
  * @return {*} object whose properties are supported api methods.
  */
 const useUserApi = (axios: AxiosInstance) => {
+  /**
+   * Get all roles
+   *
+   * @return {*}  {Promise<IGetRoles[]>}
+   */
+  const getRoles = async (): Promise<IGetRoles[]> => {
+    const { data } = await axios.get('/api/user/role/list');
+
+    return data;
+  };
+
   /**
    * Get user details for the currently authenticated user.
    *
@@ -77,6 +89,7 @@ const useUserApi = (axios: AxiosInstance) => {
   };
 
   return {
+    getRoles,
     getUser,
     getUserById,
     getUsersList,
