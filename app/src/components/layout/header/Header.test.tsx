@@ -153,7 +153,7 @@ describe('Header', () => {
 
       fireEvent.click(getByTestId('menu_log_out'));
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(history.location.pathname).toEqual('/logout');
       });
     });

@@ -191,7 +191,7 @@ describe('RequestSubmitted', () => {
 
       fireEvent.click(getByTestId('logout-button'));
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(history.location.pathname).toEqual('/logout');
       });
     });
