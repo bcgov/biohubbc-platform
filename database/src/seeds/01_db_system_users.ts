@@ -12,8 +12,7 @@ export enum SYSTEM_IDENTITY_SOURCE {
 
 export enum SYSTEM_USER_ROLE_ID {
   SYSTEM_ADMINISTRATOR = 1,
-  CREATOR = 2,
-  DATA_ADMINISTRATOR = 3
+  DATA_ADMINISTRATOR = 2
 }
 
 const systemUsers = [
@@ -28,12 +27,12 @@ const systemUsers = [
   { identifier: 'rstens', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'zochampi', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'test1', type: SYSTEM_IDENTITY_SOURCE.BCEID, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'test2', type: SYSTEM_IDENTITY_SOURCE.BCEID, roleId: SYSTEM_USER_ROLE_ID.CREATOR },
+  { identifier: 'test2', type: SYSTEM_IDENTITY_SOURCE.BCEID, roleId: 0 },
   { identifier: 'test3', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'test4', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'test5', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.DATA_ADMINISTRATOR },
-  { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.CREATOR },
-  { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.CREATOR },
+  { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: 0 },
+  { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: 0 },
   { identifier: 'cypress', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR }
 ];
 
