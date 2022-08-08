@@ -57,15 +57,15 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const biohubApi = useApi();
   const { activeUsers } = props;
 
-  const searchDataLoader = useDataLoader(() => {
+  const rolesDataLoader = useDataLoader(() => {
     return biohubApi.user.getRoles();
   });
 
-  searchDataLoader.load();
+  rolesDataLoader.load();
 
   let systemRoles: IGetRoles[] = [];
-  if (searchDataLoader.data) {
-    systemRoles = searchDataLoader.data;
+  if (rolesDataLoader.data) {
+    systemRoles = rolesDataLoader.data;
   }
 
   const [rowsPerPage, setRowsPerPage] = useState(20);

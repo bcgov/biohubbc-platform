@@ -23,7 +23,7 @@ export class ESService {
    */
   async getEsClient(): Promise<Client> {
     if (!this.esClient) {
-      this.esClient = await new Client({ node: process.env.BACKBONE_ELASTICSEARCH_URL });
+      this.esClient = await new Client({ node: process.env.ELASTICSEARCH_URL });
     }
     return this.esClient;
   }

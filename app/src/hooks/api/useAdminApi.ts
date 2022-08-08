@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+import { AdministrativeActivityStatusType } from 'constants/misc';
 import {
   IgcNotifyGenericMessage,
   IgcNotifyRecipient,
@@ -33,12 +34,15 @@ const useAdminApi = (axios: AxiosInstance) => {
 
   /**
    * Get user access requests
+   * TODO: FIX ACCESS REQUEST
    *
    * @param {AdministrativeActivityStatusType[]} [status=[]]
    * @returns {*} {Promise<IGetAccessRequestsListResponse>}
    */
-  const getAccessRequests = async (): // status: AdministrativeActivityStatusType[] = []
-  Promise<IGetAccessRequestsListResponse[]> => {
+  const getAccessRequests = async (
+    status: AdministrativeActivityStatusType[] = []
+  ): Promise<IGetAccessRequestsListResponse[]> => {
+    console.log(status);
     return [];
     // const { data } = await axios.get(`/api/administrative-activities`, {
     //   params: { type: AdministrativeActivityType.SYSTEM_ACCESS, status },
