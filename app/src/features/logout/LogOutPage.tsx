@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import { Theme } from '@mui/material/styles/createMuiTheme';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 import { mdiArrowRight, mdiDoorClosedLock, mdiDoorOpen } from '@mdi/js';
 import Icon from '@mdi/react';
 import { ConfigContext } from 'contexts/configContext';

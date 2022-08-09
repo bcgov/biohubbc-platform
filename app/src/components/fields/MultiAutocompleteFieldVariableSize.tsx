@@ -1,6 +1,6 @@
 import Checkbox from '@mui/material/Checkbox';
 import ListSubheader from '@mui/material/ListSubheader';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { makeStyles } from '@mui/styles';
 import TextField from '@mui/material/TextField';
 import CheckBox from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';

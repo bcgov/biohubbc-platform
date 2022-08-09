@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
-import { Theme } from '@mui/material/styles/createMuiTheme';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 import React, { useEffect, useState } from 'react';
 import { FileError, FileRejection } from 'react-dropzone';
 import DropZone, { IDropZoneConfigProps } from './DropZone';

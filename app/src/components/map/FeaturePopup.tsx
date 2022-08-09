@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { makeStyles } from '@mui/styles';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';

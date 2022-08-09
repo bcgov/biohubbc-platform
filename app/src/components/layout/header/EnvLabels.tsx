@@ -1,5 +1,5 @@
-import { Theme } from '@mui/material/styles/createMuiTheme';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 import { ConfigContext } from 'contexts/configContext';
 import React, { useContext } from 'react';
 

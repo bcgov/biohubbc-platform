@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Link from '@mui/material/Link';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { makeStyles } from '@mui/styles';
 import Typography from '@mui/material/Typography';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';

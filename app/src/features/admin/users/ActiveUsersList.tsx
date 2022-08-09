@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
-import makeStyles from '@mui/material/styles/makeStyles';
+import { makeStyles } from '@mui/styles';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';

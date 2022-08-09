@@ -1,13 +1,14 @@
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
-import { Theme } from '@mui/material/styles/createMuiTheme';
-import makeStyles from '@mui/material/styles/makeStyles';
+// import { makeStyles } from '@mui/styles';
 import Typography from '@mui/material/Typography';
 import { mdiTrayArrowUp } from '@mdi/js';
 import Icon from '@mdi/react';
 import { ConfigContext } from 'contexts/configContext';
 import React, { useContext } from 'react';
 import Dropzone, { FileRejection } from 'react-dropzone';
+import { Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 
 const useStyles = makeStyles((theme: Theme) => ({
   dropZoneTitle: {
