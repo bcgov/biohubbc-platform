@@ -41,9 +41,11 @@ export interface ISpatialComponentsSearchCriteria {
   boundary: Feature;
 }
 
+export type EmptyObject = Record<never, never>;
+
 export interface ISubmissionSpatialSearchResponseRow {
   spatial_component: {
-    spatial_data: FeatureCollection;
+    spatial_data: FeatureCollection | EmptyObject;
     submission_spatial_component_id: number;
   };
 }
@@ -229,7 +231,7 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Query builder to find spatial component by given criteria
+   * Query builder to find spatial component by given criteria.
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
@@ -241,40 +243,96 @@ export class SpatialRepository extends BaseRepository {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
-      .select(
-        knex.raw(
-          "jsonb_build_object('submission_spatial_component_id', submission_spatial_component_id, 'spatial_data', spatial_component) spatial_component"
-        )
-      )
-      .from('submission_spatial_component');
+      .with('with_filtered_spatial_component_with_security_transforms', (qb1) => {
+        // Get the spatial components that match the search filters, and for each record, build the array of spatial security transforms that ran against that row
+        qb1
+          .select(
+            knex.raw(
+              'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
+            ),
+            'ssc.submission_spatial_component_id',
+            'ssc.submission_id',
+            'ssc.spatial_component',
+            'ssc.secured_spatial_component'
+          )
+          .from('submission_spatial_component as ssc')
+          .leftJoin(
+            'security_transform_submission as sts',
+            'sts.submission_spatial_component_id',
+            'ssc.submission_spatial_component_id'
+          )
+          .groupBy('sts.submission_spatial_component_id')
+          .groupBy('ssc.submission_spatial_component_id')
+          .groupBy('ssc.submission_id')
+          .groupBy('ssc.spatial_component')
+          .groupBy('ssc.secured_spatial_component');
 
-    if (criteria.type?.length) {
-      // Append OR where clauses for each criteria.type
-      queryBuilder.where((qb1) => {
-        for (const type of criteria.type) {
-          qb1.or.where((qb2) => {
-            qb2.whereRaw(`jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`);
+        if (criteria.type?.length) {
+          // Append AND where clause for criteria.type
+          qb1.where((qb2) => {
+            for (const type of criteria.type) {
+              // Append OR clause for each item in criteria.type array
+              qb2.or.where((qb3) => {
+                qb3.whereRaw(
+                  `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`
+                );
+              });
+            }
           });
         }
-      });
-    }
 
-    if (criteria.datasetID?.length) {
-      // Append AND where clause for criteria.datasetID
-      queryBuilder.where((qb3) => {
-        qb3.whereRaw(
-          `submission_id in (select submission_id from submission where uuid in (${
-            "'" + criteria.datasetID?.join("','") + "'"
-          }))`
-        );
-      });
-    }
+        if (criteria.datasetID?.length) {
+          // Append AND where clause for criteria.datasetID
+          qb1.where((qb4) => {
+            qb4.whereRaw(
+              `submission_id in (select submission_id from submission where uuid in (${
+                "'" + criteria.datasetID?.join("','") + "'"
+              }))`
+            );
+          });
+        }
 
-    // Append AND where clause for criteria.boundary
-    const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
-    queryBuilder.where((qb4) => {
-      qb4.whereRaw(sqlStatement1.sql, sqlStatement1.values);
-    });
+        // Append AND where clause for criteria.boundary
+        const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
+        queryBuilder.where((qb5) => {
+          qb5.whereRaw(sqlStatement1.sql, sqlStatement1.values);
+        });
+      })
+      .with('with_user_security_transform_exceptions', (qb6) => {
+        // Build an array of the users spatial security transform exceptions
+        qb6
+          .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+          .from('system_user_security_exception as suse')
+          .where('suse.system_user_id', 1);
+      })
+      .select(
+        // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+        knex.raw(
+          `
+            jsonb_build_object(
+              'submission_spatial_component_id',
+                wfscwst.submission_spatial_component_id,
+              'spatial_data',
+                -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
+                -- then: return the spatial component
+                -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+                case
+                  when
+                    wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+                  then
+                    wfscwst.spatial_component
+                  else
+                    coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
+                end
+            ) spatial_component
+          `
+        )
+      )
+      .from(
+        knex.raw(
+          'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
+        )
+      );
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 

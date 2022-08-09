@@ -70,7 +70,20 @@ GET.apiDoc = {
                   minimum: 1
                 },
                 spatial_data: {
-                  ...GeoJSONFeatureCollection
+                  oneOf: [
+                    {
+                      ...GeoJSONFeatureCollection
+                    },
+                    {
+                      type: 'object',
+                      properties: {},
+                      additionalProperties: false,
+                      minProperties: 0,
+                      maxProperties: 0,
+                      description:
+                        'An empty object, representing a spatial component the requester does not have sufficient privileges to view.'
+                    }
+                  ]
                 }
               }
             }
