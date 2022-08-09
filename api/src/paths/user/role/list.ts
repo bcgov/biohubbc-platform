@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../constants/roles';
-import { getDBConnection } from '../../database/db';
-import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { UserService } from '../../services/user-service';
-import { getLogger } from '../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { UserService } from '../../../services/user-service';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/user');
 
@@ -20,12 +20,12 @@ export const GET: Operation = [
       ]
     };
   }),
-  getUserList()
+  getRoleList()
 ];
 
 GET.apiDoc = {
-  description: 'Get all Users.',
-  tags: ['user'],
+  description: 'Get all Roles.',
+  tags: ['roles'],
   security: [
     {
       Bearer: []
@@ -33,32 +33,22 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'User response object.',
+      description: 'Role response object.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
             items: {
-              title: 'User Response Object',
+              title: 'Role Response Object',
               type: 'object',
+              required: ['system_role_id', 'name'],
               properties: {
-                id: {
-                  type: 'number'
+                system_role_id: {
+                  type: 'integer',
+                  minimum: 1
                 },
-                user_identifier: {
+                name: {
                   type: 'string'
-                },
-                role_ids: {
-                  type: 'array',
-                  items: {
-                    oneOf: [{ type: 'number' }, { type: 'string' }]
-                  }
-                },
-                role_names: {
-                  type: 'array',
-                  items: {
-                    type: 'string'
-                  }
                 }
               }
             }
@@ -71,11 +61,11 @@ GET.apiDoc = {
 };
 
 /**
- * Get all users.
+ * Get all roles.
  *
  * @returns {RequestHandler}
  */
-export function getUserList(): RequestHandler {
+export function getRoleList(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
@@ -84,13 +74,14 @@ export function getUserList(): RequestHandler {
 
       const userService = new UserService(connection);
 
-      const response = await userService.listSystemUsers();
+      const response = await userService.getRoles();
 
       await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getUserList', message: 'error', error });
+      defaultLog.error({ label: 'getRoleList', message: 'error', error });
+      await connection.rollback();
       throw error;
     } finally {
       connection.release();

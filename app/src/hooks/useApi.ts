@@ -2,7 +2,6 @@ import { ConfigContext } from 'contexts/configContext';
 import { useContext } from 'react';
 import useAdminApi from './api/useAdminApi';
 import useAxios from './api/useAxios';
-import useCodesApi from './api/useCodesApi';
 import useDatasetApi from './api/useDatasetApi';
 import useN8NApi from './api/useN8NApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
@@ -19,8 +18,6 @@ export const useApi = () => {
   const config = useContext(ConfigContext);
   const apiAxios = useAxios(config?.API_HOST);
   const n8nAxios = useAxios(config?.N8N_HOST);
-
-  const codes = useCodesApi(apiAxios);
 
   const user = useUserApi(apiAxios);
 
@@ -41,7 +38,6 @@ export const useApi = () => {
   const dataset = useDatasetApi(apiAxios);
 
   return {
-    codes,
     user,
     admin,
     n8n,

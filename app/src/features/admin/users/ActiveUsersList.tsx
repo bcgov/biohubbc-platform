@@ -12,7 +12,7 @@ import TablePagination from '@material-ui/core/TablePagination';
 import TableRow from '@material-ui/core/TableRow';
 import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
-import { mdiDotsVertical, mdiInformationOutline, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import { mdiDotsVertical, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import EditDialog from 'components/dialog/EditDialog';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
@@ -21,10 +21,10 @@ import { DeleteSystemUserI18N } from 'constants/i18n';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
+import useDataLoader from 'hooks/useDataLoader';
+import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useContext, useState } from 'react';
-import { useHistory } from 'react-router';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
@@ -43,7 +43,6 @@ const useStyles = makeStyles(() => ({
 
 export interface IActiveUsersListProps {
   activeUsers: IGetUserResponse[];
-  codes: IGetAllCodeSetsResponse;
   refresh: () => void;
 }
 
@@ -56,8 +55,18 @@ export interface IActiveUsersListProps {
 const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
-  const { activeUsers, codes } = props;
-  const history = useHistory();
+  const { activeUsers } = props;
+
+  const rolesDataLoader = useDataLoader(() => {
+    return biohubApi.user.getRoles();
+  });
+
+  rolesDataLoader.load();
+
+  let systemRoles: IGetRoles[] = [];
+  if (rolesDataLoader.data) {
+    systemRoles = rolesDataLoader.data;
+  }
 
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [page, setPage] = useState(0);
@@ -281,35 +290,33 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
                           buttonLabel={row.role_names.join(', ') || 'Not Applicable'}
                           buttonTitle={'Change User Permissions'}
                           buttonProps={{ variant: 'text' }}
-                          menuItems={codes.system_roles
-                            .sort((item1, item2) => {
-                              return item1.name.localeCompare(item2.name);
-                            })
-                            .map((item) => {
-                              return {
-                                menuLabel: item.name,
-                                menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.id)
-                              };
-                            })}
+                          menuItems={systemRoles.map((item) => {
+                            return {
+                              menuLabel: item.name,
+                              menuOnClick: () => handleChangeUserPermissionsClick(row, item.name, item.system_role_id)
+                            };
+                          })}
                           buttonEndIcon={<Icon path={mdiMenuDown} size={1} />}
                         />
                       </Box>
                     </TableCell>
+
                     <TableCell align="center">
                       <Box my={-1}>
                         <CustomMenuIconButton
                           buttonTitle="Actions"
                           buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
                           menuItems={[
-                            {
-                              menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
-                              menuLabel: 'View Users Details',
-                              menuOnClick: () =>
-                                history.push({
-                                  pathname: `/admin/users/${row.id}`,
-                                  state: row
-                                })
-                            },
+                            //TODO: disabled view details button, page and router does not exist
+                            // {
+                            //   menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
+                            //   menuLabel: 'View Users Details',
+                            //   menuOnClick: () =>
+                            //     history.push({
+                            //       pathname: `/admin/users/${row.id}`,
+                            //       state: row
+                            //     })
+                            // },
                             {
                               menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
                               menuLabel: 'Remove User',
@@ -347,8 +354,8 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
           element: (
             <AddSystemUsersForm
               system_roles={
-                props.codes?.system_roles?.map((item) => {
-                  return { value: item.id, label: item.name };
+                systemRoles.map((item) => {
+                  return { value: item.system_role_id, label: item.name };
                 }) || []
               }
             />
