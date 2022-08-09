@@ -1,10 +1,10 @@
-import Box from '@material-ui/core/Box';
-import Card from '@material-ui/core/Card';
-import Container from '@material-ui/core/Container';
-import Divider from '@material-ui/core/Divider';
-import Link from '@material-ui/core/Link';
-import Typography from '@material-ui/core/Typography';
-import { makeStyles } from '@material-ui/styles';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';

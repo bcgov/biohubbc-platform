@@ -1,5 +1,5 @@
-import { Container, makeStyles, Paper, Typography } from '@material-ui/core';
-import Box from '@material-ui/core/Box';
+import { Container, makeStyles, Paper, Typography } from '@mui/material';
+import Box from '@mui/material/Box';
 import SearchComponent from 'features/search/SearchComponent';
 import { Formik, FormikProps } from 'formik';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';

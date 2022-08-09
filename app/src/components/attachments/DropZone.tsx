@@ -1,8 +1,8 @@
-import Box from '@material-ui/core/Box';
-import Link from '@material-ui/core/Link';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import makeStyles from '@material-ui/core/styles/makeStyles';
-import Typography from '@material-ui/core/Typography';
+import Box from '@mui/material/Box';
+import Link from '@mui/material/Link';
+import { Theme } from '@mui/material/styles/createMuiTheme';
+import makeStyles from '@mui/material/styles/makeStyles';
+import Typography from '@mui/material/Typography';
 import { mdiTrayArrowUp } from '@mdi/js';
 import Icon from '@mdi/react';
 import { ConfigContext } from 'contexts/configContext';

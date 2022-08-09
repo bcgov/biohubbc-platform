@@ -1,5 +1,5 @@
-import Box from '@material-ui/core/Box';
-import Typography from '@material-ui/core/Typography';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import ComponentDialog from 'components/dialog/ComponentDialog';
 import React from 'react';

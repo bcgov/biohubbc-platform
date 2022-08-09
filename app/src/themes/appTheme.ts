@@ -1,4 +1,4 @@
-import { createMuiTheme } from '@material-ui/core';
+import { createMuiTheme } from '@mui/material';
 import 'styles.scss';
 
 const appTheme = createMuiTheme({

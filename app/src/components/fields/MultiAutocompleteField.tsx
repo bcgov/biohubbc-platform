@@ -1,8 +1,8 @@
-import Checkbox from '@material-ui/core/Checkbox';
-import TextField from '@material-ui/core/TextField';
-import CheckBox from '@material-ui/icons/CheckBox';
-import CheckBoxOutlineBlank from '@material-ui/icons/CheckBoxOutlineBlank';
-import Autocomplete, { createFilterOptions } from '@material-ui/lab/Autocomplete';
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
+import CheckBox from '@mui/icons-material/CheckBox';
+import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
+import Autocomplete, { createFilterOptions } from '@mui/lab/Autocomplete';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React from 'react';
