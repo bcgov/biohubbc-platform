@@ -214,7 +214,7 @@ export class SpatialRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError(
-        'Failed to insert spatial transform submission id and submission spatial component id',
+        'Failed to insert security transform submission id and submission spatial component id',
         [
           'SpatialRepository->insertSecurityTransformSubmissionRecord',
           'rowCount was null or undefined, expected rowCount >= 1'
@@ -236,7 +236,7 @@ export class SpatialRepository extends BaseRepository {
     const response = await this.connection.query(transform, [submissionId]);
 
     if (response.rowCount <= 0) {
-      throw new ApiExecuteSQLError('Failed to run transform on submission id', [
+      throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
         'SpatialRepository->runSpatialTransformOnSubmissionId',
         'rowCount was null or undefined, expected rowCount >= 1'
       ]);
@@ -255,6 +255,13 @@ export class SpatialRepository extends BaseRepository {
    */
   async runSecurityTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSecureRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
+
+    if (response.rowCount <= 0) {
+      throw new ApiExecuteSQLError('Failed to run security transform on submission id', [
+        'SpatialRepository->runSecurityTransformOnSubmissionId',
+        'rowCount was null or undefined, expected rowCount >= 1'
+      ]);
+    }
 
     return response.rows;
   }
