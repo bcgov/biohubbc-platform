@@ -181,12 +181,26 @@ export class SpatialService extends DBService {
     return this.spatialRepository.deleteSpatialComponentsBySubmissionId(submission_id);
   }
 
+  /**
+   * Delete records referencing which spatial transforms were applied to a spatial component
+   *
+   * @param {number} submission_id
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SpatialService
+   */
   async deleteSpatialComponentsSpatialTransformRefsBySubmissionId(
     submission_id: number
   ): Promise<{ submission_id: number }[]> {
     return this.spatialRepository.deleteSpatialComponentsSpatialTransformRefsBySubmissionId(submission_id);
   }
 
+  /**
+   * Delete records referencing which security transforms were applied to a spatial component
+   *
+   * @param {number} submission_id
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SpatialService
+   */
   async deleteSpatialComponentsSecurityTransformRefsBySubmissionId(
     submission_id: number
   ): Promise<{ submission_id: number }[]> {

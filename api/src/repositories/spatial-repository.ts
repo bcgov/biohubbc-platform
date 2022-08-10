@@ -217,7 +217,7 @@ export class SpatialRepository extends BaseRepository {
         'Failed to insert security transform submission id and submission spatial component id',
         [
           'SpatialRepository->insertSecurityTransformSubmissionRecord',
-          'rowCount was null or undefined, expected rowCount >= 1'
+          'rowCount was null or undefined, expected rowCount = 1'
         ]
       );
     }
