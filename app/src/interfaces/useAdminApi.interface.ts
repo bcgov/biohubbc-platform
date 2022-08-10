@@ -34,3 +34,8 @@ export interface IgcNotifyRecipient {
   phoneNumber: string;
   userId: number;
 }
+
+export interface IGetRoles {
+  system_role_id: number;
+  name: string;
+}

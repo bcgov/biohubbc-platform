@@ -8,7 +8,7 @@ import Select from '@material-ui/core/Select';
 import Typography from '@material-ui/core/Typography';
 import CustomTextField from 'components/fields/CustomTextField';
 import { useFormikContext } from 'formik';
-import { IGetAllCodeSetsResponse } from 'interfaces/useCodesApi.interface';
+import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import React from 'react';
 import yup from 'utils/YupSchema';
 
@@ -28,7 +28,7 @@ export const IDIRRequestFormYupSchema = yup.object().shape({
 });
 
 export interface IIDIRRequestFormProps {
-  codes?: IGetAllCodeSetsResponse;
+  roles: IGetRoles[];
 }
 
 /**
@@ -38,8 +38,8 @@ export interface IIDIRRequestFormProps {
  */
 const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
   const { values, touched, errors, handleChange } = useFormikContext<IIDIRRequestForm>();
-  const { codes } = props;
 
+  const { roles } = props;
   return (
     <Box>
       <Grid container spacing={3}>
@@ -59,8 +59,8 @@ const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
                 error={touched.role && Boolean(errors.role)}
                 displayEmpty
                 inputProps={{ 'aria-label': 'Role' }}>
-                {codes?.system_roles.map((item) => (
-                  <MenuItem key={item.id} value={item.id}>
+                {roles.map((item) => (
+                  <MenuItem key={item.system_role_id} value={item.name}>
                     {item.name}
                   </MenuItem>
                 ))}

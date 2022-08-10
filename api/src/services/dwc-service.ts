@@ -407,8 +407,8 @@ export class DarwinCoreService extends DBService {
   async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord.eml_source) {
-      throw new ApiGeneralError('The eml source is not available');
+    if (!submissionRecord.source_transform_id) {
+      throw new ApiGeneralError('The source_transform_id is not available');
     }
 
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(

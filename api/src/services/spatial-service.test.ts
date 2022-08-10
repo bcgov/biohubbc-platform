@@ -6,6 +6,7 @@ import sinonChai from 'sinon-chai';
 import {
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
+  ISubmissionSpatialComponent,
   ISubmissionSpatialSearchResponseRow,
   SpatialRepository
 } from '../repositories/spatial-repository';
@@ -171,6 +172,66 @@ describe('SpatialService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(mockResponseRows);
+    });
+  });
+
+  describe('deleteSpatialComponentsTransformRefsBySubmissionId', () => {
+    it('should return submission IDs upon deleting spatial data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const mockResponseRows = [{ submission_id: 3 }] as unknown as { submission_id: number }[];
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'deleteSpatialComponentsTransformRefsBySubmissionId')
+        .resolves(mockResponseRows);
+
+      const response = await spatialService.deleteSpatialComponentsTransformRefsBySubmissionId(3);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(mockResponseRows);
+    });
+  });
+
+  describe('findSpatialMetadataBySubmissionSpatialComponentId', () => {
+    describe('with multiple features', () => {
+      it('should return spatial component metadata', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const spatialService = new SpatialService(mockDBConnection);
+
+        const mockResponseRows = {
+          spatial_component: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] }
+        } as unknown as ISubmissionSpatialComponent;
+
+        const repo = sinon
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .resolves(mockResponseRows);
+
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+        expect(repo).to.be.calledOnce;
+        expect(response).to.be.eql({ prop1: 'val1' });
+      });
+    });
+
+    describe('with single feature', () => {
+      it('should return spatial component metadata', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const spatialService = new SpatialService(mockDBConnection);
+
+        const mockResponseRows = {
+          spatial_component: { features: [{ properties: { prop1: 'val1' } }] }
+        } as unknown as ISubmissionSpatialComponent;
+
+        const repo = sinon
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .resolves(mockResponseRows);
+
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+        expect(repo).to.be.calledOnce;
+        expect(response).to.be.eql({ prop1: 'val1' });
+      });
     });
   });
 });

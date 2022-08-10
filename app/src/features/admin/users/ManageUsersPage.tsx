@@ -5,7 +5,6 @@ import Typography from '@material-ui/core/Typography';
 import { AdministrativeActivityStatusType } from 'constants/misc';
 import AccessRequestList from 'features/admin/users/AccessRequestList';
 import { useApi } from 'hooks/useApi';
-import useCodes from 'hooks/useCodes';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useEffect, useState } from 'react';
@@ -26,8 +25,6 @@ const ManageUsersPage: React.FC = () => {
   const [activeUsers, setActiveUsers] = useState<IGetUserResponse[]>([]);
   const [isLoadingActiveUsers, setIsLoadingActiveUsers] = useState(false);
   const [hasLoadedActiveUsers, setHasLoadedActiveUsers] = useState(false);
-
-  const { codes } = useCodes();
 
   const refreshAccessRequests = async () => {
     const accessResponse = await biohubApi.admin.getAccessRequests([
@@ -87,7 +84,7 @@ const ManageUsersPage: React.FC = () => {
     getActiveUsers();
   }, [biohubApi, isLoadingActiveUsers, hasLoadedActiveUsers]);
 
-  if (!hasLoadedAccessRequests || !hasLoadedActiveUsers || !codes) {
+  if (!hasLoadedAccessRequests || !hasLoadedActiveUsers) {
     return <CircularProgress className="pageProgress" size={40} />;
   }
 
@@ -101,7 +98,6 @@ const ManageUsersPage: React.FC = () => {
         <Box>
           <AccessRequestList
             accessRequests={accessRequests}
-            codes={codes}
             refresh={() => {
               refreshAccessRequests();
               refreshActiveUsers();
@@ -109,7 +105,7 @@ const ManageUsersPage: React.FC = () => {
           />
         </Box>
         <Box pt={3}>
-          <ActiveUsersList activeUsers={activeUsers} codes={codes} refresh={refreshActiveUsers} />
+          <ActiveUsersList activeUsers={activeUsers} refresh={refreshActiveUsers} />
         </Box>
       </Container>
     </Box>

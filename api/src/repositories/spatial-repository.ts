@@ -412,7 +412,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
    * @memberof SpatialRepository
    */
-  async findSpatialMetadataBySubmissionId(
+  async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialComponent> {
     const queryBuilder = getKnexQueryBuilder()

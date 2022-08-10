@@ -1,0 +1,490 @@
+{
+  "info": {
+    "_postman_id": "57bdcb56-dc22-4e1a-be0f-542ff412aef0",
+    "name": "BioHub-API-DEV",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "4169714"
+  },
+  "item": [
+    {
+      "name": "api",
+      "item": [
+        {
+          "name": "dwc",
+          "item": [
+            {
+              "name": "spatial",
+              "item": [
+                {
+                  "name": "{submissionSpatialComponentId}",
+                  "item": [
+                    {
+                      "name": "metadata",
+                      "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                          "raw": "{{API_BASE_URL}}/dwc/spatial/:submissionSpatialComponentId/metadata",
+                          "host": ["{{API_BASE_URL}}"],
+                          "path": [
+                            "dwc",
+                            "spatial",
+                            ":submissionSpatialComponentId",
+                            "metadata"
+                          ],
+                          "variable": [
+                            {
+                              "key": "submissionSpatialComponentId",
+                              "value": "1",
+                              "description": "Required. A submission spatial component ID."
+                            }
+                          ]
+                        }
+                      },
+                      "response": []
+                    }
+                  ]
+                },
+                {
+                  "name": "search",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/spatial/search?boundary={\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[-140.450008,47.803322],[-112.677655,47.803322],[-112.677655,60.408259],[-140.450008,60.408259],[-140.450008,47.803322]]]}}",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "spatial", "search"],
+                      "query": [
+                        {
+                          "key": "boundary",
+                          "value": "{\"type\":\"Feature\",\"properties\":{},\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[-140.450008,47.803322],[-112.677655,47.803322],[-112.677655,60.408259],[-140.450008,60.408259],[-140.450008,47.803322]]]}}",
+                          "description": "Required. A single stringified Feature<Polygon>."
+                        },
+                        {
+                          "key": "type",
+                          "value": "",
+                          "description": "Optional. A spatial component type. To include multiple types, add additional `type` keys.",
+                          "disabled": true
+                        },
+                        {
+                          "key": "datasetID",
+                          "value": "",
+                          "description": "Optional. A dataset uuid. To include multiple dataset ids, add additional `datasetID` keys.",
+                          "disabled": true
+                        }
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "submission",
+              "item": [
+                {
+                  "name": "intake",
+                  "event": [
+                    {
+                      "listen": "prerequest",
+                      "script": {
+                        "exec": [""],
+                        "type": "text/javascript"
+                      }
+                    },
+                    {
+                      "listen": "test",
+                      "script": {
+                        "exec": [""],
+                        "type": "text/javascript"
+                      }
+                    }
+                  ],
+                  "request": {
+                    "auth": {
+                      "type": "bearer",
+                      "bearer": [
+                        {
+                          "key": "token",
+                          "value": "{{_KEYCLOAK_SERVICE_CLIENT_TOKEN}}",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "formdata",
+                      "formdata": [
+                        {
+                          "key": "media",
+                          "description": "Required. A DwCA zip file.",
+                          "type": "file",
+                          "src": []
+                        },
+                        {
+                          "key": "data_package_id",
+                          "value": "",
+                          "description": "Required. A UUID V4 dataset ID.",
+                          "type": "text"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/submission/intake",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "submission", "intake"]
+                    }
+                  },
+                  "response": []
+                }
+              ]
+            },
+            {
+              "name": "eml",
+              "item": [
+                {
+                  "name": "search",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "multipart/form-data"
+                      },
+                      {
+                        "key": "Accept",
+                        "value": "application/json"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{API_BASE_URL}}/dwc/eml/search/?terms=moose",
+                      "host": ["{{API_BASE_URL}}"],
+                      "path": ["dwc", "eml", "search", ""],
+                      "query": [
+                        {
+                          "key": "terms",
+                          "value": "moose"
+                        }
+                      ]
+                    },
+                    "description": "Submit a new Darwin Core Archive (DwCA) data package."
+                  },
+                  "response": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "/version",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{API_BASE_URL}}/version",
+              "host": ["{{API_BASE_URL}}"],
+              "path": ["version"]
+            },
+            "description": "Get API information"
+          },
+          "response": []
+        },
+        {
+          "name": "/logger",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{API_BASE_URL}}/logger?level=info",
+              "host": ["{{API_BASE_URL}}"],
+              "path": ["logger"],
+              "query": [
+                {
+                  "key": "level",
+                  "value": "info",
+                  "description": "Required. Supported values: error, warn, info, debug, silly"
+                }
+              ]
+            },
+            "description": "Update the log level for the API's default logger"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "elastic search",
+      "item": [
+        {
+          "name": "eml",
+          "item": [
+            {
+              "name": "{id}",
+              "item": [
+                {
+                  "name": "get",
+                  "request": {
+                    "auth": {
+                      "type": "noauth"
+                    },
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{ELASTIC_SEARCH_BASE_URL}}/{{ELASTIC_SEARCH_EML_INDEX}}/_doc/:id",
+                      "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+                      "path": ["{{ELASTIC_SEARCH_EML_INDEX}}", "_doc", ":id"],
+                      "variable": [
+                        {
+                          "key": "id",
+                          "value": "552538d7-d889-4a27-852e-30681462ba4d",
+                          "description": "Required. Document ID."
+                        }
+                      ]
+                    }
+                  },
+                  "response": []
+                }
+              ],
+              "auth": {
+                "type": "noauth"
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [""]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [""]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "list",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{ELASTIC_SEARCH_BASE_URL}}/{{ELASTIC_SEARCH_EML_INDEX}}/_search",
+                  "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+                  "path": ["{{ELASTIC_SEARCH_EML_INDEX}}", "_search"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "delete",
+              "request": {
+                "auth": {
+                  "type": "noauth"
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{ELASTIC_SEARCH_BASE_URL}}/{{ELASTIC_SEARCH_EML_INDEX}}",
+                  "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+                  "path": ["{{ELASTIC_SEARCH_EML_INDEX}}"]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "noauth"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [""]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [""]
+              }
+            }
+          ]
+        },
+        {
+          "name": "indices",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{ELASTIC_SEARCH_BASE_URL}}/_aliases",
+              "host": ["{{ELASTIC_SEARCH_BASE_URL}}"],
+              "path": ["_aliases"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "noauth"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [""]
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{_KEYCLOAK_USER_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const userTokenRequest = {",
+          "    url: pm.environment.get(\"KEYCLOAK_URL\"),",
+          "    method: \"POST\",",
+          "    header: \"Content-Type:application/x-www-form-urlencoded\",",
+          "    body: {",
+          "        mode: \"urlencoded\",",
+          "        urlencoded: [",
+          "            { key: \"scope\", value: \"openid\" },",
+          "            { key: \"grant_type\", value: \"password\" },",
+          "            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_CLIENT_ID\") },",
+          "            { key: \"username\", value: pm.environment.get(\"KEYCLOAK_USER_NAME\") },",
+          "            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_USER_PASSWORD\") },",
+          "        ],",
+          "    },",
+          "};",
+          "",
+          "const serviceClientTokenRequest = {",
+          "    url: pm.environment.get(\"KEYCLOAK_URL\"),",
+          "    method: \"POST\",",
+          "    header: \"Content-Type:application/x-www-form-urlencoded\",",
+          "    auth: {",
+          "        type: \"basic\",",
+          "        basic: [",
+          "            { key: \"password\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_PASSWORD\") }",
+          "        ],",
+          "    },",
+          "    body: {",
+          "        mode: \"urlencoded\",",
+          "        urlencoded: [",
+          "            { key: \"scope\", value: \"openid\" },",
+          "            { key: \"grant_type\", value: \"client_credentials\" },",
+          "            { key: \"client_id\", value: pm.environment.get(\"KEYCLOAK_SERVICE_CLIENT_ID\") },",
+          "        ],",
+          "    },",
+          "};",
+          "",
+          "const fetchUserToken = () => {",
+          "    pm.sendRequest(userTokenRequest, function (err, res) {",
+          "        if (err) {",
+          "            console.log(\"Failed to fetch user token: \", err);",
+          "            return;",
+          "        }",
+          "",
+          "        const responseJson = res.json();",
+          "",
+          "        if (responseJson.error) {",
+          "            console.log(\"User token error: \", res.json());",
+          "            return;",
+          "        }",
+          "",
+          "        pm.environment.set(\"_KEYCLOAK_USER_TOKEN\", responseJson.access_token);",
+          "",
+          "        const expiryDate = new Date();",
+          "        expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
+          "        pm.environment.set(\"_KEYCLOAK_USER_TOKEN_EXPIRY\", expiryDate.getTime());",
+          "    });",
+          "}",
+          "",
+          "const fetchServiceClientToken = () => {",
+          "    pm.sendRequest(serviceClientTokenRequest, function (err, res) {",
+          "        if (err) {",
+          "            console.log(\"Failed to fetch service client token: \", err);",
+          "            return;",
+          "        }",
+          "",
+          "        const responseJson = res.json();",
+          "",
+          "        if (responseJson.error) {",
+          "            console.log(\"Service client token error: \", res.json());",
+          "            return;",
+          "        }",
+          "",
+          "        pm.environment.set(\"_KEYCLOAK_SERVICE_CLIENT_TOKEN\", responseJson.access_token);",
+          "",
+          "        const expiryDate = new Date();",
+          "        expiryDate.setSeconds(expiryDate.getSeconds() + responseJson.expires_in);",
+          "        pm.environment.set(\"_KEYCLOAK_SERVICE_CLIENT_TOKEN_EXPIRY\", expiryDate.getTime());",
+          "    });",
+          "}",
+          "",
+          "const fetchTokens = () => {",
+          "    if (pm.environment.get('_KEYCLOAK_USER_TOKEN_EXPIRY') <= new Date().getTime()) {",
+          "        fetchUserToken();",
+          "    }",
+          "",
+          "    if (pm.environment.get('_KEYCLOAK_SERVICE_CLIENT_TOKEN_EXPIRY') <= new Date().getTime()) {",
+          "        fetchServiceClientToken();",
+          "    }",
+          "}",
+          "",
+          "fetchTokens();",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ]
+}
