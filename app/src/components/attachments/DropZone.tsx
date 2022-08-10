@@ -73,7 +73,7 @@ export interface IDropZoneConfigProps {
   acceptedFileExtensions?: string;
 }
 
-export const DropZone: React.FC<IDropZoneProps & IDropZoneConfigProps> = (props) => {
+export const DropZone: React.FC<React.PropsWithChildren<IDropZoneProps & IDropZoneConfigProps>> = (props) => {
   const classes = useStyles();
   const config = useContext(ConfigContext);
 

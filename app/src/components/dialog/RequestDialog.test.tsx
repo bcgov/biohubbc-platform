@@ -3,7 +3,7 @@ import { useFormikContext } from 'formik';
 import React from 'react';
 import RequestDialog from './RequestDialog';
 
-const TestComponent: React.FC = () => {
+const TestComponent: React.FC<React.PropsWithChildren> = () => {
   const formikProps = useFormikContext();
   const { handleSubmit } = formikProps;
   return <form onSubmit={handleSubmit}>A Child Component!</form>;

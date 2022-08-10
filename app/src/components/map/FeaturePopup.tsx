@@ -59,7 +59,7 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
+const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = (props) => {
   const { submissionSpatialComponentId } = props;
 
   const classes = useStyles();
@@ -81,9 +81,9 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
 
   const { isLoading, data, isReady } = dataLoader;
 
-  const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
+  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
+  const MetadataHeader: React.FC<React.PropsWithChildren<{ type: string; date?: string }>> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
         {props.type || 'Feature'}
@@ -96,7 +96,7 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
     </Box>
   );
 
-  const NoMetadataAvailable: React.FC = () => (
+  const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
     <Typography className={classes.date} component="h6" variant="body1">
       No metadata available.
     </Typography>

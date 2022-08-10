@@ -47,7 +47,7 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ submissionSpatialComponentId }) => {
+const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = ({ submissionSpatialComponentId }) => {
   const classes = useStyles();
   const api = useApi();
   const history = useHistory();
@@ -61,9 +61,9 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ subm
   const { isLoading, isReady } = dataLoader;
   const data = dataLoader.data as BoundaryCentroidFeatureProperties;
 
-  const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
+  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => <div className={classes.modalContent}>{children}</div>;
 
-  const MetadataHeader: React.FC<{ title: string }> = (props) => (
+  const MetadataHeader: React.FC<React.PropsWithChildren<{ title: string }>> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
         Dataset
@@ -76,7 +76,7 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ subm
     </Box>
   );
 
-  const NoMetadataAvailable: React.FC = () => (
+  const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
     <Typography className={classes.date} component="h6" variant="body1">
       No metadata available.
     </Typography>

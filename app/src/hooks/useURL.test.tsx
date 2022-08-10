@@ -6,7 +6,7 @@ import { Route, Router } from 'react-router';
 import useURL from './useURL';
 
 const getWrapper = (history: MemoryHistory) => {
-  const wrapper: React.FC = ({ children }) => (
+  const wrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <Router history={history}>
       <Route path="test/:id/page">{children}</Route>
     </Router>
@@ -58,7 +58,7 @@ describe('useURL', () => {
     it('should append new query params to initial query parameters', async () => {
       const history = createMemoryHistory({ initialEntries: ['test/123/page?val0=0&val1=1'] });
 
-      const wrapper: React.FC = ({ children }) => (
+      const wrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
         <Router history={history}>
           <Route path="test/:id/page">{children}</Route>
         </Router>

@@ -15,7 +15,7 @@ import ActiveUsersList from './ActiveUsersList';
  *
  * @return {*}
  */
-const ManageUsersPage: React.FC = () => {
+const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const biohubApi = useApi();
 
   const [accessRequests, setAccessRequests] = useState<IGetAccessRequestsListResponse[]>([]);

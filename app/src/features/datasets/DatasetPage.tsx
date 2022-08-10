@@ -37,7 +37,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const DatasetPage: React.FC = () => {
+const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
   const biohubApi = useApi();
   const urlParams = useParams();

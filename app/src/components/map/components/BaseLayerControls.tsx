@@ -1,7 +1,7 @@
 import React from 'react';
 import { LayersControl, TileLayer } from 'react-leaflet';
 
-const BaseLayerControls: React.FC = () => {
+const BaseLayerControls: React.FC<React.PropsWithChildren> = () => {
   return (
     <>
       <LayersControl.BaseLayer checked name="BC Government">

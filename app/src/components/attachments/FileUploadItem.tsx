@@ -82,7 +82,7 @@ export interface IFileUploadItemProps {
   status?: UploadFileStatus;
 }
 
-const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
+const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = (props) => {
   const isMounted = useIsMounted();
   const classes = useStyles();
 
@@ -276,7 +276,7 @@ interface IActionButtonProps {
  * @param {*} props
  * @return {*}
  */
-const ActionButton: React.FC<IActionButtonProps> = (props) => {
+const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (props) => {
   const classes = useStyles();
 
   if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED) {
@@ -336,7 +336,7 @@ interface IProgressBarProps {
  * @param {*} props
  * @return {*}
  */
-const ProgressBar: React.FC<IProgressBarProps> = (props) => {
+const ProgressBar: React.FC<React.PropsWithChildren<IProgressBarProps>> = (props) => {
   const classes = useStyles();
 
   if (props.status === UploadFileStatus.STAGED) {

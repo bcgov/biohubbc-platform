@@ -47,7 +47,7 @@ export interface IMapContainerProps {
   onBoundsChange?: IMapBoundsOnChange;
 }
 
-const MapContainer: React.FC<IMapContainerProps> = (props) => {
+const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (props) => {
   const classes = useStyles();
 
   const {

@@ -39,7 +39,7 @@ interface IAccessRequestForm {
  *
  * @return {*}
  */
-export const AccessRequestPage: React.FC = () => {
+export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
   const biohubApi = useApi();
   const history = useHistory();

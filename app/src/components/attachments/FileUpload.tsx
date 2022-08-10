@@ -102,7 +102,7 @@ export interface IFileUploadProps {
   dropZoneProps?: Partial<IDropZoneConfigProps>;
 }
 
-export const FileUpload: React.FC<IFileUploadProps> = (props) => {
+export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (props) => {
   const classes = useStyles();
 
   const [files, setFiles] = useState<IUploadFile[]>([]);

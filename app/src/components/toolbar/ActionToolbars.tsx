@@ -19,7 +19,7 @@ export interface ICustomButtonProps {
 
 export interface IButtonToolbarProps extends ICustomButtonProps, IActionToolbarProps {}
 
-export const H3ButtonToolbar: React.FC<IButtonToolbarProps> = (props) => {
+export const H3ButtonToolbar: React.FC<React.PropsWithChildren<IButtonToolbarProps>> = (props) => {
   const id = `h3-button-toolbar-${props.buttonLabel.replace(/\s/g, '')}`;
 
   return (
@@ -42,7 +42,7 @@ export const H3ButtonToolbar: React.FC<IButtonToolbarProps> = (props) => {
   );
 };
 
-export const H2ButtonToolbar: React.FC<IButtonToolbarProps> = (props) => {
+export const H2ButtonToolbar: React.FC<React.PropsWithChildren<IButtonToolbarProps>> = (props) => {
   const id = `h2-button-toolbar-${props.buttonLabel.replace(/\s/g, '')}`;
 
   return (
@@ -72,7 +72,7 @@ export interface IMenuToolbarItem {
 
 export interface IMenuToolbarProps extends ICustomMenuButtonProps, IActionToolbarProps {}
 
-export const H2MenuToolbar: React.FC<IMenuToolbarProps> = (props) => {
+export const H2MenuToolbar: React.FC<React.PropsWithChildren<IMenuToolbarProps>> = (props) => {
   return (
     <ActionToolbar label={props.label} labelProps={{ variant: 'h2' }} toolbarProps={props.toolbarProps}>
       <CustomMenuButton {...props} />
@@ -89,7 +89,7 @@ export interface ICustomMenuButtonProps {
   menuItems: IMenuToolbarItem[];
 }
 
-export const CustomMenuButton: React.FC<ICustomMenuButtonProps> = (props) => {
+export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButtonProps>> = (props) => {
   const [anchorEl, setAnchorEl] = useState(null);
 
   const open = Boolean(anchorEl);
@@ -130,7 +130,7 @@ export const CustomMenuButton: React.FC<ICustomMenuButtonProps> = (props) => {
         open={open}
         onClose={handleClose}
         anchorEl={anchorEl}
-        getContentAnchorEl={null}
+        // getContentAnchorEl={null}
         anchorOrigin={{
           vertical: 'bottom',
           horizontal: 'right'
@@ -167,7 +167,7 @@ export interface ICustomMenuIconButtonProps {
   menuItems: IMenuToolbarItem[];
 }
 
-export const CustomMenuIconButton: React.FC<ICustomMenuIconButtonProps> = (props) => {
+export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuIconButtonProps>> = (props) => {
   const [anchorEl, setAnchorEl] = useState(null);
 
   const open = Boolean(anchorEl);
@@ -204,7 +204,7 @@ export const CustomMenuIconButton: React.FC<ICustomMenuIconButtonProps> = (props
         open={open}
         onClose={handleClose}
         anchorEl={anchorEl}
-        getContentAnchorEl={null}
+        // getContentAnchorEl={null}
         anchorOrigin={{
           vertical: 'top',
           horizontal: 'right'
@@ -240,7 +240,7 @@ interface IActionToolbarProps {
   toolbarProps?: Partial<ToolbarProps>;
 }
 
-const ActionToolbar: React.FC<IActionToolbarProps> = (props) => {
+const ActionToolbar: React.FC<React.PropsWithChildren<IActionToolbarProps>> = (props) => {
   return (
     <Toolbar {...props.toolbarProps} style={{ justifyContent: 'space-between' }}>
       <Typography {...props.labelProps} color="inherit">

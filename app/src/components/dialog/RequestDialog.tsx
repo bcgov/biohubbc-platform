@@ -57,7 +57,7 @@ export interface IRequestDialog {
   onApprove: (values: any) => void;
 }
 
-const RequestDialog: React.FC<IRequestDialog> = (props) => {
+const RequestDialog: React.FC<React.PropsWithChildren<IRequestDialog>> = (props) => {
   if (!props.open) {
     return <></>;
   }

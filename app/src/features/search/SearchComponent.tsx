@@ -60,7 +60,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const SearchComponent: React.FC = () => {
+const SearchComponent: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   const formikProps = useFormikContext<IAdvancedSearch>();

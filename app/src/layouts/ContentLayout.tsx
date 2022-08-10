@@ -16,7 +16,7 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const ContentLayout: React.FC = (props) => {
+const ContentLayout: React.FC<React.PropsWithChildren> = (props) => {
   const classes = useStyles();
 
   return (

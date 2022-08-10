@@ -10,7 +10,7 @@ import DatasetsPage from './DatasetsPage';
  *
  * @return {*}
  */
-const datasetsRouter: React.FC = () => {
+const datasetsRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
       <AppRoute exact path="/datasets" layout={ContentLayout}>

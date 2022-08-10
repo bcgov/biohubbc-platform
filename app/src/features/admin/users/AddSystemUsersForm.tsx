@@ -49,7 +49,7 @@ export interface AddSystemUsersFormProps {
   system_roles: any[];
 }
 
-const AddSystemUsersForm: React.FC<AddSystemUsersFormProps> = (props) => {
+const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormProps>> = (props) => {
   const { values, handleChange, handleSubmit, getFieldMeta } = useFormikContext<IAddSystemUsersForm>();
 
   return (

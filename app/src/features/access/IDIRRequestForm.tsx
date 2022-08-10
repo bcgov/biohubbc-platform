@@ -36,7 +36,7 @@ export interface IIDIRRequestFormProps {
  *
  * @return {*}
  */
-const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
+const IDIRRequestForm: React.FC<React.PropsWithChildren<IIDIRRequestFormProps>> = (props) => {
   const { values, touched, errors, handleChange } = useFormikContext<IIDIRRequestForm>();
 
   const { roles } = props;
@@ -54,7 +54,7 @@ const IDIRRequestForm: React.FC<IIDIRRequestFormProps> = (props) => {
                 labelId="role-label"
                 label="Role"
                 value={values.role}
-                labelWidth={300}
+                // @TODO // labelWidth={300}
                 onChange={handleChange}
                 error={touched.role && Boolean(errors.role)}
                 displayEmpty

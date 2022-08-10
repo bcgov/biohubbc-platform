@@ -8,7 +8,7 @@ interface ITestComponentProps {
   timeout: number;
 }
 
-const TestComponent: React.FC<ITestComponentProps> = (props) => {
+const TestComponent: React.FC<React.PropsWithChildren<ITestComponentProps>> = (props) => {
   useInterval(props.callback, props.period, props.timeout);
 
   return <></>;

@@ -52,7 +52,7 @@ export interface IActiveUsersListProps {
  * @param {*} props
  * @return {*}
  */
-const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
+const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
   const { activeUsers } = props;

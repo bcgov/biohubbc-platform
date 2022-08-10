@@ -65,7 +65,7 @@ export interface IErrorDialogProps {
  * @param {*} props
  * @return {*}
  */
-export const ErrorDialog: React.FC<IErrorDialogProps> = (props) => {
+export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> = (props) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
 
   const ErrorDetailsList = (errorProps: { errors: (string | object)[] }) => {

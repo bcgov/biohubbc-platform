@@ -14,7 +14,7 @@ import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import appTheme from 'themes/appTheme';
 
-const App: React.FC = () => {
+const App: React.FC<React.PropsWithChildren> = () => {
   return (
     <ThemeProvider theme={appTheme}>
       <ConfigContextProvider>

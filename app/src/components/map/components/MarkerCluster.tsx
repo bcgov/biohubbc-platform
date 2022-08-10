@@ -36,7 +36,7 @@ export interface IMarkerLayersProps {
   layers?: IMarkerLayer[];
 }
 
-const MarkerClusterGroup: React.FC<IMarkerLayersProps> = (props) => {
+const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
   if (!props.layers?.length) {
     return null;
   }

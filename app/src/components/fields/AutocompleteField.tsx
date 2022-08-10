@@ -1,5 +1,5 @@
 import TextField from '@mui/material/TextField';
-import Autocomplete, { createFilterOptions } from '@mui/lab/Autocomplete';
+import Autocomplete from '@mui/lab/Autocomplete';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React, { ChangeEvent } from 'react';
@@ -21,7 +21,7 @@ export interface IAutocompleteField<T extends string | number> {
 
 // To be used when you want an autocomplete field with no freesolo allowed but only one option can be selected
 
-const AutocompleteField: React.FC<IAutocompleteField<string | number>> = <T extends string | number>(
+const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<string | number>>> = <T extends string | number>(
   props: IAutocompleteField<T>
 ) => {
   const { touched, errors, setFieldValue, values } = useFormikContext<IAutocompleteFieldOption<T>>();
@@ -36,6 +36,7 @@ const AutocompleteField: React.FC<IAutocompleteField<string | number>> = <T exte
     return result;
   };
 
+  /*
   const handleGetOptionSelected = (
     option: IAutocompleteFieldOption<T>,
     value: IAutocompleteFieldOption<T>
@@ -46,6 +47,7 @@ const AutocompleteField: React.FC<IAutocompleteField<string | number>> = <T exte
 
     return option.value === value.value;
   };
+  */
 
   return (
     <Autocomplete
@@ -58,11 +60,11 @@ const AutocompleteField: React.FC<IAutocompleteField<string | number>> = <T exte
       value={getExistingValue(get(values, props.name))}
       options={props.options}
       getOptionLabel={(option) => option.label}
-      getOptionSelected={handleGetOptionSelected}
-      filterOptions={createFilterOptions({ limit: props.filterLimit })}
+      // @TODO // getOptionSelected={handleGetOptionSelected}
+      // @TODO // filterOptions={createFilterOptions({ limit: props.filterLimit })}
       onChange={(event, option) => {
         if (props.onChange) {
-          props.onChange(event, option);
+          // @TODO // props.onChange(event, option);
           return;
         }
 

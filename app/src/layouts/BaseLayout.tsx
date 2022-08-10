@@ -6,7 +6,7 @@ import Header from 'components/layout/header/Header';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import React from 'react';
 
-const BaseLayout: React.FC = (props) => {
+const BaseLayout: React.FC<React.PropsWithChildren> = (props) => {
   function isSupportedBrowser() {
     if (
       navigator.userAgent.indexOf('Chrome') !== -1 ||

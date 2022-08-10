@@ -12,7 +12,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-export const BetaLabel: React.FC = () => {
+export const BetaLabel: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   return (

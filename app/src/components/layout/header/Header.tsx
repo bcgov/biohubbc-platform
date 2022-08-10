@@ -103,7 +103,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const Header: React.FC = () => {
+const Header: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   const [openSupportDialog, setOpenSupportDialog] = React.useState(false);

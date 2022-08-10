@@ -60,7 +60,7 @@ export interface IAccessRequestListProps {
  * @param {*} props
  * @return {*}
  */
-const AccessRequestList: React.FC<IAccessRequestListProps> = (props) => {
+const AccessRequestList: React.FC<React.PropsWithChildren<IAccessRequestListProps>> = (props) => {
   const { accessRequests, refresh } = props;
 
   const classes = useStyles();

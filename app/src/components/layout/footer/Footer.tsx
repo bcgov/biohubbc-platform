@@ -32,7 +32,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const Footer: React.FC = () => {
+const Footer: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   return (

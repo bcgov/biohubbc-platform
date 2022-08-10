@@ -13,7 +13,7 @@ import useURL from 'hooks/useURL';
 import React, { useEffect, useState } from 'react';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 
-const MapPage: React.FC = () => {
+const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
 
   const url = useURL<{
