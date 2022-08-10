@@ -55,6 +55,13 @@ const MapPage: React.FC = () => {
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
 
+  useEffect(() => {
+    if (drawnBoundary) {
+      const searchBoundary = getSearchBoundary(mapViewBoundary, drawnBoundary)
+      mapDataLoader.refresh(searchBoundary, type, zoom)
+    }
+  }, [])
+
   const getSearchBoundary = (boundary1?: Feature<Polygon>, boundary2?: Feature<Polygon>) => {
     return (boundary2 && boundary1 && intersect(boundary2, boundary1)) || boundary1 || boundary2 || ALL_OF_BC_BOUNDARY;
   };
