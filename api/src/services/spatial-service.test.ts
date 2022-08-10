@@ -175,7 +175,7 @@ describe('SpatialService', () => {
     });
   });
 
-  describe('deleteSpatialComponentsTransformRefsBySubmissionId', () => {
+  describe('deleteSpatialComponentsSpatialTransformRefsBySubmissionId', () => {
     it('should return submission IDs upon deleting spatial data', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
@@ -183,10 +183,10 @@ describe('SpatialService', () => {
       const mockResponseRows = [{ submission_id: 3 }] as unknown as { submission_id: number }[];
 
       const repo = sinon
-        .stub(SpatialRepository.prototype, 'deleteSpatialComponentsTransformRefsBySubmissionId')
+        .stub(SpatialRepository.prototype, 'deleteSpatialComponentsSpatialTransformRefsBySubmissionId')
         .resolves(mockResponseRows);
 
-      const response = await spatialService.deleteSpatialComponentsTransformRefsBySubmissionId(3);
+      const response = await spatialService.deleteSpatialComponentsSpatialTransformRefsBySubmissionId(3);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(mockResponseRows);

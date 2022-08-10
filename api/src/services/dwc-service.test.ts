@@ -491,8 +491,11 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
         .resolves({ submission_id: 1 });
 
-      const deleteSpatialComponentsTransformRefsBySubmissionIdStub = sinon
-        .stub(SpatialService.prototype, 'deleteSpatialComponentsTransformRefsBySubmissionId')
+      const deleteSpatialComponentsSpatialTransformRefsBySubmissionIdStub = sinon
+        .stub(SpatialService.prototype, 'deleteSpatialComponentsSpatialTransformRefsBySubmissionId')
+        .resolves([]);
+      const deleteSpatialComponentsSecurityTransformRefsBySubmissionIdStub = sinon
+        .stub(SpatialService.prototype, 'deleteSpatialComponentsSecurityTransformRefsBySubmissionId')
         .resolves([]);
       const deleteSpatialComponentsStub = sinon
         .stub(SpatialService.prototype, 'deleteSpatialComponentsBySubmissionId')
@@ -511,7 +514,8 @@ describe('DarwinCoreService', () => {
 
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
-      expect(deleteSpatialComponentsTransformRefsBySubmissionIdStub).to.be.calledWith(1);
+      expect(deleteSpatialComponentsSpatialTransformRefsBySubmissionIdStub).to.be.calledWith(1);
+      expect(deleteSpatialComponentsSecurityTransformRefsBySubmissionIdStub).to.be.calledWith(1);
       expect(deleteSpatialComponentsStub).to.be.calledWith(1);
       expect(submissionEndDateStub).to.be.calledWith(1);
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
