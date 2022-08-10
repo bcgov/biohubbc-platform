@@ -20,8 +20,23 @@ export interface IGetSpatialTransformRecord {
   transform: string;
 }
 
-export interface ITransformRow {
+export interface IGetSecurityTransformRecord {
+  security_transform_id: number;
+  name: string;
+  description: string | null;
+  notes: string | null;
+  transform: string;
+}
+
+export interface ITransformSpatialRow {
   result_data: FeatureCollection;
+}
+
+export interface ITransformSecureRow {
+  spatial_component: {
+    spatial_data: FeatureCollection;
+    submission_spatial_component_id: number;
+  };
 }
 
 export interface ISubmissionSpatialComponent {
@@ -111,6 +126,29 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
+   *get security transform records
+   *
+   * @return {*}  {Promise<IGetSecurityTransformRecord[]>}
+   * @memberof SpatialRepository
+   */
+  async getSecurityTransformRecords(): Promise<IGetSecurityTransformRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        security_transform_id,
+        name,
+        description,
+        notes,
+        transform
+      FROM
+        security_transform;
+    `;
+
+    const response = await this.connection.sql<IGetSecurityTransformRecord>(sqlStatement);
+
+    return response.rows;
+  }
+
+  /**
    * Insert record of transform id used for submission spatial component record
    *
    * @param {number} spatialTransformId
@@ -149,6 +187,44 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
+   * Insert record of transform id used for submission security component record
+   *
+   * @param {number} securityTransformId
+   * @param {number} submissionSpatialComponentId
+   * @return {*}  {Promise<{ spatial_transform_submission_id: number }>}
+   * @memberof SpatialRepository
+   */
+  async insertSecurityTransformSubmissionRecord(
+    securityTransformId: number,
+    submissionSpatialComponentId: number
+  ): Promise<{ security_transform_submission_id: number }> {
+    const sqlStatement = SQL`
+        INSERT INTO security_transform_submission (
+          security_transform_id,
+          submission_spatial_component_id
+        ) VALUES (
+          ${securityTransformId},
+          ${submissionSpatialComponentId}
+        )
+        RETURNING
+          security_transform_submission_id;
+      `;
+
+    const response = await this.connection.sql<{ security_transform_submission_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError(
+        'Failed to insert spatial transform submission id and submission spatial component id',
+        [
+          'SpatialRepository->insertSecurityTransformSubmissionRecord',
+          'rowCount was null or undefined, expected rowCount >= 1'
+        ]
+      );
+    }
+    return response.rows[0];
+  }
+
+  /**
    * Run Spatial Transform with transform string on submissionId
    *
    * @param {number} submissionId
@@ -156,7 +232,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ITransformRow[]>}
    * @memberof SpatialRepository
    */
-  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformRow[]> {
+  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
     if (response.rowCount <= 0) {
@@ -165,6 +241,20 @@ export class SpatialRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount >= 1'
       ]);
     }
+
+    return response.rows;
+  }
+
+  /**
+   * Run Security Transform with transform string on submissionId
+   *
+   * @param {number} submissionId
+   * @param {string} transform
+   * @return {*}  {Promise<ITransformRow[]>}
+   * @memberof SpatialRepository
+   */
+  async runSecurityTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSecureRow[]> {
+    const response = await this.connection.query(transform, [submissionId]);
 
     return response.rows;
   }
@@ -222,6 +312,40 @@ export class SpatialRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission spatial component details', [
         'SpatialRepository->insertSubmissionSpatialComponent',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+    return response.rows[0];
+  }
+
+  /**
+   * Insert given transformed data into Spatial Component Table
+   *
+   * @param {number} submissionId
+   * @param {Feature[]} transformedData
+   * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
+   * @memberof SpatialRepository
+   */
+  async updateSubmissionSpatialComponentWithSecurity(
+    submissionSpatialComponentId: number,
+    transformedData: object
+  ): Promise<{ submission_spatial_component_id: number }> {
+    const sqlStatement = SQL`
+        UPDATE
+          submission_spatial_component
+        SET
+          secured_spatial_component =  ${transformedData}
+        WHERE
+          submission_spatial_component_id = ${submissionSpatialComponentId}
+        RETURNING
+          submission_spatial_component_id;
+      `;
+
+    const response = await this.connection.sql<{ submission_spatial_component_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to update submission spatial component details', [
+        'SpatialRepository->updateSubmissionSpatialComponentWithSecurity',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -316,12 +440,36 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
-  async deleteSpatialComponentsTransformRefsBySubmissionId(
+  async deleteSpatialComponentsSpatialTransformRefsBySubmissionId(
     submission_id: number
   ): Promise<{ submission_id: number }[]> {
     const sqlStatement = SQL`
       DELETE FROM
         spatial_transform_submission
+      WHERE
+        submission_spatial_component_id IN (
+          SELECT
+            submission_spatial_component_id
+          FROM
+            submission_spatial_component
+          WHERE
+            submission_id=${submission_id}
+        )
+      RETURNING
+        ${submission_id};
+    `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    return response.rows;
+  }
+
+  async deleteSpatialComponentsSecurityTransformRefsBySubmissionId(
+    submission_id: number
+  ): Promise<{ submission_id: number }[]> {
+    const sqlStatement = SQL`
+      DELETE FROM
+        security_transform_submission
       WHERE
         submission_spatial_component_id IN (
           SELECT
