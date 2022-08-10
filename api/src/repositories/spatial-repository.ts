@@ -319,7 +319,7 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Insert given transformed data into Spatial Component Table
+   * Update secured spatial column with the transformed spatial data
    *
    * @param {number} submissionId
    * @param {Feature[]} transformedData
@@ -406,6 +406,31 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
+   *Function to support findSpatialComponentsByCriteria function
+   *
+   * @param {Feature} boundary
+   * @param {string} geoColumn
+   * @return {*}  {SQLStatement}
+   * @memberof SpatialRepository
+   */
+  _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
+    return SQL`
+      public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
+        public.geography(
+          public.ST_Force2D(
+            public.ST_SetSRID(
+              public.ST_Force2D(
+                public.ST_GeomFromGeoJSON('${JSON.stringify(boundary.geometry)}')
+              ),
+              4326
+            )
+          )
+        )
+      )
+    `);
+  }
+
+  /**
    * Query spatial components by given submission ID
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
@@ -425,6 +450,13 @@ export class SpatialRepository extends BaseRepository {
     return spatialComponentResponse.rows[0];
   }
 
+  /**
+   *Deletes spatial components in a submission id before updating it with new data
+   *
+   * @param {number} submission_id
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SpatialRepository
+   */
   async deleteSpatialComponentsBySubmissionId(submission_id: number): Promise<{ submission_id: number }[]> {
     const sqlStatement = SQL`
       DELETE FROM
@@ -440,6 +472,13 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   *remove references in spatial_transform_submission table
+   *
+   * @param {number} submission_id
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SpatialRepository
+   */
   async deleteSpatialComponentsSpatialTransformRefsBySubmissionId(
     submission_id: number
   ): Promise<{ submission_id: number }[]> {
@@ -464,6 +503,13 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   *remove references in security_transform_submission table
+   *
+   * @param {number} submission_id
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SpatialRepository
+   */
   async deleteSpatialComponentsSecurityTransformRefsBySubmissionId(
     submission_id: number
   ): Promise<{ submission_id: number }[]> {
@@ -486,22 +532,5 @@ export class SpatialRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     return response.rows;
-  }
-
-  _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
-    return SQL`
-      public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
-        public.geography(
-          public.ST_Force2D(
-            public.ST_SetSRID(
-              public.ST_Force2D(
-                public.ST_GeomFromGeoJSON('${JSON.stringify(boundary.geometry)}')
-              ),
-              4326
-            )
-          )
-        )
-      )
-    `);
   }
 }
