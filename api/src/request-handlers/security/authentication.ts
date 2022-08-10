@@ -102,9 +102,5 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
  * @return {*} {Promise<true>}
  */
 export const authenticateRequestOptional = async function (req: Request): Promise<true> {
-  try {
-    return authenticateRequest(req).catch(() => true);
-  } catch (error) {
-    return true;
-  }
+  return authenticateRequest(req).catch(() => true);
 };
