@@ -50,7 +50,8 @@ export class DarwinCoreService extends DBService {
       await this.submissionService.setSubmissionEndDateById(submission_id);
 
       //Delete scraped spatial components table details
-      await this.spatialService.deleteSpatialComponentsTransformRefsBySubmissionId(submission_id);
+      await this.spatialService.deleteSpatialComponentsSpatialTransformRefsBySubmissionId(submission_id);
+      await this.spatialService.deleteSpatialComponentsSecurityTransformRefsBySubmissionId(submission_id);
       await this.spatialService.deleteSpatialComponentsBySubmissionId(submission_id);
     }
 
@@ -226,6 +227,25 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
+      return;
+    }
+
+    //Step 10: Run security transform
+    try {
+      await this.spatialService.runSecurityTransforms(submissionId);
+      await this.submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
+      );
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
       return;
     }
   }

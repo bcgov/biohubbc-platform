@@ -491,8 +491,11 @@ describe('DarwinCoreService', () => {
         .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
         .resolves({ submission_id: 1 });
 
-      const deleteSpatialComponentsTransformRefsBySubmissionIdStub = sinon
-        .stub(SpatialService.prototype, 'deleteSpatialComponentsTransformRefsBySubmissionId')
+      const deleteSpatialComponentsSpatialTransformRefsBySubmissionIdStub = sinon
+        .stub(SpatialService.prototype, 'deleteSpatialComponentsSpatialTransformRefsBySubmissionId')
+        .resolves([]);
+      const deleteSpatialComponentsSecurityTransformRefsBySubmissionIdStub = sinon
+        .stub(SpatialService.prototype, 'deleteSpatialComponentsSecurityTransformRefsBySubmissionId')
         .resolves([]);
       const deleteSpatialComponentsStub = sinon
         .stub(SpatialService.prototype, 'deleteSpatialComponentsBySubmissionId')
@@ -511,7 +514,8 @@ describe('DarwinCoreService', () => {
 
       await darwinCoreService.intake(multerFile, 'dataPackageId');
       expect(getSubmissionStub).to.be.calledWith('dataPackageId');
-      expect(deleteSpatialComponentsTransformRefsBySubmissionIdStub).to.be.calledWith(1);
+      expect(deleteSpatialComponentsSpatialTransformRefsBySubmissionIdStub).to.be.calledWith(1);
+      expect(deleteSpatialComponentsSecurityTransformRefsBySubmissionIdStub).to.be.calledWith(1);
       expect(deleteSpatialComponentsStub).to.be.calledWith(1);
       expect(submissionEndDateStub).to.be.calledWith(1);
       expect(createStub).to.be.calledOnceWith(multerFile, 'dataPackageId');
@@ -1239,6 +1243,103 @@ describe('DarwinCoreService', () => {
         } catch (actualError) {
           expect(runSpatialTransformsStub).to.be.calledWith(1);
           expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE);
+        }
+      });
+    });
+
+    describe('Step 10: Run security transforms and update relevant records', () => {
+      afterEach(() => {
+        sinon.restore();
+      });
+
+      it('should throw an error', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+        const multerFile = {
+          originalname: 'file1.txt',
+          buffer: Buffer.from('file1data')
+        } as unknown as Express.Multer.File;
+
+        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').resolves({
+          dataPackageId: 'dataPackageId',
+          submissionId: 1
+        });
+
+        const insertSubmissionStatusAndMessageStub = sinon
+          .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+          .resolves();
+        sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+        sinon.stub(DarwinCoreService.prototype, 'uploadRecordToS3').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+        sinon
+          .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+          .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
+        sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+        sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
+
+        const runSecurityTransformsStub = sinon
+          .stub(SpatialService.prototype, 'runSecurityTransforms')
+          .throws(new ApiGeneralError('error'));
+
+        try {
+          await darwinCoreService.create(multerFile, 'dataPackageId');
+          expect.fail();
+        } catch (actualError) {
+          expect(runSecurityTransformsStub).to.have.been.calledWith(1);
+          expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+            1,
+            SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
+            SUBMISSION_MESSAGE_TYPE.ERROR,
+            'error'
+          );
+        }
+      });
+
+      it('should set submission status', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+        const multerFile = {
+          originalname: 'file1.txt',
+          buffer: Buffer.from('file1data')
+        } as unknown as Express.Multer.File;
+
+        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage').resolves({
+          dataPackageId: 'dataPackageId',
+          submissionId: 1
+        });
+
+        sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+        const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+        sinon.stub(DarwinCoreService.prototype, 'uploadRecordToS3').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'tempSecureSubmission').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
+        sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+        sinon
+          .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+          .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
+        sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+        const runSpatialTransformsStub = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
+        const runSecurityTransformsStub = sinon.stub(SpatialService.prototype, 'runSecurityTransforms').resolves();
+
+        try {
+          await darwinCoreService.create(multerFile, 'dataPackageId');
+          expect.fail();
+        } catch (actualError) {
+          expect(runSpatialTransformsStub).to.be.calledWith(1);
+          expect(runSecurityTransformsStub).to.be.calledWith(1);
+
+          expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE);
         }
       });
     });
