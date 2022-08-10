@@ -1,9 +1,27 @@
+import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Models } from '../models';
-import { Queries } from '../queries';
+import { IGetRoles, UserRepository } from '../repositories/user-repository';
 import { DBService } from './db-service';
 
 export class UserService extends DBService {
+  userRepository: UserRepository;
+
+  constructor(connection: IDBConnection) {
+    super(connection);
+
+    this.userRepository = new UserRepository(connection);
+  }
+  /**
+   * Get all system roles in db
+   *
+   * @return {*}  {Promise<IGetRoles[]>}
+   * @memberof UserService
+   */
+  async getRoles(): Promise<IGetRoles[]> {
+    return this.userRepository.getRoles();
+  }
+
   /**
    * Fetch a single system user by their ID.
    *
@@ -12,11 +30,13 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async getUserById(systemUserId: number): Promise<Models.user.UserObject | null> {
-    const sqlStatement = Queries.users.getUserByIdSQL(systemUserId);
+    const response = await this.userRepository.getUserById(systemUserId);
 
-    const response = await this.connection.sql(sqlStatement);
+    if (!response) {
+      return null;
+    }
 
-    return (response?.rows?.[0] && new Models.user.UserObject(response.rows[0])) || null;
+    return new Models.user.UserObject(response);
   }
 
   /**
@@ -27,11 +47,13 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async getUserByIdentifier(userIdentifier: string): Promise<Models.user.UserObject | null> {
-    const sqlStatement = Queries.users.getUserByUserIdentifierSQL(userIdentifier);
+    const response = await this.userRepository.getUserByIdentifier(userIdentifier);
 
-    const response = await this.connection.sql(sqlStatement);
+    if (response.length !== 1) {
+      return null;
+    }
 
-    return (response?.rows?.[0] && new Models.user.UserObject(response.rows[0])) || null;
+    return new Models.user.UserObject(response[0]);
   }
 
   /**
@@ -45,17 +67,9 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async addSystemUser(userIdentifier: string, identitySource: string): Promise<Models.user.UserObject> {
-    const addSystemUserSQLStatement = Queries.users.addSystemUserSQL(userIdentifier, identitySource);
+    const response = await this.userRepository.addSystemUser(userIdentifier, identitySource);
 
-    const response = await this.connection.sql(addSystemUserSQLStatement);
-
-    const userObject = (response?.rows?.[0] && new Models.user.UserObject(response.rows[0])) || null;
-
-    if (!userObject) {
-      throw new ApiExecuteSQLError('Failed to insert system user');
-    }
-
-    return userObject;
+    return new Models.user.UserObject(response);
   }
 
   /**
@@ -65,11 +79,9 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async listSystemUsers(): Promise<Models.user.UserObject[]> {
-    const getUserListSQLStatement = Queries.users.getUserListSQL();
+    const response = await this.userRepository.listSystemUsers();
 
-    const getUserListResponse = await this.connection.sql(getUserListSQLStatement);
-
-    return getUserListResponse.rows.map((row) => new Models.user.UserObject(row));
+    return response.map((row) => new Models.user.UserObject(row));
   }
 
   /**
@@ -120,34 +132,20 @@ export class UserService extends DBService {
    * Activates an existing system user that had been deactivated (soft deleted).
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<Models.user.UserObject>)}
    * @memberof UserService
    */
   async activateSystemUser(systemUserId: number) {
-    const sqlStatement = Queries.users.activateSystemUserSQL(systemUserId);
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to activate system user');
-    }
+    await this.userRepository.activateSystemUser(systemUserId);
   }
 
   /**
    * Deactivates an existing system user (soft delete).
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<Models.user.UserObject>)}
    * @memberof UserService
    */
   async deactivateSystemUser(systemUserId: number) {
-    const sqlStatement = Queries.users.deactivateSystemUserSQL(systemUserId);
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to deactivate system user');
-    }
+    await this.userRepository.deactivateSystemUser(systemUserId);
   }
 
   /**
@@ -157,13 +155,7 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async deleteUserSystemRoles(systemUserId: number) {
-    const sqlStatement = Queries.users.deleteAllSystemRolesSQL(systemUserId);
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to delete user system roles');
-    }
+    await this.userRepository.deleteUserSystemRoles(systemUserId);
   }
 
   /**
@@ -174,12 +166,6 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async addUserSystemRoles(systemUserId: number, roleIds: number[]) {
-    const sqlStatement = Queries.users.postSystemRolesSQL(systemUserId, roleIds);
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to insert user system roles');
-    }
+    await this.userRepository.addUserSystemRoles(systemUserId, roleIds);
   }
 }

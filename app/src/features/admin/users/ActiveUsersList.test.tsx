@@ -2,7 +2,6 @@ import { render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import React from 'react';
 import { Router } from 'react-router';
-import { codes } from 'test-helpers/code-helpers';
 import ActiveUsersList, { IActiveUsersListProps } from './ActiveUsersList';
 
 const history = createMemoryHistory();
@@ -20,8 +19,7 @@ describe('ActiveUsersList', () => {
     const mockGetUsers = jest.fn();
     const { getByText } = renderContainer({
       activeUsers: [],
-      codes: codes,
-      getUsers: mockGetUsers
+      refresh: mockGetUsers
     });
 
     await waitFor(() => {
@@ -41,8 +39,7 @@ describe('ActiveUsersList', () => {
           role_names: ['role 1', 'role 2']
         }
       ],
-      codes: codes,
-      getUsers: mockGetUsers
+      refresh: mockGetUsers
     });
 
     await waitFor(() => {
@@ -62,8 +59,7 @@ describe('ActiveUsersList', () => {
           role_names: []
         }
       ],
-      codes: codes,
-      getUsers: mockGetUsers
+      refresh: mockGetUsers
     });
 
     await waitFor(() => {
@@ -75,8 +71,7 @@ describe('ActiveUsersList', () => {
     const mockGetUsers = jest.fn();
     const { getByTestId } = renderContainer({
       activeUsers: [],
-      codes: codes,
-      getUsers: mockGetUsers
+      refresh: mockGetUsers
     });
 
     await waitFor(() => {

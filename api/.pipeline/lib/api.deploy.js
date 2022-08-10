@@ -33,6 +33,8 @@ const apiDeploy = (settings) => {
         APP_HOST: phases[phase].appHost,
         NODE_ENV: phases[phase].env || 'dev',
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
+        ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
+        S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
         KEYCLOAK_ADMIN_USERNAME: 'biohubbc-svc',
         KEYCLOAK_SECRET: 'keycloak-admin-password',

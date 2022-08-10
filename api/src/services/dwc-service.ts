@@ -1,5 +1,4 @@
 import { XMLParser } from 'fast-xml-parser';
-import { ES_INDEX } from '../constants/database';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
@@ -10,6 +9,7 @@ import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
+import { ElasticSearchIndices } from './es-service';
 import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
@@ -50,7 +50,8 @@ export class DarwinCoreService extends DBService {
       await this.submissionService.setSubmissionEndDateById(submission_id);
 
       //Delete scraped spatial components table details
-      await this.spatialService.deleteSpatialComponentsTransformRefsBySubmissionId(submission_id);
+      await this.spatialService.deleteSpatialComponentsSpatialTransformRefsBySubmissionId(submission_id);
+      await this.spatialService.deleteSpatialComponentsSecurityTransformRefsBySubmissionId(submission_id);
       await this.spatialService.deleteSpatialComponentsBySubmissionId(submission_id);
     }
 
@@ -228,6 +229,25 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+
+    //Step 10: Run security transform
+    try {
+      await this.spatialService.runSecurityTransforms(submissionId);
+      await this.submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
+      );
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+      return;
+    }
   }
 
   /**
@@ -387,8 +407,8 @@ export class DarwinCoreService extends DBService {
   async transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    if (!submissionRecord.eml_source) {
-      throw new ApiGeneralError('The eml source is not available');
+    if (!submissionRecord.source_transform_id) {
+      throw new ApiGeneralError('The source_transform_id is not available');
     }
 
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
@@ -502,7 +522,7 @@ export class DarwinCoreService extends DBService {
 
     return esClient.index({
       id: dataPackageId,
-      index: ES_INDEX.EML,
+      index: ElasticSearchIndices.EML,
       document: convertedEML
     });
   }
@@ -550,6 +570,6 @@ export class DarwinCoreService extends DBService {
   async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
     const esClient = await this.getEsClient();
 
-    return esClient.delete({ id: dataPackageId, index: ES_INDEX.EML });
+    return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
   }
 }
