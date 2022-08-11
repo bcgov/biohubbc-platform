@@ -67,7 +67,6 @@ const MapPage: React.FC = () => {
     }
   })
 
-
   const getSearchBoundary = (boundary1?: Feature<Polygon>, boundary2?: Feature<Polygon>) => {
     return (boundary2 && boundary1 && intersect(boundary2, boundary1)) || boundary1 || boundary2 || ALL_OF_BC_BOUNDARY;
   };
