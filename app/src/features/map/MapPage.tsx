@@ -60,9 +60,9 @@ const MapPage: React.FC = () => {
   useEffect(() => {
     if (!loadedFromUrl.current) {
       if (drawnBoundary) {
-        loadedFromUrl.current = true
-        const searchBoundary = getSearchBoundary(mapViewBoundary, drawnBoundary)
-        mapDataLoader.refresh(searchBoundary, type, zoom) 
+        loadedFromUrl.current = true;
+        const searchBoundary = getSearchBoundary(mapViewBoundary, drawnBoundary);
+        mapDataLoader.refresh(searchBoundary, type, zoom);
       }
     }
   })
