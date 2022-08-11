@@ -59,8 +59,8 @@ const MapPage: React.FC = () => {
 
   useEffect(() => {
     if (!loadedFromUrl.current) {
+      loadedFromUrl.current = true;
       if (drawnBoundary) {
-        loadedFromUrl.current = true;
         const searchBoundary = getSearchBoundary(mapViewBoundary, drawnBoundary);
         mapDataLoader.refresh(searchBoundary, type, zoom);
       }
