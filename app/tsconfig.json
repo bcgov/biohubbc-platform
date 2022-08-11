@@ -33,6 +33,7 @@
     ],
   },
   "include": [
-    "src"
+    "src",
+    "font.d.ts"
   ]
 }
