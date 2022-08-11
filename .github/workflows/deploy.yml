@@ -34,6 +34,7 @@ jobs:
   scaleDownPods:
     name: Scale down the pods for this PR
     runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
@@ -52,6 +53,7 @@ jobs:
   checkoutRepo:
     name: Checkout and cache target branch
     runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
