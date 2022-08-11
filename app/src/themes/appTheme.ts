@@ -30,7 +30,8 @@ const appTheme = createMuiTheme({
   typography: {
     fontFamily: ['BCSans', 'Verdana', 'Arial', 'sans-serif'].join(',')
   },
-  /*overrides: {
+  /* @TODO: Fix these
+  overrides: {
     MuiTypography: {
       // https://material-ui.com/api/typography/
       h1: {
