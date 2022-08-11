@@ -51,9 +51,9 @@ export interface ISubmissionSpatialComponent {
 }
 
 export interface ISpatialComponentsSearchCriteria {
-  type: string[];
-  datasetID?: string[];
   boundary: Feature;
+  type?: string[];
+  datasetID?: string[];
 }
 
 export type EmptyObject = Record<string, never>;
@@ -399,9 +399,10 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.secured_spatial_component');
 
         if (criteria.type?.length) {
+          const searchTypes = criteria.type;
           // Append AND where clause for criteria.type
           qb1.where((qb2) => {
-            for (const type of criteria.type) {
+            for (const type of searchTypes) {
               // Append OR clause for each item in criteria.type array
               qb2.or.where((qb3) => {
                 qb3.whereRaw(
@@ -413,11 +414,12 @@ export class SpatialRepository extends BaseRepository {
         }
 
         if (criteria.datasetID?.length) {
+          const searchDatasetIDs = criteria.datasetID;
           // Append AND where clause for criteria.datasetID
           qb1.where((qb4) => {
             qb4.whereRaw(
               `submission_id in (select submission_id from submission where uuid in (${
-                "'" + criteria.datasetID?.join("','") + "'"
+                "'" + searchDatasetIDs.join("','") + "'"
               }))`
             );
           });
