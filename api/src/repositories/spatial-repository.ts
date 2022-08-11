@@ -56,12 +56,12 @@ export interface ISpatialComponentsSearchCriteria {
   boundary: Feature;
 }
 
-export type EmptyObject = Record<never, never>;
+export type EmptyObject = Record<string, never>;
 
 export interface ISubmissionSpatialSearchResponseRow {
   spatial_component: {
-    spatial_data: FeatureCollection | EmptyObject;
     submission_spatial_component_id: number;
+    spatial_data: FeatureCollection | EmptyObject;
   };
 }
 
