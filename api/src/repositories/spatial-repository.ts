@@ -392,6 +392,14 @@ export class SpatialRepository extends BaseRepository {
     return this._findSpatialComponentsByCriteria(criteria);
   }
 
+  /**
+   * Query builder to find spatial component by given criteria, specifically for admin users that bypass all security
+   * rules.
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
+   * @memberof SpatialRepository
+   */
   async _findSpatialComponentsByCriteriaAsAdminUser(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
