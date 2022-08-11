@@ -174,8 +174,8 @@ export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature<
  * @param {unknown} obj
  * @return {*}  {boolean} `true` if `obj` is an object, `false` otherwise.
  */
-export const isObject = (obj: unknown): boolean => {
-  return typeof obj === 'object' && obj !== null;
+export const isObject = (obj: unknown): obj is Record<string, unknown> => {
+  return !!(obj && typeof obj === 'object');
 };
 
 /**

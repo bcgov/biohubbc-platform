@@ -15,9 +15,11 @@ export interface IGetSearchResultsResponse {
   geometry: Feature[];
 }
 
+export type EmptyObject = Record<string, never>;
+
 export interface ISpatialData {
   submission_spatial_component_id: number;
-  spatial_data: FeatureCollection;
+  spatial_data: FeatureCollection | EmptyObject;
 }
 
 /**
