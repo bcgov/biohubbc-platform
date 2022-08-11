@@ -234,9 +234,12 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       <Paper>
         <Toolbar disableGutters>
           <Grid
-            justify="space-between" // Add it here :)
-            container
-            alignItems="center">
+            sx={{
+              justify: "space-between",
+              // @TODO remove? // container: true,
+              alignItems: "center"
+            }}
+          >
             <Grid item>
               <Box px={2}>
                 <Typography variant="h2">Active Users ({activeUsers?.length || 0})</Typography>
@@ -334,12 +337,12 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
         {activeUsers?.length > 0 && (
           <TablePagination
             rowsPerPageOptions={[5, 10, 15, 20]}
-            component="div"
+            // component="div"
             count={activeUsers.length}
             rowsPerPage={rowsPerPage}
             page={page}
-            onChangePage={(event: unknown, newPage: number) => handleChangePage(event, newPage, setPage)}
-            onChangeRowsPerPage={(event: React.ChangeEvent<HTMLInputElement>) =>
+            onPageChange={(event: unknown, newPage: number) => handleChangePage(event, newPage, setPage)}
+            onRowsPerPageChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               handleChangeRowsPerPage(event, setPage, setRowsPerPage)
             }
           />
