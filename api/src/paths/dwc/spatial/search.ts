@@ -103,13 +103,7 @@ export function searchSpatialComponents(): RequestHandler {
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
 
-    let connection;
-
-    if (req['keycloak_token']) {
-      connection = getDBConnection(req['keycloak_token']);
-    } else {
-      connection = getAPIUserDBConnection();
-    }
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     try {
       await connection.open();
