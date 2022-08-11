@@ -392,7 +392,7 @@ describe('SpatialRepository', () => {
     });
   });
 
-  describe('findSpatialComponentsByCriteria', () => {
+  describe('_findSpatialComponentsByCriteriaAsAdminUser', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -412,7 +412,7 @@ describe('SpatialRepository', () => {
         boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
       };
 
-      const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
+      const response = await spatialRepository._findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
 
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
@@ -434,7 +434,55 @@ describe('SpatialRepository', () => {
         boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
       };
 
-      const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
+      const response = await spatialRepository._findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
+
+      expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
+    });
+  });
+
+  describe('_findSpatialComponentsByCriteria', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with minimal search criteria', async () => {
+      const mockResponseRow1 = { submission_spatial_component_id: 1 } as unknown as ISubmissionSpatialComponent;
+      const mockResponseRow2 = { submission_spatial_component_id: 2 } as unknown as ISubmissionSpatialComponent;
+      const mockQueryResponse = { rowCount: 2, rows: [mockResponseRow1, mockResponseRow2] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
+        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+      };
+
+      const response = await spatialRepository._findSpatialComponentsByCriteria(mockSearchCriteria);
+
+      expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
+    });
+
+    it('should succeed with maximal search criteria', async () => {
+      const mockResponseRow1 = { submission_spatial_component_id: 1 } as unknown as ISubmissionSpatialComponent;
+      const mockResponseRow2 = { submission_spatial_component_id: 2 } as unknown as ISubmissionSpatialComponent;
+      const mockQueryResponse = { rowCount: 2, rows: [mockResponseRow1, mockResponseRow2] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
+        type: ['Occurrence', 'Boundary'],
+        datasetID: ['111-111-111', '222-222-222'],
+        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+      };
+
+      const response = await spatialRepository._findSpatialComponentsByCriteria(mockSearchCriteria);
 
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });

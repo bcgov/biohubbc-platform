@@ -38,21 +38,7 @@ describe('UserService', () => {
       sinon.restore();
     });
 
-    it('returns null if the query response has no rows', async function () {
-      const mockDBConnection = getMockDBConnection();
-
-      const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserById');
-      mockUserRepository.resolves(undefined);
-
-      const userService = new UserService(mockDBConnection);
-
-      const result = await userService.getUserById(1);
-
-      expect(result).to.be.null;
-      expect(mockUserRepository).to.have.been.calledOnce;
-    });
-
-    it('returns a UserObject for the first row of the response', async function () {
+    it('returns a UserObject', async function () {
       const mockDBConnection = getMockDBConnection();
 
       const mockResponseRow = { system_user_id: 123 };
@@ -254,45 +240,6 @@ describe('UserService', () => {
       expect(getUserByIdentifierStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
       expect(activateSystemUserStub).not.to.have.been.called;
-    });
-
-    it('throws an error if it fails to get the newly activated user', async () => {
-      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
-
-      const existingSystemUser = new Models.user.UserObject({
-        system_user_id: 2,
-        user_identifier: SYSTEM_IDENTITY_SOURCE.IDIR,
-        record_end_date: '2021-11-22',
-        role_ids: [1],
-        role_names: ['Editor']
-      });
-      const getUserByIdentifierStub = sinon
-        .stub(UserService.prototype, 'getUserByIdentifier')
-        .resolves(existingSystemUser);
-
-      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
-
-      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
-
-      const activatedSystemUser = null;
-      const getUserByIdStub = sinon.stub(UserService.prototype, 'getUserById').resolves(activatedSystemUser);
-
-      const userIdentifier = 'username';
-      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
-
-      const userService = new UserService(mockDBConnection);
-
-      try {
-        await userService.ensureSystemUser(userIdentifier, identitySource);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiError).message).to.equal('Failed to ensure system user');
-      }
-
-      expect(getUserByIdentifierStub).to.have.been.calledOnce;
-      expect(addSystemUserStub).not.to.have.been.called;
-      expect(activateSystemUserStub).to.have.been.calledOnce;
-      expect(getUserByIdStub).to.have.been.calledOnce;
     });
 
     it('gets an existing system user that is not already active and re-activates it', async () => {

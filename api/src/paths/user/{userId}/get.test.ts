@@ -38,30 +38,6 @@ describe('user', () => {
       }
     });
 
-    it('should throw a 400 error if it fails to get the system user', async () => {
-      const dbConnectionObj = getMockDBConnection();
-
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-      mockReq.params = {
-        userId: '1'
-      };
-
-      sinon.stub(UserService.prototype, 'getUserById').resolves(null);
-
-      try {
-        const requestHandler = user.getUserById();
-
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as HTTPError).status).to.equal(400);
-        expect((actualError as HTTPError).message).to.equal('Failed to get system user');
-      }
-    });
-
     it('finds user by Id and returns 200 and requestHandler on success', async () => {
       const dbConnectionObj = getMockDBConnection();
 

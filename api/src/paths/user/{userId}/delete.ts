@@ -69,10 +69,6 @@ export function removeSystemUser(): RequestHandler {
 
       const usrObject = await userService.getUserById(userId);
 
-      if (!usrObject) {
-        throw new HTTP400('Failed to get system user');
-      }
-
       if (usrObject.record_end_date) {
         throw new HTTP400('The system user is not active');
       }

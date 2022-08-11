@@ -1,7 +1,10 @@
 import { Feature, FeatureCollection } from 'geojson';
-import SQL, { SQLStatement } from 'sql-template-strings';
+import { Knex } from 'knex';
+import SQL from 'sql-template-strings';
+import { SYSTEM_ROLE } from '../constants/roles';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { UserService } from '../services/user-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -371,6 +374,74 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    const userService = new UserService(this.connection);
+
+    const userObject = await userService.getUserById(this.connection.systemUserId());
+
+    if (
+      [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
+        userObject.role_names.includes(systemRole)
+      )
+    ) {
+      // Fetch all non-secure records that match the search criteria
+      return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);
+    }
+
+    // Fetch all records (non-secure and/or secure, depending on the security rules applied and any user exceptions)
+    // that match the search criteria
+    return this._findSpatialComponentsByCriteria(criteria);
+  }
+
+  async _findSpatialComponentsByCriteriaAsAdminUser(
+    criteria: ISpatialComponentsSearchCriteria
+  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .with('with_filtered_spatial_component', (qb1) => {
+        // Get the spatial components that match the search filters
+        qb1.select().from('submission_spatial_component as ssc');
+
+        if (criteria.type?.length) {
+          this._whereTypeIn(criteria.type, qb1);
+        }
+
+        if (criteria.datasetID?.length) {
+          this._whereDatasetIDIn(criteria.datasetID, qb1);
+        }
+
+        this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
+      })
+      .select(
+        // Select the non-secure spatial component from the search results
+        knex.raw(
+          `
+            jsonb_build_object(
+              'submission_spatial_component_id',
+                wfsc.submission_spatial_component_id,
+              'spatial_data',
+                wfsc.spatial_component
+            ) spatial_component
+          `
+        )
+      )
+      .from(knex.raw('with_filtered_spatial_component as wfsc'));
+
+    const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+
+    return response.rows;
+  }
+
+  /**
+   * Query builder to find spatial component by given criteria.
+   *
+   * @param {ISpatialComponentsSearchCriteria} criteria
+   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
+   * @memberof SpatialRepository
+   */
+  async _findSpatialComponentsByCriteria(
+    criteria: ISpatialComponentsSearchCriteria
+  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -399,44 +470,21 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.secured_spatial_component');
 
         if (criteria.type?.length) {
-          const searchTypes = criteria.type;
-          // Append AND where clause for criteria.type
-          qb1.where((qb2) => {
-            for (const type of searchTypes) {
-              // Append OR clause for each item in criteria.type array
-              qb2.or.where((qb3) => {
-                qb3.whereRaw(
-                  `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`
-                );
-              });
-            }
-          });
+          this._whereTypeIn(criteria.type, qb1);
         }
 
         if (criteria.datasetID?.length) {
-          const searchDatasetIDs = criteria.datasetID;
-          // Append AND where clause for criteria.datasetID
-          qb1.where((qb4) => {
-            qb4.whereRaw(
-              `submission_id in (select submission_id from submission where uuid in (${
-                "'" + searchDatasetIDs.join("','") + "'"
-              }))`
-            );
-          });
+          this._whereDatasetIDIn(criteria.datasetID, qb1);
         }
 
-        // Append AND where clause for criteria.boundary
-        const sqlStatement1 = this._whereBoundaryIntersects(criteria.boundary, 'geography');
-        queryBuilder.where((qb5) => {
-          qb5.whereRaw(sqlStatement1.sql, sqlStatement1.values);
-        });
+        this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
         // Build an array of the users spatial security transform exceptions
         qb6
           .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
           .from('system_user_security_exception as suse')
-          .where('suse.system_user_id', 1);
+          .where('suse.system_user_id', this.connection.systemUserId());
       })
       .select(
         // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
@@ -473,15 +521,49 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Function to support findSpatialComponentsByCriteria function
+   * Append where clause condition for spatial component type.
+   *
+   * @param {string[]} types
+   * @param {Knex.QueryBuilder} qb1
+   * @memberof SpatialRepository
+   */
+  _whereTypeIn(types: string[], qb1: Knex.QueryBuilder) {
+    // Append AND where clause for types
+    qb1.where((qb2) => {
+      for (const type of types) {
+        // Append OR clause for each item in types array
+        qb2.or.where((qb3) => {
+          qb3.whereRaw(`jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`);
+        });
+      }
+    });
+  }
+
+  /**
+   * Append where clause condition for spatial component parent dataset id.
+   *
+   * @param {string[]} datasetIDs
+   * @param {Knex.QueryBuilder} qb1
+   * @memberof SpatialRepository
+   */
+  _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
+    qb1.where((qb2) => {
+      qb2.whereRaw(
+        `submission_id in (select submission_id from submission where uuid in (${"'" + datasetIDs.join("','") + "'"}))`
+      );
+    });
+  }
+
+  /**
+   * Append where clause condition for spatial component boundary intersect.
    *
    * @param {Feature} boundary
    * @param {string} geoColumn
-   * @return {*}  {SQLStatement}
+   * @param {Knex.QueryBuilder} qb1
    * @memberof SpatialRepository
    */
-  _whereBoundaryIntersects(boundary: Feature, geoColumn: string): SQLStatement {
-    return SQL`
+  _whereBoundaryIntersects(boundary: Feature, geoColumn: string, qb1: Knex.QueryBuilder) {
+    const sqlStatement = SQL`
       public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
         public.geography(
           public.ST_Force2D(
@@ -495,6 +577,10 @@ export class SpatialRepository extends BaseRepository {
         )
       )
     `);
+
+    qb1.where((qb2) => {
+      qb2.whereRaw(sqlStatement.sql, sqlStatement.values);
+    });
   }
 
   /**
