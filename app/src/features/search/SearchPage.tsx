@@ -3,6 +3,7 @@ import Card from '@material-ui/core/Card';
 import Container from '@material-ui/core/Container';
 import Divider from '@material-ui/core/Divider';
 import Link from '@material-ui/core/Link';
+import Paper from '@material-ui/core/Paper';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
 import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
@@ -19,8 +20,9 @@ import qs from 'qs';
 import React, { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
+import { Theme } from '@material-ui/core';
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((theme: Theme) => ({
   searchResultTitle: {
     fontSize: '1.125rem'
   },
@@ -37,7 +39,11 @@ const useStyles = makeStyles(() => ({
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
     maxWidth: '92ch'
-  }
+  },
+  bodyContainer: {
+    paddingTop: theme.spacing(5),
+    paddingBottom: theme.spacing(5)
+  },
 }));
 
 const advancedSearchInitialValues: IAdvancedSearch = {
@@ -159,19 +165,23 @@ const SearchPage = () => {
   searchDataLoader.load(formikRef.current?.values.keywords || formikValues.keywords);
 
   return (
-    <Box py={5}>
+    <Box>
+      <Box component={Paper} py={5}>
+        <Container maxWidth="xl">
+          <Box mt={-1} mb={5}>
+            <Typography variant="h1">Find BioHub Datasets</Typography>
+          </Box>
+          <Formik<IAdvancedSearch>
+            innerRef={formikRef}
+            initialValues={formikValues}
+            onSubmit={handleSubmit}
+            onReset={handleReset}
+            enableReinitialize={true}>
+            <SearchComponent />
+          </Formik>
+        </Container>
+      </Box>
       <Container maxWidth="xl">
-        <Box mb={5}>
-          <Typography variant="h1">Find BioHub Datasets</Typography>
-        </Box>
-        <Formik<IAdvancedSearch>
-          innerRef={formikRef}
-          initialValues={formikValues}
-          onSubmit={handleSubmit}
-          onReset={handleReset}
-          enableReinitialize={true}>
-          <SearchComponent />
-        </Formik>
         <Box mt={6} mb={4}>
           {formikRef.current?.values.keywords && (
             <Typography variant="h2" className={classes.searchResultTitle}>
