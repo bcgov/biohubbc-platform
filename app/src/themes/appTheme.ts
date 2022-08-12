@@ -11,15 +11,46 @@ const appTheme = createTheme({
         @font-face {
           font-family: 'BCSans';
           font-style: normal;
-          font-display: swap;
           font-weight: 400;
-          src: local('BCSans'), local('BCSans-Regular'), url('./assets/fonts/BCSans/BCSans-Regular.woff') format('woff');
-        }`
-      ,
+          src: 
+            local('BCSans'),
+            url('./assets/fonts/BCSans/BCSans-Regular.woff2') format('woff2'),
+            url('./assets/fonts/BCSans/BCSans-Regular.woff') format('woff')
+            font-display: swap;
+        }
+        @font-face {
+          font-family: 'BCSans';
+          font-style: italic;
+          src: 
+            local('BCSans'),
+            url('./assets/fonts/BCSans/BCSans-Italic.woff2') format('woff2'),
+            url('./assets/fonts/BCSans/BCSans-Italic.woff') format('woff')
+            font-display: swap;
+        }
+        @font-face {
+          font-family: 'BCSans';
+          font-weight: 700;
+          src: 
+            local('BCSans'),
+            url('./assets/fonts/BCSans/BCSans-Bold.woff2') format('woff2'),
+            url('./assets/fonts/BCSans/BCSans-Bold.woff') format('woff')
+            font-display: swap;
+        }
+        @font-face {
+          font-family: 'BCSans';
+          font-style: italic;
+          font-weight: 700;
+          src: 
+            local('BCSans'),
+            url('./assets/fonts/BCSans/BCSans-BoldItalic.woff2') format('woff2'),
+            url('./assets/fonts/BCSans/BCSans-BoldItalic.woff2') format('woff')
+            font-display: swap;
+        }
+      `,
     },
     MuiTypography: {
       defaultProps: {
-        fontFamily: 'BCSans'
+        // fontFamily: 'BCSans'
       }
     }
   }
