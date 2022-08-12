@@ -12,8 +12,7 @@ export enum SYSTEM_IDENTITY_SOURCE {
 
 export enum SYSTEM_USER_ROLE_ID {
   SYSTEM_ADMINISTRATOR = 1,
-  CREATOR = 2,
-  DATA_ADMINISTRATOR = 3
+  DATA_ADMINISTRATOR = 2
 }
 
 const systemUsers = [
@@ -28,12 +27,12 @@ const systemUsers = [
   { identifier: 'rstens', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'zochampi', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'test1', type: SYSTEM_IDENTITY_SOURCE.BCEID, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'test2', type: SYSTEM_IDENTITY_SOURCE.BCEID, roleId: SYSTEM_USER_ROLE_ID.CREATOR },
+  { identifier: 'test2', type: SYSTEM_IDENTITY_SOURCE.BCEID },
   { identifier: 'test3', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'test4', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
   { identifier: 'test5', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.DATA_ADMINISTRATOR },
-  { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.CREATOR },
-  { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.CREATOR },
+  { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR },
+  { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR },
   { identifier: 'cypress', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR }
 ];
 
@@ -61,10 +60,12 @@ export async function seed(knex: Knex): Promise<void> {
         ${insertSystemUserSQL(systemUser.identifier, systemUser.type)}
       `);
 
-      // Add system administrator role
-      await knex.raw(`
+      if (systemUser.roleId) {
+        // Add system role
+        await knex.raw(`
         ${insertSystemUserRoleSQL(systemUser.identifier, systemUser.roleId)}
-      `);
+        `);
+      }
     }
   }
 }

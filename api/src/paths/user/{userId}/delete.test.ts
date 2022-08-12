@@ -32,29 +32,6 @@ describe('removeSystemUser', () => {
     }
   });
 
-  it('should throw a 400 error when it fails to get the system user', async () => {
-    const dbConnectionObj = getMockDBConnection();
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.params = { userId: '1' };
-    mockReq.body = { roles: [1, 2] };
-
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-    sinon.stub(UserService.prototype, 'getUserById').resolves(null);
-
-    try {
-      const requestHandler = delete_endpoint.removeSystemUser();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).message).to.equal('Failed to get system user');
-      expect((actualError as HTTPError).status).to.equal(400);
-    }
-  });
-
   it('should throw a 400 error when user record has expired', async () => {
     const dbConnectionObj = getMockDBConnection();
 

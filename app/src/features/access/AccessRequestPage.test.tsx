@@ -122,10 +122,10 @@ describe('AccessRequestPage', () => {
     const systemRoleListbox = within(getByRole('listbox'));
 
     await waitFor(() => {
-      expect(systemRoleListbox.getByText('Creator')).toBeInTheDocument();
+      expect(systemRoleListbox.getByText('System Administrator')).toBeInTheDocument();
     });
 
-    fireEvent.click(systemRoleListbox.getByText('Creator'));
+    fireEvent.click(systemRoleListbox.getByText('System Administrator'));
 
     fireEvent.click(getByText('Submit Request'));
 
@@ -179,10 +179,10 @@ describe('AccessRequestPage', () => {
     const systemRoleListbox = within(getByRole('listbox'));
 
     await waitFor(() => {
-      expect(systemRoleListbox.getByText('Creator')).toBeInTheDocument();
+      expect(systemRoleListbox.getByText('System Administrator')).toBeInTheDocument();
     });
 
-    fireEvent.click(systemRoleListbox.getByText('Creator'));
+    fireEvent.click(systemRoleListbox.getByText('System Administrator'));
 
     fireEvent.click(getByText('Submit Request'));
 
@@ -209,10 +209,10 @@ describe('AccessRequestPage', () => {
     const systemRoleListbox = within(getByRole('listbox'));
 
     await waitFor(() => {
-      expect(systemRoleListbox.getByText('Creator')).toBeInTheDocument();
+      expect(systemRoleListbox.getByText('System Administrator')).toBeInTheDocument();
     });
 
-    fireEvent.click(systemRoleListbox.getByText('Creator'));
+    fireEvent.click(systemRoleListbox.getByText('System Administrator'));
 
     fireEvent.click(getByText('Submit Request'));
 

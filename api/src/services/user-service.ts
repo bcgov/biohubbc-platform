@@ -26,15 +26,11 @@ export class UserService extends DBService {
    * Fetch a single system user by their ID.
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<Models.user.UserObject | null>)}
+   * @return {*}  {(Promise<Models.user.UserObject>)}
    * @memberof UserService
    */
-  async getUserById(systemUserId: number): Promise<Models.user.UserObject | null> {
+  async getUserById(systemUserId: number): Promise<Models.user.UserObject> {
     const response = await this.userRepository.getUserById(systemUserId);
-
-    if (!response) {
-      return null;
-    }
 
     return new Models.user.UserObject(response);
   }
@@ -119,13 +115,7 @@ export class UserService extends DBService {
     await this.activateSystemUser(userObject.id);
 
     // get the newly activated user
-    userObject = await this.getUserById(userObject.id);
-
-    if (!userObject) {
-      throw new ApiExecuteSQLError('Failed to ensure system user');
-    }
-
-    return userObject;
+    return this.getUserById(userObject.id);
   }
 
   /**

@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
-import { getAPIUserDBConnection } from '../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
@@ -13,7 +13,12 @@ export const GET: Operation = [searchSpatialComponents()];
 
 GET.apiDoc = {
   description: 'Searches for spatial components.',
-  tags: ['search'],
+  tags: ['spatial', 'search'],
+  security: [
+    {
+      OptionalBearer: []
+    }
+  ],
   parameters: [
     {
       in: 'query',
@@ -65,7 +70,20 @@ GET.apiDoc = {
                   minimum: 1
                 },
                 spatial_data: {
-                  ...GeoJSONFeatureCollection
+                  oneOf: [
+                    {
+                      ...GeoJSONFeatureCollection
+                    },
+                    {
+                      type: 'object',
+                      properties: {},
+                      additionalProperties: false,
+                      minProperties: 0,
+                      maxProperties: 0,
+                      description:
+                        'An empty object, representing a spatial component the requester does not have sufficient privileges to view.'
+                    }
+                  ]
                 }
               }
             }
@@ -85,7 +103,7 @@ export function searchSpatialComponents(): RequestHandler {
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
 
-    const connection = getAPIUserDBConnection();
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     try {
       await connection.open();

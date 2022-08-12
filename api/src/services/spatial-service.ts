@@ -1,5 +1,6 @@
 import { IDBConnection } from '../database/db';
 import {
+  IGetSecurityTransformRecord,
   IGetSpatialTransformRecord,
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
@@ -42,6 +43,17 @@ export class SpatialService extends DBService {
   }
 
   /**
+   * get security transform record from name
+   *
+   * @param {string} spatialTransformName
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialService
+   */
+  async getSecurityTransformRecords(): Promise<IGetSecurityTransformRecord[]> {
+    return this.spatialRepository.getSecurityTransformRecords();
+  }
+
+  /**
    * Insert record of transform id used for submission spatial component record
    *
    * @param {number} spatialTransformId
@@ -55,6 +67,24 @@ export class SpatialService extends DBService {
   ): Promise<{ spatial_transform_submission_id: number }> {
     return this.spatialRepository.insertSpatialTransformSubmissionRecord(
       spatialTransformId,
+      submissionSpatialComponentId
+    );
+  }
+
+  /**
+   * Insert record of transform id used for submission security component record
+   *
+   * @param {number} securityTransformId
+   * @param {number} submissionSpatialComponentId
+   * @return {*}  {Promise<{ spatial_transform_submission_id: number }>}
+   * @memberof SpatialService
+   */
+  async insertSecurityTransformSubmissionRecord(
+    securityTransformId: number,
+    submissionSpatialComponentId: number
+  ): Promise<{ security_transform_submission_id: number }> {
+    return this.spatialRepository.insertSecurityTransformSubmissionRecord(
+      securityTransformId,
       submissionSpatialComponentId
     );
   }
@@ -94,6 +124,40 @@ export class SpatialService extends DBService {
   }
 
   /**
+   *Collect security transforms from db, run transformations on submission id, update the spatial component table
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof SpatialService
+   */
+  async runSecurityTransforms(submissionId: number): Promise<void> {
+    const spatialTransformRecords = await this.getSecurityTransformRecords();
+
+    const promises1 = spatialTransformRecords.map(async (transformRecord) => {
+      const transformed = await this.spatialRepository.runSecurityTransformOnSubmissionId(
+        submissionId,
+        transformRecord.transform
+      );
+
+      const promises2 = transformed.map(async (dataPoint) => {
+        const submissionSpatialComponentId = await this.spatialRepository.updateSubmissionSpatialComponentWithSecurity(
+          dataPoint.spatial_component.submission_spatial_component_id,
+          dataPoint.spatial_component.spatial_data
+        );
+
+        await this.insertSecurityTransformSubmissionRecord(
+          transformRecord.security_transform_id,
+          submissionSpatialComponentId.submission_spatial_component_id
+        );
+      });
+
+      await Promise.all(promises2);
+    });
+
+    await Promise.all(promises1);
+  }
+
+  /**
    * Query builder to find spatial component by given criteria
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
@@ -118,16 +182,29 @@ export class SpatialService extends DBService {
   }
 
   /**
-   * Delete spatial component transform records by submission id.
+   * Delete records referencing which spatial transforms were applied to a spatial component
    *
    * @param {number} submission_id
    * @return {*}  {Promise<{ submission_id: number }[]>}
    * @memberof SpatialService
    */
-  async deleteSpatialComponentsTransformRefsBySubmissionId(
+  async deleteSpatialComponentsSpatialTransformRefsBySubmissionId(
     submission_id: number
   ): Promise<{ submission_id: number }[]> {
-    return this.spatialRepository.deleteSpatialComponentsTransformRefsBySubmissionId(submission_id);
+    return this.spatialRepository.deleteSpatialComponentsSpatialTransformRefsBySubmissionId(submission_id);
+  }
+
+  /**
+   * Delete records referencing which security transforms were applied to a spatial component
+   *
+   * @param {number} submission_id
+   * @return {*}  {Promise<{ submission_id: number }[]>}
+   * @memberof SpatialService
+   */
+  async deleteSpatialComponentsSecurityTransformRefsBySubmissionId(
+    submission_id: number
+  ): Promise<{ submission_id: number }[]> {
+    return this.spatialRepository.deleteSpatialComponentsSecurityTransformRefsBySubmissionId(submission_id);
   }
 
   /**

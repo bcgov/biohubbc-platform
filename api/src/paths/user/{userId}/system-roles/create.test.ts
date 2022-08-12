@@ -75,33 +75,6 @@ describe('getAddSystemRolesHandler', () => {
     }
   });
 
-  it('should throw a 400 error when no system user found', async () => {
-    const dbConnectionObj = getMockDBConnection();
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    mockReq.params = {
-      userId: '1'
-    };
-    mockReq.body = {
-      roles: [1]
-    };
-
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-    sinon.stub(UserService.prototype, 'getUserById').resolves(null);
-
-    try {
-      const requestHandler = system_roles.getAddSystemRolesHandler();
-
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).status).to.equal(400);
-      expect((actualError as HTTPError).message).to.equal('Failed to get system user');
-    }
-  });
-
   it('re-throws the error thrown by UserService.addUserSystemRoles', async () => {
     const dbConnectionObj = getMockDBConnection();
 
