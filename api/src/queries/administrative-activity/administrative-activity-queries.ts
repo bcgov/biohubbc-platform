@@ -113,21 +113,21 @@ export const postAdministrativeActivitySQL = (systemUserId: number, data: unknow
  * @param {number} systemUserId the ID of the user in context
  * @return {*}  {SQLStatement}
  */
-export const countPendingAdministrativeActivitiesSQL = (userIdentifier: string): SQLStatement => {
-  return SQL`
-    SELECT
-      *
-    FROM
-      administrative_activity aa
-    LEFT OUTER JOIN
-      administrative_activity_status_type aast
-    ON
-      aa.administrative_activity_status_type_id = aast.administrative_activity_status_type_id
-      WHERE
-      (aa.data -> 'username')::text =  '"' || ${userIdentifier} || '"'
-    AND aast.name = 'Pending';
-  `;
-};
+// export const countPendingAdministrativeActivitiesSQL = (userIdentifier: string): SQLStatement => {
+//   return SQL`
+//     SELECT
+//       *
+//     FROM
+//       administrative_activity aa
+//     LEFT OUTER JOIN
+//       administrative_activity_status_type aast
+//     ON
+//       aa.administrative_activity_status_type_id = aast.administrative_activity_status_type_id
+//       WHERE
+//       (aa.data -> 'username')::text =  '"' || ${userIdentifier} || '"'
+//     AND aast.name = 'Pending';
+//   `;
+// };
 
 /**
  * SQL query update an existing administrative activity record.

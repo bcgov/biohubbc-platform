@@ -67,92 +67,15 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
-    let submissionId = 0;
+    const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
 
-    //Step 1: ingest dwca file and save record in db. additionally
-    try {
-      const ingest = await this.ingestNewDwCADataPackage(file, dataPackageId);
 
-      submissionId = ingest.submissionId;
+    await this.create_step2_uploadRecordToS3(submissionId, file);
+    await this.create_step3_validateSubmission(submissionId);
 
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'ingestNewDwCADataPackage', message: 'error', error });
+    await this.create_step4_secureSubmission(submissionId);
 
-      throw new ApiGeneralError('Ingestion failed', error.message);
-    }
-
-    //Step 2: Upload file to s3
-    try {
-      await this.uploadRecordToS3(submissionId, file);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'uploadRecordToS3', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 3: Validate submission file
-    try {
-      await this.tempValidateSubmission(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.VALIDATED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_VALIDATION,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 4: Secure submission file
-    try {
-      await this.tempSecureSubmission(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SECURITY,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 5: Ingest EML from dwca file
-    try {
-      await this.ingestNewDwCAEML(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_INGESTED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
+    await this.create_step5_ingestEML(submissionId);
 
     //Step 6: Convert eml to json and save record
     try {
@@ -246,6 +169,101 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
       );
+      return;
+    }
+  }
+
+  async create_step1_ingestDWC(file: Express.Multer.File, dataPackageId: string): Promise<number> {
+    let submissionId = 0;
+
+    //Step 1: ingest dwca file and save record in db. additionally
+    try {
+      const ingest = await this.ingestNewDwCADataPackage(file, dataPackageId);
+
+      submissionId = ingest.submissionId;
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
+
+      return submissionId;
+    } catch (error: any) {
+      defaultLog.debug({ label: 'ingestNewDwCADataPackage', message: 'error', error });
+
+      throw new ApiGeneralError('Ingestion failed', error.message);
+    }
+  }
+
+  async create_step2_uploadRecordToS3(submissionId: number, file: Express.Multer.File): Promise<void> {
+    try {
+      await this.uploadRecordToS3(submissionId, file);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'uploadRecordToS3', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step3_validateSubmission(submissionId: number): Promise<void> {
+    try {
+      await this.tempValidateSubmission(submissionId);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.VALIDATED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_VALIDATION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step4_secureSubmission(submissionId: number): Promise<void> {
+    try {
+      await this.tempSecureSubmission(submissionId);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SECURITY,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step5_ingestEML(submissionId: number): Promise<void> {
+    try {
+      await this.ingestNewDwCAEML(submissionId);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_INGESTED);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
       return;
     }
   }
