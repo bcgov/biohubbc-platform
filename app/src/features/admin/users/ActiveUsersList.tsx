@@ -236,7 +236,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
           <Grid
             sx={{
               justify: "space-between",
-              // @TODO remove? // container: true,
               alignItems: "center"
             }}
           >
