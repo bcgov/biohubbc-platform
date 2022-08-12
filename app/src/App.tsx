@@ -1,5 +1,5 @@
 import CircularProgress from '@mui/material/CircularProgress';
-import { ThemeProvider } from '@mui/styles';
+import { ThemeProvider } from '@mui/material/styles';
 
 // Strange looking type {} import below, see: https://github.com/microsoft/TypeScript/issues/36812
 // @TODO repricated import?
