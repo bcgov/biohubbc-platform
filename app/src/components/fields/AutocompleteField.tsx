@@ -36,7 +36,6 @@ const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<str
     return result;
   };
 
-  /*
   const handleGetOptionSelected = (
     option: IAutocompleteFieldOption<T>,
     value: IAutocompleteFieldOption<T>
@@ -47,7 +46,6 @@ const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<str
 
     return option.value === value.value;
   };
-  */
 
   return (
     <Autocomplete
@@ -60,8 +58,7 @@ const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<str
       value={getExistingValue(get(values, props.name))}
       options={props.options}
       getOptionLabel={(option) => option.label}
-      
-      // TODO remove ? getOptionSelected={handleGetOptionSelected}
+      isOptionEqualToValue={handleGetOptionSelected}
       filterOptions={createFilterOptions({ limit: props.filterLimit })}
       onChange={(event, option) => {
         if (props.onChange) {

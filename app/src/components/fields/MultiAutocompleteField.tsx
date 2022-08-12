@@ -1,8 +1,8 @@
-// import Checkbox from '@mui/material/Checkbox';
+import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
-// import CheckBox from '@mui/icons-material/CheckBox';
-// import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
-import Autocomplete from '@mui/lab/Autocomplete';
+import CheckBox from '@mui/icons-material/CheckBox';
+import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
+import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React from 'react';
@@ -31,7 +31,6 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
     return props.options.filter((option) => existingValues.includes(option.value));
   };
 
-  /*
   const handleGetOptionSelected = (
     option: IMultiAutocompleteFieldOption,
     value: IMultiAutocompleteFieldOption
@@ -42,7 +41,6 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
 
     return option.value === value.value;
   };
-  */
 
   return (
     <Autocomplete
@@ -52,8 +50,8 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
       id={props.id}
       options={props.options}
       getOptionLabel={(option) => option.label}
-      // @TODO // getOptionSelected={handleGetOptionSelected}
-      // @TODO // filterOptions={createFilterOptions({ limit: props.filterLimit })}
+      isOptionEqualToValue={handleGetOptionSelected}
+      filterOptions={createFilterOptions({ limit: props.filterLimit })}
       disableCloseOnSelect
       onChange={(event, option) => {
         setFieldValue(
@@ -61,10 +59,8 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
           option.map((item) => item.value)
         );
       }}
-      /**
-       * @TODO
-       *
-      renderOption={(option, { selected }) => {
+
+      renderOption={(_props, option, { selected }) => {
         const disabled: any = props.options && props.options?.indexOf(option) !== -1;
         return (
           <>
@@ -80,7 +76,7 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
           </>
         );
       }}
-      */
+
       renderInput={(params) => (
         <TextField
           {...params}
