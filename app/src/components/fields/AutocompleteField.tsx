@@ -1,8 +1,8 @@
 import TextField from '@mui/material/TextField';
-import Autocomplete from '@mui/lab/Autocomplete';
+import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
-import React, { ChangeEvent } from 'react';
+import React, { SyntheticEvent } from 'react';
 
 export interface IAutocompleteFieldOption<T extends string | number> {
   value: T;
@@ -16,7 +16,7 @@ export interface IAutocompleteField<T extends string | number> {
   options: IAutocompleteFieldOption<T>[];
   required?: boolean;
   filterLimit?: number;
-  onChange?: (event: ChangeEvent<Record<string, unknown>>, option: IAutocompleteFieldOption<T> | null) => void;
+  onChange?: (event: SyntheticEvent<Element, Event>, option: IAutocompleteFieldOption<T> | null) => void;
 }
 
 // To be used when you want an autocomplete field with no freesolo allowed but only one option can be selected
@@ -60,11 +60,12 @@ const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<str
       value={getExistingValue(get(values, props.name))}
       options={props.options}
       getOptionLabel={(option) => option.label}
-      // @TODO // getOptionSelected={handleGetOptionSelected}
-      // @TODO // filterOptions={createFilterOptions({ limit: props.filterLimit })}
+      
+      // TODO remove ? getOptionSelected={handleGetOptionSelected}
+      filterOptions={createFilterOptions({ limit: props.filterLimit })}
       onChange={(event, option) => {
         if (props.onChange) {
-          // @TODO // props.onChange(event, option);
+          props.onChange(event, option);
           return;
         }
 
