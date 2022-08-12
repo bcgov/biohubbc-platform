@@ -130,7 +130,6 @@ export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButto
         open={open}
         onClose={handleClose}
         anchorEl={anchorEl}
-        // getContentAnchorEl={null}
         anchorOrigin={{
           vertical: 'bottom',
           horizontal: 'right'
@@ -204,7 +203,6 @@ export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuI
         open={open}
         onClose={handleClose}
         anchorEl={anchorEl}
-        // getContentAnchorEl={null}
         anchorOrigin={{
           vertical: 'top',
           horizontal: 'right'
