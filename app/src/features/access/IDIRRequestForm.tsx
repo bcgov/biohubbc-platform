@@ -54,7 +54,7 @@ const IDIRRequestForm: React.FC<React.PropsWithChildren<IIDIRRequestFormProps>> 
                 labelId="role-label"
                 label="Role"
                 value={values.role}
-                // @TODO // labelWidth={300}
+                notched
                 onChange={handleChange}
                 error={touched.role && Boolean(errors.role)}
                 displayEmpty

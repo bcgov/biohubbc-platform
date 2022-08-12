@@ -1,10 +1,5 @@
 import CircularProgress from '@mui/material/CircularProgress';
 import { ThemeProvider } from '@mui/material/styles';
-
-// Strange looking type {} import below, see: https://github.com/microsoft/TypeScript/issues/36812
-// @TODO repricated import?
-// import type {} from '@material-ui/lab/themeAugmentation'; // this allows @material-ui/lab components to be themed
-
 import { ReactKeycloakProvider } from '@react-keycloak/web';
 import AppRouter from 'AppRouter';
 import { AuthStateContextProvider } from 'contexts/authStateContext';

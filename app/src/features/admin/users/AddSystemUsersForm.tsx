@@ -90,7 +90,7 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                             labelId="login_method"
                             label="Login Method"
                             value={systemUser.identitySource}
-                            // @TODO // labelWidth={300}
+                            notched
                             onChange={handleChange}
                             error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}
                             displayEmpty
@@ -116,7 +116,7 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                             labelId="system_role"
                             label="System Role"
                             value={systemUser.system_role}
-                            // @TODO // labelWidth={300}
+                            notched
                             onChange={handleChange}
                             error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}
                             displayEmpty

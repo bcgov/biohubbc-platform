@@ -236,7 +236,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
           <Grid
             sx={{
               justify: "space-between",
-              // @TODO remove? // container: true,
               alignItems: "center"
             }}
           >
@@ -337,7 +336,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
         {activeUsers?.length > 0 && (
           <TablePagination
             rowsPerPageOptions={[5, 10, 15, 20]}
-            // component="div"
+            component="div"
             count={activeUsers.length}
             rowsPerPage={rowsPerPage}
             page={page}
