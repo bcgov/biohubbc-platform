@@ -5,25 +5,27 @@ import React from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   appFooter: {
-    backgroundColor: theme.palette.primary.main
+    backgroundColor: theme.palette.bcgovblue.main
   },
   appFooterToolbar: {
     minHeight: '46px',
     '& ul': {
-      display: 'flex',
-      flexWrap: 'wrap',
-      alignItems: 'center',
       margin: 0,
       padding: 0,
       listStyleType: 'none'
     },
+    '& li': {
+      display: 'inline-block'
+    },
     '& li + li ': {
-      marginLeft: theme.spacing(2),
-      paddingLeft: theme.spacing(2),
+      marginLeft: theme.spacing(1.5),
+      paddingLeft: theme.spacing(1.5),
       borderLeft: '1px solid #4b5e7e'
     },
     '& a': {
+      display: 'block',
       color: '#ffffff',
+      fontSize: '0.875rem',
       textDecoration: 'none'
     },
     '& a:hover': {

@@ -5,7 +5,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import OtherLink from '@mui/material/Link';
 import { Theme } from '@mui/material';
@@ -26,7 +25,8 @@ import { LoggedInUserControls, NotLoggedInUserControls } from './UserControls';
 const useStyles = makeStyles((theme: Theme) => ({
   govHeader: {},
   govHeaderToolbar: {
-    height: '70px'
+    height: '70px',
+    backgroundColor: theme.palette.bcgovblue.main
   },
   brand: {
     display: 'flex',
@@ -59,24 +59,6 @@ const useStyles = makeStyles((theme: Theme) => ({
     wrapText: {
       display: 'block'
     }
-  },
-  userProfile: {
-    color: theme.palette.primary.contrastText,
-    fontSize: '0.9375rem',
-    '& hr': {
-      backgroundColor: '#4b5e7e',
-      height: '1rem'
-    },
-    '& a': {
-      color: 'inherit',
-      textDecoration: 'none'
-    },
-    '& a:hover': {
-      textDecoration: 'underline'
-    }
-  },
-  govHeaderIconButton: {
-    color: '#ffffff'
   },
   mainNav: {
     backgroundColor: '#38598a'
@@ -119,10 +101,10 @@ const Header: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <>
-      <AppBar position="sticky" style={{ boxShadow: 'none' }}>
+      <AppBar position="sticky">
         <Box className={classes.govHeader}>
           <Toolbar className={classes.govHeaderToolbar}>
-            <Box display="flex" justifyContent="space-between" width="100%">
+            <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
               <Link to="/" className={classes.brand} aria-label="Go to Home Page">
                 <picture>
                   <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
@@ -135,19 +117,21 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   <EnvironmentLabel />
                 </span>
               </Link>
-              <Box display="flex" className={classes.userProfile} my="auto" alignItems="center">
-                <UnAuthGuard>
-                  <NotLoggedInUserControls />
-                </UnAuthGuard>
-                <AuthGuard>
-                  <LoggedInUserControls />
-                </AuthGuard>
-                <Box pl={2}>
-                  <Divider orientation="vertical" />
-                </Box>
-                <IconButton className={classes.govHeaderIconButton} onClick={showSupportDialog}>
-                  <Icon path={mdiHelpCircle} size={1.12} />
+              <Box display="flex" alignItems="center">
+                <IconButton aria-label="Need help?" onClick={showSupportDialog}
+                  sx={{
+                    color: 'bcgovblue.contrastText'
+                  }} >
+                  <Icon path={mdiHelpCircle} size={1}/>
                 </IconButton>
+                <Box>
+                  <UnAuthGuard>
+                    <NotLoggedInUserControls />
+                  </UnAuthGuard>
+                  <AuthGuard>
+                    <LoggedInUserControls />
+                  </AuthGuard>
+                </Box>
               </Box>
             </Box>
           </Toolbar>

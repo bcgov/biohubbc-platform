@@ -3,57 +3,73 @@ import 'styles.scss';
 
 const appTheme = createTheme({
   typography: {
-    fontFamily: 'BCSans'
+    fontFamily: 'BCSans',
+    h1: {
+      fontSize: '2.25rem',
+      fontWeight: 700
+    },
+    h2: {
+      fontSize: '1.875rem',
+      fontWeight: 700
+    },
+    h3: {
+      fontSize: '1.5rem',
+      fontWeight: 700
+    },
+    h4: {
+      fontSize: '1.25rem',
+      fontWeight: 700
+    }
+  },
+  palette: {
+    background: {
+      default: '#f7f8fa'
+    },
+    bcgovblue: {
+      main: '#036',
+      contrastText: '#fff',
+    }
   },
   components: {
-    MuiCssBaseline: {
-      styleOverrides: `
-        @font-face {
-          font-family: 'BCSans';
-          font-style: normal;
-          font-weight: 400;
-          src: 
-            local('BCSans'),
-            url('./assets/fonts/BCSans/BCSans-Regular.woff2') format('woff2'),
-            url('./assets/fonts/BCSans/BCSans-Regular.woff') format('woff')
-            font-display: swap;
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none'
         }
-        @font-face {
-          font-family: 'BCSans';
-          font-style: italic;
-          src: 
-            local('BCSans'),
-            url('./assets/fonts/BCSans/BCSans-Italic.woff2') format('woff2'),
-            url('./assets/fonts/BCSans/BCSans-Italic.woff') format('woff')
-            font-display: swap;
-        }
-        @font-face {
-          font-family: 'BCSans';
-          font-weight: 700;
-          src: 
-            local('BCSans'),
-            url('./assets/fonts/BCSans/BCSans-Bold.woff2') format('woff2'),
-            url('./assets/fonts/BCSans/BCSans-Bold.woff') format('woff')
-            font-display: swap;
-        }
-        @font-face {
-          font-family: 'BCSans';
-          font-style: italic;
-          font-weight: 700;
-          src: 
-            local('BCSans'),
-            url('./assets/fonts/BCSans/BCSans-BoldItalic.woff2') format('woff2'),
-            url('./assets/fonts/BCSans/BCSans-BoldItalic.woff2') format('woff')
-            font-display: swap;
-        }
-      `,
+      }
     },
-    MuiTypography: {
-      defaultProps: {
-        // fontFamily: 'BCSans'
+    MuiLink: {
+      styleOverrides: {
+        root: {
+          color: '#1A5A96',
+          textDecoration: 'none',
+          textDecorationColor: '#1A5A96',
+          ":hover": {
+            textDecoration: 'underline'
+          }
+        }
       }
     }
   }
 });
+
+declare module '@mui/material/styles' {
+  interface Palette {
+    bcgovblue: Palette['primary'];
+  }
+
+  // allow configuration using `createTheme`
+  interface PaletteOptions {
+    bcgovblue?: PaletteOptions['primary'];
+  }
+}
+
+// Update the Button's color prop options
+declare module '@mui/material/Button' {
+  interface ButtonPropsColorOverrides {
+    bcgovblue: true;
+  }
+}
+
 
 export default appTheme;
