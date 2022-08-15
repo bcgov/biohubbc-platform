@@ -69,108 +69,15 @@ export class DarwinCoreService extends DBService {
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
     const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
 
-
     await this.create_step2_uploadRecordToS3(submissionId, file);
     await this.create_step3_validateSubmission(submissionId);
-
     await this.create_step4_secureSubmission(submissionId);
-
     await this.create_step5_ingestEML(submissionId);
-
-    //Step 6: Convert eml to json and save record
-    try {
-      await this.convertSubmissionEMLtoJSON(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_TO_JSON);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'convertSubmissionEMLtoJSON', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 7: Transform submission file and upload to ES
-    try {
-      await this.transformAndUploadMetaData(submissionId, dataPackageId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_METADATA_TO_ES,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 8: Normalize Submission record and save json
-    try {
-      const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-      await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'normalizeSubmissionDWCA', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_NORMALIZATION,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 9: Run spatial transforms and save data
-    try {
-      await this.spatialService.runSpatialTransforms(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
-      );
-    } catch (error: any) {
-      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 10: Run security transform
-    try {
-      await this.spatialService.runSecurityTransforms(submissionId);
-      await this.submissionService.insertSubmissionStatus(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
-      );
-    } catch (error: any) {
-      defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-      return;
-    }
+    await this.create_step6_convertEMLToJsonAndSave(submissionId);
+    await this.create_step7_transformAndUploadMetaData(submissionId, dataPackageId);
+    await this.create_step8_getSubmissionRecordAndConvertToDWCArchive(submissionId);
+    await this.create_step9_runSpatialTransformsAndSave(submissionId);
+    await this.create_step10_runSecurityTransforms(submissionId);
   }
 
   async create_step1_ingestDWC(file: Express.Multer.File, dataPackageId: string): Promise<number> {
@@ -183,6 +90,8 @@ export class DarwinCoreService extends DBService {
       submissionId = ingest.submissionId;
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
+
+      console.log('step 1 done');
 
       return submissionId;
     } catch (error: any) {
@@ -197,6 +106,8 @@ export class DarwinCoreService extends DBService {
       await this.uploadRecordToS3(submissionId, file);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
+
+      console.log('step 2 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'uploadRecordToS3', message: 'error', error });
 
@@ -216,6 +127,7 @@ export class DarwinCoreService extends DBService {
       await this.tempValidateSubmission(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.VALIDATED);
+      console.log('step 3 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
 
@@ -235,6 +147,7 @@ export class DarwinCoreService extends DBService {
       await this.tempSecureSubmission(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
+      console.log('step 4 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
 
@@ -254,6 +167,7 @@ export class DarwinCoreService extends DBService {
       await this.ingestNewDwCAEML(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_INGESTED);
+      console.log('step 5 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
 
@@ -264,6 +178,114 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
+      return;
+    }
+  }
+
+  async create_step6_convertEMLToJsonAndSave(submissionId: number): Promise<void> {
+    try {
+      await this.convertSubmissionEMLtoJSON(submissionId);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_TO_JSON);
+      console.log('step 6 done');
+    } catch (error: any) {
+      defaultLog.debug({ label: 'convertSubmissionEMLtoJSON', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step7_transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
+    try {
+      await this.transformAndUploadMetaData(submissionId, dataPackageId);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
+
+      console.log('step 7 done');
+    } catch (error: any) {
+      defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_METADATA_TO_ES,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step8_getSubmissionRecordAndConvertToDWCArchive(submissionId: number) {
+    try {
+      const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+      await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
+
+      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
+
+      console.log('step 8 done');
+    } catch (error: any) {
+      defaultLog.debug({ label: 'normalizeSubmissionDWCA', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_NORMALIZATION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step9_runSpatialTransformsAndSave(submissionId: number) {
+    try {
+      await this.spatialService.runSpatialTransforms(submissionId);
+
+      await this.submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
+      );
+
+      console.log('step 9 done');
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      return;
+    }
+  }
+
+  async create_step10_runSecurityTransforms(submissionId: number) {
+    try {
+      await this.spatialService.runSecurityTransforms(submissionId);
+      await this.submissionService.insertSubmissionStatus(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
+      );
+      console.log('step 10 done');
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
       return;
     }
   }
