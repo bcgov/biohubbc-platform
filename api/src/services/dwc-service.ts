@@ -73,19 +73,17 @@ export class DarwinCoreService extends DBService {
 
     await this.create_step3_validateSubmission(submissionId);
 
-    await this.create_step4_secureSubmission(submissionId);
+    await this.create_step4_ingestEML(submissionId);
 
-    await this.create_step5_ingestEML(submissionId);
+    await this.create_step5_convertEMLToJSON(submissionId);
 
-    await this.create_step6_convertEMLToJsonAndSave(submissionId);
+    await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
 
-    await this.create_step7_transformAndUploadMetaData(submissionId, dataPackageId);
+    await this.create_step7_getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-    await this.create_step8_getSubmissionRecordAndConvertToDWCArchive(submissionId);
+    await this.create_step8_runSpatialTransforms(submissionId);
 
-    await this.create_step9_runSpatialTransformsAndSave(submissionId);
-
-    await this.create_step10_runSecurityTransforms(submissionId);
+    await this.create_step9_runSecurityTransforms(submissionId);
   }
 
   /**
@@ -114,6 +112,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Step 2 in processing a DWC archive file:upload the record to S3
+   *
+   * @param {number} submissionId
+   * @param {Express.Multer.File} file
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async create_step2_uploadRecordToS3(submissionId: number, file: Express.Multer.File): Promise<void> {
     try {
       await this.uploadRecordToS3(submissionId, file);
@@ -133,6 +139,13 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Step 3 in processing a DWC archive file: validate the submission
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async create_step3_validateSubmission(submissionId: number): Promise<void> {
     try {
       await this.tempValidateSubmission(submissionId);
@@ -152,26 +165,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
-  async create_step4_secureSubmission(submissionId: number): Promise<void> {
-    try {
-      await this.tempSecureSubmission(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SECURITY,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-  }
-
-  async create_step5_ingestEML(submissionId: number): Promise<void> {
+  /**
+   * Step 4 in processing a DWC archive file: ingest EML
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step4_ingestEML(submissionId: number): Promise<void> {
     try {
       await this.ingestNewDwCAEML(submissionId);
 
@@ -189,8 +190,14 @@ export class DarwinCoreService extends DBService {
       return;
     }
   }
-
-  async create_step6_convertEMLToJsonAndSave(submissionId: number): Promise<void> {
+  /**
+   * Step 5 in processing a DWC archive file: convert EML to JSON
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step5_convertEMLToJSON(submissionId: number): Promise<void> {
     try {
       await this.convertSubmissionEMLtoJSON(submissionId);
 
@@ -209,7 +216,15 @@ export class DarwinCoreService extends DBService {
     }
   }
 
-  async create_step7_transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
+  /**
+   * Step 6 in processing a DWC archive file: transform and upload metadata
+   *
+   * @param {number} submissionId
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step6_transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     try {
       await this.transformAndUploadMetaData(submissionId, dataPackageId);
 
@@ -228,7 +243,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
-  async create_step8_getSubmissionRecordAndConvertToDWCArchive(submissionId: number) {
+  /**
+   * Step 7 in processing a DWC archive file: get submission record and convert to DWC Archive
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async create_step7_getSubmissionRecordAndConvertToDWCArchive(submissionId: number) {
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
@@ -248,7 +270,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
-  async create_step9_runSpatialTransformsAndSave(submissionId: number) {
+  /**
+   * Step 8 in processing a DWC archive file: run spatial transforms
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async create_step8_runSpatialTransforms(submissionId: number) {
     try {
       await this.spatialService.runSpatialTransforms(submissionId);
 
@@ -270,7 +299,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
-  async create_step10_runSecurityTransforms(submissionId: number) {
+  /**
+   * Step 9 in processing a DWC archive file: run security transforms
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async create_step9_runSecurityTransforms(submissionId: number) {
     try {
       await this.spatialService.runSecurityTransforms(submissionId);
       await this.submissionService.insertSubmissionStatus(
