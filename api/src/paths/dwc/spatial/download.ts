@@ -73,13 +73,6 @@ export function downloadSpatialComponents(): RequestHandler {
             boundary: JSON.parse(req.query.boundary as string) as Feature
           };
 
-        // what happens if the endpoint is hit without a dataset ID?
-        // naming convention for the zip file? does it matter?
-        // mentions public user, what is that compared to a private user? logging in?
-        // how can I setup my data so things are public/ private
-        // is there a particular browser we need to target?
-
-        // download button built into map: https://www.npmjs.com/package/react-leaflet-easyprint
         const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
         try {
@@ -99,7 +92,8 @@ export function downloadSpatialComponents(): RequestHandler {
                 'Content-Type': 'application/zip',
                 'Content-Disposition': `attached; filename="${fileName}"`
             })
-            
+
+            // encoding zip as hex to avoid corrupted file in response
             res.status(200).send(zipToSend.toString("hex"))
         } catch (error) {
             defaultLog.error({ label: 'downloadSpatialComponents', message: 'error', error})

@@ -1,5 +1,6 @@
-import { Button, Theme } from '@material-ui/core';
-import DownloadIcon from '@material-ui/icons/GetApp'
+import { Button, Grid, Theme } from '@material-ui/core';
+import Icon from '@mdi/react';
+import { mdiDownload } from '@mdi/js';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
@@ -97,11 +98,7 @@ const DatasetPage: React.FC = () => {
       datasetID: datasetId
     })
     .then(res => {
-      // working, kinda, not sure how other browsers will handle this
-      // const url = URL.createObjectURL(new Blob([res], {type:  'application/zip'}))
-      // window.location.href = url;
-      // https://stackoverflow.com/questions/70969837/how-to-download-zip-file-that-i-recieve-from-a-http-response-axios-put-request
-
+      // decode data to avoid file corruption
       const content = Buffer.from(res, "hex");
       const blob = new Blob([content], {type: 'application/zip'})
       const link = document.createElement('a');
@@ -152,11 +149,29 @@ const DatasetPage: React.FC = () => {
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">
-            <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
-            <Button
-              onClick={downloadDataSet}>
-              <DownloadIcon />
-            </Button>
+            <Grid
+              justify='space-between'
+              container
+              alignItems='center'
+            >
+              <Grid item>
+                <Box px={2}>
+                  <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+                </Box>
+              </Grid>
+              <Grid item>
+                <Box my={1} mx={2}>
+                  <Button
+                    color="primary"
+                    variant="outlined"
+                    disableElevation
+                    aria-label={'Download occurances'}
+                    onClick={() => downloadDataSet()}>
+                      <Icon path={mdiDownload} size={1} />
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
             <Box p={2} pt={0} className={classes.datasetMapContainer}>
               <MapContainer
                 mapId="boundary_map"
