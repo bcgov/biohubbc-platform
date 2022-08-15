@@ -1,10 +1,20 @@
-import { render, waitFor } from 'test-helpers/test-utils';
+import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { createMemoryHistory } from 'history';
 import React from 'react';
 import { Router } from 'react-router';
 import ActiveUsersList, { IActiveUsersListProps } from './ActiveUsersList';
+import { useApi } from 'hooks/useApi';
 
 const history = createMemoryHistory();
+
+jest.mock('../../../hooks/useApi');
+const mockUseApi = {
+  user: {
+    getRoles: jest.fn()
+  }
+};
+
+const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = (props: IActiveUsersListProps) => {
   return render(
@@ -15,6 +25,15 @@ const renderContainer = (props: IActiveUsersListProps) => {
 };
 
 describe('ActiveUsersList', () => {
+  beforeEach(() => {
+    // clear mocks before each test
+    mockBiohubApi().user.getRoles.mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   it('shows `No Active Users` when there are no active users', async () => {
     const mockGetUsers = jest.fn();
     const { getByText } = renderContainer({
