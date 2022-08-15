@@ -1,6 +1,6 @@
 import React, { ReactElement } from 'react'
 import { render, RenderOptions } from '@testing-library/react'
-import { ThemeProvider } from '@mui/styles'
+import { ThemeProvider } from '@mui/material/styles'
 import appTheme from 'themes/appTheme'
 
 const AllProviders: React.FC<React.PropsWithChildren> = (props) => {

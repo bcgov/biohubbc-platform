@@ -3,10 +3,10 @@
 exports[`NotFoundPage renders correctly 1`] = `
 <DocumentFragment>
   <div
-    class="MuiContainer-root MuiContainer-maxWidthLg"
+    class="MuiContainer-root MuiContainer-maxWidthLg css-1oqqzyl-MuiContainer-root"
   >
     <div
-      class="MuiBox-root MuiBox-root-1"
+      class="MuiBox-root css-gxcw53"
     >
       <svg
         role="presentation"
@@ -22,25 +22,21 @@ exports[`NotFoundPage renders correctly 1`] = `
         Page Not Found
       </h1>
       <p
-        class="MuiTypography-root MuiTypography-body1"
+        class="MuiTypography-root MuiTypography-body1 css-12btgb4-MuiTypography-root"
       >
         Sorry, the page you are trying to access does not exist.
       </p>
       <div
-        class="MuiBox-root MuiBox-root-2"
+        class="MuiBox-root css-xuhmcu"
       >
         <button
-          class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-containedSizeLarge MuiButton-sizeLarge"
+          class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeLarge MuiButton-containedSizeLarge css-ohdmtd-MuiButtonBase-root-MuiButton-root"
           tabindex="0"
           type="submit"
         >
+          Return Home
           <span
-            class="MuiButton-label"
-          >
-            Return Home
-          </span>
-          <span
-            class="MuiTouchRipple-root"
+            class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
           />
         </button>
       </div>

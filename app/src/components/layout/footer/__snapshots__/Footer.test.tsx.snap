@@ -7,7 +7,7 @@ exports[`Footer renders correctly 1`] = `
   >
     <div
       aria-label="Footer"
-      class="MuiToolbar-root MuiToolbar-regular makeStyles-appFooterToolbar-2 MuiToolbar-gutters"
+      class="MuiToolbar-root MuiToolbar-gutters MuiToolbar-regular makeStyles-appFooterToolbar-2 css-hyum1k-MuiToolbar-root"
       role="navigation"
     >
       <ul>

@@ -3,10 +3,10 @@
 exports[`DropZone matches the snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="MuiBox-root MuiBox-root-4 dropZoneContainer"
+    class="dropZoneContainer MuiBox-root css-0"
   >
     <div
-      class="MuiBox-root MuiBox-root-5"
+      class="MuiBox-root css-0"
       tabindex="0"
     >
       <input
@@ -19,7 +19,7 @@ exports[`DropZone matches the snapshot 1`] = `
         type="file"
       />
       <div
-        class="MuiBox-root MuiBox-root-6"
+        class="MuiBox-root css-ro5zyg"
       >
         <svg
           class="makeStyles-dropZoneIcon-2"
@@ -33,41 +33,41 @@ exports[`DropZone matches the snapshot 1`] = `
           />
         </svg>
         <div
-          class="MuiBox-root MuiBox-root-7 makeStyles-dropZoneTitle-1"
+          class="makeStyles-dropZoneTitle-1 MuiBox-root css-1fhgjcy"
         >
           Drag your files here, or 
           <a
-            class="MuiTypography-root MuiLink-root MuiLink-underlineAlways MuiTypography-colorPrimary"
+            class="MuiTypography-root MuiTypography-inherit MuiLink-root MuiLink-underlineAlways css-myvcsz-MuiTypography-root-MuiLink-root"
           >
             Browse Files
           </a>
         </div>
         <div
-          class="MuiBox-root MuiBox-root-8"
+          class="MuiBox-root css-xi606m"
         >
           <div
-            class="MuiBox-root MuiBox-root-9"
+            class="MuiBox-root css-0"
           >
             <span
-              class="MuiTypography-root MuiTypography-subtitle2 MuiTypography-colorTextSecondary"
+              class="MuiTypography-root MuiTypography-subtitle2 css-75nrt7-MuiTypography-root"
             >
               Accepted files: .txt
             </span>
           </div>
           <div
-            class="MuiBox-root MuiBox-root-10"
+            class="MuiBox-root css-0"
           >
             <span
-              class="MuiTypography-root MuiTypography-subtitle2 MuiTypography-colorTextSecondary"
+              class="MuiTypography-root MuiTypography-subtitle2 css-75nrt7-MuiTypography-root"
             >
               Maximum file size: 50 MB
             </span>
           </div>
           <div
-            class="MuiBox-root MuiBox-root-11"
+            class="MuiBox-root css-0"
           >
             <span
-              class="MuiTypography-root MuiTypography-subtitle2 MuiTypography-colorTextSecondary"
+              class="MuiTypography-root MuiTypography-subtitle2 css-75nrt7-MuiTypography-root"
             >
               Maximum files: 10
             </span>

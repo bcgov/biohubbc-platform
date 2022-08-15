@@ -2,17 +2,17 @@
 
 exports[`RequestSubmitted renders a spinner when \`hasLoadedAllUserInfo\` is false 1`] = `
 <DocumentFragment>
-  <div
-    class="MuiCircularProgress-root pageProgress MuiCircularProgress-colorPrimary MuiCircularProgress-indeterminate"
+  <span
+    class="MuiCircularProgress-root MuiCircularProgress-indeterminate MuiCircularProgress-colorPrimary pageProgress css-in83y0-MuiCircularProgress-root"
     role="progressbar"
     style="width: 40px; height: 40px;"
   >
     <svg
-      class="MuiCircularProgress-svg"
+      class="MuiCircularProgress-svg css-1idz92c-MuiCircularProgress-svg"
       viewBox="22 22 44 44"
     >
       <circle
-        class="MuiCircularProgress-circle MuiCircularProgress-circleIndeterminate"
+        class="MuiCircularProgress-circle MuiCircularProgress-circleIndeterminate css-176wh8e-MuiCircularProgress-circle"
         cx="44"
         cy="44"
         fill="none"
@@ -20,17 +20,17 @@ exports[`RequestSubmitted renders a spinner when \`hasLoadedAllUserInfo\` is fal
         stroke-width="3.6"
       />
     </svg>
-  </div>
+  </span>
 </DocumentFragment>
 `;
 
 exports[`RequestSubmitted renders correctly when user has no role but has a pending access requests 1`] = `
 <DocumentFragment>
   <div
-    class="MuiContainer-root MuiContainer-maxWidthLg"
+    class="MuiContainer-root MuiContainer-maxWidthLg css-1oqqzyl-MuiContainer-root"
   >
     <div
-      class="MuiBox-root MuiBox-root-1"
+      class="MuiBox-root css-gxcw53"
     >
       <svg
         role="presentation"
@@ -46,26 +46,22 @@ exports[`RequestSubmitted renders correctly when user has no role but has a pend
         Access Request Submitted
       </h1>
       <p
-        class="MuiTypography-root MuiTypography-body1"
+        class="MuiTypography-root MuiTypography-body1 css-12btgb4-MuiTypography-root"
       >
         Your access request has been submitted for review.
       </p>
       <div
-        class="MuiBox-root MuiBox-root-2"
+        class="MuiBox-root css-xuhmcu"
       >
         <button
-          class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-containedSizeLarge MuiButton-sizeLarge"
+          class="MuiButtonBase-root MuiButton-root MuiButton-contained MuiButton-containedPrimary MuiButton-sizeLarge MuiButton-containedSizeLarge css-ohdmtd-MuiButtonBase-root-MuiButton-root"
           data-testid="logout-button"
           tabindex="0"
           type="submit"
         >
+          Log Out
           <span
-            class="MuiButton-label"
-          >
-            Log Out
-          </span>
-          <span
-            class="MuiTouchRipple-root"
+            class="MuiTouchRipple-root css-8je8zh-MuiTouchRipple-root"
           />
         </button>
       </div>
