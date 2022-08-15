@@ -100,19 +100,13 @@ const DatasetPage: React.FC = () => {
       // working, kinda, not sure how other browsers will handle this
       // const url = URL.createObjectURL(new Blob([res], {type:  'application/zip'}))
       // window.location.href = url;
+      // https://stackoverflow.com/questions/70969837/how-to-download-zip-file-that-i-recieve-from-a-http-response-axios-put-request
 
-      // console.log(`Data from API: ${res}`)
-      // console.log(res)
-      // console.log(typeof res)
-
-
-
-      
-
+      const content = Buffer.from(res, "hex");
+      const blob = new Blob([content], {type: 'application/zip'})
       const link = document.createElement('a');
+
       link.download = 'PointData.zip';
-      // const temp = new Blob([ArrayBuffer()])
-      let blob = new Blob([res], {type: 'application/zip'});
       link.href = URL.createObjectURL(blob);
       link.click();
 

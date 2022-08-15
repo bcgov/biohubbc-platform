@@ -73,9 +73,6 @@ export function downloadSpatialComponents(): RequestHandler {
             boundary: JSON.parse(req.query.boundary as string) as Feature
           };
 
-          console.log("_______________________ DOWNLOAD __________________________")
-          console.log(criteria.datasetID)
-
         // what happens if the endpoint is hit without a dataset ID?
         // naming convention for the zip file? does it matter?
         // mentions public user, what is that compared to a private user? logging in?
@@ -92,16 +89,18 @@ export function downloadSpatialComponents(): RequestHandler {
             await connection.commit();
 
             const zip = new AdmZip();
+            const fileName = "data.json";
             
-            zip.addFile("test.json", Buffer.from(JSON.stringify(response)), "Making a file");
+            zip.addFile(fileName, Buffer.from(JSON.stringify(response)), "Making a file");
             const zipToSend = await zip.toBuffer()
 
-            res.writeHead(200, {
+            res.set({
+                'Content-Length': Buffer.byteLength(zipToSend),
                 'Content-Type': 'application/zip',
-                'Content-Disposition': `attached; filename="PointData.zip"`
+                'Content-Disposition': `attached; filename="${fileName}"`
             })
-            zip.writeZip("./test.zip");
-            res.end(zipToSend);
+            
+            res.status(200).send(zipToSend.toString("hex"))
         } catch (error) {
             defaultLog.error({ label: 'downloadSpatialComponents', message: 'error', error})
             await connection.rollback();
