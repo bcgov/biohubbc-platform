@@ -79,7 +79,7 @@ export class DarwinCoreService extends DBService {
 
     await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
 
-    await this.create_step7_getSubmissionRecordAndConvertToDWCArchive(submissionId);
+    await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
     await this.create_step8_runSpatialTransforms(submissionId);
 
@@ -250,9 +250,10 @@ export class DarwinCoreService extends DBService {
    * @return {*}
    * @memberof DarwinCoreService
    */
-  async create_step7_getSubmissionRecordAndConvertToDWCArchive(submissionId: number) {
+  async create_step7_normalizeSubmissionDWCA(submissionId: number) {
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
