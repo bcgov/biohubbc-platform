@@ -1,14 +1,18 @@
 import React, { ReactElement } from 'react'
 import { render, RenderOptions } from '@testing-library/react'
 import { ThemeProvider } from '@mui/styles'
+import Keycloak from 'keycloak-js'
 import appTheme from 'themes/appTheme'
+import { ReactKeycloakProvider } from '@react-keycloak/web'
 
 const AllProviders: React.FC<React.PropsWithChildren> = (props) => {
   const { children} = props
   return (
-    <ThemeProvider theme={appTheme}>    
-      {children}
-    </ThemeProvider>
+    <ReactKeycloakProvider authClient={new Keycloak()}>
+      <ThemeProvider theme={appTheme}>    
+        {children}
+      </ThemeProvider>
+    </ReactKeycloakProvider>
   )
 }
 
