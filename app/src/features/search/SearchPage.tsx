@@ -168,9 +168,9 @@ const SearchPage = () => {
 
   return (
     <Box>
-      <Box component={Paper} py={5}>
+      <Box component={Paper} pt={6} pb={7}>
         <Container maxWidth="xl">
-          <Box mt={-1} mb={5}>
+          <Box mb={4}>
             <Typography variant="h1">Find BioHub Datasets</Typography>
           </Box>
           <Formik<IAdvancedSearch>

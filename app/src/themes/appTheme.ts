@@ -25,6 +25,9 @@ const appTheme = createTheme({
     background: {
       default: '#f7f8fa'
     },
+    primary: {
+      main: '#036'
+    },
     bcgovblue: {
       main: '#036',
       contrastText: '#fff',
@@ -49,6 +52,20 @@ const appTheme = createTheme({
           }
         }
       }
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: {
+          fontWeight: '700'
+        }
+      }
+    },
+    MuiDialogActions: {
+      styleOverrides: {
+        root: {
+          padding: '20px 24px'
+        }
+      }
     }
   }
 });
@@ -70,6 +87,5 @@ declare module '@mui/material/Button' {
     bcgovblue: true;
   }
 }
-
 
 export default appTheme;

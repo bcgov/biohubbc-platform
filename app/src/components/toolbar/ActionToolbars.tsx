@@ -131,12 +131,12 @@ export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButto
         onClose={handleClose}
         anchorEl={anchorEl}
         anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'right'
+          vertical: 'top',
+          horizontal: 'left'
         }}
         transformOrigin={{
           vertical: 'top',
-          horizontal: 'right'
+          horizontal: 'left'
         }}
         MenuListProps={{
           'aria-labelledby': 'basic-button'
