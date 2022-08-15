@@ -4,9 +4,10 @@ import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
-import { ISpatialData } from 'interfaces/useSearchApi.interface';
+import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import React from 'react';
+import { isObject } from './Utils';
 
 export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
@@ -14,6 +15,10 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
   for (const spatialRecord of spatialDataRecords) {
+    if (isEmptyObject(spatialRecord.spatial_data)) {
+      continue;
+    }
+
     for (const feature of spatialRecord.spatial_data.features) {
       if (feature.geometry.type === 'GeometryCollection') {
         // Not expecting or supporting geometry collections
@@ -47,6 +52,11 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
   }
 
   return { markerLayers: [occurrencesMarkerLayer], staticLayers: [occurrenceStaticLayer, boundaryStaticLayer] };
+};
+
+export const isEmptyObject = (obj: any): obj is EmptyObject => {
+  // Check if `obj` is an object with no keys (aka: an empty object)
+  return !!(isObject(obj) && !Object.keys(obj).length);
 };
 
 export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeature => {

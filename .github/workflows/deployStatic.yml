@@ -34,6 +34,7 @@ jobs:
   scaleDownPods:
     name: Scale down the pods for this PR
     runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
@@ -52,6 +53,7 @@ jobs:
   checkoutRepo:
     name: Checkout and cache target branch
     runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
@@ -84,7 +86,7 @@ jobs:
   buildDatabase:
     name: Build Database Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -143,7 +145,7 @@ jobs:
   buildDatabaseSetup:
     name: Build Database Setup Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -202,7 +204,7 @@ jobs:
   buildAPI:
     name: Build API Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -261,7 +263,7 @@ jobs:
   buildAPP:
     name: Build APP Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -320,7 +322,7 @@ jobs:
   deployDatabase:
     name: Deploy Database Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -380,7 +382,7 @@ jobs:
   deployDatabaseSetup:
     name: Deploy Database Setup Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -441,7 +443,7 @@ jobs:
   deployAPI:
     name: Deploy API Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -502,7 +504,7 @@ jobs:
   deployAPP:
     name: Deploy APP Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
       BRANCH: ${{ github.base_ref }}
@@ -561,7 +563,7 @@ jobs:
   cycleschemaspy:
     name: Cycle SchemaSpy to refresh after database update in dev
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false && github.base_ref == 'dev' }}
+    if: ${{ github.event.pull_request.merged == true && github.base_ref == 'dev' }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
@@ -583,7 +585,7 @@ jobs:
   clean:
     name: Clean Build/Deployment Artifacts
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == true }}
     needs:
       - deployDatabase
       - deployDatabaseSetup

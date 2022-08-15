@@ -98,10 +98,6 @@ export function getAddSystemRolesHandler(): RequestHandler {
 
       const userObject = await userService.getUserById(userId);
 
-      if (!userObject) {
-        throw new HTTP400('Failed to get system user');
-      }
-
       // Filter out any system roles that have already been added to the user
       const rolesToAdd = roles.filter((role) => !userObject.role_ids.includes(role));
 

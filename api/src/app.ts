@@ -6,7 +6,7 @@ import swaggerUIExperss from 'swagger-ui-express';
 import { defaultPoolConfig, initDBPool } from './database/db';
 import { ensureHTTPError, HTTPErrorType } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
-import { authenticateRequest } from './request-handlers/security/authentication';
+import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
 import { getLogger } from './utils/logger';
 
 const defaultLog = getLogger('app');
@@ -75,9 +75,13 @@ const openAPIFramework = initialize({
     'application/x-www-form-urlencoded': express.urlencoded({ limit: MAX_REQ_BODY_SIZE, extended: true })
   },
   securityHandlers: {
-    // authenticates the request bearer token, for endpoints that specify `Bearer` security
     Bearer: async function (req: any) {
+      // authenticates the request bearer token, for endpoints that specify `Bearer` security
       return authenticateRequest(req);
+    },
+    OptionalBearer: async function (req: any) {
+      // authenticates the request bearer token, if one exists, for endpoints that specify `OptionalBearer` security
+      return authenticateRequestOptional(req);
     }
   },
   errorTransformer: function (openapiError: object, ajvError: object): object {

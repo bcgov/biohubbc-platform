@@ -33,7 +33,7 @@ const HomePage = () => {
   };
 
   return (
-    <Paper square elevation={0}>
+    <Paper square elevation={2}>
       <Container maxWidth="md" className={classes.heroBannerContainer}>
         <Box display="flex" alignContent="center" mt={-2} mb={8}>
           <Typography variant="h1">

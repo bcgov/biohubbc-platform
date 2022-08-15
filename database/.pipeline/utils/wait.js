@@ -2,15 +2,25 @@
 
 const { OpenShiftClientX } = require('pipeline-cli');
 
-const wait = (resourceName, settings, countArg, timeoutArg) => {
+/**
+ * Check that a given resource exists.
+ *
+ * @param {*} resourceName
+ * @param {*} settings
+ * @param {*} numberOfRetries How many times to check for the resource (defaults to 20)
+ * @param {*} timeoutBetweenRetries How many seconds to wait between each check (defaults to 5)
+ * @param {*} initialDelay How many seconds to wait before performing the first check (defaults to 0)
+ */
+const wait = (resourceName, settings, numberOfRetries, timeoutBetweenRetries, initialDelay) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
-  const timeout = timeoutArg || 20000;
-  let count = countArg || 20;
+  const timeout = (timeoutBetweenRetries || 5) * 1000;
+  let count = numberOfRetries || 20;
+  const delay = (initialDelay || 0) * 1000;
 
   const check = () => {
     try {
@@ -108,7 +118,8 @@ const wait = (resourceName, settings, countArg, timeoutArg) => {
     }
   };
 
-  setTimeout(check, timeout + 10000);
+  // Initial execution after `delay` milliseconds
+  setTimeout(check, delay);
 };
 
 module.exports = { wait };
