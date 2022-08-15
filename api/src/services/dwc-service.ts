@@ -10,7 +10,6 @@ import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { ElasticSearchIndices } from './es-service';
-import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
@@ -62,7 +61,7 @@ export class DarwinCoreService extends DBService {
    * Process a new DwCA submission.
    *
    * @param {Express.Multer.File} file
-   * @param {string} dataPackageId
+   * @param {string} dataPackageIsd
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
@@ -546,41 +545,6 @@ export class DarwinCoreService extends DBService {
 
     if (!response.validation) {
       throw new ApiGeneralError('Validation failed');
-    }
-
-    return response;
-  }
-
-  /**
-   * Temp replacement for secure until more requirements are set
-   *
-   * @param {number} submissionId
-   * @return {*}
-   * @memberof DarwinCoreService
-   */
-  async tempSecureSubmission(submissionId: number) {
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
-
-    return { secure: true };
-  }
-
-  /**
-   * Validate Security rules of submission record and set status
-   *
-   * @param {number} submissionId
-   * @param {number} securityId
-   * @return {*} //TODO return type
-   * @memberof DarwinCoreService
-   */
-  async secureSubmission(submissionId: number, securityId: number) {
-    const securityService = new SecurityService(this.connection);
-
-    const securitySchema = await securityService.getSecuritySchemaBySecurityId(securityId); //TODO hardcoded return
-
-    const response = await securityService.validateSecurityOfSubmission(submissionId, securitySchema);
-
-    if (!response.secure) {
-      throw new ApiGeneralError('Secure submission failed');
     }
 
     return response;
