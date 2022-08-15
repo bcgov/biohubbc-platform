@@ -1,4 +1,4 @@
-import { cleanup } from '@testing-library/react';
+import { cleanup } from 'test-helpers/test-utils';
 import { act, renderHook } from '@testing-library/react-hooks';
 import { createMemoryHistory, MemoryHistory } from 'history';
 import React from 'react';

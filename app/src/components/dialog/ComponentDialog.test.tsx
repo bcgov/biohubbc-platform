@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import ComponentDialog from 'components/dialog/ComponentDialog';
 import React from 'react';
 

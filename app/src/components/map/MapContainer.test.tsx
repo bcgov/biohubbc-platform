@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render } from 'test-helpers/test-utils';
 import bbox from '@turf/bbox';
 import React from 'react';
 import { IMarker } from './components/MarkerCluster';

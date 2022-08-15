@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render } from 'test-helpers/test-utils';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';

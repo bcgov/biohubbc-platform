@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { FeatureCollection } from 'geojson';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
