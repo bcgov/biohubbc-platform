@@ -30,6 +30,7 @@ GET.apiDoc = {
 
 export function downloadSpatialComponents(): RequestHandler {
     return async (req, res) => {
+        console.log("________ NEW HOTNESS _______")
         // const criteria = {
         //     type: (req.query.type as string[]) || [],
         //     datasetID: (req.query.datasetID as string[]) || [],
@@ -43,44 +44,28 @@ export function downloadSpatialComponents(): RequestHandler {
         // is there a particular browser we need to target?
 
         // download button built into map: https://www.npmjs.com/package/react-leaflet-easyprint
-
-        console.log("--- THE NEW HOTNESS DOWNLOAD SPATIAL COMPONENTS ---")
-
         const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
         try {
             await connection.open();
             // const spatialService = new SpatialService(connection);
             // const response = await spatialService.findSpatialComponentsByCriteria(criteria);
-
-            /*
-            app.get('/download', (request, response) => {
-            const fileData = 'SGVsbG8sIFdvcmxkIQ=='
-            const fileName = 'hello_world.txt'
-            const fileType = 'text/plain'
-
-            response.writeHead(200, {
-                'Content-Disposition': `attachment; filename="${fileName}"`,
-                'Content-Type': fileType,
-            })
-
-            const download = Buffer.from(fileData, 'base64')
-            response.end(download)
-            })
-            */
-
-            await connection.commit();
+            // await connection.commit();
 
             const zip = new AdmZip();
-            zip.addFile(Date.now() + '.json', Buffer.from(JSON.stringify({msg: "Look at this bad boii"})));
+            const content = "inner content of the file";
+            zip.addFile("test.txt", Buffer.from(content, "utf8"), "entry comment goes here");
             const zipToSend = zip.toBuffer();
 
             res.writeHead(200, {
                 'Content-Type': 'application/zip',
-                'Content-Disposition': `attached; filename="download.zip"`
+                'Content-Disposition': `attached; filename="test.zip"`
             })
-
-            res.end(zipToSend)
+            // get everything as a buffer
+            // var willSendthis = zip.toBuffer();
+            // or write everything to disk
+            // zip.writeZip("./test.zip");
+            res.end(zipToSend);
         } catch (error) {
             defaultLog.error({ label: 'downloadSpatialComponents', message: 'error', error})
             await connection.rollback();

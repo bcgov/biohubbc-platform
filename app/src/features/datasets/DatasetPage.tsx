@@ -97,7 +97,10 @@ const DatasetPage: React.FC = () => {
       datasetID: datasetId
     })
     .then(res => {
+      console.log("______________")
+      console.log(res.data)
       const url = URL.createObjectURL(new Blob([res], {type:  'application/zip'}))
+      console.log(url)
       window.location.href = url;
     })
     .finally(() => {
