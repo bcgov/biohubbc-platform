@@ -70,28 +70,41 @@ export class DarwinCoreService extends DBService {
     const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
 
     await this.create_step2_uploadRecordToS3(submissionId, file);
+
     await this.create_step3_validateSubmission(submissionId);
+
     await this.create_step4_secureSubmission(submissionId);
+
     await this.create_step5_ingestEML(submissionId);
+
     await this.create_step6_convertEMLToJsonAndSave(submissionId);
+
     await this.create_step7_transformAndUploadMetaData(submissionId, dataPackageId);
+
     await this.create_step8_getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
     await this.create_step9_runSpatialTransformsAndSave(submissionId);
+
     await this.create_step10_runSecurityTransforms(submissionId);
   }
 
+  /**
+   * Step 1 in processing a DWC archive file: ingest the file and generated a submissionId
+   *
+   * @param {Express.Multer.File} file
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<number>}
+   * @memberof DarwinCoreService
+   */
   async create_step1_ingestDWC(file: Express.Multer.File, dataPackageId: string): Promise<number> {
     let submissionId = 0;
 
-    //Step 1: ingest dwca file and save record in db. additionally
     try {
       const ingest = await this.ingestNewDwCADataPackage(file, dataPackageId);
 
       submissionId = ingest.submissionId;
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
-
-      console.log('step 1 done');
 
       return submissionId;
     } catch (error: any) {
@@ -106,8 +119,6 @@ export class DarwinCoreService extends DBService {
       await this.uploadRecordToS3(submissionId, file);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
-
-      console.log('step 2 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'uploadRecordToS3', message: 'error', error });
 
@@ -127,7 +138,6 @@ export class DarwinCoreService extends DBService {
       await this.tempValidateSubmission(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.VALIDATED);
-      console.log('step 3 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'tempValidateSubmission', message: 'error', error });
 
@@ -147,7 +157,6 @@ export class DarwinCoreService extends DBService {
       await this.tempSecureSubmission(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
-      console.log('step 4 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
 
@@ -167,7 +176,6 @@ export class DarwinCoreService extends DBService {
       await this.ingestNewDwCAEML(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_INGESTED);
-      console.log('step 5 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'ingestNewDwCAEML', message: 'error', error });
 
@@ -187,7 +195,6 @@ export class DarwinCoreService extends DBService {
       await this.convertSubmissionEMLtoJSON(submissionId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.EML_TO_JSON);
-      console.log('step 6 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'convertSubmissionEMLtoJSON', message: 'error', error });
 
@@ -207,8 +214,6 @@ export class DarwinCoreService extends DBService {
       await this.transformAndUploadMetaData(submissionId, dataPackageId);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
-
-      console.log('step 7 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
 
@@ -229,8 +234,6 @@ export class DarwinCoreService extends DBService {
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
-
-      console.log('step 8 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'normalizeSubmissionDWCA', message: 'error', error });
 
@@ -253,8 +256,6 @@ export class DarwinCoreService extends DBService {
         submissionId,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
       );
-
-      console.log('step 9 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'runSpatialTransform', message: 'error', error });
 
@@ -276,7 +277,6 @@ export class DarwinCoreService extends DBService {
         submissionId,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
       );
-      console.log('step 10 done');
     } catch (error: any) {
       defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
 
