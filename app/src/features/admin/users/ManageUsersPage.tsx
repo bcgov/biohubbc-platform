@@ -1,6 +1,4 @@
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
-import Typography from '@mui/material/Typography';
 import { useApi } from 'hooks/useApi';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import React, { useEffect, useState } from 'react';
@@ -45,13 +43,8 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   }, [biohubApi, isLoadingActiveUsers, hasLoadedActiveUsers]);
 
   return (
-    <Box py={5}>
-      <Container maxWidth="xl">
-        <Box mt={-1} mb={5}>
-          <Typography variant="h1">Manage Users</Typography>
-        </Box>
-        <ActiveUsersList activeUsers={activeUsers} refresh={refreshActiveUsers} />
-      </Container>
+    <Box py={6}>
+      <ActiveUsersList activeUsers={activeUsers} refresh={refreshActiveUsers} />
     </Box>
   );
 };

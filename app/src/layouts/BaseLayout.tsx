@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
-import Alert from '@mui/lab/Alert';
+import Alert from '@mui/material/Alert';
 import Footer from 'components/layout/footer/Footer';
 import Header from 'components/layout/header/Header';
 import { DialogContextProvider } from 'contexts/dialogContext';
