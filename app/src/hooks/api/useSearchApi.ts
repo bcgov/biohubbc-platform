@@ -44,7 +44,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const downloadSpatialData = async ( criteria: {
+  const getSpatialDataFile = async ( criteria: {
     boundary: Feature;
     type: string[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
@@ -74,7 +74,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     keywordSearch,
     getSpatialData,
     getSpatialMetadata,
-    downloadSpatialData
+    getSpatialDataFile
   };
 };
 

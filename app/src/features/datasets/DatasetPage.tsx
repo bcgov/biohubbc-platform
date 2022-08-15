@@ -50,7 +50,7 @@ const DatasetPage: React.FC = () => {
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
   const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
-    biohubApi.search.downloadSpatialData({
+    biohubApi.search.getSpatialDataFile({
       boundary: searchBoundary,
       type: searchType,
       zoom: searchZoom,
