@@ -31,7 +31,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     zoom?: number; // TODO include in request params when backend is updated to receive it
     datasetID?: string;
   }): Promise<ISpatialData[]> => {
-    const { data }= await axios.get(`/api/dwc/spatial/search`, {
+    const { data } = await axios.get(`/api/dwc/spatial/search`, {
       params: { boundary: criteria.boundary, type: criteria.type, datasetID: criteria.datasetID }
     });
 
@@ -40,6 +40,7 @@ const useSearchApi = (axios: AxiosInstance) => {
 
   const getSpatialMetadata = async (submissionSpatialComponentId: number): Promise<ISpatialMetadata> => {
     const { data } = await axios.get(`/api/dwc/spatial/${submissionSpatialComponentId}/metadata`);
+
     return data;
   };
 

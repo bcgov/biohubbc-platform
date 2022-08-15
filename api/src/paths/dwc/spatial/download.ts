@@ -12,9 +12,13 @@ const defaultLog = getLogger('paths/dwc/eml/download');
 export const GET: Operation = [downloadSpatialComponents()];
 
 GET.apiDoc = {
-    description: '',
-    tags: [],
-    security: [],
+    description: 'Archived search results for spatial components.',
+    tags: ['spatial', 'search', 'download'],
+    security: [
+        {
+            OptionalBearer: []
+        }
+    ],
     parameters: [
         {
           in: 'query',
@@ -52,11 +56,12 @@ GET.apiDoc = {
       ],
     responses: {
         200: {
-          description: '',
+          description: 'Archived spatial components response object.',
           content: {
             'application/zip': {
                 schema: {
-                    type: "string"
+                    type: "string",
+                    description: "Buffer of the arcived search results."
                 }
             }
           }
@@ -84,7 +89,7 @@ export function downloadSpatialComponents(): RequestHandler {
             const zip = new AdmZip();
             const fileName = "data.json";
             
-            zip.addFile(fileName, Buffer.from(JSON.stringify(response)), "Making a file");
+            zip.addFile(fileName, Buffer.from(JSON.stringify(response)), "Search results.");
             const zipToSend = await zip.toBuffer()
 
             res.set({
