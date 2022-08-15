@@ -48,9 +48,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
 
   const dialogContext = useContext(DialogContext);
 
-  const rolesDataLoader = useDataLoader(() => {
-    return biohubApi.user.getRoles();
-  });
+  const rolesDataLoader = useDataLoader(() => biohubApi.user.getRoles());
 
   rolesDataLoader.load();
 

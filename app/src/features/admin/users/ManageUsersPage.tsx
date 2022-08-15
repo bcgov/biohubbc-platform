@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import { useApi } from 'hooks/useApi';
-import { IGetUserResponse } from 'interfaces/useUserApi.interface';
-import React, { useEffect, useState } from 'react';
+import useDataLoader from 'hooks/useDataLoader';
+import React from 'react';
 import ActiveUsersList from './ActiveUsersList';
 
 /**
@@ -12,39 +12,12 @@ import ActiveUsersList from './ActiveUsersList';
 const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   const biohubApi = useApi();
 
-  const [activeUsers, setActiveUsers] = useState<IGetUserResponse[]>([]);
-  const [isLoadingActiveUsers, setIsLoadingActiveUsers] = useState(false);
-  const [hasLoadedActiveUsers, setHasLoadedActiveUsers] = useState(false);
-
-  const refreshActiveUsers = async () => {
-    const activeUsersResponse = await biohubApi.user.getUsersList();
-
-    setActiveUsers(activeUsersResponse);
-  };
-
-  useEffect(() => {
-    const getActiveUsers = async () => {
-      const activeUsersResponse = await biohubApi.user.getUsersList();
-
-      setActiveUsers(() => {
-        setHasLoadedActiveUsers(true);
-        setIsLoadingActiveUsers(false);
-        return activeUsersResponse;
-      });
-    };
-
-    if (hasLoadedActiveUsers || isLoadingActiveUsers) {
-      return;
-    }
-
-    setIsLoadingActiveUsers(true);
-
-    getActiveUsers();
-  }, [biohubApi, isLoadingActiveUsers, hasLoadedActiveUsers]);
+  const usersDataLoader = useDataLoader(() => biohubApi.user.getUsersList());
+  usersDataLoader.load();
 
   return (
     <Box py={7}>
-      <ActiveUsersList activeUsers={activeUsers} refresh={refreshActiveUsers} />
+      <ActiveUsersList activeUsers={usersDataLoader.data || []} refresh={usersDataLoader.refresh} />
     </Box>
   );
 };

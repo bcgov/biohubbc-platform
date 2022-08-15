@@ -1,8 +1,8 @@
 import { useKeycloak } from '@react-keycloak/web';
-import { IGetUserResponse } from 'interfaces/useUserApi.interface';
 import { KeycloakInstance } from 'keycloak-js';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { useApi } from './useApi';
+import useDataLoader from './useDataLoader';
 
 export enum SYSTEM_IDENTITY_SOURCE {
   BCEID = 'BCEID',
@@ -108,16 +108,31 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const biohubApi = useApi();
 
-  const [systemUser, setSystemUser] = useState<IGetUserResponse>();
-  const [shouldLoadSystemUser, setShouldLoadSystemUser] = useState<boolean>(false);
-  const [isSystemUserLoading, setIsSystemUserLoading] = useState<boolean>(false);
-  const [hasLoadedSystemUser, setHasLoadedSystemUser] = useState<boolean>(false);
+  const keycloakUserDataLoader = useDataLoader(async () => {
+    return (keycloak && (keycloak.loadUserInfo() as IUserInfo)) || undefined;
+  });
 
-  const [keycloakUser, setKeycloakUser] = useState<IUserInfo | null>(null);
-  const [isKeycloakUserLoading, setIsKeycloakUserLoading] = useState<boolean>(false);
+  const userDataLoader = useDataLoader(() => biohubApi.user.getUser());
 
-  const [shouldLoadAccessRequest, setShouldLoadAccessRequest] = useState<boolean>(false);
-  const [hasAccessRequest, setHasAccessRequest] = useState<boolean>(false);
+  const hasPendingAdministrativeActivitiesDataLoader = useDataLoader(() =>
+    biohubApi.admin.hasPendingAdministrativeActivities()
+  );
+
+  if (keycloak) {
+    // keycloak is ready, load keycloak user info
+    keycloakUserDataLoader.load();
+  }
+
+  if (keycloak?.authenticated) {
+    // keycloak user is authenticated, load system user info
+    userDataLoader.load();
+
+    if (userDataLoader.data && (!userDataLoader.data.role_names.length || userDataLoader.data?.user_record_end_date)) {
+      // Authenticated user either has has no roles or has been deactivated
+      // Check if the user has a pending access request
+      hasPendingAdministrativeActivitiesDataLoader.load();
+    }
+  }
 
   /**
    * Parses out the username portion of the preferred_username from the token.
@@ -126,14 +141,14 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @return {*} {(string | null)}
    */
   const getUserIdentifier = useCallback((): string | null => {
-    const userIdentifier = keycloakUser?.['preferred_username']?.split('@')?.[0];
+    const userIdentifier = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[0];
 
     if (!userIdentifier) {
       return null;
     }
 
     return userIdentifier;
-  }, [keycloakUser]);
+  }, [keycloakUserDataLoader.data]);
 
   /**
    * Parses out the identity source portion of the preferred_username from the token.
@@ -142,7 +157,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @return {*} {(string | null)}
    */
   const getIdentitySource = useCallback((): SYSTEM_IDENTITY_SOURCE | null => {
-    const identitySource = keycloakUser?.['preferred_username']?.split('@')?.[1].toUpperCase();
+    const identitySource = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[1].toUpperCase();
 
     if (!identitySource) {
       return null;
@@ -157,93 +172,14 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     }
 
     return null;
-  }, [keycloakUser]);
-
-  useEffect(() => {
-    const getrestorationTrackerUser = async () => {
-      let userDetails: IGetUserResponse;
-
-      try {
-        userDetails = await biohubApi.user.getUser();
-      } catch {
-        //do nothing
-      }
-
-      setSystemUser(() => {
-        if (userDetails?.role_names?.length && !userDetails?.user_record_end_date) {
-          setHasLoadedSystemUser(true);
-        } else {
-          setShouldLoadAccessRequest(true);
-        }
-
-        return userDetails;
-      });
-    };
-
-    if (!keycloak?.authenticated) {
-      return;
-    }
-
-    if (isSystemUserLoading || (systemUser && !shouldLoadSystemUser)) {
-      return;
-    }
-
-    setIsSystemUserLoading(true);
-
-    getrestorationTrackerUser();
-  }, [keycloak, systemUser, isSystemUserLoading, shouldLoadSystemUser, biohubApi.user]);
-
-  useEffect(() => {
-    const getSystemAccessRequest = async () => {
-      let accessRequests: number;
-
-      try {
-        accessRequests = await biohubApi.admin.hasPendingAdministrativeActivities();
-      } catch {
-        // do nothing
-      }
-      setHasAccessRequest(() => {
-        setHasLoadedSystemUser(true);
-        return accessRequests > 0;
-      });
-    };
-
-    if (!keycloak?.authenticated) {
-      return;
-    }
-
-    if (!keycloakUser || !shouldLoadAccessRequest) {
-      return;
-    }
-
-    getSystemAccessRequest();
-  }, [keycloak, biohubApi.admin, getUserIdentifier, hasAccessRequest, keycloakUser, shouldLoadAccessRequest]);
-
-  useEffect(() => {
-    const getKeycloakUser = async () => {
-      const user = (await keycloak?.loadUserInfo()) as IUserInfo;
-      setKeycloakUser(user);
-    };
-
-    if (!keycloak?.authenticated) {
-      return;
-    }
-
-    if (keycloakUser || isKeycloakUserLoading || !keycloak?.authenticated) {
-      return;
-    }
-
-    setIsKeycloakUserLoading(true);
-
-    getKeycloakUser();
-  }, [keycloak, keycloakUser, isKeycloakUserLoading]);
+  }, [keycloakUserDataLoader.data]);
 
   const systemUserId = (): number => {
-    return systemUser?.id || 0;
+    return userDataLoader.data?.id || 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return systemUser?.role_names || [];
+    return userDataLoader.data?.role_names || [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
@@ -261,41 +197,36 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   const username = (): string | undefined => {
-    return keycloakUser?.preferred_username;
+    return keycloakUserDataLoader.data?.preferred_username;
   };
 
   const displayName = (): string | undefined => {
-    return keycloakUser?.name || keycloakUser?.preferred_username;
+    return keycloakUserDataLoader.data?.name || keycloakUserDataLoader.data?.preferred_username;
   };
 
   const email = (): string | undefined => {
-    return keycloakUser?.email;
+    return keycloakUserDataLoader.data?.email;
   };
 
   const firstName = (): string | undefined => {
-    return keycloakUser?.firstName;
+    return keycloakUserDataLoader.data?.firstName;
   };
 
   const lastName = (): string | undefined => {
-    return keycloakUser?.lastName;
+    return keycloakUserDataLoader.data?.lastName;
   };
 
   const refresh = () => {
-    // refresh system user
-    setHasLoadedSystemUser(false);
-    setIsSystemUserLoading(false);
-    setShouldLoadSystemUser(true);
-
-    // refresh access requests
-    setShouldLoadAccessRequest(true);
+    userDataLoader.refresh();
+    hasPendingAdministrativeActivitiesDataLoader.refresh();
   };
 
   return {
     keycloak: keycloak,
-    hasLoadedAllUserInfo: hasLoadedSystemUser,
+    hasLoadedAllUserInfo: !!(userDataLoader.data || hasPendingAdministrativeActivitiesDataLoader.data),
     systemRoles: getSystemRoles(),
     hasSystemRole,
-    hasAccessRequest,
+    hasAccessRequest: !!hasPendingAdministrativeActivitiesDataLoader.data,
     getUserIdentifier,
     getIdentitySource,
     username: username(),
