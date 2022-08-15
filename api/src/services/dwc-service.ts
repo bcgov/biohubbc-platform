@@ -244,7 +244,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 7 in processing a DWC archive file: get submission record and convert to DWC Archive
+   * Step 7 in processing a DWC archive file: normalize the dwc archive file
    *
    * @param {number} submissionId
    * @return {*}
