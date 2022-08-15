@@ -104,7 +104,7 @@ describe('AccessRequestPage', () => {
 
       fireEvent.click(getByText('Log out'));
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(history.location.pathname).toEqual('/logout');
       });
     });
