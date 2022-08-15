@@ -49,6 +49,14 @@ const DatasetPage: React.FC = () => {
   const datasetId = urlParams['id'];
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
+  const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
+    biohubApi.search.downloadSpatialData({
+      boundary: searchBoundary,
+      type: searchType,
+      zoom: searchZoom,
+      datasetID: datasetId
+    })
+  )
 
   useDataLoaderError(datasetDataLoader, () => {
     return {
@@ -79,6 +87,14 @@ const DatasetPage: React.FC = () => {
     })
   );
 
+  useDataLoaderError(fileDataLoader, () => {
+    return {
+      dialogTitle: 'Error generating file',
+      dialogText:
+        'An error has occurred while attempting to archive and download occurance data, please try again. If the error persists, please contact your system administrator.'
+    };
+  })
+
   useDataLoaderError(mapDataLoader, () => {
     return {
       dialogTitle: 'Error Loading Map Data',
@@ -91,28 +107,31 @@ const DatasetPage: React.FC = () => {
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
   const downloadDataSet = () => {
-    biohubApi.search.downloadSpatialData({
-      boundary: ALL_OF_BC_BOUNDARY,
-      type: [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
-      zoom: MAP_DEFAULT_ZOOM,
-      datasetID: datasetId
-    })
-    .then(res => {
-      // decode data to avoid file corruption
-      const content = Buffer.from(res, "hex");
-      const blob = new Blob([content], {type: 'application/zip'})
-      const link = document.createElement('a');
-
-      link.download = 'PointData.zip';
-      link.href = URL.createObjectURL(blob);
-      link.click();
-
-      URL.revokeObjectURL(link.href);
-    })
-    .finally(() => {
-      console.log("File downloaded")
-    })
+    console.log("Download Data Set")
+    fileDataLoader.refresh(
+      ALL_OF_BC_BOUNDARY,
+      [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+      MAP_DEFAULT_ZOOM
+    )
   }
+
+  useEffect(() => {
+    if (!fileDataLoader.data) {
+      return;
+    }
+
+    const data = fileDataLoader.data;
+    const content = Buffer.from(data, "hex");
+    const blob = new Blob([content], {type: 'application/zip'});
+    const link = document.createElement('a');
+
+    link.download = `${datasetId}.zip`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+
+    URL.revokeObjectURL(link.href);
+    fileDataLoader.clear();
+  }, [fileDataLoader.data])
 
   useEffect(() => {
     if (!mapDataLoader.data) {

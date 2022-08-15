@@ -53,6 +53,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     const { data } = await axios.get(`/api/dwc/spatial/download`, {
       params: { boundary: criteria.boundary, type: criteria.type, datasetID: criteria.datasetID }
     })
+
     return data;
   }
 

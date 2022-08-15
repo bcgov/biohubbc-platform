@@ -87,7 +87,7 @@ export function downloadSpatialComponents(): RequestHandler {
             await connection.commit();
 
             const zip = new AdmZip();
-            const fileName = "data.json";
+            const fileName = `results.json`;
             
             zip.addFile(fileName, Buffer.from(JSON.stringify(response)), "Search results.");
             const zipToSend = await zip.toBuffer()
