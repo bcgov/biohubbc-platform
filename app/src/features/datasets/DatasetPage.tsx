@@ -97,11 +97,26 @@ const DatasetPage: React.FC = () => {
       datasetID: datasetId
     })
     .then(res => {
-      console.log("______________")
-      console.log(res.data)
-      const url = URL.createObjectURL(new Blob([res], {type:  'application/zip'}))
-      console.log(url)
-      window.location.href = url;
+      // working, kinda, not sure how other browsers will handle this
+      // const url = URL.createObjectURL(new Blob([res], {type:  'application/zip'}))
+      // window.location.href = url;
+
+      // console.log(`Data from API: ${res}`)
+      // console.log(res)
+      // console.log(typeof res)
+
+
+
+      
+
+      const link = document.createElement('a');
+      link.download = 'PointData.zip';
+      // const temp = new Blob([ArrayBuffer()])
+      let blob = new Blob([res], {type: 'application/zip'});
+      link.href = URL.createObjectURL(blob);
+      link.click();
+
+      URL.revokeObjectURL(link.href);
     })
     .finally(() => {
       console.log("File downloaded")

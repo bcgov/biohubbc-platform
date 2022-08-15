@@ -1,11 +1,10 @@
 import AdmZip from "adm-zip";
 import { RequestHandler } from "express";
 import { Operation } from "express-openapi";
-// import { Feature } from 'geojson';
+import { Feature } from 'geojson';
 import { getAPIUserDBConnection, getDBConnection } from "../../../database/db";
-// import { GeoJSONFeatureCollection } from "../../../openapi/schemas/geoJson";
 import { defaultErrorResponses } from "../../../openapi/schemas/http-responses";
-// import { SpatialService } from "../../../services/spatial-service";
+import { SpatialService } from "../../../services/spatial-service";
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/download');
@@ -16,12 +15,50 @@ GET.apiDoc = {
     description: '',
     tags: [],
     security: [],
-    parameters: [],
+    parameters: [
+        {
+          in: 'query',
+          name: 'boundary',
+          required: true,
+          schema: {
+            type: 'string'
+          },
+          description: 'A stringified GeoJSON Feature. Will return results that intersect the feature.'
+        },
+        {
+          in: 'query',
+          name: 'type',
+          schema: {
+            type: 'array',
+            items: {
+              type: 'string'
+            },
+            nullable: true
+          },
+          description: 'An array of spatial component types to filter on. Will return results that match any of the types.'
+        },
+        {
+          in: 'query',
+          name: 'datasetID',
+          schema: {
+            type: 'array',
+            items: {
+              type: 'string'
+            },
+            nullable: true
+          },
+          description: 'An array of dataset IDs. Will return results that belong to any of the dataset IDs.'
+        }
+      ],
     responses: {
         200: {
           description: '',
           content: {
-            'application/zip': {}
+            'application/zip': {
+                schema: {
+                    type: "string"
+                }
+            }
           }
         },
         ...defaultErrorResponses
@@ -30,12 +67,14 @@ GET.apiDoc = {
 
 export function downloadSpatialComponents(): RequestHandler {
     return async (req, res) => {
-        console.log("________ NEW HOTNESS _______")
-        // const criteria = {
-        //     type: (req.query.type as string[]) || [],
-        //     datasetID: (req.query.datasetID as string[]) || [],
-        //     boundary: JSON.parse(req.query.boundary as string) as Feature
-        // };
+        const criteria = {
+            type: (req.query.type as string[]) || [],
+            datasetID: (req.query.datasetID as string[]) || [],
+            boundary: JSON.parse(req.query.boundary as string) as Feature
+          };
+
+          console.log("_______________________ DOWNLOAD __________________________")
+          console.log(criteria.datasetID)
 
         // what happens if the endpoint is hit without a dataset ID?
         // naming convention for the zip file? does it matter?
@@ -48,23 +87,20 @@ export function downloadSpatialComponents(): RequestHandler {
 
         try {
             await connection.open();
-            // const spatialService = new SpatialService(connection);
-            // const response = await spatialService.findSpatialComponentsByCriteria(criteria);
-            // await connection.commit();
+            const spatialService = new SpatialService(connection);
+            const response = await spatialService.findSpatialComponentsByCriteria(criteria);
+            await connection.commit();
 
             const zip = new AdmZip();
-            const content = "inner content of the file";
-            zip.addFile("test.txt", Buffer.from(content, "utf8"), "entry comment goes here");
-            const zipToSend = zip.toBuffer();
+            
+            zip.addFile("test.json", Buffer.from(JSON.stringify(response)), "Making a file");
+            const zipToSend = await zip.toBuffer()
 
             res.writeHead(200, {
                 'Content-Type': 'application/zip',
-                'Content-Disposition': `attached; filename="test.zip"`
+                'Content-Disposition': `attached; filename="PointData.zip"`
             })
-            // get everything as a buffer
-            // var willSendthis = zip.toBuffer();
-            // or write everything to disk
-            // zip.writeZip("./test.zip");
+            zip.writeZip("./test.zip");
             res.end(zipToSend);
         } catch (error) {
             defaultLog.error({ label: 'downloadSpatialComponents', message: 'error', error})
