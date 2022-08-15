@@ -40,6 +40,9 @@ export function downloadSpatialComponents(): RequestHandler {
         // naming convention for the zip file? does it matter?
         // mentions public user, what is that compared to a private user? logging in?
         // how can I setup my data so things are public/ private
+        // is there a particular browser we need to target?
+
+        // download button built into map: https://www.npmjs.com/package/react-leaflet-easyprint
 
         console.log("--- THE NEW HOTNESS DOWNLOAD SPATIAL COMPONENTS ---")
 
@@ -72,14 +75,12 @@ export function downloadSpatialComponents(): RequestHandler {
             zip.addFile(Date.now() + '.json', Buffer.from(JSON.stringify({msg: "Look at this bad boii"})));
             const zipToSend = zip.toBuffer();
 
-            // res.status(200).json(response.map((item) => item.spatial_component));
-            // res.status(200).sendFile(zipToSend.toString())
             res.writeHead(200, {
-                'Content-Disposition': `attachment; filename="download.zip"`,
-                'Content-Type': 'application/zip'
+                'Content-Type': 'application/zip',
+                'Content-Disposition': `attached; filename="download.zip"`
             })
-            .end(zipToSend)
-            // res.status(200).end(zipToSend)
+
+            res.end(zipToSend)
         } catch (error) {
             defaultLog.error({ label: 'downloadSpatialComponents', message: 'error', error})
             await connection.rollback();

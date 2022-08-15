@@ -1,4 +1,5 @@
-import { Theme } from '@material-ui/core';
+import { Button, Theme } from '@material-ui/core';
+import DownloadIcon from '@material-ui/icons/GetApp'
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
@@ -88,6 +89,22 @@ const DatasetPage: React.FC = () => {
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
+  const downloadDataSet = () => {
+    biohubApi.search.downloadSpatialData({
+      boundary: ALL_OF_BC_BOUNDARY,
+      type: [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+      zoom: MAP_DEFAULT_ZOOM,
+      datasetID: datasetId
+    })
+    .then(res => {
+      const url = URL.createObjectURL(new Blob([res], {type:  'application/zip'}))
+      window.location.href = url;
+    })
+    .finally(() => {
+      console.log("File downloaded")
+    })
+  }
+
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;
@@ -124,6 +141,10 @@ const DatasetPage: React.FC = () => {
         <Box py={5}>
           <Card data-testid="MapContainer">
             <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+            <Button
+              onClick={downloadDataSet}>
+              <DownloadIcon />
+            </Button>
             <Box p={2} pt={0} className={classes.datasetMapContainer}>
               <MapContainer
                 mapId="boundary_map"
