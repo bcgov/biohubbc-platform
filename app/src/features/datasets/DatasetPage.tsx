@@ -1,4 +1,6 @@
-import { Button, Grid, Theme } from '@material-ui/core';
+import Grid from '@material-ui/core/Grid';
+import Button from '@material-ui/core/Button';
+import { Theme } from '@material-ui/core/styles/createMuiTheme';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
@@ -89,7 +91,7 @@ const DatasetPage: React.FC = () => {
 
   useDataLoaderError(fileDataLoader, () => {
     return {
-      dialogTitle: 'Error generating file',
+      dialogTitle: 'Error Exporting Data',
       dialogText:
         'An error has occurred while attempting to archive and download occurance data, please try again. If the error persists, please contact your system administrator.'
     };
