@@ -10,13 +10,26 @@ import AccessRequestPage from './AccessRequestPage';
 
 const history = createMemoryHistory();
 
-jest.mock('../../hooks/useApi');
+const mockCreateAdministrativeActivity = jest.fn()
+
+jest.mock('../../hooks/useApi', () => jest.fn().mockImplementation(() => {
+  return {
+    admin: {
+      createAdministrativeActivity: mockCreateAdministrativeActivity
+    }
+  }
+}));
+
+/*
 const mockUseApi = {
   admin: {
     createAdministrativeActivity: jest.fn()
   }
 };
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+*/
+
+
+// const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = () => {
   const authState = getMockAuthState({
@@ -54,7 +67,7 @@ const renderContainer = () => {
 describe('AccessRequestPage', () => {
   beforeEach(() => {
     // clear mocks before each test
-    mockBiohubApi().admin.createAdministrativeActivity.mockClear();
+    mockCreateAdministrativeActivity.mockClear();
   });
 
   afterEach(() => {
@@ -111,7 +124,7 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('processes a successful request submission', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity.mockResolvedValue({
+    mockCreateAdministrativeActivity.mockResolvedValue({
       id: 1
     });
 
@@ -170,7 +183,7 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('shows error dialog with api error message when submission fails', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity = jest.fn(() => Promise.reject(new Error('API Error is Here')));
+    mockCreateAdministrativeActivity.mockImplementationOnce(() => Promise.reject(new Error('API Error is Here')));
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
 
@@ -198,7 +211,7 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('shows error dialog with default error message when response from createAdministrativeActivity is invalid', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity.mockResolvedValue({
+    mockCreateAdministrativeActivity.mockResolvedValue({
       id: null
     });
 
