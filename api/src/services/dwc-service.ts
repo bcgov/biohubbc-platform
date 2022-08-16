@@ -61,7 +61,7 @@ export class DarwinCoreService extends DBService {
    * Process a new DwCA submission.
    *
    * @param {Express.Multer.File} file
-   * @param {string} dataPackageIsd
+   * @param {string} dataPackageId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
@@ -121,7 +121,9 @@ export class DarwinCoreService extends DBService {
    */
   async create_step2_uploadRecordToS3(submissionId: number, file: Express.Multer.File): Promise<void> {
     try {
-      await this.uploadRecordToS3(submissionId, file);
+      const uploadResult = await this.uploadRecordToS3(submissionId, file);
+
+      console.log('upload result: ', uploadResult);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
     } catch (error: any) {

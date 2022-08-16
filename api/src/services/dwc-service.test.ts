@@ -6,7 +6,12 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
-import { ISourceTransformModel, ISubmissionModel } from '../repositories/submission-repository';
+import {
+  ISourceTransformModel,
+  ISubmissionModel,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE
+} from '../repositories/submission-repository';
 import { IStyleModel } from '../repositories/validation-repository';
 import { ElasticSearchIndices } from '../services/es-service';
 import * as fileUtils from '../utils/file-utils';
@@ -515,14 +520,16 @@ describe('DarwinCoreService', () => {
         buffer: Buffer.from('file1data')
       } as unknown as Express.Multer.File;
 
-      sinon.stub(DarwinCoreService.prototype, 'create_step1_ingestDWC').resolves(1);
+      const ingestDWCStub = sinon.stub(DarwinCoreService.prototype, 'create_step1_ingestDWC').resolves(1);
 
-      sinon.stub(DarwinCoreService.prototype, 'create_step2_uploadRecordToS3').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'create_step3_validateSubmission').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'create_step4_ingestEML').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'create_step5_convertEMLToJSON').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'create_step6_transformAndUploadMetaData').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'create_step7_normalizeSubmissionDWCA').resolves();
+      const uploadStub = sinon.stub(DarwinCoreService.prototype, 'create_step2_uploadRecordToS3').resolves();
+      const validateStub = sinon.stub(DarwinCoreService.prototype, 'create_step3_validateSubmission').resolves();
+      const ingestEMLStub = sinon.stub(DarwinCoreService.prototype, 'create_step4_ingestEML').resolves();
+      const convertEMLToJSONStub = sinon.stub(DarwinCoreService.prototype, 'create_step5_convertEMLToJSON').resolves();
+      const spatialTransformStub = sinon
+        .stub(DarwinCoreService.prototype, 'create_step6_transformAndUploadMetaData')
+        .resolves();
+      const normalizeStub = sinon.stub(DarwinCoreService.prototype, 'create_step7_normalizeSubmissionDWCA').resolves();
 
       const runSpatialTransformsStub = sinon
         .stub(DarwinCoreService.prototype, 'create_step8_runSpatialTransforms')
@@ -531,13 +538,17 @@ describe('DarwinCoreService', () => {
         .stub(DarwinCoreService.prototype, 'create_step9_runSecurityTransforms')
         .resolves();
 
-      try {
-        await darwinCoreService.create(multerFile, 'dataPackageId');
-        expect.fail();
-      } catch (actualError) {
-        expect(runSpatialTransformsStub).to.be.calledWith(1);
-        expect(runSecurityTransformsStub).to.be.calledWith(1);
-      }
+      await darwinCoreService.create(multerFile, 'dataPackageId');
+
+      expect(ingestDWCStub).to.be.calledWith(multerFile, 'dataPackageId');
+      expect(uploadStub).to.be.calledWith(1);
+      expect(validateStub).to.be.calledWith(1);
+      expect(ingestEMLStub).to.be.calledWith(1);
+      expect(convertEMLToJSONStub).to.be.calledWith(1);
+      expect(spatialTransformStub).to.be.calledWith(1);
+      expect(normalizeStub).to.be.calledWith(1);
+      expect(runSpatialTransformsStub).to.be.calledWith(1);
+      expect(runSecurityTransformsStub).to.be.calledWith(1);
     });
   });
 
@@ -545,21 +556,23 @@ describe('DarwinCoreService', () => {
     afterEach(() => {
       sinon.restore();
     });
+
+    const multerFile = {
+      originalname: 'file1.txt',
+      buffer: Buffer.from('file1data')
+    } as unknown as Express.Multer.File;
     it('should succeed with valid input', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      const prepDWCArchiveStub = sinon
+      const ingestDWCStub = sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
-        .resolves({ dataPackageId: 'abcd', submissionId: 1 });
+        .resolves({ dataPackageId: 'dataPackageId', submissionId: 1 });
       const insertSubmissionRecordStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
 
-      const response = await darwinCoreService.create_step1_ingestDWC(
-        { originalname: 'name' } as unknown as Express.Multer.File,
-        'string'
-      );
-
-      expect(prepDWCArchiveStub).to.be.calledOnce;
+      const response = await darwinCoreService.create_step1_ingestDWC(multerFile, 'dataPackageId');
+      expect(ingestDWCStub).to.be.calledOnce;
+      expect(ingestDWCStub).to.be.calledWith(multerFile, 'dataPackageId');
 
       expect(response).to.eql(1);
       expect(insertSubmissionRecordStub).to.be.calledOnce;
@@ -569,19 +582,430 @@ describe('DarwinCoreService', () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-      sinon
+      const ingestDWCStub = sinon
         .stub(DarwinCoreService.prototype, 'ingestNewDwCADataPackage')
         .resolves({ dataPackageId: 'abcd', submissionId: 1 });
 
       try {
-        await darwinCoreService.create_step1_ingestDWC(
-          { originalname: 'name' } as unknown as Express.Multer.File,
-          'string'
-        );
-
+        await darwinCoreService.create_step1_ingestDWC(multerFile, 'dataPackageId');
         expect.fail();
       } catch (actualError) {
+        expect(ingestDWCStub).to.be.calledWith(multerFile, 'dataPackageId');
         expect((actualError as ApiGeneralError).message).to.equal('Ingestion failed');
+      }
+    });
+  });
+
+  describe('create_step2_uploadRecordToS3', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    const multerFile = {
+      originalname: 'file1.txt',
+      buffer: Buffer.from('file1data')
+    } as unknown as Express.Multer.File;
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const uploadStub = sinon.stub(DarwinCoreService.prototype, 'uploadRecordToS3').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step2_uploadRecordToS3(1, multerFile);
+
+      expect(uploadStub).to.be.calledOnce;
+      expect(uploadStub).to.be.calledWith(1, multerFile);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.UPLOADED);
+    });
+
+    it('should throw an error when uploading record to s3 fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const uploadRecordToS3Stub = sinon
+        .stub(DarwinCoreService.prototype, 'uploadRecordToS3')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step2_uploadRecordToS3(1, multerFile);
+        expect.fail();
+      } catch (actualError) {
+        expect(uploadRecordToS3Stub).to.have.been.calledOnceWith(1, multerFile);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step3_validateSubmission', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const validateStub = sinon.stub(DarwinCoreService.prototype, 'tempValidateSubmission').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step3_validateSubmission(1);
+
+      expect(validateStub).to.be.calledOnce;
+      expect(validateStub).to.be.calledWith(1);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.VALIDATED);
+    });
+
+    it('should throw an error when validation fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const validateStub = sinon
+        .stub(DarwinCoreService.prototype, 'tempValidateSubmission')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step3_validateSubmission(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(validateStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_VALIDATION,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step4_ingestEML', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const ingestNewDWCStub = sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step4_ingestEML(1);
+
+      expect(ingestNewDWCStub).to.be.calledOnce;
+      expect(ingestNewDWCStub).to.be.calledWith(1);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.EML_INGESTED);
+    });
+
+    it('should throw an error EML ingestion fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const ingestNewDWCStub = sinon
+        .stub(DarwinCoreService.prototype, 'ingestNewDwCAEML')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step4_ingestEML(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestNewDWCStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step5_convertEMLToJSON', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const convertEMLtoJSONStub = sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step5_convertEMLToJSON(1);
+
+      expect(convertEMLtoJSONStub).to.be.calledOnce;
+      expect(convertEMLtoJSONStub).to.be.calledWith(1);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.EML_TO_JSON);
+    });
+
+    it('should throw an error when converting EML to JSON fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const convertEMLtoJSONStub = sinon
+        .stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step5_convertEMLToJSON(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(convertEMLtoJSONStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step6_transformAndUploadMetaData', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const transformStub = sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step6_transformAndUploadMetaData(1, 'dataPackageId');
+
+      expect(transformStub).to.be.calledOnce;
+      expect(transformStub).to.be.calledWith(1);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
+    });
+
+    it('should throw an error when transform and upload metadata fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const transformStub = sinon
+        .stub(DarwinCoreService.prototype, 'transformAndUploadMetaData')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step6_transformAndUploadMetaData(1, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(transformStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_METADATA_TO_ES,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step7_normalizeSubmissionDWCA', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const dwcaStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
+      const normalizeStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step7_normalizeSubmissionDWCA(1);
+
+      expect(dwcaStub).to.be.calledOnce;
+      expect(dwcaStub).to.be.calledWith(1);
+      expect(normalizeStub).to.be.calledOnce;
+      expect(normalizeStub).to.be.calledWith(1, { rawFile: { fileName: 'file' } } as unknown as DWCArchive);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.NORMALIZED);
+    });
+
+    it('should throw an error when normalizing the submission fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const dwcaStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves({ rawFile: { fileName: 'file' } } as unknown as DWCArchive);
+
+      const normalizeStub = sinon
+        .stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step7_normalizeSubmissionDWCA(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(dwcaStub).to.have.been.calledOnceWith(1);
+        expect(normalizeStub).to.have.been.calledOnceWith(1, {
+          rawFile: { fileName: 'file' }
+        } as unknown as DWCArchive);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_NORMALIZATION,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+
+    it('should throw an error when converting the submission to DWCArchive fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const dwcaStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .throws(new ApiGeneralError('error'));
+
+      const normalizeStub = sinon.stub(DarwinCoreService.prototype, 'normalizeSubmissionDWCA').resolves();
+
+      try {
+        await darwinCoreService.create_step7_normalizeSubmissionDWCA(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(dwcaStub).to.have.been.calledOnceWith(1);
+        expect(normalizeStub).to.not.be.called;
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_NORMALIZATION,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step8_runSpatialTransforms', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const spatialTransformStub = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step8_runSpatialTransforms(1);
+
+      expect(spatialTransformStub).to.be.calledOnce;
+      expect(spatialTransformStub).to.be.calledWith(1);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE);
+    });
+
+    it('should throw an error when spatial transforms fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const spatialTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSpatialTransforms')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step8_runSpatialTransforms(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(spatialTransformStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
+      }
+    });
+  });
+
+  describe('create_step9_runSecurityTransforms', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const securityTransformStub = sinon.stub(SpatialService.prototype, 'runSecurityTransforms').resolves();
+      const insertSubmissionStatusStub = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
+      await darwinCoreService.create_step9_runSecurityTransforms(1);
+
+      expect(securityTransformStub).to.be.calledOnce;
+      expect(securityTransformStub).to.be.calledWith(1);
+      expect(insertSubmissionStatusStub).to.be.calledWith(1, SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE);
+    });
+
+    it('should throw an error when security transforms fails ', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const insertSubmissionStatusAndMessageStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage')
+        .resolves();
+
+      const secureTransformStub = sinon
+        .stub(SpatialService.prototype, 'runSecurityTransforms')
+        .throws(new ApiGeneralError('error'));
+
+      try {
+        await darwinCoreService.create_step9_runSecurityTransforms(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(secureTransformStub).to.have.been.calledOnceWith(1);
+        expect(insertSubmissionStatusAndMessageStub).to.be.calledOnceWith(
+          1,
+          SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
+          SUBMISSION_MESSAGE_TYPE.ERROR,
+          'error'
+        );
       }
     });
   });
