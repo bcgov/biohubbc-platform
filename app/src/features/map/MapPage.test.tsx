@@ -1,9 +1,7 @@
-import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { FeatureCollection } from 'geojson';
 import { createMemoryHistory } from 'history';
-import { useApi } from 'hooks/useApi';
-import React from 'react';
 import { Router } from 'react-router';
+import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import MapPage from './MapPage';
 
 jest.mock('../../hooks/useApi');
@@ -23,12 +21,12 @@ const renderContainer = () => {
   );
 };
 
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+// const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 describe('MapPage', () => {
   beforeEach(() => {
     // clear mocks before each test
-    mockBiohubApi().search.getSpatialData.mockClear();
+    mockUseApi.search.getSpatialData.mockClear();
   });
 
   afterEach(() => {
@@ -36,7 +34,7 @@ describe('MapPage', () => {
   });
 
   it('shows `Map` and map container when there are no occurrences', async () => {
-    mockBiohubApi().search.getSpatialData.mockReturnValue([]);
+    mockUseApi.search.getSpatialData.mockReturnValue([]);
 
     const { getByTestId } = renderContainer();
 
@@ -63,7 +61,7 @@ describe('MapPage', () => {
       ]
     };
 
-    mockBiohubApi().search.getSpatialData.mockReturnValue(vaildFeatureCollection);
+    mockUseApi.search.getSpatialData.mockReturnValue(vaildFeatureCollection);
 
     const { getByTestId } = renderContainer();
 

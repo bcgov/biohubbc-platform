@@ -52,7 +52,9 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
     return biohubApi.user.getRoles();
   });
 
+
   rolesDataLoader.load();
+  console.log('rolesDataLoader-----------------------------------------------', rolesDataLoader);
 
   let systemRoles: IGetRoles[] = [];
   if (rolesDataLoader.data) {
