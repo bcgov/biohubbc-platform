@@ -4,6 +4,7 @@ import { describe } from "mocha";
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
+import { ISubmissionSpatialSearchResponseRow } from "../../../repositories/spatial-repository";
 import { SpatialService } from '../../../services/spatial-service';
 // import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from "openapi-request-validator";
 // import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from "openapi-response-validator";
@@ -85,5 +86,67 @@ describe.only('download', () => {
                 expect(dbConnectionObj.release).to.have.been.calledOnce;
             }
         });
+
+        it('returns 200', async () => {
+            const datasetID = "AAA-BBB-CCC-123";
+            const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
+            sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+            const {mockReq, mockRes, mockNext} = getRequestHandlerMocks();
+
+            const boundaryFeature: Feature = {
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Polygon', coordinates: [[]] }
+            };
+
+            mockReq.query = {
+                type: ['type'],
+                boundary: JSON.stringify(boundaryFeature),
+                datasetID: [datasetID]
+            }
+
+            const mockData: ISubmissionSpatialSearchResponseRow[] = [
+                {
+                  spatial_component: {
+                    submission_spatial_component_id: 1,
+                    spatial_data: {
+                      type: 'FeatureCollection',
+                      features: [
+                        {
+                          type: 'Feature',
+                          properties: { type: 'Boundary' },
+                          geometry: { type: 'Polygon', coordinates: [[]] }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  spatial_component: {
+                    submission_spatial_component_id: 2,
+                    spatial_data: {
+                      type: 'FeatureCollection',
+                      features: [
+                        {
+                          type: 'Feature',
+                          properties: { type: 'Occurrence' },
+                          geometry: { type: 'Point', coordinates: [] }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ];
+
+            sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves(mockData);
+
+            const requestHandler = download.downloadSpatialComponents()
+            await requestHandler(mockReq, mockRes, mockNext);
+            expect(mockRes.statusValue).to.equal(200);
+
+            expect(dbConnectionObj.commit).to.have.been.calledOnce;
+            expect(dbConnectionObj.release).to.have.been.calledOnce;
+        })
     });
 })

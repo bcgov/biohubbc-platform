@@ -44,12 +44,12 @@ GET.apiDoc = {
         {
           in: 'query',
           name: 'datasetID',
+          required: true,
           schema: {
             type: 'array',
             items: {
               type: 'string'
             },
-            nullable: true
           },
           description: 'An array of dataset IDs. Will return results that belong to any of the dataset IDs.'
         }
@@ -74,7 +74,7 @@ export function downloadSpatialComponents(): RequestHandler {
     return async (req, res) => {
         const criteria = {
             type: (req.query.type as string[]) || [],
-            datasetID: (req.query.datasetID as string[]) || [],
+            datasetID: (req.query.datasetID as string[]),
             boundary: JSON.parse(req.query.boundary as string) as Feature
           };
 
