@@ -1,10 +1,9 @@
 import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
-import React from 'react';
 import { ErrorDialog } from './ErrorDialog';
 
 describe('ErrorDialog', () => {
-  it('renders correctly with no error message', () => {
-    const { baseElement } = render(
+  it('renders correctly with Title and Text', () => {
+    const { getByText } = render(
       <div id="root">
         <ErrorDialog
           dialogTitle="This is dialog title"
@@ -16,11 +15,12 @@ describe('ErrorDialog', () => {
       </div>
     );
 
-    expect(baseElement).toMatchSnapshot();
+    expect(getByText('This is dialog title')).toBeVisible();
+    expect(getByText('This is dialog text')).toBeVisible();
   });
 
-  it('renders correctly with a non-detailed error message', () => {
-    const { baseElement } = render(
+  it('renders correctly with Title, Text and Error msg', () => {
+    const { getByText } = render(
       <div id="root">
         <ErrorDialog
           dialogTitle="This is dialog title"
@@ -33,11 +33,13 @@ describe('ErrorDialog', () => {
       </div>
     );
 
-    expect(baseElement).toMatchSnapshot();
+    expect(getByText('This is dialog title')).toBeVisible();
+    expect(getByText('This is dialog text')).toBeVisible();
+    expect(getByText('This is dialog error')).toBeVisible();
   });
 
   it('renders correctly with a detailed error message', async () => {
-    const { baseElement, getByText } = render(
+    const { getByText } = render(
       <div id="root">
         <ErrorDialog
           dialogTitle="This is dialog title"
@@ -57,8 +59,6 @@ describe('ErrorDialog', () => {
       expect(getByText('an error')).toBeVisible();
       expect(getByText('{"error":"another error"}')).toBeVisible();
     });
-
-    expect(baseElement).toMatchSnapshot();
 
     fireEvent.click(getByText('Hide detailed error message'));
 

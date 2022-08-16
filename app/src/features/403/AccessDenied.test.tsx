@@ -1,10 +1,9 @@
-import { fireEvent, render } from 'test-helpers/test-utils';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
-import React from 'react';
 import { Router } from 'react-router-dom';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
+import { fireEvent, render } from 'test-helpers/test-utils';
 import AccessDenied from './AccessDenied';
 
 const history = createMemoryHistory();
@@ -73,7 +72,7 @@ describe('AccessDenied', () => {
 
     history.push('/forbidden');
 
-    const { asFragment } = render(
+    const { queryByText } = render(
       <AuthStateContext.Provider value={authState}>
         <Router history={history}>
           <AccessDenied />
@@ -85,7 +84,7 @@ describe('AccessDenied', () => {
     expect(history.location.pathname).toEqual('/forbidden');
 
     // renders a spinner
-    expect(asFragment()).toMatchSnapshot();
+    expect(queryByText('Access Denied')).toEqual(null);
   });
 
   it('redirects to `/request-submitted` when user is authenticated and has a pending access request', () => {

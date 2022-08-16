@@ -1,11 +1,10 @@
 import { render } from 'test-helpers/test-utils';
 import { Formik } from 'formik';
-import React from 'react';
 import MultiAutocompleteField from './MultiAutocompleteField';
 
 describe('MultiAutocompleteField', () => {
-  it('matches the snapshot', () => {
-    const { asFragment } = render(
+  it('renders correctly', () => {
+    const { getByText } = render(
       <Formik initialValues={[]} onSubmit={async () => {}}>
         {() => (
           <MultiAutocompleteField
@@ -19,6 +18,6 @@ describe('MultiAutocompleteField', () => {
       </Formik>
     );
 
-    expect(asFragment()).toMatchSnapshot();
+    expect(getByText("label")).toBeVisible();
   });
 });
