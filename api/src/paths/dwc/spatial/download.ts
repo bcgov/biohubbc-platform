@@ -92,8 +92,6 @@ export function downloadSpatialComponents(): RequestHandler {
             zip.addFile(fileName, Buffer.from(JSON.stringify(response)), "Search results.");
             const zipToSend = await zip.toBuffer()
 
-            console.log(Object.keys(response))
-
             // encoding zip as hex to avoid corrupted file in response
             res.status(200).send(zipToSend.toString("hex"))
         } catch (error) {

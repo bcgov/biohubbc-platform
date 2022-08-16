@@ -8,7 +8,7 @@ import * as db from '../../../database/db';
 import { ISubmissionSpatialSearchResponseRow } from "../../../repositories/spatial-repository";
 import { SpatialService } from '../../../services/spatial-service';
 import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from "openapi-request-validator";
-// import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from "openapi-response-validator";
+import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from "openapi-response-validator";
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { GET } from "./download";
 import * as download from './download';
@@ -154,17 +154,82 @@ describe('download', () => {
             })
         })
 
-        // describe('response validation', () => {
-        //     // const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
-        //     describe('should throw an error when', () => {
-        //         it('returns a null response', async () => {});
-        //         it('returns invalide/ malformed response (file buffer cannot be decoded)')
-        //     })
+        describe('response validation', () => {
+            const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
+            describe('should throw an error when', () => {
+                it('returns a null response', async () => {
+                  const apiResponse = null;
+                  const response = responseValidator.validateResponse(200, apiResponse);
 
-        //     describe('should succeed when', () => {
-        //         it('response data can be converted into zip (ADM)')
-        //     })
-        // });
+                  expect(response.message).to.equal('The response was not valid.');
+                  expect(response.errors[0].path).to.equal('response');
+                  expect(response.errors[0].message).to.equal('must be string');
+                });
+
+                it('returns invalide response', () => {
+                  const apiResponse = [{}]
+                  const response = responseValidator.validateResponse(200, apiResponse);
+                  
+                  expect(response.message).to.equal('The response was not valid.');
+                  expect(response.errors[0].message).to.equal('must be string');
+                });
+            })
+
+            describe('should succeed when', () => {
+              it('returns a response that can be turned back into object', async () => {
+                const mockData: ISubmissionSpatialSearchResponseRow[] = [
+                  {
+                    spatial_component: {
+                      submission_spatial_component_id: 1,
+                      spatial_data: {
+                        type: 'FeatureCollection',
+                        features: [
+                          {
+                            type: 'Feature',
+                            properties: { type: 'Boundary' },
+                            geometry: { type: 'Polygon', coordinates: [[]] }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    spatial_component: {
+                      submission_spatial_component_id: 2,
+                      spatial_data: {
+                        type: 'FeatureCollection',
+                        features: [
+                          {
+                            type: 'Feature',
+                            properties: { 
+                              type: 'Occurrence'
+                            },
+                            geometry: { type: 'Point', coordinates: [] }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ];
+                // convert object into valid buffer
+                const zip = new AdmZip()
+                zip.addFile("results.json", Buffer.from(JSON.stringify(mockData)), "Search Results.")
+                
+                const fileString = zip.toBuffer().toString("hex")
+                const response = responseValidator.validateResponse(200, fileString);
+
+                // Convert response back into a file 
+                const fileData = Buffer.from(fileString, "hex")
+                const responseZip = new AdmZip(fileData);
+                const zipEntries = responseZip.getEntries()
+                zipEntries.forEach(item => {
+                  expect(JSON.parse(item.getData().toString())).to.eql(mockData);
+                })
+
+                expect(response).to.equal(undefined)
+              });
+            })
+        });
     })
     
     describe('downloadSpatialComponents', () => {
@@ -247,8 +312,7 @@ describe('download', () => {
                         {
                           type: 'Feature',
                           properties: { 
-                            type: 'Occurrence',
-                            datasetID: datasetID
+                            type: 'Occurrence'
                           },
                           geometry: { type: 'Point', coordinates: [] }
                         }
