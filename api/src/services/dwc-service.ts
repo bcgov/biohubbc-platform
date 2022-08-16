@@ -68,6 +68,10 @@ export class DarwinCoreService extends DBService {
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
     const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
 
+    if (!submissionId) {
+      throw new ApiGeneralError('The Darwin Core submission could not be processed');
+    }
+
     await this.create_step2_uploadRecordToS3(submissionId, file);
 
     await this.create_step3_validateSubmission(submissionId);
@@ -396,6 +400,10 @@ export class DarwinCoreService extends DBService {
   async getSubmissionRecordAndConvertToDWCArchive(submissionId: number): Promise<DWCArchive> {
     const file = await this.submissionService.getIntakeFileFromS3(submissionId);
 
+    if (!file) {
+      throw new ApiGeneralError('The source file is not available');
+    }
+
     return this.prepDWCArchive(file);
   }
 
@@ -436,9 +444,11 @@ export class DarwinCoreService extends DBService {
   async ingestNewDwCAEML(submissionId: number): Promise<void> {
     const dwcaFile = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-    if (dwcaFile.eml) {
-      await this.submissionService.updateSubmissionRecordEMLSource(submissionId, dwcaFile.eml);
+    if (!dwcaFile || !dwcaFile.eml) {
+      throw new ApiGeneralError('Converting the record to DWC Archive failed');
     }
+
+    await this.submissionService.updateSubmissionRecordEMLSource(submissionId, dwcaFile.eml);
   }
 
   /**

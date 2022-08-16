@@ -1,6 +1,6 @@
 import { Client } from '@elastic/elasticsearch';
 import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
-import { ManagedUpload } from 'aws-sdk/clients/s3';
+import { GetObjectOutput, ManagedUpload } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
@@ -550,6 +550,30 @@ describe('DarwinCoreService', () => {
       expect(runSpatialTransformsStub).to.be.calledWith(1);
       expect(runSecurityTransformsStub).to.be.calledWith(1);
     });
+
+    it('should throw an error if step1 does not returns a submissionId', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const multerFile = {
+        originalname: 'file1.txt',
+        buffer: Buffer.from('file1data')
+      } as unknown as Express.Multer.File;
+
+      const ingestDWCStub = sinon
+        .stub(DarwinCoreService.prototype, 'create_step1_ingestDWC')
+        .resolves(null as unknown as number);
+      const uploadStub = sinon.stub(DarwinCoreService.prototype, 'create_step2_uploadRecordToS3').resolves();
+
+      try {
+        await darwinCoreService.create(multerFile, 'dataPackageId');
+        expect.fail();
+      } catch (actualError) {
+        expect(ingestDWCStub).to.be.calledWith(multerFile, 'dataPackageId');
+        expect((actualError as ApiGeneralError).message).to.equal('The Darwin Core submission could not be processed');
+        expect(uploadStub).to.not.be.called;
+      }
+    });
   });
 
   describe('create_step1_ingestDWC', () => {
@@ -1006,6 +1030,115 @@ describe('DarwinCoreService', () => {
           SUBMISSION_MESSAGE_TYPE.ERROR,
           'error'
         );
+      }
+    });
+  });
+
+  describe('getSubmissionRecordAndConvertToDWCArchive', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const mockArchiveFile = {
+        rawFile: {
+          fileName: 'test'
+        },
+        eml: {
+          buffer: Buffer.from('test')
+        }
+      };
+
+      const s3File = {
+        Metadata: { filename: 'file1.txt' },
+        Body: Buffer.from('file1data')
+      } as unknown as GetObjectOutput;
+
+      const getFileStub = sinon.stub(SubmissionService.prototype, 'getIntakeFileFromS3').resolves(s3File);
+      const prepDWCStub = sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').resolves(mockArchiveFile);
+
+      await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(1);
+
+      expect(getFileStub).to.be.calledOnce;
+      expect(getFileStub).to.be.calledWith(1);
+      expect(prepDWCStub).to.be.calledOnce;
+      expect(prepDWCStub).to.be.calledWith(s3File);
+    });
+
+    it('should succeed throw an error when a valid file is not returned', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const getFileStub = sinon
+        .stub(SubmissionService.prototype, 'getIntakeFileFromS3')
+        .resolves(null as unknown as GetObjectOutput);
+
+      try {
+        await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(getFileStub).to.be.calledOnce;
+        expect(getFileStub).to.be.calledWith(1);
+        expect((actualError as ApiGeneralError).message).to.equal('The source file is not available');
+      }
+    });
+  });
+
+  describe('ingestNewDwCAEML', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid input', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const mockArchiveFile = {
+        rawFile: {
+          fileName: 'test'
+        },
+        eml: {
+          buffer: Buffer.from('test')
+        }
+      };
+
+      const getFileStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(mockArchiveFile as unknown as DWCArchive);
+      const prepDWCStub = sinon
+        .stub(SubmissionService.prototype, 'updateSubmissionRecordEMLSource')
+        .resolves({ submission_id: 1 });
+
+      await darwinCoreService.ingestNewDwCAEML(1);
+
+      expect(getFileStub).to.be.calledOnce;
+      expect(getFileStub).to.be.calledWith(1);
+      expect(prepDWCStub).to.be.calledOnce;
+      expect(prepDWCStub).to.be.calledWith(1, mockArchiveFile.eml);
+    });
+
+    it('should succeed throw an error when the dwc file returned is not valid', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const getFileStub = sinon
+        .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
+        .resolves(null as unknown as DWCArchive);
+      const prepDWCStub = sinon
+        .stub(SubmissionService.prototype, 'updateSubmissionRecordEMLSource')
+        .resolves({ submission_id: 1 });
+
+      try {
+        await darwinCoreService.ingestNewDwCAEML(1);
+        expect.fail();
+      } catch (actualError) {
+        expect(getFileStub).to.be.calledOnce;
+        expect(getFileStub).to.be.calledWith(1);
+        expect(prepDWCStub).to.not.be.called;
+        expect((actualError as ApiGeneralError).message).to.equal('Converting the record to DWC Archive failed');
       }
     });
   });
