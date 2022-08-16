@@ -44,7 +44,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialDataFile = async ( criteria: {
+  const getSpatialDataFile = async (criteria: {
     boundary: Feature;
     type: string[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
@@ -52,10 +52,10 @@ const useSearchApi = (axios: AxiosInstance) => {
   }): Promise<any> => {
     const { data } = await axios.get(`/api/dwc/spatial/download`, {
       params: { boundary: criteria.boundary, type: criteria.type, datasetID: criteria.datasetID }
-    })
+    });
 
     return data;
-  }
+  };
 
   /**
    * Get keyword search results

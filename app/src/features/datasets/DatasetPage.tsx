@@ -1,6 +1,4 @@
 import { Button, Grid, Theme } from '@material-ui/core';
-import Icon from '@mdi/react';
-import { mdiDownload } from '@mdi/js';
 import Box from '@material-ui/core/Box';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
@@ -9,6 +7,8 @@ import Container from '@material-ui/core/Container';
 import Paper from '@material-ui/core/Paper';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
+import { mdiDownload } from '@mdi/js';
+import Icon from '@mdi/react';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
@@ -56,7 +56,7 @@ const DatasetPage: React.FC = () => {
       zoom: searchZoom,
       datasetID: datasetId
     })
-  )
+  );
 
   useDataLoaderError(datasetDataLoader, () => {
     return {
@@ -93,7 +93,7 @@ const DatasetPage: React.FC = () => {
       dialogText:
         'An error has occurred while attempting to archive and download occurance data, please try again. If the error persists, please contact your system administrator.'
     };
-  })
+  });
 
   useDataLoaderError(mapDataLoader, () => {
     return {
@@ -111,8 +111,8 @@ const DatasetPage: React.FC = () => {
       ALL_OF_BC_BOUNDARY,
       [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
       MAP_DEFAULT_ZOOM
-    )
-  }
+    );
+  };
 
   useEffect(() => {
     if (!fileDataLoader.data) {
@@ -120,8 +120,8 @@ const DatasetPage: React.FC = () => {
     }
 
     const data = fileDataLoader.data;
-    const content = Buffer.from(data, "hex");
-    const blob = new Blob([content], {type: 'application/zip'});
+    const content = Buffer.from(data, 'hex');
+    const blob = new Blob([content], { type: 'application/zip' });
     const link = document.createElement('a');
 
     link.download = `${datasetId}.zip`;
@@ -129,8 +129,7 @@ const DatasetPage: React.FC = () => {
     link.click();
 
     URL.revokeObjectURL(link.href);
-    fileDataLoader.clear();
-  }, [fileDataLoader.data])
+  }, [datasetId, fileDataLoader.data]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -167,11 +166,7 @@ const DatasetPage: React.FC = () => {
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">
-            <Grid
-              justify='space-between'
-              container
-              alignItems='center'
-            >
+            <Grid justify="space-between" container alignItems="center">
               <Grid item>
                 <Box px={2}>
                   <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
@@ -186,7 +181,7 @@ const DatasetPage: React.FC = () => {
                     aria-label={'Download occurrence'}
                     startIcon={<Icon path={mdiDownload} size={1} />}
                     onClick={() => downloadDataSet()}>
-                      EXPORT OCCURRENCES
+                    EXPORT OCCURRENCES
                   </Button>
                 </Box>
               </Grid>
