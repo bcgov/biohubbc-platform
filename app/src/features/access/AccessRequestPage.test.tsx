@@ -12,6 +12,12 @@ const history = createMemoryHistory();
 
 jest.mock('../../hooks/useApi');
 
+const mockUseApi = {
+  admin: {
+    createAdministrativeActivity: jest.fn()
+  }
+};
+
 const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = () => {
