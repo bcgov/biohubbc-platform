@@ -7,50 +7,165 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { ISubmissionSpatialSearchResponseRow } from "../../../repositories/spatial-repository";
 import { SpatialService } from '../../../services/spatial-service';
-// import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from "openapi-request-validator";
+import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from "openapi-request-validator";
 // import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from "openapi-response-validator";
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-// import { GET } from "./download";
+import { GET } from "./download";
 import * as download from './download';
 
 chai.use(sinonChai);
 
-describe.only('download', () => {
-    // describe('openApiScheme', () => {
-    //     describe('request validation', () => {
-    //         const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
+describe('download', () => {
+    describe('openApiScheme', () => {
+        describe('request validation', () => {
+            const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
-    //         describe('should throw an error when', () => {
-    //             describe('boundry', () => {
-    //                 it('is undefined', async () => {
-    //                     const request = {
-    //                         headers: {
-    //                             'content-type': 'application/json'
-    //                         },
-    //                         query: {}
-    //                     }
+            describe('should throw an error when', () => {
+                describe('boundry', () => {
+                    it('is undefined', async () => {
+                        const request = {
+                            headers: {
+                                'content-type': 'application/json'
+                            },
+                            query: {
+                              datasetID: []
+                            }
+                        }
 
-    //                     const response = requestValidator.validateRequest(request)
-    //                     expect(response.status).to.equal(400);
-    //                     expect(response.errors[0].path).to.equal('boundary');
-    //                     expect(response.errors[0].message).to.equal("must have required property 'boundary'");
-    //                 })
-    //             })
-    //         })
-    //     })
+                        const response = requestValidator.validateRequest(request)
+                        expect(response.status).to.equal(400);
+                        expect(response.errors[0].path).to.equal('boundary');
+                        expect(response.errors[0].message).to.equal("must have required property 'boundary'");
+                    });
 
-    //     describe('response validation', () => {
-    //         // const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
-    //         describe('should throw an error when', () => {
-    //             it('returns a null response', async () => {});
-    //             it('returns invalide/ malformed response (file buffer cannot be decoded)')
-    //         })
+                    it('is null', async () => {
+                      const request = {
+                        headers: {
+                          'content-type': 'application/json'
+                        },
+                        query: {
+                          boundary: null,
+                          datasetID: []
+                        }
+                      };
+          
+                      const response = requestValidator.validateRequest(request);
+          
+                      expect(response.status).to.equal(400);
+                      expect(response.errors[0].path).to.equal('boundary');
+                      expect(response.errors[0].message).to.equal('must be string');
+                    });
+          
+                    it('is not a string', async () => {
+                      const request = {
+                        headers: {
+                          'content-type': 'application/json'
+                        },
+                        query: {
+                          boundary: 123,
+                          datasetID: []
+                        }
+                      };
+          
+                      const response = requestValidator.validateRequest(request);
+          
+                      expect(response.status).to.equal(400);
+                      expect(response.errors[0].path).to.equal('boundary');
+                      expect(response.errors[0].message).to.equal('must be string');
+                    });
+                })
 
-    //         describe('should succeed when', () => {
-    //             it('response data can be converted into zip (ADM)')
-    //         })
-    //     });
-    // })
+              describe('type', () => {
+                it('is not an array', async () => {
+                  const request = {
+                    headers: {
+                      'content-type': 'application/json'
+                    },
+                    query: {
+                      boundary: 'not null',
+                      datasetID: [],
+                      type: 'not an array'
+                    }
+                  };
+      
+                  const response = requestValidator.validateRequest(request);
+      
+                  expect(response.status).to.equal(400);
+                  expect(response.errors[0].path).to.equal('type');
+                  expect(response.errors[0].message).to.equal('must be array');
+                });
+              })
+
+              describe('datasetID', () => {
+                it('is undefined', async () => {
+                  const request = {
+                    headers: {
+                      'content-type': 'application/json'
+                    },
+                    query: {
+                      boundary: 'not null'
+                    }
+                  };
+      
+                  const response = requestValidator.validateRequest(request);
+      
+                  expect(response.status).to.equal(400);
+                  expect(response.errors[0].path).to.equal('datasetID');
+                  expect(response.errors[0].message).to.equal("must have required property 'datasetID'");
+                })
+                
+                it('is null', async () => {
+                  const request = {
+                    headers: {
+                      'content-type': 'application/json'
+                    },
+                    query: {
+                      boundary: 'not null',
+                      datasetID: null
+                    }
+                  };
+      
+                  const response = requestValidator.validateRequest(request);
+      
+                  expect(response.status).to.equal(400);
+                  expect(response.errors[0].path).to.equal('datasetID');
+                  expect(response.errors[0].message).to.equal("must be array");
+                })
+                
+                it('is not an array', async () => {
+                  const request = {
+                    headers: {
+                      'content-type': 'application/json'
+                    },
+                    query: {
+                      boundary: 'not null',
+                      type: [],
+                      datasetID: 'not an array'
+                    }
+                  };
+      
+                  const response = requestValidator.validateRequest(request);
+      
+                  expect(response.status).to.equal(400);
+                  expect(response.errors[0].path).to.equal('datasetID');
+                  expect(response.errors[0].message).to.equal('must be array');
+                });
+              });
+            })
+        })
+
+        // describe('response validation', () => {
+        //     // const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
+        //     describe('should throw an error when', () => {
+        //         it('returns a null response', async () => {});
+        //         it('returns invalide/ malformed response (file buffer cannot be decoded)')
+        //     })
+
+        //     describe('should succeed when', () => {
+        //         it('response data can be converted into zip (ADM)')
+        //     })
+        // });
+    })
     
     describe('downloadSpatialComponents', () => {
         afterEach(() => {
