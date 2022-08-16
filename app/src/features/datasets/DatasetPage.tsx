@@ -183,9 +183,10 @@ const DatasetPage: React.FC = () => {
                     color="primary"
                     variant="outlined"
                     disableElevation
-                    aria-label={'Download occurances'}
+                    aria-label={'Download occurrence'}
+                    startIcon={<Icon path={mdiDownload} size={1} />}
                     onClick={() => downloadDataSet()}>
-                      <Icon path={mdiDownload} size={1} />
+                      EXPORT OCCURRENCES
                   </Button>
                 </Box>
               </Grid>
