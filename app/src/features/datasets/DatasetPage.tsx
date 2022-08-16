@@ -107,7 +107,6 @@ const DatasetPage: React.FC = () => {
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
   const downloadDataSet = () => {
-    console.log("Download Data Set")
     fileDataLoader.refresh(
       ALL_OF_BC_BOUNDARY,
       [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],

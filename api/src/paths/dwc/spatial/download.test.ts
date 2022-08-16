@@ -1,3 +1,4 @@
+import AdmZip from "adm-zip";
 import chai, { expect } from "chai";
 import { Feature } from 'geojson';
 import { describe } from "mocha";
@@ -130,7 +131,10 @@ describe.only('download', () => {
                       features: [
                         {
                           type: 'Feature',
-                          properties: { type: 'Occurrence' },
+                          properties: { 
+                            type: 'Occurrence',
+                            datasetID: datasetID
+                          },
                           geometry: { type: 'Point', coordinates: [] }
                         }
                       ]
@@ -144,7 +148,15 @@ describe.only('download', () => {
             const requestHandler = download.downloadSpatialComponents()
             await requestHandler(mockReq, mockRes, mockNext);
             expect(mockRes.statusValue).to.equal(200);
+            expect(mockRes).to.not.be.null;
 
+            // Convert response back into a file 
+            const fileData = Buffer.from(mockRes.sendValue, "hex")
+            const zip = new AdmZip(fileData)
+            const zipEntries = zip.getEntries()
+            zipEntries.forEach(item => {
+              expect(JSON.parse(item.getData().toString())).to.eql(mockData);
+            })
             expect(dbConnectionObj.commit).to.have.been.calledOnce;
             expect(dbConnectionObj.release).to.have.been.calledOnce;
         })
