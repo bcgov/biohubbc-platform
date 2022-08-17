@@ -84,13 +84,14 @@ export function downloadSpatialComponents(): RequestHandler {
       await connection.open();
       const spatialService = new SpatialService(connection);
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
-      await connection.commit();
 
       const zip = new AdmZip();
       const fileName = `results.json`;
 
       zip.addFile(fileName, Buffer.from(JSON.stringify(response)), 'Search results.');
       const zipToSend = await zip.toBuffer();
+
+      await connection.commit();
 
       // encoding zip as hex to avoid corrupted file in response
       res.status(200).send(zipToSend.toString('hex'));
