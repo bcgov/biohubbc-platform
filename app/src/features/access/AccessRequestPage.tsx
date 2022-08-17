@@ -53,7 +53,6 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
   });
 
   rolesDataLoader.load();
-  console.log('rolesDataLoader-----------------------------------------------', rolesDataLoader);
 
   let systemRoles: IGetRoles[] = [];
   if (rolesDataLoader.data) {
