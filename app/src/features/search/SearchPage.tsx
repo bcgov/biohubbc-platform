@@ -1,16 +1,14 @@
-
+import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Link from '@mui/material/Link';
-import Paper from '@mui/material/Paper'
+import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
-import { Theme } from '@mui/material'
 import { makeStyles } from '@mui/styles';
-
-import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
-import Icon from '@mdi/react';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';

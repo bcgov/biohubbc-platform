@@ -2,8 +2,8 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Link from '@mui/material/Link';
-import { makeStyles } from '@mui/styles';
 import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -47,7 +47,9 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = ({ submissionSpatialComponentId }) => {
+const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = ({
+  submissionSpatialComponentId
+}) => {
   const classes = useStyles();
   const api = useApi();
   const history = useHistory();
@@ -61,7 +63,9 @@ const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   const { isLoading, isReady } = dataLoader;
   const data = dataLoader.data as BoundaryCentroidFeatureProperties;
 
-  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => <div className={classes.modalContent}>{children}</div>;
+  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
+    <div className={classes.modalContent}>{children}</div>
+  );
 
   const MetadataHeader: React.FC<React.PropsWithChildren<{ title: string }>> = (props) => (
     <Box mb={1}>

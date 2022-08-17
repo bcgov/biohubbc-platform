@@ -1,3 +1,6 @@
+import { mdiHelpCircle } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -7,12 +10,9 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import OtherLink from '@mui/material/Link';
-import { Theme } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { mdiHelpCircle } from '@mdi/js';
-import Icon from '@mdi/react';
+import { makeStyles } from '@mui/styles';
 import headerImageLarge from 'assets/images/gov-bc-logo-horiz.png';
 import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
 import { BetaLabel, EnvironmentLabel } from 'components/layout/header/EnvLabels';
@@ -118,11 +118,13 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 </span>
               </Link>
               <Box display="flex" alignItems="center">
-                <IconButton aria-label="Need help?" onClick={showSupportDialog}
+                <IconButton
+                  aria-label="Need help?"
+                  onClick={showSupportDialog}
                   sx={{
                     color: 'bcgovblue.contrastText'
-                  }} >
-                  <Icon path={mdiHelpCircle} size={1}/>
+                  }}>
+                  <Icon path={mdiHelpCircle} size={1} />
                 </IconButton>
                 <Box>
                   <UnAuthGuard>

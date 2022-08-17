@@ -1,8 +1,8 @@
-import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
 import React from 'react';
 import { Router } from 'react-router';
+import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import ManageUsersPage from './ManageUsersPage';
 
 const history = createMemoryHistory();

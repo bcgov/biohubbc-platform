@@ -1,12 +1,12 @@
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
-import { makeStyles } from '@mui/styles';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -81,7 +81,9 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   const { isLoading, data, isReady } = dataLoader;
 
-  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => <div className={classes.modalContent}>{children}</div>;
+  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
+    <div className={classes.modalContent}>{children}</div>
+  );
 
   const MetadataHeader: React.FC<React.PropsWithChildren<{ type: string; date?: string }>> = (props) => (
     <Box mb={1}>

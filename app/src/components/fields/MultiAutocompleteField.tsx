@@ -1,8 +1,8 @@
-import Checkbox from '@mui/material/Checkbox';
-import TextField from '@mui/material/TextField';
 import CheckBox from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React from 'react';
@@ -59,7 +59,6 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
           option.map((item) => item.value)
         );
       }}
-
       renderOption={(_props, option, { selected }) => {
         const disabled: any = props.options && props.options?.indexOf(option) !== -1;
         return (
@@ -76,7 +75,6 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
           </>
         );
       }}
-
       renderInput={(params) => (
         <TextField
           {...params}

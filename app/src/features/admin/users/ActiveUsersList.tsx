@@ -1,8 +1,9 @@
+import { mdiDotsVertical, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
-import { makeStyles } from '@mui/styles';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -12,8 +13,7 @@ import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { mdiDotsVertical, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
-import Icon from '@mdi/react';
+import { makeStyles } from '@mui/styles';
 import EditDialog from 'components/dialog/EditDialog';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
@@ -249,10 +249,13 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             sx={{
               pl: { sm: 2 },
               pr: { xs: 1, sm: 1 }
-            }}
-          >
+            }}>
             <Typography variant="h4" component="h2">
-              Active Users <Typography sx={{fontSize: 'inherit'}} color="textSecondary" component="span">({activeUsers?.length || 0})</Typography></Typography>
+              Active Users{' '}
+              <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+                ({activeUsers?.length || 0})
+              </Typography>
+            </Typography>
           </Toolbar>
           <TableContainer>
             <Table className={classes.table}>
@@ -260,7 +263,9 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                 <TableRow>
                   <TableCell>Username</TableCell>
                   <TableCell>Role</TableCell>
-                  <TableCell align="center" width="100">Actions</TableCell>
+                  <TableCell align="center" width="100">
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody data-testid="active-users-table">
@@ -274,9 +279,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                 {activeUsers.length > 0 &&
                   activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
                     <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
-                      <TableCell>
-                        {row.user_identifier || 'No assigned role'}
-                      </TableCell>
+                      <TableCell>{row.user_identifier || 'No assigned role'}</TableCell>
                       <TableCell>
                         <CustomMenuButton
                           buttonLabel={row.role_names.join(', ') || 'No assigned role'}

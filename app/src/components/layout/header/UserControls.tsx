@@ -1,13 +1,13 @@
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import { mdiAccountCircle, mdiLoginVariant } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Link from '@mui/material/Link';
+import { makeStyles } from '@mui/styles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import React, { useContext } from 'react';
-import Link from '@mui/material/Link';
-import { Theme } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 
 const useStyles = makeStyles((theme: Theme) => ({
   userInfo: {
@@ -30,9 +30,13 @@ export const LoggedInUserControls = () => {
     <Box display="flex" alignItems="center" pl={2}>
       <Box className={classes.userInfo} display="flex" flexDirection="row" alignItems="center" mr={2} pr={2}>
         <Icon path={mdiAccountCircle} size={1} />
-        <Box component="span" ml={1}>{loggedInUserDisplayName}</Box>
+        <Box component="span" ml={1}>
+          {loggedInUserDisplayName}
+        </Box>
       </Box>
-      <Link href="/logout" data-testid="menu_log_out"
+      <Link
+        href="/logout"
+        data-testid="menu_log_out"
         sx={{
           color: 'bcgovblue.contrastText'
         }}>

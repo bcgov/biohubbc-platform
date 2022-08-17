@@ -1,3 +1,5 @@
+import { mdiPlus, mdiTrashCanOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import FormControl from '@mui/material/FormControl';
@@ -6,8 +8,6 @@ import IconButton from '@mui/material/IconButton';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
-import { mdiPlus, mdiTrashCanOutline } from '@mdi/js';
-import Icon from '@mdi/react';
 import CustomTextField from 'components/fields/CustomTextField';
 import { FieldArray, useFormikContext } from 'formik';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
@@ -78,14 +78,8 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                       />
                     </Box>
                     <Box width="250px" py={1} px={0.5}>
-                      <FormControl
-                        fullWidth
-                        required
-                        error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}
-                        >
-                        <InputLabel id="system_role">
-                          System Role
-                        </InputLabel>
+                      <FormControl fullWidth required error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}>
+                        <InputLabel id="system_role">System Role</InputLabel>
                         <Select
                           id={`systemUsers.[${index}].system_role`}
                           name={`systemUsers.[${index}].system_role`}
@@ -105,13 +99,11 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                       </FormControl>
                     </Box>
                     <Box width="250px" py={1} px={0.5}>
-                      <FormControl 
-                        fullWidth 
+                      <FormControl
+                        fullWidth
                         required
                         error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}>
-                        <InputLabel id="loginMethod">
-                          Login Method
-                        </InputLabel>
+                        <InputLabel id="loginMethod">Login Method</InputLabel>
                         <Select
                           id={`systemUsers.[${index}].identitySource`}
                           name={`systemUsers.[${index}].identitySource`}

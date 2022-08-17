@@ -30,7 +30,7 @@ const appTheme = createTheme({
     },
     bcgovblue: {
       main: '#036',
-      contrastText: '#fff',
+      contrastText: '#fff'
     }
   },
   components: {
@@ -47,7 +47,7 @@ const appTheme = createTheme({
           color: '#1A5A96',
           textDecoration: 'none',
           textDecorationColor: '#1A5A96',
-          ":hover": {
+          ':hover': {
             textDecoration: 'underline'
           }
         }

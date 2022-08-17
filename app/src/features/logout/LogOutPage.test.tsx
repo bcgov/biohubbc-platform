@@ -1,8 +1,8 @@
-import { cleanup, render } from 'test-helpers/test-utils';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { createMemoryHistory } from 'history';
 import React from 'react';
 import { Router } from 'react-router-dom';
+import { cleanup, render } from 'test-helpers/test-utils';
 import * as utils from 'utils/Utils';
 import LogOutPage from './LogOutPage';
 

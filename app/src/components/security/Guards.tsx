@@ -1,7 +1,6 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
-import React, { isValidElement, ReactElement, useContext } from 'react';
-import { PropsWithChildren } from 'react';
+import React, { isValidElement, PropsWithChildren, ReactElement, useContext } from 'react';
 import { isAuthenticated } from 'utils/authUtils';
 
 interface IGuardProps<T = never> extends PropsWithChildren {
@@ -19,7 +18,9 @@ interface IGuardProps<T = never> extends PropsWithChildren {
  * @param {*} props
  * @return {*}
  */
-export const NoRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>> = (props) => {
+export const NoRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>> = (
+  props
+) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);
@@ -47,7 +48,9 @@ export const NoRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: S
  * @param {*} props
  * @return {*}
  */
-export const SystemRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>> = (props) => {
+export const SystemRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>> = (
+  props
+) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);

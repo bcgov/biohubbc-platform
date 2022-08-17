@@ -11,7 +11,7 @@ describe('DropZone', () => {
   it('renders component properly', () => {
     const { getByText } = renderContainer();
 
-    expect(getByText("Browse Files", {exact: false})).toBeVisible();
+    expect(getByText('Browse Files', { exact: false })).toBeVisible();
   });
 
   it('calls the `onFiles` callback when files are selected', async () => {

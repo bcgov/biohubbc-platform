@@ -1,5 +1,5 @@
-import { render } from 'test-helpers/test-utils';
 import { Formik } from 'formik';
+import { render } from 'test-helpers/test-utils';
 import MultiAutocompleteField from './MultiAutocompleteField';
 
 describe('MultiAutocompleteField', () => {
@@ -18,6 +18,6 @@ describe('MultiAutocompleteField', () => {
       </Formik>
     );
 
-    expect(getByText("label")).toBeVisible();
+    expect(getByText('label')).toBeVisible();
   });
 });

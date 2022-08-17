@@ -172,7 +172,9 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('shows error dialog with api error message when submission fails', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity.mockImplementationOnce(() => Promise.reject(new Error('API Error is Here')));
+    mockBiohubApi().admin.createAdministrativeActivity.mockImplementationOnce(() =>
+      Promise.reject(new Error('API Error is Here'))
+    );
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
 

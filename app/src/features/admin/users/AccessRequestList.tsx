@@ -1,9 +1,8 @@
+import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Paper from '@mui/material/Paper';
-import { Theme } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -12,6 +11,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import clsx from 'clsx';
 import RequestDialog from 'components/dialog/RequestDialog';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';

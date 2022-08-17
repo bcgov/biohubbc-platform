@@ -1,11 +1,7 @@
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-
-import {
-  IMultiAutocompleteFieldOption
-} from 'components/fields/MultiAutocompleteField';
-
+import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useFormikContext } from 'formik';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';

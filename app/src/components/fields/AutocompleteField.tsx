@@ -1,5 +1,5 @@
-import TextField from '@mui/material/TextField';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React, { SyntheticEvent } from 'react';
@@ -21,7 +21,9 @@ export interface IAutocompleteField<T extends string | number> {
 
 // To be used when you want an autocomplete field with no freesolo allowed but only one option can be selected
 
-const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<string | number>>> = <T extends string | number>(
+const AutocompleteField: React.FC<React.PropsWithChildren<IAutocompleteField<string | number>>> = <
+  T extends string | number
+>(
   props: IAutocompleteField<T>
 ) => {
   const { touched, errors, setFieldValue, values } = useFormikContext<IAutocompleteFieldOption<T>>();

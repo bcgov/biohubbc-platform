@@ -46,7 +46,6 @@ describe('EditDialog', () => {
 
     expect(getByText('this is a test')).toBeVisible();
     expect(getByText('This is an error')).toBeVisible();
-
   });
 
   it('calls the onYes prop when `Yes` button is clicked', async () => {

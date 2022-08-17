@@ -11,9 +11,9 @@ describe('Footer', () => {
       </ThemeProvider>
     );
 
-    expect(getByText("Disclaimer")).toBeVisible();
-    expect(getByText("Privacy")).toBeVisible();
-    expect(getByText("Accessibility")).toBeVisible();
-    expect(getByText("Copyright")).toBeVisible();
+    expect(getByText('Disclaimer')).toBeVisible();
+    expect(getByText('Privacy')).toBeVisible();
+    expect(getByText('Accessibility')).toBeVisible();
+    expect(getByText('Copyright')).toBeVisible();
   });
 });
