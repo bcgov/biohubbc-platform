@@ -1,12 +1,16 @@
-import { Theme } from '@material-ui/core';
 import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
 import Card from '@material-ui/core/Card';
 import CardHeader from '@material-ui/core/CardHeader';
 import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
 import Container from '@material-ui/core/Container';
+import Grid from '@material-ui/core/Grid';
 import Paper from '@material-ui/core/Paper';
+import { Theme } from '@material-ui/core/styles/createMuiTheme';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/styles';
+import { mdiDownload } from '@mdi/js';
+import Icon from '@mdi/react';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
@@ -47,6 +51,14 @@ const DatasetPage: React.FC = () => {
   const datasetId = urlParams['id'];
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
+  const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
+    biohubApi.search.getSpatialDataFile({
+      boundary: searchBoundary,
+      type: searchType,
+      zoom: searchZoom,
+      datasetID: datasetId
+    })
+  );
 
   useDataLoaderError(datasetDataLoader, () => {
     return {
@@ -77,6 +89,14 @@ const DatasetPage: React.FC = () => {
     })
   );
 
+  useDataLoaderError(fileDataLoader, () => {
+    return {
+      dialogTitle: 'Error Exporting Data',
+      dialogText:
+        'An error has occurred while attempting to archive and download occurance data, please try again. If the error persists, please contact your system administrator.'
+    };
+  });
+
   useDataLoaderError(mapDataLoader, () => {
     return {
       dialogTitle: 'Error Loading Map Data',
@@ -87,6 +107,31 @@ const DatasetPage: React.FC = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+
+  const downloadDataSet = () => {
+    fileDataLoader.refresh(
+      ALL_OF_BC_BOUNDARY,
+      [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
+      MAP_DEFAULT_ZOOM
+    );
+  };
+
+  useEffect(() => {
+    if (!fileDataLoader.data) {
+      return;
+    }
+
+    const data = fileDataLoader.data;
+    const content = Buffer.from(data, 'hex');
+    const blob = new Blob([content], { type: 'application/zip' });
+    const link = document.createElement('a');
+
+    link.download = `${datasetId}.zip`;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+
+    URL.revokeObjectURL(link.href);
+  }, [datasetId, fileDataLoader.data]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -123,7 +168,26 @@ const DatasetPage: React.FC = () => {
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">
-            <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+            <Grid justify="space-between" container alignItems="center">
+              <Grid item>
+                <Box px={2}>
+                  <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+                </Box>
+              </Grid>
+              <Grid item>
+                <Box my={1} mx={2}>
+                  <Button
+                    color="primary"
+                    variant="outlined"
+                    disableElevation
+                    aria-label={'Download occurrence'}
+                    startIcon={<Icon path={mdiDownload} size={1} />}
+                    onClick={() => downloadDataSet()}>
+                    EXPORT OCCURRENCES
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
             <Box p={2} pt={0} className={classes.datasetMapContainer}>
               <MapContainer
                 mapId="boundary_map"
