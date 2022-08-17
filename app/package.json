@@ -31,7 +31,6 @@
     "@mdi/js": "~6.4.95",
     "@mdi/react": "~1.4.0",
     "@mui/icons-material": "^5.8.4",
-    "@mui/lab": "^5.0.0-alpha.94",
     "@mui/material": "^5.10.0",
     "@mui/styles": "^5.9.3",
     "@react-keycloak/web": "^3.4.0",
