@@ -166,11 +166,20 @@ const SearchPage = () => {
 
   return (
     <Box>
-      <Box component={Paper} pt={6} pb={7}>
+      <Paper square elevation={0}
+        sx={{
+          py: 7
+        }}
+      >
         <Container maxWidth="xl">
-          <Box mb={4}>
-            <Typography variant="h1">Find BioHub Datasets</Typography>
-          </Box>
+          <Typography variant="h1"
+            sx={{
+              mt: -2,
+              mb: 4
+            }}
+          >
+            Find BioHub Datasets
+          </Typography>
           <Formik<IAdvancedSearch>
             innerRef={formikRef}
             initialValues={formikValues}
@@ -180,7 +189,7 @@ const SearchPage = () => {
             <SearchComponent />
           </Formik>
         </Container>
-      </Box>
+      </Paper>
       <Container maxWidth="xl">
         <Box mt={6} mb={4}>
           {formikRef.current?.values.keywords && (

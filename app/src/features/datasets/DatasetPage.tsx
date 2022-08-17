@@ -123,7 +123,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">
-            <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+            <CardHeader title="Occurrences" titleTypographyProps={{variant: 'h4', component: 'h2'}}></CardHeader>
             <Box p={2} pt={0} className={classes.datasetMapContainer}>
               <MapContainer
                 mapId="boundary_map"

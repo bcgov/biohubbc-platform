@@ -17,9 +17,9 @@ const useStyles = makeStyles((theme: Theme) => ({
   searchInput: {
     height: '56px',
     paddingLeft: theme.spacing(2),
-    borderRadius: '6px',
-    border: '1px solid rgba(0, 0, 0, 0.23)',
-    background: '#ffffff',
+    borderRadius: '5px',
+    border: '1px solid #cccccc',
+    background: '#f7f8fa',
     outline: '4px solid transparent',
     outlineOffset: '-1px',
     transition: 'all ease-out 0.25s',

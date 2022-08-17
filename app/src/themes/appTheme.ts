@@ -41,6 +41,13 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiCardHeader: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
+        }
+      }
+    },
     MuiLink: {
       styleOverrides: {
         root: {

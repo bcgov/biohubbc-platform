@@ -43,7 +43,7 @@ const ManageUsersPage: React.FC<React.PropsWithChildren> = () => {
   }, [biohubApi, isLoadingActiveUsers, hasLoadedActiveUsers]);
 
   return (
-    <Box py={6}>
+    <Box py={7}>
       <ActiveUsersList activeUsers={activeUsers} refresh={refreshActiveUsers} />
     </Box>
   );
