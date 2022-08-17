@@ -2,17 +2,17 @@ import AccessRequestList from 'features/admin/users/AccessRequestList';
 import { useApi } from 'hooks/useApi';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IAccessRequestDataObject, IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import React from 'react';
 import { cleanup, fireEvent, render, waitFor } from 'test-helpers/test-utils';
 
 jest.mock('../../../hooks/useApi');
+
+const mockBiohubApi = useApi as jest.Mock;
+
 const mockUseApi = {
   admin: {
     updateAccessRequest: jest.fn()
   }
 };
-
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = (accessRequests: IGetAccessRequestsListResponse[], refresh: () => void) => {
   return render(<AccessRequestList accessRequests={accessRequests} refresh={refresh} />);
@@ -20,8 +20,7 @@ const renderContainer = (accessRequests: IGetAccessRequestsListResponse[], refre
 
 describe('AccessRequestList', () => {
   beforeEach(() => {
-    // clear mocks before each test
-    mockBiohubApi().admin.updateAccessRequest.mockClear();
+    mockBiohubApi.mockImplementation(() => mockUseApi);
   });
 
   afterEach(() => {
@@ -206,8 +205,8 @@ describe('AccessRequestList', () => {
 
     await waitFor(() => {
       expect(refresh).toHaveBeenCalledTimes(1);
-      expect(mockBiohubApi().admin.updateAccessRequest).toHaveBeenCalledTimes(1);
-      expect(mockBiohubApi().admin.updateAccessRequest).toHaveBeenCalledWith(
+      expect(mockUseApi.admin.updateAccessRequest).toHaveBeenCalledTimes(1);
+      expect(mockUseApi.admin.updateAccessRequest).toHaveBeenCalledWith(
         'testusername',
         SYSTEM_IDENTITY_SOURCE.IDIR,
         1,
@@ -258,8 +257,8 @@ describe('AccessRequestList', () => {
 
     await waitFor(() => {
       expect(refresh).toHaveBeenCalledTimes(1);
-      expect(mockBiohubApi().admin.updateAccessRequest).toHaveBeenCalledTimes(1);
-      expect(mockBiohubApi().admin.updateAccessRequest).toHaveBeenCalledWith(
+      expect(mockUseApi.admin.updateAccessRequest).toHaveBeenCalledTimes(1);
+      expect(mockUseApi.admin.updateAccessRequest).toHaveBeenCalledWith(
         'testusername',
         SYSTEM_IDENTITY_SOURCE.IDIR,
         1,
