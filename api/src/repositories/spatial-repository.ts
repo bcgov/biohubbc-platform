@@ -2,7 +2,7 @@ import { Feature, FeatureCollection } from 'geojson';
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { SYSTEM_ROLE } from '../constants/roles';
-import { getKnex, getKnexQueryBuilder } from '../database/db';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { UserService } from '../services/user-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
@@ -374,6 +374,7 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    console.log("___ SEARCH REPO TOP ____")
     const userService = new UserService(this.connection);
 
     const userObject = await userService.getUserById(this.connection.systemUserId());
@@ -383,6 +384,7 @@ export class SpatialRepository extends BaseRepository {
         userObject.role_names.includes(systemRole)
       )
     ) {
+      console.log("___ AS ADMIN ____")
       // Fetch all non-secure records that match the search criteria
       return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);
     }
@@ -450,6 +452,8 @@ export class SpatialRepository extends BaseRepository {
   async _findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    console.log("")
+    console.log("____ SEARCH ____")
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -522,6 +526,12 @@ export class SpatialRepository extends BaseRepository {
           'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
         )
       );
+
+    //   console.log("___________________________________________________________")
+    //   console.log("")
+    // console.log(queryBuilder.toSQL().toNative().sql)
+    //       console.log("")
+    // console.log("___________________________________________________________")
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -601,13 +611,72 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialComponent> {
-    const queryBuilder = getKnexQueryBuilder()
-      .select()
-      .from('submission_spatial_component')
-      .where({ submission_spatial_component_id });
+    console.log("____ META DATA ____")
+    const userService = new UserService(this.connection);
+    const userObject = await userService.getUserById(this.connection.systemUserId())
 
+    if ([SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) => userObject.role_names.includes(systemRole))) {
+      console.log("Cool kid club")
+    }
+
+    return this._findSpatialMetadataBySubmissionSpatialCompnentId(submission_spatial_component_id);
+  }
+
+  async _findSpatialMetadataBySubmissionSpatialCompnentId(
+    submission_spatial_component_id: number
+  ): Promise<ISubmissionSpatialComponent> {
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder();
+/*
+          `
+            jsonb_build_object(
+              'submission_spatial_component_id',
+                wfscwst.submission_spatial_component_id,
+              'spatial_data',
+                -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
+                -- then: return the spatial component
+                -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+                case
+                  when
+                    wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+                  then
+                    wfscwst.spatial_component
+                  else
+                    coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
+                end
+            ) spatial_component
+      `
+
+      ISubmissionSpatialComponent {
+
+        submission_spatial_component_id: number;
+        submission_id: number;
+        spatial_component: FeatureCollection;
+        geometry: null;
+        geography: string;
+
+        secured_spatial_component: FeatureCollection;
+        secured_geometry: null;
+        secured_geography: string;
+      }
+    */
+    
+
+    queryBuilder.select(knex.raw(
+      `jsonb_build_object(
+        'submission_spatial_component_id',
+         
+      )`
+    ));
+    
+    queryBuilder.select().from('submission_spatial_component').where({submission_spatial_component_id});
+
+    // const old_queryBuilder = getKnexQueryBuilder()
+    //   .select()
+    //   .from('submission_spatial_component')
+    //   .where({ submission_spatial_component_id });
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
-
+    console.log(spatialComponentResponse.rows[0])
     return spatialComponentResponse.rows[0];
   }
 
