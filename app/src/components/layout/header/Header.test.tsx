@@ -4,7 +4,7 @@ import { createMemoryHistory } from 'history';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { Router } from 'react-router-dom';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
-import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
+import { render } from 'test-helpers/test-utils';
 import Header from './Header';
 
 const history = createMemoryHistory();

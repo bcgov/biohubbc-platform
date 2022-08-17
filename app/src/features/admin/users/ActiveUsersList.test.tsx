@@ -6,7 +6,6 @@ import ActiveUsersList, { IActiveUsersListProps } from './ActiveUsersList';
 
 const history = createMemoryHistory();
 
-
 const renderContainer = (props: IActiveUsersListProps) => {
   return render(
     <Router history={history}>
@@ -23,7 +22,6 @@ const mockUseApi = {
     getRoles: jest.fn()
   }
 };
-
 
 describe('ActiveUsersList', () => {
   beforeEach(() => {

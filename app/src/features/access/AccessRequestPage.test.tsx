@@ -120,10 +120,12 @@ describe('AccessRequestPage', () => {
       id: 1
     });
 
-    mockUseApi.user.getRoles.mockResolvedValue([{
-      system_role_id: 1,
-      name: 'System Administrator'
-    }]);
+    mockUseApi.user.getRoles.mockResolvedValue([
+      {
+        system_role_id: 1,
+        name: 'System Administrator'
+      }
+    ]);
 
     const { getByText, getAllByRole, getByRole } = renderContainer();
 
@@ -184,20 +186,21 @@ describe('AccessRequestPage', () => {
       Promise.reject(new Error('API Error is Here'))
     );
 
-    mockUseApi.user.getRoles.mockResolvedValue([{
-      system_role_id: 1,
-      name: 'System Administrator'
-    }]);
+    mockUseApi.user.getRoles.mockResolvedValue([
+      {
+        system_role_id: 1,
+        name: 'System Administrator'
+      }
+    ]);
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
-
 
     fireEvent.mouseDown(getAllByRole('button')[0]);
 
     const systemRoleListbox = within(getByRole('listbox'));
 
     await waitFor(() => {
-      expect(systemRoleListbox.getByText('System Administrator', {exact: false})).toBeInTheDocument();
+      expect(systemRoleListbox.getByText('System Administrator', { exact: false })).toBeInTheDocument();
     });
 
     fireEvent.click(systemRoleListbox.getByText('System Administrator'));
@@ -220,10 +223,12 @@ describe('AccessRequestPage', () => {
       id: null
     });
 
-    mockUseApi.user.getRoles.mockResolvedValue([{
-      system_role_id: 1,
-      name: 'System Administrator'
-    }]);
+    mockUseApi.user.getRoles.mockResolvedValue([
+      {
+        system_role_id: 1,
+        name: 'System Administrator'
+      }
+    ]);
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
 
