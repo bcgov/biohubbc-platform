@@ -232,11 +232,11 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
     <>
       <Container maxWidth="xl">
         <Box mb={6} display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h1"
+          <Typography
+            variant="h1"
             sx={{
               mt: -2
-            }}
-          >
+            }}>
             Manage Users
           </Typography>
           <Button
@@ -247,12 +247,11 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             aria-label={'Add Users'}
             startIcon={<Icon path={mdiPlus} size={1} />}
             onClick={() => setOpenAddUserDialog(true)}
-              sx={{
-                mt: -2,
-                fontWeight: 700
-              }}
-            >
-              Add Users
+            sx={{
+              mt: -2,
+              fontWeight: 700
+            }}>
+            Add Users
           </Button>
         </Box>
         <Paper>

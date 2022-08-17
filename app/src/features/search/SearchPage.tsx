@@ -166,18 +166,19 @@ const SearchPage = () => {
 
   return (
     <Box>
-      <Paper square elevation={0}
+      <Paper
+        square
+        elevation={0}
         sx={{
           py: 7
-        }}
-      >
+        }}>
         <Container maxWidth="xl">
-          <Typography variant="h1"
+          <Typography
+            variant="h1"
             sx={{
               mt: -2,
               mb: 4
-            }}
-          >
+            }}>
             Find BioHub Datasets
           </Typography>
           <Formik<IAdvancedSearch>

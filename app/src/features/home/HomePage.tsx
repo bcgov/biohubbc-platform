@@ -22,32 +22,33 @@ const HomePage = () => {
 
   return (
     <Paper square elevation={0}>
-      <Container maxWidth="md"
+      <Container
+        maxWidth="md"
         sx={{
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
           height: '30rem'
-        }}
-      >
-        <Typography variant="h1"
+        }}>
+        <Typography
+          variant="h1"
           sx={{
             mt: -4,
             fontSize: '3rem',
             letterSpacing: '-0.03rem'
-          }}
-        >
+          }}>
           Biodiversity Hub B.C.
         </Typography>
-        <Typography variant="body1" color="textSecondary"
+        <Typography
+          variant="body1"
+          color="textSecondary"
           sx={{
             mt: 3,
             mb: 6,
             maxWidth: '45ch',
             fontSize: '1.75rem',
             lineHeight: '1.25'
-          }}
-        >
+          }}>
           Open access to British Columbia's terrestrial, aquatic species and habitat inventory data
         </Typography>
         <Box>

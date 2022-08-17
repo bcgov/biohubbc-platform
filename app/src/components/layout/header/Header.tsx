@@ -26,8 +26,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   govHeader: {},
   govHeaderToolbar: {
     height: '80px',
-    backgroundColor: theme.palette.bcgovblue.main,
-
+    backgroundColor: theme.palette.bcgovblue.main
   },
   brand: {
     display: 'flex',
@@ -120,7 +119,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     {/* <EnvironmentLabel /> */}
                   </span>
                 </Link>
-                <Box ml={4}
+                <Box
+                  ml={4}
                   sx={{
                     '& a': {
                       p: 2,
@@ -131,8 +131,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     '& a:hover': {
                       textDecoration: 'underline'
                     }
-                  }}
-                >
+                  }}>
                   <Link to="/" id="menu_home">
                     Home
                   </Link>
