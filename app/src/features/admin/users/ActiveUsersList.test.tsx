@@ -82,7 +82,7 @@ describe('ActiveUsersList', () => {
     });
 
     await waitFor(() => {
-      expect(getByTestId('custom-menu-button-NotApplicable')).toBeInTheDocument();
+      expect(getByTestId('custom-menu-button-Noassignedrole')).toBeInTheDocument();
     });
   });
 
