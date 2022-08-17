@@ -1,8 +1,7 @@
+import { cleanup, render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import React from 'react';
 import { Router } from 'react-router';
-import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import ManageUsersPage from './ManageUsersPage';
 
 const history = createMemoryHistory();
@@ -16,6 +15,9 @@ const renderContainer = () => {
 };
 
 jest.mock('../../../hooks/useApi');
+
+const mockBiohubApi = useApi as jest.Mock;
+
 const mockUseApi = {
   admin: {
     getAccessRequests: jest.fn()
@@ -24,13 +26,10 @@ const mockUseApi = {
     getUsersList: jest.fn()
   }
 };
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 describe('ManageUsersPage', () => {
   beforeEach(() => {
-    // clear mocks before each test
-    mockBiohubApi().admin.getAccessRequests.mockClear();
-    mockBiohubApi().user.getUsersList.mockClear();
+    mockBiohubApi.mockImplementation(() => mockUseApi);
   });
 
   afterEach(() => {
@@ -38,8 +37,8 @@ describe('ManageUsersPage', () => {
   });
 
   it('renders the main page content correctly', async () => {
-    mockBiohubApi().admin.getAccessRequests.mockReturnValue([]);
-    mockBiohubApi().user.getUsersList.mockReturnValue([]);
+    mockUseApi.admin.getAccessRequests.mockReturnValue([]);
+    mockUseApi.user.getUsersList.mockReturnValue([]);
 
     const { getByText } = renderContainer();
 
@@ -49,8 +48,8 @@ describe('ManageUsersPage', () => {
   });
 
   it('renders the access requests and active users component', async () => {
-    mockBiohubApi().admin.getAccessRequests.mockReturnValue([]);
-    mockBiohubApi().user.getUsersList.mockReturnValue([]);
+    mockUseApi.admin.getAccessRequests.mockReturnValue([]);
+    mockUseApi.user.getUsersList.mockReturnValue([]);
 
     const { getByText } = renderContainer();
 
