@@ -661,15 +661,28 @@ export class SpatialRepository extends BaseRepository {
       }
     */
     
-
-    queryBuilder.select(knex.raw(
+/*
+knex.raw(
       `jsonb_build_object(
         'submission_spatial_component_id',
          
       )`
-    ));
-    
-    queryBuilder.select().from('submission_spatial_component').where({submission_spatial_component_id});
+    )
+*/
+
+    queryBuilder
+    .select(knex.raw(
+      `jsonb_build_object(
+        'submission_spatial_component_id',
+        'submission_spatial_component_id',
+        []
+        null, 
+        "string"
+      )
+      `
+    ))
+    .from('submission_spatial_component')
+    .where({submission_spatial_component_id});
 
     // const old_queryBuilder = getKnexQueryBuilder()
     //   .select()
