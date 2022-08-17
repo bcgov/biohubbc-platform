@@ -4,6 +4,8 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import {
+  IGetSecurityTransformRecord,
+  IGetSpatialTransformRecord,
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
   ISubmissionSpatialComponent,
@@ -33,6 +35,38 @@ describe('SpatialService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ spatial_transform_id: 1 });
+    });
+  });
+
+  describe('getSpatialTransformRecords', () => {
+    it('should return IGetSpatialTransformRecord[] on get', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'getSpatialTransformRecords')
+        .resolves([{ spatial_transform_id: 1 } as unknown as IGetSpatialTransformRecord]);
+
+      const response = await spatialService.getSpatialTransformRecords();
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([{ spatial_transform_id: 1 }]);
+    });
+  });
+
+  describe('getSecurityTransformRecords', () => {
+    it('should return IGetSecurityTransformRecord[] on get', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'getSecurityTransformRecords')
+        .resolves([{ security_transform_id: 1 } as unknown as IGetSecurityTransformRecord]);
+
+      const response = await spatialService.getSecurityTransformRecords();
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([{ security_transform_id: 1 }]);
     });
   });
 
@@ -317,6 +351,22 @@ describe('SpatialService', () => {
   });
 
   describe('findSpatialMetadataBySubmissionSpatialComponentId', () => {
+    it('should return {} when no component found', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const mockResponseRows = { test: 'test' } as unknown as ISubmissionSpatialComponent;
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+        .resolves(mockResponseRows);
+
+      const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({});
+    });
+
     describe('with multiple features', () => {
       it('should return spatial component metadata', async () => {
         const mockDBConnection = getMockDBConnection();

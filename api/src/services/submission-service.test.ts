@@ -488,7 +488,7 @@ describe('SubmissionService', () => {
 
         const getSpatialComponentCountByDatasetIdStub = sinon
           .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
-          .resolves([{ spatial_type: 'Occurrence', count: 0 }]);
+          .resolves([{ spatial_type: 'Test', count: 2 }]);
 
         const response = await submissionService.findSubmissionRecordWithSpatialCount('111-111-111');
 
