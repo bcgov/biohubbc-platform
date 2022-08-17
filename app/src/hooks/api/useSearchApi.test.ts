@@ -43,6 +43,21 @@ describe('useSearchApi', () => {
 
     expect(result[0]).toEqual({ type: 'FeatureCollection' });
   });
+
+  it('getSpatialFile works as expected', async () => {
+    const res = 'zipped file contents';
+
+    mock.onGet('/api/dwc/spatial/download').reply(200, res);
+
+    const result = await useSearchApi(axios).getSpatialDataFile({
+      boundary: { type: 'Feature' } as Feature,
+      type: ['type'],
+      datasetID: 'AAA-BBB'
+    });
+
+    expect(typeof result).toBe('string');
+    expect(result).toEqual('zipped file contents');
+  });
 });
 
 describe('usePublicSearchApi', () => {
