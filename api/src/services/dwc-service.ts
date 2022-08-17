@@ -10,7 +10,6 @@ import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { ElasticSearchIndices } from './es-service';
-import { SecurityService } from './security-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import { ValidationService } from './validation-service';
@@ -67,24 +66,68 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
+    const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
+
+    if (!submissionId) {
+      throw new ApiGeneralError('The Darwin Core submission could not be processed');
+    }
+
+    await this.create_step2_uploadRecordToS3(submissionId, file);
+
+    await this.create_step3_validateSubmission(submissionId);
+
+    await this.create_step4_ingestEML(submissionId);
+
+    await this.create_step5_convertEMLToJSON(submissionId);
+
+    await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
+
+    await this.create_step7_normalizeSubmissionDWCA(submissionId);
+
+    await this.create_step8_runSpatialTransforms(submissionId);
+
+    await this.create_step9_runSecurityTransforms(submissionId);
+  }
+
+  /**
+   * Step 1 in processing a DWC archive file: ingest the file and generated a submissionId
+   *
+   * @param {Express.Multer.File} file
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<number>}
+   * @memberof DarwinCoreService
+   */
+  async create_step1_ingestDWC(file: Express.Multer.File, dataPackageId: string): Promise<number> {
     let submissionId = 0;
 
-    //Step 1: ingest dwca file and save record in db. additionally
     try {
       const ingest = await this.ingestNewDwCADataPackage(file, dataPackageId);
 
       submissionId = ingest.submissionId;
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.INGESTED);
+
+      return submissionId;
     } catch (error: any) {
       defaultLog.debug({ label: 'ingestNewDwCADataPackage', message: 'error', error });
 
       throw new ApiGeneralError('Ingestion failed', error.message);
     }
+  }
 
-    //Step 2: Upload file to s3
+  /**
+   * Step 2 in processing a DWC archive file:upload the record to S3
+   *
+   * @param {number} submissionId
+   * @param {Express.Multer.File} file
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step2_uploadRecordToS3(submissionId: number, file: Express.Multer.File): Promise<void> {
     try {
-      await this.uploadRecordToS3(submissionId, file);
+      const uploadResult = await this.uploadRecordToS3(submissionId, file);
+
+      console.log('upload result: ', uploadResult);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
     } catch (error: any) {
@@ -99,8 +142,16 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+  }
 
-    //Step 3: Validate submission file
+  /**
+   * Step 3 in processing a DWC archive file: validate the submission
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step3_validateSubmission(submissionId: number): Promise<void> {
     try {
       await this.tempValidateSubmission(submissionId);
 
@@ -117,26 +168,16 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+  }
 
-    //Step 4: Secure submission file
-    try {
-      await this.tempSecureSubmission(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'tempSecureSubmission', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SECURITY,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      return;
-    }
-
-    //Step 5: Ingest EML from dwca file
+  /**
+   * Step 4 in processing a DWC archive file: ingest EML
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step4_ingestEML(submissionId: number): Promise<void> {
     try {
       await this.ingestNewDwCAEML(submissionId);
 
@@ -153,8 +194,15 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
-
-    //Step 6: Convert eml to json and save record
+  }
+  /**
+   * Step 5 in processing a DWC archive file: convert EML to JSON
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step5_convertEMLToJSON(submissionId: number): Promise<void> {
     try {
       await this.convertSubmissionEMLtoJSON(submissionId);
 
@@ -171,8 +219,17 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+  }
 
-    //Step 7: Transform submission file and upload to ES
+  /**
+   * Step 6 in processing a DWC archive file: transform and upload metadata
+   *
+   * @param {number} submissionId
+   * @param {string} dataPackageId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
+  async create_step6_transformAndUploadMetaData(submissionId: number, dataPackageId: string): Promise<void> {
     try {
       await this.transformAndUploadMetaData(submissionId, dataPackageId);
 
@@ -189,10 +246,19 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+  }
 
-    //Step 8: Normalize Submission record and save json
+  /**
+   * Step 7 in processing a DWC archive file: normalize the dwc archive file
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async create_step7_normalizeSubmissionDWCA(submissionId: number) {
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
@@ -208,8 +274,16 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+  }
 
-    //Step 9: Run spatial transforms and save data
+  /**
+   * Step 8 in processing a DWC archive file: run spatial transforms
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async create_step8_runSpatialTransforms(submissionId: number) {
     try {
       await this.spatialService.runSpatialTransforms(submissionId);
 
@@ -229,8 +303,16 @@ export class DarwinCoreService extends DBService {
 
       return;
     }
+  }
 
-    //Step 10: Run security transform
+  /**
+   * Step 9 in processing a DWC archive file: run security transforms
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof DarwinCoreService
+   */
+  async create_step9_runSecurityTransforms(submissionId: number) {
     try {
       await this.spatialService.runSecurityTransforms(submissionId);
       await this.submissionService.insertSubmissionStatus(
@@ -318,6 +400,10 @@ export class DarwinCoreService extends DBService {
   async getSubmissionRecordAndConvertToDWCArchive(submissionId: number): Promise<DWCArchive> {
     const file = await this.submissionService.getIntakeFileFromS3(submissionId);
 
+    if (!file) {
+      throw new ApiGeneralError('The source file is not available');
+    }
+
     return this.prepDWCArchive(file);
   }
 
@@ -358,9 +444,11 @@ export class DarwinCoreService extends DBService {
   async ingestNewDwCAEML(submissionId: number): Promise<void> {
     const dwcaFile = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-    if (dwcaFile.eml) {
-      await this.submissionService.updateSubmissionRecordEMLSource(submissionId, dwcaFile.eml);
+    if (!dwcaFile || !dwcaFile.eml) {
+      throw new ApiGeneralError('Converting the record to DWC Archive failed');
     }
+
+    await this.submissionService.updateSubmissionRecordEMLSource(submissionId, dwcaFile.eml);
   }
 
   /**
@@ -469,41 +557,6 @@ export class DarwinCoreService extends DBService {
 
     if (!response.validation) {
       throw new ApiGeneralError('Validation failed');
-    }
-
-    return response;
-  }
-
-  /**
-   * Temp replacement for secure until more requirements are set
-   *
-   * @param {number} submissionId
-   * @return {*}
-   * @memberof DarwinCoreService
-   */
-  async tempSecureSubmission(submissionId: number) {
-    await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.SECURED);
-
-    return { secure: true };
-  }
-
-  /**
-   * Validate Security rules of submission record and set status
-   *
-   * @param {number} submissionId
-   * @param {number} securityId
-   * @return {*} //TODO return type
-   * @memberof DarwinCoreService
-   */
-  async secureSubmission(submissionId: number, securityId: number) {
-    const securityService = new SecurityService(this.connection);
-
-    const securitySchema = await securityService.getSecuritySchemaBySecurityId(securityId); //TODO hardcoded return
-
-    const response = await securityService.validateSecurityOfSubmission(submissionId, securitySchema);
-
-    if (!response.secure) {
-      throw new ApiGeneralError('Secure submission failed');
     }
 
     return response;

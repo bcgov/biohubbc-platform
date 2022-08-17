@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
@@ -191,8 +192,12 @@ export class UserRepository extends BaseRepository {
       system_role sr
     ON
       sur.system_role_id = sr.system_role_id
+    LEFT JOIN
+    	user_identity_source uis
+    ON
+    	su.user_identity_source_id = uis.user_identity_source_id
     WHERE
-      su.record_end_date IS NULL
+      su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}, ${SYSTEM_IDENTITY_SOURCE.SYSTEM})
     GROUP BY
       su.system_user_id,
       su.record_end_date,
@@ -278,14 +283,7 @@ export class UserRepository extends BaseRepository {
         *;
     `;
 
-    const response = await this.connection.sql(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to delete user system roles', [
-        'UserRepository->deleteUserSystemRoles',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
+    await this.connection.sql(sqlStatement);
   }
 
   /**
