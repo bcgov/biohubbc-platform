@@ -1,33 +1,21 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { ESService } from '../../../services/es-service';
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/search');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  searchInElasticSearch()
-];
+export const GET: Operation = [searchInElasticSearch()];
 
 GET.apiDoc = {
   description: 'searches submission files with elastic search',
-  tags: ['search'],
+  tags: ['eml', 'search'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   parameters: [
@@ -80,7 +68,7 @@ export function searchInElasticSearch(): RequestHandler {
   return async (req, res) => {
     const queryString = String(req.query.terms) || '*';
 
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     try {
       await connection.open();
