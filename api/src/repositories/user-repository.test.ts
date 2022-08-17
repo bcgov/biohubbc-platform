@@ -307,24 +307,6 @@ describe('UserRepository', () => {
     afterEach(() => {
       sinon.restore();
     });
-    it('should throw an error when delete fails', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const userRepository = new UserRepository(mockDBConnection);
-
-      try {
-        await userRepository.deleteUserSystemRoles(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to delete user system roles');
-      }
-    });
 
     it('should delete user roles', async () => {
       const mockResponse = [
