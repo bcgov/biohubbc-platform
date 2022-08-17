@@ -1,26 +1,23 @@
-import { cleanup, fireEvent, render, waitFor, within } from 'test-helpers/test-utils';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import { createMemoryHistory } from 'history';
-import { useApi } from 'hooks/useApi';
-import React from 'react';
+import * as useApi from 'hooks/useApi';
 import { Router } from 'react-router';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
+import { cleanup, fireEvent, render, waitFor, within } from 'test-helpers/test-utils';
 import AccessRequestPage from './AccessRequestPage';
 
 const history = createMemoryHistory();
 
+const mockCreateAdministrativeActivity = jest.fn();
+const mockGetRoles = jest.fn().mockResolvedValue('HELLO');
+
 jest.mock('../../hooks/useApi');
 
-const mockUseApi = {
-  admin: {
-    createAdministrativeActivity: jest.fn()
-  }
-};
-
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
-
 const renderContainer = () => {
+  useApi.useApi().admin.createAdministrativeActivity = mockCreateAdministrativeActivity;
+  useApi.useApi().user.getRoles = mockGetRoles;
+
   const authState = getMockAuthState({
     keycloakWrapper: {
       keycloak: {
@@ -56,7 +53,8 @@ const renderContainer = () => {
 describe('AccessRequestPage', () => {
   beforeEach(() => {
     // clear mocks before each test
-    mockBiohubApi().admin.createAdministrativeActivity.mockClear();
+    mockCreateAdministrativeActivity.mockClear();
+    mockGetRoles.mockClear();
   });
 
   afterEach(() => {
@@ -64,10 +62,12 @@ describe('AccessRequestPage', () => {
   });
 
   it('renders correctly', async () => {
-    const { asFragment } = renderContainer();
+    const { getByText } = renderContainer();
 
     await waitFor(() => {
-      expect(asFragment()).toMatchSnapshot();
+      expect(
+        getByText('You will need to provide some additional details before accessing this application.')
+      ).toBeVisible();
     });
   });
 

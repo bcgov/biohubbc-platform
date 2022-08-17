@@ -1,11 +1,10 @@
-import { render } from 'test-helpers/test-utils';
 import { Formik } from 'formik';
-import React from 'react';
+import { render } from 'test-helpers/test-utils';
 import BCeIDRequestForm, { BCeIDRequestFormInitialValues, BCeIDRequestFormYupSchema } from './BCeIDRequestForm';
 
 describe('BCeIDRequestForm', () => {
-  it('matches the snapshot', () => {
-    const { asFragment } = render(
+  it('renders properly', () => {
+    const { getAllByText } = render(
       <Formik
         initialValues={BCeIDRequestFormInitialValues}
         validationSchema={BCeIDRequestFormYupSchema}
@@ -14,6 +13,6 @@ describe('BCeIDRequestForm', () => {
       </Formik>
     );
 
-    expect(asFragment()).toMatchSnapshot();
+    expect(getAllByText('Company Name').length).toEqual(2);
   });
 });
