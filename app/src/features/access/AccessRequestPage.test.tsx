@@ -113,7 +113,7 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('processes a successful request submission', async () => {
-    mockCreateAdministrativeActivity.mockResolvedValue({
+    mockBiohubApi().admin.createAdministrativeActivity.mockResolvedValue({
       id: 1
     });
 
@@ -172,7 +172,7 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('shows error dialog with api error message when submission fails', async () => {
-    mockCreateAdministrativeActivity.mockImplementationOnce(() => Promise.reject(new Error('API Error is Here')));
+    mockBiohubApi().admin.createAdministrativeActivity.mockImplementationOnce(() => Promise.reject(new Error('API Error is Here')));
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
 
@@ -200,7 +200,7 @@ describe('AccessRequestPage', () => {
   });
 
   it.skip('shows error dialog with default error message when response from createAdministrativeActivity is invalid', async () => {
-    mockCreateAdministrativeActivity.mockResolvedValue({
+    mockBiohubApi().admin.createAdministrativeActivity.mockResolvedValue({
       id: null
     });
 
