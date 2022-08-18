@@ -1,9 +1,7 @@
-import Box from '@material-ui/core/Box';
-import Grid from '@material-ui/core/Grid';
-import Typography from '@material-ui/core/Typography';
-import MultiAutocompleteFieldVariableSize, {
-  IMultiAutocompleteFieldOption
-} from 'components/fields/MultiAutocompleteFieldVariableSize';
+import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import Typography from '@mui/material/Typography';
+import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useFormikContext } from 'formik';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
@@ -33,7 +31,7 @@ export interface IReviewAccessRequestFormProps {
  *
  * @return {*}
  */
-const ReviewAccessRequestForm: React.FC<IReviewAccessRequestFormProps> = (props) => {
+const ReviewAccessRequestForm: React.FC<React.PropsWithChildren<IReviewAccessRequestFormProps>> = (props) => {
   const { handleSubmit } = useFormikContext<IReviewAccessRequestForm>();
 
   const company = props.request.data.company || 'Not Applicable';
@@ -115,12 +113,14 @@ const ReviewAccessRequestForm: React.FC<IReviewAccessRequestFormProps> = (props)
         <form onSubmit={handleSubmit}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <MultiAutocompleteFieldVariableSize
+              {/*
+              <div
                 id={'system_roles'}
                 label={'Requested Role'}
                 options={props.system_roles}
                 required={true}
               />
+  */}
             </Grid>
           </Grid>
         </form>

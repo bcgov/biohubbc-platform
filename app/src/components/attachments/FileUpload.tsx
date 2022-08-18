@@ -1,7 +1,7 @@
-import Box from '@material-ui/core/Box';
-import List from '@material-ui/core/List';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import makeStyles from '@material-ui/core/styles/makeStyles';
+import { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import List from '@mui/material/List';
+import { makeStyles } from '@mui/styles';
 import React, { useEffect, useState } from 'react';
 import { FileError, FileRejection } from 'react-dropzone';
 import DropZone, { IDropZoneConfigProps } from './DropZone';
@@ -102,7 +102,7 @@ export interface IFileUploadProps {
   dropZoneProps?: Partial<IDropZoneConfigProps>;
 }
 
-export const FileUpload: React.FC<IFileUploadProps> = (props) => {
+export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (props) => {
   const classes = useStyles();
 
   const [files, setFiles] = useState<IUploadFile[]>([]);

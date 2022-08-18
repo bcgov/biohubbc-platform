@@ -1,8 +1,8 @@
-import { cleanup, render } from '@testing-library/react';
 import { ConfigContext, IConfig } from 'contexts/configContext';
 import { createMemoryHistory } from 'history';
 import React from 'react';
 import { Router } from 'react-router-dom';
+import { cleanup, render } from 'test-helpers/test-utils';
 import * as utils from 'utils/Utils';
 import LogOutPage from './LogOutPage';
 
@@ -64,7 +64,11 @@ describe('LogOutPage', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      N8N_HOST: '',
+      REACT_APP_NODE_ENV: 'local',
+      MAX_UPLOAD_NUM_FILES: 10,
+      MAX_UPLOAD_FILE_SIZE: 52428800
     };
 
     const { getByText } = render(
@@ -93,7 +97,11 @@ describe('LogOutPage', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      N8N_HOST: '',
+      REACT_APP_NODE_ENV: 'local',
+      MAX_UPLOAD_NUM_FILES: 10,
+      MAX_UPLOAD_FILE_SIZE: 52428800
     };
 
     const { getByText } = render(

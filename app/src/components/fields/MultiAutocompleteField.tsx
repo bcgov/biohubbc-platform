@@ -1,8 +1,8 @@
-import Checkbox from '@material-ui/core/Checkbox';
-import TextField from '@material-ui/core/TextField';
-import CheckBox from '@material-ui/icons/CheckBox';
-import CheckBoxOutlineBlank from '@material-ui/icons/CheckBoxOutlineBlank';
-import Autocomplete, { createFilterOptions } from '@material-ui/lab/Autocomplete';
+import CheckBox from '@mui/icons-material/CheckBox';
+import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
+import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React from 'react';
@@ -20,7 +20,7 @@ export interface IMultiAutocompleteField {
   filterLimit?: number;
 }
 
-const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
+const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocompleteField>> = (props) => {
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
 
   const getExistingValue = (existingValues: any[]): IMultiAutocompleteFieldOption[] => {
@@ -50,7 +50,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       id={props.id}
       options={props.options}
       getOptionLabel={(option) => option.label}
-      getOptionSelected={handleGetOptionSelected}
+      isOptionEqualToValue={handleGetOptionSelected}
       filterOptions={createFilterOptions({ limit: props.filterLimit })}
       disableCloseOnSelect
       onChange={(event, option) => {
@@ -59,7 +59,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
           option.map((item) => item.value)
         );
       }}
-      renderOption={(option, { selected }) => {
+      renderOption={(_props, option, { selected }) => {
         const disabled: any = props.options && props.options?.indexOf(option) !== -1;
         return (
           <>

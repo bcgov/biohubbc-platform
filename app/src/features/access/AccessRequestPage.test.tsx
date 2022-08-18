@@ -1,22 +1,26 @@
-import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import React from 'react';
 import { Router } from 'react-router';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
+import { cleanup, fireEvent, render, waitFor, within } from 'test-helpers/test-utils';
 import AccessRequestPage from './AccessRequestPage';
 
 const history = createMemoryHistory();
 
 jest.mock('../../hooks/useApi');
+
+const mockBiohubApi = useApi as jest.Mock;
+
 const mockUseApi = {
   admin: {
     createAdministrativeActivity: jest.fn()
+  },
+  user: {
+    getRoles: jest.fn()
   }
 };
-const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
 
 const renderContainer = () => {
   const authState = getMockAuthState({
@@ -53,8 +57,7 @@ const renderContainer = () => {
 
 describe('AccessRequestPage', () => {
   beforeEach(() => {
-    // clear mocks before each test
-    mockBiohubApi().admin.createAdministrativeActivity.mockClear();
+    mockBiohubApi.mockImplementation(() => mockUseApi);
   });
 
   afterEach(() => {
@@ -62,10 +65,12 @@ describe('AccessRequestPage', () => {
   });
 
   it('renders correctly', async () => {
-    const { asFragment } = renderContainer();
+    const { getByText } = renderContainer();
 
     await waitFor(() => {
-      expect(asFragment()).toMatchSnapshot();
+      expect(
+        getByText('You will need to provide some additional details before accessing this application.')
+      ).toBeVisible();
     });
   });
 
@@ -104,16 +109,23 @@ describe('AccessRequestPage', () => {
 
       fireEvent.click(getByText('Log out'));
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(history.location.pathname).toEqual('/logout');
       });
     });
   });
 
-  it.skip('processes a successful request submission', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity.mockResolvedValue({
+  it('processes a successful request submission', async () => {
+    mockUseApi.admin.createAdministrativeActivity.mockResolvedValue({
       id: 1
     });
+
+    mockUseApi.user.getRoles.mockResolvedValue([
+      {
+        system_role_id: 1,
+        name: 'System Administrator'
+      }
+    ]);
 
     const { getByText, getAllByRole, getByRole } = renderContainer();
 
@@ -134,14 +146,14 @@ describe('AccessRequestPage', () => {
     });
   });
 
-  it.skip('takes the user to the request-submitted page immediately if they already have an access request', async () => {
+  it('takes the user to the request-submitted page immediately if they already have an access request', async () => {
     const authState = getMockAuthState({
       keycloakWrapper: {
         keycloak: {
           authenticated: true
         },
         hasLoadedAllUserInfo: true,
-        hasAccessRequest: false,
+        hasAccessRequest: true,
 
         systemRoles: [],
         getUserIdentifier: jest.fn(),
@@ -169,8 +181,17 @@ describe('AccessRequestPage', () => {
     });
   });
 
-  it.skip('shows error dialog with api error message when submission fails', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity = jest.fn(() => Promise.reject(new Error('API Error is Here')));
+  it('shows error dialog with api error message when submission fails', async () => {
+    mockUseApi.admin.createAdministrativeActivity.mockImplementationOnce(() =>
+      Promise.reject(new Error('API Error is Here'))
+    );
+
+    mockUseApi.user.getRoles.mockResolvedValue([
+      {
+        system_role_id: 1,
+        name: 'System Administrator'
+      }
+    ]);
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
 
@@ -179,7 +200,7 @@ describe('AccessRequestPage', () => {
     const systemRoleListbox = within(getByRole('listbox'));
 
     await waitFor(() => {
-      expect(systemRoleListbox.getByText('System Administrator')).toBeInTheDocument();
+      expect(systemRoleListbox.getByText('System Administrator', { exact: false })).toBeInTheDocument();
     });
 
     fireEvent.click(systemRoleListbox.getByText('System Administrator'));
@@ -197,10 +218,17 @@ describe('AccessRequestPage', () => {
     });
   });
 
-  it.skip('shows error dialog with default error message when response from createAdministrativeActivity is invalid', async () => {
-    mockBiohubApi().admin.createAdministrativeActivity.mockResolvedValue({
+  it('shows error dialog with default error message when response from createAdministrativeActivity is invalid', async () => {
+    mockUseApi.admin.createAdministrativeActivity.mockResolvedValue({
       id: null
     });
+
+    mockUseApi.user.getRoles.mockResolvedValue([
+      {
+        system_role_id: 1,
+        name: 'System Administrator'
+      }
+    ]);
 
     const { getByText, getAllByRole, getByRole, queryByText } = renderContainer();
 

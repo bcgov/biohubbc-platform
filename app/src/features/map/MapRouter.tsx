@@ -9,7 +9,7 @@ import MapPage from './MapPage';
  *
  * @return {*}
  */
-const MapRouter: React.FC = () => {
+const MapRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
       <AppRoute exact path="/map" layout={ContentLayout}>

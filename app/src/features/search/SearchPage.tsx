@@ -1,14 +1,14 @@
-import { Theme } from '@material-ui/core';
-import Box from '@material-ui/core/Box';
-import Card from '@material-ui/core/Card';
-import Container from '@material-ui/core/Container';
-import Divider from '@material-ui/core/Divider';
-import Link from '@material-ui/core/Link';
-import Paper from '@material-ui/core/Paper';
-import Typography from '@material-ui/core/Typography';
-import { makeStyles } from '@material-ui/styles';
 import { mdiEyeOffOutline, mdiEyeOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import Container from '@mui/material/Container';
+import Divider from '@mui/material/Divider';
+import Link from '@mui/material/Link';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
@@ -166,11 +166,21 @@ const SearchPage = () => {
 
   return (
     <Box>
-      <Box component={Paper} py={5}>
+      <Paper
+        square
+        elevation={0}
+        sx={{
+          py: 7
+        }}>
         <Container maxWidth="xl">
-          <Box mt={-1} mb={5}>
-            <Typography variant="h1">Find BioHub Datasets</Typography>
-          </Box>
+          <Typography
+            variant="h1"
+            sx={{
+              mt: -2,
+              mb: 4
+            }}>
+            Find BioHub Datasets
+          </Typography>
           <Formik<IAdvancedSearch>
             innerRef={formikRef}
             initialValues={formikValues}
@@ -180,7 +190,7 @@ const SearchPage = () => {
             <SearchComponent />
           </Formik>
         </Container>
-      </Box>
+      </Paper>
       <Container maxWidth="xl">
         <Box mt={6} mb={4}>
           {formikRef.current?.values.keywords && (

@@ -1,7 +1,8 @@
-import { cleanup, render } from '@testing-library/react';
 import bbox from '@turf/bbox';
+import { LatLngBoundsExpression } from 'leaflet';
 import React from 'react';
-import { IMarker } from './components/MarkerCluster';
+import { cleanup, render } from 'test-helpers/test-utils';
+import { IMarkerLayer } from './components/MarkerCluster';
 import { IStaticLayer } from './components/StaticLayers';
 import MapContainer from './MapContainer';
 
@@ -64,7 +65,7 @@ describe('MapContainer', () => {
       }
     });
 
-    const bounds = [
+    const bounds: LatLngBoundsExpression = [
       [bboxCoords[1], bboxCoords[0]],
       [bboxCoords[3], bboxCoords[2]]
     ];
@@ -81,13 +82,14 @@ describe('MapContainer', () => {
   });
 
   it('renders with markers', () => {
-    const markers: IMarker[] = [
+    const markerLayers: IMarkerLayer[] = [
       {
-        position: [55, 128]
+        layerName: 'test-marker-layer',
+        markers: [{ position: [55, 128] }]
       }
     ];
 
-    const { container } = render(<MapContainer mapId="myMap" markers={markers} />);
+    const { container } = render(<MapContainer mapId="myMap" markerLayers={markerLayers} />);
 
     expect(container.querySelector('#myMap')).toBeInTheDocument();
   });

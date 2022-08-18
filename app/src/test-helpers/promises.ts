@@ -16,7 +16,7 @@
  * @template R The type of the Promise.
  * @template Q The type of the reject reason.
  */
-export class Deferred<R = void, Q extends any = void> {
+export class Deferred<R = void, Q = void> {
   /**
    * Resolves the deferred promise with the given value.
    *
@@ -28,7 +28,7 @@ export class Deferred<R = void, Q extends any = void> {
 
   /**
    * Rejects the deferred promise with the given reason.
-   * @param {Q extends any = void} [reason] The reason that the promise rejects.
+   * @param {Q = void} [reason] The reason that the promise rejects.
    * @returns {void}
    */
   reject: (reason?: Q) => void = () => null;

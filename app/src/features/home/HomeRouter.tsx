@@ -9,7 +9,7 @@ import HomePage from './HomePage';
  *
  * @return {*}
  */
-const HomeRouter: React.FC = () => {
+const HomeRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
       <AppRoute exact path="/" layout={ContentLayout}>

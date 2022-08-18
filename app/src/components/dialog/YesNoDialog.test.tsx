@@ -1,6 +1,5 @@
-import { fireEvent, render, waitFor } from '@testing-library/react';
 import YesNoDialog from 'components/dialog/YesNoDialog';
-import React from 'react';
+import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
 
 const handleOnYes = jest.fn();
 const handleOnNo = jest.fn();
@@ -30,22 +29,23 @@ const renderContainer = ({
 };
 
 describe('EditDialog', () => {
-  it('matches the snapshot when not open', () => {
-    const { baseElement } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'this is text', open: false });
+  it('Does not render dialog pop up when open set to false', () => {
+    const { queryByText } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'this is text', open: false });
 
-    expect(baseElement).toMatchSnapshot();
+    expect(queryByText('this is a test')).toEqual(null);
   });
 
-  it('matches the snapshot when open, with no error message', () => {
-    const { baseElement } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'this is text' });
+  it('Does render dialog pop up when open set to true', () => {
+    const { getByText } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'this is text' });
 
-    expect(baseElement).toMatchSnapshot();
+    expect(getByText('this is a test')).toBeVisible();
   });
 
-  it('matches snapshot when open, with error message', () => {
-    const { baseElement } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'This is an error' });
+  it('Does render dialog pop up and error msgs when open set to true', () => {
+    const { getByText } = renderContainer({ dialogTitle: 'this is a test', dialogText: 'This is an error' });
 
-    expect(baseElement).toMatchSnapshot();
+    expect(getByText('this is a test')).toBeVisible();
+    expect(getByText('This is an error')).toBeVisible();
   });
 
   it('calls the onYes prop when `Yes` button is clicked', async () => {

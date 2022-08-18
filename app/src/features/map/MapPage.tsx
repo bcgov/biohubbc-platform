@@ -1,5 +1,5 @@
-import Box from '@material-ui/core/Box';
-import Typography from '@material-ui/core/Typography';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
@@ -13,7 +13,7 @@ import useURL from 'hooks/useURL';
 import React, { useEffect, useRef, useState } from 'react';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 
-const MapPage: React.FC = () => {
+const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
 
   const url = useURL<{

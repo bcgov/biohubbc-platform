@@ -1,4 +1,4 @@
-import CircularProgress from '@material-ui/core/CircularProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 import { AuthStateContext } from 'contexts/authStateContext';
 import qs from 'qs';
 import React, { useContext } from 'react';
@@ -14,7 +14,7 @@ import { Redirect, Route, RouteProps, useLocation } from 'react-router';
  * @param {*} { children, ...rest }
  * @return {*}
  */
-export const AuthenticatedRouteGuard: React.FC<RouteProps> = ({ children, ...rest }) => {
+export const AuthenticatedRouteGuard: React.FC<React.PropsWithChildren<RouteProps>> = ({ children, ...rest }) => {
   return (
     <CheckForAuthLoginParam>
       <WaitForKeycloakToLoadUserInfo>
@@ -45,7 +45,7 @@ export const AuthenticatedRouteGuard: React.FC<RouteProps> = ({ children, ...res
  * @param {*} { children }
  * @return {*}
  */
-const CheckForAuthLoginParam: React.FC = ({ children }) => {
+const CheckForAuthLoginParam: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const location = useLocation();
@@ -77,7 +77,7 @@ const CheckForAuthLoginParam: React.FC = ({ children }) => {
  * @param {*} { children }
  * @return {*}
  */
-const WaitForKeycloakToLoadUserInfo: React.FC = ({ children }) => {
+const WaitForKeycloakToLoadUserInfo: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   if (!keycloakWrapper?.hasLoadedAllUserInfo) {
@@ -96,7 +96,7 @@ const WaitForKeycloakToLoadUserInfo: React.FC = ({ children }) => {
  * @param {*} { children }
  * @return {*}
  */
-const CheckIfAuthenticatedUser: React.FC = ({ children }) => {
+const CheckIfAuthenticatedUser: React.FC<React.PropsWithChildren> = ({ children }) => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const location = useLocation();
