@@ -626,34 +626,6 @@ export class SpatialRepository extends BaseRepository {
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialComponent> {
     const knex = getKnex();
-/*
-
-      ISubmissionSpatialComponent {
-
-        submission_spatial_component_id: number;
-        submission_id: number;
-        spatial_component: FeatureCollection;
-        geometry: null;
-        geography: string;
-
-        secured_spatial_component: FeatureCollection;
-        secured_geometry: null;
-        secured_geography: string;
-      }
-    */
-
-    // queryBuilder.select(knex.raw(`
-    //   submission_spatial_component_id, 
-    //   submission_id,
-    //   spatial_component, 
-    //   geometry, 
-    //   geography,
-    //   secured_spatial_component,
-    //   secured_geometry,
-    //   secured_geography      
-    // `))
-    // .from('submission_spatial_component')
-    // .where({submission_spatial_component_id});
 
     const queryBuilder = knex
       .queryBuilder()
@@ -689,10 +661,6 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.geography')
           .groupBy('ssc.secured_geometry')
           .groupBy('ssc.secured_geography');
-
-          console.log()
-
-
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
         // Build an array of the users spatial security transform exceptions
@@ -703,21 +671,6 @@ export class SpatialRepository extends BaseRepository {
       })
       .select(
         // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-        /*
-
-      ISubmissionSpatialComponent {
-
-        submission_spatial_component_id: number;
-        submission_id: number;
-        spatial_component: FeatureCollection;
-        geometry: null;
-        geography: string;
-
-        secured_spatial_component: FeatureCollection;
-        secured_geometry: null;
-        secured_geography: string;
-      }
-    */
         knex.raw(
           `
           submission_spatial_component_id,
@@ -738,11 +691,23 @@ export class SpatialRepository extends BaseRepository {
                     coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
                 end
           ) spatial_component,
-          geometry, 
-          geography, 
-          secured_spatial_component, 
-          secured_geometry,
-          secured_geography
+          geometry,
+          case 
+            when
+              wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+            then
+              wfscwst.geography
+            else
+              coalesce(wfscwst.secured_geography, wfscwst.geography)
+          end as geography,
+          case 
+            when
+              wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+            then
+              wfscwst.geometry
+            else
+              coalesce(wfscwst.secured_geometry, wfscwst.geometry)
+          end as geometry
           `
         )
       )
