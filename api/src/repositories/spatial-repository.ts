@@ -610,7 +610,7 @@ export class SpatialRepository extends BaseRepository {
    */
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialComponent> {
+  ): Promise<any> {
     console.log("____ META DATA ____")
     const userService = new UserService(this.connection);
     const userObject = await userService.getUserById(this.connection.systemUserId())
@@ -626,26 +626,7 @@ export class SpatialRepository extends BaseRepository {
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialComponent> {
     const knex = getKnex();
-    const queryBuilder = knex.queryBuilder();
 /*
-          `
-            jsonb_build_object(
-              'submission_spatial_component_id',
-                wfscwst.submission_spatial_component_id,
-              'spatial_data',
-                -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
-                -- then: return the spatial component
-                -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
-                case
-                  when
-                    wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
-                  then
-                    wfscwst.spatial_component
-                  else
-                    coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
-                end
-            ) spatial_component
-      `
 
       ISubmissionSpatialComponent {
 
@@ -660,36 +641,161 @@ export class SpatialRepository extends BaseRepository {
         secured_geography: string;
       }
     */
-    
-/*
-knex.raw(
-      `jsonb_build_object(
-        'submission_spatial_component_id',
-         
-      )`
-    )
-*/
 
-    queryBuilder
-    .select(knex.raw(
-      `jsonb_build_object(
-        'submission_spatial_component_id',
-        'submission_spatial_component_id',
-        []
-        null, 
-        "string"
+    // queryBuilder.select(knex.raw(`
+    //   submission_spatial_component_id, 
+    //   submission_id,
+    //   spatial_component, 
+    //   geometry, 
+    //   geography,
+    //   secured_spatial_component,
+    //   secured_geometry,
+    //   secured_geography      
+    // `))
+    // .from('submission_spatial_component')
+    // .where({submission_spatial_component_id});
+
+    const queryBuilder = knex
+      .queryBuilder()
+      .with('with_filtered_spatial_component_with_security_transforms', (qb1) => {
+        // Get the spatial components that match the search filters, and for each record, build the array of spatial security transforms that ran against that row
+        qb1
+          .select(
+            knex.raw(
+              'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
+            ),
+            'ssc.submission_spatial_component_id',
+            'ssc.submission_id',
+            'ssc.spatial_component',
+            'ssc.secured_spatial_component',
+            'ssc.geometry',
+            'ssc.geography',
+            'ssc.secured_geometry',
+            'ssc.secured_geography'
+          )
+          .from('submission_spatial_component as ssc')
+          .leftJoin(
+            'security_transform_submission as sts',
+            'sts.submission_spatial_component_id',
+            'ssc.submission_spatial_component_id'
+          )
+          .whereIn("ssc.submission_spatial_component_id", [submission_spatial_component_id])
+          .groupBy('sts.submission_spatial_component_id')
+          .groupBy('ssc.submission_spatial_component_id')
+          .groupBy('ssc.submission_id')
+          .groupBy('ssc.spatial_component')
+          .groupBy('ssc.secured_spatial_component')
+          .groupBy('ssc.geometry')
+          .groupBy('ssc.geography')
+          .groupBy('ssc.secured_geometry')
+          .groupBy('ssc.secured_geography');
+
+          console.log()
+
+
+      })
+      .with('with_user_security_transform_exceptions', (qb6) => {
+        // Build an array of the users spatial security transform exceptions
+        qb6
+          .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+          .from('system_user_security_exception as suse')
+          .where('suse.system_user_id', this.connection.systemUserId());
+      })
+      .select(
+        // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+        /*
+
+      ISubmissionSpatialComponent {
+
+        submission_spatial_component_id: number;
+        submission_id: number;
+        spatial_component: FeatureCollection;
+        geometry: null;
+        geography: string;
+
+        secured_spatial_component: FeatureCollection;
+        secured_geometry: null;
+        secured_geography: string;
+      }
+    */
+        knex.raw(
+          `
+          submission_spatial_component_id,
+          submission_id,
+          jsonb_build_object(
+              'submission_spatial_component_id',
+              wfscwst.submission_spatial_component_id,
+              'spatial_data',
+                -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
+                -- then: return the spatial component
+                -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+                case
+                  when
+                    wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+                  then
+                    wfscwst.spatial_component
+                  else
+                    coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
+                end
+          ) spatial_component,
+          geometry, 
+          geography, 
+          secured_spatial_component, 
+          secured_geometry,
+          secured_geography
+          `
+        )
       )
-      `
-    ))
-    .from('submission_spatial_component')
-    .where({submission_spatial_component_id});
+      .from(
+        knex.raw(
+          'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
+        )
+      );
 
-    // const old_queryBuilder = getKnexQueryBuilder()
-    //   .select()
-    //   .from('submission_spatial_component')
-    //   .where({ submission_spatial_component_id });
+    const old_queryBuilder = knex.queryBuilder()
+      .select()
+      .from('submission_spatial_component')
+      .where({ submission_spatial_component_id });
+
+    console.log("___________________________________________________________")
+    console.log("")
+    // console.log(queryBuilder.toSQL().toNative().sql)
+    // console.log(queryBuilder.toSQL().toNative().bindings)
+    console.log("")
+    console.log("___________________________________________________________")
+
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
-    console.log(spatialComponentResponse.rows[0])
+    const oldRes = await this.connection.knex<ISubmissionSpatialComponent>(old_queryBuilder);
+
+    console.log("__________________________ New Hotness _________________________________")
+    // fields looks all messed up, I need to build that JSON object differently so things will work...
+    // console.log(spatialComponentResponse.fields)
+    console.log("Row Count: " + spatialComponentResponse.rowCount)
+    console.log(spatialComponentResponse.rows[0].spatial_component)
+    /*
+
+          spatial_component {
+            spatial_data {
+              type
+              features []
+            }
+            submission_id
+          }
+
+          // working
+          spatial_component {
+            type
+            features []
+          }
+
+    */
+          console.log("")
+    console.log("__________________________ Old News _________________________________")
+    // console.log(oldRes.fields)
+    console.log("Row Count: " + oldRes.rowCount)
+    console.log(oldRes.rows[0].spatial_component)
+
+
     return spatialComponentResponse.rows[0];
   }
 
