@@ -1,13 +1,13 @@
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import IconButton from '@material-ui/core/IconButton';
-import LinearProgress from '@material-ui/core/LinearProgress';
-import ListItem from '@material-ui/core/ListItem';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import makeStyles from '@material-ui/core/styles/makeStyles';
-import Typography from '@material-ui/core/Typography';
 import { mdiCheck, mdiFileOutline, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import LinearProgress from '@mui/material/LinearProgress';
+import ListItem from '@mui/material/ListItem';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import axios, { CancelTokenSource } from 'axios';
 import ComponentDialog from 'components/dialog/ComponentDialog';
 import { APIError } from 'hooks/api/useAxios';
@@ -82,7 +82,7 @@ export interface IFileUploadItemProps {
   status?: UploadFileStatus;
 }
 
-const FileUploadItem: React.FC<IFileUploadItemProps> = (props) => {
+const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = (props) => {
   const isMounted = useIsMounted();
   const classes = useStyles();
 
@@ -276,7 +276,7 @@ interface IActionButtonProps {
  * @param {*} props
  * @return {*}
  */
-const ActionButton: React.FC<IActionButtonProps> = (props) => {
+const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (props) => {
   const classes = useStyles();
 
   if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED) {
@@ -336,7 +336,7 @@ interface IProgressBarProps {
  * @param {*} props
  * @return {*}
  */
-const ProgressBar: React.FC<IProgressBarProps> = (props) => {
+const ProgressBar: React.FC<React.PropsWithChildren<IProgressBarProps>> = (props) => {
   const classes = useStyles();
 
   if (props.status === UploadFileStatus.STAGED) {

@@ -9,7 +9,7 @@ import ManageUsersPage from './users/ManageUsersPage';
  *
  * @return {*}
  */
-const AdminUsersRouter: React.FC = () => {
+const AdminUsersRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
       <AppRoute exact path="/admin/users" layout={ContentLayout}>

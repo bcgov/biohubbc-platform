@@ -1,20 +1,19 @@
-import { fireEvent, render } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
-import React from 'react';
 import { Router } from 'react-router-dom';
+import { fireEvent, render } from 'test-helpers/test-utils';
 import NotFoundPage from './NotFoundPage';
 
 const history = createMemoryHistory();
 
 describe('NotFoundPage', () => {
   it('renders correctly', () => {
-    const { asFragment } = render(
+    const { getByText } = render(
       <Router history={history}>
         <NotFoundPage />
       </Router>
     );
 
-    expect(asFragment()).toMatchSnapshot();
+    expect(getByText('Page Not Found')).toBeVisible();
   });
 
   it('takes the user home when they click the return home button', () => {

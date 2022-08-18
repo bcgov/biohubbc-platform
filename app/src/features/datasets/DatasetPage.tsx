@@ -1,16 +1,17 @@
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import Card from '@material-ui/core/Card';
-import CardHeader from '@material-ui/core/CardHeader';
-import CircularProgress from '@material-ui/core/CircularProgress/CircularProgress';
-import Container from '@material-ui/core/Container';
-import Grid from '@material-ui/core/Grid';
-import Paper from '@material-ui/core/Paper';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import Typography from '@material-ui/core/Typography';
-import { makeStyles } from '@material-ui/styles';
 import { mdiDownload } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardHeader from '@mui/material/CardHeader';
+import CircularProgress from '@mui/material/CircularProgress/CircularProgress';
+import Container from '@mui/material/Container';
+import Grid from '@mui/material/Grid';
+import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
+import { Buffer } from 'buffer';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
@@ -41,7 +42,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const DatasetPage: React.FC = () => {
+const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
   const biohubApi = useApi();
   const urlParams = useParams();
@@ -168,10 +169,12 @@ const DatasetPage: React.FC = () => {
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">
-            <Grid justify="space-between" container alignItems="center">
+            <Grid sx={{ justify: 'space-between', alignItems: 'center' }}>
               <Grid item>
                 <Box px={2}>
-                  <CardHeader title="OCCURRENCES" disableTypography></CardHeader>
+                  <CardHeader
+                    title="Occurrences"
+                    titleTypographyProps={{ variant: 'h4', component: 'h2' }}></CardHeader>
                 </Box>
               </Grid>
               <Grid item>

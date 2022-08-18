@@ -73,7 +73,7 @@ export interface IDrawControlsProps {
   clearOnDraw?: boolean;
 }
 
-const DrawControls: React.FC<IDrawControlsProps> = (props) => {
+const DrawControls: React.FC<React.PropsWithChildren<IDrawControlsProps>> = (props) => {
   const context = useLeafletContext();
 
   /**
