@@ -738,7 +738,7 @@ export class SpatialRepository extends BaseRepository {
     console.log("Row Count: " + spatialComponentResponse.rowCount)
     console.log(spatialComponentResponse.rows[0].spatial_component)
     /*
-
+          // new hotness
           spatial_component {
             spatial_data {
               type
