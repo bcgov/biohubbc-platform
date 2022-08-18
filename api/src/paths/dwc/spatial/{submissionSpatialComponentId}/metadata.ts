@@ -1,32 +1,20 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection } from '../../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SpatialService } from '../../../../services/spatial-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  getSpatialMetadataById()
-];
+export const GET: Operation = [getSpatialMetadataById()];
 
 GET.apiDoc = {
   description: 'Retrieves spatial component metadata based on submission spatial component id',
   tags: ['spatial'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   parameters: [
@@ -66,7 +54,7 @@ export function getSpatialMetadataById(): RequestHandler {
   return async (req, res) => {
     const submissionSpatialComponentId = Number(req.params.submissionSpatialComponentId);
 
-    const connection = getAPIUserDBConnection();
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     try {
       await connection.open();

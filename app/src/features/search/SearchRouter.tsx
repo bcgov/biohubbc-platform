@@ -9,7 +9,7 @@ import SearchPage from './SearchPage';
  *
  * @return {*}
  */
-const SearchRouter: React.FC = () => {
+const SearchRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
       <AppRoute exact path="/search" layout={ContentLayout}>

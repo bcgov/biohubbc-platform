@@ -1,9 +1,9 @@
-import Box from '@material-ui/core/Box';
-import CircularProgress from '@material-ui/core/CircularProgress';
-import Collapse from '@material-ui/core/Collapse';
-import Link from '@material-ui/core/Link';
-import makeStyles from '@material-ui/core/styles/makeStyles';
-import Typography from '@material-ui/core/Typography';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
+import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -47,7 +47,9 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ submissionSpatialComponentId }) => {
+const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = ({
+  submissionSpatialComponentId
+}) => {
   const classes = useStyles();
   const api = useApi();
   const history = useHistory();
@@ -61,9 +63,11 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ subm
   const { isLoading, isReady } = dataLoader;
   const data = dataLoader.data as BoundaryCentroidFeatureProperties;
 
-  const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
+  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
+    <div className={classes.modalContent}>{children}</div>
+  );
 
-  const MetadataHeader: React.FC<{ title: string }> = (props) => (
+  const MetadataHeader: React.FC<React.PropsWithChildren<{ title: string }>> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
         Dataset
@@ -76,7 +80,7 @@ const DatasetPopup: React.FC<{ submissionSpatialComponentId: number }> = ({ subm
     </Box>
   );
 
-  const NoMetadataAvailable: React.FC = () => (
+  const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
     <Typography className={classes.date} component="h6" variant="body1">
       No metadata available.
     </Typography>

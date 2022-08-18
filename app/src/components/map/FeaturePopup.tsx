@@ -1,12 +1,12 @@
-import Box from '@material-ui/core/Box';
-import CircularProgress from '@material-ui/core/CircularProgress';
-import Collapse from '@material-ui/core/Collapse';
-import makeStyles from '@material-ui/core/styles/makeStyles';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableRow from '@material-ui/core/TableRow';
-import Typography from '@material-ui/core/Typography';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -59,7 +59,7 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props) => {
+const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = (props) => {
   const { submissionSpatialComponentId } = props;
 
   const classes = useStyles();
@@ -81,9 +81,11 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
 
   const { isLoading, data, isReady } = dataLoader;
 
-  const ModalContentWrapper: React.FC = ({ children }) => <div className={classes.modalContent}>{children}</div>;
+  const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
+    <div className={classes.modalContent}>{children}</div>
+  );
 
-  const MetadataHeader: React.FC<{ type: string; date?: string }> = (props) => (
+  const MetadataHeader: React.FC<React.PropsWithChildren<{ type: string; date?: string }>> = (props) => (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
         {props.type || 'Feature'}
@@ -96,7 +98,7 @@ const FeaturePopup: React.FC<{ submissionSpatialComponentId: number }> = (props)
     </Box>
   );
 
-  const NoMetadataAvailable: React.FC = () => (
+  const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
     <Typography className={classes.date} component="h6" variant="body1">
       No metadata available.
     </Typography>

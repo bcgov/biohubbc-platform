@@ -1,4 +1,4 @@
-import TextField, { TextFieldProps } from '@material-ui/core/TextField';
+import TextField, { TextFieldProps } from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
 import React from 'react';
@@ -8,7 +8,7 @@ export interface ICustomTextField {
   other?: TextFieldProps;
 }
 
-const CustomTextField: React.FC<ICustomTextField> = (props) => {
+const CustomTextField: React.FC<React.PropsWithChildren<ICustomTextField>> = (props) => {
   const { touched, errors, values, handleChange } = useFormikContext<any>();
 
   const { name, label, other } = props;
@@ -24,7 +24,7 @@ const CustomTextField: React.FC<ICustomTextField> = (props) => {
       value={get(values, name)}
       fullWidth={true}
       error={get(touched, name) && Boolean(get(errors, name))}
-      helperText={get(touched, name) && get(errors, name)}
+      helperText={get(touched, name) && <>{get(errors, name) as string}</>}
       {...other}
     />
   );

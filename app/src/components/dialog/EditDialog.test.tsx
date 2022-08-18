@@ -1,8 +1,7 @@
-import { fireEvent, render, waitFor } from '@testing-library/react';
 import EditDialog from 'components/dialog/EditDialog';
 import CustomTextField from 'components/fields/CustomTextField';
 import { useFormikContext } from 'formik';
-import React from 'react';
+import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import yup from 'utils/YupSchema';
 
 export interface ISampleFormikFormProps {
