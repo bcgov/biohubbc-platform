@@ -134,7 +134,11 @@ describe('getLogOutUrl', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      N8N_HOST: '',
+      REACT_APP_NODE_ENV: 'local',
+      MAX_UPLOAD_NUM_FILES: 10,
+      MAX_UPLOAD_FILE_SIZE: 52428800
     };
 
     expect(getLogOutUrl(config)).toBeUndefined();
@@ -151,7 +155,11 @@ describe('getLogOutUrl', () => {
         realm: '',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      N8N_HOST: '',
+      REACT_APP_NODE_ENV: 'local',
+      MAX_UPLOAD_NUM_FILES: 10,
+      MAX_UPLOAD_FILE_SIZE: 52428800
     };
 
     expect(getLogOutUrl(config)).toBeUndefined();
@@ -168,7 +176,11 @@ describe('getLogOutUrl', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: ''
+      SITEMINDER_LOGOUT_URL: '',
+      N8N_HOST: '',
+      REACT_APP_NODE_ENV: 'local',
+      MAX_UPLOAD_NUM_FILES: 10,
+      MAX_UPLOAD_FILE_SIZE: 52428800
     };
 
     expect(getLogOutUrl(config)).toBeUndefined();
@@ -193,7 +205,11 @@ describe('getLogOutUrl', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
+      N8N_HOST: '',
+      REACT_APP_NODE_ENV: 'local',
+      MAX_UPLOAD_NUM_FILES: 10,
+      MAX_UPLOAD_FILE_SIZE: 52428800
     };
 
     expect(getLogOutUrl(config)).toEqual(
@@ -204,7 +220,7 @@ describe('getLogOutUrl', () => {
 
 describe('getFormattedFileSize', () => {
   it('returns `0 KB` if no file size exists', async () => {
-    const formattedFileSize = getFormattedFileSize(null as unknown);
+    const formattedFileSize = getFormattedFileSize(null as unknown as number);
     expect(formattedFileSize).toEqual('0 KB');
   });
 

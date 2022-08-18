@@ -1,11 +1,11 @@
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import Input from '@material-ui/core/Input';
-import InputAdornment from '@material-ui/core/InputAdornment';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import { makeStyles } from '@material-ui/styles';
 import { mdiMagnify } from '@mdi/js';
 import { Icon } from '@mdi/react';
+import { Theme } from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Input from '@mui/material/Input';
+import InputAdornment from '@mui/material/InputAdornment';
+import { makeStyles } from '@mui/styles';
 import { useFormikContext } from 'formik';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import React from 'react';
@@ -17,9 +17,9 @@ const useStyles = makeStyles((theme: Theme) => ({
   searchInput: {
     height: '56px',
     paddingLeft: theme.spacing(2),
-    borderRadius: '6px',
-    border: '1px solid rgba(0, 0, 0, 0.23)',
-    background: '#ffffff',
+    borderRadius: '5px',
+    border: '1px solid #cccccc',
+    background: '#f7f8fa',
     outline: '4px solid transparent',
     outlineOffset: '-1px',
     transition: 'all ease-out 0.25s',
@@ -60,7 +60,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const SearchComponent: React.FC = () => {
+const SearchComponent: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   const formikProps = useFormikContext<IAdvancedSearch>();

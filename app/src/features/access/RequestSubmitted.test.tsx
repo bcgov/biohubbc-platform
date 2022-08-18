@@ -1,10 +1,9 @@
-import { fireEvent, render, waitFor } from '@testing-library/react';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
-import React from 'react';
 import { Router } from 'react-router';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
+import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import RequestSubmitted from './RequestSubmitted';
 
 describe('RequestSubmitted', () => {
@@ -32,7 +31,7 @@ describe('RequestSubmitted', () => {
 
     history.push('/access-request');
 
-    const { asFragment } = render(
+    const { queryByText } = render(
       <AuthStateContext.Provider value={authState}>
         <Router history={history}>
           <RequestSubmitted />
@@ -44,7 +43,7 @@ describe('RequestSubmitted', () => {
     expect(history.location.pathname).toEqual('/access-request');
 
     // renders a spinner
-    expect(asFragment()).toMatchSnapshot();
+    expect(queryByText('Access Request Submitted')).toEqual(null);
   });
 
   it('redirects to `/` when user has at least 1 system role', () => {
@@ -141,7 +140,7 @@ describe('RequestSubmitted', () => {
 
     history.push('/access-request');
 
-    const { getByText, asFragment } = render(
+    const { getByText } = render(
       <AuthStateContext.Provider value={authState}>
         <Router history={history}>
           <RequestSubmitted />
@@ -155,7 +154,7 @@ describe('RequestSubmitted', () => {
     expect(getByText('Log Out')).toBeVisible();
 
     // renders the component in full
-    expect(asFragment()).toMatchSnapshot();
+    expect(getByText('Access Request Submitted')).toBeVisible();
   });
 
   describe('Log Out', () => {
@@ -191,7 +190,7 @@ describe('RequestSubmitted', () => {
 
       fireEvent.click(getByTestId('logout-button'));
 
-      waitFor(() => {
+      await waitFor(() => {
         expect(history.location.pathname).toEqual('/logout');
       });
     });

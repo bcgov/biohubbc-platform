@@ -1,7 +1,7 @@
-import { render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
-import React from 'react';
+import { useApi } from 'hooks/useApi';
 import { Router } from 'react-router';
+import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import ActiveUsersList, { IActiveUsersListProps } from './ActiveUsersList';
 
 const history = createMemoryHistory();
@@ -14,7 +14,24 @@ const renderContainer = (props: IActiveUsersListProps) => {
   );
 };
 
+jest.mock('../../../hooks/useApi');
+const mockBiohubApi = useApi as jest.Mock;
+
+const mockUseApi = {
+  user: {
+    getRoles: jest.fn()
+  }
+};
+
 describe('ActiveUsersList', () => {
+  beforeEach(() => {
+    mockBiohubApi.mockImplementation(() => mockUseApi);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   it('shows `No Active Users` when there are no active users', async () => {
     const mockGetUsers = jest.fn();
     const { getByText } = renderContainer({
@@ -63,7 +80,7 @@ describe('ActiveUsersList', () => {
     });
 
     await waitFor(() => {
-      expect(getByTestId('custom-menu-button-NotApplicable')).toBeInTheDocument();
+      expect(getByTestId('custom-menu-button-Noassignedrole')).toBeInTheDocument();
     });
   });
 

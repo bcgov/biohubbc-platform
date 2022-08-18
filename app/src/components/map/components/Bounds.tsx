@@ -8,7 +8,7 @@ export interface ISetMapBoundsProps {
   zoom?: number;
 }
 
-export const SetMapBounds: React.FC<ISetMapBoundsProps> = (props) => {
+export const SetMapBounds: React.FC<React.PropsWithChildren<ISetMapBoundsProps>> = (props) => {
   const map = useMap();
 
   // Set bounds if provided, ignore zoom
@@ -34,7 +34,7 @@ export interface IGetMapBoundsProps {
   onChange: IMapBoundsOnChange;
 }
 
-export const GetMapBounds: React.FC<IGetMapBoundsProps> = (props) => {
+export const GetMapBounds: React.FC<React.PropsWithChildren<IGetMapBoundsProps>> = (props) => {
   const { onChange } = props;
 
   const map = useMapEvents({

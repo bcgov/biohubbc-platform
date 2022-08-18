@@ -1,5 +1,5 @@
-import { render } from '@testing-library/react';
 import React from 'react';
+import { render } from 'test-helpers/test-utils';
 import { useInterval } from './useInterval';
 
 interface ITestComponentProps {
@@ -8,7 +8,7 @@ interface ITestComponentProps {
   timeout: number;
 }
 
-const TestComponent: React.FC<ITestComponentProps> = (props) => {
+const TestComponent: React.FC<React.PropsWithChildren<ITestComponentProps>> = (props) => {
   useInterval(props.callback, props.period, props.timeout);
 
   return <></>;

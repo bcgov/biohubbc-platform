@@ -16,7 +16,7 @@ import React from 'react';
 import { Redirect, Switch, useLocation } from 'react-router-dom';
 import AppRoute from 'utils/AppRoute';
 
-const AppRouter: React.FC = () => {
+const AppRouter: React.FC<React.PropsWithChildren> = () => {
   const location = useLocation();
 
   const getTitle = (page: string) => {

@@ -1,12 +1,12 @@
-import { cleanup } from '@testing-library/react';
 import { act, renderHook } from '@testing-library/react-hooks';
 import { createMemoryHistory, MemoryHistory } from 'history';
 import React from 'react';
 import { Route, Router } from 'react-router';
+import { cleanup } from 'test-helpers/test-utils';
 import useURL from './useURL';
 
 const getWrapper = (history: MemoryHistory) => {
-  const wrapper: React.FC = ({ children }) => (
+  const wrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <Router history={history}>
       <Route path="test/:id/page">{children}</Route>
     </Router>
@@ -58,7 +58,7 @@ describe('useURL', () => {
     it('should append new query params to initial query parameters', async () => {
       const history = createMemoryHistory({ initialEntries: ['test/123/page?val0=0&val1=1'] });
 
-      const wrapper: React.FC = ({ children }) => (
+      const wrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
         <Router history={history}>
           <Route path="test/:id/page">{children}</Route>
         </Router>

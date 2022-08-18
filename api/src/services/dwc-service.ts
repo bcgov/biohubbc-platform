@@ -125,9 +125,7 @@ export class DarwinCoreService extends DBService {
    */
   async create_step2_uploadRecordToS3(submissionId: number, file: Express.Multer.File): Promise<void> {
     try {
-      const uploadResult = await this.uploadRecordToS3(submissionId, file);
-
-      console.log('upload result: ', uploadResult);
+      await this.uploadRecordToS3(submissionId, file);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.UPLOADED);
     } catch (error: any) {

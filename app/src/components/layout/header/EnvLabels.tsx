@@ -1,5 +1,5 @@
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import makeStyles from '@material-ui/core/styles/makeStyles';
+import { Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 import { ConfigContext } from 'contexts/configContext';
 import React, { useContext } from 'react';
 
@@ -12,7 +12,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-export const BetaLabel: React.FC = () => {
+export const BetaLabel: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   return (
