@@ -114,9 +114,9 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const userDataLoader = useDataLoader(() => biohubApi.user.getUser());
 
-  const hasPendingAdministrativeActivitiesDataLoader = useDataLoader(() =>
-    biohubApi.admin.hasPendingAdministrativeActivities()
-  );
+  // const hasPendingAdministrativeActivitiesDataLoader = useDataLoader(() =>
+  //   biohubApi.admin.hasPendingAdministrativeActivities()
+  // );
 
   if (keycloak) {
     // keycloak is ready, load keycloak user info
@@ -130,7 +130,8 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     if (userDataLoader.data && (!userDataLoader.data.role_names.length || userDataLoader.data?.user_record_end_date)) {
       // Authenticated user either has has no roles or has been deactivated
       // Check if the user has a pending access request
-      hasPendingAdministrativeActivitiesDataLoader.load();
+      // TODO removed while access requests are broken
+      // hasPendingAdministrativeActivitiesDataLoader.load();
     }
   }
 
@@ -218,15 +219,15 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const refresh = () => {
     userDataLoader.refresh();
-    hasPendingAdministrativeActivitiesDataLoader.refresh();
+    // hasPendingAdministrativeActivitiesDataLoader.refresh();
   };
 
   return {
     keycloak: keycloak,
-    hasLoadedAllUserInfo: !!(userDataLoader.data || hasPendingAdministrativeActivitiesDataLoader.data),
+    hasLoadedAllUserInfo: !!userDataLoader.data, // !!(userDataLoader.data || hasPendingAdministrativeActivitiesDataLoader.data),
     systemRoles: getSystemRoles(),
     hasSystemRole,
-    hasAccessRequest: !!hasPendingAdministrativeActivitiesDataLoader.data,
+    hasAccessRequest: false, // !!hasPendingAdministrativeActivitiesDataLoader.data,
     getUserIdentifier,
     getIdentitySource,
     username: username(),
