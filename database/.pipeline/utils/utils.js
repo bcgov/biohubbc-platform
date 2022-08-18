@@ -246,9 +246,9 @@ const waitForResourceToMeetCondition = async (
       if (!isConditionMet) {
         return retry();
       }
-    } catch (excp) {
+    } catch {
       console.error(`6 - waitForResourceToMeetCondition - Error: waiting for resource failed`);
-      throw excp;
+      throw new Error(`6 - waitForResourceToMeetCondition - Error: waiting for resource failed`);
     }
   };
 
@@ -303,8 +303,9 @@ const checkAndClean = async (resourceName, numberOfRetries, timeoutBetweenRetrie
 
       console.log(`4 - checkAndClean - Deleting resource: ${resourceName}`);
       deleteResourceByName(resourceName, oc);
-    } catch (excp) {
+    } catch {
       console.error(`7 - checkAndClean - Error: waiting for resource failed`);
+      throw new Error(`7 - checkAndClean - Error: waiting for resource failed`);
     }
   };
 
