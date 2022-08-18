@@ -31,7 +31,7 @@ export interface IStaticLayersProps {
   layers?: IStaticLayer[];
 }
 
-const StaticLayers: React.FC<IStaticLayersProps> = (props) => {
+const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (props) => {
   if (!props.layers?.length) {
     return null;
   }

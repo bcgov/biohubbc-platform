@@ -1,22 +1,21 @@
-import AppBar from '@material-ui/core/AppBar';
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import Dialog from '@material-ui/core/Dialog';
-import DialogActions from '@material-ui/core/DialogActions';
-import DialogContent from '@material-ui/core/DialogContent';
-import DialogTitle from '@material-ui/core/DialogTitle';
-import Divider from '@material-ui/core/Divider';
-import IconButton from '@material-ui/core/IconButton';
-import OtherLink from '@material-ui/core/Link';
-import { Theme } from '@material-ui/core/styles/createMuiTheme';
-import makeStyles from '@material-ui/core/styles/makeStyles';
-import Toolbar from '@material-ui/core/Toolbar';
-import Typography from '@material-ui/core/Typography';
 import { mdiHelpCircle } from '@mdi/js';
 import Icon from '@mdi/react';
+import { Theme } from '@mui/material';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import IconButton from '@mui/material/IconButton';
+import OtherLink from '@mui/material/Link';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import headerImageLarge from 'assets/images/gov-bc-logo-horiz.png';
 import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
-import { BetaLabel, EnvironmentLabel } from 'components/layout/header/EnvLabels';
+import { BetaLabel } from 'components/layout/header/EnvLabels';
 import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'components/security/Guards';
 import { SYSTEM_ROLE } from 'constants/roles';
 import React from 'react';
@@ -26,15 +25,17 @@ import { LoggedInUserControls, NotLoggedInUserControls } from './UserControls';
 const useStyles = makeStyles((theme: Theme) => ({
   govHeader: {},
   govHeaderToolbar: {
-    height: '70px'
+    height: '80px',
+    backgroundColor: theme.palette.bcgovblue.main
   },
   brand: {
     display: 'flex',
     flex: '0 0 auto',
     alignItems: 'center',
+    overflow: 'hidden',
     color: 'inherit',
     textDecoration: 'none',
-    fontSize: '1.5rem',
+    fontSize: '1.75rem',
     '& img': {
       marginTop: '-2px',
       verticalAlign: 'middle'
@@ -59,24 +60,6 @@ const useStyles = makeStyles((theme: Theme) => ({
     wrapText: {
       display: 'block'
     }
-  },
-  userProfile: {
-    color: theme.palette.primary.contrastText,
-    fontSize: '0.9375rem',
-    '& hr': {
-      backgroundColor: '#4b5e7e',
-      height: '1rem'
-    },
-    '& a': {
-      color: 'inherit',
-      textDecoration: 'none'
-    },
-    '& a:hover': {
-      textDecoration: 'underline'
-    }
-  },
-  govHeaderIconButton: {
-    color: '#ffffff'
   },
   mainNav: {
     backgroundColor: '#38598a'
@@ -103,7 +86,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const Header: React.FC = () => {
+const Header: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
   const [openSupportDialog, setOpenSupportDialog] = React.useState(false);
@@ -119,40 +102,74 @@ const Header: React.FC = () => {
 
   return (
     <>
-      <AppBar position="sticky" style={{ boxShadow: 'none' }}>
+      <AppBar position="sticky" elevation={0}>
         <Box className={classes.govHeader}>
           <Toolbar className={classes.govHeaderToolbar}>
-            <Box display="flex" justifyContent="space-between" width="100%">
-              <Link to="/" className={classes.brand} aria-label="Go to Home Page">
-                <picture>
-                  <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
-                  <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
-                  <img src={headerImageSmall} alt={'Government of British Columbia'} />
-                </picture>
-                <span>
-                  <strong>BioHub</strong>
-                  <BetaLabel />
-                  <EnvironmentLabel />
-                </span>
-              </Link>
-              <Box display="flex" className={classes.userProfile} my="auto" alignItems="center">
-                <UnAuthGuard>
-                  <NotLoggedInUserControls />
-                </UnAuthGuard>
-                <AuthGuard>
-                  <LoggedInUserControls />
-                </AuthGuard>
-                <Box pl={2}>
-                  <Divider orientation="vertical" />
+            <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+              <Box display="flex" alignItems="center">
+                <Link to="/" className={classes.brand} aria-label="Go to Home Page">
+                  <picture>
+                    <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
+                    <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
+                    <img src={headerImageSmall} alt={'Government of British Columbia'} />
+                  </picture>
+                  <span>
+                    <strong>BioHub</strong>
+                    <BetaLabel />
+                    {/* <EnvironmentLabel /> */}
+                  </span>
+                </Link>
+                <Box
+                  ml={4}
+                  sx={{
+                    '& a': {
+                      p: 2,
+                      color: 'bcgovblue.contrastText',
+                      fontWeight: 700,
+                      textDecoration: 'none'
+                    },
+                    '& a:hover': {
+                      textDecoration: 'underline'
+                    }
+                  }}>
+                  <Link to="/" id="menu_home">
+                    Home
+                  </Link>
+                  <Link to="/search" id="menu_search">
+                    Find Datasets
+                  </Link>
+                  <Link to="/map" id="menu_map">
+                    Map Search
+                  </Link>
+                  <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                    <Link to="/admin/users" id="menu_admin_users">
+                      Manage Users
+                    </Link>
+                  </SystemRoleGuard>
                 </Box>
-                <IconButton className={classes.govHeaderIconButton} onClick={showSupportDialog}>
-                  <Icon path={mdiHelpCircle} size={1.12} />
+              </Box>
+              <Box display="flex" alignItems="center">
+                <IconButton
+                  aria-label="Need help?"
+                  onClick={showSupportDialog}
+                  sx={{
+                    color: 'bcgovblue.contrastText'
+                  }}>
+                  <Icon path={mdiHelpCircle} size={1} />
                 </IconButton>
+                <Box>
+                  <UnAuthGuard>
+                    <NotLoggedInUserControls />
+                  </UnAuthGuard>
+                  <AuthGuard>
+                    <LoggedInUserControls />
+                  </AuthGuard>
+                </Box>
               </Box>
             </Box>
           </Toolbar>
         </Box>
-        <Box className={classes.mainNav}>
+        {/* <Box className={classes.mainNav}>
           <Toolbar variant="dense" className={classes.mainNavToolbar} role="navigation" aria-label="Main Navigation">
             <Link to="/" id="menu_home">
               Home
@@ -169,7 +186,7 @@ const Header: React.FC = () => {
               </Link>
             </SystemRoleGuard>
           </Toolbar>
-        </Box>
+        </Box> */}
       </AppBar>
 
       <Dialog open={openSupportDialog}>

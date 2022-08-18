@@ -1,19 +1,19 @@
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
-import Grid from '@material-ui/core/Grid';
-import Paper from '@material-ui/core/Paper';
-import makeStyles from '@material-ui/core/styles/makeStyles';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
-import TableHead from '@material-ui/core/TableHead';
-import TablePagination from '@material-ui/core/TablePagination';
-import TableRow from '@material-ui/core/TableRow';
-import Toolbar from '@material-ui/core/Toolbar';
-import Typography from '@material-ui/core/Typography';
 import { mdiDotsVertical, mdiMenuDown, mdiPlus, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TablePagination from '@mui/material/TablePagination';
+import TableRow from '@mui/material/TableRow';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import EditDialog from 'components/dialog/EditDialog';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
@@ -34,7 +34,6 @@ import AddSystemUsersForm, {
 
 const useStyles = makeStyles(() => ({
   table: {
-    tableLayout: 'fixed',
     '& td': {
       verticalAlign: 'middle'
     }
@@ -52,7 +51,7 @@ export interface IActiveUsersListProps {
  * @param {*} props
  * @return {*}
  */
-const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
+const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> = (props) => {
   const classes = useStyles();
   const biohubApi = useApi();
   const { activeUsers } = props;
@@ -68,7 +67,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
     systemRoles = rolesDataLoader.data;
   }
 
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
   const [page, setPage] = useState(0);
   const dialogContext = useContext(DialogContext);
 
@@ -96,7 +95,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
 
   const handleRemoveUserClick = (row: IGetUserResponse) => {
     dialogContext.setYesNoDialog({
-      dialogTitle: 'Remove User?',
+      dialogTitle: 'Remove user?',
       dialogContent: (
         <Typography variant="body1" component="div" color="textSecondary">
           Removing user <strong>{row.user_identifier}</strong> will revoke their access to this application. Are you
@@ -105,7 +104,7 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
       ),
       yesButtonLabel: 'Remove User',
       noButtonLabel: 'Cancel',
-      yesButtonProps: { color: 'secondary' },
+      yesButtonProps: { color: 'error' },
       onClose: () => {
         dialogContext.setYesNoDialog({ open: false });
       },
@@ -231,65 +230,70 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
 
   return (
     <>
-      <Paper>
-        <Toolbar disableGutters>
-          <Grid
-            justify="space-between" // Add it here :)
-            container
-            alignItems="center">
-            <Grid item>
-              <Box px={2}>
-                <Typography variant="h2">Active Users ({activeUsers?.length || 0})</Typography>
-              </Box>
-            </Grid>
-
-            <Grid item>
-              <Box my={1} mx={2}>
-                <Button
-                  color="primary"
-                  variant="outlined"
-                  disableElevation
-                  data-testid="invite-system-users-button"
-                  aria-label={'Add Users'}
-                  startIcon={<Icon path={mdiPlus} size={1} />}
-                  onClick={() => setOpenAddUserDialog(true)}>
-                  <strong>Add Users</strong>
-                </Button>
-              </Box>
-            </Grid>
-          </Grid>
-        </Toolbar>
-        <TableContainer>
-          <Table className={classes.table}>
-            <TableHead>
-              <TableRow>
-                <TableCell>Username</TableCell>
-                <TableCell>Role</TableCell>
-                <TableCell width="100px" align="center">
-                  Actions
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody data-testid="active-users-table">
-              {!activeUsers?.length && (
-                <TableRow data-testid={'active-users-row-0'}>
-                  <TableCell colSpan={6} style={{ textAlign: 'center' }}>
-                    No Active Users
+      <Container maxWidth="xl">
+        <Box mb={6} display="flex" justifyContent="space-between" alignItems="center">
+          <Typography
+            variant="h1"
+            sx={{
+              mt: -2
+            }}>
+            Manage Users
+          </Typography>
+          <Button
+            size="large"
+            color="primary"
+            variant="contained"
+            data-testid="invite-system-users-button"
+            aria-label={'Add Users'}
+            startIcon={<Icon path={mdiPlus} size={1} />}
+            onClick={() => setOpenAddUserDialog(true)}
+            sx={{
+              mt: -2,
+              fontWeight: 700
+            }}>
+            Add Users
+          </Button>
+        </Box>
+        <Paper>
+          <Toolbar
+            sx={{
+              pl: { sm: 2 },
+              pr: { xs: 1, sm: 1 }
+            }}>
+            <Typography variant="h4" component="h2">
+              Active Users{' '}
+              <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">
+                ({activeUsers?.length || 0})
+              </Typography>
+            </Typography>
+          </Toolbar>
+          <TableContainer>
+            <Table className={classes.table}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Username</TableCell>
+                  <TableCell>Role</TableCell>
+                  <TableCell align="center" width="100">
+                    Actions
                   </TableCell>
                 </TableRow>
-              )}
-              {activeUsers.length > 0 &&
-                activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
-                  <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
-                    <TableCell>
-                      <strong>{row.user_identifier || 'Not Applicable'}</strong>
+              </TableHead>
+              <TableBody data-testid="active-users-table">
+                {!activeUsers?.length && (
+                  <TableRow data-testid={'active-users-row-0'}>
+                    <TableCell colSpan={6} style={{ textAlign: 'center' }}>
+                      No Active Users
                     </TableCell>
-                    <TableCell>
-                      <Box m={-1}>
+                  </TableRow>
+                )}
+                {activeUsers.length > 0 &&
+                  activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
+                    <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
+                      <TableCell>{row.user_identifier || 'No assigned role'}</TableCell>
+                      <TableCell>
                         <CustomMenuButton
-                          buttonLabel={row.role_names.join(', ') || 'Not Applicable'}
+                          buttonLabel={row.role_names.join(', ') || 'No assigned role'}
                           buttonTitle={'Change User Permissions'}
-                          buttonProps={{ variant: 'text' }}
                           menuItems={systemRoles.map((item) => {
                             return {
                               menuLabel: item.name,
@@ -298,53 +302,53 @@ const ActiveUsersList: React.FC<IActiveUsersListProps> = (props) => {
                           })}
                           buttonEndIcon={<Icon path={mdiMenuDown} size={1} />}
                         />
-                      </Box>
-                    </TableCell>
+                      </TableCell>
 
-                    <TableCell align="center">
-                      <Box my={-1}>
-                        <CustomMenuIconButton
-                          buttonTitle="Actions"
-                          buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
-                          menuItems={[
-                            //TODO: disabled view details button, page and router does not exist
-                            // {
-                            //   menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
-                            //   menuLabel: 'View Users Details',
-                            //   menuOnClick: () =>
-                            //     history.push({
-                            //       pathname: `/admin/users/${row.id}`,
-                            //       state: row
-                            //     })
-                            // },
-                            {
-                              menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
-                              menuLabel: 'Remove User',
-                              menuOnClick: () => handleRemoveUserClick(row)
-                            }
-                          ]}
-                        />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {activeUsers?.length > 0 && (
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 15, 20]}
-            component="div"
-            count={activeUsers.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onChangePage={(event: unknown, newPage: number) => handleChangePage(event, newPage, setPage)}
-            onChangeRowsPerPage={(event: React.ChangeEvent<HTMLInputElement>) =>
-              handleChangeRowsPerPage(event, setPage, setRowsPerPage)
-            }
-          />
-        )}
-      </Paper>
+                      <TableCell align="center">
+                        <Box>
+                          <CustomMenuIconButton
+                            buttonTitle="Actions"
+                            buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
+                            menuItems={[
+                              //TODO: disabled view details button, page and router does not exist
+                              // {
+                              //   menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
+                              //   menuLabel: 'View Users Details',
+                              //   menuOnClick: () =>
+                              //     history.push({
+                              //       pathname: `/admin/users/${row.id}`,
+                              //       state: row
+                              //     })
+                              // },
+                              {
+                                menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
+                                menuLabel: 'Remove user',
+                                menuOnClick: () => handleRemoveUserClick(row)
+                              }
+                            ]}
+                          />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {activeUsers?.length > 0 && (
+            <TablePagination
+              rowsPerPageOptions={[50, 100, 200]}
+              component="div"
+              count={activeUsers.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(event: unknown, newPage: number) => handleChangePage(event, newPage, setPage)}
+              onRowsPerPageChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                handleChangeRowsPerPage(event, setPage, setRowsPerPage)
+              }
+            />
+          )}
+        </Paper>
+      </Container>
 
       <EditDialog
         dialogTitle={'Add Users'}

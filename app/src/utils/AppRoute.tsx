@@ -16,7 +16,13 @@ export type IAppRouteProps = RouteProps & {
   layout?: React.ComponentType<any>;
 };
 
-const AppRoute: React.FC<IAppRouteProps> = ({ component: Component, children, layout: Layout, title, ...rest }) => {
+const AppRoute: React.FC<React.PropsWithChildren<IAppRouteProps>> = ({
+  component: Component,
+  children,
+  layout: Layout,
+  title,
+  ...rest
+}) => {
   if (title) {
     document.title = title;
   }

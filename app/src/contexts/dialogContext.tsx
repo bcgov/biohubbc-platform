@@ -1,7 +1,7 @@
-import IconButton from '@material-ui/core/IconButton';
-import Snackbar from '@material-ui/core/Snackbar';
-import CloseIcon from '@material-ui/icons/Close';
-import { Color } from '@material-ui/lab/Alert';
+import CloseIcon from '@mui/icons-material/Close';
+import { AlertColor } from '@mui/material/Alert';
+import IconButton from '@mui/material/IconButton';
+import Snackbar from '@mui/material/Snackbar';
 import { ErrorDialog, IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import YesNoDialog, { IYesNoDialogProps } from 'components/dialog/YesNoDialog';
 import React, { createContext, ReactNode, useState } from 'react';
@@ -57,8 +57,8 @@ export interface IDialogContext {
 export interface ISnackbarProps {
   open: boolean;
   onClose: () => void;
-  severity?: Color;
-  color?: Color;
+  severity?: AlertColor;
+  color?: AlertColor;
   snackbarMessage: ReactNode;
 }
 
@@ -118,7 +118,7 @@ export const DialogContext = createContext<IDialogContext>({
  * @param {*} props
  * @return {*}
  */
-export const DialogContextProvider: React.FC = (props) => {
+export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const [yesNoDialogProps, setYesNoDialogProps] = useState<IYesNoDialogProps>(defaultYesNoDialogProps);
 
   const [errorDialogProps, setErrorDialogProps] = useState<IErrorDialogProps>(defaultErrorDialogProps);

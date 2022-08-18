@@ -2,24 +2,13 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-// import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SpatialService } from '../../../../services/spatial-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
 
-export const GET: Operation = [
-  // authorizeRequestHandler(() => {
-  //   return {
-  //     and: [
-  //       {
-  //         discriminator: 'SystemUser'
-  //       }
-  //     ]
-  //   };
-  // }),
-  getSpatialMetadataById()
-];
+export const GET: Operation = [getSpatialMetadataById()];
 
 GET.apiDoc = {
   description: 'Retrieves spatial component metadata based on submission spatial component id',
