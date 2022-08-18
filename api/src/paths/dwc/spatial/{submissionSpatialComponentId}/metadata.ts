@@ -2,7 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SpatialService } from '../../../../services/spatial-service';
 import { getLogger } from '../../../../utils/logger';
 
