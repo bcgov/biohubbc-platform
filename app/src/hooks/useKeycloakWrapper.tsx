@@ -1,5 +1,5 @@
 import { useKeycloak } from '@react-keycloak/web';
-import { KeycloakInstance } from 'keycloak-js';
+import Keycloak from 'keycloak-js';
 import { useCallback } from 'react';
 import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
@@ -38,10 +38,10 @@ export interface IKeycloakWrapper {
   /**
    * Original raw keycloak object.
    *
-   * @type {(KeycloakInstance | undefined)}
+   * @type {(Keycloak | undefined)}
    * @memberof IKeycloakWrapper
    */
-  keycloak: KeycloakInstance | undefined;
+  keycloak: Keycloak | undefined;
   /**
    * Returns `true` if the user's information has been loaded, false otherwise.
    *

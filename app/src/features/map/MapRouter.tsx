@@ -1,5 +1,4 @@
 import ContentLayout from 'layouts/ContentLayout';
-import React from 'react';
 import { Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import MapPage from './MapPage';

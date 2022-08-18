@@ -12,7 +12,6 @@ import LogOutPage from 'features/logout/LogOutPage';
 import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
 import BaseLayout from 'layouts/BaseLayout';
-import React from 'react';
 import { Redirect, Switch, useLocation } from 'react-router-dom';
 import AppRoute from 'utils/AppRoute';
 

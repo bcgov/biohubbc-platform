@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import React from 'react';
 import ActiveUsersList from './ActiveUsersList';
 
 /**
