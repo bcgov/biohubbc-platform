@@ -374,7 +374,6 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-    console.log("___ SEARCH REPO TOP ____")
     const userService = new UserService(this.connection);
 
     const userObject = await userService.getUserById(this.connection.systemUserId());
@@ -384,7 +383,6 @@ export class SpatialRepository extends BaseRepository {
         userObject.role_names.includes(systemRole)
       )
     ) {
-      console.log("___ AS ADMIN ____")
       // Fetch all non-secure records that match the search criteria
       return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);
     }
@@ -452,8 +450,6 @@ export class SpatialRepository extends BaseRepository {
   async _findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-    console.log("")
-    console.log("____ SEARCH ____")
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -598,24 +594,72 @@ export class SpatialRepository extends BaseRepository {
   /**
    * Query spatial components by given submission ID
    *
-   * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @param {number} submission_spatial_component_id
+   * @return {*}  {Promise<ISubmissionSpatialComponent>}
    * @memberof SpatialRepository
    */
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
   ): Promise<any> {
-    console.log("____ META DATA ____")
     const userService = new UserService(this.connection);
     const userObject = await userService.getUserById(this.connection.systemUserId())
 
     if ([SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) => userObject.role_names.includes(systemRole))) {
-      console.log("Cool kid club")
+      return this._findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(submission_spatial_component_id);
     }
 
     return this._findSpatialMetadataBySubmissionSpatialCompnentId(submission_spatial_component_id);
   }
 
+  /**
+   * Query builder to find spatial component from a given submission id, specifically for admin users that bypass all security
+   * rules.
+   *
+   * @param {number} submission_spatial_component_id
+   * @return {*}  {Promise<ISubmissionSpatialComponent>}
+   * @memberof SpatialRepository
+   */
+  async _findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(
+    submission_spatial_component_id: number 
+  ): Promise<ISubmissionSpatialComponent> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .with('with_filtered_spatial_component', (qb1) => {
+        // Get the spatial components that match the search filters
+        qb1.select().from('submission_spatial_component as ssc').where({submission_spatial_component_id});
+      })
+      .select(
+        // Select the non-secure spatial component from the search results
+        knex.raw(
+          `
+            jsonb_build_object(
+              'submission_spatial_component_id',
+                wfsc.submission_spatial_component_id,
+              'spatial_data',
+                wfsc.spatial_component
+            ) spatial_component,
+            'ssc.submission_spatial_component_id',
+            'ssc.submission_id',
+            'ssc.geometry',
+            'ssc.geography'
+          `
+        )
+      )
+      .from(knex.raw('with_filtered_spatial_component as wfsc'));
+
+    const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
+
+    return response.rows[0];
+  }
+
+  /**
+   * Query builder to find a spatial component from a given submission id.
+   *
+   * @param {number} submission_spatial_component_id
+   * @return {*}  {Promise<ISubmissionSpatialComponent>}
+   * @memberof SpatialRepository
+   */
   async _findSpatialMetadataBySubmissionSpatialCompnentId(
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialComponent> {
@@ -712,9 +756,6 @@ export class SpatialRepository extends BaseRepository {
       );
 
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
-    // const oldRes = await this.connection.knex<ISubmissionSpatialComponent>(old_queryBuilder);
-
-    // console.log("__________________________ New Hotness _________________________________")
     /*
           // new hotness
           // same as search return object
@@ -731,13 +772,7 @@ export class SpatialRepository extends BaseRepository {
             type
             features []
           }
-
-
-          POINT (-100.763087126 100.487313035)
     */
-    //       console.log("")
-    // console.log("__________________________ Old News _________________________________")
-
 
     return spatialComponentResponse.rows[0];
   }
