@@ -17,6 +17,7 @@ import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
 import MarkerClusterGroup, { IMarkerLayer } from './components/MarkerCluster';
 import StaticLayers, { IStaticLayer } from './components/StaticLayers';
+import UploadControls from './components/UploadControls';
 
 const useStyles = makeStyles(() => ({
   map: {
@@ -99,6 +100,7 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
           />
         </FeatureGroup>
       )}
+      <UploadControls />
 
       <EventHandler eventHandlers={eventHandlers} />
 
