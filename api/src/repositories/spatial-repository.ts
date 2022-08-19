@@ -488,34 +488,11 @@ export class SpatialRepository extends BaseRepository {
         this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
-        // Build an array of the users spatial security transform exceptions
-        qb6
-          .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
-          .from('system_user_security_exception as suse')
-          .where('suse.system_user_id', this.connection.systemUserId());
+        this._buildSpatialSecurityExceptions(knex, qb6, this.connection.systemUserId())
       })
       .select(
         // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-        knex.raw(
-          `
-            jsonb_build_object(
-              'submission_spatial_component_id',
-                wfscwst.submission_spatial_component_id,
-              'spatial_data',
-                -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
-                -- then: return the spatial component
-                -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
-                case
-                  when
-                    wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
-                  then
-                    wfscwst.spatial_component
-                  else
-                    coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
-                end
-            ) spatial_component
-          `
-        )
+        knex.fromRaw(this._buildSelectForSecureNonSecureSpatialComponents(knex))
       )
       .from(
         knex.raw(
@@ -659,12 +636,12 @@ export class SpatialRepository extends BaseRepository {
    * Query builder to find a spatial component from a given submission id.
    *
    * @param {number} submission_spatial_component_id
-   * @return {*}  {Promise<ISubmissionSpatialComponent>}
+   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow>}
    * @memberof SpatialRepository
    */
   async _findSpatialMetadataBySubmissionSpatialCompnentId(
     submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialComponent> {
+  ): Promise<ISubmissionSpatialSearchResponseRow> {
     const knex = getKnex();
 
     const queryBuilder = knex
@@ -679,11 +656,7 @@ export class SpatialRepository extends BaseRepository {
             'ssc.submission_spatial_component_id',
             'ssc.submission_id',
             'ssc.spatial_component',
-            'ssc.secured_spatial_component',
-            'ssc.geometry',
-            'ssc.geography',
-            'ssc.secured_geometry',
-            'ssc.secured_geography'
+            'ssc.secured_spatial_component'
           )
           .from('submission_spatial_component as ssc')
           .leftJoin(
@@ -696,60 +669,14 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_id')
           .groupBy('ssc.spatial_component')
-          .groupBy('ssc.secured_spatial_component')
-          .groupBy('ssc.geometry')
-          .groupBy('ssc.geography')
-          .groupBy('ssc.secured_geometry')
-          .groupBy('ssc.secured_geography');
+          .groupBy('ssc.secured_spatial_component');
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
-        // Build an array of the users spatial security transform exceptions
-        qb6
-          .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
-          .from('system_user_security_exception as suse')
-          .where('suse.system_user_id', this.connection.systemUserId());
+        this._buildSpatialSecurityExceptions(knex, qb6, this.connection.systemUserId())
       })
       .select(
         // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-        knex.raw(
-          `
-          submission_spatial_component_id,
-          submission_id,
-          jsonb_build_object(
-              'submission_spatial_component_id',
-              wfscwst.submission_spatial_component_id,
-              'spatial_data',
-                -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
-                -- then: return the spatial component
-                -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
-                case
-                  when
-                    wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
-                  then
-                    wfscwst.spatial_component
-                  else
-                    coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
-                end
-          ) spatial_component,
-          geometry,
-          case 
-            when
-              wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
-            then
-              wfscwst.geography
-            else
-              coalesce(wfscwst.secured_geography, wfscwst.geography)
-          end as geography,
-          case 
-            when
-              wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
-            then
-              wfscwst.geometry
-            else
-              coalesce(wfscwst.secured_geometry, wfscwst.geometry)
-          end as geometry
-          `
-        )
+        knex.fromRaw(this._buildSelectForSecureNonSecureSpatialComponents(knex))
       )
       .from(
         knex.raw(
@@ -757,26 +684,56 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-    const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
-    /*
-          // new hotness
-          // same as search return object
-          spatial_component {
-            spatial_data {
-              type
-              features []
-            }
-            submission_id
-          }
-
-          // working
-          spatial_component {
-            type
-            features []
-          }
-    */
+    const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
     return spatialComponentResponse.rows[0];
+  }
+
+  /**
+   * Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+   * 
+   * @param {Knex} knex 
+   * @return {*}  { Knex.Raw<any> }
+   * @memberof SpatialRepository
+   */
+  _buildSelectForSecureNonSecureSpatialComponents(knex: Knex): Knex.Raw<any> {
+    return knex.raw(
+      `
+      submission_spatial_component_id,
+      submission_id,
+      jsonb_build_object(
+          'submission_spatial_component_id',
+          wfscwst.submission_spatial_component_id,
+          'spatial_data',
+            -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
+            -- then: return the spatial component
+            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+            case
+              when
+                wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+              then
+                wfscwst.spatial_component
+              else
+                coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
+            end
+      ) spatial_component
+      `
+    )
+  }
+
+  /**
+   * Build an array of the users spatial security transform exceptions
+   *
+   * @param {Knex} knex
+   * @param {Knex.QueryBuilder} qb
+   * @param {number} system_user_id
+   * @memberof SpatialRepository
+   */
+  async  _buildSpatialSecurityExceptions(knex: Knex, qb: Knex.QueryBuilder, system_user_id: number) {
+    qb
+      .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+      .from('system_user_security_exception as suse')
+      .where('suse.system_user_id', system_user_id);
   }
 
   /**
