@@ -598,13 +598,15 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialComponent>}
    * @memberof SpatialRepository
    */
-  async findSpatialMetadataBySubmissionSpatialComponentId(
-    submission_spatial_component_id: number
-  ): Promise<any> {
+  async findSpatialMetadataBySubmissionSpatialComponentId(submission_spatial_component_id: number): Promise<any> {
     const userService = new UserService(this.connection);
-    const userObject = await userService.getUserById(this.connection.systemUserId())
+    const userObject = await userService.getUserById(this.connection.systemUserId());
 
-    if ([SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) => userObject.role_names.includes(systemRole))) {
+    if (
+      [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
+        userObject.role_names.includes(systemRole)
+      )
+    ) {
       return this._findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(submission_spatial_component_id);
     }
 
@@ -620,14 +622,14 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   async _findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(
-    submission_spatial_component_id: number 
+    submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialComponent> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
       .with('with_filtered_spatial_component', (qb1) => {
         // Get the spatial components that match the search filters
-        qb1.select().from('submission_spatial_component as ssc').where({submission_spatial_component_id});
+        qb1.select().from('submission_spatial_component as ssc').where({ submission_spatial_component_id });
       })
       .select(
         // Select the non-secure spatial component from the search results
@@ -689,7 +691,7 @@ export class SpatialRepository extends BaseRepository {
             'sts.submission_spatial_component_id',
             'ssc.submission_spatial_component_id'
           )
-          .whereIn("ssc.submission_spatial_component_id", [submission_spatial_component_id])
+          .whereIn('ssc.submission_spatial_component_id', [submission_spatial_component_id])
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_id')
