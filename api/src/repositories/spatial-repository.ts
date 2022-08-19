@@ -488,7 +488,7 @@ export class SpatialRepository extends BaseRepository {
         this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
-        this._buildSpatialSecurityExceptions(knex, qb6, this.connection.systemUserId())
+        this._buildSpatialSecurityExceptions(knex, qb6, this.connection.systemUserId());
       })
       .select(
         // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
@@ -672,7 +672,7 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.secured_spatial_component');
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
-        this._buildSpatialSecurityExceptions(knex, qb6, this.connection.systemUserId())
+        this._buildSpatialSecurityExceptions(knex, qb6, this.connection.systemUserId());
       })
       .select(
         // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
@@ -690,9 +690,10 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-   * 
-   * @param {Knex} knex 
+   * Select either the non-secure or secure spatial component from the search results,
+   * based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+   *
+   * @param {Knex} knex
    * @return {*}  { Knex.Raw<any> }
    * @memberof SpatialRepository
    */
@@ -718,7 +719,7 @@ export class SpatialRepository extends BaseRepository {
             end
       ) spatial_component
       `
-    )
+    );
   }
 
   /**
@@ -729,9 +730,8 @@ export class SpatialRepository extends BaseRepository {
    * @param {number} system_user_id
    * @memberof SpatialRepository
    */
-  async  _buildSpatialSecurityExceptions(knex: Knex, qb: Knex.QueryBuilder, system_user_id: number) {
-    qb
-      .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+  async _buildSpatialSecurityExceptions(knex: Knex, qb: Knex.QueryBuilder, system_user_id: number) {
+    qb.select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
       .from('system_user_security_exception as suse')
       .where('suse.system_user_id', system_user_id);
   }
