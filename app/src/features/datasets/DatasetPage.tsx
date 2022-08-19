@@ -140,7 +140,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data);
-
+    console.log('result:', result)
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);

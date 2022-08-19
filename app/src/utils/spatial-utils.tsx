@@ -29,7 +29,7 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
         occurrencesMarkerLayer.markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          popup: <FeaturePopup submissionSpatialComponentIds={[spatialRecord.submission_spatial_component_id]} />
         });
       }
 
@@ -37,7 +37,7 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          popup: <FeaturePopup submissionSpatialComponentIds={[spatialRecord.submission_spatial_component_id]} />
         });
       }
 
