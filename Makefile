@@ -33,7 +33,9 @@ db-migrate: | build-db-migrate run-db-migrate ## Performs all commands necessary
 db-rollback: | build-db-rollback run-db-rollback ## Performs all commands necessary to rollback the latest database migrations
 n8n-setup: | build-n8n-setup run-n8n-setup ## Performs all commands necessary to run the n8n setup
 n8n-export: | build-n8n-export run-n8n-export ## Performs all commands necessary to export the latest n8n credentials and workflows
+
 clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
+geoserver: | close build-geoserver run-geoserver ## Performs all commands necessary to run the geoserver project (db, geoserver) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -228,6 +230,22 @@ run-clamav: ## Run clamav
 	@docker-compose -f docker-compose.yml up -d clamav
 
 ## ------------------------------------------------------------------------------
+## geoserver commands
+## ------------------------------------------------------------------------------
+
+build-geoserver: ## Build the geoserver image
+	@echo "==============================================="
+	@echo "Make: build-geoserver - building geoserver image"
+	@echo "==============================================="
+	@docker-compose -f docker-compose.yml build geoserver
+
+run-geoserver: ## Run geoserver
+	@echo "==============================================="
+	@echo "Make: run-geoserver - running geoserver"
+	@echo "==============================================="
+	@docker-compose -f docker-compose.yml up -d geoserver
+
+## ------------------------------------------------------------------------------
 ## Run `npm` commands for all projects
 ## ------------------------------------------------------------------------------
 
@@ -363,6 +381,18 @@ log-n8n-nginx: ## Runs `docker logs <container> -f` for the n8n nginx container
 	@echo "Running docker logs for the n8n-nginx container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-n8n-nginx-$(DOCKER_NAMESPACE)-container -f $(args)
+
+log-geoserver: ## Runs `docker logs <container> -f` for the n8n nginx container
+	@echo "==============================================="
+	@echo "Running docker logs for the geoserver container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-geoserver-$(DOCKER_NAMESPACE)-container -f $(args)
+
+log-geoserver-nginx: ## Runs `docker logs <container> -f` for the n8n nginx container
+	@echo "==============================================="
+	@echo "Running docker logs for the geoserver-nginx container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-geoserver-nginx-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Help

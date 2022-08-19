@@ -308,14 +308,14 @@ services:
   geoserver:
     image: kartoza/geoserver:2.21.1
     container_name: ${DOCKER_PROJECT_NAME}-geoserver-${DOCKER_NAMESPACE}-container
-    # restart: on-failure
+    restart: on-failure
     ports:
       - ${GEOSERVER_PORT}:8080
-    # healthcheck:
-    #   test: curl --fail -s http://localhost:8080/ || exit 1
-    #   interval: 5s
-    #   timeout: 5s
-    #   retries: 30
+    healthcheck:
+      test: curl --fail -s http://localhost:8080/ || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 30
     environment:
       - POSTGRES_JNDI=TRUE
       - HOST=${DB_HOST}
@@ -328,31 +328,13 @@ services:
       - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER}
       # - INITIAL_MEMORY=${GEOSERVER_INITIAL_MEMORY}
       # - MAXIMUM_MEMORY=${GEOSERVER_MAXIMUM_MEMORY}
-      - TOMCAT_USER=${TOMCAT_USER}
-      - TOMCAT_PASSWORD=${TOMCAT_PASSWORD}
     volumes:
       - postgres:${GEOSERVER_DATA_DIR}
-      - ./Containers/geoserver/settings/context.xml:/build_data/context.xml
     networks:
       - biohubbc-network
     depends_on:
       - db
       - db_setup
-
-  # Build the n8n nginx proxy docker image
-  # geoserver_nginx:
-  #   image: ${DOCKER_PROJECT_NAME}-geoserver-nginx-${DOCKER_NAMESPACE}-img
-  #   container_name: ${DOCKER_PROJECT_NAME}-geoserver-nginx-${DOCKER_NAMESPACE}-container
-  #   build:
-  #     context: ./.docker/nginx/geoserver
-  #     dockerfile: Dockerfile
-  #   restart: always
-  #   ports:
-  #     - ${GEOSERVER_PROXY_PORT}:5100
-  #   networks:
-  #     - biohubbc-network
-  #   depends_on:
-  #     - geoserver
 
 networks:
   biohubbc-network:
