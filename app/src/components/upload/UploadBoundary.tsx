@@ -1,13 +1,15 @@
-import { Alert, Button, Grid } from '@mui/material';
+import { Alert, Box, Button, Grid, Typography } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 import FileUpload from 'components/attachments/FileUpload';
+import { IUploadHandler } from 'components/attachments/FileUploadItem';
 import CustomTextField from 'components/fields/CustomTextField';
 import { AttachmentValidExtensions } from 'constants/attachments';
-import { Formik, FormikProps } from 'formik';
+import { useFormikContext } from 'formik';
 import { Feature } from 'geojson';
-import React, { useRef } from 'react';
+import { get } from 'lodash-es';
+import React from 'react';
+import { handleGPXUpload, handleKMLUpload, handleShapefileUpload } from 'utils/mapUploadUtils';
 import yup from 'utils/YupSchema';
-// import { handleGPXUpload, handleKMLUpload, handleShapefileUpload } from 'utils/mapUploadUtils';
 
 const useStyles = makeStyles((theme) => ({
   actionButton: {
@@ -35,67 +37,58 @@ export const BoundaryUploadYupSchema = yup.object().shape({
 
 const UploadBoundary: React.FC<React.PropsWithChildren<any>> = (props) => {
   const classes = useStyles();
-  const formikRef = useRef<FormikProps<IBoundaryUpload>>(null);
+  const formikProps = useFormikContext<IBoundaryUpload>();
 
-  const submitBoundary = () => {
-    console.log('poop');
-  };
+  const boundaryUploadHandler = (): IUploadHandler => {
+    return (file) => {
+      if (file?.type.includes('zip') || file?.name.includes('.zip')) {
+        handleShapefileUpload(file, 'geometry', formikProps);
+      } else if (file?.type.includes('gpx') || file?.name.includes('.gpx')) {
+        handleGPXUpload(file, 'geometry', formikProps);
+      } else if (file?.type.includes('kml') || file?.name.includes('.kml')) {
+        handleKMLUpload(file, 'geometry', formikProps);
+      }
 
-  const boundaryUploadHandler = (): any => {
-    console.log('aaaaaaaaaaaaaaaaaaaa');
-    // return (file) => {
-    //   if (file?.type.includes('zip') || file?.name.includes('.zip')) {
-    //     handleShapefileUpload(file, name, formikProps);
-    //   } else if (file?.type.includes('gpx') || file?.name.includes('.gpx')) {
-    //     handleGPXUpload(file, name, formikProps);
-    //   } else if (file?.type.includes('kml') || file?.name.includes('.kml')) {
-    //     handleKMLUpload(file, name, formikProps);
-    //   }
-
-    //   return Promise.resolve();
-    // };
+      return Promise.resolve();
+    };
   };
 
   return (
     <>
-      <Formik
-        key={'BoundaryUpload'}
-        innerRef={formikRef}
-        enableReinitialize={true}
-        initialValues={BoundaryUploadInitialValues}
-        validationSchema={BoundaryUploadYupSchema}
-        validateOnBlur={true}
-        validateOnChange={false}
-        onSubmit={submitBoundary}
-      >
-        <form>
-          <Grid container spacing={2}>
-            <Grid item xs={12} mt={1}>
-              <CustomTextField name="boundary_name" label="Boundary Name" other={{ multiline: false, rows: 1 }} />
-            </Grid>
-            <Grid item xs={12}>
-              <Alert severity="info">If uploading a shapefile, it must be configured with a valid projection.</Alert>
-              <FileUpload
-                uploadHandler={boundaryUploadHandler()}
-                dropZoneProps={{
-                  acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                className={classes.actionButton}
-                data-testid="boundary_submit"
-              >
-                Submit Boundary
-              </Button>
-            </Grid>
-          </Grid>
-        </form>
-      </Formik>
+      <Grid container spacing={2}>
+        <Grid item xs={12} mt={1}>
+          <CustomTextField name="boundary_name" label="Boundary Name" other={{ multiline: false, rows: 1 }} />
+        </Grid>
+        <Grid item xs={12}>
+          <Alert severity="info">If uploading a shapefile, it must be configured with a valid projection.</Alert>
+          <FileUpload
+            uploadHandler={boundaryUploadHandler()}
+            dropZoneProps={{
+              acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
+            }}
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <Button
+            variant="contained"
+            color="primary"
+            className={classes.actionButton}
+            data-testid="boundary_submit"
+            onClick={() => {
+              formikProps.handleSubmit();
+            }}
+          >
+            Submit Boundary
+          </Button>
+        </Grid>
+        {get(formikProps.errors, formikProps.values.boundary_name) && (
+          <Box pt={2}>
+            <Typography style={{ fontSize: '12px', color: '#f44336' }}>
+              {get(formikProps.errors, formikProps.values.boundary_name)}
+            </Typography>
+          </Box>
+        )}
+      </Grid>
     </>
   );
 };

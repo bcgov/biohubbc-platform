@@ -16,21 +16,29 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export const handleShapefileUpload = <T,>(file: File, name: string, formikProps: FormikContextType<T>) => {
   const { values, setFieldValue, setFieldError } = formikProps;
-
   // Back out if not a zipped file
   if (!file?.type.match(/zip/) || !file?.name.includes('.zip')) {
     setFieldError(name, 'You must upload a valid shapefile (.zip format). Please try again.');
     return;
   }
+  //TODO: CANT GET ZIP TO WORK
+
+  console.log('file', file);
+  console.log('name', name);
+  console.log('formikProps', formikProps);
 
   // Create a file reader to extract the binary data
   const reader = new FileReader();
-  reader.readAsArrayBuffer(file);
+
+  console.log('reader', reader);
 
   // When the file is loaded run the conversion
   reader.onload = async (event: any) => {
     // The converter wants a buffer
     const zip: Buffer = event?.target?.result as Buffer;
+    console.log('zip', zip);
+    console.log('zip.buffer', zip.buffer);
+    console.log('typeof(zip)', typeof(zip));
 
     // Exit out if no zip
     if (!zip) {
@@ -39,6 +47,8 @@ export const handleShapefileUpload = <T,>(file: File, name: string, formikProps:
 
     // Run the conversion
     const geojson = await shp(zip);
+    console.log('geojson', geojson);
+
 
     let features: Feature[] = [];
     if (Array.isArray(geojson)) {
@@ -48,9 +58,14 @@ export const handleShapefileUpload = <T,>(file: File, name: string, formikProps:
     } else {
       features = geojson.features;
     }
-
+    console.log('features', features);
+    console.log('values', values);
+    console.log('name', name);
     setFieldValue(name, [...features, ...get(values, name)]);
   };
+
+  reader.readAsArrayBuffer(file);
+
 };
 
 /**
@@ -215,3 +230,4 @@ export const generateValidGeometryCollection = (geometry: any, id?: string) => {
 
   return { geometryCollection };
 };
+
