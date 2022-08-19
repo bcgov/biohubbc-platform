@@ -575,7 +575,9 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialComponent>}
    * @memberof SpatialRepository
    */
-  async findSpatialMetadataBySubmissionSpatialComponentId(submission_spatial_component_id: number): Promise<any> {
+  async findSpatialMetadataBySubmissionSpatialComponentId(
+    submission_spatial_component_id: number
+  ): Promise<ISubmissionSpatialSearchResponseRow> {
     const userService = new UserService(this.connection);
     const userObject = await userService.getUserById(this.connection.systemUserId());
 
@@ -600,7 +602,7 @@ export class SpatialRepository extends BaseRepository {
    */
   async _findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(
     submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialComponent> {
+  ): Promise<ISubmissionSpatialSearchResponseRow> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -627,7 +629,7 @@ export class SpatialRepository extends BaseRepository {
       )
       .from(knex.raw('with_filtered_spatial_component as wfsc'));
 
-    const response = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
+    const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
     return response.rows[0];
   }

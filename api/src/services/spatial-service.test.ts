@@ -6,7 +6,6 @@ import sinonChai from 'sinon-chai';
 import {
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
-  ISubmissionSpatialComponent,
   ISubmissionSpatialSearchResponseRow,
   SpatialRepository
 } from '../repositories/spatial-repository';
@@ -323,8 +322,11 @@ describe('SpatialService', () => {
         const spatialService = new SpatialService(mockDBConnection);
 
         const mockResponseRows = {
-          spatial_component: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] }
-        } as unknown as ISubmissionSpatialComponent;
+          spatial_component: {
+            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
+            submission_spatial_component_id: 1
+          }
+        } as unknown as ISubmissionSpatialSearchResponseRow;
 
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
@@ -343,8 +345,11 @@ describe('SpatialService', () => {
         const spatialService = new SpatialService(mockDBConnection);
 
         const mockResponseRows = {
-          spatial_component: { features: [{ properties: { prop1: 'val1' } }] }
-        } as unknown as ISubmissionSpatialComponent;
+          spatial_component: {
+            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
+            submission_spatial_component_id: 1
+          }
+        } as unknown as ISubmissionSpatialSearchResponseRow;
 
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
