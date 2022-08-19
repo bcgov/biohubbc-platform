@@ -527,12 +527,6 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-    //   console.log("___________________________________________________________")
-    //   console.log("")
-    // console.log(queryBuilder.toSQL().toNative().sql)
-    //       console.log("")
-    // console.log("___________________________________________________________")
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
     return response.rows;
@@ -717,28 +711,13 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-    const old_queryBuilder = knex.queryBuilder()
-      .select()
-      .from('submission_spatial_component')
-      .where({ submission_spatial_component_id });
-
-    console.log("___________________________________________________________")
-    console.log("")
-    // console.log(queryBuilder.toSQL().toNative().sql)
-    // console.log(queryBuilder.toSQL().toNative().bindings)
-    console.log("")
-    console.log("___________________________________________________________")
-
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialComponent>(queryBuilder);
-    const oldRes = await this.connection.knex<ISubmissionSpatialComponent>(old_queryBuilder);
+    // const oldRes = await this.connection.knex<ISubmissionSpatialComponent>(old_queryBuilder);
 
-    console.log("__________________________ New Hotness _________________________________")
-    // fields looks all messed up, I need to build that JSON object differently so things will work...
-    // console.log(spatialComponentResponse.fields)
-    console.log("Row Count: " + spatialComponentResponse.rowCount)
-    console.log(spatialComponentResponse.rows[0].spatial_component)
+    // console.log("__________________________ New Hotness _________________________________")
     /*
           // new hotness
+          // same as search return object
           spatial_component {
             spatial_data {
               type
@@ -753,12 +732,11 @@ export class SpatialRepository extends BaseRepository {
             features []
           }
 
+
+          POINT (-100.763087126 100.487313035)
     */
-          console.log("")
-    console.log("__________________________ Old News _________________________________")
-    // console.log(oldRes.fields)
-    console.log("Row Count: " + oldRes.rowCount)
-    console.log(oldRes.rows[0].spatial_component)
+    //       console.log("")
+    // console.log("__________________________ Old News _________________________________")
 
 
     return spatialComponentResponse.rows[0];
