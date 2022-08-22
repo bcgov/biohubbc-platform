@@ -440,40 +440,48 @@ export class SubmissionRepository extends BaseRepository {
     // .select()
     // .from('results')
 
-    const temp = knex.with('with_user_security_transform_exceptions', (qb) => {
+    const temp = knex
+    .with('with_user_security_transform_exceptions', (qb) => {
       qb
         .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
         .from('system_user_security_exception as suse')
         .where('suse.system_user_id', this.connection.systemUserId());
     })
+    .with('with_filtered_spatial_component_with_security_transforms', knex.raw(`
+      SELECT 
+        array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms,
+        ssc.spatial_component
+      FROM 
+        submission_spatial_component ssc,
+        security_transform_submission sts,
+        submission s
+      WHERE sts.submission_spatial_component_id = ssc.submission_spatial_component_id
+      AND ssc.submission_id = s.submission_id
+      AND s.record_end_date is null
+      AND s.uuid = '${datasetId}'
+      GROUP BY ssc.spatial_component
+    `))
     .with('results', knex.raw(`
       SELECT
         features_array #> '{properties, type}' spatial_type,
         count(features_array #> '{properties, type}')::integer count
-      FROM
-        submission_spatial_component ssc,
-        jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
-        submission s
-      WHERE s.uuid = '${datasetId}'
-      AND ssc.submission_id = s.submission_id
-      AND s.record_end_date is null
+      FROM 
+        with_filtered_spatial_component_with_security_transforms wfscwst,
+        jsonb_array_elements(wfscwst.spatial_component -> 'features') features_array,
+        with_user_security_transform_exceptions wuste
+      WHERE wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
       GROUP BY spatial_type
     `))
     .select()
     .from('results')
-
 
     console.log("")
     console.log('______________________')
     const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
 
     const new_response = await this.connection.knex<any>(temp)
+    console.log(new_response.rowCount)
 
-    console.log("HERE 4")
-
-
-    console.log(new_response.rows)
-    // console.log("HERE 5")
     return response.rows;
   }
 
