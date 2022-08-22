@@ -6,7 +6,7 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Toolbar, { ToolbarProps } from '@mui/material/Toolbar';
 import Typography, { TypographyProps } from '@mui/material/Typography';
-import React, { ReactNode, useState } from 'react';
+import { ReactNode, useState } from 'react';
 
 export interface ICustomButtonProps {
   buttonLabel: string;

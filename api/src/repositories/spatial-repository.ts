@@ -56,6 +56,7 @@ export interface ISubmissionSpatialComponent {
 export interface ISpatialComponentsSearchCriteria {
   boundary: Feature;
   type?: string[];
+  species?: string[];
   datasetID?: string[];
 }
 
@@ -414,6 +415,10 @@ export class SpatialRepository extends BaseRepository {
           this._whereTypeIn(criteria.type, qb1);
         }
 
+        if (criteria.species?.length) {
+          this._whereSpeciesIn(criteria.species, qb1);
+        }
+
         if (criteria.datasetID?.length) {
           this._whereDatasetIDIn(criteria.datasetID, qb1);
         }
@@ -476,9 +481,11 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.submission_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.secured_spatial_component');
-
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);
+        }
+        if (criteria.species?.length) {
+          this._whereSpeciesIn(criteria.species, qb1);
         }
 
         if (criteria.datasetID?.length) {
@@ -519,6 +526,27 @@ export class SpatialRepository extends BaseRepository {
         // Append OR clause for each item in types array
         qb2.or.where((qb3) => {
           qb3.whereRaw(`jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${type}")')`);
+        });
+      }
+    });
+  }
+
+  /**
+   * Append where clause condition for spatial component associatedTaxa.
+   *
+   * @param {string[]} species
+   * @param {Knex.QueryBuilder} qb1
+   * @memberof SpatialRepository
+   */
+  _whereSpeciesIn(species: string[], qb1: Knex.QueryBuilder) {
+    // Append AND where clause for species
+    qb1.where((qb2) => {
+      for (const singleSpecies of species) {
+        // Append OR clause for each item in species array
+        qb2.and.where((qb3) => {
+          qb3.whereRaw(
+            `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.associatedTaxa == "${singleSpecies}")')`
+          );
         });
       }
     });

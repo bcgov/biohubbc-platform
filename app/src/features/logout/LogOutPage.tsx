@@ -5,7 +5,7 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import { makeStyles } from '@mui/styles';
 import { ConfigContext } from 'contexts/configContext';
-import React, { useContext, useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { getLogOutUrl } from 'utils/Utils';
 
 const useStyles = makeStyles((theme: Theme) => ({

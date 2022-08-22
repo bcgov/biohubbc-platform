@@ -1,9 +1,9 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
-import React, { isValidElement, PropsWithChildren, ReactElement, useContext } from 'react';
+import { isValidElement, ReactElement, useContext } from 'react';
 import { isAuthenticated } from 'utils/authUtils';
 
-interface IGuardProps<T = never> extends PropsWithChildren {
+interface IGuardProps<T = never> extends React.PropsWithChildren {
   /**
    * An optional backup ReactElement to render if the guard fails.
    *

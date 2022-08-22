@@ -5,7 +5,6 @@ import AppRouter from 'AppRouter';
 import { AuthStateContextProvider } from 'contexts/authStateContext';
 import { ConfigContext, ConfigContextProvider } from 'contexts/configContext';
 import Keycloak from 'keycloak-js';
-import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import appTheme from 'themes/appTheme';
 

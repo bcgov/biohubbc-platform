@@ -4,7 +4,7 @@ import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
 import { ErrorDialog, IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import YesNoDialog, { IYesNoDialogProps } from 'components/dialog/YesNoDialog';
-import React, { createContext, ReactNode, useState } from 'react';
+import { createContext, ReactNode, useState } from 'react';
 
 export interface IDialogContext {
   /**
@@ -160,11 +160,11 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
         onClose={() => setSnackbar({ open: false })}
         message={snackbarProps.snackbarMessage}
         action={
-          <React.Fragment>
+          <>
             <IconButton size="small" aria-label="close" color="inherit" onClick={() => setSnackbar({ open: false })}>
               <CloseIcon fontSize="small" />
             </IconButton>
-          </React.Fragment>
+          </>
         }
       />
     </DialogContext.Provider>
