@@ -1,6 +1,6 @@
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
-import { getKnexQueryBuilder } from '../database/db';
+import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
@@ -398,32 +398,71 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
+    console.log("GET SPATIAL COMPONENT COUNT")
+    console.log("________________________")
+    console.log(datasetId)
+    // this is the admin string
     const sqlStatement = SQL`
-      WITH with_submission as (
-        SELECT
-          submission.submission_id
-        FROM
-          submission
-        WHERE
-          submission.uuid = ${datasetId}
-        AND
-          submission.record_end_date is NULL
-      )
       SELECT
         features_array #> '{properties, type}' spatial_type,
         count(features_array #> '{properties, type}')::integer count
-      FROM
-        submission_spatial_component,
-        jsonb_array_elements(submission_spatial_component.spatial_component -> 'features') features_array,
-        with_submission
-      WHERE
-        submission_spatial_component.submission_id = with_submission.submission_id
-      GROUP BY
-        spatial_type;
+      FROM 
+        submission_spatial_component ssc,
+        jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
+        submission s
+      WHERE s.uuid = ${datasetId}
+      AND ssc.submission_id = s.submission_id
+      AND s.record_end_date is null
+      GROUP BY spatial_type;
     `;
 
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder()
+    .with('with_filtered_spatial_component_with_security_transforms', (qb) => {
+      // get security restrictions for data set
+      qb
+        .select(
+          knex.raw(
+            'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
+          )
+        )
+        .from('submission_spatial_component as ssc')
+        .leftJoin(
+          'security_transform_submission as sts',
+          'sts.submission_spatial_component_id',
+          'ssc.submission_spatial_component_id'
+        )
+        .leftJoin('submission as s', 'ssc.submission_id', 's.submission_id')
+        .where('s.uuid', datasetId)
+    })
+    .select()
+    .from('with_filtered_spatial_component_with_security_transforms');
+    
+    // .with('with_user_security_transform_exceptions', qb1 => {
+    //   qb1
+    //   .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+    //   .from('system_user_security_exception as suse')
+    //   .where('suse.system_user_id', this.connection.systemUserId());
+    // })
+    // .select("features_array #> '{properties, type}' spatial_type, count(features_array #> '{properties, type}')::integer count")
+    // .from("with_filtered_spatial_component_with_security_transforms wfspcwst, with_user_security_transform_exceptions wuste, jsonb_array_elements(ssc.spatial_component -> 'features') features_array")
+    // .where('wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms')
+    // .groupBy('spatial_type');
+
+    console.log("HERE 2")
+    console.log("")
+    console.log('______________________')
+    console.log(queryBuilder.toSQL().toNative().sql)
+  
     const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
 
+    const new_response = await this.connection.knex<any>(queryBuilder)
+
+    // console.log("HERE 4")
+
+
+    console.log(new_response.rows)
+    // console.log("HERE 5")
     return response.rows;
   }
 
