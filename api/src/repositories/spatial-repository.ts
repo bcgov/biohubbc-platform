@@ -440,13 +440,7 @@ export class SpatialRepository extends BaseRepository {
       )
       .from(knex.raw('with_filtered_spatial_component as wfsc'));
 
-    console.log('---------- admin------------');
-
-    console.log('queryBuilder is: ', queryBuilder.toSQL().toNative().sql);
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-
-    //console.log('response is:', response.rows);
 
     return response.rows;
   }
@@ -487,11 +481,9 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.submission_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.secured_spatial_component');
-
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);
         }
-
         if (criteria.species?.length) {
           this._whereSpeciesIn(criteria.species, qb1);
         }
