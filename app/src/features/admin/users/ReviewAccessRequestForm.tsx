@@ -5,7 +5,6 @@ import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocomple
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useFormikContext } from 'formik';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import React from 'react';
 import { getFormattedDate } from 'utils/Utils';
 import yup from 'utils/YupSchema';
 

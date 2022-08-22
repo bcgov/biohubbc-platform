@@ -4,7 +4,6 @@ import ReviewAccessRequestForm, {
 import { Formik } from 'formik';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import React from 'react';
 import { render, waitFor } from 'test-helpers/test-utils';
 
 const renderContainer = (accessRequest: IGetAccessRequestsListResponse) => {

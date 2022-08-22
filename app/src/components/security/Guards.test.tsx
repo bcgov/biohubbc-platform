@@ -1,7 +1,6 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
-import React from 'react';
 import { Route, Router } from 'react-router';
 import { getMockAuthState } from 'test-helpers/auth-helpers';
 import { render } from 'test-helpers/test-utils';
