@@ -29,7 +29,7 @@ export async function up(knex: Knex): Promise<void> {
               CASE
                 WHEN
                   json_build_array(Lower(wsc.spatial_component->'features'->0->'properties'->'dwc'->>'associatedTaxa'))::jsonb
-                  <@ json_build_array('mountain goat', 'bighorn sheep', 'thinhorn sheep' , 'spotted owl', 'm-oram', 'm-ovca', 'm-ovca-ca', 'm-ovda', 'm-ovda-da', 'm-ovca-st', 'b-spow', 'b-spow-ca')::jsonb
+                  <@ json_build_array('mountain goat', 'bighorn sheep', 'thinhorn sheep' , 'spotted owl', 'm-oram', 'm-ovca', 'm-ovca-ca', 'm-ovda', 'm-ovda-da', 'm-ovda-st', 'b-spow', 'b-spow-ca')::jsonb
                 THEN
                     json_build_object()
                 ELSE
