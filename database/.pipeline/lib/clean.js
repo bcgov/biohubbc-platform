@@ -1,9 +1,9 @@
 'use strict';
 
 const { OpenShiftClientX } = require('pipeline-cli');
-const { checkAndClean } = require('../utils/checkAndClean');
+const { checkAndClean } = require('../utils/utils');
 
-const clean = (settings) => {
+const clean = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
   const target_phase = options.env;
@@ -61,7 +61,9 @@ const clean = (settings) => {
     if (phaseKey !== 'build') {
       const newOC = new OpenShiftClientX(Object.assign({ namespace: phases[phaseKey].namespace }, options));
       const setupPod = `${phases[phaseKey].name}-setup${phases[phaseKey].suffix}`;
-      checkAndClean(`pod/${setupPod}`, newOC);
+      await checkAndClean(`pod/${setupPod}`, 10, 5, 0, newOC).catch(() => {
+        // Ignore errors, nothing to clean
+      });
     }
 
     oc.raw('delete', ['all'], {
