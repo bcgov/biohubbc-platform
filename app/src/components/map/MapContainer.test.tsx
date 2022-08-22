@@ -1,6 +1,5 @@
 import bbox from '@turf/bbox';
 import { LatLngBoundsExpression } from 'leaflet';
-import React from 'react';
 import { cleanup, render } from 'test-helpers/test-utils';
 import { IMarkerLayer } from './components/MarkerCluster';
 import { IStaticLayer } from './components/StaticLayers';

@@ -1,7 +1,7 @@
 import { Theme } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 import { ConfigContext } from 'contexts/configContext';
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   appPhaseTag: {

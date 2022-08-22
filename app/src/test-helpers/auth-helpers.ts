@@ -1,11 +1,11 @@
 import { IAuthState } from 'contexts/authStateContext';
-import { KeycloakInstance } from 'keycloak-js';
+import Keycloak from 'keycloak-js';
 
 const SystemUserAuthState: IAuthState = {
   keycloakWrapper: {
     keycloak: {
       authenticated: true
-    } as unknown as KeycloakInstance,
+    } as unknown as Keycloak,
     hasLoadedAllUserInfo: true,
     systemRoles: [],
     hasSystemRole: () => false,

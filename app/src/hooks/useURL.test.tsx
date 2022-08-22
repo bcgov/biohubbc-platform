@@ -1,6 +1,5 @@
 import { act, renderHook } from '@testing-library/react-hooks';
 import { createMemoryHistory, MemoryHistory } from 'history';
-import React from 'react';
 import { Route, Router } from 'react-router';
 import { cleanup } from 'test-helpers/test-utils';
 import useURL from './useURL';

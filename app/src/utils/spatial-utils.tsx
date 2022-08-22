@@ -6,7 +6,6 @@ import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
-import React from 'react';
 import { isObject } from './Utils';
 
 export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
