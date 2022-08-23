@@ -11,7 +11,7 @@ const useStyles = makeStyles(() => ({
   upload: {
     position: 'absolute',
     left: '20px',
-    bottom: '20px',
+    bottom: '60px',
     padding: '10px',
     zIndex: 400
   }

@@ -11,8 +11,6 @@ export interface ISetMapBoundsProps {
 export const SetMapBounds: React.FC<React.PropsWithChildren<ISetMapBoundsProps>> = (props) => {
   const map = useMap();
 
-  console.log('props', props);
-
   // Set bounds if provided, ignore zoom
   if (props.bounds) {
     map.fitBounds(props.bounds);

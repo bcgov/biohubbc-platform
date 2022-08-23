@@ -2,9 +2,10 @@ import { kml } from '@tmcw/togeojson';
 import bbox from '@turf/bbox';
 import { FormikContextType } from 'formik';
 import { Feature } from 'geojson';
+import JSZip from 'jszip';
 import get from 'lodash-es/get';
-import shp from 'shpjs';
-import { v4 as uuidv4 } from 'uuid';
+import { read } from 'shapefile';
+
 /**
  * Function to handle zipped shapefile spatial boundary uploads
  *
@@ -32,38 +33,44 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
 
   console.log('reader', reader);
 
-  // When the file is loaded run the conversion
-  reader.onload = async (event: any) => {
-    // The converter wants a buffer
-    const zip: Buffer = event?.target?.result as Buffer;
-    console.log('zip', zip);
-    console.log('zip.buffer', zip.buffer);
-    console.log('typeof(zip)', typeof zip);
-
-    // Exit out if no zip
-    if (!zip) {
-      return;
-    }
-
-    // Run the conversion
-    const geojson = await shp(zip);
-    console.log('geojson', geojson);
-
-    let features: Feature[] = [];
-    if (Array.isArray(geojson)) {
-      geojson.forEach((item) => {
-        features = features.concat(item.features);
-      });
-    } else {
-      features = geojson.features;
-    }
-    console.log('features', features);
-    console.log('values', values);
-    console.log('name', name);
-    setFieldValue(name, [...features, ...get(values, name)]);
-  };
-
   reader.readAsArrayBuffer(file);
+
+  const archive = await file.arrayBuffer().then((buffer) => JSZip.loadAsync(buffer));
+  console.log('archive', archive);
+
+  const shpFileName = Object.keys(archive.files).find((key) => {
+    return key.includes('.shp');
+  });
+
+  if (!shpFileName) {
+    setFieldError(name, 'You must upload a valid shapefile (.zip format). That contains .shp file. Please try again.');
+    return;
+  }
+
+  const shpFile = await archive.file(shpFileName)?.async('arraybuffer');
+  console.log('shpFile', shpFile);
+
+  if (!shpFile) {
+    setFieldError(name, 'You must upload a valid shapefile (.zip format). .shp file is invalid. Please try again.');
+    return;
+  }
+  // Run the conversion
+  const collection = await read(shpFile);
+  console.log('collection', collection);
+
+  const sanitizedGeoJSON: Feature[] = [];
+  if (Array.isArray(collection.features)) {
+    collection.features.forEach((feature) => {
+      if (feature.geometry && feature.geometry.type === 'Polygon') {
+        sanitizedGeoJSON.push(feature);
+      }
+    });
+  }
+
+  console.log('sanitizedGeoJSON', sanitizedGeoJSON);
+  console.log('values', values);
+  console.log('name', name);
+  setFieldValue(name, [...sanitizedGeoJSON, ...get(values, name)]);
 };
 
 /**
@@ -125,68 +132,4 @@ export const calculateUpdatedMapBounds = (geometries: Feature[]): any[][] | unde
     [bboxCoords[1], bboxCoords[0]],
     [bboxCoords[3], bboxCoords[2]]
   ];
-};
-
-/*
-  Leaflet does not know how to draw Multipolygons or GeometryCollections
-  that are not in proper GeoJSON format so we manually convert to a Feature[]
-  of GeoJSON objects which it can draw using the <GeoJSON /> tag for
-  non-editable geometries
-
-  We also set the bounds based on those geometries so the extent is set
-*/
-export const generateValidGeometryCollection = (geometry: any, id?: string) => {
-  const geometryCollection: Feature[] = [];
-  const bounds: any[] = [];
-
-  if (!geometry || !geometry.length) {
-    return { geometryCollection, bounds };
-  }
-
-  if (geometry[0]?.type === 'MultiPolygon') {
-    geometry[0].coordinates.forEach((geoCoords: any) => {
-      geometryCollection.push({
-        id: id || uuidv4(),
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: geoCoords
-        },
-        properties: {}
-      });
-    });
-  } else if (geometry[0]?.type === 'GeometryCollection') {
-    geometry[0].geometries.forEach((geometry: any) => {
-      geometryCollection.push({
-        id: id || uuidv4(),
-        type: 'Feature',
-        geometry,
-        properties: {}
-      });
-    });
-  } else if (geometry[0]?.type !== 'Feature') {
-    geometryCollection.push({
-      id: id || uuidv4(),
-      type: 'Feature',
-      geometry: geometry[0],
-      properties: {}
-    });
-  } else {
-    geometryCollection.push(geometry[0]);
-  }
-
-  const allGeosFeatureCollection = {
-    type: 'FeatureCollection',
-    features: geometryCollection
-  };
-
-  if (geometry[0]?.type !== 'Point') {
-    const bboxCoords = bbox(allGeosFeatureCollection);
-
-    bounds.push([bboxCoords[1], bboxCoords[0]], [bboxCoords[3], bboxCoords[2]]);
-
-    return { geometryCollection, bounds };
-  }
-
-  return { geometryCollection };
 };

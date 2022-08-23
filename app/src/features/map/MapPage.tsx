@@ -108,6 +108,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
+  //User uploads boundary for search
   const onBoundaryUpload = (boundary: IBoundaryUpload) => {
     console.log('boundary' + JSON.stringify(boundary));
 
@@ -116,7 +117,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     //SET STATIC LAYER
     const layers: IStaticLayerFeature[] = [];
-
     boundary.features.forEach((feature: Feature<Polygon>) => {
       const staticLayerFeature: IStaticLayerFeature = {
         geoJSON: feature,
@@ -124,9 +124,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       };
       layers.push(staticLayerFeature);
     });
-
     const staticLayer: IStaticLayer = { layerName: boundary.name, features: layers };
-
     setStaticLayers([...staticLayers, staticLayer]);
 
     //SET BOUNDS
@@ -140,6 +138,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   };
   console.log('shouldUpdateBounds', shouldUpdateBounds);
   console.log('updatedBounds', updatedBounds);
+
   return (
     <Box width="100%" height="100%">
       <Typography variant="h1" hidden>

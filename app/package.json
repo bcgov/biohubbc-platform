@@ -91,6 +91,7 @@
     "@types/react-router": "^5.1.18",
     "@types/react-router-dom": "^5.3.3",
     "@types/react-window": "~1.8.2",
+    "@types/shapefile": "^0.6.1",
     "@types/shpjs": "^3.4.0",
     "@types/uuid": "~8.3.0",
     "@typescript-eslint/eslint-plugin": "^5.33.1",
