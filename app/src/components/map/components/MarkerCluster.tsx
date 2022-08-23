@@ -1,5 +1,5 @@
 import L, { LatLngExpression } from 'leaflet';
-import React, { ReactElement } from 'react';
+import { ReactElement } from 'react';
 import { LayersControl, Marker, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster';
 

@@ -1,4 +1,7 @@
 'use strict';
+
+let process = require('process');
+
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -104,8 +107,8 @@ const phases = {
 };
 
 // This callback forces the node process to exit as failure.
-process.on('unhandledRejection', (reason) => {
-  console.log(reason);
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 

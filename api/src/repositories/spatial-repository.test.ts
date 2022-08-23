@@ -64,6 +64,80 @@ describe('SpatialRepository', () => {
     });
   });
 
+  describe('getSpatialTransformRecords', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            spatial_transform_id: 1,
+            name: 'transform name',
+            description: 'transform description',
+            notes: 'notes',
+            transform: 'transform details'
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const response = await spatialRepository.getSpatialTransformRecords();
+
+      expect(response[0].spatial_transform_id).to.equal(1);
+      expect(response[0].name).to.equal('transform name');
+      expect(response[0].description).to.equal('transform description');
+      expect(response[0].notes).to.equal('notes');
+      expect(response[0].transform).to.equal('transform details');
+    });
+  });
+
+  describe('getSecurityTransformRecords', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            security_transform_id: 1,
+            name: 'transform name',
+            description: 'transform description',
+            notes: 'notes',
+            transform: 'transform details'
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const response = await spatialRepository.getSecurityTransformRecords();
+
+      expect(response[0].security_transform_id).to.equal(1);
+      expect(response[0].name).to.equal('transform name');
+      expect(response[0].description).to.equal('transform description');
+      expect(response[0].notes).to.equal('notes');
+      expect(response[0].transform).to.equal('transform details');
+    });
+  });
+
   describe('insertSpatialTransformSubmissionRecord', () => {
     afterEach(() => {
       sinon.restore();

@@ -11,7 +11,6 @@ import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import React from 'react';
 
 export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
 

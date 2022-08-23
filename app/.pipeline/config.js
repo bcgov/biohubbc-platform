@@ -1,5 +1,7 @@
 'use strict';
 
+let process = require('process');
+
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -71,12 +73,9 @@ const phases = {
     instance: `${name}-dev-${deployChangeId}`,
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
-    host:
-      (isStaticDeployment && (staticUrls.dev)) ||
-      `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+    host: (isStaticDeployment && staticUrls.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     apiHost:
-      (isStaticDeployment && (staticUrlsAPI.dev)) ||
-      `${apiName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+      (isStaticDeployment && staticUrlsAPI.dev) || `${apiName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     n8nHost: '', // staticUrlsN8N.dev, // Disable until nginx is setup: https://quartech.atlassian.net/browse/BHBC-1435
     siteminderLogoutURL: config.siteminderLogoutURL.dev,
     maxUploadNumFiles,
@@ -129,8 +128,8 @@ const phases = {
 };
 
 // This callback forces the node process to exit as failure.
-process.on('unhandledRejection', (reason) => {
-  console.log(reason);
+process.on('unhandledRejection', (reason, promise) => {
+  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
 

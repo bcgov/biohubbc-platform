@@ -6,7 +6,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import React from 'react';
+import { useState } from 'react';
 
 export interface IErrorDialogProps {
   /**
@@ -66,7 +66,7 @@ export interface IErrorDialogProps {
  * @return {*}
  */
 export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> = (props) => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const ErrorDetailsList = (errorProps: { errors: (string | object)[] }) => {
     const items = errorProps.errors.map((error, index) => {

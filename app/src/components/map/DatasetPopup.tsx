@@ -8,7 +8,6 @@ import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import React from 'react';
 import { useHistory } from 'react-router';
 
 export type BoundaryCentroidFeature = Feature & { properties: BoundaryCentroidFeatureProperties };
