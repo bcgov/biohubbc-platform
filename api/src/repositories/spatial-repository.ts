@@ -380,9 +380,7 @@ export class SpatialRepository extends BaseRepository {
     const userObject = await userService.getUserById(this.connection.systemUserId());
 
     if (
-      [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
-        userObject.role_names.includes(systemRole)
-      )
+      await this.isSystemUserAdmin()
     ) {
       // Fetch all non-secure records that match the search criteria
       return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);

@@ -15,9 +15,9 @@ export class BaseRepository {
     this.connection = connection;
   }
 
-  async isSystemUserAdmin(id: number): Promise<boolean> {
+  async isSystemUserAdmin(): Promise<boolean> {
     const userService = new UserService(this.connection);
-    const userObject = await userService.getUserById(id);
+    const userObject = await userService.getUserById(this.connection.systemUserId());
     return [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
       userObject.role_names.includes(systemRole)
     );
