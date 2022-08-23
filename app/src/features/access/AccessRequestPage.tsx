@@ -15,7 +15,7 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import { Redirect, useHistory } from 'react-router';
 import BCeIDRequestForm, { BCeIDRequestFormInitialValues, BCeIDRequestFormYupSchema } from './BCeIDRequestForm';
 import IDIRRequestForm, { IDIRRequestFormInitialValues, IDIRRequestFormYupSchema } from './IDIRRequestForm';
@@ -48,9 +48,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
 
   const dialogContext = useContext(DialogContext);
 
-  const rolesDataLoader = useDataLoader(() => {
-    return biohubApi.user.getRoles();
-  });
+  const rolesDataLoader = useDataLoader(() => biohubApi.user.getRoles());
 
   rolesDataLoader.load();
 

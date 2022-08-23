@@ -1,5 +1,4 @@
 import ContentLayout from 'layouts/ContentLayout';
-import React from 'react';
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import DatasetPage from './DatasetPage';

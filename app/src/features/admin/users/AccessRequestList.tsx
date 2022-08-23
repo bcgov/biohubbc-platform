@@ -20,7 +20,7 @@ import { AdministrativeActivityStatusType } from 'constants/misc';
 import { DialogContext } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
 import { IGetAccessRequestsListResponse } from 'interfaces/useAdminApi.interface';
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import { getFormattedDate } from 'utils/Utils';
 import ReviewAccessRequestForm, {
   IReviewAccessRequestForm,

@@ -6,7 +6,7 @@ import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
 import { ConfigContext } from 'contexts/configContext';
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import Dropzone, { FileRejection } from 'react-dropzone';
 
 const useStyles = makeStyles((theme: Theme) => ({

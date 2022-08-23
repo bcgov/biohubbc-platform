@@ -10,7 +10,6 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import React from 'react';
 
 const DatasetsPage = () => {
   const biohubApi = useApi();
