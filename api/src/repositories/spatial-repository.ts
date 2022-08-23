@@ -508,7 +508,7 @@ export class SpatialRepository extends BaseRepository {
       );
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-    console.log(response.rows)
+
     return response.rows;
   }
 
@@ -727,7 +727,7 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   _buildSelectForSecureNonSecureSpatialComponents(): Knex.Raw<any> {
-    const knex = getKnex()
+    const knex = getKnex();
     return knex.raw(
       `
       submission_spatial_component_id,
