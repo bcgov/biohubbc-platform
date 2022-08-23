@@ -14,7 +14,7 @@ import { GetMapBounds, IMapBoundsOnChange, SetMapBounds } from './components/Bou
 import DrawControls, { IDrawControlsOnChange, IDrawControlsProps } from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
-import MarkerClusterGroup, { IMarkerLayer } from './components/MarkerCluster';
+import MarkerClusterGroup, { IMarker, IMarkerLayer } from './components/MarkerCluster';
 import StaticLayers, { IStaticLayer } from './components/StaticLayers';
 
 const useStyles = makeStyles(() => ({
@@ -64,6 +64,28 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
     onBoundsChange
   } = props;
 
+  const filteredMarkerLayers = (markerLayers || []).reduce((acc: IMarkerLayer[], layer: IMarkerLayer) => {
+    const doPositionsMatch = (markerA: L.LatLngExpression, markerB: L.LatLngExpression): boolean => {
+      return markerA[0] === markerB[0] && markerA[1] === markerB[1];
+    }
+    return [
+      ...acc,
+      {
+        ...layer,
+        markers: layer.markers.reduce((markers: IMarker[], marker: IMarker) => {
+  
+          if (markers.some((mark) => doPositionsMatch(mark.position, marker.position))) {
+            return markers
+          }
+          return [
+            ...markers,
+            marker
+          ]
+        }, [])
+      }
+    ]
+  }, [])
+
   const fullscreenControlProp = (fullScreenControl && { pseudoFullscreen: true }) || undefined;
 
   return (
@@ -104,7 +126,7 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
       <LayersControl position="bottomright">
         <StaticLayers layers={staticLayers} />
 
-        <MarkerClusterGroup layers={markerLayers} />
+        <MarkerClusterGroup layers={filteredMarkerLayers} />
 
         <BaseLayerControls />
       </LayersControl>

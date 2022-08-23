@@ -214,13 +214,13 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
    * @memberof SpatialService
    */
-  async findSpatialMetadataBySubmissionSpatialComponentId(
-    submissionSpatialComponentId: number
-  ): Promise<Record<string, string>> {
-    const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentId(
-      submissionSpatialComponentId
+  async findSpatialMetadataBySubmissionSpatialComponentIds(
+    submissionSpatialComponentIds: number[]
+  ): Promise<Array<Record<string, string>>> {
+    const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds(
+      submissionSpatialComponentIds
     );
 
-    return (response.spatial_component?.features[0]?.properties as Record<string, string>) || {};
+    return (response.map((submissionSpatialComponent) => submissionSpatialComponent.spatial_component.features[0]?.properties as Record<string, string>) || {});
   }
 }

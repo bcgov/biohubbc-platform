@@ -49,7 +49,7 @@ const useSearchApi = (axios: AxiosInstance) => {
       params: { submissionSpatialComponentIds }
     });
 
-    return [data, data, data];
+    return data;
   };
 
   const getSpatialDataFile = async (criteria: {

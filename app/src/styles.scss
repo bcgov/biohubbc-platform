@@ -83,3 +83,9 @@ dd {
 .mapLocations dd {
   display: inline-block;
 }
+
+.leaflet-popup-content {
+  max-height: 300px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}

@@ -38,8 +38,11 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {}
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {}
+            }
           }
         }
       }
@@ -64,8 +67,8 @@ export function getSpatialMetadataByIds(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(
-        submissionSpatialComponentIds[0]
+      const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds(
+        submissionSpatialComponentIds
       );
 
       await connection.commit();

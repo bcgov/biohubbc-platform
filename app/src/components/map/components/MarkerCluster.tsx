@@ -51,7 +51,7 @@ const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> 
 
     layerControls.push(
       <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
-        <ReactLeafletMarkerClusterGroup chunkedLoading spiderfyOnMaxZoom={false}>
+        <ReactLeafletMarkerClusterGroup chunkedLoading spiderfyOnMaxZoom={true}>
           {layer.markers.map((item, index: number) => {
             const id = item.key || index;
 
