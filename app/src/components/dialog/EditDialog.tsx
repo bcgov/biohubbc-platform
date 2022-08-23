@@ -6,7 +6,6 @@ import DialogTitle from '@mui/material/DialogTitle';
 import useTheme from '@mui/material/styles/useTheme';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { Formik, FormikValues } from 'formik';
-import { PropsWithChildren } from 'react';
 
 export interface IEditDialogComponentProps<T> {
   element: any;
@@ -73,7 +72,7 @@ export interface IEditDialogProps<T> {
  * @param {PropsWithChildren<IEditDialogProps<T>>} props
  * @return {*}
  */
-export const EditDialog = <T extends FormikValues>(props: PropsWithChildren<IEditDialogProps<T>>) => {
+export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildren<IEditDialogProps<T>>) => {
   const theme = useTheme();
 
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));

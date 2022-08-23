@@ -4,7 +4,7 @@ import { useDeepCompareEffect } from 'hooks/useDeepCompareEffect';
 import * as L from 'leaflet';
 import 'leaflet-draw';
 import 'leaflet/dist/leaflet.css';
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
 /*
  * Supported draw events.

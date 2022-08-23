@@ -3,13 +3,18 @@
  * programmatically with a given value, thus "deferring" the promise.
  *
  * @example
+ *
  * const deferred = new Deferred();
+ *
  * const someDataFetcher = (callback: () => Promise<any>) => {
- *   callback().then((res) => console.log(res.data));
+ *   callback().then((res) => {
+ *     // res = 'some response data'
+ *   });
  * };
+ *
  * someDataFetcher(() => deferred.promise)
+ *
  * deferred.resolve({ data: 'some response data' });
- * // Console logs 'some response data'.
  *
  * @export
  * @class

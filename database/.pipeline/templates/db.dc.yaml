@@ -211,15 +211,22 @@ objects:
                   value: '${PGDATA_PATH_OVERRIDE}'
               image: ' '
               imagePullPolicy: IfNotPresent
-              livenessProbe:
-                initialDelaySeconds: 30
-                tcpSocket:
-                  port: 5432
-                timeoutSeconds: 1
               name: postgresql
               ports:
                 - containerPort: 5432
                   protocol: TCP
+              startupProbe:
+                exec:
+                  command:
+                    - '/bin/sh'
+                    - '-i'
+                    - '-c'
+                    - pg_isready -h 127.0.0.1 -q -t 10
+                initialDelaySeconds: 10
+                periodSeconds: 15
+                timeoutSeconds: 10
+                successThreshold: 1
+                failureThreshold: 10
               readinessProbe:
                 exec:
                   command:
@@ -227,18 +234,17 @@ objects:
                     - '-i'
                     - '-c'
                     - pg_isready -h 127.0.0.1 -q -t10
-                initialDelaySeconds: 5
-                timeoutSeconds: 1
-              startupProbe:
-                exec:
-                  command:
-                    - /bin/sh
-                    - '-i'
-                    - '-c'
-                    - pg_isready -h 127.0.0.1 -q -t 10
-                initialDelaySeconds: 30
-                timeoutSeconds: 10
+                initialDelaySeconds: 10
                 periodSeconds: 15
+                timeoutSeconds: 10
+                successThreshold: 1
+                failureThreshold: 10
+              livenessProbe:
+                tcpSocket:
+                  port: 5432
+                initialDelaySeconds: 10
+                periodSeconds: 15
+                timeoutSeconds: 10
                 successThreshold: 1
                 failureThreshold: 10
               resources:

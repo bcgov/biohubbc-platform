@@ -221,6 +221,6 @@ export class SpatialService extends DBService {
       submissionSpatialComponentId
     );
 
-    return (response.spatial_component?.features[0]?.properties as Record<string, string>) || {};
+    return (response.spatial_component?.spatial_data?.features[0]?.properties as Record<string, string>) || {};
   }
 }

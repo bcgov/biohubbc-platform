@@ -1,6 +1,6 @@
 import { Feature } from 'geojson';
 import * as L from 'leaflet';
-import React, { ReactElement } from 'react';
+import { ReactElement } from 'react';
 import {
   FeatureGroup,
   GeoJSON,
