@@ -43,6 +43,18 @@ GET.apiDoc = {
     },
     {
       in: 'query',
+      name: 'species',
+      schema: {
+        type: 'array',
+        items: {
+          type: 'string'
+        },
+        nullable: true
+      },
+      description: 'An array of species codes to filter on. Will return results that match any of the types.'
+    },
+    {
+      in: 'query',
       name: 'datasetID',
       schema: {
         type: 'array',
@@ -99,6 +111,7 @@ export function searchSpatialComponents(): RequestHandler {
   return async (req, res) => {
     const criteria = {
       type: (req.query.type as string[]) || [],
+      species: (req.query.species as string[]) || [],
       datasetID: (req.query.datasetID as string[]) || [],
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };

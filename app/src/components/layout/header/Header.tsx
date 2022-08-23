@@ -18,7 +18,7 @@ import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
 import { BetaLabel } from 'components/layout/header/EnvLabels';
 import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'components/security/Guards';
 import { SYSTEM_ROLE } from 'constants/roles';
-import React from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LoggedInUserControls, NotLoggedInUserControls } from './UserControls';
 
@@ -89,7 +89,7 @@ const useStyles = makeStyles((theme: Theme) => ({
 const Header: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
 
-  const [openSupportDialog, setOpenSupportDialog] = React.useState(false);
+  const [openSupportDialog, setOpenSupportDialog] = useState(false);
   const preventDefault = (event: React.SyntheticEvent) => event.preventDefault();
 
   const showSupportDialog = () => {

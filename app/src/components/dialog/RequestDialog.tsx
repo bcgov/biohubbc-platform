@@ -7,7 +7,6 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import { Formik } from 'formik';
-import React from 'react';
 
 export interface IRequestDialogComponent {
   element: any;

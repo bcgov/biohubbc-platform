@@ -18,7 +18,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import { truncate } from 'lodash';
 import qs from 'qs';
-import React, { useCallback, useContext, useRef, useState } from 'react';
+import { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
 import SearchComponent from './SearchComponent';
 

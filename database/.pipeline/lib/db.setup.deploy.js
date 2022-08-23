@@ -2,10 +2,16 @@
 
 const { OpenShiftClientX } = require('pipeline-cli');
 const path = require('path');
-const { checkAndClean } = require('../utils/checkAndClean');
-const { wait } = require('../utils/wait');
+const {
+  checkAndClean,
+  getResourceByName,
+  getResourceByRaw,
+  isResourceComplete,
+  isResourceRunning,
+  waitForResourceToMeetCondition
+} = require('../utils/utils');
 
-const dbSetupDeploy = (settings) => {
+const dbSetupDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
@@ -19,12 +25,15 @@ const dbSetupDeploy = (settings) => {
   const instance = `${isName}-${changeId}`;
   const isVersion = `${phases[phase].tag}-setup`;
   const imageStreamName = `${isName}:${isVersion}`;
+  const dbName = `${phases[phase].name}-postgresql${phases[phase].suffix}`;
 
   const objects = [];
   const imageStreamObjects = [];
 
   // Clean existing image
-  checkAndClean(`istag/${imageStreamName}`, oc);
+  await checkAndClean(`istag/${imageStreamName}`, 10, 5, 0, oc).catch(() => {
+    // Ignore errors, nothing to clean
+  });
 
   // Creating image stream for setup
   imageStreamObjects.push(
@@ -58,7 +67,7 @@ const dbSetupDeploy = (settings) => {
         VERSION: phases[phase].tag,
         CHANGE_ID: changeId,
         NODE_ENV: phases[phase].env || 'dev',
-        DB_SERVICE_NAME: `${phases[phase].name}-postgresql${phases[phase].suffix}`,
+        DB_SERVICE_NAME: dbName,
         DB_SCHEMA: 'biohub',
         DB_SCHEMA_DAPI_V1: 'biohub_dapi_v1',
         IMAGE: dbSetupImageStream.image.dockerImageReference
@@ -66,12 +75,26 @@ const dbSetupDeploy = (settings) => {
     })
   );
 
-  checkAndClean(`pod/${name}`, oc);
+  // Clean existing setup pod
+  await checkAndClean(`pod/${name}`, 10, 5, 0, oc).catch(() => {
+    // Ignore errors, nothing to clean
+  });
 
+  // Wait to confirm if the db pod deployed successfully
+  await waitForResourceToMeetCondition(
+    () => getResourceByRaw(`name=${dbName}`, 'pod', settings, oc),
+    isResourceRunning,
+    30,
+    5,
+    0
+  );
+
+  // Deploy the db setup pod
   oc.applyRecommendedLabels(objects, isName, phase, `${changeId}`, instance);
   oc.applyAndDeploy(objects, phases[phase].instance);
 
-  wait(`pod/${name}`, settings, 60, 5);
+  // Wait to confirm if the db setup pod deployed successfully
+  await waitForResourceToMeetCondition(() => getResourceByName(`pod/${name}`, oc), isResourceComplete, 30, 5, 0);
 };
 
 module.exports = { dbSetupDeploy };
