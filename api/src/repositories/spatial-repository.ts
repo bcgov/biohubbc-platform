@@ -1,10 +1,8 @@
 import { Feature, FeatureCollection } from 'geojson';
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { SYSTEM_ROLE } from '../constants/roles';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { UserService } from '../services/user-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -375,13 +373,7 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-    const userService = new UserService(this.connection);
-
-    const userObject = await userService.getUserById(this.connection.systemUserId());
-
-    if (
-      await this.isSystemUserAdmin()
-    ) {
+    if (await this.isSystemUserAdmin()) {
       // Fetch all non-secure records that match the search criteria
       return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);
     }
@@ -604,14 +596,7 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialSearchResponseRow> {
-    const userService = new UserService(this.connection);
-    const userObject = await userService.getUserById(this.connection.systemUserId());
-
-    if (
-      [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
-        userObject.role_names.includes(systemRole)
-      )
-    ) {
+    if (await this.isSystemUserAdmin()) {
       return this._findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(submission_spatial_component_id);
     }
 

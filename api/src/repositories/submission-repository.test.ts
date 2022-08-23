@@ -360,7 +360,9 @@ describe('SubmissionRepository', () => {
       const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
 
       const mockDBConnection = getMockDBConnection();
-      sinon.stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdWithSecurity').returns(mockResponse);
+      sinon
+        .stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdWithSecurity')
+        .returns(mockResponse);
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
