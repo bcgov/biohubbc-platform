@@ -417,29 +417,6 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const knex = getKnex();
-    // const queryBuilder = knex.queryBuilder()
-    // .with('with_user_security_transform_exceptions', (qb) => {
-    //   qb
-    //     .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
-    //     .from('system_user_security_exception as suse')
-    //     .where('suse.system_user_id', this.connection.systemUserId());
-    // })
-    // .withRaw('results', knex.raw(`
-    //   SELECT
-    //     features_array #> '{properties, type}' spatial_type,
-    //     count(features_array #> '{properties, type}')::integer count
-    //   FROM
-    //     submission_spatial_component ssc,
-    //     jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
-    //     submission s
-    //   WHERE s.uuid = ${datasetId}
-    //   AND ssc.submission_id = s.submission_id
-    //   AND s.record_end_date is null
-    //   GROUP BY spatial_type;
-    // `))
-    // .select()
-    // .from('results')
-
     const temp = knex
     .with('with_user_security_transform_exceptions', (qb) => {
       qb
@@ -450,7 +427,8 @@ export class SubmissionRepository extends BaseRepository {
     .with('with_filtered_spatial_component_with_security_transforms', knex.raw(`
       SELECT 
         array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms,
-        ssc.spatial_component
+        ssc.spatial_component,
+        ssc.secured_spatial_component
       FROM 
         submission_spatial_component ssc,
         security_transform_submission sts,
@@ -459,7 +437,25 @@ export class SubmissionRepository extends BaseRepository {
       AND ssc.submission_id = s.submission_id
       AND s.record_end_date is null
       AND s.uuid = '${datasetId}'
-      GROUP BY ssc.spatial_component
+      GROUP BY ssc.spatial_component, ssc.secured_spatial_component
+    `))
+    .with('combined_spatial_components', knex.raw(`
+      SELECT 
+      jsonb_build_object(
+        'spatial_data',
+          -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
+          -- then: return the spatial component
+          -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+          case
+            when
+              wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
+            then
+              wfscwst.spatial_component
+            else
+              coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
+          end
+      ) spatial_component
+      FROM with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste
     `))
     .with('results', knex.raw(`
       SELECT
@@ -469,7 +465,6 @@ export class SubmissionRepository extends BaseRepository {
         with_filtered_spatial_component_with_security_transforms wfscwst,
         jsonb_array_elements(wfscwst.spatial_component -> 'features') features_array,
         with_user_security_transform_exceptions wuste
-      WHERE wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
       GROUP BY spatial_type
     `))
     .select()
@@ -480,7 +475,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
 
     const new_response = await this.connection.knex<any>(temp)
-    console.log(new_response.rowCount)
+    console.log(new_response.rows)
 
     return response.rows;
   }
