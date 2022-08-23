@@ -398,7 +398,7 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
-    if (await this.isAdmin(this.connection.systemUserId())) {
+    if (await this.isSystemUserAdmin(this.connection.systemUserId())) {
       return this._getSpatialComponentCountByDatasetIdAsAdmin(datasetId);
     }
 
