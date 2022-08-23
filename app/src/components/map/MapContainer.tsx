@@ -8,7 +8,6 @@ import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import 'leaflet/dist/leaflet.css';
-import React from 'react';
 import { FeatureGroup, LayersControl, MapContainer as LeafletMapContainer } from 'react-leaflet';
 import BaseLayerControls from './components/BaseLayerControls';
 import { GetMapBounds, IMapBoundsOnChange, SetMapBounds } from './components/Bounds';

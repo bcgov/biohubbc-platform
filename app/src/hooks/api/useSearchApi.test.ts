@@ -31,17 +31,33 @@ describe('useSearchApi', () => {
     expect(result[0].id).toEqual('1');
   });
 
-  it('getSpatialData works as expected', async () => {
-    const res = [{ type: 'FeatureCollection' } as FeatureCollection];
+  describe('getSpatialData', () => {
+    it('with criteria `type` works as expected', async () => {
+      const res = [{ type: 'FeatureCollection' } as FeatureCollection];
 
-    mock.onGet('/api/dwc/spatial/search').reply(200, res);
+      mock.onGet('/api/dwc/spatial/search').reply(200, res);
 
-    const result = await useSearchApi(axios).getSpatialData({
-      boundary: { type: 'Feature' } as Feature,
-      type: ['type']
+      const result = await useSearchApi(axios).getSpatialData({
+        boundary: { type: 'Feature' } as Feature,
+        type: ['type']
+      });
+
+      expect(result[0]).toEqual({ type: 'FeatureCollection' });
     });
 
-    expect(result[0]).toEqual({ type: 'FeatureCollection' });
+    it('with criteria `species` works as expected', async () => {
+      const res = [{ species: 'Spotted Owl' }];
+
+      mock.onGet('/api/dwc/spatial/search').reply(200, res);
+
+      const result = await useSearchApi(axios).getSpatialData({
+        boundary: { type: 'Feature' } as Feature,
+        type: ['type'],
+        species: ['species']
+      });
+
+      expect(result[0]).toEqual({ species: 'Spotted Owl' });
+    });
   });
 
   it('getSpatialFile works as expected', async () => {

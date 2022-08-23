@@ -8,7 +8,6 @@ import InputAdornment from '@mui/material/InputAdornment';
 import { makeStyles } from '@mui/styles';
 import { useFormikContext } from 'formik';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
-import React from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   searchInputContainer: {

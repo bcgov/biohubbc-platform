@@ -28,11 +28,17 @@ const useSearchApi = (axios: AxiosInstance) => {
   const getSpatialData = async (criteria: {
     boundary: Feature;
     type: string[];
+    species?: string[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
     datasetID?: string;
   }): Promise<ISpatialData[]> => {
     const { data } = await axios.get(`/api/dwc/spatial/search`, {
-      params: { boundary: criteria.boundary, type: criteria.type, datasetID: criteria.datasetID }
+      params: {
+        boundary: criteria.boundary,
+        species: criteria.species,
+        type: criteria.type,
+        datasetID: criteria.datasetID
+      }
     });
 
     return data;

@@ -12,7 +12,7 @@ import axios, { CancelTokenSource } from 'axios';
 import ComponentDialog from 'components/dialog/ComponentDialog';
 import { APIError } from 'hooks/api/useAxios';
 import useIsMounted from 'hooks/useIsMounted';
-import React, { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   uploadProgress: {
@@ -259,7 +259,7 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
 
 export default FileUploadItem;
 
-export const MemoizedFileUploadItem = React.memo(FileUploadItem, (prevProps, nextProps) => {
+export const MemoizedFileUploadItem = memo(FileUploadItem, (prevProps, nextProps) => {
   return prevProps.file.name === nextProps.file.name;
 });
 
@@ -319,7 +319,7 @@ const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (pro
   return <Box width="4rem" />;
 };
 
-export const MemoizedActionButton = React.memo(ActionButton, (prevProps, nextProps) => {
+export const MemoizedActionButton = memo(ActionButton, (prevProps, nextProps) => {
   return prevProps.status === nextProps.status;
 });
 
@@ -386,6 +386,6 @@ const ProgressBar: React.FC<React.PropsWithChildren<IProgressBarProps>> = (props
   );
 };
 
-export const MemoizedProgressBar = React.memo(ProgressBar, (prevProps, nextProps) => {
+export const MemoizedProgressBar = memo(ProgressBar, (prevProps, nextProps) => {
   return prevProps.status === nextProps.status && prevProps.progress === nextProps.progress;
 });
