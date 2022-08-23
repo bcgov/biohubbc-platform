@@ -356,6 +356,23 @@ describe('SubmissionRepository', () => {
       expect(response[0].count).to.equal(10);
     });
 
+    it('should succeed with valid data as admin', async () => {
+      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
+
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdAsAdmin').returns(mockResponse);
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
+
+      expect(response[0].spatial_type).to.equal('occurrence');
+      expect(response[0].count).to.equal(10);
+    });
+
     it('should call _getSpatialComponentCountByDatasetIdWithSecurity when user is a system admin', async () => {
       const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
