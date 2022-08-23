@@ -7,8 +7,8 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { SpatialService } from '../../../../services/spatial-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import * as metadata from './metadata';
-import { GET } from './metadata';
+import * as metadata from '../metadata';
+import { GET } from '../metadata';
 
 chai.use(sinonChai);
 

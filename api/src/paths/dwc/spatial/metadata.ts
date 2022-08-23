@@ -1,13 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { SpatialService } from '../../../../services/spatial-service';
-import { getLogger } from '../../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { SpatialService } from '../../../services/spatial-service';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
 
-export const GET: Operation = [getSpatialMetadataById()];
+export const GET: Operation = [getSpatialMetadataByIds()];
 
 GET.apiDoc = {
   description: 'Retrieves spatial component metadata based on submission spatial component id',
@@ -19,12 +19,15 @@ GET.apiDoc = {
   ],
   parameters: [
     {
-      description: 'spatial component submission id',
-      in: 'path',
-      name: 'submissionSpatialComponentId',
+      description: 'spatial component submission ids',
+      in: 'query',
+      name: 'submissionSpatialComponentIds',
       schema: {
-        type: 'integer',
-        minimum: 1
+        type: 'array',
+        items: {
+          type: 'number',
+          minimum: 1
+        }
       },
       required: true
     }
@@ -50,9 +53,9 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function getSpatialMetadataById(): RequestHandler {
+export function getSpatialMetadataByIds(): RequestHandler {
   return async (req, res) => {
-    const submissionSpatialComponentId = Number(req.params.submissionSpatialComponentId);
+    const submissionSpatialComponentIds = req.query.submissionSpatialComponentIds as unknown as number[];
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
@@ -62,7 +65,7 @@ export function getSpatialMetadataById(): RequestHandler {
       const spatialService = new SpatialService(connection);
 
       const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(
-        submissionSpatialComponentId
+        submissionSpatialComponentIds[0]
       );
 
       await connection.commit();

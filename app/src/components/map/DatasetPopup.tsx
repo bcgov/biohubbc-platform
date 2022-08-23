@@ -47,15 +47,15 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = ({
-  submissionSpatialComponentId
+const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentIds: number[] }>> = ({
+  submissionSpatialComponentIds
 }) => {
   const classes = useStyles();
   const api = useApi();
   const history = useHistory();
 
   const dataLoader = useDataLoader(() => {
-    return api.search.getSpatialMetadata(submissionSpatialComponentId);
+    return api.search.getSpatialMetadata(submissionSpatialComponentIds);
   });
 
   dataLoader.load();
