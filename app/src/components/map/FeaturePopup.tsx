@@ -11,6 +11,7 @@ import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { ISpatialMetadata } from 'interfaces/useSearchApi.interface';
 
 export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
 
@@ -78,7 +79,9 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   dataLoader.load();
 
-  const { isLoading, data, isReady } = dataLoader;
+  const { isLoading, isReady } = dataLoader;
+
+  const data = dataLoader.data || []
 
   const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className={classes.modalContent}>{children}</div>
@@ -113,7 +116,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  if (!data) {
+  if (data.length === 0) {
     return (
       <ModalContentWrapper>
         <NoMetadataAvailable />
@@ -121,35 +124,39 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  const type = data.type;
-  const dwc = data.dwc;
+  return <>
+    {data.map((metadata: ISpatialMetadata) => {
+      const type = metadata.type;
+      const dwc = metadata.dwc;
 
-  if (!dwc || !Object.keys(dwc).length) {
-    return (
-      <ModalContentWrapper>
-        <MetadataHeader type={type} />
-        <NoMetadataAvailable />
-      </ModalContentWrapper>
-    );
-  }
+      if (!dwc || !Object.keys(dwc).length) {
+        return (
+          <ModalContentWrapper>
+            <MetadataHeader type={type} />
+            <NoMetadataAvailable />
+          </ModalContentWrapper>
+        );
+      }
 
-  return (
-    <ModalContentWrapper>
-      <Collapse in={isReady}>
-        <MetadataHeader type={type} date={dwc.eventDate} />
-        <Table className={classes.table}>
-          <TableBody>
-            {Object.entries(dwc).map(([key, value]) => (
-              <TableRow key={key}>
-                <TableCell className={classes.tableCell}>{key}</TableCell>
-                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Collapse>
-    </ModalContentWrapper>
-  );
+      return (
+        <ModalContentWrapper>
+          <Collapse in={isReady}>
+            <MetadataHeader type={type} date={dwc.eventDate} />
+            <Table className={classes.table}>
+              <TableBody>
+                {Object.entries(dwc).map(([key, value]) => (
+                  <TableRow key={key}>
+                    <TableCell className={classes.tableCell}>{key}</TableCell>
+                    <TableCell className={classes.tableCell}>{String(value)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Collapse>
+        </ModalContentWrapper>
+      );
+    })}
+  </>
 };
 
 export default FeaturePopup;

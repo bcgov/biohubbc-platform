@@ -44,7 +44,7 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
-          popup: <DatasetPopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          popup: <DatasetPopup submissionSpatialComponentIds={[spatialRecord.submission_spatial_component_id]} />
         });
       }
     }

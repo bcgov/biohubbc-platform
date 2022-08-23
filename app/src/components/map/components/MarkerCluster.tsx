@@ -47,7 +47,7 @@ const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> 
     if (!layer.markers?.length) {
       return;
     }
-    console.log('markers:', layer.markers)
+    // console.log('markers:', layer.markers)
 
     layerControls.push(
       <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
