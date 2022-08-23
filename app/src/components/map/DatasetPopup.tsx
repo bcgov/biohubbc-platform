@@ -60,7 +60,7 @@ const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   dataLoader.load();
 
   const { isLoading, isReady } = dataLoader;
-  const data = dataLoader?.data[0] as BoundaryCentroidFeatureProperties;
+  const data = (dataLoader.data || []) as BoundaryCentroidFeatureProperties[];
 
   const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className={classes.modalContent}>{children}</div>
@@ -103,19 +103,23 @@ const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  const datasetTitle = data.datasetTitle;
-  const datasetID = data.datasetID;
+  return <>
+    {data.map((metadata) => {
+      const datasetTitle = metadata.datasetTitle;
+      const datasetID = metadata.datasetID;
 
-  return (
-    <ModalContentWrapper>
-      <Collapse in={isReady}>
-        <MetadataHeader title={datasetTitle} />
-        <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
-          Go to Dataset
-        </Link>
-      </Collapse>
-    </ModalContentWrapper>
-  );
+      return (
+        <ModalContentWrapper>
+          <Collapse in={isReady}>
+            <MetadataHeader title={datasetTitle} />
+            <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
+              Go to Dataset
+            </Link>
+          </Collapse>
+        </ModalContentWrapper>
+      );
+    })}
+  </>
 };
 
 export default DatasetPopup;
