@@ -337,7 +337,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe.only('getSpatialComponentCountByDatasetId', () => {
+  describe('getSpatialComponentCountByDatasetId', () => {
     afterEach(() => {
       sinon.restore();
     });
