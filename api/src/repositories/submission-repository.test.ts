@@ -14,6 +14,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import {
   IInsertSubmissionRecord,
   ISourceTransformModel,
+  ISpatialComponentCount,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -342,13 +343,10 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ spatial_type: 'occurrence', count: 10 }] } as any as Promise<
-        QueryResult<any>
-      >;
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
 
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId').returns(mockResponse);
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
@@ -376,8 +374,8 @@ describe('SubmissionRepository', () => {
 
       await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
 
-      expect(getSpatialComponentCountByDatasetIdWithSecurityStub).to.have.been.calledOnce;
-      expect(getSpatialComponentCountByDatasetIdAsAdminStub).not.to.have.been.called;
+      expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.have.been.calledOnce;
+      expect(getSpatialComponentCountByDatasetIdWithSecurityStub).not.to.have.been.called;
     });
 
     it('should call _getSpatialComponentCountByDatasetIdWithSecurity when user is a data admin', async () => {
