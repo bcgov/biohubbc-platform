@@ -398,7 +398,6 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
-
     if (await this.isAdmin(this.connection.systemUserId())) {
       const sqlStatement = SQL`
         SELECT
@@ -418,15 +417,16 @@ export class SubmissionRepository extends BaseRepository {
     } else {
       const knex = getKnex();
       const queryBuilder = knex
-      // get security transforms
-      .with('with_user_security_transform_exceptions', (qb) => {
-        qb
-          .select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
-          .from('system_user_security_exception as suse')
-          .where('suse.system_user_id', this.connection.systemUserId());
-      })
-      // filter spatial components for data set
-      .with('with_filtered_spatial_component_with_security_transforms', knex.raw(`
+        // get security transforms
+        .with('with_user_security_transform_exceptions', (qb) => {
+          qb.select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+            .from('system_user_security_exception as suse')
+            .where('suse.system_user_id', this.connection.systemUserId());
+        })
+        // filter spatial components for data set
+        .with(
+          'with_filtered_spatial_component_with_security_transforms',
+          knex.raw(`
         SELECT 
           array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms,
           ssc.spatial_component,
@@ -440,9 +440,12 @@ export class SubmissionRepository extends BaseRepository {
         AND s.record_end_date is null
         AND s.uuid = '${datasetId}'
         GROUP BY ssc.spatial_component, ssc.secured_spatial_component
-      `))
-      // perform transforms
-      .with('combined_spatial_components', knex.raw(`
+      `)
+        )
+        // perform transforms
+        .with(
+          'combined_spatial_components',
+          knex.raw(`
         SELECT 
         case
           when
@@ -453,9 +456,12 @@ export class SubmissionRepository extends BaseRepository {
             coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
         end as spatial_data
         FROM with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste
-      `))
-      // count and group filtered spatial data
-      .with('results', knex.raw(`
+      `)
+        )
+        // count and group filtered spatial data
+        .with(
+          'results',
+          knex.raw(`
         SELECT 
           features_array #> '{properties, type}' spatial_type,
           count(features_array #> '{properties, type}')::integer count
@@ -463,11 +469,12 @@ export class SubmissionRepository extends BaseRepository {
           combined_spatial_components csc,
           jsonb_array_elements(csc.spatial_data -> 'features') features_array
         GROUP BY spatial_type
-      `))
-      .select()
-      .from('results')
-  
-      const response = await this.connection.knex<ISpatialComponentCount>(queryBuilder)
+      `)
+        )
+        .select()
+        .from('results');
+
+      const response = await this.connection.knex<ISpatialComponentCount>(queryBuilder);
       return response.rows;
     }
   }
