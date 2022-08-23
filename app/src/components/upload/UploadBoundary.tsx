@@ -5,10 +5,10 @@ import { IUploadHandler } from 'components/attachments/FileUploadItem';
 import CustomTextField from 'components/fields/CustomTextField';
 import { AttachmentValidExtensions } from 'constants/attachments';
 import { useFormikContext } from 'formik';
-import { Feature } from 'geojson';
+import { Feature, Polygon } from 'geojson';
 import { get } from 'lodash-es';
 import React from 'react';
-import { handleGPXUpload, handleKMLUpload, handleShapefileUpload } from 'utils/mapUploadUtils';
+import { handleKMLUpload, handleShapefileUpload } from 'utils/mapUtils';
 import yup from 'utils/YupSchema';
 
 const useStyles = makeStyles((theme) => ({
@@ -17,23 +17,46 @@ const useStyles = makeStyles((theme) => ({
     '& + button': {
       marginLeft: '0.5rem'
     }
+  },
+  pointType: {
+    lineHeight: 'unset'
+  },
+  date: {
+    margin: 0,
+    lineHeight: 'unset'
   }
 }));
 
 export interface IBoundaryUpload {
-  boundary_name: string;
-  geometry: Feature[];
+  name: string;
+  features: Feature<Polygon>[];
 }
 
 export const BoundaryUploadInitialValues: IBoundaryUpload = {
-  boundary_name: '',
-  geometry: []
+  name: '',
+  features: []
 };
 
 export const BoundaryUploadYupSchema = yup.object().shape({
-  boundary_name: yup.string().max(3000, 'Cannot exceed 3000 characters'),
-  geometry: yup.array().min(1, 'You must specify a project boundary').required('You must specify a project boundary')
+  name: yup.string().max(3000, 'Cannot exceed 3000 characters'),
+  features: yup.array().min(1, 'You must specify a project boundary').required('You must specify a project boundary')
 });
+
+export const BoundaryToolTip: React.FC<React.PropsWithChildren<{ name: string }>> = (props) => {
+  const classes = useStyles();
+  return (
+    <Box mb={1}>
+      <Typography variant="overline" className={classes.pointType}>
+        Boundary
+      </Typography>
+      {props.name && (
+        <Typography className={classes.date} component="h6" variant="subtitle1">
+          {props.name}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 const UploadBoundary: React.FC<React.PropsWithChildren<any>> = (props) => {
   const classes = useStyles();
@@ -42,11 +65,9 @@ const UploadBoundary: React.FC<React.PropsWithChildren<any>> = (props) => {
   const boundaryUploadHandler = (): IUploadHandler => {
     return (file) => {
       if (file?.type.includes('zip') || file?.name.includes('.zip')) {
-        handleShapefileUpload(file, 'geometry', formikProps);
-      } else if (file?.type.includes('gpx') || file?.name.includes('.gpx')) {
-        handleGPXUpload(file, 'geometry', formikProps);
+        handleShapefileUpload(file, 'features', formikProps);
       } else if (file?.type.includes('kml') || file?.name.includes('.kml')) {
-        handleKMLUpload(file, 'geometry', formikProps);
+        handleKMLUpload(file, 'features', formikProps);
       }
 
       return Promise.resolve();
@@ -57,7 +78,7 @@ const UploadBoundary: React.FC<React.PropsWithChildren<any>> = (props) => {
     <>
       <Grid container spacing={2}>
         <Grid item xs={12} mt={1}>
-          <CustomTextField name="boundary_name" label="Boundary Name" other={{ multiline: false, rows: 1 }} />
+          <CustomTextField name="name" label="Boundary Name" other={{ multiline: false, rows: 1 }} />
         </Grid>
         <Grid item xs={12}>
           <Alert severity="info">If uploading a shapefile, it must be configured with a valid projection.</Alert>
@@ -76,15 +97,14 @@ const UploadBoundary: React.FC<React.PropsWithChildren<any>> = (props) => {
             data-testid="boundary_submit"
             onClick={() => {
               formikProps.handleSubmit();
-            }}
-          >
+            }}>
             Submit Boundary
           </Button>
         </Grid>
-        {get(formikProps.errors, formikProps.values.boundary_name) && (
+        {get(formikProps.errors, formikProps.values.name) && (
           <Box pt={2}>
             <Typography style={{ fontSize: '12px', color: '#f44336' }}>
-              {get(formikProps.errors, formikProps.values.boundary_name)}
+              {get(formikProps.errors, formikProps.values.name)}
             </Typography>
           </Box>
         )}

@@ -6,12 +6,10 @@ import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
-import React from 'react';
 import { isObject } from './Utils';
 
 export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
-  const occurrenceStaticLayer: IStaticLayer = { layerName: LAYER_NAME.OCCURRENCES, features: [] };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
   for (const spatialRecord of spatialDataRecords) {
@@ -51,7 +49,7 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
     }
   }
 
-  return { markerLayers: [occurrencesMarkerLayer], staticLayers: [occurrenceStaticLayer, boundaryStaticLayer] };
+  return { markerLayers: [occurrencesMarkerLayer], staticLayers: [boundaryStaticLayer] };
 };
 
 export const isEmptyObject = (obj: any): obj is EmptyObject => {

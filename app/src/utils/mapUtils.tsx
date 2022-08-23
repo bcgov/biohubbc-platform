@@ -1,4 +1,4 @@
-import { gpx, kml } from '@tmcw/togeojson';
+import { kml } from '@tmcw/togeojson';
 import bbox from '@turf/bbox';
 import { FormikContextType } from 'formik';
 import { Feature } from 'geojson';
@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @param {FormikContextType<T>} formikProps The formik props
  * @return {*}
  */
-export const handleShapefileUpload = <T,>(file: File, name: string, formikProps: FormikContextType<T>) => {
+export const handleShapefileUpload = async <T,>(file: File, name: string, formikProps: FormikContextType<T>) => {
   const { values, setFieldValue, setFieldError } = formikProps;
   // Back out if not a zipped file
   if (!file?.type.match(/zip/) || !file?.name.includes('.zip')) {
@@ -38,7 +38,7 @@ export const handleShapefileUpload = <T,>(file: File, name: string, formikProps:
     const zip: Buffer = event?.target?.result as Buffer;
     console.log('zip', zip);
     console.log('zip.buffer', zip.buffer);
-    console.log('typeof(zip)', typeof(zip));
+    console.log('typeof(zip)', typeof zip);
 
     // Exit out if no zip
     if (!zip) {
@@ -48,7 +48,6 @@ export const handleShapefileUpload = <T,>(file: File, name: string, formikProps:
     // Run the conversion
     const geojson = await shp(zip);
     console.log('geojson', geojson);
-
 
     let features: Feature[] = [];
     if (Array.isArray(geojson)) {
@@ -65,45 +64,6 @@ export const handleShapefileUpload = <T,>(file: File, name: string, formikProps:
   };
 
   reader.readAsArrayBuffer(file);
-
-};
-
-/**
- * Function to handle GPX file spatial boundary uploads
- *
- * @template T Type of the formikProps (should be auto-determined if the incoming formikProps are properly typed)
- * @param {File} file The file to upload
- * @param {string} name The name of the formik field that the parsed geometry will be saved to
- * @param {FormikContextType<T>} formikProps The formik props
- * @return {*}
- */
-export const handleGPXUpload = async <T,>(file: File, name: string, formikProps: FormikContextType<T>) => {
-  const { values, setFieldValue, setFieldError } = formikProps;
-
-  const fileAsString = await file?.text().then((xmlString: string) => {
-    return xmlString;
-  });
-
-  if (!file?.type.includes('gpx') && !fileAsString?.includes('</gpx>')) {
-    setFieldError(name, 'You must upload a GPX file, please try again.');
-    return;
-  }
-
-  try {
-    const domGpx = new DOMParser().parseFromString(fileAsString, 'application/xml');
-    const geoJson = gpx(domGpx);
-
-    const sanitizedGeoJSON: Feature[] = [];
-    geoJson.features.forEach((feature: Feature) => {
-      if (feature.geometry) {
-        sanitizedGeoJSON.push(feature);
-      }
-    });
-
-    setFieldValue(name, [...sanitizedGeoJSON, ...get(values, name)]);
-  } catch (error) {
-    setFieldError(name, 'Error uploading your GPX file, please check the file and try again.');
-  }
 };
 
 /**
@@ -132,7 +92,7 @@ export const handleKMLUpload = async <T,>(file: File, name: string, formikProps:
 
   const sanitizedGeoJSON: Feature[] = [];
   geojson.features.forEach((feature: Feature) => {
-    if (feature.geometry) {
+    if (feature.geometry && feature.geometry.type === 'Polygon') {
       sanitizedGeoJSON.push(feature);
     }
   });
@@ -230,4 +190,3 @@ export const generateValidGeometryCollection = (geometry: any, id?: string) => {
 
   return { geometryCollection };
 };
-

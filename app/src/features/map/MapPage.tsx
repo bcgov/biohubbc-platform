@@ -2,15 +2,19 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
+import UploadControls from 'components/map/components/UploadControls';
 import MapContainer from 'components/map/MapContainer';
+import { BoundaryToolTip, IBoundaryUpload } from 'components/upload/UploadBoundary';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import useURL from 'hooks/useURL';
+import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
+import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
@@ -45,6 +49,13 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+  const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
+  const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
+
+  useEffect(() => {
+    setShouldUpdateBounds(false);
+    console.log('updatedBounds', updatedBounds);
+  }, [updatedBounds]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -53,8 +64,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     const result = parseSpatialDataByType(mapDataLoader.data);
 
-    setStaticLayers(result.staticLayers);
+    setStaticLayers([...staticLayers, result.staticLayers[0]]);
     setMarkerLayers(result.markerLayers);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data]);
 
   useEffect(() => {
@@ -96,6 +108,38 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
+  const onBoundaryUpload = (boundary: IBoundaryUpload) => {
+    console.log('boundary' + JSON.stringify(boundary));
+
+    //Get points inside bounds
+    mapDataLoader.refresh(boundary.features[0], type, zoom);
+
+    //SET STATIC LAYER
+    const layers: IStaticLayerFeature[] = [];
+
+    boundary.features.forEach((feature: Feature<Polygon>) => {
+      const staticLayerFeature: IStaticLayerFeature = {
+        geoJSON: feature,
+        tooltip: <BoundaryToolTip name={boundary.name} />
+      };
+      layers.push(staticLayerFeature);
+    });
+
+    const staticLayer: IStaticLayer = { layerName: boundary.name, features: layers };
+
+    setStaticLayers([...staticLayers, staticLayer]);
+
+    //SET BOUNDS
+    const bounds = calculateUpdatedMapBounds(boundary.features);
+    if (bounds) {
+      const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+      setShouldUpdateBounds(true);
+      setUpdatedBounds(newBounds);
+      console.log('newBounds', newBounds);
+    }
+  };
+  console.log('shouldUpdateBounds', shouldUpdateBounds);
+  console.log('updatedBounds', updatedBounds);
   return (
     <Box width="100%" height="100%">
       <Typography variant="h1" hidden>
@@ -119,7 +163,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           fullScreenControl={true}
           markerLayers={markerLayers}
           staticLayers={staticLayers}
+          bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
+        <UploadControls onBoundaryUpload={onBoundaryUpload} />
       </Box>
     </Box>
   );
