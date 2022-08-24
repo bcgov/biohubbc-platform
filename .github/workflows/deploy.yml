@@ -86,7 +86,7 @@ jobs:
   buildDatabase:
     name: Build Database Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ false && github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
@@ -144,7 +144,7 @@ jobs:
   buildDatabaseSetup:
     name: Build Database Setup Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ false && github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
@@ -377,7 +377,7 @@ jobs:
   deployDatabase:
     name: Deploy Database Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ false && github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
@@ -436,7 +436,7 @@ jobs:
   deployDatabaseSetup:
     name: Deploy Database Setup Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ false && github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
@@ -615,7 +615,7 @@ jobs:
   deployGeoserver:
     name: Deploy buildGeoserver Image
     runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ false && github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
