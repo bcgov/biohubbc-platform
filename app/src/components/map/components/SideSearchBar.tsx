@@ -21,6 +21,7 @@ export interface IDatasetRequest {
 }
 const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
   // const api = useApi();
+  // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
   console.log('formikRef in the map page', formikRef);
@@ -62,8 +63,45 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
     // }
   };
 
+  // //User uploads boundary for search
+  // const onAreaUpload = (area: IFormikAreaUpload) => {
+  //   //Get points inside bounds
+  //   const featureArray: Feature[] = [];
+  //   area.features.forEach((feature: Feature<Polygon>) => {
+  //     const newFeature: Feature = {
+  //       type: 'Feature',
+  //       geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
+  //       properties: feature.properties
+  //     };
+  //     featureArray.push(newFeature);
+  //   });
+
+  //   // const geoCollection:Feature<GeometryCollection> = {};
+  //   mapDataLoader.refresh(featureArray[0], type, zoom);
+
+  //   //SET BOUNDS
+  //   const bounds = calculateUpdatedMapBounds(area.features);
+  //   if (bounds) {
+  //     const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+  //     setShouldUpdateBounds(true);
+  //     setUpdatedBounds(newBounds);
+  //   }
+
+  //   //SET STATIC LAYER
+  //   const layers: IStaticLayerFeature[] = [];
+  //   area.features.forEach((feature: Feature<Polygon>) => {
+  //     const staticLayerFeature: IStaticLayerFeature = {
+  //       geoJSON: feature,
+  //       tooltip: <AreaToolTip name={area.name} />
+  //     };
+  //     layers.push(staticLayerFeature);
+  //   });
+  //   const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+  //   setStaticLayers([...staticLayers, staticLayer]);
+  // };
+
   return (
-    <Box component={Paper} p={4} width={400}>
+    <Box component={Paper} p={4} width={500}>
       <Formik<IDatasetSearchForm>
         innerRef={formikRef}
         enableReinitialize={true}
@@ -94,13 +132,14 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
 
             <Box mt={5} display="flex" justifyContent="flex-end">
               <Button
+                fullWidth={true}
                 onClick={formikProps.submitForm}
                 variant="contained"
                 color="primary"
                 size="large"
                 type="submit"
                 data-testid="dataset-find-button">
-                Find
+                Find Data
               </Button>
             </Box>
           </Form>
