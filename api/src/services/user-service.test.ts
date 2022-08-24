@@ -101,8 +101,8 @@ describe('UserService', () => {
       const mockUserObject = { role_names: [] } as unknown as UserObject;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-      const isAdmin = await userService.isSystemUserAdmin()
-      expect(isAdmin).to.be.false
+      const isAdmin = await userService.isSystemUserAdmin();
+      expect(isAdmin).to.be.false;
     });
 
     it('should be an admin as data admin', async () => {
@@ -111,8 +111,8 @@ describe('UserService', () => {
       const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-      const isAdmin = await userService.isSystemUserAdmin()
-      expect(isAdmin).to.be.true
+      const isAdmin = await userService.isSystemUserAdmin();
+      expect(isAdmin).to.be.true;
     });
 
     it('should be an admin as system admin', async () => {
@@ -121,8 +121,8 @@ describe('UserService', () => {
       const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-      const isAdmin = await userService.isSystemUserAdmin()
-      expect(isAdmin).to.be.true
+      const isAdmin = await userService.isSystemUserAdmin();
+      expect(isAdmin).to.be.true;
     });
   });
 

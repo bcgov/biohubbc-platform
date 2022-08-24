@@ -5,7 +5,6 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
-import { SYSTEM_ROLE } from '../constants/roles';
 import { ApiGeneralError } from '../errors/api-error';
 import { UserObject } from '../models/user';
 import { UserService } from '../services/user-service';
@@ -472,56 +471,6 @@ describe('SpatialRepository', () => {
   describe('findSpatialComponentsByCriteria', () => {
     afterEach(() => {
       sinon.restore();
-    });
-
-    it('should call _findSpatialComponentsByCriteriaAsAdminUser when user is a system admin', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
-
-      const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
-        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteriaAsAdminUser')
-        .resolves();
-      const findSpatialComponentsByCriteriaStub = sinon
-        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteria')
-        .resolves();
-
-      const spatialRepository = new SpatialRepository(mockDBConnection);
-
-      const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
-      };
-
-      await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
-
-      expect(findSpatialComponentsByCriteriaAsAdminUserStub).to.have.been.calledOnce;
-      expect(findSpatialComponentsByCriteriaStub).not.to.have.been.called;
-    });
-
-    it('should call _findSpatialComponentsByCriteriaAsAdminUser when user is a data admin', async () => {
-      const mockDBConnection = getMockDBConnection();
-
-      const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
-
-      const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
-        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteriaAsAdminUser')
-        .resolves();
-      const findSpatialComponentsByCriteriaStub = sinon
-        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteria')
-        .resolves();
-
-      const spatialRepository = new SpatialRepository(mockDBConnection);
-
-      const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
-      };
-
-      await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
-
-      expect(findSpatialComponentsByCriteriaAsAdminUserStub).to.have.been.calledOnce;
-      expect(findSpatialComponentsByCriteriaStub).not.to.have.been.called;
     });
 
     it('should call _findSpatialComponentsByCriteria', async () => {

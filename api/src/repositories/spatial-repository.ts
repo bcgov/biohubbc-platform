@@ -476,9 +476,10 @@ export class SpatialRepository extends BaseRepository {
           'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
         )
       );
-
+    console.log('');
+    console.log('___________________');
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-
+    console.log(response);
     return response.rows;
   }
 

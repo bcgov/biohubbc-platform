@@ -4,10 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
-import { SYSTEM_ROLE } from '../constants/roles';
 import { ApiGeneralError } from '../errors/api-error';
-import { UserObject } from '../models/user';
-import { UserService } from '../services/user-service';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -371,9 +368,6 @@ describe('SubmissionRepository', () => {
     });
 
     it('internal function should succeed with valid data as admin', async () => {
-      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
-
       const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
 
       const mockDBConnection = getMockDBConnection();
@@ -381,54 +375,10 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
+      const response = await submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin('111-222-333');
 
       expect(response[0].spatial_type).to.equal('occurrence');
       expect(response[0].count).to.equal(10);
-    });
-
-    it('should call _getSpatialComponentCountByDatasetIdWithSecurity when user is a system admin', async () => {
-      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
-
-      const mockDBConnection = getMockDBConnection();
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const getSpatialComponentCountByDatasetIdWithSecurityStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
-        .resolves();
-
-      const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
-        .resolves();
-
-      await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
-
-      expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.have.been.calledOnce;
-      expect(getSpatialComponentCountByDatasetIdWithSecurityStub).not.to.have.been.called;
-    });
-
-    it('should call _getSpatialComponentCountByDatasetIdWithSecurity when user is a data admin', async () => {
-      const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
-      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
-
-      const mockDBConnection = getMockDBConnection();
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const getSpatialComponentCountByDatasetIdWithSecurityStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
-        .resolves();
-
-      const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
-        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
-        .resolves();
-
-      await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
-
-      expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.have.been.calledOnce;
-      expect(getSpatialComponentCountByDatasetIdWithSecurityStub).not.to.have.been.called;
     });
   });
 

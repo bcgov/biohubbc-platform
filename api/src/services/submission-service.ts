@@ -368,8 +368,8 @@ export class SubmissionService extends DBService {
     const [submissionEMLJSON, spatialComponentCounts] = await Promise.all([
       this.findSubmissionRecordEMLJSONByDatasetId(datasetId),
       (await userService.isSystemUserAdmin())
-        ? this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
-        : this.submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin(datasetId)
+        ? this.submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin(datasetId)
+        : this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
     ]);
 
     if (!submissionEMLJSON) {
