@@ -13,7 +13,7 @@ export const SetMapBounds: React.FC<React.PropsWithChildren<ISetMapBoundsProps>>
 
   // Set bounds if provided, ignore zoom
   if (props.bounds) {
-    map.fitBounds(props.bounds, { padding: [30, 30] });
+    map.fitBounds(props.bounds);
 
     return null;
   }

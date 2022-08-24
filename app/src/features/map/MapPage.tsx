@@ -4,9 +4,12 @@ import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import intersect from '@turf/intersect';
+import simplify from '@turf/simplify';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
+import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import MapContainer from 'components/map/MapContainer';
+import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
@@ -19,7 +22,9 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import useURL from 'hooks/useURL';
+import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
+import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 import yup from 'utils/YupSchema';
 
@@ -98,6 +103,12 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+  const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
+  const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
+
+  useEffect(() => {
+    setShouldUpdateBounds(false);
+  }, [updatedBounds]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -106,8 +117,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     const result = parseSpatialDataByType(mapDataLoader.data);
 
-    setStaticLayers(result.staticLayers);
+    setStaticLayers([...staticLayers, result.staticLayers[0]]);
     setMarkerLayers(result.markerLayers);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data]);
 
   useEffect(() => {
@@ -185,6 +197,43 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   console.log('formikRef in the map page', formikRef);
 
+  //User uploads boundary for search
+  const onAreaUpload = (area: IFormikAreaUpload) => {
+    //Get points inside bounds
+    const featureArray: Feature[] = [];
+    area.features.forEach((feature: Feature<Polygon>) => {
+      const newFeature: Feature = {
+        type: 'Feature',
+        geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
+        properties: feature.properties
+      };
+      featureArray.push(newFeature);
+    });
+
+    // const geoCollection:Feature<GeometryCollection> = {};
+    mapDataLoader.refresh(featureArray[0], type, zoom);
+
+    //SET BOUNDS
+    const bounds = calculateUpdatedMapBounds(area.features);
+    if (bounds) {
+      const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+      setShouldUpdateBounds(true);
+      setUpdatedBounds(newBounds);
+    }
+
+    //SET STATIC LAYER
+    const layers: IStaticLayerFeature[] = [];
+    area.features.forEach((feature: Feature<Polygon>) => {
+      const staticLayerFeature: IStaticLayerFeature = {
+        geoJSON: feature,
+        tooltip: <AreaToolTip name={area.name} />
+      };
+      layers.push(staticLayerFeature);
+    });
+    const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+    setStaticLayers([...staticLayers, staticLayer]);
+  };
+
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
       <Box component={Paper} p={4}>
@@ -239,10 +288,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           </>
         </Formik>
       </Box>
-      <Box data-testid="MapContainer">
+      <Box data-testid="MapContainer" width="100%" height="100%">
         <MapContainer
           mapId="boundary_map"
-          onBoundsChange={onMapViewChange}
+          onBoundsChange={() => onMapViewChange}
           drawControls={{
             initialFeatures: drawnBoundary && [drawnBoundary],
             options: {
@@ -257,7 +306,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           fullScreenControl={true}
           markerLayers={markerLayers}
           staticLayers={staticLayers}
+          bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
+        <UploadAreaControls onAreaUpload={onAreaUpload} />
       </Box>
     </Box>
   );
