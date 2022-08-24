@@ -1,21 +1,33 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
-  name: geoserver
-  creationTimestamp: null
+  name: biohub-geoserver
+  labels:
+    build: biohub-geoserver
 annotations:
   iconClass: icon-tomcat
 parameters:
   - name: NAME
     displayName: Name
-    description: A name used for all objects
+    description: The name assigned to all of the resources.
     required: true
+    value: biohubbc-geoserver
   - name: SUFFIX
     displayName: Name Suffix
     description: A suffix appended to all objects
     required: true
+    value: ''
   - name: TAG_NAME
     required: true
+  - name: SOURCE_IMAGE_NAME
+    required: true
+    value: geoserver
+  - name: SOURCE_IMAGE_VERSION
+    required: true
+    value: 2.21.1
+  - name: SOURCE_IMAGE_NAMESPACE
+    required: true
+    value: a0ec71-tools
 objects:
   - kind: ImageStream
     apiVersion: v1
@@ -32,9 +44,211 @@ objects:
           annotations:
           from:
             kind: ImageStreamTag
-            name: kartoza/geoserver:2.21.1
-            namespace: a0ec71-tools
+            name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
+            namespace: ${SOURCE_IMAGE_NAMESPACE}
           generation: 1
           importPolicy: {}
           referencePolicy:
             type: Source
+# kind: Template
+# apiVersion: template.openshift.io/v1
+# metadata:
+#   labels:
+#     build: biohub-geoserver
+#   name: biohub-geoserver
+# parameters:
+#   - name: NAME
+#     displayName: Name
+#     description: The name assigned to all of the resources.  Use 'backup-{database name}' depending on your database provider
+#     required: true
+#     value: biohubbc-geoserver
+#   - name: SUFFIX
+#     displayName: Suffix
+#     description: A name suffix used for all objects
+#     required: false
+#     value: ''
+#   - name: APP_NAME
+#     displayName: App Name
+#     description: Used to group components together in the OpenShift console.
+#     required: true
+#     value: biohub-geoserver
+#   - name: APP_GROUP
+#     displayName: App Group
+#     description: The name assigned to all of the deployments in this project.
+#     required: true
+#     value: biohubbc
+#   - name: GIT_REPO_URL
+#     displayName: Git Repo URL
+#     description: The URL to your GIT repo.
+#     required: true
+#     value: https://github.com/bcgov/geodock.git
+#   - name: GIT_REF
+#     displayName: Git Reference
+#     description: The git reference or branch.
+#     required: true
+#     value: master
+#   - name: SOURCE_CONTEXT_DIR
+#     displayName: Source Context Directory
+#     description: The source context directory.
+#     required: false
+#     value: /
+#   - name: DOCKERFILE_PATH
+#     displayName: Docker File
+#     description: The path and file of the docker file defining the build.
+#     required: false
+#     value: Dockerfile
+#   - name: OUTPUT_IMAGE_TAG
+#     displayName: Output Image Tag
+#     description: The tag given to the built image.
+#     required: true
+#     value: 2.21.1
+#   #   - name: TAG_NAME
+#   #     required: true
+#   #   - name: IMAGE_STREAM_NAME
+#   #     description: The ImageStream name.
+#   #     displayName: IMAGE_STREAM_NAME
+#   #     required: true
+#   #   - name: IMAGE_STREAM_VERSION
+#   #     description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
+#   #     displayName: Version of GeoServer Image
+#   #     required: true
+#   #   - name: IMAGE_STREAM_NAMESPACE
+#   #     description: The OpenShift Namespace where the ImageStream resides.
+#   #     displayName: Namespace
+#   #     required: true
+#   - name: CPU_LIMIT
+#     displayName: Resources CPU Limit
+#     description: The resources CPU limit (in cores) for this build; 0 = use default.
+#     required: true
+#     value: '0'
+#   - name: MEMORY_LIMIT
+#     displayName: Resources Memory Limit
+#     description: The resources Memory limit (in Mi, Gi, etc) for this build; 0Mi = use default.
+#     required: true
+#     value: 0Mi
+#   - name: CPU_REQUEST
+#     displayName: Resources CPU Request
+#     description: The resources CPU request (in cores) for this build; 0 = use default.
+#     required: true
+#     value: '0'
+#   - name: MEMORY_REQUEST
+#     displayName: Resources Memory Request
+#     description: The resources Memory request (in Mi, Gi, etc) for this build; 0Mi = use default.
+#     required: true
+#     value: 0Mi
+# objects:
+#   - kind: ImageStream
+#     apiVersion: v1
+#     metadata:
+#       name: ${NAME}
+#       labels:
+#         name: ${NAME}
+#         app: ${APP_NAME}${SUFFIX}
+#         app-group: ${APP_GROUP}
+#   - kind: BuildConfig
+#     apiVersion: v1
+#     metadata:
+#       name: ${NAME}
+#       labels:
+#         name: ${NAME}
+#         app: ${APP_NAME}${SUFFIX}
+#         app-group: ${APP_GROUP}
+#     spec:
+#       runPolicy: Serial
+#       source:
+#         type: Git
+#         git:
+#           uri: ${GIT_REPO_URL}
+#           ref: ${GIT_REF}
+#         contextDir: ${SOURCE_CONTEXT_DIR}
+#       strategy:
+#         type: Docker
+#         dockerStrategy:
+#           dockerfilePath: '${DOCKERFILE_PATH}'
+#       output:
+#         to:
+#           kind: ImageStreamTag
+#           name: ${NAME}:${OUTPUT_IMAGE_TAG}
+#       resources:
+#         requests:
+#           cpu: ${CPU_REQUEST}
+#           memory: ${MEMORY_REQUEST}
+#         limits:
+#           cpu: ${CPU_LIMIT}
+#           memory: ${MEMORY_LIMIT}
+#       triggers:
+#         - type: ImageChange
+#         - type: ConfigChange
+#   # - kind: ImageStream
+#   #   apiVersion: v1
+#   #   metadata:
+#   #     name: '${NAME}'
+#   #     labels:
+#   #       shared: 'true'
+#   #     annotations: {}
+#   #   spec:
+#   #     lookupPolicy:
+#   #       local: false
+#   #     tags:
+#   #       - name: '${TAG_NAME}'
+#   #         annotations:
+#   #         from:
+#   #           kind: ImageStreamTag
+#   #           name: `${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}`
+#   #           namespace: `${IMAGE_STREAM_NAMESPACE}
+#   #         generation: 1
+#   #         importPolicy: {}
+#   #         referencePolicy:
+#   #           type: Source
+# # apiVersion: template.openshift.io/v1
+# # kind: Template
+# # metadata:
+# #   name: geoserver
+# #   creationTimestamp: null
+# # annotations:
+# #   iconClass: icon-tomcat
+# # parameters:
+# #   - name: NAME
+# #     displayName: Name
+# #     description: A name used for all objects
+# #     required: true
+# #   - name: SUFFIX
+# #     displayName: Name Suffix
+# #     description: A suffix appended to all objects
+# #     required: true
+# #   - name: TAG_NAME
+# #     required: true
+# #   - name: IMAGE_STREAM_NAME
+# #     description: The ImageStream name.
+# #     displayName: IMAGE_STREAM_NAME
+# #     required: true
+# #   - name: IMAGE_STREAM_VERSION
+# #     description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
+# #     displayName: Version of GeoServer Image
+# #     required: true
+# #   - name: IMAGE_STREAM_NAMESPACE
+# #     description: The OpenShift Namespace where the ImageStream resides.
+# #     displayName: Namespace
+# #     required: true
+# # objects:
+# #   - kind: ImageStream
+# #     apiVersion: v1
+# #     metadata:
+# #       name: '${NAME}'
+# #       labels:
+# #         shared: 'true'
+# #       annotations: {}
+# #     spec:
+# #       lookupPolicy:
+# #         local: false
+# #       tags:
+# #         - name: '${TAG_NAME}'
+# #           annotations:
+# #           from:
+# #             kind: ImageStreamTag
+# #             name: `${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}`
+# #             namespace: `${IMAGE_STREAM_NAMESPACE}
+# #           generation: 1
+# #           importPolicy: {}
+# #           referencePolicy:
+# #             type: Source

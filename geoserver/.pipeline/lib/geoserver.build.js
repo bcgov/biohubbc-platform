@@ -26,7 +26,10 @@ const dbBuild = (settings) => {
       param: {
         NAME: name,
         SUFFIX: `${phases[phase].suffix}`,
-        TAG_NAME: `${phases[phase].tag}`
+        TAG_NAME: `${phases[phase].tag}`,
+        SOURCE_IMAGE_NAME: 'geoserver',
+        SOURCE_IMAGE_VERSION: '2.21.1',
+        SOURCE_IMAGE_NAMESPACE: 'a0ec71-tools'
       }
     })
   );
