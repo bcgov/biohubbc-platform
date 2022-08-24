@@ -54,6 +54,9 @@ export interface IDatasetSearchFormProps {
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
   const formikProps = useFormikContext<IDatasetSearchForm>();
 
+  console.log('props in datasetSearchForm:', props);
+  console.log('formikprops values in datasearch form:', formikProps.values);
+
   return (
     <>
       <Box mb={3} maxWidth={'72ch'}>
@@ -86,7 +89,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
         </Grid>
         <Grid item xs={12}>
           <MultiAutocompleteField
-            id={'species_list'}
+            id={`species_list`}
             label={'Select Species'}
             options={props.speciesList}
             required={false}

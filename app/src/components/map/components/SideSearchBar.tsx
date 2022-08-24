@@ -19,7 +19,7 @@ export interface IDatasetRequest {
     datasetName?: string;
   };
 }
-const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
+const SideSearchBar: React.FC = () => {
   // const api = useApi();
   // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
@@ -44,6 +44,7 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
 
     console.log('values', values);
     console.log('searchParams', searchParams);
+    console.log('formikref.values in Side searchbar', formikRef.current?.values);
 
     return;
     // await api.search.getSpatialData(searchParams.criteria);
@@ -121,8 +122,9 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
                   <Box component="fieldset" width={'100%'}>
                     <DatasetSearchForm
                       speciesList={[
-                        { value: 'species1', label: 'species 1' },
-                        { value: 'species2', label: 'species 2' }
+                        { value: '1', label: 'Moose' },
+                        { value: '2', label: 'Thinhorn sheep' },
+                        { value: '3', label: 'Bighorn sheep' }
                       ]}
                     />
                   </Box>

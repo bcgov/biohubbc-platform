@@ -5,7 +5,6 @@ import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
-
 export interface IMultiAutocompleteFieldOption {
   value: string | number;
   label: string;
@@ -19,16 +18,31 @@ export interface IMultiAutocompleteField {
   filterLimit?: number;
 }
 
-const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocompleteField>> = (props) => {
+const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
+  console.log('props in the multiautocomplete field: ', props);
+
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
+  // const [inputValue, setInputValue] = useState('');
+  // const [options, setOptions] = useState(props.options || []); // store options if provided
 
   const getExistingValue = (existingValues: any[]): IMultiAutocompleteFieldOption[] => {
     if (!existingValues) {
       return [];
     }
-
     return props.options.filter((option) => existingValues.includes(option.value));
   };
+
+  // const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
+  //   const selectedOptionsValue = selectedOptions.map((item) => item.value);
+  //   const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item.value));
+
+  //   setOptions([...selectedOptions, ...remainingOptions]);
+
+  //   setFieldValue(
+  //     props.id,
+  //     selectedOptions.map((item) => item.value)
+  //   );
+  // };
 
   const handleGetOptionSelected = (
     option: IMultiAutocompleteFieldOption,
@@ -41,11 +55,26 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
     return option.value === value.value;
   };
 
+  // const handleOnInputChange = (event: React.ChangeEvent<any>, value: string, reason: AutocompleteInputChangeReason) => {
+  //   if (event && event.type === 'blur') {
+  //     setInputValue('');
+  //   } else if (reason !== 'reset') {
+  //     setInputValue(value);
+  //   }
+  // };
+
+  console.log('values in multiautocompletefield:', values);
+  console.log('props.id:', props.id);
+
+  console.log('what is in get(values, props.id) ', get(values, `species_list`));
+
+  console.log('values[props.id]', values[props.id]);
+
   return (
     <Autocomplete
       multiple
       autoHighlight={true}
-      value={getExistingValue(get(values, props.id))}
+      value={getExistingValue(values[props.id])}
       id={props.id}
       options={props.options}
       getOptionLabel={(option) => option.label}
@@ -58,6 +87,8 @@ const MultiAutocompleteField: React.FC<React.PropsWithChildren<IMultiAutocomplet
           option.map((item) => item.value)
         );
       }}
+      // inputValue={inputValue}
+      // onInputChange={handleOnInputChange}
       renderOption={(_props, option, { selected }) => {
         const disabled: any = props.options && props.options?.indexOf(option) !== -1;
         return (
