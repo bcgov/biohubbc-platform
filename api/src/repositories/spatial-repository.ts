@@ -364,26 +364,6 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Query builder to find spatial component by given criteria.
-   *
-   * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
-   * @memberof SpatialRepository
-   */
-  async findSpatialComponentsByCriteria(
-    criteria: ISpatialComponentsSearchCriteria
-  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-    if (await this.isSystemUserAdmin()) {
-      // Fetch all non-secure records that match the search criteria
-      return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);
-    }
-
-    // Fetch all records (non-secure and/or secure, depending on the security rules applied and any user exceptions)
-    // that match the search criteria
-    return this._findSpatialComponentsByCriteria(criteria);
-  }
-
-  /**
    * Query builder to find spatial component by given criteria, specifically for admin users that bypass all security
    * rules.
    *
@@ -391,7 +371,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialRepository
    */
-  async _findSpatialComponentsByCriteriaAsAdminUser(
+  async findSpatialComponentsByCriteriaAsAdminUser(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
@@ -442,7 +422,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialRepository
    */
-  async _findSpatialComponentsByCriteria(
+  async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
@@ -587,23 +567,6 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Query spatial components by given submission ID
-   *
-   * @param {number} submission_spatial_component_id
-   * @return {*}  {Promise<ISubmissionSpatialComponent>}
-   * @memberof SpatialRepository
-   */
-  async findSpatialMetadataBySubmissionSpatialComponentId(
-    submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialSearchResponseRow> {
-    if (await this.isSystemUserAdmin()) {
-      return this._findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(submission_spatial_component_id);
-    }
-
-    return this._findSpatialMetadataBySubmissionSpatialCompnentId(submission_spatial_component_id);
-  }
-
-  /**
    * Query builder to find spatial component from a given submission id, specifically for admin users that bypass all security
    * rules.
    *
@@ -611,7 +574,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialComponent>}
    * @memberof SpatialRepository
    */
-  async _findSpatialMetadataBySubmissionSpatialCompnentIdAsAdminUser(
+  async findSpatialMetadataBySubmissionSpatialComponentIdasAdmin(
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialSearchResponseRow> {
     const knex = getKnex();
@@ -652,7 +615,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow>}
    * @memberof SpatialRepository
    */
-  async _findSpatialMetadataBySubmissionSpatialCompnentId(
+  async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
   ): Promise<ISubmissionSpatialSearchResponseRow> {
     const knex = getKnex();

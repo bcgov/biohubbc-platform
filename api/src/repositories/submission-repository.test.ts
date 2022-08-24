@@ -360,13 +360,11 @@ describe('SubmissionRepository', () => {
       const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
 
       const mockDBConnection = getMockDBConnection();
-      sinon
-        .stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdWithSecurity')
-        .returns(mockResponse);
+      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId').returns(mockResponse);
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository._getSpatialComponentCountByDatasetIdWithSecurity('111-222-333');
+      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
 
       expect(response[0].spatial_type).to.equal('occurrence');
       expect(response[0].count).to.equal(10);
@@ -379,7 +377,7 @@ describe('SubmissionRepository', () => {
       const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
 
       const mockDBConnection = getMockDBConnection();
-      sinon.stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdAsAdmin').returns(mockResponse);
+      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin').returns(mockResponse);
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
@@ -398,11 +396,11 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const getSpatialComponentCountByDatasetIdWithSecurityStub = sinon
-        .stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdWithSecurity')
+        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
         .resolves();
 
       const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
-        .stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdAsAdmin')
+        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
         .resolves();
 
       await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
@@ -420,11 +418,11 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const getSpatialComponentCountByDatasetIdWithSecurityStub = sinon
-        .stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdWithSecurity')
+        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
         .resolves();
 
       const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
-        .stub(SubmissionRepository.prototype, '_getSpatialComponentCountByDatasetIdAsAdmin')
+        .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
         .resolves();
 
       await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');

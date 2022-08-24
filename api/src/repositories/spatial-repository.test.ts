@@ -481,10 +481,10 @@ describe('SpatialRepository', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
-        .stub(SpatialRepository.prototype, '_findSpatialComponentsByCriteriaAsAdminUser')
+        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteriaAsAdminUser')
         .resolves();
       const findSpatialComponentsByCriteriaStub = sinon
-        .stub(SpatialRepository.prototype, '_findSpatialComponentsByCriteria')
+        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteria')
         .resolves();
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
@@ -506,10 +506,10 @@ describe('SpatialRepository', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
-        .stub(SpatialRepository.prototype, '_findSpatialComponentsByCriteriaAsAdminUser')
+        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteriaAsAdminUser')
         .resolves();
       const findSpatialComponentsByCriteriaStub = sinon
-        .stub(SpatialRepository.prototype, '_findSpatialComponentsByCriteria')
+        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteria')
         .resolves();
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
@@ -531,10 +531,10 @@ describe('SpatialRepository', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
-        .stub(SpatialRepository.prototype, '_findSpatialComponentsByCriteriaAsAdminUser')
+        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteriaAsAdminUser')
         .resolves();
       const findSpatialComponentsByCriteriaStub = sinon
-        .stub(SpatialRepository.prototype, '_findSpatialComponentsByCriteria')
+        .stub(SpatialRepository.prototype, 'findSpatialComponentsByCriteria')
         .resolves();
 
       const spatialRepository = new SpatialRepository(mockDBConnection);
@@ -570,7 +570,7 @@ describe('SpatialRepository', () => {
         boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
       };
 
-      const response = await spatialRepository._findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
+      const response = await spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
 
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
@@ -592,7 +592,7 @@ describe('SpatialRepository', () => {
         boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
       };
 
-      const response = await spatialRepository._findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
+      const response = await spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
 
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
@@ -618,7 +618,7 @@ describe('SpatialRepository', () => {
         boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
       };
 
-      const response = await spatialRepository._findSpatialComponentsByCriteria(mockSearchCriteria);
+      const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
 
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
@@ -640,7 +640,7 @@ describe('SpatialRepository', () => {
         boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
       };
 
-      const response = await spatialRepository._findSpatialComponentsByCriteria(mockSearchCriteria);
+      const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
 
       expect(response).to.eql([mockResponseRow1, mockResponseRow2]);
     });
