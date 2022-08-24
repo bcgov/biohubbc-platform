@@ -90,7 +90,7 @@ describe('UserService', () => {
     });
   });
 
-  describe.only('isSystemUserAdmin', () => {
+  describe('isSystemUserAdmin', () => {
     afterEach(() => {
       sinon.restore();
     });
