@@ -5,35 +5,32 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import { IFormikAreaUpload } from 'components/upload/UploadArea';
+// import { IFindDataset } from 'components/map/components/SideSearchBar';
+import { useFormikContext } from 'formik';
 import React from 'react';
 import yup from 'utils/YupSchema';
 
 export interface IDatasetSearchForm {
-  searchCriteria: {
-    dataset: string;
-    species_list: string[];
-  };
+  dataset: string;
+  species_list: string[];
+  area: IFormikAreaUpload[];
 }
 
 export const DatasetSearchFormInitialValues: IDatasetSearchForm = {
-  searchCriteria: {
-    dataset: '',
-    species_list: []
-  }
+  dataset: 'Species Observations' ,
+  species_list: [],
+  area: []
 };
 
 export const DatasetSearchFormYupSchema = yup.object().shape({
-  searchCriteria: yup.object().shape({
-    dataset: yup.string(),
-    species_list: yup.mixed()
-  })
+  dataset: yup.string(),
+  species_list: yup.mixed(),
+  area: yup.mixed()
 });
 
 export interface IDatasetSearchFormProps {
-  searchCriteria: {
-    dataset: string[];
-    species_list: IMultiAutocompleteFieldOption[];
-  };
+  speciesList: IMultiAutocompleteFieldOption[];
 }
 
 /**
@@ -42,7 +39,7 @@ export interface IDatasetSearchFormProps {
  * @return {*}
  */
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
-
+  const formikProps = useFormikContext<IDatasetSearchForm>();
 
   return (
     <>
@@ -52,29 +49,33 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
         </Typography>
       </Box>
 
-      <Grid container spacing={3} direction="column">
+      <Grid container spacing={4} direction="column">
         <Grid item xs={12}>
-          <InputLabel id="permit_type">Permit Type</InputLabel>
+          <InputLabel id="datasetmenu_label">Dataset</InputLabel>
           <Select
-            id={`datasetmenu`}
-            name={`datasetmenu`}
+            fullWidth={true}
+            id={`dataset`}
+            name={`dataset`}
             labelId="dataset-menu"
             label="Dataset Menu"
-            value={props.searchCriteria.dataset}
-            inputProps={{ 'aria-label': 'Dataset option' }}>
-            <MenuItem key={1} value={'Species Inventory Project'}>
-              Species Inventory project
-            </MenuItem>
-            <MenuItem key={2} value={'Species Observations'}>
+            value={formikProps.values.dataset}
+            inputProps={{ 'aria-label': 'Dataset option' }}
+            onChange={(item) => {
+              formikProps.setFieldValue('dataset', item.target.value);
+            }}>
+            <MenuItem key={1} value={'Species Observations'}>
               Species Observations
+            </MenuItem>
+            <MenuItem key={2} value={'Species Inventory Project'}>
+              Species Inventory Project
             </MenuItem>
           </Select>
         </Grid>
         <Grid item xs={12}>
           <MultiAutocompleteField
-            id={'dataset.select_species'}
+            id={'species_list'}
             label={'Select Species'}
-            options={props.searchCriteria.species_list}
+            options={props.speciesList}
             required={false}
           />
         </Grid>
