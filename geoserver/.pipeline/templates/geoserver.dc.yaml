@@ -239,18 +239,18 @@ objects:
                 privileged: false
               terminationMessagePath: '/dev/termination-log'
               volumeMounts:
-                - mountPath: '/'
+                - mountPath: '/opt/geoserver_data/'
                   name: '${NAME}${SUFFIX}-data'
-                # - mountPath: '/var/run/geoserver'
-                #   name: '${NAME}${SUFFIX}-run'
+                - mountPath: '/'
+                  name: '${NAME}${SUFFIX}-run'
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           volumes:
             - name: '${NAME}${SUFFIX}-data'
               persistentVolumeClaim:
                 claimName: '${NAME}${SUFFIX}'
-            # - name: '${NAME}${SUFFIX}-run'
-            #   emptyDir: {}
+            - name: '${NAME}${SUFFIX}-run'
+              emptyDir: {}
       triggers:
         - imageChangeParams:
             automatic: true
@@ -263,7 +263,6 @@ objects:
             lastTriggeredImage: ''
           type: ImageChange
         - type: ConfigChange
-    status: {}
   - apiVersion: route.openshift.io/v1
     kind: Route
     metadata:

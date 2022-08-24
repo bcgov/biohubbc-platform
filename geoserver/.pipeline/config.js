@@ -59,7 +59,7 @@ const phases = {
     instance: `${name}-build-${changeId}`,
     version: `${version}-${changeId}`,
     tag: tag,
-    host: /*(isStaticDeployment && staticUrls.dev) || */ `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+    host: `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'build',
     // tz: config.timezone.db,
     branch: branch
@@ -74,6 +74,7 @@ const phases = {
     instance: `${name}-dev-${deployChangeId}`,
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
+    host: `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev'
     // tz: config.timezone.db
     // dbSetupDockerfilePath: dbSetupDockerfilePath
