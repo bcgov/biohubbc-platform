@@ -1,22 +1,13 @@
-import { Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
 import intersect from '@turf/intersect';
 import simplify from '@turf/simplify';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
+import SideSearchBar from 'components/map/components/SideSearchBar';
 import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import DatasetSearchForm, {
-  DatasetSearchFormInitialValues,
-  DatasetSearchFormYupSchema,
-  IDatasetSearchForm
-} from 'features/datasets/components/DatasetSearchForm';
-import { Form, Formik, FormikProps } from 'formik';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -26,49 +17,6 @@ import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
-import yup from 'utils/YupSchema';
-
-export interface IDatasetRequest {
-  criteria: {
-    boundary: Feature;
-    type: string[];
-    species?: string[];
-    zoom?: number; // TODO include in request params when backend is updated to receive it
-    datasetID?: string;
-    datasetName?: string;
-  };
-}
-
-export interface IFindDataset extends IDatasetRequest, IDatasetSearchForm {}
-
-export const DatasetFormInitialValues: IDatasetRequest = {
-  criteria: {
-    boundary: null as unknown as Feature,
-    type: ['Boundary'],
-    species: ['species1', 'species2'],
-    zoom: 0,
-    datasetID: 'abc',
-    datasetName: 'Species Observations'
-  }
-};
-
-export const FindDatasetInitialValues = {
-  ...DatasetFormInitialValues,
-  ...DatasetSearchFormInitialValues
-};
-
-export const DatasetFormYupSchema = yup.object().shape({
-  criteria: yup.object().shape({
-    boundary: yup.mixed(),
-    type: yup.array(),
-    species: yup.array(),
-    zoom: yup.number().notRequired(),
-    datasetID: yup.string(),
-    datasetName: yup.string().notRequired()
-  })
-});
-
-export const FindDatasetYupSchema = yup.object().concat(DatasetFormYupSchema).concat(DatasetSearchFormYupSchema);
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -161,8 +109,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
-  const formikRef = useRef<FormikProps<IFindDataset>>(null);
-
   // const showFindErrorDialog = (textDialogProps?: Partial<IErrorDialogProps>) => {
   //   dialogContext.setErrorDialog({
   //     dialogTitle: CreateProjectI18N.createErrorTitle,
@@ -172,30 +118,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   //     open: true
   //   });
   // };
-
-  /**
-   * Handle dataset requests.
-   */
-  const handleDatasetRequestCreation = async (values: IDatasetRequest) => {
-    try {
-      await api.search.getSpatialData(values.criteria);
-
-      // if (!response?.satasetID) {
-      //   showCreateErrorDialog({
-      //     dialogError: 'The response from the server was null, or did not contain a project ID.'
-      //   });
-      //   return;
-      // }
-    } catch (error) {
-      showCreateErrorDialog({
-        //dialogTitle: 'Error Finding Dataset',
-        dialogError: 'Some error' //(error as APIError)?.message,
-        // dialogErrorDetails: (error as APIError)?.errors
-      });
-    }
-  };
-
-  console.log('formikRef in the map page', formikRef);
 
   //User uploads boundary for search
   const onAreaUpload = (area: IFormikAreaUpload) => {
@@ -236,58 +158,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
-      <Box component={Paper} p={4}>
-        <Formik<IFindDataset>
-          innerRef={formikRef}
-          enableReinitialize={true}
-          initialValues={FindDatasetInitialValues}
-          validationSchema={FindDatasetYupSchema}
-          validateOnBlur={true}
-          validateOnChange={false}
-          onSubmit={handleDatasetRequestCreation}>
-          <>
-            <Form noValidate>
-              <Box my={5}>
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={3}>
-                    <Box my={5}>
-                      <Grid container spacing={3}>
-                        <Grid item xs={12} md={3}>
-                          <Typography variant="h3">Map search</Typography>
-                        </Grid>
-                        <Grid item xs={12} md={9}>
-                          <Box component="fieldset" mx={0}>
-                            <DatasetSearchForm
-                              searchCriteria={{
-                                dataset: ['item 1', 'item 2'],
-                                species_list: [
-                                  { value: 'species1', label: 'species 1' },
-                                  { value: 'species2', label: 'species 2' }
-                                ]
-                              }}
-                            />
-                          </Box>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
-
-              <Box mt={5} display="flex" justifyContent="flex-end">
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  type="submit"
-                  data-testid="dataset-find-button">
-                  Find
-                </Button>
-              </Box>
-            </Form>
-          </>
-        </Formik>
-      </Box>
+      <SideSearchBar />
       <Box data-testid="MapContainer" width="100%" height="100%">
         <MapContainer
           mapId="boundary_map"
@@ -315,6 +186,3 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 };
 
 export default MapPage;
-function showCreateErrorDialog(arg0: { dialogError: string }) {
-  throw new Error('Function not implemented.');
-}
