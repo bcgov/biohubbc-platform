@@ -621,8 +621,8 @@ jobs:
     needs:
       - scaleDownPods
       - buildGeoserver
-      - deployDatabase
-      - deployDatabaseSetup
+      # - deployDatabase
+      # - deployDatabaseSetup
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
