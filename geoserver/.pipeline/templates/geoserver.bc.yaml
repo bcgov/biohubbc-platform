@@ -1,11 +1,61 @@
+# apiVersion: template.openshift.io/v1
+# kind: Template
+# metadata:
+#   name: biohub-platform-geoserver
+#   labels:
+#     build: biohub-platform-geoserver
+# annotations:
+#   iconClass: icon-tomcat
+# parameters:
+#   - name: NAME
+#     displayName: Name
+#     description: The name assigned to all of the resources.
+#     required: true
+#     value: biohub-platform-geoserver
+#   - name: SUFFIX
+#     displayName: Name Suffix
+#     description: A suffix appended to all objects
+#     required: true
+#     value: ''
+#   - name: TARGET_IMAGE_VERSION
+#     required: true
+# - name: SOURCE_IMAGE_NAME
+#   required: true
+#   value: geoserver
+# - name: SOURCE_IMAGE_VERSION
+#   required: true
+#   value: 2.21.1
+#   - name: SOURCE_IMAGE_NAMESPACE
+#     required: true
+#     value: a0ec71-tools
+# objects:
+#   - kind: ImageStream
+#     apiVersion: v1
+#     metadata:
+#       name: '${NAME}'
+#       labels:
+#         shared: 'true'
+#       annotations: {}
+#     spec:
+#       lookupPolicy:
+#         local: false
+#       tags:
+#         - name: '${TARGET_IMAGE_VERSION}'
+#           annotations:
+#           from:
+#             kind: ImageStreamTag
+#             name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
+#             namespace: ${SOURCE_IMAGE_NAMESPACE}
+#           generation: 1
+#           importPolicy: {}
+#           referencePolicy:
+#             type: Source
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
   name: biohub-platform-geoserver
   labels:
     build: biohub-platform-geoserver
-annotations:
-  iconClass: icon-tomcat
 parameters:
   - name: NAME
     displayName: Name
@@ -19,122 +69,108 @@ parameters:
     value: ''
   - name: TARGET_IMAGE_VERSION
     required: true
-  - name: SOURCE_IMAGE_NAME
+  # - name: SOURCE_IMAGE_NAME
+  #   required: true
+  #   value: geoserver
+  # - name: SOURCE_IMAGE_VERSION
+  #   required: true
+  #   value: 2.21.1
+  # - name: SOURCE_IMAGE_NAMESPACE
+  #   required: true
+  #   value: a0ec71-tools
+  - name: SOURCE_REPOSITORY_URL
     required: true
-    value: geoserver
-  - name: SOURCE_IMAGE_VERSION
+    value: https://github.com/bcgov/biohubbc-platform.git
+  - name: SOURCE_REPOSITORY_REF
+    required: false
+    value: dev
+  - name: SOURCE_CONTEXT_DIR
     required: true
-    value: 2.21.1
-  - name: SOURCE_IMAGE_NAMESPACE
+    value: Containers/geoserver
+  - name: BASE_IMAGE_URL
     required: true
-    value: a0ec71-tools
+    value: registry.hub.docker.com/library/debian:bullseye
+  - name: BASE_IMAGE_NAME
+    required: true
+    value: debian
+  - name: BASE_IMAGE_VERSION
+    required: true
+    value: bullseye
 objects:
+  # - kind: ImageStream
+  #   apiVersion: image.openshift.io/v1
+  #   metadata:
+  #     name: debian
+  #   spec:
+  #     lookupPolicy:
+  #       local: false
+  #     tags:
+  #       - name: bullseye
+  #         annotations:
+  #           openshift.io/imported-from: 'debian:bullseye'
+  #         from:
+  #           kind: DockerImage
+  #           name: 'debian:bullseye'
+  #         generation: 2
+  #         importPolicy: {}
+  #         referencePolicy:
+  #           type: Source
+
+  - kind: ImageStream
+    apiVersion: image.openshift.io/v1
+    lookupPolicy:
+      local: false
+    metadata:
+      name: ${BASE_IMAGE_NAME}
+    tag:
+      - name: ${BASE_IMAGE_VERSION}
+        annotations: null
+        from:
+          kind: DockerImage
+          name: ${BASE_IMAGE_URL}
+        importPolicy: {}
+        referencePolicy:
+          type: Local
+
   - kind: ImageStream
     apiVersion: v1
     metadata:
       name: '${NAME}'
       labels:
         shared: 'true'
-      annotations: {}
     spec:
       lookupPolicy:
         local: false
-      tags:
-        - name: '${TARGET_IMAGE_VERSION}'
-          annotations:
+
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      name: '${NAME}${SUFFIX}'
+      labels: {}
+      annotations: {}
+    spec:
+      nodeSelector: null
+      postCommit: {}
+      resources: {}
+      successfulBuildsHistoryLimit: 5
+      failedBuildsHistoryLimit: 5
+      runPolicy: Serial
+      strategy:
+        type: Docker
+        dockerStrategy:
           from:
             kind: ImageStreamTag
-            name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
-            namespace: ${SOURCE_IMAGE_NAMESPACE}
-          generation: 1
-          importPolicy: {}
-          referencePolicy:
-            type: Source
-# apiVersion: template.openshift.io/v1
-# kind: Template
-# metadata:
-#   name: biohubbc-geoserver
-#   labels:
-#     build: biohubbc-geoserver
-# parameters:
-#   - name: NAME
-#     displayName: Name
-#     description: The name assigned to all of the resources.
-#     required: true
-#     value: biohubbc-geoserver
-#   - name: SUFFIX
-#     displayName: Name Suffix
-#     description: A suffix appended to all objects
-#     required: true
-#     value: ''
-#   - name: TARGET_IMAGE_VERSION
-#     required: true
-#   # - name: SOURCE_IMAGE_NAME
-#   #   required: true
-#   #   value: geoserver
-#   # - name: SOURCE_IMAGE_VERSION
-#   #   required: true
-#   #   value: 2.21.1
-#   # - name: SOURCE_IMAGE_NAMESPACE
-#   #   required: true
-#   #   value: a0ec71-tools
-# objects:
-#   # - kind: ImageStream
-#   #   apiVersion: image.openshift.io/v1
-#   #   metadata:
-#   #     name: debian
-#   #   spec:
-#   #     lookupPolicy:
-#   #       local: false
-#   #     tags:
-#   #       - name: bullseye
-#   #         annotations:
-#   #           openshift.io/imported-from: 'debian:bullseye'
-#   #         from:
-#   #           kind: DockerImage
-#   #           name: 'debian:bullseye'
-#   #         generation: 2
-#   #         importPolicy: {}
-#   #         referencePolicy:
-#   #           type: Source
-
-#   - kind: ImageStream
-#     apiVersion: v1
-#     metadata:
-#       name: '${NAME}'
-#       labels:
-#         shared: 'true'
-#     spec:
-#       lookupPolicy:
-#         local: false
-
-#   - kind: BuildConfig
-#     apiVersion: build.openshift.io/v1
-#     metadata:
-#       name: '${NAME}${SUFFIX}'
-#       labels: {}
-#       annotations: {}
-#     spec:
-#       nodeSelector: null
-#       postCommit: {}
-#       resources: {}
-#       successfulBuildsHistoryLimit: 5
-#       failedBuildsHistoryLimit: 5
-#       runPolicy: Serial
-#       strategy:
-#         type: Docker
-#         dockerStrategy:
-#           dockerfilePath: Dockerfile
-#       source:
-#         type: Git
-#         git:
-#           uri: 'https://github.com/geoserver/docker.git'
-#           ref: master
-#         contextDir: /
-#       output:
-#         to:
-#           kind: ImageStreamTag
-#           name: '${NAME}:${TARGET_IMAGE_VERSION}'
-#       triggers:
-#         - type: ConfigChange
-#         - type: ImageChange
+            name: ${BASE_IMAGE_NAME}:${BASE_IMAGE_VERSION}
+      source:
+        contextDir: '${SOURCE_CONTEXT_DIR}'
+        git:
+          uri: '${SOURCE_REPOSITORY_URL}'
+          ref: '${SOURCE_REPOSITORY_REF}'
+        type: Git
+      output:
+        to:
+          kind: ImageStreamTag
+          name: '${NAME}:${TARGET_IMAGE_VERSION}'
+      triggers:
+        - type: ConfigChange
+        - type: ImageChange
