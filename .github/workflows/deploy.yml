@@ -615,7 +615,7 @@ jobs:
   deployGeoserver:
     name: Deploy buildGeoserver Image
     runs-on: ubuntu-latest
-    if: ${{ false && github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
+    if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     needs:
