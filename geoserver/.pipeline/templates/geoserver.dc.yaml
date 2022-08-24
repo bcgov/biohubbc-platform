@@ -14,6 +14,9 @@ parameters:
   - name: SUFFIX
     required: true
     value: '-dev'
+  - name: HOST
+    description: Host name of the application
+    required: true
   # - name: GEOSERVER_SERVICE_NAME
   #   description: The name of the OpenShift Service exposed for the database.
   #   required: true
@@ -101,9 +104,9 @@ objects:
   #     ports:
   #       - name: geoserver
   #         nodePort: 0
-  #         port: ${PORT_DEFAULT}
+  #         port: ${{PORT_DEFAULT}}
   #         protocol: TCP
-  #         targetPort: ${PORT_DEFAULT}
+  #         targetPort: ${{PORT_DEFAULT}}
   #     selector:
   #       name: '${NAME}${SUFFIX}'
   #     sessionAffinity: None
@@ -129,17 +132,17 @@ objects:
       type: ClusterIP
     status:
       loadBalancer: {}
-  # - kind: PersistentVolumeClaim
-  #   apiVersion: v1
-  #   metadata:
-  #     name: '${NAME}${SUFFIX}'
-  #     role: db
-  #   spec:
-  #     accessModes:
-  #       - ReadWriteMany
-  #     resources:
-  #       requests:
-  #         storage: '${VOLUME_CAPACITY}'
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: '${NAME}${SUFFIX}'
+      role: db
+    spec:
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: '${VOLUME_CAPACITY}'
   - kind: ImageStream
     apiVersion: v1
     metadata:
@@ -171,8 +174,9 @@ objects:
       template:
         metadata:
           labels:
+            deploymentConfig: '${NAME}${SUFFIX}'
             name: '${NAME}${SUFFIX}'
-            role: db
+            role: geoserver
         spec:
           containers:
             - capabilities: {}
@@ -195,12 +199,12 @@ objects:
               imagePullPolicy: IfNotPresent
               name: geoserver
               ports:
-                - containerPort: ${PORT_DEFAULT}
+                - containerPort: ${{PORT_DEFAULT}}
                   protocol: TCP
               # livenessProbe:
               #   initialDelaySeconds: 30
               #   tcpSocket:
-              #     port: ${PORT_DEFAULT}
+              #     port: ${{PORT_DEFAULT}}
               #   timeoutSeconds: 1
               # readinessProbe:
               #   exec:
@@ -237,16 +241,16 @@ objects:
               volumeMounts:
                 - mountPath: '/'
                   name: '${NAME}${SUFFIX}-data'
-                - mountPath: '/var/run/geoserver'
-                  name: '${NAME}${SUFFIX}-run'
+                # - mountPath: '/var/run/geoserver'
+                #   name: '${NAME}${SUFFIX}-run'
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           volumes:
             - name: '${NAME}${SUFFIX}-data'
               persistentVolumeClaim:
                 claimName: '${NAME}${SUFFIX}'
-            - name: '${NAME}${SUFFIX}-run'
-              emptyDir: {}
+            # - name: '${NAME}${SUFFIX}-run'
+            #   emptyDir: {}
       triggers:
         - imageChangeParams:
             automatic: true

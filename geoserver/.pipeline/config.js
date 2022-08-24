@@ -23,6 +23,8 @@ const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${ver
 //   dbSetupDockerfilePath = './.docker/db/Dockerfile.migrate';
 // }
 
+// const staticUrls = config.staticUrls;
+
 const processOptions = (options) => {
   const result = { ...options };
 
@@ -57,6 +59,7 @@ const phases = {
     instance: `${name}-build-${changeId}`,
     version: `${version}-${changeId}`,
     tag: tag,
+    host: /*(isStaticDeployment && staticUrls.dev) || */ `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'build',
     // tz: config.timezone.db,
     branch: branch

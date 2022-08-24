@@ -29,6 +29,7 @@ const dbDeploy = (settings) => {
       param: {
         NAME: name,
         SUFFIX: phases[phase].suffix,
+        HOST: phases[phase].host,
         // GEOSERVER_SERVICE_NAME: `${name}-geoserver${phases[phase].suffix}`,
         IMAGE_STREAM_NAME: name,
         IMAGE_STREAM_VERSION: phases.build.tag,
