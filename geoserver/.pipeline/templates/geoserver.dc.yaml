@@ -10,57 +10,47 @@ annotations:
 parameters:
   - name: NAME
     description: The name of the OpenShift Service exposed for geoserver .
-    displayName: Geoserver Service Name
     required: true
     value: 'geoserver'
   - name: GEOSERVER_SERVICE_NAME
     description: The name of the OpenShift Service exposed for the database.
-    displayName: Database Service Name
     required: true
   - name: IMAGE_STREAM_NAME
     description: The ImageStream name.
-    displayName: IMAGE_STREAM_NAME
-    value: 'kartoza-geoserver'
+    required: true
   - name: IMAGE_STREAM_VERSION
     description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
-    displayName: Version of GeoServer Image
     required: true
   - name: IMAGE_STREAM_NAMESPACE
     description: The OpenShift Namespace where the ImageStream resides.
-    displayName: Namespace
+    required: true
     value: 'a0ec71-tools'
   - name: GEOSERVER_SECRETS_NAME
     description: The OpenShift secret that contains sensitive geoserver values.
     required: true
   # - name: POSTGRESQL_USER
   #   description: Username for PostgreSQL user that will be used for accessing the database.
-  #   displayName: PostgreSQL Connection Username
   #   required: true
   #   value: 'postgres'
   # - name: POSTGRESQL_ADMIN_USER
   #   description: Admin Username for PostgreSQL user that will be used for accessing the database.
-  #   displayName: PostgreSQL Admin Connection Username
   #   required: true
   #   value: 'postgres'
   # - name: POSTGRESQL_PASSWORD
   #   description: Password for the PostgreSQL connection user.
-  #   displayName: PostgreSQL Connection Password
   #   from: '[a-zA-Z0-9]{16}'
   #   generate: expression
   #   required: true
   # - name: POSTGRESQL_ADMIN_PASSWORD
   #   description: Password for the PostgreSQL admin user.
-  #   displayName: PostgreSQL Admin Connection Password
   #   from: '[a-zA-Z0-9]{16}'
   #   generate: expression
   #   required: true
   # - name: POSTGRESQL_DATABASE
   #   description: Name of the PostgreSQL database accessed.
-  #   displayName: PostgreSQL Database Name
   #   required: true
   # - name: PGDATA_PATH_OVERRIDE
   #   description: Set this value to override the /pgdata directory name. By default the hostname of the container is used, which does not work well in OpenShift.
-  #   displayName: PGDATA Path Override
   #   required: true
   #   value: 'biohubbc'
   # - name: TZ
@@ -69,7 +59,6 @@ parameters:
   #   value: 'America/Vancouver'
   - name: VOLUME_CAPACITY
     description: Volume space available for data, e.g. 512Mi, 2Gi.
-    displayName: Volume Capacity
     required: true
   - name: CPU_REQUEST
     value: '10m'
