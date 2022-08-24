@@ -3,8 +3,10 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { SYSTEM_ROLE } from '../constants/roles';
 import { ApiError } from '../errors/api-error';
 import { Models } from '../models';
+import { UserObject } from '../models/user';
 import { IGetRoles, IGetUser, IInsertUser, UserRepository } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { UserService } from './user-service';
@@ -85,6 +87,42 @@ describe('UserService', () => {
 
       expect(result).to.eql(new Models.user.UserObject(mockResponseRow[0]));
       expect(mockUserRepository).to.have.been.calledOnce;
+    });
+  });
+
+  describe.only('isSystemUserAdmin', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should not be an admin', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const userService = new UserService(mockDBConnection);
+      const mockUserObject = { role_names: [] } as unknown as UserObject;
+      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+      const isAdmin = await userService.isSystemUserAdmin()
+      expect(isAdmin).to.be.false
+    });
+
+    it('should be an admin as data admin', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const userService = new UserService(mockDBConnection);
+      const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
+      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+      const isAdmin = await userService.isSystemUserAdmin()
+      expect(isAdmin).to.be.true
+    });
+
+    it('should be an admin as system admin', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const userService = new UserService(mockDBConnection);
+      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+      sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+      const isAdmin = await userService.isSystemUserAdmin()
+      expect(isAdmin).to.be.true
     });
   });
 
