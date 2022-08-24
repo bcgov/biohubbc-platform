@@ -14,11 +14,8 @@ parameters:
   - name: SUFFIX
     required: true
     value: '-dev'
-  - name: HOST
-    description: Host name of the application
-    required: true
-  # - name: GEOSERVER_SERVICE_NAME
-  #   description: The name of the OpenShift Service exposed for the database.
+  # - name: HOST
+  #   description: Host name of the application
   #   required: true
   - name: IMAGE_STREAM_NAME
     description: The ImageStream name.
@@ -26,47 +23,18 @@ parameters:
   - name: IMAGE_STREAM_VERSION
     description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
     required: true
-  - name: IMAGE_STREAM_NAMESPACE
-    description: The OpenShift Namespace where the ImageStream resides.
-    required: true
-    value: 'a0ec71-tools'
-  - name: GEOSERVER_SECRETS_NAME
-    description: The OpenShift secret that contains sensitive geoserver values.
-    required: true
+  # - name: IMAGE_STREAM_NAMESPACE
+  #   description: The OpenShift Namespace where the ImageStream resides.
+  #   required: true
+  #   value: 'a0ec71-tools'
+  # - name: GEOSERVER_SECRETS_NAME
+  #   description: The OpenShift secret that contains sensitive geoserver values.
+  #   required: true
   - name: PORT_DEFAULT
     value: '8080'
   - name: PORT_DEFAULT_NAME
     description: Default port name
     value: '8080-tcp'
-  # - name: POSTGRESQL_USER
-  #   description: Username for PostgreSQL user that will be used for accessing the database.
-  #   required: true
-  #   value: 'postgres'
-  # - name: POSTGRESQL_ADMIN_USER
-  #   description: Admin Username for PostgreSQL user that will be used for accessing the database.
-  #   required: true
-  #   value: 'postgres'
-  # - name: POSTGRESQL_PASSWORD
-  #   description: Password for the PostgreSQL connection user.
-  #   from: '[a-zA-Z0-9]{16}'
-  #   generate: expression
-  #   required: true
-  # - name: POSTGRESQL_ADMIN_PASSWORD
-  #   description: Password for the PostgreSQL admin user.
-  #   from: '[a-zA-Z0-9]{16}'
-  #   generate: expression
-  #   required: true
-  # - name: POSTGRESQL_DATABASE
-  #   description: Name of the PostgreSQL database accessed.
-  #   required: true
-  # - name: PGDATA_PATH_OVERRIDE
-  #   description: Set this value to override the /pgdata directory name. By default the hostname of the container is used, which does not work well in OpenShift.
-  #   required: true
-  #   value: 'biohubbc'
-  # - name: TZ
-  #   description: Database timezone
-  #   required: false
-  #   value: 'America/Vancouver'
   - name: VOLUME_CAPACITY
     description: Volume space available for data, e.g. 512Mi, 2Gi.
     required: true
@@ -81,68 +49,32 @@ parameters:
   - name: REPLICAS
     value: '1'
 objects:
-  # - kind: Secret
-  #   apiVersion: v1
-  #   metadata:
-  #     annotations:
-  #       template.openshift.io/expose-database_name: "{.data['geoserver-admin-user']}"
-  #       template.openshift.io/expose-password: "{.data['geoserver-admin-user-password']}"
-  #       as-copy-of: '${GEOSERVER_SECRETS_NAME}'
-  #     name: '${NAME}${SUFFIX}'
-  #     role: db
-  #   stringData:
-  #     geoserver-admin-user: '${GEOSERVER_ADMIN_USER}'
-  #     geoserver-admin-user-password: '${GEOSERVER_ADMIN_PASSWORD}'
-  # - kind: Service
-  #   apiVersion: v1
-  #   metadata:
-  #     annotations:
-  #       template.openshift.io/expose-uri: geoserver://{.spec.clusterIP}:{.spec.ports[?(.name=="geoserver")].port}
-  #       role: db
-  #     name: '${NAME}${SUFFIX}'
-  #   spec:
-  #     ports:
-  #       - name: geoserver
-  #         nodePort: 0
-  #         port: ${{PORT_DEFAULT}}
-  #         protocol: TCP
-  #         targetPort: ${{PORT_DEFAULT}}
-  #     selector:
-  #       name: '${NAME}${SUFFIX}'
-  #     sessionAffinity: None
-  #     type: ClusterIP
-  #   status:
-  #     loadBalancer: {}
-  - apiVersion: v1
-    kind: Service
-    metadata:
-      annotations: null
-      creationTimestamp: null
-      labels: {}
-      name: ${NAME}${SUFFIX}
-    spec:
-      ports:
-        - name: ${NAME}-${PORT_DEFAULT_NAME}
-          port: ${{PORT_DEFAULT}}
-          protocol: TCP
-          targetPort: ${{PORT_DEFAULT}}
-      selector:
-        deploymentconfig: ${NAME}${SUFFIX}
-      sessionAffinity: None
-      type: ClusterIP
-    status:
-      loadBalancer: {}
-  - kind: PersistentVolumeClaim
+  - kind: Service
     apiVersion: v1
     metadata:
-      name: '${NAME}${SUFFIX}'
-      role: db
-    spec:
-      accessModes:
-        - ReadWriteMany
-      resources:
-        requests:
-          storage: '${VOLUME_CAPACITY}'
+      name: ${NAME}${SUFFIX}
+    type: ClusterIP
+    ports:
+      - name: ${NAME}-${PORT_DEFAULT_NAME}
+        protocol: TCP
+        port: ${{PORT_DEFAULT}}
+        targetPort: ${{PORT_DEFAULT}}
+    sessionAffinity: None
+    selector:
+      deployment: ${NAME}${SUFFIX}
+
+  # - kind: PersistentVolumeClaim
+  #   apiVersion: v1
+  #   metadata:
+  #     name: '${NAME}${SUFFIX}'
+  #     role: db
+  #   spec:
+  #     accessModes:
+  #       - ReadWriteMany
+  #     resources:
+  #       requests:
+  #         storage: '${VOLUME_CAPACITY}'
+
   - kind: ImageStream
     apiVersion: v1
     metadata:
@@ -155,6 +87,7 @@ objects:
     spec:
       lookupPolicy:
         local: false
+
   - kind: DeploymentConfig
     apiVersion: v1
     metadata:
@@ -166,7 +99,7 @@ objects:
       replicas: '${{REPLICAS}}'
       selector:
         name: '${NAME}${SUFFIX}'
-        role: db
+        role: geoserver
       strategy:
         type: Recreate
         maxSurge: 50%
@@ -180,53 +113,12 @@ objects:
         spec:
           containers:
             - capabilities: {}
-              # env:
-              #   - name: GEOSERVER_ADMIN_USER
-              #     valueFrom:
-              #       secretKeyRef:
-              #         key: geoserver-admin-user
-              #         name: '${NAME}${SUFFIX}'
-              #   - name: GEOSERVER_ADMIN_PASSWORD
-              #     valueFrom:
-              #       secretKeyRef:
-              #         key: geoserver-admin-user-password
-              #         name: '${NAME}${SUFFIX}'
-              #   - name: TOMCAT_EXTRAS
-              #     value: 'false'
-              #   - name: ROOT_WEBAPP_REDIRECT
-              #     value: 'true'
               image: ' '
               imagePullPolicy: IfNotPresent
               name: geoserver
               ports:
                 - containerPort: ${{PORT_DEFAULT}}
                   protocol: TCP
-              # livenessProbe:
-              #   initialDelaySeconds: 30
-              #   tcpSocket:
-              #     port: ${{PORT_DEFAULT}}
-              #   timeoutSeconds: 1
-              # readinessProbe:
-              #   exec:
-              #     command:
-              #       - '/bin/sh'
-              #       - '-i'
-              #       - '-c'
-              #       - pg_isready -h 127.0.0.1 -q -t10
-              #   initialDelaySeconds: 5
-              #   timeoutSeconds: 1
-              # startupProbe:
-              #   exec:
-              #     command:
-              #       - /bin/sh
-              #       - '-i'
-              #       - '-c'
-              #       - pg_isready -h 127.0.0.1 -q -t 10
-              #   initialDelaySeconds: 30
-              #   timeoutSeconds: 10
-              #   periodSeconds: 15
-              #   successThreshold: 1
-              #   failureThreshold: 10
               resources:
                 requests:
                   cpu: '${CPU_REQUEST}'
@@ -238,19 +130,19 @@ objects:
                 capabilities: {}
                 privileged: false
               terminationMessagePath: '/dev/termination-log'
-              volumeMounts:
-                - mountPath: '/opt/geoserver_data/'
-                  name: '${NAME}${SUFFIX}-data'
-                - mountPath: '/'
-                  name: '${NAME}${SUFFIX}-run'
+              # volumeMounts:
+              #   - mountPath: '/opt/geoserver_data/'
+              #     name: '${NAME}${SUFFIX}-data'
+              #   - mountPath: '/'
+              #     name: '${NAME}${SUFFIX}-run'
           dnsPolicy: ClusterFirst
           restartPolicy: Always
-          volumes:
-            - name: '${NAME}${SUFFIX}-data'
-              persistentVolumeClaim:
-                claimName: '${NAME}${SUFFIX}'
-            - name: '${NAME}${SUFFIX}-run'
-              emptyDir: {}
+          # volumes:
+          #   - name: '${NAME}${SUFFIX}-data'
+          #     persistentVolumeClaim:
+          #       claimName: '${NAME}${SUFFIX}'
+          #   - name: '${NAME}${SUFFIX}-run'
+          #     emptyDir: {}
       triggers:
         - imageChangeParams:
             automatic: true
@@ -259,28 +151,26 @@ objects:
             from:
               kind: ImageStreamTag
               name: '${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}'
-              namespace: '${IMAGE_STREAM_NAMESPACE}'
-            lastTriggeredImage: ''
           type: ImageChange
         - type: ConfigChange
-  - apiVersion: route.openshift.io/v1
-    kind: Route
-    metadata:
-      annotations: {}
-      creationTimestamp: null
-      labels: {}
-      name: ${NAME}${SUFFIX}
-    spec:
-      host: ${HOST}
-      tls:
-        insecureEdgeTerminationPolicy: Redirect
-        termination: edge
-      port:
-        targetPort: ${NAME}-${PORT_DEFAULT_NAME}
-      to:
-        kind: Service
-        name: '${NAME}${SUFFIX}'
-        weight: 100
-      wildcardPolicy: None
     status:
-      ingress: null
+      availableReplicas: 0
+      latestVersion: 0
+      observedGeneration: 0
+      replicas: 0
+      unavailableReplicas: 0
+      updatedReplicas: 0
+
+# - kind: Route
+#   apiVersion: route.openshift.io/v1
+#   metadata:
+#     name: ${NAME}${SUFFIX}
+#   spec:
+#     host: ${NAME}${SUFFIX}-a0ec71-dev.apps.silver.devops.gov.bc.ca
+#     to:
+#       kind: Service
+#       name: ${NAME}${SUFFIX}
+#       weight: 100
+#     port:
+#       targetPort: ${NAME}-${PORT_DEFAULT_NAME}
+#     wildcardPolicy: None
