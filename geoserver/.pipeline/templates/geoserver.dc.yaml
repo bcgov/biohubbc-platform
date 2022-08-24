@@ -27,6 +27,11 @@ parameters:
   - name: GEOSERVER_SECRETS_NAME
     description: The OpenShift secret that contains sensitive geoserver values.
     required: true
+  - name: PORT_DEFAULT
+    value: '8080'
+  - name: PORT_DEFAULT_NAME
+    description: Default port name
+    value: '8080-tcp'
   # - name: POSTGRESQL_USER
   #   description: Username for PostgreSQL user that will be used for accessing the database.
   #   required: true
@@ -70,18 +75,18 @@ parameters:
   - name: REPLICAS
     value: '1'
 objects:
-  - kind: Secret
-    apiVersion: v1
-    metadata:
-      annotations:
-        template.openshift.io/expose-database_name: "{.data['geoserver-admin-user']}"
-        template.openshift.io/expose-password: "{.data['geoserver-admin-user-password']}"
-        as-copy-of: '${GEOSERVER_SECRETS_NAME}'
-      name: '${GEOSERVER_SERVICE_NAME}'
-      role: db
-    stringData:
-      geoserver-admin-user: '${GEOSERVER_ADMIN_USER}'
-      geoserver-admin-user-password: '${GEOSERVER_ADMIN_PASSWORD}'
+  # - kind: Secret
+  #   apiVersion: v1
+  #   metadata:
+  #     annotations:
+  #       template.openshift.io/expose-database_name: "{.data['geoserver-admin-user']}"
+  #       template.openshift.io/expose-password: "{.data['geoserver-admin-user-password']}"
+  #       as-copy-of: '${GEOSERVER_SECRETS_NAME}'
+  #     name: '${GEOSERVER_SERVICE_NAME}'
+  #     role: db
+  #   stringData:
+  #     geoserver-admin-user: '${GEOSERVER_ADMIN_USER}'
+  #     geoserver-admin-user-password: '${GEOSERVER_ADMIN_PASSWORD}'
   - kind: Service
     apiVersion: v1
     metadata:
@@ -93,26 +98,26 @@ objects:
       ports:
         - name: geoserver
           nodePort: 0
-          port: 8080
+          port: ${PORT_DEFAULT}
           protocol: TCP
-          targetPort: 8080
+          targetPort: ${PORT_DEFAULT}
       selector:
         name: '${GEOSERVER_SERVICE_NAME}'
       sessionAffinity: None
       type: ClusterIP
     status:
       loadBalancer: {}
-  - kind: PersistentVolumeClaim
-    apiVersion: v1
-    metadata:
-      name: '${GEOSERVER_SERVICE_NAME}'
-      role: db
-    spec:
-      accessModes:
-        - ReadWriteMany
-      resources:
-        requests:
-          storage: '${VOLUME_CAPACITY}'
+  # - kind: PersistentVolumeClaim
+  #   apiVersion: v1
+  #   metadata:
+  #     name: '${GEOSERVER_SERVICE_NAME}'
+  #     role: db
+  #   spec:
+  #     accessModes:
+  #       - ReadWriteMany
+  #     resources:
+  #       requests:
+  #         storage: '${VOLUME_CAPACITY}'
   - kind: ImageStream
     apiVersion: v1
     metadata:
@@ -149,32 +154,32 @@ objects:
         spec:
           containers:
             - capabilities: {}
-              env:
-                - name: GEOSERVER_ADMIN_USER
-                  valueFrom:
-                    secretKeyRef:
-                      key: geoserver-admin-user
-                      name: '${GEOSERVER_SERVICE_NAME}'
-                - name: GEOSERVER_ADMIN_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      key: geoserver-admin-user-password
-                      name: '${GEOSERVER_SERVICE_NAME}'
-                - name: TOMCAT_EXTRAS
-                  value: 'false'
-                - name: ROOT_WEBAPP_REDIRECT
-                  value: 'true'
+              # env:
+              #   - name: GEOSERVER_ADMIN_USER
+              #     valueFrom:
+              #       secretKeyRef:
+              #         key: geoserver-admin-user
+              #         name: '${GEOSERVER_SERVICE_NAME}'
+              #   - name: GEOSERVER_ADMIN_PASSWORD
+              #     valueFrom:
+              #       secretKeyRef:
+              #         key: geoserver-admin-user-password
+              #         name: '${GEOSERVER_SERVICE_NAME}'
+              #   - name: TOMCAT_EXTRAS
+              #     value: 'false'
+              #   - name: ROOT_WEBAPP_REDIRECT
+              #     value: 'true'
               image: ' '
               imagePullPolicy: IfNotPresent
-              livenessProbe:
-                initialDelaySeconds: 30
-                tcpSocket:
-                  port: 8080
-                timeoutSeconds: 1
               name: geoserver
               ports:
-                - containerPort: 8080
+                - containerPort: ${PORT_DEFAULT}
                   protocol: TCP
+              # livenessProbe:
+              #   initialDelaySeconds: 30
+              #   tcpSocket:
+              #     port: ${PORT_DEFAULT}
+              #   timeoutSeconds: 1
               # readinessProbe:
               #   exec:
               #     command:
@@ -233,3 +238,24 @@ objects:
           type: ImageChange
         - type: ConfigChange
     status: {}
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      annotations: {}
+      creationTimestamp: null
+      labels: {}
+      name: ${NAME}${SUFFIX}
+    spec:
+      host: ${HOST}
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      port:
+        targetPort: ${NAME}-${PORT_DEFAULT_NAME}
+      to:
+        kind: Service
+        name: ${NAME}${SUFFIX}
+        weight: 100
+      wildcardPolicy: None
+    status:
+      ingress: null
