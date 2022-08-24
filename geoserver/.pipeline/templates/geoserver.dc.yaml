@@ -3,7 +3,6 @@ kind: Template
 labels:
   template: geoserver-persistent-template
 metadata:
-  creationTimestamp: null
   name: biohub-platform-geoserver-dc
 annotations:
   iconClass: icon-tomcat
@@ -162,9 +161,9 @@ objects:
                       key: geoserver-admin-user-password
                       name: '${GEOSERVER_SERVICE_NAME}'
                 - name: TOMCAT_EXTRAS
-                  value: false
+                  value: 'false'
                 - name: ROOT_WEBAPP_REDIRECT
-                  value: true
+                  value: 'true'
               image: ' '
               imagePullPolicy: IfNotPresent
               livenessProbe:
@@ -176,27 +175,27 @@ objects:
               ports:
                 - containerPort: 8080
                   protocol: TCP
-              readinessProbe:
-                exec:
-                  command:
-                    - '/bin/sh'
-                    - '-i'
-                    - '-c'
-                    - pg_isready -h 127.0.0.1 -q -t10
-                initialDelaySeconds: 5
-                timeoutSeconds: 1
-              startupProbe:
-                exec:
-                  command:
-                    - /bin/sh
-                    - '-i'
-                    - '-c'
-                    - pg_isready -h 127.0.0.1 -q -t 10
-                initialDelaySeconds: 30
-                timeoutSeconds: 10
-                periodSeconds: 15
-                successThreshold: 1
-                failureThreshold: 10
+              # readinessProbe:
+              #   exec:
+              #     command:
+              #       - '/bin/sh'
+              #       - '-i'
+              #       - '-c'
+              #       - pg_isready -h 127.0.0.1 -q -t10
+              #   initialDelaySeconds: 5
+              #   timeoutSeconds: 1
+              # startupProbe:
+              #   exec:
+              #     command:
+              #       - /bin/sh
+              #       - '-i'
+              #       - '-c'
+              #       - pg_isready -h 127.0.0.1 -q -t 10
+              #   initialDelaySeconds: 30
+              #   timeoutSeconds: 10
+              #   periodSeconds: 15
+              #   successThreshold: 1
+              #   failureThreshold: 10
               resources:
                 requests:
                   cpu: '${CPU_REQUEST}'

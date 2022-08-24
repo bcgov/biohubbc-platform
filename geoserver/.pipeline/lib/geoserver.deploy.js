@@ -33,8 +33,8 @@ const dbDeploy = (settings) => {
         IMAGE_STREAM_VERSION: phases.build.tag,
         IMAGE_STREAM_NAMESPACE: phases.build.namespace,
         GEOSERVER_SECRETS_NAME: 'biohubbc-geoserver-credentials',
-        POSTGRESQL_DATABASE: 'biohubbc',
-        TZ: phases[phase].tz,
+        // POSTGRESQL_DATABASE: 'biohubbc',
+        // TZ: phases[phase].tz,
         VOLUME_CAPACITY: '3Gi'
       }
     })
