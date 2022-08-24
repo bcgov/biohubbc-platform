@@ -1,11 +1,12 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import intersect from '@turf/intersect';
+import simplify from '@turf/simplify';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
-import UploadControls from 'components/map/components/UploadControls';
+import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import MapContainer from 'components/map/MapContainer';
-import { BoundaryToolTip, IBoundaryUpload } from 'components/upload/UploadBoundary';
+import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -54,7 +55,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   useEffect(() => {
     setShouldUpdateBounds(false);
-    console.log('updatedBounds', updatedBounds);
   }, [updatedBounds]);
 
   useEffect(() => {
@@ -109,35 +109,41 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   };
 
   //User uploads boundary for search
-  const onBoundaryUpload = (boundary: IBoundaryUpload) => {
-    console.log('boundary' + JSON.stringify(boundary));
-
+  const onAreaUpload = (area: IFormikAreaUpload) => {
     //Get points inside bounds
-    mapDataLoader.refresh(boundary.features[0], type, zoom);
-
-    //SET STATIC LAYER
-    const layers: IStaticLayerFeature[] = [];
-    boundary.features.forEach((feature: Feature<Polygon>) => {
-      const staticLayerFeature: IStaticLayerFeature = {
-        geoJSON: feature,
-        tooltip: <BoundaryToolTip name={boundary.name} />
+    const featureArray: Feature[] = [];
+    area.features.forEach((feature: Feature<Polygon>) => {
+      const newFeature: Feature = {
+        type: 'Feature',
+        geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
+        properties: feature.properties
       };
-      layers.push(staticLayerFeature);
+      featureArray.push(newFeature);
     });
-    const staticLayer: IStaticLayer = { layerName: boundary.name, features: layers };
-    setStaticLayers([...staticLayers, staticLayer]);
+
+    // const geoCollection:Feature<GeometryCollection> = {};
+    mapDataLoader.refresh(featureArray[0], type, zoom);
 
     //SET BOUNDS
-    const bounds = calculateUpdatedMapBounds(boundary.features);
+    const bounds = calculateUpdatedMapBounds(area.features);
     if (bounds) {
       const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
       setShouldUpdateBounds(true);
       setUpdatedBounds(newBounds);
-      console.log('newBounds', newBounds);
     }
+
+    //SET STATIC LAYER
+    const layers: IStaticLayerFeature[] = [];
+    area.features.forEach((feature: Feature<Polygon>) => {
+      const staticLayerFeature: IStaticLayerFeature = {
+        geoJSON: feature,
+        tooltip: <AreaToolTip name={area.name} />
+      };
+      layers.push(staticLayerFeature);
+    });
+    const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+    setStaticLayers([...staticLayers, staticLayer]);
   };
-  console.log('shouldUpdateBounds', shouldUpdateBounds);
-  console.log('updatedBounds', updatedBounds);
 
   return (
     <Box width="100%" height="100%">
@@ -164,7 +170,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           staticLayers={staticLayers}
           bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
-        <UploadControls onBoundaryUpload={onBoundaryUpload} />
+        <UploadAreaControls onAreaUpload={onAreaUpload} />
       </Box>
     </Box>
   );

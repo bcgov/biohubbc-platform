@@ -40,6 +40,7 @@
     "@turf/bbox": "~6.3.0",
     "@turf/boolean-equal": "~6.3.0",
     "@turf/intersect": "~6.3.0",
+    "@turf/simplify": "^6.5.0",
     "axios": "~0.21.4",
     "buffer": "^6.0.3",
     "clsx": "~1.1.1",

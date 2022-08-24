@@ -22,41 +22,24 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
     setFieldError(name, 'You must upload a valid shapefile (.zip format). Please try again.');
     return;
   }
-  //TODO: CANT GET ZIP TO WORK
-
-  console.log('file', file);
-  console.log('name', name);
-  console.log('formikProps', formikProps);
-
-  // Create a file reader to extract the binary data
-  const reader = new FileReader();
-
-  console.log('reader', reader);
-
-  reader.readAsArrayBuffer(file);
 
   const archive = await file.arrayBuffer().then((buffer) => JSZip.loadAsync(buffer));
-  console.log('archive', archive);
 
   const shpFileName = Object.keys(archive.files).find((key) => {
     return key.includes('.shp');
   });
-
   if (!shpFileName) {
     setFieldError(name, 'You must upload a valid shapefile (.zip format). That contains .shp file. Please try again.');
     return;
   }
 
   const shpFile = await archive.file(shpFileName)?.async('arraybuffer');
-  console.log('shpFile', shpFile);
-
   if (!shpFile) {
     setFieldError(name, 'You must upload a valid shapefile (.zip format). .shp file is invalid. Please try again.');
     return;
   }
   // Run the conversion
   const collection = await read(shpFile);
-  console.log('collection', collection);
 
   const sanitizedGeoJSON: Feature[] = [];
   if (Array.isArray(collection.features)) {
@@ -67,9 +50,6 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
     });
   }
 
-  console.log('sanitizedGeoJSON', sanitizedGeoJSON);
-  console.log('values', values);
-  console.log('name', name);
   setFieldValue(name, [...sanitizedGeoJSON, ...get(values, name)]);
 };
 
