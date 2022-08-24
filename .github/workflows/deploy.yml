@@ -613,7 +613,7 @@ jobs:
 
   # Deploy GeoServer image
   deployGeoserver:
-    name: Deploy buildGeoserver Image
+    name: Deploy Geoserver Image
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == false && github.event.pull_request.draft == false }}
     env:

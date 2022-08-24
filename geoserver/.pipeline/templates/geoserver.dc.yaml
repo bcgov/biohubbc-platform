@@ -11,9 +11,12 @@ parameters:
     description: The name of the OpenShift Service exposed for geoserver .
     required: true
     value: 'geoserver'
-  - name: GEOSERVER_SERVICE_NAME
-    description: The name of the OpenShift Service exposed for the database.
+  - name: SUFFIX
     required: true
+    value: '-dev'
+  # - name: GEOSERVER_SERVICE_NAME
+  #   description: The name of the OpenShift Service exposed for the database.
+  #   required: true
   - name: IMAGE_STREAM_NAME
     description: The ImageStream name.
     required: true
@@ -82,27 +85,46 @@ objects:
   #       template.openshift.io/expose-database_name: "{.data['geoserver-admin-user']}"
   #       template.openshift.io/expose-password: "{.data['geoserver-admin-user-password']}"
   #       as-copy-of: '${GEOSERVER_SECRETS_NAME}'
-  #     name: '${GEOSERVER_SERVICE_NAME}'
+  #     name: '${NAME}${SUFFIX}'
   #     role: db
   #   stringData:
   #     geoserver-admin-user: '${GEOSERVER_ADMIN_USER}'
   #     geoserver-admin-user-password: '${GEOSERVER_ADMIN_PASSWORD}'
-  - kind: Service
-    apiVersion: v1
+  # - kind: Service
+  #   apiVersion: v1
+  #   metadata:
+  #     annotations:
+  #       template.openshift.io/expose-uri: geoserver://{.spec.clusterIP}:{.spec.ports[?(.name=="geoserver")].port}
+  #       role: db
+  #     name: '${NAME}${SUFFIX}'
+  #   spec:
+  #     ports:
+  #       - name: geoserver
+  #         nodePort: 0
+  #         port: ${PORT_DEFAULT}
+  #         protocol: TCP
+  #         targetPort: ${PORT_DEFAULT}
+  #     selector:
+  #       name: '${NAME}${SUFFIX}'
+  #     sessionAffinity: None
+  #     type: ClusterIP
+  #   status:
+  #     loadBalancer: {}
+  - apiVersion: v1
+    kind: Service
     metadata:
-      annotations:
-        template.openshift.io/expose-uri: geoserver://{.spec.clusterIP}:{.spec.ports[?(.name=="geoserver")].port}
-        role: db
-      name: '${GEOSERVER_SERVICE_NAME}'
+      annotations: null
+      creationTimestamp: null
+      labels: {}
+      name: ${NAME}${SUFFIX}
     spec:
       ports:
-        - name: geoserver
-          nodePort: 0
-          port: ${PORT_DEFAULT}
+        - name: ${NAME}-${PORT_DEFAULT_NAME}
+          port: ${{PORT_DEFAULT}}
           protocol: TCP
-          targetPort: ${PORT_DEFAULT}
+          targetPort: ${{PORT_DEFAULT}}
       selector:
-        name: '${GEOSERVER_SERVICE_NAME}'
+        deploymentconfig: ${NAME}${SUFFIX}
       sessionAffinity: None
       type: ClusterIP
     status:
@@ -110,7 +132,7 @@ objects:
   # - kind: PersistentVolumeClaim
   #   apiVersion: v1
   #   metadata:
-  #     name: '${GEOSERVER_SERVICE_NAME}'
+  #     name: '${NAME}${SUFFIX}'
   #     role: db
   #   spec:
   #     accessModes:
@@ -135,12 +157,12 @@ objects:
     metadata:
       annotations:
         template.alpha.openshift.io/wait-for-ready: 'true'
-      name: '${GEOSERVER_SERVICE_NAME}'
+      name: '${NAME}${SUFFIX}'
       role: db
     spec:
       replicas: '${{REPLICAS}}'
       selector:
-        name: '${GEOSERVER_SERVICE_NAME}'
+        name: '${NAME}${SUFFIX}'
         role: db
       strategy:
         type: Recreate
@@ -149,7 +171,7 @@ objects:
       template:
         metadata:
           labels:
-            name: '${GEOSERVER_SERVICE_NAME}'
+            name: '${NAME}${SUFFIX}'
             role: db
         spec:
           containers:
@@ -159,12 +181,12 @@ objects:
               #     valueFrom:
               #       secretKeyRef:
               #         key: geoserver-admin-user
-              #         name: '${GEOSERVER_SERVICE_NAME}'
+              #         name: '${NAME}${SUFFIX}'
               #   - name: GEOSERVER_ADMIN_PASSWORD
               #     valueFrom:
               #       secretKeyRef:
               #         key: geoserver-admin-user-password
-              #         name: '${GEOSERVER_SERVICE_NAME}'
+              #         name: '${NAME}${SUFFIX}'
               #   - name: TOMCAT_EXTRAS
               #     value: 'false'
               #   - name: ROOT_WEBAPP_REDIRECT
@@ -214,16 +236,16 @@ objects:
               terminationMessagePath: '/dev/termination-log'
               volumeMounts:
                 - mountPath: '/'
-                  name: '${GEOSERVER_SERVICE_NAME}-data'
+                  name: '${NAME}${SUFFIX}-data'
                 - mountPath: '/var/run/geoserver'
-                  name: '${GEOSERVER_SERVICE_NAME}-run'
+                  name: '${NAME}${SUFFIX}-run'
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           volumes:
-            - name: '${GEOSERVER_SERVICE_NAME}-data'
+            - name: '${NAME}${SUFFIX}-data'
               persistentVolumeClaim:
-                claimName: '${GEOSERVER_SERVICE_NAME}'
-            - name: '${GEOSERVER_SERVICE_NAME}-run'
+                claimName: '${NAME}${SUFFIX}'
+            - name: '${NAME}${SUFFIX}-run'
               emptyDir: {}
       triggers:
         - imageChangeParams:
@@ -254,7 +276,7 @@ objects:
         targetPort: ${NAME}-${PORT_DEFAULT_NAME}
       to:
         kind: Service
-        name: ${NAME}${SUFFIX}
+        name: '${NAME}${SUFFIX}'
         weight: 100
       wildcardPolicy: None
     status:

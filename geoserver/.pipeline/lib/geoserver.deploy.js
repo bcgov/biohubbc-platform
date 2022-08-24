@@ -28,7 +28,8 @@ const dbDeploy = (settings) => {
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/geoserver.dc.yaml`, {
       param: {
         NAME: name,
-        GEOSERVER_SERVICE_NAME: `${name}-geoserver${phases[phase].suffix}`,
+        SUFFIX: phases[phase].suffix,
+        // GEOSERVER_SERVICE_NAME: `${name}-geoserver${phases[phase].suffix}`,
         IMAGE_STREAM_NAME: name,
         IMAGE_STREAM_VERSION: phases.build.tag,
         IMAGE_STREAM_NAMESPACE: phases.build.namespace,
