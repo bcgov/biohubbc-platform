@@ -153,7 +153,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       <Box width="100%" height="100%" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"
-          onBoundsChange={onMapViewChange}
+          onBoundsChange={() => onMapViewChange}
           drawControls={{
             initialFeatures: drawnBoundary && [drawnBoundary],
             options: {
