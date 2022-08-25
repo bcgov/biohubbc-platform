@@ -5,7 +5,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultList, { IDataType } from 'features/datasets/components/SearchResultList';
+import SearchResultList from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature } from 'geojson';
 // import { useApi } from 'hooks/useApi';
