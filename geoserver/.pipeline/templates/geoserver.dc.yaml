@@ -54,7 +54,7 @@ objects:
     apiVersion: v1
     metadata:
       name: ${NAME}${SUFFIX}
-    specs:
+    spec:
       ports:
         - name: ${NAME}-${PORT_DEFAULT_NAME}
           protocol: TCP
