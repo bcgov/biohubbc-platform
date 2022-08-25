@@ -60,7 +60,7 @@ objects:
           targetPort: ${{PORT_DEFAULT}}
       sessionAffinity: None
       selector:
-        deployment: ${NAME}${SUFFIX}
+        deploymentConfig: ${NAME}${SUFFIX}
       type: ClusterIP
 
   # - kind: PersistentVolumeClaim
