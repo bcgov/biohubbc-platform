@@ -33,4 +33,4 @@ RUN aptitude -y install curl wait-for-it
 EXPOSE 8080
 
 # Run
-ENTRYPOINT wait-for-it localhost:8080
+ENTRYPOINT wait-for-it localhost:8080 -- bash config.sh & sh bin/startup.sh 

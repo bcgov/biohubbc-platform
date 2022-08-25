@@ -4,8 +4,6 @@ labels:
   template: geoserver-persistent-template
 metadata:
   name: biohub-platform-geoserver-dc
-annotations:
-  iconClass: icon-tomcat
 parameters:
   - name: NAME
     description: The name of the OpenShift Service exposed for geoserver .
