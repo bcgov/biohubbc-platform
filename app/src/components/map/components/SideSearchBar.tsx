@@ -79,7 +79,7 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
         number_of_records: 5
     },
     {
-        dataset_id: '1241241314123',
+        dataset_id: '555999238492349072',
         dataset_name: 'Deer',
         number_of_records: 6
     }
@@ -129,7 +129,11 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
         )}
       </Formik>
       <Box mt={5} display="flex" flexDirection={"column"}>
-        <SearchResultList items={tempData} toggleDataSet={(dataSetId)=>{console.log(`Toggle: ${dataSetId}`)}}/>
+        <SearchResultList 
+          items={tempData} 
+          toggleDataSet={(dataSetId)=>{console.log(`Toggle: ${dataSetId}`)}}
+          backToSearch={() => {console.log("Back to search")}} 
+        />
       </Box>
     </Box>
   );
