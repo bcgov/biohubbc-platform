@@ -38,6 +38,10 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none'
+        },
+        sizeLarge: {
+          fontSize: '1rem',
+          fontWeight: 700
         }
       }
     },
