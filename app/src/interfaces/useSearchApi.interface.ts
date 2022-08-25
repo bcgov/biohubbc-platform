@@ -18,8 +18,8 @@ export interface IGetSearchResultsResponse {
 export type EmptyObject = Record<string, never>;
 
 export interface ISpatialData {
-  submission_spatial_component_id: number;
   spatial_data: FeatureCollection | EmptyObject;
+  submission_spatial_component_id: number[];
 }
 
 /**

@@ -69,6 +69,11 @@ export interface ISubmissionSpatialSearchResponseRow {
   };
 }
 
+export interface ISubmissionSpatialSearchResponseGroup {
+  spatial_data: FeatureCollection | EmptyObject;
+  submission_spatial_component_id: number[];
+}
+
 export class SpatialRepository extends BaseRepository {
   /**
    * Insert new spatial transform record
@@ -458,6 +463,7 @@ export class SpatialRepository extends BaseRepository {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
+      // .with
       .with('with_filtered_spatial_component_with_security_transforms', (qb1) => {
         // Get the spatial components that match the search filters, and for each record, build the array of spatial security transforms that ran against that row
         qb1
@@ -525,10 +531,18 @@ export class SpatialRepository extends BaseRepository {
         )
       )
       .from(
-        knex.raw(
-          'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
+        knex.raw(`
+          with_filtered_spatial_component_with_security_transforms
+            AS
+          wfscwst,
+          with_user_security_transform_exceptions
+            AS
+          wuste`
         )
       );
+      
+    const rawQuery = queryBuilder.toSQL().toNative()
+    console.log('RAW=', String(rawQuery.sql))
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -617,6 +631,20 @@ export class SpatialRepository extends BaseRepository {
     qb1.where((qb2) => {
       qb2.whereRaw(sqlStatement.sql, sqlStatement.values);
     });
+  }
+
+  _groupByGeography(qb1: Knex.QueryBuilder) {
+    const sqlStatement = SQL`
+      with points as (select distinct geography from submission_spatial_component
+        where geometrytype(geography) = 'POINT'
+        and jsonb_path_exists(spatial_component,'$.features[*] ? (@.properties.type == "Occurrence")')
+      )
+      select array_agg(s.submission_spatial_component_id), p.geography  from submission_spatial_component s, points p
+      where s.geography = p.geography
+      group by p.geography;
+    `
+
+    qb1.where(sqlStatement)
   }
 
   /**

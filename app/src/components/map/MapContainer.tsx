@@ -64,7 +64,11 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
     onBoundsChange
   } = props;
 
-  const filteredMarkerLayers = (markerLayers || []).reduce((acc: IMarkerLayer[], layer: IMarkerLayer) => {
+  const filteredMarkerLayers
+  = markerLayers
+  const x
+  
+  = (markerLayers || []).reduce((acc: IMarkerLayer[], layer: IMarkerLayer) => {
     const doPositionsMatch = (markerA: L.LatLngExpression, markerB: L.LatLngExpression): boolean => {
       return markerA[0] === markerB[0] && markerA[1] === markerB[1];
     }

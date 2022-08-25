@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
+// import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
@@ -75,6 +75,7 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
+              /*
               required: ['submission_spatial_component_id', 'spatial_data'],
               properties: {
                 submission_spatial_component_id: {
@@ -98,6 +99,7 @@ GET.apiDoc = {
                   ]
                 }
               }
+              */
             }
           }
         }
@@ -127,7 +129,7 @@ export function searchSpatialComponents(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(response.map((item) => item.spatial_component));
+      res.status(200).json(response); //response.map((item) => item.spatial_component));
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();
