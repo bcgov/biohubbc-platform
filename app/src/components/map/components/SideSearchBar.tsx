@@ -1,4 +1,5 @@
-import { Box, Button, Grid, Paper, Typography } from '@mui/material';
+import { Box, Button } from '@mui/material';
+import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
   DatasetSearchFormYupSchema,
@@ -20,12 +21,17 @@ export interface IDatasetRequest {
     datasetName?: string;
   };
 }
-const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
-  const [showForm, setShowForm] = useState(true)
+
+export interface SideSearchBarProps {
+  onAreaUpdate: (area: IFormikAreaUpload[]) => void;
+}
+
+const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   // const api = useApi();
+  // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
-  console.log('formikRef in the map page', formikRef);
+  // console.log('formikRef in the map page', formikRef);
 
   /**
    * Handle dataset requests.
@@ -45,7 +51,8 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
 
     console.log('values', values);
     console.log('searchParams', searchParams);
-    setShowForm(false);
+    console.log('formikref.values in Side searchbar', formikRef.current?.values);
+
     return;
     // await api.search.getSpatialData(searchParams.criteria);
 
@@ -64,88 +71,84 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
     // }
   };
 
-  const toggleForm = () => {
-    setShowForm(!showForm);
-  }
+  // //User uploads boundary for search
+  // const onAreaUpload = (area: IFormikAreaUpload) => {
+  //   //Get points inside bounds
+  //   const featureArray: Feature[] = [];
+  //   area.features.forEach((feature: Feature<Polygon>) => {
+  //     const newFeature: Feature = {
+  //       type: 'Feature',
+  //       geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
+  //       properties: feature.properties
+  //     };
+  //     featureArray.push(newFeature);
+  //   });
 
-  const tempData: IDataType[] = [
-    {
-        dataset_id: '12314123',
-        dataset_name: 'Moose',
-        number_of_records: 4
-    },
-    {
-        dataset_id: '1231-4123',
-        dataset_name: 'Bears',
-        number_of_records: 2
-    },
-    {
-        dataset_id: '123124131223',
-        dataset_name: 'Ducks',
-        number_of_records: 5
-    },
-    {
-        dataset_id: '555999238492349072',
-        dataset_name: 'Deer',
-        number_of_records: 6
-    }
-]
+  //   // const geoCollection:Feature<GeometryCollection> = {};
+  //   mapDataLoader.refresh(featureArray[0], type, zoom);
+
+  //   //SET BOUNDS
+  //   const bounds = calculateUpdatedMapBounds(area.features);
+  //   if (bounds) {
+  //     const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+  //     setShouldUpdateBounds(true);
+  //     setUpdatedBounds(newBounds);
+  //   }
+
+  //   //SET STATIC LAYER
+  //   const layers: IStaticLayerFeature[] = [];
+  //   area.features.forEach((feature: Feature<Polygon>) => {
+  //     const staticLayerFeature: IStaticLayerFeature = {
+  //       geoJSON: feature,
+  //       tooltip: <AreaToolTip name={area.name} />
+  //     };
+  //     layers.push(staticLayerFeature);
+  //   });
+  //   const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+  //   setStaticLayers([...staticLayers, staticLayer]);
+  // };
+
   return (
-    <Box component={Paper} p={4} width={400}>
-      {showForm && 
-        <Formik<IDatasetSearchForm>
-          innerRef={formikRef}
-          enableReinitialize={true}
-          initialValues={DatasetSearchFormInitialValues}
-          validationSchema={DatasetSearchFormYupSchema}
-          validateOnBlur={true}
-          validateOnChange={false}
-          onSubmit={handleDatasetRequestCreation}>
-          {(formikProps) => (
-            <Form>
-              <Box my={2}>
-                <Grid container direction="column" justifyContent="center" spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="h3">Find BioHub Data</Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Box component="fieldset" width={'100%'}>
-                      <DatasetSearchForm
-                        speciesList={[
-                          { value: 'species1', label: 'species 1' },
-                          { value: 'species2', label: 'species 2' }
-                        ]}
-                      />
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
+    <>
+      <Formik<IDatasetSearchForm>
+        innerRef={formikRef}
+        enableReinitialize={true}
+        initialValues={DatasetSearchFormInitialValues}
+        validationSchema={DatasetSearchFormYupSchema}
+        validateOnBlur={true}
+        validateOnChange={false}
+        onSubmit={handleDatasetRequestCreation}>
+        {(formikProps) => (
+          <Form>
+            <DatasetSearchForm
+              onAreaUpdate={props.onAreaUpdate}
+              speciesList={[
+                { value: '1', label: 'Moose' },
+                { value: '2', label: 'Thinhorn sheep' },
+                { value: '3', label: 'Bighorn sheep' }
+              ]}
+            />
 
-              <Box mt={5} display="flex" justifyContent="flex-end">
-                <Button
-                  onClick={formikProps.submitForm}
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  type="submit"
-                  data-testid="dataset-find-button">
-                  Find
-                </Button>
-              </Box>
-            </Form>
-          )}
-        </Formik>
-      }
-      {!showForm &&
-        <Box mt={5} display="flex" flexDirection={"column"}>
-          <SearchResultList 
-            items={tempData} 
-            toggleDataSet={(dataSetId) => {console.log(`Toggle: ${dataSetId}`)}}
-            backToSearch={() => toggleForm()} 
-          />
-        </Box>
-      }
-    </Box>
+            <Box mt={4}>
+              <Button
+                fullWidth={true}
+                onClick={formikProps.submitForm}
+                variant="contained"
+                color="primary"
+                size="large"
+                type="submit"
+                data-testid="dataset-find-button"
+                sx={{
+                  fontWeight: 700
+                }}
+                >
+                Find Data
+              </Button>
+            </Box>
+          </Form>
+        )}
+      </Formik>
+    </>
   );
 };
 

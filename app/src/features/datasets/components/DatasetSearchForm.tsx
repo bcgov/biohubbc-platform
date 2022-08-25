@@ -1,16 +1,29 @@
-import { InputLabel } from '@mui/material';
+import { mdiTrashCanOutline } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Button, IconButton, InputLabel, List } from '@mui/material';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
+import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
+import { makeStyles } from '@mui/styles';
 import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
-// import { IFindDataset } from 'components/map/components/SideSearchBar';
-import { useFormikContext } from 'formik';
+import { FieldArray, useFormikContext } from 'formik';
 import React from 'react';
 import yup from 'utils/YupSchema';
 
+const useStyles = makeStyles(() => ({
+  listItem: {
+    width: '100%',
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: '#dadada',
+    borderRadius: '4px',
+    background: '#f7f8fa'
+  }
+}));
 export interface IDatasetSearchForm {
   dataset: string;
   species_list: string[];
@@ -18,7 +31,7 @@ export interface IDatasetSearchForm {
 }
 
 export const DatasetSearchFormInitialValues: IDatasetSearchForm = {
-  dataset: 'Species Observations' ,
+  dataset: 'Species Observations',
   species_list: [],
   area: []
 };
@@ -30,6 +43,7 @@ export const DatasetSearchFormYupSchema = yup.object().shape({
 });
 
 export interface IDatasetSearchFormProps {
+  onAreaUpdate: (area: IFormikAreaUpload[]) => void;
   speciesList: IMultiAutocompleteFieldOption[];
 }
 
@@ -39,27 +53,39 @@ export interface IDatasetSearchFormProps {
  * @return {*}
  */
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
+  const classes = useStyles();
+
   const formikProps = useFormikContext<IDatasetSearchForm>();
+  // console.log('props in datasetSearchForm:', props);
+  // console.log('formikprops values in datasearch form:', formikProps.values);
 
   return (
     <>
-      <Box mb={3} maxWidth={'72ch'}>
-        <Typography variant="body1" color="textPrimary">
+      <Typography variant="h3" component="h1"
+        sx={{
+          mb: 4
+        }}
+      >
+        Map Search
+      </Typography>
+      <Box component="fieldset">
+        <Box component="legend" mb={2} p={0}
+          sx={{
+            fontWeight: 700
+          }}
+        >
           What do you want to find?
-        </Typography>
-      </Box>
-
-      <Grid container spacing={4} direction="column">
-        <Grid item xs={12}>
-          <InputLabel id="datasetmenu_label">Dataset</InputLabel>
+        </Box>
+        <FormControl fullWidth>
+          <InputLabel id="dataset-menu">Dataset</InputLabel>
           <Select
             fullWidth={true}
             id={`dataset`}
             name={`dataset`}
             labelId="dataset-menu"
-            label="Dataset Menu"
+            label="Dataset"
             value={formikProps.values.dataset}
-            inputProps={{ 'aria-label': 'Dataset option' }}
+            inputProps={{ 'aria-label': 'Dataset' }}
             onChange={(item) => {
               formikProps.setFieldValue('dataset', item.target.value);
             }}>
@@ -70,16 +96,74 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
               Species Inventory Project
             </MenuItem>
           </Select>
-        </Grid>
-        <Grid item xs={12}>
+        </FormControl>
+        <Box mt={3}>
           <MultiAutocompleteField
-            id={'species_list'}
+            id={`species_list`}
             label={'Select Species'}
             options={props.speciesList}
             required={false}
           />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
+
+      <Box component="fieldset" mt={5}>
+        <Box component="legend" mb={1} p={0}
+          sx={{
+            fontWeight: 700
+          }}
+        >
+          Define area of interest
+        </Box>
+        <Typography variant="body1" color="textSecondary"
+          sx={{
+            mb: 3
+          }}
+        >
+          Define your area of interest by selecting an option below OR use the drawing tools on the map.
+        </Typography>
+        
+        <Box>
+          <Button color="primary" data-testid="select-region" variant="outlined"
+            sx={{
+              mr: 1
+            }}
+          >
+            Select Region
+          </Button>
+
+          <FieldArray
+            name="area"
+            render={(arrayHelpers) => (
+              <>
+                <UploadAreaControls onAreaUpdate={props.onAreaUpdate} />
+                <Box my={1}>
+                  <List dense disablePadding>
+                    {!!formikProps.values.area.length &&
+                      formikProps.values.area.map((areaData, index) => {
+                        return (
+                          <Box
+                            key={`${areaData.name}-area`}
+                            className={classes.listItem}
+                            p={1}
+                            m={0.5}
+                            display="flex"
+                            justifyContent={'space-between'}
+                            alignItems={'center'}>
+                            {areaData.name}
+                            <IconButton aria-label="delete" color="inherit" onClick={() => arrayHelpers.remove(index)}>
+                              <Icon path={mdiTrashCanOutline} size={1} />
+                            </IconButton>
+                          </Box>
+                        );
+                      })}
+                  </List>
+                </Box>
+              </>
+            )}
+          />
+        </Box>
+      </Box>
     </>
   );
 };

@@ -1,10 +1,8 @@
 import Box from '@mui/material/Box';
 import intersect from '@turf/intersect';
-import simplify from '@turf/simplify';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import SideSearchBar from 'components/map/components/SideSearchBar';
 import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
-import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
@@ -13,9 +11,7 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import useURL from 'hooks/useURL';
-import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
-import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
@@ -51,12 +47,12 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
-  const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
-  const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
+  // const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
+  // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
-  useEffect(() => {
-    setShouldUpdateBounds(false);
-  }, [updatedBounds]);
+  // useEffect(() => {
+  //   setShouldUpdateBounds(false);
+  // }, [updatedBounds]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -109,57 +105,30 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
-  // const showFindErrorDialog = (textDialogProps?: Partial<IErrorDialogProps>) => {
-  //   dialogContext.setErrorDialog({
-  //     dialogTitle: CreateProjectI18N.createErrorTitle,
-  //     dialogText: CreateProjectI18N.createErrorText,
-  //     ...defaultErrorDialogProps,
-  //     ...textDialogProps,
-  //     open: true
-  //   });
-  // };
+  const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
+    console.log('areas', areas);
 
-  //User uploads boundary for search
-  const onAreaUpload = (area: IFormikAreaUpload) => {
-    //Get points inside bounds
-    const featureArray: Feature[] = [];
-    area.features.forEach((feature: Feature<Polygon>) => {
-      const newFeature: Feature = {
-        type: 'Feature',
-        geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
-        properties: feature.properties
-      };
-      featureArray.push(newFeature);
-    });
-
-    // const geoCollection:Feature<GeometryCollection> = {};
-    mapDataLoader.refresh(featureArray[0], type, zoom);
-
-    //SET BOUNDS
-    const bounds = calculateUpdatedMapBounds(area.features);
-    if (bounds) {
-      const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
-      setShouldUpdateBounds(true);
-      setUpdatedBounds(newBounds);
-    }
-
-    //SET STATIC LAYER
+    // SET STATIC LAYER
     const layers: IStaticLayerFeature[] = [];
-    area.features.forEach((feature: Feature<Polygon>) => {
-      const staticLayerFeature: IStaticLayerFeature = {
-        geoJSON: feature,
-        tooltip: <AreaToolTip name={area.name} />
-      };
-      layers.push(staticLayerFeature);
+    areas.forEach((area) => {
+      area.features.forEach((feature: Feature<Polygon>) => {
+        const staticLayerFeature: IStaticLayerFeature = {
+          geoJSON: feature,
+          tooltip: <AreaToolTip name={area.name} />
+        };
+        layers.push(staticLayerFeature);
+      });
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+      setStaticLayers([staticLayer]);
     });
-    const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
-    setStaticLayers([...staticLayers, staticLayer]);
   };
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
-      <SideSearchBar />
-      <Box data-testid="MapContainer" width="100%" height="100%">
+      <Box flex="0 0 auto" py={4} px={3} width="500px">
+      <SideSearchBar onAreaUpdate={onAreaUpdate}/>
+      </Box>
+      <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"
           onBoundsChange={() => onMapViewChange}
@@ -177,9 +146,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           fullScreenControl={true}
           markerLayers={markerLayers}
           staticLayers={staticLayers}
-          bounds={(shouldUpdateBounds && updatedBounds) || undefined}
+          // bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
-        <UploadAreaControls onAreaUpload={onAreaUpload} />
       </Box>
     </Box>
   );
