@@ -1,10 +1,12 @@
 import CheckBox from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
-import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
+import Autocomplete, { AutocompleteInputChangeReason, createFilterOptions } from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
+import { useState } from 'react';
+
 export interface IMultiAutocompleteFieldOption {
   value: string | number;
   label: string;
@@ -19,31 +21,30 @@ export interface IMultiAutocompleteField {
 }
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
-  // console.log('props in the multiautocomplete field: ', props);
-
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
-  // const [inputValue, setInputValue] = useState('');
-  // const [options, setOptions] = useState(props.options || []); // store options if provided
+  const [inputValue, setInputValue] = useState('');
+  const [options, setOptions] = useState(props.options || []); // store options if provided
 
   const getExistingValue = (existingValues: any[]): IMultiAutocompleteFieldOption[] => {
     if (!existingValues) {
       return [];
     }
-    return props.options.filter((option) => existingValues.includes(option.value));
+    return options.filter((option) => existingValues.includes(option.value));
   };
 
-  // const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
-  //   const selectedOptionsValue = selectedOptions.map((item) => item.value);
-  //   const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item.value));
+  const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
+    const selectedOptionsValue = selectedOptions.map((item) => item.value);
+    const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item.value));
 
-  //   setOptions([...selectedOptions, ...remainingOptions]);
+    setOptions([...selectedOptions, ...remainingOptions]);
 
-  //   setFieldValue(
-  //     props.id,
-  //     selectedOptions.map((item) => item.value)
-  //   );
-  // };
+    setFieldValue(
+      props.id,
+      selectedOptions.map((item) => item.value)
+    );
+  };
 
+  //not getting triggered
   const handleGetOptionSelected = (
     option: IMultiAutocompleteFieldOption,
     value: IMultiAutocompleteFieldOption
@@ -55,54 +56,42 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     return option.value === value.value;
   };
 
-  // const handleOnInputChange = (event: React.ChangeEvent<any>, value: string, reason: AutocompleteInputChangeReason) => {
-  //   if (event && event.type === 'blur') {
-  //     setInputValue('');
-  //   } else if (reason !== 'reset') {
-  //     setInputValue(value);
-  //   }
-  // };
-
-  // console.log('values in multiautocompletefield:', values);
-  // console.log('props.id:', props.id);
-
-  // console.log('what is in get(values, props.id) ', get(values, `species_list`));
-
-  // console.log('values[props.id]', values[props.id]);
+  const handleOnInputChange = (event: React.ChangeEvent<any>, value: string, reason: AutocompleteInputChangeReason) => {
+    if (event && event.type === 'blur') {
+      setInputValue('');
+    } else if (reason !== 'reset') {
+      setInputValue(value);
+    }
+  };
 
   return (
     <Autocomplete
       multiple
       autoHighlight={true}
-      value={getExistingValue(values[props.id])}
+      value={getExistingValue(get(values, props.id))}
       id={props.id}
-      options={props.options}
+      options={options}
       getOptionLabel={(option) => option.label}
       isOptionEqualToValue={handleGetOptionSelected}
       filterOptions={createFilterOptions({ limit: props.filterLimit })}
       disableCloseOnSelect
-      onChange={(event, option) => {
-        setFieldValue(
-          props.id,
-          option.map((item) => item.value)
-        );
-      }}
-      // inputValue={inputValue}
-      // onInputChange={handleOnInputChange}
-      renderOption={(_props, option, { selected }) => {
-        const disabled: any = props.options && props.options?.indexOf(option) !== -1;
+      onChange={handleOnChange}
+      inputValue={inputValue}
+      onInputChange={handleOnInputChange}
+      renderOption={(_renderProps, option, { selected }) => {
         return (
-          <>
+          <li key={option.value} {..._renderProps}>
             <Checkbox
               icon={<CheckBoxOutlineBlank fontSize="small" />}
               checkedIcon={<CheckBox fontSize="small" />}
               style={{ marginRight: 8 }}
               checked={selected}
-              disabled={disabled}
+              disabled={(options && options?.indexOf(option) !== -1) || false}
               value={option.value}
+              color="default"
             />
             {option.label}
-          </>
+          </li>
         );
       }}
       renderInput={(params) => (
