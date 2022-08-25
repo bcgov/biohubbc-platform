@@ -12,9 +12,9 @@ parameters:
   - name: SUFFIX
     required: true
     value: '-dev'
-  # - name: HOST
-  #   description: Host name of the application
-  #   required: true
+  - name: HOST
+    description: Host name of the application
+    required: true
   - name: IMAGE_STREAM_NAME
     description: The ImageStream name.
     required: true
@@ -169,16 +169,22 @@ objects:
       unavailableReplicas: 0
       updatedReplicas: 0
 
-# - kind: Route
-#   apiVersion: route.openshift.io/v1
-#   metadata:
-#     name: ${NAME}${SUFFIX}
-#   spec:
-#     host: ${NAME}${SUFFIX}-a0ec71-dev.apps.silver.devops.gov.bc.ca
-#     to:
-#       kind: Service
-#       name: ${NAME}${SUFFIX}
-#       weight: 100
-#     port:
-#       targetPort: ${NAME}-${PORT_DEFAULT_NAME}
-#     wildcardPolicy: None
+  - kind: Route
+    apiVersion: route.openshift.io/v1
+    metadata:
+      annotations: {}
+      creationTimestamp: null
+      labels: {}
+      name: ${NAME}${SUFFIX}
+    spec:
+      host: ${HOST}
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: edge
+      to:
+        kind: Service
+        name: ${NAME}${SUFFIX}
+        weight: 100
+      port:
+        targetPort: ${NAME}-${PORT_DEFAULT_NAME}
+      wildcardPolicy: None

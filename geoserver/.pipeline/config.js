@@ -59,7 +59,6 @@ const phases = {
     instance: `${name}-build-${changeId}`,
     version: `${version}-${changeId}`,
     tag: tag,
-    host: `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'build',
     // tz: config.timezone.db,
     branch: branch
