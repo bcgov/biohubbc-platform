@@ -67,7 +67,7 @@ objects:
   #   apiVersion: v1
   #   metadata:
   #     name: '${NAME}${SUFFIX}'
-  #     role: db
+  #     role: geoserver
   #   spec:
   #     accessModes:
   #       - ReadWriteMany
@@ -83,7 +83,7 @@ objects:
       labels:
         shared: 'true'
       annotations: {}
-      role: db
+      role: geoserver
     spec:
       lookupPolicy:
         local: false
@@ -94,18 +94,28 @@ objects:
       annotations:
         template.alpha.openshift.io/wait-for-ready: 'true'
       name: '${NAME}${SUFFIX}'
-      role: db
+      role: geoserver
     spec:
       replicas: '${{REPLICAS}}'
+      revisionHistoryLimit: 10
       selector:
-        name: '${NAME}${SUFFIX}'
-        role: geoserver
+        deploymentConfig: ${NAME}${SUFFIX}
       strategy:
-        type: Recreate
-        maxSurge: 50%
-        maxUnavailable: 0
+        activeDeadlineSeconds: 21600
+        recreateParams:
+          timeoutSeconds: 600
+        resources:
+          limits:
+            cpu: ${CPU_LIMIT}
+            memory: ${MEMORY_LIMIT}
+          requests:
+            cpu: ${CPU_REQUEST}
+            memory: ${MEMORY_REQUEST}
+        type: Rolling
       template:
         metadata:
+          annotations: null
+          creationTimestamp: null
           labels:
             deploymentConfig: '${NAME}${SUFFIX}'
             name: '${NAME}${SUFFIX}'
@@ -114,7 +124,7 @@ objects:
           containers:
             - capabilities: {}
               image: ' '
-              imagePullPolicy: IfNotPresent
+              imagePullPolicy: Always
               name: geoserver
               ports:
                 - containerPort: ${{PORT_DEFAULT}}
@@ -126,9 +136,7 @@ objects:
                 limits:
                   cpu: '${CPU_LIMIT}'
                   memory: '${MEMORY_LIMIT}'
-              securityContext:
-                capabilities: {}
-                privileged: false
+              securityContext: {}
               terminationMessagePath: '/dev/termination-log'
               # volumeMounts:
               #   - mountPath: '/opt/geoserver_data/'
