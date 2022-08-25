@@ -128,7 +128,7 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
           </Form>
         )}
       </Formik>
-      <Box mt={5} display="flex" flexDirection={"row"}>
+      <Box mt={5} display="flex" flexDirection={"column"}>
         <SearchResultList items={tempData} toggleDataSet={(dataSetId)=>{console.log(`Toggle: ${dataSetId}`)}}/>
       </Box>
     </Box>
