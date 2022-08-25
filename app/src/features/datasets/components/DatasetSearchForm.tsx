@@ -1,6 +1,6 @@
 import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, IconButton, InputLabel } from '@mui/material';
+import { Button, IconButton, InputLabel, List } from '@mui/material';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import MenuItem from '@mui/material/MenuItem';
@@ -10,7 +10,7 @@ import { makeStyles } from '@mui/styles';
 import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
-import { FormikContextType, useFormikContext } from 'formik';
+import { FieldArray, useFormikContext } from 'formik';
 import React from 'react';
 import yup from 'utils/YupSchema';
 
@@ -43,6 +43,7 @@ export const DatasetSearchFormYupSchema = yup.object().shape({
 });
 
 export interface IDatasetSearchFormProps {
+  onAreaUpdate: (area: IFormikAreaUpload[]) => void;
   speciesList: IMultiAutocompleteFieldOption[];
 }
 
@@ -52,10 +53,11 @@ export interface IDatasetSearchFormProps {
  * @return {*}
  */
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
-  const formikProps = useFormikContext<IDatasetSearchForm>();
+  const classes = useStyles();
 
-  console.log('props in datasetSearchForm:', props);
-  console.log('formikprops values in datasearch form:', formikProps.values);
+  const formikProps = useFormikContext<IDatasetSearchForm>();
+  // console.log('props in datasetSearchForm:', props);
+  // console.log('formikprops values in datasearch form:', formikProps.values);
 
   return (
     <>
@@ -107,20 +109,37 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           <Button color="primary" data-testid="select-region" variant="outlined" sx={{ marginRight: 1 }}>
             Select Region
           </Button>
-          <UploadAreaControls />
-        </Grid>
-        <Grid item xs={12}>
-          {!!formikProps.values.area.length &&
-            formikProps.values.area.map((areaData) => {
-              return (
-                <SelectedVarListItem
-                  key={areaData.name}
-                  name={areaData.name}
-                  formikName={'area'}
-                  formikProp={formikProps}
-                />
-              );
-            })}
+
+          <FieldArray
+            name="area"
+            render={(arrayHelpers) => (
+              <>
+                <UploadAreaControls onAreaUpdate={props.onAreaUpdate} />
+                <Box my={1}>
+                  <List dense disablePadding>
+                    {!!formikProps.values.area.length &&
+                      formikProps.values.area.map((areaData, index) => {
+                        return (
+                          <Box
+                            key={`${areaData.name}-area`}
+                            className={classes.listItem}
+                            p={1}
+                            m={0.5}
+                            display="flex"
+                            justifyContent={'space-between'}
+                            alignItems={'center'}>
+                            {areaData.name}
+                            <IconButton aria-label="delete" color="inherit" onClick={() => arrayHelpers.remove(index)}>
+                              <Icon path={mdiTrashCanOutline} size={1} />
+                            </IconButton>
+                          </Box>
+                        );
+                      })}
+                  </List>
+                </Box>
+              </>
+            )}
+          />
         </Grid>
       </Grid>
     </>
@@ -128,42 +147,3 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 };
 
 export default DatasetSearchForm;
-
-export interface SelectedVarListItemProps {
-  name: string;
-  formikName: string;
-  formikProp: FormikContextType<IDatasetSearchForm>;
-}
-
-export const SelectedVarListItem: React.FC<SelectedVarListItemProps> = (props) => {
-  const classes = useStyles();
-  const { name, formikName, formikProp } = props;
-
-  const removeVar = () => {
-    const currentVarIndex = formikProp.values.area.findIndex((x) => x.name === name);
-    console.log('name', name);
-    console.log('formikName', formikName);
-    console.log('formikProp', formikProp.values);
-    console.log('currentVarIndex', currentVarIndex);
-
-    const newFormikVal = formikProp.values.area.splice(currentVarIndex, 1);
-    formikProp.setFieldValue(formikName, newFormikVal);
-    console.log('AAAAAAAAAAAAAAAAAAAAAformikProp', formikProp.values.area);
-  };
-
-  return (
-    <Box
-      key={`${name}-${formikName}`}
-      className={classes.listItem}
-      p={1}
-      m={0.5}
-      display="flex"
-      justifyContent={'space-between'}
-      alignItems={'center'}>
-      {name}
-      <IconButton aria-label="delete" color="inherit" onClick={removeVar}>
-        <Icon path={mdiTrashCanOutline} size={1} />
-      </IconButton>
-    </Box>
-  );
-};

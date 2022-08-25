@@ -2,8 +2,9 @@ import Box from '@mui/material/Box';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import SideSearchBar from 'components/map/components/SideSearchBar';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
+import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
@@ -104,9 +105,27 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     mapDataLoader.refresh(searchBoundary, type, zoom);
   };
 
+  const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
+    console.log('areas', areas);
+
+    // SET STATIC LAYER
+    const layers: IStaticLayerFeature[] = [];
+    areas.forEach((area) => {
+      area.features.forEach((feature: Feature<Polygon>) => {
+        const staticLayerFeature: IStaticLayerFeature = {
+          geoJSON: feature,
+          tooltip: <AreaToolTip name={area.name} />
+        };
+        layers.push(staticLayerFeature);
+      });
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+      setStaticLayers([staticLayer]);
+    });
+  };
+
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
-      <SideSearchBar />
+      <SideSearchBar onAreaUpdate={onAreaUpdate} />
       <Box data-testid="MapContainer" width="100%" height="100%">
         <MapContainer
           mapId="boundary_map"

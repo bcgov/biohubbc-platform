@@ -19,7 +19,7 @@ export interface IMultiAutocompleteField {
 }
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
-  console.log('props in the multiautocomplete field: ', props);
+  // console.log('props in the multiautocomplete field: ', props);
 
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
   // const [inputValue, setInputValue] = useState('');
@@ -63,12 +63,12 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
   //   }
   // };
 
-  console.log('values in multiautocompletefield:', values);
-  console.log('props.id:', props.id);
+  // console.log('values in multiautocompletefield:', values);
+  // console.log('props.id:', props.id);
 
-  console.log('what is in get(values, props.id) ', get(values, `species_list`));
+  // console.log('what is in get(values, props.id) ', get(values, `species_list`));
 
-  console.log('values[props.id]', values[props.id]);
+  // console.log('values[props.id]', values[props.id]);
 
   return (
     <Autocomplete

@@ -1,4 +1,5 @@
 import { Box, Button, Grid, Paper, Typography } from '@mui/material';
+import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
   DatasetSearchFormYupSchema,
@@ -19,12 +20,17 @@ export interface IDatasetRequest {
     datasetName?: string;
   };
 }
-const SideSearchBar: React.FC = () => {
+
+export interface SideSearchBarProps {
+  onAreaUpdate: (area: IFormikAreaUpload[]) => void;
+}
+
+const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   // const api = useApi();
   // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
-  console.log('formikRef in the map page', formikRef);
+  // console.log('formikRef in the map page', formikRef);
 
   /**
    * Handle dataset requests.
@@ -121,6 +127,7 @@ const SideSearchBar: React.FC = () => {
                 <Grid item xs={12}>
                   <Box component="fieldset" width={'100%'}>
                     <DatasetSearchForm
+                      onAreaUpdate={props.onAreaUpdate}
                       speciesList={[
                         { value: '1', label: 'Moose' },
                         { value: '2', label: 'Thinhorn sheep' },
