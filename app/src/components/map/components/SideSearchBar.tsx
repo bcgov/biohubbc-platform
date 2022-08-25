@@ -27,6 +27,7 @@ export interface SideSearchBarProps {
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
+  const [showForm, setShowForm] = useState(true)
   // const api = useApi();
   // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
@@ -52,6 +53,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     console.log('values', values);
     console.log('searchParams', searchParams);
     console.log('formikref.values in Side searchbar', formikRef.current?.values);
+    toggleForm()
 
     return;
     // await api.search.getSpatialData(searchParams.criteria);
@@ -108,46 +110,61 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   //   setStaticLayers([...staticLayers, staticLayer]);
   // };
 
+  const toggleForm = () => {
+    setShowForm(!showForm);
+  }
   return (
     <>
-      <Formik<IDatasetSearchForm>
-        innerRef={formikRef}
-        enableReinitialize={true}
-        initialValues={DatasetSearchFormInitialValues}
-        validationSchema={DatasetSearchFormYupSchema}
-        validateOnBlur={true}
-        validateOnChange={false}
-        onSubmit={handleDatasetRequestCreation}>
-        {(formikProps) => (
-          <Form>
-            <DatasetSearchForm
-              onAreaUpdate={props.onAreaUpdate}
-              speciesList={[
-                { value: '1', label: 'Moose' },
-                { value: '2', label: 'Thinhorn sheep' },
-                { value: '3', label: 'Bighorn sheep' }
-              ]}
-            />
+      {showForm && 
+        <Formik<IDatasetSearchForm>
+          innerRef={formikRef}
+          enableReinitialize={true}
+          initialValues={DatasetSearchFormInitialValues}
+          validationSchema={DatasetSearchFormYupSchema}
+          validateOnBlur={true}
+          validateOnChange={false}
+          onSubmit={handleDatasetRequestCreation}>
+          {(formikProps) => (
+            <Form>
+              <DatasetSearchForm
+                onAreaUpdate={props.onAreaUpdate}
+                speciesList={[
+                  { value: '1', label: 'Moose' },
+                  { value: '2', label: 'Thinhorn sheep' },
+                  { value: '3', label: 'Bighorn sheep' }
+                ]}
+              />
 
-            <Box mt={4}>
-              <Button
-                fullWidth={true}
-                onClick={formikProps.submitForm}
-                variant="contained"
-                color="primary"
-                size="large"
-                type="submit"
-                data-testid="dataset-find-button"
-                sx={{
-                  fontWeight: 700
-                }}
-                >
-                Find Data
-              </Button>
-            </Box>
-          </Form>
-        )}
-      </Formik>
+              <Box mt={4}>
+                <Button
+                  fullWidth={true}
+                  onClick={formikProps.submitForm}
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  type="submit"
+                  data-testid="dataset-find-button"
+                  sx={{
+                    fontWeight: 700
+                  }}
+                  >
+                  Find Data
+                </Button>
+              </Box>
+            </Form>
+          )}
+        </Formik>
+      }
+
+      {!showForm &&
+        <Box mt={5} display="flex" flexDirection={"column"}>
+          <SearchResultList 
+            items={[]} 
+            toggleDataSet={(dataSetId) => {console.log(`Toggle: ${dataSetId}`)}}
+            backToSearch={() => toggleForm()} 
+          />
+        </Box>
+      }
     </>
   );
 };
