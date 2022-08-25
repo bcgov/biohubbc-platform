@@ -4,6 +4,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
+import SearchResultList, { IDataType } from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature } from 'geojson';
 // import { useApi } from 'hooks/useApi';
@@ -61,7 +62,28 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
     //   });
     // }
   };
-
+  const tempData: IDataType[] = [
+    {
+        dataset_id: '12314123',
+        dataset_name: 'Moose',
+        number_of_records: 4
+    },
+    {
+        dataset_id: '1231-4123',
+        dataset_name: 'Bears',
+        number_of_records: 2
+    },
+    {
+        dataset_id: '123124131223',
+        dataset_name: 'Ducks',
+        number_of_records: 5
+    },
+    {
+        dataset_id: '1241241314123',
+        dataset_name: 'Deer',
+        number_of_records: 6
+    }
+]
   return (
     <Box component={Paper} p={4} width={400}>
       <Formik<IDatasetSearchForm>
@@ -106,6 +128,9 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
           </Form>
         )}
       </Formik>
+      <Box mt={5} display="flex" flexDirection={"row"}>
+        <SearchResultList items={tempData} toggleDataSet={(dataSetId)=>{console.log(`Toggle: ${dataSetId}`)}}/>
+      </Box>
     </Box>
   );
 };
