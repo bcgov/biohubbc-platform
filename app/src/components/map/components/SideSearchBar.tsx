@@ -8,7 +8,7 @@ import SearchResultList, { IDataType } from 'features/datasets/components/Search
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature } from 'geojson';
 // import { useApi } from 'hooks/useApi';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export interface IDatasetRequest {
   criteria: {
@@ -21,6 +21,7 @@ export interface IDatasetRequest {
   };
 }
 const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
+  const [showForm, setShowForm] = useState(true)
   // const api = useApi();
 
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
@@ -44,7 +45,7 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
 
     console.log('values', values);
     console.log('searchParams', searchParams);
-
+    setShowForm(false);
     return;
     // await api.search.getSpatialData(searchParams.criteria);
 
@@ -62,6 +63,11 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
     //   });
     // }
   };
+
+  const toggleForm = () => {
+    setShowForm(!showForm);
+  }
+
   const tempData: IDataType[] = [
     {
         dataset_id: '12314123',
@@ -86,55 +92,59 @@ const SideSearchBar: React.FC<React.PropsWithChildren> = () => {
 ]
   return (
     <Box component={Paper} p={4} width={400}>
-      <Formik<IDatasetSearchForm>
-        innerRef={formikRef}
-        enableReinitialize={true}
-        initialValues={DatasetSearchFormInitialValues}
-        validationSchema={DatasetSearchFormYupSchema}
-        validateOnBlur={true}
-        validateOnChange={false}
-        onSubmit={handleDatasetRequestCreation}>
-        {(formikProps) => (
-          <Form>
-            <Box my={2}>
-              <Grid container direction="column" justifyContent="center" spacing={2}>
-                <Grid item xs={12}>
-                  <Typography variant="h3">Find BioHub Data</Typography>
+      {showForm && 
+        <Formik<IDatasetSearchForm>
+          innerRef={formikRef}
+          enableReinitialize={true}
+          initialValues={DatasetSearchFormInitialValues}
+          validationSchema={DatasetSearchFormYupSchema}
+          validateOnBlur={true}
+          validateOnChange={false}
+          onSubmit={handleDatasetRequestCreation}>
+          {(formikProps) => (
+            <Form>
+              <Box my={2}>
+                <Grid container direction="column" justifyContent="center" spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="h3">Find BioHub Data</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Box component="fieldset" width={'100%'}>
+                      <DatasetSearchForm
+                        speciesList={[
+                          { value: 'species1', label: 'species 1' },
+                          { value: 'species2', label: 'species 2' }
+                        ]}
+                      />
+                    </Box>
+                  </Grid>
                 </Grid>
-                <Grid item xs={12}>
-                  <Box component="fieldset" width={'100%'}>
-                    <DatasetSearchForm
-                      speciesList={[
-                        { value: 'species1', label: 'species 1' },
-                        { value: 'species2', label: 'species 2' }
-                      ]}
-                    />
-                  </Box>
-                </Grid>
-              </Grid>
-            </Box>
+              </Box>
 
-            <Box mt={5} display="flex" justifyContent="flex-end">
-              <Button
-                onClick={formikProps.submitForm}
-                variant="contained"
-                color="primary"
-                size="large"
-                type="submit"
-                data-testid="dataset-find-button">
-                Find
-              </Button>
-            </Box>
-          </Form>
-        )}
-      </Formik>
-      <Box mt={5} display="flex" flexDirection={"column"}>
-        <SearchResultList 
-          items={tempData} 
-          toggleDataSet={(dataSetId)=>{console.log(`Toggle: ${dataSetId}`)}}
-          backToSearch={() => {console.log("Back to search")}} 
-        />
-      </Box>
+              <Box mt={5} display="flex" justifyContent="flex-end">
+                <Button
+                  onClick={formikProps.submitForm}
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  type="submit"
+                  data-testid="dataset-find-button">
+                  Find
+                </Button>
+              </Box>
+            </Form>
+          )}
+        </Formik>
+      }
+      {!showForm &&
+        <Box mt={5} display="flex" flexDirection={"column"}>
+          <SearchResultList 
+            items={tempData} 
+            toggleDataSet={(dataSetId) => {console.log(`Toggle: ${dataSetId}`)}}
+            backToSearch={() => toggleForm()} 
+          />
+        </Box>
+      }
     </Box>
   );
 };

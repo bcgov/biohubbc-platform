@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Checkbox from '@mui/material/Checkbox';
 import React, { useState } from 'react';
 import { Container } from '@mui/system';
+import { Button } from '@mui/material';
 
 export interface IDataType {
     dataset_id: string,
@@ -14,7 +15,7 @@ export interface IDataType {
 export interface ISearchResultListProps {
     items: IDataType[],
     toggleDataSet: (datasetId: string) => void,
-    backToSearch?: () => void
+    backToSearch: () => void
 }
 
 export interface IDatasetVisibility {
@@ -47,14 +48,16 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                 </Typography>
             </Grid>
             <Grid item xs={4}>
-                <Typography variant="body1" color="textPrimary">
-                    Refine Search
-                </Typography>
+                <Button onClick={() => props.backToSearch()}>    
+                    <Typography variant="body1" color="textPrimary">
+                        Refine Search
+                    </Typography>
+                </Button>
             </Grid>
         </Box>
         <Container maxWidth="xl">
             <Box>
-                <Grid justifyContent="center">
+                <Grid container direction={"column"} justifyContent="center">
                     {props.items.map((item: IDataType, index: number) => {
                         return (
                             <Grid container direction="row" alignItems={"center"} key={`${item.dataset_id}-${index}`}>
