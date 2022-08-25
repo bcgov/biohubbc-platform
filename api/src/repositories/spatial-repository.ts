@@ -656,7 +656,7 @@ export class SpatialRepository extends BaseRepository {
 
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+  ): Promise<ISubmissionSpatialSearchResponseRow> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -700,7 +700,7 @@ export class SpatialRepository extends BaseRepository {
 
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
-    return spatialComponentResponse.rows;
+    return spatialComponentResponse.rows[0];
   }
 
   /**
