@@ -25,7 +25,7 @@ const dbBuild = (settings) => {
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/geoserver.bc.yaml`, {
       param: {
         NAME: name,
-        SUFFIX: `${phases[phase].suffix}`,
+        // SUFFIX: `${phases[phase].suffix}`,
         TARGET_IMAGE_VERSION: `${phases[phase].tag}`,
         SOURCE_IMAGE_NAME: 'geoserver',
         SOURCE_IMAGE_VERSION: '2.21.1',
