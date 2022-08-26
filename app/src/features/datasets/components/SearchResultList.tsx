@@ -13,9 +13,9 @@ export interface IDataType {
 }
 
 export interface ISearchResultListProps {
-    items: IDataType[],
-    toggleDataSet: (datasets: IDatasetVisibility) => void,
-    backToSearch: () => void
+    items: IDataType[];
+    onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
+    backToSearch: () => void;
 }
 
 export interface IDatasetVisibility {
@@ -37,7 +37,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
         const value = datasetVisibility[dataset_id];
         udpated[dataset_id] = !udpated[dataset_id]
         setDatasetVisibility({... datasetVisibility, [dataset_id]: !value});
-        props.toggleDataSet(udpated);
+        props.onToggleDataVisibility(udpated);
     }
 
     return (

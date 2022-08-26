@@ -37,12 +37,12 @@ export interface SideSearchBarProps {
     unknown
   >;
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
-  onDatasetToggleVisibility: (datasets: IDatasetVisibility) => void;
+  onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(true)
 
   /**
    * Handle dataset requests.
@@ -62,6 +62,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     // const geoCollection:Feature<GeometryCollection> = {};
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
+    toggleForm()
   };
 
   // //User uploads boundary for search
@@ -74,6 +75,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   //     setUpdatedBounds(newBounds);
   //   }
   // };
+  console.log("_____________________________")
+  console.log(props.mapDataLoader.data)
 
   const toggleForm = () => {
     setShowForm(!showForm);
@@ -138,9 +141,9 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       
     {!showForm && 
       <SearchResultList
-        items={temp} 
+        items={temp}
         backToSearch={() => toggleForm()}
-        toggleDataSet={props.onDatasetToggleVisibility}
+        onToggleDataVisibility={props.onToggleDataVisibility}
       />
     }
     </>

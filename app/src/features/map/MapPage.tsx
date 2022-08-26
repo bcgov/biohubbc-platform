@@ -128,14 +128,14 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     });
   };
 
-  const onToggleDatasetVisibility = (datasets: IDatasetVisibility) => {
+  const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
     setDatasetVisibility(datasets);
   }
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
       <Box flex="0 0 auto" py={4} px={3} width="500px">
-        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} onDatasetToggleVisibility={onToggleDatasetVisibility} />
+        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} onToggleDataVisibility={onToggleDataVisibility} />
       </Box>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
