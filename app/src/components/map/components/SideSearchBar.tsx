@@ -1,4 +1,5 @@
 import { Box, Button } from '@mui/material';
+import simplify from '@turf/simplify';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
@@ -6,8 +7,9 @@ import DatasetSearchForm, {
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
 import { Form, Formik, FormikProps } from 'formik';
-import { Feature } from 'geojson';
-import { useApi } from 'hooks/useApi';
+import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
+import { DataLoader } from 'hooks/useDataLoader';
+import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { useRef } from 'react';
 
 export interface IDatasetRequest {
@@ -22,83 +24,45 @@ export interface IDatasetRequest {
 }
 
 export interface SideSearchBarProps {
+  mapDataLoader: DataLoader<
+    [
+      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
+      searchType: string[],
+      species?: string[],
+      searchZoom?: number,
+      datasetID?: string
+    ],
+    ISpatialData[],
+    unknown
+  >;
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
-  const api = useApi();
-  // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
-
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
-  // console.log('formikRef in the map page', formikRef);
 
   /**
    * Handle dataset requests.
    */
   const handleDatasetRequestCreation = async (values: IDatasetSearchForm) => {
-    // try {
-    const searchParams: any = {
-      criteria: {
-        boundary: {
+    const featureArray: Feature[] = [];
+    values.area.forEach((area: IFormikAreaUpload) => {
+      area.features.forEach((feature: Feature<Polygon>) => {
+        const newFeature: Feature = {
           type: 'Feature',
-          geometry: [
-            {
-              type: 'Polygon',
-              coordinates: [
-                [
-                  [-146.95401365536304, 44.62175409623327],
-                  [-146.95401365536304, 63.528970541102794],
-                  [-105.07413084286304, 63.528970541102794],
-                  [-105.07413084286304, 44.62175409623327],
-                  [-146.95401365536304, 44.62175409623327]
-                ]
-              ]
-            }
-          ],
-          properties: {}
-        },
-        type: ['Occurrence'],
-        species: values.species_list,
-        zoom: 2, // TODO include in request params when backend is updated to receive it
-        datasetName: values.dataset
-      }
-    };
+          geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
+          properties: feature.properties
+        };
+        featureArray.push(newFeature);
+      });
+    });
 
-    console.log('searchParams', searchParams);
-
-    return await api.search.getSpatialData(searchParams.criteria);
-
-    // if (!response?.datasetID) {
-    //   showCreateErrorDialog({
-    //     dialogError: 'The response from the server was null, or did not contain a project ID.'
-    //   });
-    //   return;
-    // }
-    // } catch (error) {
-    //   showCreateErrorDialog({
-    //     //dialogTitle: 'Error Finding Dataset',
-    //     dialogError: 'Some error' //(error as APIError)?.message,
-    //     // dialogErrorDetails: (error as APIError)?.errors
-    //   });
-    // }
+    // const geoCollection:Feature<GeometryCollection> = {};
+    props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
   };
 
   // //User uploads boundary for search
   // const onAreaUpload = (area: IFormikAreaUpload) => {
-  //   //Get points inside bounds
-  //   const featureArray: Feature[] = [];
-  //   area.features.forEach((feature: Feature<Polygon>) => {
-  //     const newFeature: Feature = {
-  //       type: 'Feature',
-  //       geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
-  //       properties: feature.properties
-  //     };
-  //     featureArray.push(newFeature);
-  //   });
-
-  //   // const geoCollection:Feature<GeometryCollection> = {};
-  //   mapDataLoader.refresh(featureArray[0], type, zoom);
-
   //   //SET BOUNDS
   //   const bounds = calculateUpdatedMapBounds(area.features);
   //   if (bounds) {

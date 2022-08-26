@@ -443,7 +443,6 @@ export class SpatialRepository extends BaseRepository {
       .from(knex.raw('with_filtered_spatial_component as wfsc'));
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-    console.log(queryBuilder.toSQL().toNative().sql);
 
     return response.rows;
   }
@@ -533,7 +532,7 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-      console.log(queryBuilder.toSQL().toNative().sql);
+    console.log(queryBuilder.toSQL().toNative().sql);
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -604,8 +603,6 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   _whereBoundaryIntersects(boundaries: Feature[], geoColumn: string, qb1: Knex.QueryBuilder) {
-    console.log('boundaries|boundaries|boundaries|boundaries|boundaries', boundaries);
-
     //TODO: geoJson not happy on search
     const generateSqlStatement = (geometry: Feature) => {
       return SQL`
@@ -629,14 +626,10 @@ export class SpatialRepository extends BaseRepository {
         // Append OR clause for each item in boundary array
         qb2.or.where((qb3) => {
           const sqlStatement = generateSqlStatement(boundary);
-          console.log('sqlStatement', sqlStatement);
-
           qb3.whereRaw(sqlStatement.sql, sqlStatement.values);
         });
       }
     });
-
-    console.log('qb1', qb1.toSQL());
   }
 
   /**

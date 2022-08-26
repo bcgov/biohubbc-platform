@@ -57,6 +57,11 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   const formikProps = useFormikContext<IDatasetSearchForm>();
 
+  useEffect(() => {
+    props.onAreaUpdate(formikProps.values.area);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formikProps.values.area]);
+
   return (
     <>
       <Typography
