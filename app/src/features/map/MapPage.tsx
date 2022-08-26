@@ -25,7 +25,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     zoom: number | undefined;
   }>();
 
-  const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
+  const mapDataLoader = useDataLoader((searchBoundary: Feature[], searchType: string[], searchZoom: number) =>
     api.search.getSpatialData({ boundary: searchBoundary, type: searchType, zoom: searchZoom })
   );
 
@@ -71,7 +71,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       loadedFromUrl.current = true;
       if (drawnBoundary) {
         const searchBoundary = getSearchBoundary(mapViewBoundary, drawnBoundary);
-        mapDataLoader.refresh(searchBoundary, type, zoom);
+        mapDataLoader.refresh([searchBoundary], type, zoom);
       }
     }
   });
@@ -101,8 +101,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     // Store drawn bounds in URL
     url.appendQueryParams({ drawnBoundary: bounds });
+    console.log('[searchBoundary]', [searchBoundary]);
 
-    mapDataLoader.refresh(searchBoundary, type, zoom);
+    mapDataLoader.refresh([searchBoundary], type, zoom);
   };
 
   const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
@@ -126,7 +127,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
       <Box flex="0 0 auto" py={4} px={3} width="500px">
-      <SideSearchBar onAreaUpdate={onAreaUpdate}/>
+        <SideSearchBar onAreaUpdate={onAreaUpdate} />
       </Box>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer

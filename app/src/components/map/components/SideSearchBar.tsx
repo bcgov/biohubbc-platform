@@ -106,18 +106,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   //     setShouldUpdateBounds(true);
   //     setUpdatedBounds(newBounds);
   //   }
-
-  //   //SET STATIC LAYER
-  //   const layers: IStaticLayerFeature[] = [];
-  //   area.features.forEach((feature: Feature<Polygon>) => {
-  //     const staticLayerFeature: IStaticLayerFeature = {
-  //       geoJSON: feature,
-  //       tooltip: <AreaToolTip name={area.name} />
-  //     };
-  //     layers.push(staticLayerFeature);
-  //   });
-  //   const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
-  //   setStaticLayers([...staticLayers, staticLayer]);
   // };
 
   return (

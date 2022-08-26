@@ -26,7 +26,7 @@ const useSearchApi = (axios: AxiosInstance) => {
   };
 
   const getSpatialData = async (criteria: {
-    boundary: Feature;
+    boundary: Feature[];
     type: string[];
     species?: string[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
@@ -52,7 +52,7 @@ const useSearchApi = (axios: AxiosInstance) => {
   };
 
   const getSpatialDataFile = async (criteria: {
-    boundary: Feature;
+    boundary: Feature[];
     type: string[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
     datasetID?: string;

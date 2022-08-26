@@ -38,7 +38,7 @@ describe('useSearchApi', () => {
       mock.onGet('/api/dwc/spatial/search').reply(200, res);
 
       const result = await useSearchApi(axios).getSpatialData({
-        boundary: { type: 'Feature' } as Feature,
+        boundary: [{ type: 'Feature' }] as Feature[],
         type: ['type']
       });
 
@@ -51,7 +51,7 @@ describe('useSearchApi', () => {
       mock.onGet('/api/dwc/spatial/search').reply(200, res);
 
       const result = await useSearchApi(axios).getSpatialData({
-        boundary: { type: 'Feature' } as Feature,
+        boundary: [{ type: 'Feature' }] as Feature[],
         type: ['type'],
         species: ['species']
       });
@@ -66,7 +66,7 @@ describe('useSearchApi', () => {
     mock.onGet('/api/dwc/spatial/download').reply(200, res);
 
     const result = await useSearchApi(axios).getSpatialDataFile({
-      boundary: { type: 'Feature' } as Feature,
+      boundary: [{ type: 'Feature' }] as Feature[],
       type: ['type'],
       datasetID: 'AAA-BBB'
     });

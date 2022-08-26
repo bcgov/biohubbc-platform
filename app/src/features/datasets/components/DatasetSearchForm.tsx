@@ -11,7 +11,7 @@ import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'component
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import { FieldArray, useFormikContext } from 'formik';
-import React from 'react';
+import React, { useEffect } from 'react';
 import yup from 'utils/YupSchema';
 
 const useStyles = makeStyles(() => ({
@@ -31,7 +31,7 @@ export interface IDatasetSearchForm {
 }
 
 export const DatasetSearchFormInitialValues: IDatasetSearchForm = {
-  dataset: 'Species Observations',
+  dataset: 'Occurrence',
   species_list: [],
   area: []
 };
@@ -59,19 +59,22 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   return (
     <>
-      <Typography variant="h3" component="h1"
+      <Typography
+        variant="h3"
+        component="h1"
         sx={{
           mb: 4
-        }}
-      >
+        }}>
         Map Search
       </Typography>
       <Box component="fieldset">
-        <Box component="legend" mb={2} p={0}
+        <Box
+          component="legend"
+          mb={2}
+          p={0}
           sx={{
             fontWeight: 700
-          }}
-        >
+          }}>
           What do you want to find?
         </Box>
         <FormControl fullWidth>
@@ -87,10 +90,10 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             onChange={(item) => {
               formikProps.setFieldValue('dataset', item.target.value);
             }}>
-            <MenuItem key={'Occurrence'} value={'Occurrence'}>
+            <MenuItem key={1} value={'Occurrence'}>
               Species Observations
             </MenuItem>
-            <MenuItem key={'Boundary Centroid'} value={'Boundary Centroid'}>
+            <MenuItem key={2} value={'Boundary Centroid'}>
               Species Inventory Project
             </MenuItem>
           </Select>
@@ -106,27 +109,32 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
       </Box>
 
       <Box component="fieldset" mt={5}>
-        <Box component="legend" mb={1} p={0}
+        <Box
+          component="legend"
+          mb={1}
+          p={0}
           sx={{
             fontWeight: 700
-          }}
-        >
+          }}>
           Define area of interest
         </Box>
-        <Typography variant="body1" color="textSecondary"
+        <Typography
+          variant="body1"
+          color="textSecondary"
           sx={{
             mb: 3
-          }}
-        >
+          }}>
           Define your area of interest by selecting an option below OR use the drawing tools on the map.
         </Typography>
-        
+
         <Box>
-          <Button color="primary" data-testid="select-region" variant="outlined"
+          <Button
+            color="primary"
+            data-testid="select-region"
+            variant="outlined"
             sx={{
               mr: 1
-            }}
-          >
+            }}>
             Select Region
           </Button>
 
@@ -134,7 +142,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             name="area"
             render={(arrayHelpers) => (
               <>
-                <UploadAreaControls onAreaUpdate={props.onAreaUpdate} />
+                <UploadAreaControls />
                 <Box my={1}>
                   <List dense disablePadding>
                     {!!formikProps.values.area.length &&
@@ -149,7 +157,12 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
                             justifyContent={'space-between'}
                             alignItems={'center'}>
                             {areaData.name}
-                            <IconButton aria-label="delete" color="inherit" onClick={() => arrayHelpers.remove(index)}>
+                            <IconButton
+                              aria-label="delete"
+                              color="inherit"
+                              onClick={() => {
+                                arrayHelpers.remove(index);
+                              }}>
                               <Icon path={mdiTrashCanOutline} size={1} />
                             </IconButton>
                           </Box>
