@@ -39,17 +39,10 @@ objects:
           annotations:
           from:
             kind: ImageStreamTag
-            name: ${SOURCE_IMAGE_NAME}:latest
+            name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
             namespace: ${SOURCE_IMAGE_NAMESPACE}
           generation: 1
           importPolicy: {}
           referencePolicy:
             type: Source
       successfulBuildsHistoryLimit: 5
-      triggers:
-        - type: ImageChange
-          imageChange:
-            from:
-              kind: ImageStreamTag
-              name: ${SOURCE_IMAGE_NAME}:latest
-              namespace: ${SOURCE_IMAGE_NAMESPACE}
