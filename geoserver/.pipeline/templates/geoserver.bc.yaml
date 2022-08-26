@@ -11,7 +11,7 @@ parameters:
     displayName: Name
     description: The name assigned to all of the resources.
     required: true
-    value: biohubbc-geoserver
+    value: biohub-platform-geoserver
   - name: TARGET_IMAGE_VERSION
     required: true
   - name: SOURCE_IMAGE_NAME
@@ -39,7 +39,7 @@ objects:
           annotations:
           from:
             kind: ImageStreamTag
-            name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
+            name: ${SOURCE_IMAGE_NAME}:latest
             namespace: ${SOURCE_IMAGE_NAMESPACE}
           generation: 1
           importPolicy: {}
@@ -51,5 +51,5 @@ objects:
           imageChange:
             from:
               kind: ImageStreamTag
-              name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
+              name: ${SOURCE_IMAGE_NAME}:latest
               namespace: ${SOURCE_IMAGE_NAMESPACE}
