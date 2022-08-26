@@ -1,4 +1,5 @@
 import { Box, Button } from '@mui/material';
+import simplify from '@turf/simplify';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
@@ -7,9 +8,10 @@ import DatasetSearchForm, {
 } from 'features/datasets/components/DatasetSearchForm';
 import SearchResultList from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
-import { Feature } from 'geojson';
-// import { useApi } from 'hooks/useApi';
-import { useRef, useState } from 'react';
+import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
+import { DataLoader } from 'hooks/useDataLoader';
+import { ISpatialData } from 'interfaces/useSearchApi.interface';
+import { useRef } from 'react';
 
 export interface IDatasetRequest {
   criteria: {
@@ -23,72 +25,45 @@ export interface IDatasetRequest {
 }
 
 export interface SideSearchBarProps {
+  mapDataLoader: DataLoader<
+    [
+      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
+      searchType: string[],
+      species?: string[],
+      searchZoom?: number,
+      datasetID?: string
+    ],
+    ISpatialData[],
+    unknown
+  >;
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
-  const [showForm, setShowForm] = useState(true)
-  // const api = useApi();
-  // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
-
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
-  // console.log('formikRef in the map page', formikRef);
 
   /**
    * Handle dataset requests.
    */
   const handleDatasetRequestCreation = async (values: IDatasetSearchForm) => {
-    // try {
-    const searchParams: any = {
-      criteria: {
-        boundary: { type: 'Feature', geometry: [{ type: 'Polygon' }], properties: {} },
-        type: ['a'],
-        species: values.species_list,
-        zoom: 2, // TODO include in request params when backend is updated to receive it
-        datasetID: 'string',
-        datasetName: values.dataset
-      }
-    };
+    const featureArray: Feature[] = [];
+    values.area.forEach((area: IFormikAreaUpload) => {
+      area.features.forEach((feature: Feature<Polygon>) => {
+        const newFeature: Feature = {
+          type: 'Feature',
+          geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
+          properties: feature.properties
+        };
+        featureArray.push(newFeature);
+      });
+    });
 
-    console.log('values', values);
-    console.log('searchParams', searchParams);
-    console.log('formikref.values in Side searchbar', formikRef.current?.values);
-    toggleForm()
-
-    return;
-    // await api.search.getSpatialData(searchParams.criteria);
-
-    // if (!response?.satasetID) {
-    //   showCreateErrorDialog({
-    //     dialogError: 'The response from the server was null, or did not contain a project ID.'
-    //   });
-    //   return;
-    // }
-    // } catch (error) {
-    //   showCreateErrorDialog({
-    //     //dialogTitle: 'Error Finding Dataset',
-    //     dialogError: 'Some error' //(error as APIError)?.message,
-    //     // dialogErrorDetails: (error as APIError)?.errors
-    //   });
-    // }
+    // const geoCollection:Feature<GeometryCollection> = {};
+    props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
   };
 
   // //User uploads boundary for search
   // const onAreaUpload = (area: IFormikAreaUpload) => {
-  //   //Get points inside bounds
-  //   const featureArray: Feature[] = [];
-  //   area.features.forEach((feature: Feature<Polygon>) => {
-  //     const newFeature: Feature = {
-  //       type: 'Feature',
-  //       geometry: simplify(feature.geometry, { tolerance: 0.01, highQuality: false }),
-  //       properties: feature.properties
-  //     };
-  //     featureArray.push(newFeature);
-  //   });
-
-  //   // const geoCollection:Feature<GeometryCollection> = {};
-  //   mapDataLoader.refresh(featureArray[0], type, zoom);
-
   //   //SET BOUNDS
   //   const bounds = calculateUpdatedMapBounds(area.features);
   //   if (bounds) {
@@ -96,18 +71,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   //     setShouldUpdateBounds(true);
   //     setUpdatedBounds(newBounds);
   //   }
-
-  //   //SET STATIC LAYER
-  //   const layers: IStaticLayerFeature[] = [];
-  //   area.features.forEach((feature: Feature<Polygon>) => {
-  //     const staticLayerFeature: IStaticLayerFeature = {
-  //       geoJSON: feature,
-  //       tooltip: <AreaToolTip name={area.name} />
-  //     };
-  //     layers.push(staticLayerFeature);
-  //   });
-  //   const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
-  //   setStaticLayers([...staticLayers, staticLayer]);
   // };
 
   const toggleForm = () => {
@@ -115,56 +78,45 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   }
   return (
     <>
-      {showForm && 
-        <Formik<IDatasetSearchForm>
-          innerRef={formikRef}
-          enableReinitialize={true}
-          initialValues={DatasetSearchFormInitialValues}
-          validationSchema={DatasetSearchFormYupSchema}
-          validateOnBlur={true}
-          validateOnChange={false}
-          onSubmit={handleDatasetRequestCreation}>
-          {(formikProps) => (
-            <Form>
-              <DatasetSearchForm
-                onAreaUpdate={props.onAreaUpdate}
-                speciesList={[
-                  { value: '1', label: 'Moose' },
-                  { value: '2', label: 'Thinhorn sheep' },
-                  { value: '3', label: 'Bighorn sheep' }
-                ]}
-              />
+      <Formik<IDatasetSearchForm>
+        innerRef={formikRef}
+        enableReinitialize={true}
+        initialValues={DatasetSearchFormInitialValues}
+        validationSchema={DatasetSearchFormYupSchema}
+        validateOnBlur={true}
+        validateOnChange={false}
+        onSubmit={handleDatasetRequestCreation}>
+        {(formikProps) => (
+          <Form>
+            <DatasetSearchForm
+              onAreaUpdate={props.onAreaUpdate}
+              speciesList={[
+                { value: 'M-ALAM', label: 'Moose' },
+                { value: 'M-ORAM', label: 'Mountain Goat' },
+                { value: 'M-OVDA', label: 'Thinhorn sheep' },
+                { value: 'M-OVCA', label: 'Bighorn sheep' },
+                { value: 'B-SPOW', label: 'Spotted Owl' }
+              ]}
+            />
 
-              <Box mt={4}>
-                <Button
-                  fullWidth={true}
-                  onClick={formikProps.submitForm}
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  type="submit"
-                  data-testid="dataset-find-button"
-                  sx={{
-                    fontWeight: 700
-                  }}
-                  >
-                  Find Data
-                </Button>
-              </Box>
-            </Form>
-          )}
-        </Formik>
-      }
-
-      {!showForm &&
-        <Box mt={5} display="flex" flexDirection={"column"}>
-          <SearchResultList 
-            items={[]} 
-            toggleDataSet={(dataSetId) => {console.log(`Toggle: ${dataSetId}`)}}
-            backToSearch={() => toggleForm()} 
-          />
-        </Box>
-      }
+            <Box mt={4}>
+              <Button
+                fullWidth={true}
+                onClick={formikProps.submitForm}
+                variant="contained"
+                color="primary"
+                size="large"
+                type="submit"
+                data-testid="dataset-find-button"
+                sx={{
+                  fontWeight: 700
+                }}>
+                Find Data
+              </Button>
+            </Box>
+          </Form>
+        )}
+      </Formik>
     </>
   );
 };

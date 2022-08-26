@@ -54,7 +54,7 @@ export interface ISubmissionSpatialComponent {
 }
 
 export interface ISpatialComponentsSearchCriteria {
-  boundary: Feature;
+  boundary: Feature[];
   type?: string[];
   species?: string[];
   datasetID?: string[];
@@ -375,6 +375,8 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    console.log('criteriacriteriacriteriacriteriacriteriacriteriacriteria', criteria);
+
     const userService = new UserService(this.connection);
 
     const userObject = await userService.getUserById(this.connection.systemUserId());
@@ -530,6 +532,8 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
+    console.log(queryBuilder.toSQL().toNative().sql);
+
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
     return response.rows;
@@ -566,7 +570,7 @@ export class SpatialRepository extends BaseRepository {
     qb1.where((qb2) => {
       for (const singleSpecies of species) {
         // Append OR clause for each item in species array
-        qb2.and.where((qb3) => {
+        qb2.or.where((qb3) => {
           qb3.whereRaw(
             `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.associatedTaxa == "${singleSpecies}")')`
           );
@@ -591,21 +595,23 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Append where clause condition for spatial component boundary intersect.
+   * Append where clause condition for spatial component boundaries intersect.
    *
-   * @param {Feature} boundary
+   * @param {Feature[]} boundaries
    * @param {string} geoColumn
    * @param {Knex.QueryBuilder} qb1
    * @memberof SpatialRepository
    */
-  _whereBoundaryIntersects(boundary: Feature, geoColumn: string, qb1: Knex.QueryBuilder) {
-    const sqlStatement = SQL`
+  _whereBoundaryIntersects(boundaries: Feature[], geoColumn: string, qb1: Knex.QueryBuilder) {
+    //TODO: geoJson not happy on search
+    const generateSqlStatement = (geometry: Feature) => {
+      return SQL`
       public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
         public.geography(
           public.ST_Force2D(
             public.ST_SetSRID(
               public.ST_Force2D(
-                public.ST_GeomFromGeoJSON('${JSON.stringify(boundary.geometry)}')
+                public.ST_GeomFromGeoJSON('${JSON.stringify(geometry.geometry)}')
               ),
               4326
             )
@@ -613,9 +619,16 @@ export class SpatialRepository extends BaseRepository {
         )
       )
     `);
+    };
 
     qb1.where((qb2) => {
-      qb2.whereRaw(sqlStatement.sql, sqlStatement.values);
+      for (const boundary of boundaries) {
+        // Append OR clause for each item in boundary array
+        qb2.or.where((qb3) => {
+          const sqlStatement = generateSqlStatement(boundary);
+          qb3.whereRaw(sqlStatement.sql, sqlStatement.values);
+        });
+      }
     });
   }
 

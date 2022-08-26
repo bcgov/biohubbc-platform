@@ -7,7 +7,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/eml/search');
+const defaultLog = getLogger('paths/dwc/spatial/search');
 
 export const GET: Operation = [searchSpatialComponents()];
 
@@ -25,7 +25,10 @@ GET.apiDoc = {
       name: 'boundary',
       required: true,
       schema: {
-        type: 'string'
+        type: 'array',
+        items: {
+          type: 'string'
+        }
       },
       description: 'A stringified GeoJSON Feature. Will return results that intersect the feature.'
     },
@@ -109,11 +112,19 @@ GET.apiDoc = {
 
 export function searchSpatialComponents(): RequestHandler {
   return async (req, res) => {
+    const boundaries: Feature[] = [];
+    if (req.query.boundary?.length) {
+      const boundariesArray: string[] = req.query.boundary as string[];
+      boundariesArray.forEach((boundary) => {
+        boundaries.push(JSON.parse(boundary));
+      });
+    }
+
     const criteria = {
       type: (req.query.type as string[]) || [],
       species: (req.query.species as string[]) || [],
       datasetID: (req.query.datasetID as string[]) || [],
-      boundary: JSON.parse(req.query.boundary as string) as Feature
+      boundary: boundaries || []
     };
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
