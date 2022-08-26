@@ -38,6 +38,7 @@ RUN chown -R $USER_ID:$GROUP_ID $GEOSERVER_HOME
 # Install GeoServer
 RUN aptitude -y install openjdk-11-jdk
 RUN aptitude -y install unzip
+RUN aptitude -y install vim
 RUN unzip download
 RUN rm download
 

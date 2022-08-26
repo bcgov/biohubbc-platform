@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE web-app PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" "http://java.sun.com/dtd/web-app_2_3.dtd">
 <web-app>
-    <display-name>GeoServer</display-name>
+    <display-name>GeoServer CUSTOM</display-name>
   
       <context-param>
     <param-name>serviceStrategy</param-name>
@@ -42,12 +42,12 @@
     <param-value>true</param-value>
   </context-param>
   -->
-    <!-- 
-    <context-param>
+    
+    <!-- <context-param>
       <param-name>PROXY_BASE_URL</param-name>
-      <param-value>http://82.58.146.45/geoserver</param-value>
-    </context-param>
-     -->
+      <param-value>https://XXXXX.XXXXXXXXXX.XXXX/geoserver</param-value>
+    </context-param> -->
+    
    
      <!--
     <context-param>
@@ -103,27 +103,27 @@
      </init-param>
    </filter>
 
-   <filter>
+   <!-- <filter>
      <filter-name>Request Logging Filter</filter-name>
      <filter-class>org.geoserver.filters.LoggingFilter</filter-class>
-     <init-param>
+     <init-param> -->
          <!-- The 'enabled' parameter is a boolean value, "true" (case-insensitive) for true or
               any other value for false.  If enabled, then the logging will be performed;
               otherwise the logging filter will have no effect.  If not specified, this 
               parameter defaults to false.
               -->
-         <param-name>enabled</param-name>
+         <!-- <param-name>enabled</param-name>
          <param-value>false</param-value>
      </init-param>
-     <init-param>
+     <init-param> -->
          <!-- The 'log-request-headers' parameter is a boolean value, "true" (case-insensitive) for
               true or any other value for false.  If enabled, then the logging will include the HTTP 
               headers of requests.  If not specified, this parameter defaults to false.
               -->
-         <param-name>log-request-headers</param-name>
+         <!-- <param-name>log-request-headers</param-name>
          <param-value>false</param-value>
      </init-param>  
-     <init-param>
+     <init-param> -->
      <!-- The 'log-request-bodies' parameter is a boolean value, "true" (case-insensitive) for
           true or any other value for false.  If enabled, then the logging will include the body
           of POST and PUT requests.  If not specified, this parameter defaults to false.
@@ -131,10 +131,10 @@
           not begin to process requests until the entire request body has been received by the 
           server.
           -->
-     <param-name>log-request-bodies</param-name>
+     <!-- <param-name>log-request-bodies</param-name>
      <param-value>false</param-value>
      </init-param>
-   </filter>
+   </filter> -->
    
    <filter>
      <filter-name>Advanced Dispatch Filter</filter-name>
@@ -242,10 +242,10 @@
       <url-pattern>/*</url-pattern>
     </filter-mapping>
     
-    <filter-mapping>
+    <!-- <filter-mapping>
       <filter-name>Request Logging Filter</filter-name>
       <url-pattern>/*</url-pattern>
-    </filter-mapping>
+    </filter-mapping> -->
    
     <!-- 
       If you want to use your security system comment out this one too
@@ -276,9 +276,9 @@
     </listener>
     
     <!-- logging initializer, should execute before spring context startup -->
-    <listener>
+    <!-- <listener>
       <listener-class>org.geoserver.logging.LoggingStartupContextListener</listener-class>
-    </listener>
+    </listener> -->
   
     <!--  spring context loader -->
     <listener>

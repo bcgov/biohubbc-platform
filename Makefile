@@ -145,6 +145,12 @@ n8n-container: ## Executes into the n8n container.
 	@echo "==============================================="
 	@docker-compose exec n8n sh
 
+geoserver-container: ## Executes into the geoserver container.
+	@echo "==============================================="
+	@echo "Shelling into geoserver container"
+	@echo "==============================================="
+	@docker-compose exec geoserver bash
+
 ## ------------------------------------------------------------------------------
 ## Database migration commands
 ## ------------------------------------------------------------------------------

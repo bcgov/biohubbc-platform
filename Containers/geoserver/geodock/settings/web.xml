@@ -42,12 +42,12 @@
     <param-value>true</param-value>
   </context-param>
   -->
-    <!-- 
+    
     <context-param>
       <param-name>PROXY_BASE_URL</param-name>
-      <param-value>http://82.58.146.45/geoserver</param-value>
+      <param-value>https://XXXXX.XXXXXXXXXX.XXXX/geoserver</param-value>
     </context-param>
-     -->
+    
    
      <!--
     <context-param>
