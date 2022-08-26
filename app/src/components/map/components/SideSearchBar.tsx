@@ -1,4 +1,4 @@
-import { Box, Button, Grid, Paper, Typography } from '@mui/material';
+import { Box, Button } from '@mui/material';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
@@ -121,7 +121,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   // };
 
   return (
-    <Box component={Paper} p={4} width={500}>
+    <>
       <Formik<IDatasetSearchForm>
         innerRef={formikRef}
         enableReinitialize={true}
@@ -132,29 +132,18 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
         onSubmit={handleDatasetRequestCreation}>
         {(formikProps) => (
           <Form>
-            <Box my={2}>
-              <Grid container direction="column" justifyContent="center" spacing={2}>
-                <Grid item xs={12}>
-                  <Typography variant="h3">Find BioHub Data</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box component="fieldset" width={'100%'}>
-                    <DatasetSearchForm
-                      onAreaUpdate={props.onAreaUpdate}
-                      speciesList={[
-                        { value: 'M-ALAM', label: 'Moose' },
-                        { value: 'M-ORAM', label: 'Mountain Goat' },
-                        { value: 'M-OVDA', label: 'Thinhorn sheep' },
-                        { value: 'M-OVCA', label: 'Bighorn sheep' },
-                        { value: 'B-SPOW', label: 'Spotted Owl' }
-                      ]}
-                    />
-                  </Box>
-                </Grid>
-              </Grid>
-            </Box>
+            <DatasetSearchForm
+              onAreaUpdate={props.onAreaUpdate}
+              speciesList={[
+                { value: 'M-ALAM', label: 'Moose' },
+                { value: 'M-ORAM', label: 'Mountain Goat' },
+                { value: 'M-OVDA', label: 'Thinhorn sheep' },
+                { value: 'M-OVCA', label: 'Bighorn sheep' },
+                { value: 'B-SPOW', label: 'Spotted Owl' }
+              ]}
+            />
 
-            <Box mt={5} display="flex" justifyContent="flex-end">
+            <Box mt={4}>
               <Button
                 fullWidth={true}
                 onClick={formikProps.submitForm}
@@ -162,14 +151,17 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                 color="primary"
                 size="large"
                 type="submit"
-                data-testid="dataset-find-button">
+                data-testid="dataset-find-button"
+                sx={{
+                  fontWeight: 700
+                }}>
                 Find Data
               </Button>
             </Box>
           </Form>
         )}
       </Formik>
-    </Box>
+    </>
   );
 };
 

@@ -2,7 +2,7 @@ import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, IconButton, InputLabel, List } from '@mui/material';
 import Box from '@mui/material/Box';
-import Grid from '@mui/material/Grid';
+import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
@@ -59,23 +59,31 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   return (
     <>
-      <Box mb={3} maxWidth={'72ch'}>
-        <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+      <Typography variant="h3" component="h1"
+        sx={{
+          mb: 4
+        }}
+      >
+        Map Search
+      </Typography>
+      <Box component="fieldset">
+        <Box component="legend" mb={2} p={0}
+          sx={{
+            fontWeight: 700
+          }}
+        >
           What do you want to find?
-        </Typography>
-      </Box>
-
-      <Grid container spacing={4} direction="column">
-        <Grid item xs={12}>
-          <InputLabel id="datasetmenu_label">Dataset</InputLabel>
+        </Box>
+        <FormControl fullWidth>
+          <InputLabel id="dataset-menu">Dataset</InputLabel>
           <Select
             fullWidth={true}
             id={`dataset`}
             name={`dataset`}
             labelId="dataset-menu"
-            label="Dataset Menu"
+            label="Dataset"
             value={formikProps.values.dataset}
-            inputProps={{ 'aria-label': 'Dataset option' }}
+            inputProps={{ 'aria-label': 'Dataset' }}
             onChange={(item) => {
               formikProps.setFieldValue('dataset', item.target.value);
             }}>
@@ -86,25 +94,39 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
               Species Inventory Project
             </MenuItem>
           </Select>
-        </Grid>
-        <Grid item xs={12}>
+        </FormControl>
+        <Box mt={3}>
           <MultiAutocompleteField
             id={`species_list`}
             label={'Select Species'}
             options={props.speciesList}
             required={false}
           />
-        </Grid>
-        <Grid item xs={12}>
-          <Box mb={3} maxWidth={'72ch'}>
-            <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-              Define area of interest
-            </Typography>
-            <Typography variant="body1">
-              Define your area of interest by selecting an option below OR use the drawing tools on the map.
-            </Typography>
-          </Box>
-          <Button color="primary" data-testid="select-region" variant="outlined" sx={{ marginRight: 1 }}>
+        </Box>
+      </Box>
+
+      <Box component="fieldset" mt={5}>
+        <Box component="legend" mb={1} p={0}
+          sx={{
+            fontWeight: 700
+          }}
+        >
+          Define area of interest
+        </Box>
+        <Typography variant="body1" color="textSecondary"
+          sx={{
+            mb: 3
+          }}
+        >
+          Define your area of interest by selecting an option below OR use the drawing tools on the map.
+        </Typography>
+        
+        <Box>
+          <Button color="primary" data-testid="select-region" variant="outlined"
+            sx={{
+              mr: 1
+            }}
+          >
             Select Region
           </Button>
 
@@ -138,8 +160,8 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
               </>
             )}
           />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </>
   );
 };
