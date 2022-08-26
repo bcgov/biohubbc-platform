@@ -6,12 +6,12 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultList from 'features/datasets/components/SearchResultList';
+import SearchResultList, { IDatasetVisibility, IDataType } from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';
 import { ISpatialData } from 'interfaces/useSearchApi.interface';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export interface IDatasetRequest {
   criteria: {
@@ -37,10 +37,12 @@ export interface SideSearchBarProps {
     unknown
   >;
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
+  onDatasetToggleVisibility: (datasets: IDatasetVisibility) => void;
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
+  const [showForm, setShowForm] = useState(false)
 
   /**
    * Handle dataset requests.
@@ -76,8 +78,23 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const toggleForm = () => {
     setShowForm(!showForm);
   }
+
+  const temp: IDataType[] = [
+    {
+      dataset_id: "62",
+      dataset_name: "Moose",
+      number_of_records: 1
+    },
+    {
+      dataset_id: "55-22-44-44",
+      dataset_name: "Ducks",
+      number_of_records: 15
+    }
+  ]
+
   return (
     <>
+    {showForm && 
       <Formik<IDatasetSearchForm>
         innerRef={formikRef}
         enableReinitialize={true}
@@ -117,6 +134,15 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
           </Form>
         )}
       </Formik>
+    }
+      
+    {!showForm && 
+      <SearchResultList
+        items={temp} 
+        backToSearch={() => toggleForm()}
+        toggleDataSet={props.onDatasetToggleVisibility}
+      />
+    }
     </>
   );
 };

@@ -20,6 +20,7 @@ describe('MapContainer', () => {
     const staticLayers: IStaticLayer[] = [
       {
         layerName: 'test layer',
+        visible: true,
         features: [
           {
             geoJSON: {

@@ -6,6 +6,7 @@ import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/Sta
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -55,17 +56,19 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
+  const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
+
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;
     }
 
-    const result = parseSpatialDataByType(mapDataLoader.data);
+    const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
 
-    setStaticLayers([...staticLayers, result.staticLayers[0]]);
+    setStaticLayers([result.staticLayers[0]]);
     setMarkerLayers(result.markerLayers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapDataLoader.data]);
+  }, [mapDataLoader.data, datasetVisibility]);
 
   useEffect(() => {
     if (!loadedFromUrl.current) {
@@ -120,15 +123,19 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         };
         layers.push(staticLayerFeature);
       });
-      const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, visible: true };
       setStaticLayers([staticLayer]);
     });
   };
 
+  const onToggleDatasetVisibility = (datasets: IDatasetVisibility) => {
+    setDatasetVisibility(datasets);
+  }
+
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
       <Box flex="0 0 auto" py={4} px={3} width="500px">
-        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} />
+        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} onDatasetToggleVisibility={onToggleDatasetVisibility} />
       </Box>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer

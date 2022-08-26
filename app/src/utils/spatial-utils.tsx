@@ -3,14 +3,15 @@ import { IStaticLayer } from 'components/map/components/StaticLayers';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import { isObject } from './Utils';
 
-export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
+export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datasetVisibility: IDatasetVisibility = {}) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
-  const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
+  const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true };
 
   for (const spatialRecord of spatialDataRecords) {
     if (isEmptyObject(spatialRecord.spatial_data)) {
@@ -18,6 +19,8 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
     }
 
     for (const feature of spatialRecord.spatial_data.features) {
+      const visible = datasetVisibility[spatialRecord.submission_spatial_component_id] === undefined ? true : datasetVisibility[spatialRecord.submission_spatial_component_id]
+
       if (feature.geometry.type === 'GeometryCollection') {
         // Not expecting or supporting geometry collections
         continue;
@@ -32,6 +35,7 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
       }
 
       if (isBoundaryFeature(feature)) {
+        boundaryStaticLayer.visible = visible;
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
@@ -40,6 +44,7 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[]) => {
       }
 
       if (isBoundaryCentroidFeature(feature)) {
+        boundaryStaticLayer.visible = visible;
         boundaryStaticLayer.features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,

@@ -25,6 +25,7 @@ export interface IStaticLayerFeature {
 export interface IStaticLayer {
   layerName: string;
   features: IStaticLayerFeature[];
+  visible: boolean;
 }
 
 export interface IStaticLayersProps {
@@ -44,8 +45,8 @@ const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (pro
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked name={layer.layerName} key={`static-layer-${layer.layerName}`}>
-        <FeatureGroup key={`static-feature-group-${layer.layerName}`}>
+      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`static-layer-${(Math.random() + 1).toString(36).substring(7)}`}>
+        <FeatureGroup key={`static-feature-group-${(Math.random() + 1).toString(36).substring(7)}`}>
           {layer.features.map((item, index) => {
             const id = item.key || item.geoJSON.id || index;
 
