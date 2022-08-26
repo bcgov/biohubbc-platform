@@ -175,7 +175,8 @@ objects:
     spec:
       host: ${HOST}
       tls:
-        insecureEdgeTerminationPolicy: Redirect
+        # `Allow` is normally set to `Redirect` to ensure http traffic is redirected to https, but this requires non-default configuration in tomcat that has not yet been set up
+        insecureEdgeTerminationPolicy: Allow
         termination: edge
       to:
         kind: Service
