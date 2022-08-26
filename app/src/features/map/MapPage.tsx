@@ -111,8 +111,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     console.log('areas', areas);
 
     // SET STATIC LAYER
-    const layers: IStaticLayerFeature[] = [];
+    const staticLayers: IStaticLayer[] = [];
     areas.forEach((area) => {
+      const layers: IStaticLayerFeature[] = [];
       area.features.forEach((feature: Feature<Polygon>) => {
         const staticLayerFeature: IStaticLayerFeature = {
           geoJSON: feature,
@@ -121,8 +122,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         layers.push(staticLayerFeature);
       });
       const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
-      setStaticLayers([staticLayer]);
+      staticLayers.push(staticLayer);
     });
+
+    setStaticLayers(staticLayers);
   };
 
   return (
