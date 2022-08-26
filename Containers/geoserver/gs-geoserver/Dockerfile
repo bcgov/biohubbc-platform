@@ -67,7 +67,9 @@ RUN wget -q -O /tmp/geoserver.zip https://downloads.sourceforge.net/project/geos
     unzip -q $CATALINA_HOME/webapps/geoserver.war -d $CATALINA_HOME/webapps/geoserver && \
     rm $CATALINA_HOME/webapps/geoserver.war && \
     mv $CATALINA_HOME/webapps/geoserver/WEB-INF/lib/marlin-0.9.3.jar $CATALINA_HOME/lib/marlin.jar && \
-    mkdir -p $GEOSERVER_DATA_DIR
+    mkdir -p $GEOSERVER_DATA_DIR && \
+    mkdir -p $ADDITIONAL_LIBS_DIR && \
+    mkdir -p $ADDITIONAL_FONTS_DIR
 
 COPY $GS_DATA_PATH $GEOSERVER_DATA_DIR
 COPY $ADDITIONAL_LIBS_PATH $GEOSERVER_LIB_DIR
@@ -81,6 +83,22 @@ RUN apt purge -y && \
 # copy scripts
 COPY *.sh /opt/
 RUN chmod +x /opt/*.sh
+
+RUN chmod -R 777 ${CATALINA_HOME}
+RUN chmod -R 777 ${GEOSERVER_DATA_DIR}
+RUN chmod -R 777 ${ADDITIONAL_LIBS_DIR}
+RUN chmod -R 777 ${ADDITIONAL_FONTS_DIR}
+
+# Setup non-root user
+ENV USER_ID=1001
+ENV GROUP_ID=root
+ENV USER=geoserver
+RUN useradd -rm -d /home/$USER -s /bin/bash -g $GROUP_ID -G sudo -u $USER_ID $USER
+RUN chown -R $USER_ID:$GROUP_ID $CATALINA_HOME $GEOSERVER_DATA_DIR $ADDITIONAL_LIBS_DIR $ADDITIONAL_FONTS_DIR
+USER $USER
+
+
+EXPOSE 8080 8443
 
 ENTRYPOINT /opt/startup.sh
 
