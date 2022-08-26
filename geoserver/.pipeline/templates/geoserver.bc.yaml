@@ -45,3 +45,11 @@ objects:
           importPolicy: {}
           referencePolicy:
             type: Source
+      successfulBuildsHistoryLimit: 5
+      triggers:
+        - type: ImageChange
+          imageChange:
+            from:
+              kind: ImageStreamTag
+              name: '${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}'
+              namespace: ${SOURCE_IMAGE_NAMESPACE}
