@@ -56,8 +56,6 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
   const classes = useStyles();
 
   const formikProps = useFormikContext<IDatasetSearchForm>();
-  // console.log('props in datasetSearchForm:', props);
-  // console.log('formikprops values in datasearch form:', formikProps.values);
 
   return (
     <>
@@ -81,10 +79,10 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             onChange={(item) => {
               formikProps.setFieldValue('dataset', item.target.value);
             }}>
-            <MenuItem key={1} value={'Species Observations'}>
+            <MenuItem key={'Occurrence'} value={'Occurrence'}>
               Species Observations
             </MenuItem>
-            <MenuItem key={2} value={'Species Inventory Project'}>
+            <MenuItem key={'Boundary Centroid'} value={'Boundary Centroid'}>
               Species Inventory Project
             </MenuItem>
           </Select>

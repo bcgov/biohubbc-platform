@@ -441,6 +441,7 @@ export class SpatialRepository extends BaseRepository {
       .from(knex.raw('with_filtered_spatial_component as wfsc'));
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+    console.log(queryBuilder.toSQL().toNative().sql);
 
     return response.rows;
   }
@@ -530,6 +531,8 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
+      console.log(queryBuilder.toSQL().toNative().sql);
+
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
     return response.rows;
@@ -566,7 +569,7 @@ export class SpatialRepository extends BaseRepository {
     qb1.where((qb2) => {
       for (const singleSpecies of species) {
         // Append OR clause for each item in species array
-        qb2.and.where((qb3) => {
+        qb2.or.where((qb3) => {
           qb3.whereRaw(
             `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.associatedTaxa == "${singleSpecies}")')`
           );

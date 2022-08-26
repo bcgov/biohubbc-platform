@@ -7,7 +7,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/eml/search');
+const defaultLog = getLogger('paths/dwc/spatial/search');
 
 export const GET: Operation = [searchSpatialComponents()];
 
@@ -94,7 +94,8 @@ GET.apiDoc = {
                       maxProperties: 0,
                       description:
                         'An empty object, representing a spatial component the requester does not have sufficient privileges to view.'
-                    }
+                    },
+                    
                   ]
                 }
               }
@@ -115,6 +116,7 @@ export function searchSpatialComponents(): RequestHandler {
       datasetID: (req.query.datasetID as string[]) || [],
       boundary: JSON.parse(req.query.boundary as string) as Feature
     };
+    console.log('criteria in /paths/dwc/spatial/search: ', criteria);
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
@@ -124,6 +126,8 @@ export function searchSpatialComponents(): RequestHandler {
       const spatialService = new SpatialService(connection);
 
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
+
+      console.log('response is: ', response);
 
       await connection.commit();
 

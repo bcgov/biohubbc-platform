@@ -7,7 +7,7 @@ import DatasetSearchForm, {
 } from 'features/datasets/components/DatasetSearchForm';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature } from 'geojson';
-// import { useApi } from 'hooks/useApi';
+import { useApi } from 'hooks/useApi';
 import { useRef } from 'react';
 
 export interface IDatasetRequest {
@@ -26,7 +26,7 @@ export interface SideSearchBarProps {
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
-  // const api = useApi();
+  const api = useApi();
   // const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
@@ -39,23 +39,36 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     // try {
     const searchParams: any = {
       criteria: {
-        boundary: { type: 'Feature', geometry: [{ type: 'Polygon' }], properties: {} },
-        type: ['a'],
+        boundary: {
+          type: 'Feature',
+          geometry: [
+            {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [-146.95401365536304, 44.62175409623327],
+                  [-146.95401365536304, 63.528970541102794],
+                  [-105.07413084286304, 63.528970541102794],
+                  [-105.07413084286304, 44.62175409623327],
+                  [-146.95401365536304, 44.62175409623327]
+                ]
+              ]
+            }
+          ],
+          properties: {}
+        },
+        type: ['Occurrence'],
         species: values.species_list,
         zoom: 2, // TODO include in request params when backend is updated to receive it
-        datasetID: 'string',
         datasetName: values.dataset
       }
     };
 
-    console.log('values', values);
     console.log('searchParams', searchParams);
-    console.log('formikref.values in Side searchbar', formikRef.current?.values);
 
-    return;
-    // await api.search.getSpatialData(searchParams.criteria);
+    return await api.search.getSpatialData(searchParams.criteria);
 
-    // if (!response?.satasetID) {
+    // if (!response?.datasetID) {
     //   showCreateErrorDialog({
     //     dialogError: 'The response from the server was null, or did not contain a project ID.'
     //   });
@@ -129,9 +142,11 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                     <DatasetSearchForm
                       onAreaUpdate={props.onAreaUpdate}
                       speciesList={[
-                        { value: '1', label: 'Moose' },
-                        { value: '2', label: 'Thinhorn sheep' },
-                        { value: '3', label: 'Bighorn sheep' }
+                        { value: 'M-ALAM', label: 'Moose' },
+                        { value: 'M-ORAM', label: 'Mountain Goat' },
+                        { value: 'M-OVDA', label: 'Thinhorn sheep' },
+                        { value: 'M-OVCA', label: 'Bighorn sheep' },
+                        { value: 'B-SPOW', label: 'Spotted Owl' }
                       ]}
                     />
                   </Box>

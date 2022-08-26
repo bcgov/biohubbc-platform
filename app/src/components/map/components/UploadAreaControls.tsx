@@ -21,8 +21,8 @@ const UploadAreaControls: React.FC<React.PropsWithChildren<UploadAreaControlsPro
   const [openUploadArea, setOpenUploadArea] = useState(false);
 
   const submitArea = (values: IFormikAreaUpload) => {
-    console.log('values', values);
-    console.log('formikProps.values.area', formikProps.values.area);
+    // console.log('values', values);
+    // console.log('formikProps.values.area', formikProps.values.area);
 
     formikProps.setFieldValue('area', [...formikProps.values.area, values]);
     props.onAreaUpdate([...formikProps.values.area, values]);
