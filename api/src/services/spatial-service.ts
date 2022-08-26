@@ -184,7 +184,8 @@ export class SpatialService extends DBService {
     }
       
     return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
-      */
+     * <<<<<
+     */
 
 
 
