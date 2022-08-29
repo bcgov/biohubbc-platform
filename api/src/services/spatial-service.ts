@@ -8,6 +8,7 @@ import {
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { DBService } from './db-service';
+import { UserService } from './user-service';
 
 export class SpatialService extends DBService {
   spatialRepository: SpatialRepository;
@@ -167,6 +168,12 @@ export class SpatialService extends DBService {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
+    const userService = new UserService(this.connection);
+
+    if (await userService.isSystemUserAdmin()) {
+      return this.spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(criteria);
+    }
+
     return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
   }
 
@@ -217,10 +224,19 @@ export class SpatialService extends DBService {
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submissionSpatialComponentId: number
   ): Promise<Record<string, string>> {
+    const userService = new UserService(this.connection);
+
+    if (await userService.isSystemUserAdmin()) {
+      const adminResponse = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdasAdmin(
+        submissionSpatialComponentId
+      );
+      return (adminResponse.spatial_component?.spatial_data?.features[0]?.properties as Record<string, string>) || {};
+    }
+
     const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentId(
       submissionSpatialComponentId
     );
 
-    return (response.spatial_component?.features[0]?.properties as Record<string, string>) || {};
+    return (response.spatial_component?.spatial_data?.features[0]?.properties as Record<string, string>) || {};
   }
 }
