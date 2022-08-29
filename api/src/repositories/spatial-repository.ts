@@ -64,6 +64,9 @@ export type EmptyObject = Record<string, never>;
 
 export interface ISubmissionSpatialSearchResponseRow {
   spatial_component: {
+    dataset_id?: string;
+    associated_taxa?: string;
+    vernacular_name?: string;
     submission_spatial_component_id: number;
     spatial_data: FeatureCollection | EmptyObject;
   };
@@ -467,6 +470,15 @@ export class SpatialRepository extends BaseRepository {
             knex.raw(
               'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
             ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
+            ),
             'ssc.submission_spatial_component_id',
             'ssc.submission_id',
             'ssc.spatial_component',
@@ -510,6 +522,12 @@ export class SpatialRepository extends BaseRepository {
             jsonb_build_object(
               'submission_spatial_component_id',
                 wfscwst.submission_spatial_component_id,
+              'dataset_id',
+                wfscwst.dataset_id,
+              'associated_taxa',
+                wfscwst.associated_taxa,
+              'vernacular_name',
+                wfscwst.vernacular_name,
               'spatial_data',
                 -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
                 -- then: return the spatial component
@@ -532,10 +550,8 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-    console.log(queryBuilder.toSQL().toNative().sql);
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-
+    console.log(response.rows)
     return response.rows;
   }
 

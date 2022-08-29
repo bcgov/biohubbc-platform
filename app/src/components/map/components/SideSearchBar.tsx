@@ -43,6 +43,7 @@ export interface SideSearchBarProps {
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
   const [showForm, setShowForm] = useState(true)
+  const [selectedSpecies, setSelectedSpecies] = useState<string[]>([])
 
   /**
    * Handle dataset requests.
@@ -61,7 +62,9 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     });
 
     // const geoCollection:Feature<GeometryCollection> = {};
+    console.log(values)
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
+    setSelectedSpecies(values.species_list)
     toggleForm()
   };
 
@@ -81,19 +84,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const toggleForm = () => {
     setShowForm(!showForm);
   }
-
-  const temp: IDataType[] = [
-    {
-      dataset_id: "62",
-      dataset_name: "Moose",
-      number_of_records: 1
-    },
-    {
-      dataset_id: "55-22-44-44",
-      dataset_name: "Ducks",
-      number_of_records: 15
-    }
-  ]
 
   return (
     <>
@@ -141,7 +131,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       
     {!showForm && 
       <SearchResultList
-        items={temp}
+        mapDataLoader={props.mapDataLoader}
+        species={selectedSpecies}
         backToSearch={() => toggleForm()}
         onToggleDataVisibility={props.onToggleDataVisibility}
       />

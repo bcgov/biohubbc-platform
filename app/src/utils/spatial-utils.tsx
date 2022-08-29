@@ -9,6 +9,33 @@ import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import { isObject } from './Utils';
 
+export interface ISpatialDataGroupedBySpecies {
+  [species: string]: ISpatialData[]
+}
+
+export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) => {
+  const grouped: ISpatialDataGroupedBySpecies = {};
+
+  for (const spatialRecord of spatialDataRecords) {
+    // ignore empty objects
+    if (isEmptyObject(spatialRecord.spatial_data)) {
+      continue;
+    }
+
+    // check for taxa property
+    if (spatialRecord.associated_taxa) {
+      // start group for first item
+      if (!grouped[spatialRecord.associated_taxa]) {
+        grouped[spatialRecord.associated_taxa] = []
+      }
+
+      grouped[spatialRecord.associated_taxa] = [... grouped[spatialRecord.associated_taxa], spatialRecord]
+    }
+  }
+  
+  return grouped
+}
+
 export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datasetVisibility: IDatasetVisibility = {}) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true };
