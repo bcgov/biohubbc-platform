@@ -40,7 +40,7 @@ export const AreaToolTip: React.FC<React.PropsWithChildren<{ name: string }>> = 
   return (
     <Box mb={1}>
       <Typography variant="overline" className={classes.pointType}>
-        Area
+        Area:
       </Typography>
       {props.name && (
         <Typography className={classes.date} component="h6" variant="subtitle1">

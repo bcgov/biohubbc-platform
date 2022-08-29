@@ -16,7 +16,6 @@ import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
-  //const dialogContext = useContext(DialogContext);
 
   const url = useURL<{
     mapViewBoundary: Feature<Polygon> | undefined;

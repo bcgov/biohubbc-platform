@@ -57,20 +57,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       });
     });
 
-    // const geoCollection:Feature<GeometryCollection> = {};
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
   };
-
-  // //User uploads boundary for search
-  // const onAreaUpload = (area: IFormikAreaUpload) => {
-  //   //SET BOUNDS
-  //   const bounds = calculateUpdatedMapBounds(area.features);
-  //   if (bounds) {
-  //     const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
-  //     setShouldUpdateBounds(true);
-  //     setUpdatedBounds(newBounds);
-  //   }
-  // };
 
   return (
     <>
@@ -116,9 +104,5 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     </>
   );
 };
-
-// function showCreateErrorDialog(arg0: { dialogError: string }) {
-//   throw new Error('Function not implemented.');
-// }
 
 export default SideSearchBar;
