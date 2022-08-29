@@ -1,10 +1,8 @@
 import { Feature, FeatureCollection } from 'geojson';
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
-import { SYSTEM_ROLE } from '../constants/roles';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { UserService } from '../services/user-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -366,37 +364,6 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Query builder to find spatial component by given criteria.
-   *
-   * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
-   * @memberof SpatialRepository
-   */
-  async findSpatialComponentsByCriteria(
-    criteria: ISpatialComponentsSearchCriteria
-  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-
-    const userService = new UserService(this.connection);
-
-    const userObject = await userService.getUserById(this.connection.systemUserId());
-
-    if (
-      [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
-        userObject.role_names.includes(systemRole)
-      )
-    ) {
-      // Fetch all non-secure records that match the search criteria
-      return this._findSpatialComponentsByCriteriaAsAdminUser(criteria);
-    }
-
-    // Fetch all records (non-secure and/or secure, depending on the security rules applied and any user exceptions)
-    // that match the search criteria
-    return this._findSpatialComponentsByCriteria(criteria);
-  }
-
-  /**
-=======
->>>>>>> 92cc1ed8213d903d3120cd7ae98e9d2bf8fe176d
    * Query builder to find spatial component by given criteria, specifically for admin users that bypass all security
    * rules.
    *
@@ -404,7 +371,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialRepository
    */
-  async _findSpatialComponentsByCriteriaAsAdminUser(
+  async findSpatialComponentsByCriteriaAsAdminUser(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
@@ -455,7 +422,7 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialRepository
    */
-  async _findSpatialComponentsByCriteria(
+  async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
