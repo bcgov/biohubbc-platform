@@ -22,22 +22,6 @@ describe('download', () => {
 
       describe('should throw an error when', () => {
         describe('boundry', () => {
-          it('is undefined', async () => {
-            const request = {
-              headers: {
-                'content-type': 'application/json'
-              },
-              query: {
-                datasetID: []
-              }
-            };
-
-            const response = requestValidator.validateRequest(request);
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal("must have required property 'boundary'");
-          });
-
           it('is null', async () => {
             const request = {
               headers: {
@@ -53,10 +37,10 @@ describe('download', () => {
 
             expect(response.status).to.equal(400);
             expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be array');
           });
 
-          it('is not a string', async () => {
+          it('is not a array', async () => {
             const request = {
               headers: {
                 'content-type': 'application/json'
@@ -71,7 +55,7 @@ describe('download', () => {
 
             expect(response.status).to.equal(400);
             expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be array');
           });
         });
 
@@ -82,7 +66,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 datasetID: [],
                 type: 'not an array'
               }
@@ -103,7 +87,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null'
+                boundary: []
               }
             };
 
@@ -120,7 +104,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 datasetID: null
               }
             };
@@ -138,7 +122,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 type: [],
                 datasetID: 'not an array'
               }
@@ -251,7 +235,7 @@ describe('download', () => {
 
       mockReq.query = {
         type: ['type'],
-        boundary: JSON.stringify(boundaryFeature)
+        boundary: [JSON.stringify(boundaryFeature)]
       };
 
       sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').throws(new Error('test error'));
@@ -283,7 +267,7 @@ describe('download', () => {
 
       mockReq.query = {
         type: ['type'],
-        boundary: JSON.stringify(boundaryFeature),
+        boundary: [JSON.stringify(boundaryFeature)],
         datasetID: [datasetID]
       };
 

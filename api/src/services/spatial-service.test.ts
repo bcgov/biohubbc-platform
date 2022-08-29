@@ -256,7 +256,7 @@ describe('SpatialService', () => {
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence'],
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       const response = await spatialService.findSpatialComponentsByCriteria(mockSearchCriteria);
@@ -280,7 +280,7 @@ describe('SpatialService', () => {
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence'],
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       await spatialService.findSpatialComponentsByCriteria(mockSearchCriteria);
@@ -304,7 +304,7 @@ describe('SpatialService', () => {
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence'],
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       await spatialService.findSpatialComponentsByCriteria(mockSearchCriteria);
@@ -340,7 +340,7 @@ describe('SpatialService', () => {
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence'],
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       const response = await spatialService.findSpatialComponentsByCriteria(mockSearchCriteria);
