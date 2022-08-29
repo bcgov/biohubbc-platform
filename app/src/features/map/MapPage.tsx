@@ -101,14 +101,11 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     // Store drawn bounds in URL
     url.appendQueryParams({ drawnBoundary: bounds });
-    console.log('[searchBoundary]', [searchBoundary]);
 
     mapDataLoader.refresh([searchBoundary], type, [], zoom);
   };
 
   const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
-    console.log('areas', areas);
-
     // SET STATIC LAYER
     const staticLayers: IStaticLayer[] = [];
     areas.forEach((area) => {

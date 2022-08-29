@@ -477,8 +477,6 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-    console.log(queryBuilder.toSQL().toNative().sql);
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
     return response.rows;
   }
