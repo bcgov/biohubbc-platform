@@ -6,7 +6,8 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultList, { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
+import SearchResultOccurrenceList from 'features/datasets/components/SearchResultOccurrenceList';
+import SearchResultProjectList, { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';
@@ -43,8 +44,7 @@ export interface SideSearchBarProps {
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
   const [showForm, setShowForm] = useState(true)
-  const [selectedSpecies, setSelectedSpecies] = useState<string[]>([])
-
+  const [datasetType, setDatasetType] = useState<string>("")
   /**
    * Handle dataset requests.
    */
@@ -63,7 +63,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     // const geoCollection:Feature<GeometryCollection> = {};
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
-    setSelectedSpecies(values.species_list)
+    setDatasetType(values.dataset)
     toggleForm()
   };
 
@@ -126,13 +126,21 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       </Formik>
     }
       
-    {!showForm && 
-      <SearchResultList
-        mapDataLoader={props.mapDataLoader}
-        species={selectedSpecies}
-        backToSearch={() => toggleForm()}
-        onToggleDataVisibility={props.onToggleDataVisibility}
-      />
+    {!showForm && (
+      datasetType == "Boundary Centroid" ? (
+        <SearchResultProjectList
+          mapDataLoader={props.mapDataLoader}
+          backToSearch={() => toggleForm()}
+          onToggleDataVisibility={props.onToggleDataVisibility}
+        />
+      ) : (
+        <SearchResultOccurrenceList
+          mapDataLoader={props.mapDataLoader}
+          backToSearch={() => toggleForm()}
+          onToggleDataVisibility={props.onToggleDataVisibility}
+        />
+      )
+    )
     }
     </>
   );

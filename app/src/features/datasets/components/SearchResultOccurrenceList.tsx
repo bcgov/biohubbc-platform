@@ -5,46 +5,29 @@ import Checkbox from '@mui/material/Checkbox';
 import React, { useEffect, useState } from 'react';
 import { Container } from '@mui/system';
 import { Button } from '@mui/material';
-import { DataLoader } from 'hooks/useDataLoader';
-import { ISpatialData } from 'interfaces/useSearchApi.interface';
-import { Feature, GeoJsonProperties, Geometry } from 'geojson';
+import { groupSpatialDataBySpecies, ISpatialDataGroupedBySpecies } from 'utils/spatial-utils';
+import { IDatasetVisibility, ISearchResultListProps } from './SearchResultProjectList';
 
-export interface ISearchResultListProps {
-    mapDataLoader: DataLoader<
-    [
-      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
-      searchType: string[],
-      species?: string[],
-      searchZoom?: number,
-      datasetID?: string
-    ],
-    ISpatialData[],
-    unknown
-    >;
-    onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
-    backToSearch: () => void;
-}
-
-export interface IDatasetVisibility {
-    [details: string]: boolean
-}
-
-// this should be two components, one for the occurence and one for projects
 const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => {
+    const [groupedSpatialData, setGroupedSpatialData] = useState<ISpatialDataGroupedBySpecies>({})
     const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
     const {mapDataLoader} = props
 
+    
     useEffect(() => {
         if (!mapDataLoader.data) {
             return;
         }
+        console.log(mapDataLoader.data)
+        const groupedData = groupSpatialDataBySpecies(mapDataLoader.data);
         
-        const setup = {};
-        mapDataLoader.data.forEach(item => {
-            setup[item.submission_spatial_component_id] = true
-        })
+        const setup = {}
+        for(const key in groupedData) {
+            setup[key] = true
+        }
         setDatasetVisibility(setup)
-    }, [mapDataLoader.data])
+        setGroupedSpatialData(groupedData)
+    }, [props.mapDataLoader.data])
 
     const toggleVisibility = (dataset_id: string) => {
         const udpated = datasetVisibility
@@ -54,12 +37,24 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
         props.onToggleDataVisibility(udpated);
     }
 
+    const countGrouped = (groupedData: ISpatialDataGroupedBySpecies) => {
+        let count = 0;
+        for (const key in groupedData) {
+            const item = groupedData[key]
+            if (item) {
+                count += item.length
+            }
+        }
+
+        return count;
+    }
+
     return (
     <>
         <Box mb={3} flexDirection={"column"}>
             <Grid item xs={8}>
                 <Typography variant="h6">
-                    Found {mapDataLoader.data?.length} observations
+                    Found {countGrouped(groupedSpatialData)} observations
                 </Typography>
             </Grid>
             <Grid item xs={4}>
@@ -73,23 +68,23 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
         <Container maxWidth="xl">
             <Box>
                 <Grid container direction={"column"} justifyContent="center">
-                    {mapDataLoader.data?.map((item: ISpatialData, index: number) => {
+                    {Object.keys(groupedSpatialData).map((key: string, index: number) => {
                         return (
-                            <Grid container direction="row" alignItems={"center"} key={`${item.submission_spatial_component_id}-${index}`}>
+                            <Grid container direction="row" alignItems={"center"} key={`${key}-${index}`}>
                                 <Grid item xs={3}>
                                     <Checkbox
-                                        checked={datasetVisibility[item.submission_spatial_component_id] == undefined ? true : datasetVisibility[item.submission_spatial_component_id]}
-                                        onChange={() => toggleVisibility(`${item.submission_spatial_component_id}`)}
+                                        checked={datasetVisibility[key] == undefined ? true : datasetVisibility[key]}
+                                        onChange={() => toggleVisibility(key)}
                                     />
                                 </Grid>
                                 <Grid item xs={4}>
                                     <Typography variant="body1" color="textPrimary">
-                                        {item.spatial_data.features[0].properties?.datasetTitle}
+                                        {key}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={5}>
                                     <Typography variant="body1" color="textPrimary">
-                                        {0} records
+                                        {groupedSpatialData[key].length} records
                                     </Typography>
                                 </Grid>
                             </Grid>

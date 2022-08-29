@@ -6,7 +6,7 @@ import { IStaticLayer, IStaticLayerFeature, IStaticLayerMap } from 'components/m
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -64,21 +64,20 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     if (!mapDataLoader.data) {
       return;
     }
-
-    console.log("Map page")
-    console.log(datasetVisibility)
-
+    
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    staticLayerMap['62'] = result.staticLayers[0]
-
+    const id = result.staticLayers[0].dataset_id
+    
+    staticLayerMap[id] = result.staticLayers[0]
     setStaticLayerMap(staticLayerMap);
-    setMarkerLayers(result.markerLayers);
-
+    
     const layers: IStaticLayer[] = []
     for(const key in staticLayerMap) {
       layers.push(staticLayerMap[key])
     }
 
+
+    setMarkerLayers(result.markerLayers);
     setStaticLayers(layers);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,7 +136,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         };
         layers.push(staticLayerFeature);
       });
-      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, visible: true };
+      const staticLayer: IStaticLayer = { dataset_id: area.name, layerName: area.name, features: layers };
       setStaticLayerMap({... staticLayerMap, [area.name]: staticLayer});
       setStaticLayers([staticLayer]);
     });

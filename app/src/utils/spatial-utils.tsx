@@ -3,7 +3,7 @@ import { IStaticLayer } from 'components/map/components/StaticLayers';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
@@ -38,7 +38,7 @@ export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) =>
 
 export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datasetVisibility: IDatasetVisibility = {}) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
-  const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true };
+  const boundaryStaticLayer: IStaticLayer = { dataset_id: "", layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
   for (const spatialRecord of spatialDataRecords) {
     if (isEmptyObject(spatialRecord.spatial_data)) {
@@ -47,9 +47,6 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datas
 
     for (const feature of spatialRecord.spatial_data.features) {
       let visible = true;
-      if (spatialRecord.associated_taxa) {
-        visible = datasetVisibility[spatialRecord.associated_taxa] === undefined ? true : datasetVisibility[spatialRecord.associated_taxa]
-      }
 
       if (feature.geometry.type === 'GeometryCollection') {
         // Not expecting or supporting geometry collections
@@ -57,6 +54,11 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datas
       }
 
       if (isOccurrenceFeature(feature)) {
+        // check if species has been toggled on/ off
+        if (spatialRecord.associated_taxa) {
+          visible = datasetVisibility[spatialRecord.associated_taxa] === undefined ? true : datasetVisibility[spatialRecord.associated_taxa]
+        }
+
         if (visible) {
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
@@ -67,21 +69,33 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datas
       }
 
       if (isBoundaryFeature(feature)) {
-        boundaryStaticLayer.visible = visible;
-        boundaryStaticLayer.features.push({
-          geoJSON: feature,
-          key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
-        });
+        // check if dataset has been toggled
+        if (spatialRecord.submission_spatial_component_id) {
+          visible = datasetVisibility[spatialRecord.submission_spatial_component_id] === undefined ? true : datasetVisibility[spatialRecord.submission_spatial_component_id]
+        }
+        
+        if (visible) {
+          boundaryStaticLayer.features.push({
+            geoJSON: feature,
+            key: feature.id || feature.properties.id,
+            popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          });
+        }
       }
 
       if (isBoundaryCentroidFeature(feature)) {
-        boundaryStaticLayer.visible = visible;
-        boundaryStaticLayer.features.push({
-          geoJSON: feature,
-          key: feature.id || feature.properties.id,
-          popup: <DatasetPopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
-        });
+        // check if dataset has been toggled
+        if (spatialRecord.submission_spatial_component_id) {
+          visible = datasetVisibility[spatialRecord.submission_spatial_component_id] === undefined ? true : datasetVisibility[spatialRecord.submission_spatial_component_id]
+        }
+
+        if (visible) {
+          boundaryStaticLayer.features.push({
+            geoJSON: feature,
+            key: feature.id || feature.properties.id,
+            popup: <DatasetPopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          });
+        }
       }
     }
   }
