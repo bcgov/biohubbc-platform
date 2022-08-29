@@ -5,43 +5,20 @@ import Checkbox from '@mui/material/Checkbox';
 import React, { useEffect, useState } from 'react';
 import { Container } from '@mui/system';
 import { Button } from '@mui/material';
-import { DataLoader } from 'hooks/useDataLoader';
-import { ISpatialData } from 'interfaces/useSearchApi.interface';
-import { Feature, GeoJsonProperties, Geometry } from 'geojson';
 import { groupSpatialDataBySpecies, ISpatialDataGroupedBySpecies } from 'utils/spatial-utils';
+import { IDatasetVisibility, ISearchResultListProps } from './SearchResultOccurrenceList';
 
-export interface ISearchResultListProps {
-    mapDataLoader: DataLoader<
-    [
-      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
-      searchType: string[],
-      species?: string[],
-      searchZoom?: number,
-      datasetID?: string
-    ],
-    ISpatialData[],
-    unknown
-    >;
-    species: string[];
-    onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
-    backToSearch: () => void;
-}
-
-export interface IDatasetVisibility {
-    [details: string]: boolean
-}
-
-// this should be two components, one for the occurence and one for projects
-const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
+const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
     const [groupedSpatialData, setGroupedSpatialData] = useState<ISpatialDataGroupedBySpecies>({})
     const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
     const {mapDataLoader} = props
 
+    
     useEffect(() => {
         if (!mapDataLoader.data) {
             return;
         }
-
+        console.log(mapDataLoader.data)
         const groupedData = groupSpatialDataBySpecies(mapDataLoader.data);
         
         const setup = {}
@@ -120,4 +97,4 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
     );
 }
 
-export default SearchResultList;
+export default SearchResultProjectList;
