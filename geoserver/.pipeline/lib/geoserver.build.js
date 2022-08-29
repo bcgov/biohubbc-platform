@@ -27,11 +27,11 @@ const dbBuild = (settings) => {
         NAME: name,
         SUFFIX: `${phases[phase].suffix}`,
         TARGET_IMAGE_VERSION: `${phases[phase].tag}`,
+        GIT_REPO_URL: oc.git.http_url,
+        GIT_REF: phases[phase].branch || oc.git.ref
         // SOURCE_IMAGE_NAME: 'gs-geoserver',
         // SOURCE_IMAGE_VERSION: '2.21.1',
         // SOURCE_IMAGE_NAMESPACE: 'a0ec71-tools',
-        // SOURCE_REPOSITORY_URL: oc.git.http_url,
-        // SOURCE_REPOSITORY_REF: phases[phase].branch || oc.git.ref
       }
     })
   );
