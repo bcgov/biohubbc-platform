@@ -6,7 +6,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultList, { IDatasetVisibility, IDataType } from 'features/datasets/components/SearchResultList';
+import SearchResultList, { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';
@@ -62,7 +62,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     });
 
     // const geoCollection:Feature<GeometryCollection> = {};
-    console.log(values)
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
     setSelectedSpecies(values.species_list)
     toggleForm()
@@ -78,8 +77,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   //     setUpdatedBounds(newBounds);
   //   }
   // };
-  console.log("_____________________________")
-  console.log(props.mapDataLoader.data)
 
   const toggleForm = () => {
     setShowForm(!showForm);

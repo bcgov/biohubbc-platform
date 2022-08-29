@@ -46,7 +46,10 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datas
     }
 
     for (const feature of spatialRecord.spatial_data.features) {
-      const visible = datasetVisibility[spatialRecord.submission_spatial_component_id] === undefined ? true : datasetVisibility[spatialRecord.submission_spatial_component_id]
+      let visible = true;
+      if (spatialRecord.associated_taxa) {
+        visible = datasetVisibility[spatialRecord.associated_taxa] === undefined ? true : datasetVisibility[spatialRecord.associated_taxa]
+      }
 
       if (feature.geometry.type === 'GeometryCollection') {
         // Not expecting or supporting geometry collections
@@ -54,11 +57,13 @@ export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datas
       }
 
       if (isOccurrenceFeature(feature)) {
-        occurrencesMarkerLayer.markers.push({
-          position: feature.geometry.coordinates as LatLngTuple,
-          key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
-        });
+        if (visible) {
+          occurrencesMarkerLayer.markers.push({
+            position: feature.geometry.coordinates as LatLngTuple,
+            key: feature.id || feature.properties.id,
+            popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          });
+        }
       }
 
       if (isBoundaryFeature(feature)) {

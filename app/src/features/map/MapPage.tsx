@@ -65,8 +65,12 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       return;
     }
 
+    console.log("Map page")
+    console.log(datasetVisibility)
+
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
     staticLayerMap['62'] = result.staticLayers[0]
+
     setStaticLayerMap(staticLayerMap);
     setMarkerLayers(result.markerLayers);
 

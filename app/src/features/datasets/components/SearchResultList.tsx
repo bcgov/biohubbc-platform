@@ -10,12 +10,6 @@ import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { Feature, GeoJsonProperties, Geometry } from 'geojson';
 import { groupSpatialDataBySpecies, ISpatialDataGroupedBySpecies } from 'utils/spatial-utils';
 
-export interface IDataType {
-    dataset_id: string,
-    dataset_name: string,
-    number_of_records: number
-}
-
 export interface ISearchResultListProps {
     mapDataLoader: DataLoader<
     [
@@ -37,15 +31,11 @@ export interface IDatasetVisibility {
     [details: string]: boolean
 }
 
-// (bounds: Feature<Polygon>, zoom: number) => void;
 // this should be two components, one for the occurence and one for projects
 const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
     const [groupedSpatialData, setGroupedSpatialData] = useState<ISpatialDataGroupedBySpecies>({})
-    const setup = {};
+    const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
     const {mapDataLoader} = props
-
-    console.log("___________Search Results____________")
-    console.log(props.mapDataLoader.data)
 
     useEffect(() => {
         if (!mapDataLoader.data) {
@@ -54,18 +44,13 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
 
         const groupedData = groupSpatialDataBySpecies(mapDataLoader.data);
         
-        // setup check state
+        const setup = {}
         for(const key in groupedData) {
             setup[key] = true
         }
-
+        setDatasetVisibility(setup)
         setGroupedSpatialData(groupedData)
     }, [props.mapDataLoader.data])
-    // props.items.forEach(item => {
-    //     setup[item.dataset_id] = true
-    // })
-
-    const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>(setup)
 
     const toggleVisibility = (dataset_id: string) => {
         const udpated = datasetVisibility
@@ -111,7 +96,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                             <Grid container direction="row" alignItems={"center"} key={`${key}-${index}`}>
                                 <Grid item xs={3}>
                                     <Checkbox
-                                        checked={datasetVisibility[key]}
+                                        checked={datasetVisibility[key] == undefined ? true : datasetVisibility[key]}
                                         onChange={() => toggleVisibility(key)}
                                     />
                                 </Grid>
