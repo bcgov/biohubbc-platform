@@ -84,7 +84,16 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
         onSubmit={handleDatasetRequestCreation}>
         {(formikProps) => (
           <Form>
-            <DatasetSearchForm onAreaUpdate={props.onAreaUpdate} />
+            <DatasetSearchForm
+              onAreaUpdate={props.onAreaUpdate}
+              speciesList={[
+                { value: 'M-ALAM', label: 'Moose' },
+                { value: 'M-ORAM', label: 'Mountain Goat' },
+                { value: 'M-OVDA', label: 'Thinhorn sheep' },
+                { value: 'M-OVCA', label: 'Bighorn sheep' },
+                { value: 'B-SPOW', label: 'Spotted Owl' }
+              ]}
+            />
 
             <Box mt={4}>
               <Button
