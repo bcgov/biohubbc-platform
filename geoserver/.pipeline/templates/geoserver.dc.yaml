@@ -63,17 +63,17 @@ objects:
         deploymentConfig: ${NAME}${SUFFIX}
       type: ClusterIP
 
-  - kind: PersistentVolumeClaim
-    apiVersion: v1
-    metadata:
-      name: '${NAME}${SUFFIX}'
-      role: geoserver
-    spec:
-      accessModes:
-        - ReadWriteMany
-      resources:
-        requests:
-          storage: '${VOLUME_CAPACITY}'
+  # - kind: PersistentVolumeClaim
+  #   apiVersion: v1
+  #   metadata:
+  #     name: '${NAME}${SUFFIX}'
+  #     role: geoserver
+  #   spec:
+  #     accessModes:
+  #       - ReadWriteMany
+  #     resources:
+  #       requests:
+  #         storage: '${VOLUME_CAPACITY}'
 
   - kind: ImageStream
     apiVersion: v1
@@ -138,15 +138,15 @@ objects:
                   memory: '${MEMORY_LIMIT}'
               securityContext: {}
               terminationMessagePath: '/dev/termination-log'
-              volumeMounts:
-                - mountPath: '/usr/share/geoserver/data_dir'
-                  name: '${NAME}${SUFFIX}-data'
+              # volumeMounts:
+              #   - mountPath: '/usr/share/geoserver/data_dir'
+              #     name: '${NAME}${SUFFIX}-data'
           dnsPolicy: ClusterFirst
           restartPolicy: Always
-          volumes:
-            - name: '${NAME}${SUFFIX}-data'
-              persistentVolumeClaim:
-                claimName: '${NAME}${SUFFIX}'
+          # volumes:
+          #   - name: '${NAME}${SUFFIX}-data'
+          #     persistentVolumeClaim:
+          #       claimName: '${NAME}${SUFFIX}'
       triggers:
         - imageChangeParams:
             automatic: true

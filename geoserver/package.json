@@ -12,10 +12,6 @@
     "npm": ">= 6.0.0"
   },
   "scripts": {
-    "setup": "npm-run-all -l -s migrate-latest seed",
-    "migrate-latest": "knex migrate:latest --knexfile ./src/knexfile.ts",
-    "migrate-rollback": "knex migrate-rollback --knexfile ./src/knexfile.ts",
-    "seed": "knex seed:run --knexfile ./src/knexfile.ts",
     "lint": "eslint src/ --ext .js,.ts",
     "lint-fix": "npm run lint -- --fix",
     "format": "prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,scss}\"",
@@ -26,7 +22,6 @@
   },
   "devDependencies": {
     "@types/node": "~14.14.31",
-    "@types/pg": "~7.14.4",
     "@typescript-eslint/eslint-plugin": "~4.33.0",
     "@typescript-eslint/parser": "~4.33.0",
     "eslint": "~7.32.0",

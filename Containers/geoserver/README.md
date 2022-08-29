@@ -1,6 +1,16 @@
+# GeoServer Folders
+
+`./biohub-geoserver`: contains a custom Docker implementation of GeoServer (inspired by https://github.com/bcgov/geodock)
+
+`./gs-geoserver`: is a copy of an existing Docker implementation of GeoServer (taken, and modified, from https://github.com/geoserver/docker).
+
+Both versions of the base geoserver image can be built in OpenShift from the steps below. See [Creating Base GeoServer Image in OpenShift](#creating-base-geoserver-image-in-openshift)
+
+_Note: Another popular option not included here is: https://github.com/kartoza/docker-geoserver_
+
 # Creating Base GeoServer Image in OpenShift
 
-**Note: All of these steps should be done in the OpenShift Tools Project (ie: `a0ec71-tools`)**
+_Note: All of these steps should be done in the OpenShift Tools Project (ie: `a0ec71-tools`)_
 
 ## 1. Create Template
 

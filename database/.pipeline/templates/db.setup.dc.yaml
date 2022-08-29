@@ -49,7 +49,7 @@ objects:
         role: setup
     spec:
       containers:
-        - name: test
+        - name: postgresql-setup
           image: '${IMAGE}'
           resources:
             limits:
