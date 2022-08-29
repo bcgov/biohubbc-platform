@@ -375,7 +375,6 @@ export class SpatialRepository extends BaseRepository {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-
     const userService = new UserService(this.connection);
 
     const userObject = await userService.getUserById(this.connection.systemUserId());
@@ -395,8 +394,6 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-=======
->>>>>>> 92cc1ed8213d903d3120cd7ae98e9d2bf8fe176d
    * Query builder to find spatial component by given criteria, specifically for admin users that bypass all security
    * rules.
    *
@@ -510,8 +507,6 @@ export class SpatialRepository extends BaseRepository {
         )
       );
 
-    console.log(queryBuilder.toSQL().toNative().sql);
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
     return response.rows;
   }
@@ -580,7 +575,6 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   _whereBoundaryIntersects(boundaries: Feature[], geoColumn: string, qb1: Knex.QueryBuilder) {
-    //TODO: geoJson not happy on search
     const generateSqlStatement = (geometry: Feature) => {
       return SQL`
       public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,
