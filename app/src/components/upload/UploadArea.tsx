@@ -86,7 +86,8 @@ const UploadArea: React.FC<React.PropsWithChildren<any>> = (props) => {
             dropZoneProps={{
               acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
             }}
-            replace={true}
+            hideStatus={true}
+            multiple={false}
           />
         </Grid>
       </Grid>

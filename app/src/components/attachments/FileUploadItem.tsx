@@ -80,6 +80,7 @@ export interface IFileUploadItemProps {
   onCancel: () => void;
   fileHandler?: IFileHandler;
   status?: UploadFileStatus;
+  hideStatus?: boolean;
 }
 
 const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = (props) => {
@@ -246,10 +247,14 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
                 </Box>
               )}
               <Box display="flex" alignItems="center">
-                <MemoizedActionButton status={status} onCancel={() => setInitiateCancel(true)} />
+                <MemoizedActionButton
+                  hideStatus={props.hideStatus}
+                  status={status}
+                  onCancel={() => setInitiateCancel(true)}
+                />
               </Box>
             </Box>
-            <MemoizedProgressBar status={status} progress={progress} />
+            <MemoizedProgressBar hideStatus={props.hideStatus} status={status} progress={progress} />
           </Box>
         </Box>
       </Box>
@@ -266,6 +271,7 @@ export const MemoizedFileUploadItem = memo(FileUploadItem, (prevProps, nextProps
 interface IActionButtonProps {
   status: UploadFileStatus;
   onCancel: () => void;
+  hideStatus?: boolean;
 }
 
 /**
@@ -279,7 +285,7 @@ interface IActionButtonProps {
 const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (props) => {
   const classes = useStyles();
 
-  if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED) {
+  if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED || props.hideStatus) {
     return (
       <IconButton title="Remove File" aria-label="remove file" onClick={() => props.onCancel()}>
         <Icon path={mdiTrashCanOutline} size={1} />
@@ -326,6 +332,7 @@ export const MemoizedActionButton = memo(ActionButton, (prevProps, nextProps) =>
 interface IProgressBarProps {
   status: UploadFileStatus;
   progress: number;
+  hideStatus?: boolean;
 }
 
 /**
@@ -339,7 +346,7 @@ interface IProgressBarProps {
 const ProgressBar: React.FC<React.PropsWithChildren<IProgressBarProps>> = (props) => {
   const classes = useStyles();
 
-  if (props.status === UploadFileStatus.STAGED) {
+  if (props.status === UploadFileStatus.STAGED || props.hideStatus) {
     return <></>;
   }
 
