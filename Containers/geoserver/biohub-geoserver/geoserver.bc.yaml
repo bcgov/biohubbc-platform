@@ -33,7 +33,7 @@ parameters:
   - name: SOURCE_CONTEXT_DIR
     description: The repository path to the Dockerfile.
     required: true
-    value: Containers/geoserver/geodock
+    value: Containers/geoserver/biohub-geoserver
   - name: DOCKERFILE_PATH
     description: The path to the docker file (note. this is relative to the SOURCE_CONTEXT_DIR).
     required: true
