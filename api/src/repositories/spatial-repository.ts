@@ -700,7 +700,13 @@ export class SpatialRepository extends BaseRepository {
       submission_id,
       jsonb_build_object(
           'submission_spatial_component_id',
-          wfscwst.submission_spatial_component_id,
+            wfscwst.submission_spatial_component_id,
+          'dataset_id',
+            wfscwst.dataset_id,
+          'associated_taxa',
+            wfscwst.associated_taxa,
+          'vernacular_name',
+            wfscwst.vernacular_name,
           'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component
