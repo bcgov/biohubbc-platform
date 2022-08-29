@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import SideSearchBar from 'components/map/components/SideSearchBar';
-import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
+import { IStaticLayer, IStaticLayerFeature, IStaticLayerMap } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
@@ -55,6 +55,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+  const [staticLayerMap, setStaticLayerMap] = useState<IStaticLayerMap>({})
+
 
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
 
@@ -64,9 +66,17 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-
-    setStaticLayers([result.staticLayers[0]]);
+    staticLayerMap['62'] = result.staticLayers[0]
+    setStaticLayerMap(staticLayerMap);
     setMarkerLayers(result.markerLayers);
+
+    const layers: IStaticLayer[] = []
+    for(const key in staticLayerMap) {
+      layers.push(staticLayerMap[key])
+    }
+
+    setStaticLayers(layers);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
 
@@ -115,7 +125,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     // SET STATIC LAYER
     const layers: IStaticLayerFeature[] = [];
-    areas.forEach((area) => {
+    areas.forEach((area, index) => {
       area.features.forEach((feature: Feature<Polygon>) => {
         const staticLayerFeature: IStaticLayerFeature = {
           geoJSON: feature,
@@ -124,6 +134,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         layers.push(staticLayerFeature);
       });
       const staticLayer: IStaticLayer = { layerName: area.name, features: layers, visible: true };
+      setStaticLayerMap({... staticLayerMap, [area.name]: staticLayer});
       setStaticLayers([staticLayer]);
     });
   };

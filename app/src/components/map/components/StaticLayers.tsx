@@ -22,6 +22,9 @@ export interface IStaticLayerFeature {
   TooltipProps?: Partial<TooltipProps>;
 }
 
+export interface IStaticLayerMap {
+  [dataset_id: string]: IStaticLayer
+}
 export interface IStaticLayer {
   layerName: string;
   features: IStaticLayerFeature[];
