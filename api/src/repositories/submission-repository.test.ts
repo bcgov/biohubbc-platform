@@ -11,6 +11,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import {
   IInsertSubmissionRecord,
   ISourceTransformModel,
+  ISpatialComponentCount,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -333,25 +334,48 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  //Add test for getSpatialComponentCountByDatasetId
-
   describe('getSpatialComponentCountByDatasetId', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ spatial_type: 'occurrence', count: 10 }] } as any as Promise<
-        QueryResult<any>
-      >;
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
 
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId').returns(mockResponse);
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
+
+      expect(response[0].spatial_type).to.equal('occurrence');
+      expect(response[0].count).to.equal(10);
+    });
+
+    it('internal function should succeed with valid data', async () => {
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
+
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId').returns(mockResponse);
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
+
+      expect(response[0].spatial_type).to.equal('occurrence');
+      expect(response[0].count).to.equal(10);
+    });
+
+    it('internal function should succeed with valid data as admin', async () => {
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
+
+      const mockDBConnection = getMockDBConnection();
+      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin').returns(mockResponse);
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin('111-222-333');
 
       expect(response[0].spatial_type).to.equal('occurrence');
       expect(response[0].count).to.equal(10);

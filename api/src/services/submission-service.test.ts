@@ -3,7 +3,9 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { SYSTEM_ROLE } from '../constants/roles';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { UserObject } from '../models/user';
 import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
@@ -17,6 +19,7 @@ import * as FileUtils from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
+import { UserService } from './user-service';
 
 chai.use(sinonChai);
 
@@ -477,10 +480,16 @@ describe('SubmissionService', () => {
   });
 
   describe('findSubmissionRecordWithSpatialCount', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
     describe('with no occurrence spatial components', () => {
       it('should return submission with count object', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
+        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
@@ -502,6 +511,8 @@ describe('SubmissionService', () => {
       it('should return submission with count object', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
+        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
@@ -525,6 +536,8 @@ describe('SubmissionService', () => {
       it('should return null', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
+        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
@@ -539,6 +552,50 @@ describe('SubmissionService', () => {
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
         expect(response).to.be.null;
+      });
+    });
+
+    describe('with a system admin', () => {
+      it('should call getSpatialComponentCountByDatasetIdAsAdmin as system admin', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
+          .resolves(null);
+
+        const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
+          .resolves([]);
+
+        await submissionService.findSubmissionRecordWithSpatialCount('333-333-333');
+
+        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.be.calledOnce;
+      });
+    });
+
+    describe('with a system admin', () => {
+      it('should call getSpatialComponentCountByDatasetIdAsAdmin as data admin', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const submissionService = new SubmissionService(mockDBConnection);
+        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
+          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
+          .resolves(null);
+
+        const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
+          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
+          .resolves([]);
+
+        await submissionService.findSubmissionRecordWithSpatialCount('333-333-333');
+
+        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
+        expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.be.calledOnce;
       });
     });
   });

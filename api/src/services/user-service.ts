@@ -1,3 +1,4 @@
+import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Models } from '../models';
@@ -157,5 +158,18 @@ export class UserService extends DBService {
    */
   async addUserSystemRoles(systemUserId: number, roleIds: number[]) {
     await this.userRepository.addUserSystemRoles(systemUserId, roleIds);
+  }
+
+  /**
+   * Returns if the current system user is a system admin
+   *
+   * @return {*}  {Promise<boolean>}
+   * @memberof UserService
+   */
+  async isSystemUserAdmin(): Promise<boolean> {
+    const user = await this.getUserById(this.connection.systemUserId());
+    return [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR].some((systemRole) =>
+      user.role_names.includes(systemRole)
+    );
   }
 }
