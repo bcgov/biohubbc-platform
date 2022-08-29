@@ -23,7 +23,6 @@ GET.apiDoc = {
     {
       in: 'query',
       name: 'boundary',
-      required: true,
       schema: {
         type: 'array',
         items: {

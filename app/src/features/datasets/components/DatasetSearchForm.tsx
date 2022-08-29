@@ -59,6 +59,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   useEffect(() => {
     props.onAreaUpdate(formikProps.values.area);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formikProps.values.area]);
 

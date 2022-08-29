@@ -61,7 +61,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       });
     });
 
-    // const geoCollection:Feature<GeometryCollection> = {};
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
     setDatasetType(values.dataset)
     toggleForm()
@@ -98,11 +97,15 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
             <DatasetSearchForm
               onAreaUpdate={props.onAreaUpdate}
               speciesList={[
-                { value: 'M-ALAM', label: 'Moose' },
-                { value: 'M-ORAM', label: 'Mountain Goat' },
-                { value: 'M-OVDA', label: 'Thinhorn sheep' },
-                { value: 'M-OVCA', label: 'Bighorn sheep' },
-                { value: 'B-SPOW', label: 'Spotted Owl' }
+                { value: 'M-ALAM', label: 'Moose (M-ALAM)' },
+                { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
+                { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
+                { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
+                { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
+                { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
+                { value: 'M-OVCA-CA', label: 'Bighorn sheep (M-OVCA-CA)' },
+                { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' },
+                { value: 'B-SPOW-CA', label: 'Spotted Owl (B-SPOW-CA)' }
               ]}
             />
 
@@ -145,9 +148,5 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     </>
   );
 };
-
-// function showCreateErrorDialog(arg0: { dialogError: string }) {
-//   throw new Error('Function not implemented.');
-// }
 
 export default SideSearchBar;

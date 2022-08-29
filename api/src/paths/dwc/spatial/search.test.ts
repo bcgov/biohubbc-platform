@@ -21,21 +21,6 @@ describe('search', () => {
 
       describe('should throw an error when', () => {
         describe('boundary', () => {
-          it('is undefined', async () => {
-            const request = {
-              headers: {
-                'content-type': 'application/json'
-              },
-              query: {}
-            };
-
-            const response = requestValidator.validateRequest(request);
-
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal("must have required property 'boundary'");
-          });
-
           it('is null', async () => {
             const request = {
               headers: {
@@ -50,10 +35,10 @@ describe('search', () => {
 
             expect(response.status).to.equal(400);
             expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be array');
           });
 
-          it('is not a string', async () => {
+          it('is not an array', async () => {
             const request = {
               headers: {
                 'content-type': 'application/json'
@@ -67,7 +52,7 @@ describe('search', () => {
 
             expect(response.status).to.equal(400);
             expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be array');
           });
         });
 
@@ -78,7 +63,7 @@ describe('search', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 type: 'not an array'
               }
             };
@@ -98,7 +83,7 @@ describe('search', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 type: [],
                 datasetID: 'not an array'
               }
@@ -120,7 +105,7 @@ describe('search', () => {
               'content-type': 'application/json'
             },
             query: {
-              boundary: 'not null',
+              boundary: ['not null'],
               type: ['type'],
               datasetID: ['id']
             }
@@ -136,7 +121,7 @@ describe('search', () => {
               'content-type': 'application/json'
             },
             query: {
-              boundary: 'not null'
+              boundary: ['not null']
             }
           };
           const response = requestValidator.validateRequest(request);
@@ -150,7 +135,7 @@ describe('search', () => {
               'content-type': 'application/json'
             },
             query: {
-              boundary: 'not null',
+              boundary: ['not null'],
               type: null,
               datasetID: null
             }
@@ -308,7 +293,7 @@ describe('search', () => {
 
       mockReq.query = {
         type: ['type'],
-        boundary: JSON.stringify(boundaryFeature)
+        boundary: [JSON.stringify(boundaryFeature)]
       };
 
       sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').throws(new Error('test error'));
@@ -339,7 +324,7 @@ describe('search', () => {
 
       mockReq.query = {
         type: ['type'],
-        boundary: JSON.stringify(boundaryFeature)
+        boundary: [JSON.stringify(boundaryFeature)]
       };
 
       const mockResponse: ISubmissionSpatialSearchResponseRow[] = [

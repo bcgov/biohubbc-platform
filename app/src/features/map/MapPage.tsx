@@ -17,7 +17,6 @@ import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
-  //const dialogContext = useContext(DialogContext);
 
   const url = useURL<{
     mapViewBoundary: Feature<Polygon> | undefined;
@@ -118,17 +117,15 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     // Store drawn bounds in URL
     url.appendQueryParams({ drawnBoundary: bounds });
-    console.log('[searchBoundary]', [searchBoundary]);
 
     mapDataLoader.refresh([searchBoundary], type, [], zoom);
   };
 
   const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
-    console.log('areas', areas);
-
     // SET STATIC LAYER
-    const layers: IStaticLayerFeature[] = [];
-    areas.forEach((area, index) => {
+    const staticLayers: IStaticLayer[] = [];
+    areas.forEach((area) => {
+      const layers: IStaticLayerFeature[] = [];
       area.features.forEach((feature: Feature<Polygon>) => {
         const staticLayerFeature: IStaticLayerFeature = {
           geoJSON: feature,
@@ -136,10 +133,11 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         };
         layers.push(staticLayerFeature);
       });
-      const staticLayer: IStaticLayer = { dataset_id: area.name, layerName: area.name, features: layers };
-      setStaticLayerMap({... staticLayerMap, [area.name]: staticLayer});
-      setStaticLayers([staticLayer]);
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, dataset_id: "" };
+      staticLayers.push(staticLayer);
     });
+
+    setStaticLayers(staticLayers);
   };
 
   const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
