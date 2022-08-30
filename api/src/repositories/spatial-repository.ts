@@ -442,15 +442,16 @@ export class SpatialRepository extends BaseRepository {
               'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
             ),
             knex.raw(
-              'array_agg(ssc.submission_spatial_component_id) as arr_agg',
+              'ssc.submission_spatial_component_id' // 'array_remove(array_agg(ssc.submission_spatial_component_id), null) as arr_agg',
             ),
-            'p.geometry',
+            // 'p.geometry',
             'ssc.submission_id',
             'ssc.spatial_component',
             'ssc.secured_spatial_component'
           )
-          .fromRaw(`
-            submission_spatial_component ssc,
+          .fromRaw(
+            'submission_spatial_component as ssc'
+            /*`
             (SELECT DISTINCT
               geography
             FROM
@@ -459,15 +460,15 @@ export class SpatialRepository extends BaseRepository {
               geometrytype(geography) = 'POINT'
             AND
               jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "Occurrence")')
-            ) AS p`
+            ) AS p`*/
           )
-          .whereRaw('ssc.geography = p.geography')
+          // .whereRaw('ssc.geography = p.geography')
           .leftJoin(
             'security_transform_submission as sts',
             'sts.submission_spatial_component_id',
-            'ssc.arr_agg' //'ssc.submission_spatial_component_id'
+            'ssc.submission_spatial_component_id' //'ssc.arr_agg' 
           )
-          .groupBy('p.geography')
+          // .groupBy('p.geography')
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_id')
