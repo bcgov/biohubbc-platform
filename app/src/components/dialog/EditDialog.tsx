@@ -94,7 +94,8 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       {(formikProps) => (
         <Dialog
           fullScreen={fullScreen}
-          maxWidth="xl"
+          fullWidth
+          maxWidth="md"
           open={props.open}
           aria-labelledby="edit-dialog-title"
           aria-describedby="edit-dialog-description">

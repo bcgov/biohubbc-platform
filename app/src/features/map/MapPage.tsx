@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import SideSearchBar from 'components/map/components/SideSearchBar';
@@ -126,9 +127,18 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
-      <Box flex="0 0 auto" py={4} px={3} width="500px">
+      <Paper square elevation={3}
+        sx={{
+          flex: '0 0 auto',
+          width: '500px',
+          py: 4,
+          px: 3,
+          position: 'relative',
+          zIndex: '999'
+        }}
+      >
         <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} />
-      </Box>
+      </Paper>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"

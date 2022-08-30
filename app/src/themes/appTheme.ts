@@ -34,6 +34,13 @@ const appTheme = createTheme({
     }
   },
   components: {
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          fontSize: '1rem'
+        }
+      }
+    },
     MuiButton: {
       styleOverrides: {
         root: {
