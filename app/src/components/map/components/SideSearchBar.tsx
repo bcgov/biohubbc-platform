@@ -61,6 +61,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       });
     });
 
+    console.log("Form Reload")
+    console.log(featureArray, values.dataset, values.species_list)
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
     setDatasetType(values.dataset)
     toggleForm()

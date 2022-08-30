@@ -31,6 +31,7 @@ export interface IDatasetVisibility {
 
 // this should be two components, one for the occurence and one for projects
 const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
+    console.log("PROJECT LIST")
     const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
     const {mapDataLoader} = props
 
@@ -38,16 +39,17 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
         if (!mapDataLoader.data) {
             return;
         }
-        
+        console.log(mapDataLoader.data)
         const setup = {};
         mapDataLoader.data.forEach(item => {
             setup[item.submission_spatial_component_id] = true
         })
         setDatasetVisibility(setup)
+        console.log("SETUP")
+        console.log(setup)
     }, [mapDataLoader.data])
 
     const toggleVisibility = (dataset_id: string) => {
-        console.log("TOGGLE VISIBLITY FOR: " + dataset_id)
         const udpated = datasetVisibility
         const value = datasetVisibility[dataset_id];
         udpated[dataset_id] = !udpated[dataset_id]
@@ -75,7 +77,7 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
             <Box>
                 <Grid container direction={"column"} justifyContent="center">
                     {mapDataLoader.data?.map((item: ISpatialData, index: number) => {
-                        console.log(`____ FIRST FUN PLEASE: ${datasetVisibility[item.submission_spatial_component_id] === undefined ? true : datasetVisibility[item.submission_spatial_component_id]}`);
+                        console.log(item)
                         return (
                             <Grid container direction="row" alignItems={"center"} key={`${item.submission_spatial_component_id}-${index}`}>
                                 <Grid item xs={3}>

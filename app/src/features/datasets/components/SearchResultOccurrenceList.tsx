@@ -18,7 +18,6 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
         if (!mapDataLoader.data) {
             return;
         }
-        console.log(mapDataLoader.data)
         const groupedData = groupSpatialDataBySpecies(mapDataLoader.data);
         
         const setup = {}
