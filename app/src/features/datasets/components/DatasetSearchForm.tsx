@@ -10,7 +10,8 @@ import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'component
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import { FieldArray, useFormikContext } from 'formik';
-import React, { useEffect } from 'react';
+import { useApi } from 'hooks/useApi';
+import React, { useEffect, useState } from 'react';
 import yup from 'utils/YupSchema';
 
 export interface IDatasetSearchForm {
@@ -42,11 +43,26 @@ export interface IDatasetSearchFormProps {
  * @return {*}
  */
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
+  const api = useApi();
+
   const formikProps = useFormikContext<IDatasetSearchForm>();
+
+  const [speciesList, setSpeciesList] = useState<IMultiAutocompleteFieldOption[]>([]);
+
+  const convertOptions = (value: any): IMultiAutocompleteFieldOption[] =>
+    value.map((item: any) => {
+      return { value: parseInt(item.id), label: item.label };
+    });
+
+  const handleGetSpeciesList = async (value: string) => {
+    const response = await api.taxonomy.searchSpecies(value);
+    const convertedOptions = convertOptions(response.searchResponse);
+
+    setSpeciesList(convertedOptions);
+  };
 
   useEffect(() => {
     props.onAreaUpdate(formikProps.values.area);
-    //console.log('speciesList', speciesList);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formikProps.values.area]);
@@ -96,8 +112,9 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           <MultiAutocompleteField
             id={`species_list`}
             label={'Select Species'}
-            options={props.speciesList}
+            options={speciesList}
             required={false}
+            handleSearchResults={handleGetSpeciesList}
           />
         </Box>
       </Box>
