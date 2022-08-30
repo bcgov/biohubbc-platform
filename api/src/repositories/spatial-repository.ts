@@ -382,18 +382,20 @@ export class SpatialRepository extends BaseRepository {
       .queryBuilder()
       .with('with_filtered_spatial_component', (qb1) => {
         // Get the spatial components that match the search filters
-        qb1.select(
-          '*',
-          knex.raw(
-            "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
-          ),
-          knex.raw(
-            "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
-          ),
-          knex.raw(
-            "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
+        qb1
+          .select(
+            '*',
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
+            )
           )
-        ).from('submission_spatial_component as ssc');
+          .from('submission_spatial_component as ssc');
 
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);

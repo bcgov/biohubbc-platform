@@ -54,16 +54,16 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
-  
+
   const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
 
-  const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
+  const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
 
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;
     }
-    
+
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
@@ -122,7 +122,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         };
         layers.push(staticLayerFeature);
       });
-      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, dataset_id: "" };
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, dataset_id: '' };
       staticLayers.push(staticLayer);
     });
 
@@ -131,12 +131,16 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
     setDatasetVisibility(datasets);
-  }
+  };
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
       <Box flex="0 0 auto" py={4} px={3} width="500px">
-        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} onToggleDataVisibility={onToggleDataVisibility} />
+        <SideSearchBar
+          mapDataLoader={mapDataLoader}
+          onAreaUpdate={onAreaUpdate}
+          onToggleDataVisibility={onToggleDataVisibility}
+        />
       </Box>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
