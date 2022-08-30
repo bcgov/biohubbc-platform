@@ -84,7 +84,7 @@ export function downloadSpatialComponents(): RequestHandler {
 
     const criteria = {
       type: (req.query.type as string[]) || [],
-      datasetID: req.query.datasetID as string[],
+      datasetID: (req.query.datasetID as string[]) || [],
       boundary: boundaries
     };
 
