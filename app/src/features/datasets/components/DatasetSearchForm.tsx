@@ -126,7 +126,9 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           render={(arrayHelpers) => (
             <>
               <UploadAreaControls />
-              <List dense disablePadding
+              <List
+                dense
+                disablePadding
                 sx={{
                   '& li': {
                     display: 'flex',
@@ -140,17 +142,16 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
                   '& li:first-child': {
                     mt: 2,
                     borderTopLeftRadius: '4px',
-                    borderTopRightRadius: '4px',
+                    borderTopRightRadius: '4px'
                   },
                   '& li:last-child': {
                     borderBottomLeftRadius: '4px',
                     borderBottomRightRadius: '4px'
                   },
                   '& li + li': {
-                    mt: "-1px"
+                    mt: '-1px'
                   }
-                }}
-              >
+                }}>
                 {!!formikProps.values.area.length &&
                   formikProps.values.area.map((areaData, index) => {
                     return (
