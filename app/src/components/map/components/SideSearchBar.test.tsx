@@ -1,55 +1,50 @@
-import { Feature } from 'geojson';
+import { Feature, GeoJsonProperties, Geometry } from 'geojson';
+import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
+import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { cleanup, render } from 'test-helpers/test-utils';
-import SideSearchBar, { SideSearchBarProps } from './SideSearchBar';
+import SideSearchBar from './SideSearchBar';
 
-const renderContainer = (props: SideSearchBarProps) => {
-  return render(<SideSearchBar {...props} />);
+jest.mock('../../../hooks/useApi');
+
+const mockBiohubApi = useApi as jest.Mock;
+
+const mockUseApi = {
+  taxonomy: {
+    searchSpecies: jest.fn()
+  }
 };
 
 describe('SideSearchBar', () => {
+  beforeEach(() => {
+    mockBiohubApi.mockImplementation(() => mockUseApi);
+  });
   afterEach(() => {
     cleanup();
   });
-  it('renders correctly', () => {
-    const mockMapDataLoader = jest.fn();
-    const mockAreaUpdate = jest.fn();
 
-    let resolveRef: (value: unknown) => void;
+  it('renders an empty component', () => {
+    const TestComponent = () => {
+      const mockCallBack = jest.fn<any, any>().mockResolvedValue({});
+      const mockMapDataLoader = useDataLoader<
+        [
+          searchBoundary: Feature<Geometry, GeoJsonProperties>[],
+          searchType: string[],
+          species?: string[],
+          searchZoom?: number,
+          datasetID?: string
+        ],
+        ISpatialData[],
+        unknown
+      >(mockCallBack);
+      const mockAreaUpdate = jest.fn();
+      return <SideSearchBar mapDataLoader={mockMapDataLoader} onAreaUpdate={mockAreaUpdate} />;
+    };
 
-    const mockDataLoaderPromise = new Promise(function (resolve: any, reject: any) {
-      resolveRef = resolve;
-      [(searchBoundary = null as unknown as Feature)];
-    });
+    const { getByText } = render(<TestComponent />);
 
-    const mockAreaUpdatePromise = new Promise(function (resolve: any, reject: any) {
-      resolveRef = resolve;
-    });
-
-    const { getByText } = renderContainer({
-      mapDataLoader: mockMapDataLoader.mockResolvedValue(mockDataLoaderPromise),
-      onAreaUpdate: mockAreaUpdate.mockResolvedValue(mockAreaUpdatePromise)
-      //onCancel: mockOnCancel
-    });
-
-    // const { getByText } = renderContainer(
-    //   <Formik initialValues={DatasetSearchFormInitialValues} onSubmit={async () => {}}>
-    //     <DatasetSearchForm
-    //       onAreaUpdate={mockUpdateHandler.mockResolvedValue(mockUpdatePromise)}
-    //       speciesList={[
-    //         { value: 'M-ALAM', label: 'Moose (M-ALAM)' },
-    //         { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
-    //         { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
-    //         { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
-    //         { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
-    //         { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
-    //         { value: 'M-OVCA-CA', label: 'Bighorn sheep (M-OVCA-CA)' },
-    //         { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' },
-    //         { value: 'B-SPOW-CA', label: 'Spotted Owl (B-SPOW-CA)' }
-    //       ]}
-    //     />
-    //   </Formik>
-    // );
-
-    expect(getByText('label')).toBeVisible();
+    expect(getByText('What do you want to find?', { exact: false })).toBeVisible();
+    expect(getByText('Define area of interest', { exact: false })).toBeVisible();
+    expect(getByText('Find Data', { exact: false })).toBeVisible();
   });
 });
