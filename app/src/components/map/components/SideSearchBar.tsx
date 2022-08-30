@@ -45,6 +45,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
   const [showForm, setShowForm] = useState(true)
   const [datasetType, setDatasetType] = useState<string>("")
+  const [formData, setFormData] = useState<IDatasetSearchForm | null>(null)
   /**
    * Handle dataset requests.
    */
@@ -61,9 +62,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       });
     });
 
-    console.log("Form Reload")
-    console.log(featureArray, values.dataset, values.species_list)
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
+    setFormData(values)
     setDatasetType(values.dataset)
     toggleForm()
   };
@@ -89,7 +89,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       <Formik<IDatasetSearchForm>
         innerRef={formikRef}
         enableReinitialize={true}
-        initialValues={DatasetSearchFormInitialValues}
+        initialValues={formData || DatasetSearchFormInitialValues}
         validationSchema={DatasetSearchFormYupSchema}
         validateOnBlur={true}
         validateOnChange={false}

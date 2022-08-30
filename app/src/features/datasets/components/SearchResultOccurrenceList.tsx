@@ -12,7 +12,6 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
     const [groupedSpatialData, setGroupedSpatialData] = useState<ISpatialDataGroupedBySpecies>({})
     const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
     const {mapDataLoader} = props
-
     
     useEffect(() => {
         if (!mapDataLoader.data) {
@@ -26,7 +25,7 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
         }
         setDatasetVisibility(setup)
         setGroupedSpatialData(groupedData)
-    }, [props.mapDataLoader.data])
+    }, [mapDataLoader.data])
 
     const toggleVisibility = (dataset_id: string) => {
         const udpated = datasetVisibility

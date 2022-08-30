@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import SideSearchBar from 'components/map/components/SideSearchBar';
-import { IStaticLayer, IStaticLayerFeature, IStaticLayerMap } from 'components/map/components/StaticLayers';
+import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
@@ -54,8 +54,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
-  const [staticLayerMap, setStaticLayerMap] = useState<IStaticLayerMap>({})
-
+  
+  const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
 
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({})
 
@@ -65,19 +65,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
     
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    const id = result.staticLayers[0].dataset_id
-    
-    staticLayerMap[id] = result.staticLayers[0]
-    setStaticLayerMap(staticLayerMap);
-    
-    const layers: IStaticLayer[] = []
-    for(const key in staticLayerMap) {
-      layers.push(staticLayerMap[key])
-    }
-
-
     setMarkerLayers(result.markerLayers);
-    setStaticLayers(layers);
+    setStaticLayers(result.staticLayers);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
@@ -134,11 +123,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         layers.push(staticLayerFeature);
       });
       const staticLayer: IStaticLayer = { layerName: area.name, features: layers, dataset_id: "" };
-      setStaticLayerMap({... staticLayerMap, [area.name]: staticLayer});
       staticLayers.push(staticLayer);
     });
 
-    setStaticLayers(staticLayers);
+    setAreaStaticLayers(staticLayers);
   };
 
   const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
@@ -167,7 +155,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           scrollWheelZoom={true}
           fullScreenControl={true}
           markerLayers={markerLayers}
-          staticLayers={staticLayers}
+          staticLayers={[...staticLayers, ...areaStaticLayers]}
           // bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>
