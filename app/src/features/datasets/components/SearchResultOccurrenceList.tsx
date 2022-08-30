@@ -65,20 +65,21 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
         <Box>
           <Grid container direction={'column'} justifyContent="center">
             {Object.keys(groupedSpatialData).map((key: string, index: number) => {
+              const item = groupedSpatialData[key];
               return (
                 <Grid container direction="row" alignItems={'center'} key={`${key}-${index}`}>
-                  <Grid item xs={3}>
+                  <Grid item xs={2}>
                     <Checkbox
                       checked={datasetVisibility[key] == undefined ? true : datasetVisibility[key]}
                       onChange={() => toggleVisibility(key)}
                     />
                   </Grid>
-                  <Grid item xs={4}>
+                  <Grid item xs={7}>
                     <Typography variant="body1" color="textPrimary">
-                      {key}
+                      {`${item[0].vernacular_name} (${key})`}
                     </Typography>
                   </Grid>
-                  <Grid item xs={5}>
+                  <Grid item xs={3}>
                     <Typography variant="body1" color="textPrimary">
                       {groupedSpatialData[key].length} records
                     </Typography>
