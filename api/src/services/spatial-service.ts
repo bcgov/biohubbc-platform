@@ -230,13 +230,15 @@ export class SpatialService extends DBService {
       const adminResponse = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdasAdmin(
         submissionSpatialComponentId
       );
-      return (adminResponse.spatial_component?.spatial_data?.features[0]?.properties as Record<string, string>) || {};
+      return (
+        (adminResponse?.spatial_component?.spatial_data?.features?.[0]?.properties as Record<string, string>) || {}
+      );
     }
 
     const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentId(
       submissionSpatialComponentId
     );
 
-    return (response.spatial_component?.spatial_data?.features[0]?.properties as Record<string, string>) || {};
+    return (response?.spatial_component?.spatial_data?.features?.[0]?.properties as Record<string, string>) || {};
   }
 }
