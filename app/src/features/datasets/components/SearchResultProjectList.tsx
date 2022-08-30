@@ -72,20 +72,21 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
             <Box>
                 <Grid container direction={"column"} justifyContent="center">
                     {mapDataLoader.data?.map((item: ISpatialData, index: number) => {
+                        console.log(item)
                         return (
                             <Grid container direction="row" alignItems={"center"} key={`${item.submission_spatial_component_id}-${index}`}>
-                                <Grid item xs={3}>
+                                <Grid item xs={2}>
                                     <Checkbox
                                         checked={datasetVisibility[item.submission_spatial_component_id] === undefined ? true : datasetVisibility[item.submission_spatial_component_id]}
                                         onChange={() => toggleVisibility(`${item.submission_spatial_component_id}`)}
                                     />
                                 </Grid>
-                                <Grid item xs={4}>
+                                <Grid item xs={7}>
                                     <Typography variant="body1" color="textPrimary">
-                                        {item.spatial_data.features[0]?.properties?.datasetTitle}
+                                        {Object.keys(item.spatial_data).length > 0 ? item.spatial_data.features[0]?.properties?.datasetTitle : ""}
                                     </Typography>
                                 </Grid>
-                                <Grid item xs={5}>
+                                <Grid item xs={3}>
                                     <Typography variant="body1" color="textPrimary">
                                         {0} records
                                     </Typography>
