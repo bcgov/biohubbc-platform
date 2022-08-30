@@ -72,7 +72,6 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
             <Box>
                 <Grid container direction={"column"} justifyContent="center">
                     {mapDataLoader.data?.map((item: ISpatialData, index: number) => {
-                        console.log(item)
                         return (
                             <Grid container direction="row" alignItems={"center"} key={`${item.submission_spatial_component_id}-${index}`}>
                                 <Grid item xs={2}>
@@ -88,7 +87,7 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
                                 </Grid>
                                 <Grid item xs={3}>
                                     <Typography variant="body1" color="textPrimary">
-                                        {0} records
+                                        {/* {0} records */}
                                     </Typography>
                                 </Grid>
                             </Grid>
