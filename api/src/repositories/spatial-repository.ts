@@ -498,15 +498,23 @@ export class SpatialRepository extends BaseRepository {
       .with('with_user_security_transform_exceptions', (qb6) => {
         this._buildSpatialSecurityExceptions(qb6, this.connection.systemUserId());
       })
-      .select(
-        // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-        this._buildSelectForSecureNonSecureSpatialComponents()
-      )
-      .from(
-        knex.raw(
-          'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
-        )
-      );
+      .with('with_coalesced_spatial_components', (qb7) => {
+        qb7
+          .select(
+            // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+            this._buildSelectForSecureNonSecureSpatialComponents()
+          )
+          .from(
+            knex.raw(
+              'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
+            )
+          );
+      })
+      .select()
+      .from('with_coalesced_spatial_components')
+      // Filter out secure spatial components that have no spatial representation
+      // The user is not allowed to see any aspect of these particular spatial components
+      .whereRaw("spatial_component->'spatial_data' != '{}'");
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
     return response.rows;
@@ -656,7 +664,7 @@ export class SpatialRepository extends BaseRepository {
    */
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialSearchResponseRow> {
+  ): Promise<ISubmissionSpatialSearchResponseRow | undefined> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -688,19 +696,27 @@ export class SpatialRepository extends BaseRepository {
       .with('with_user_security_transform_exceptions', (qb6) => {
         this._buildSpatialSecurityExceptions(qb6, this.connection.systemUserId());
       })
-      .select(
-        // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-        this._buildSelectForSecureNonSecureSpatialComponents()
-      )
-      .from(
-        knex.raw(
-          'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
-        )
-      );
+      .with('with_coalesced_spatial_components', (qb7) => {
+        qb7
+          .select(
+            // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+            this._buildSelectForSecureNonSecureSpatialComponents()
+          )
+          .from(
+            knex.raw(
+              'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
+            )
+          );
+      })
+      .select()
+      .from('with_coalesced_spatial_components')
+      // Filter out secure spatial components that have no spatial representation
+      // The user is not allowed to see any aspect of these particular spatial components
+      .whereRaw("spatial_component->'spatial_data' != '{}'");
 
     const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
-    return spatialComponentResponse.rows[0];
+    return spatialComponentResponse.rows?.[0];
   }
 
   /**

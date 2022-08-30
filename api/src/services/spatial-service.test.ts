@@ -6,6 +6,8 @@ import sinonChai from 'sinon-chai';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { UserObject } from '../models/user';
 import {
+  IGetSecurityTransformRecord,
+  IGetSpatialTransformRecord,
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
   ISubmissionSpatialSearchResponseRow,
@@ -35,6 +37,38 @@ describe('SpatialService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ spatial_transform_id: 1 });
+    });
+  });
+
+  describe('getSpatialTransformRecords', () => {
+    it('should return IGetSpatialTransformRecord on get', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'getSpatialTransformRecords')
+        .resolves([{ name: 'name' }] as unknown as IGetSpatialTransformRecord[]);
+
+      const response = await spatialService.getSpatialTransformRecords();
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([{ name: 'name' }]);
+    });
+  });
+
+  describe('getSecurityTransformRecords', () => {
+    it('should return IGetSecurityTransformRecord on get', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'getSecurityTransformRecords')
+        .resolves([{ name: 'name' }] as unknown as IGetSecurityTransformRecord[]);
+
+      const response = await spatialService.getSecurityTransformRecords();
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([{ name: 'name' }]);
     });
   });
 
@@ -478,9 +512,7 @@ describe('SpatialService', () => {
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
       });
-    });
 
-    describe('with single feature', () => {
       it('should return spatial component metadata as data admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
@@ -502,6 +534,83 @@ describe('SpatialService', () => {
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
+      });
+
+      it('should return non secure spatial component metadata when user is not admin', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const spatialService = new SpatialService(mockDBConnection);
+        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
+
+        const mockResponseRows = {
+          spatial_component: {
+            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
+            submission_spatial_component_id: 1
+          }
+        } as unknown as ISubmissionSpatialSearchResponseRow;
+
+        const repo = sinon
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .resolves(mockResponseRows);
+
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+        expect(repo).to.be.calledOnce;
+        expect(response).to.be.eql({ prop1: 'val1' });
+      });
+    });
+
+    describe('with no features', () => {
+      it('should return {} as system admin', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const spatialService = new SpatialService(mockDBConnection);
+        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+        const mockResponseRows = {} as unknown as ISubmissionSpatialSearchResponseRow;
+
+        const repo = sinon
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
+          .resolves(mockResponseRows);
+
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+        expect(repo).to.be.calledOnce;
+        expect(response).to.be.eql({});
+      });
+
+      it('should return {} as data admin', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const spatialService = new SpatialService(mockDBConnection);
+        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
+        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+
+        const mockResponseRows = {} as unknown as ISubmissionSpatialSearchResponseRow;
+
+        const repo = sinon
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
+          .resolves(mockResponseRows);
+
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+        expect(repo).to.be.calledOnce;
+        expect(response).to.be.eql({});
+      });
+
+      it('should return {} when user is not admin', async () => {
+        const mockDBConnection = getMockDBConnection();
+        const spatialService = new SpatialService(mockDBConnection);
+        sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
+
+        const mockResponseRows = {} as unknown as ISubmissionSpatialSearchResponseRow;
+
+        const repo = sinon
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .resolves(mockResponseRows);
+
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+
+        expect(repo).to.be.calledOnce;
+        expect(response).to.be.eql({});
       });
     });
   });
