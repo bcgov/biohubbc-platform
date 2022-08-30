@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Table from '@mui/material/Table';
@@ -7,11 +8,14 @@ import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
-import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { Feature } from 'geojson';
+import { useState } from 'react';
+
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { ISpatialMetadata } from 'interfaces/useSearchApi.interface';
+import { getFormattedDate } from 'utils/Utils';
 
 export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
 
@@ -35,7 +39,11 @@ const useStyles = makeStyles(() => ({
   modalContent: {
     position: 'relative',
     width: 300,
-    minHeight: 36
+    minHeight: 36,
+  },
+  metadata: {
+    maxHeight: 300,
+    overflowY: 'scroll'
   },
   loading: {
     position: 'absolute',
@@ -64,41 +72,57 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   const classes = useStyles();
   const api = useApi();
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   const dataLoader = useDataLoader(() => {
     return api.search.getSpatialMetadata(submissionSpatialComponentIds);
   });
 
-  /**
-   * @TODO Replace this with moment/luxon date formatter
-   */
-  const formatDate = (dateString: string) => {
-    const d = new Date(dateString);
-    return d instanceof Date && !isNaN(d as unknown as number) ? d.toDateString() : dateString;
-  };
-
   dataLoader.load();
 
   const { isLoading, isReady } = dataLoader;
-
   const data = dataLoader.data || []
+  const isEmpty = !data || data.length === 0
+
+  const handleNext = () => {
+    if (isEmpty) {
+      return
+    }
+
+    setCurrentIndex((currentIndex + 1) % data.length)
+  }
+
+  const handlePrev = () => {
+    if (isEmpty) {
+      return
+    }
+    if (currentIndex === 0) {
+      setCurrentIndex(data.length - 1)
+    } else {
+      setCurrentIndex(currentIndex - 1)
+    }
+  }
 
   const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className={classes.modalContent}>{children}</div>
   );
 
-  const MetadataHeader: React.FC<React.PropsWithChildren<{ type: string; date?: string }>> = (props) => (
-    <Box mb={1}>
-      <Typography variant="overline" className={classes.pointType}>
-        {props.type || 'Feature'}
-      </Typography>
-      {props.date && (
-        <Typography className={classes.date} component="h6" variant="subtitle1">
-          {formatDate(props.date)}
+  const MetadataHeader: React.FC<React.PropsWithChildren<{ type?: string; date?: string; index?: number; length?: number }>> = (headerProps) => {
+    const { type, date, index, length } = headerProps
+
+    return (
+      <Box mb={1}>
+        <Typography component="h6" variant="subtitle1" className={classes.pointType}>
+          {type || 'Feature'} record {length && length > 0 && `(${(index || 0) + 1} of ${length})`}
         </Typography>
-      )}
-    </Box>
-  );
+        {date && (
+          <Typography className={classes.date} component="h6" variant="subtitle1">
+            {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, date)}
+          </Typography>
+        )}
+      </Box>
+    );
+  }
 
   const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
     <Typography className={classes.date} component="h6" variant="body1">
@@ -124,39 +148,43 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  return <>
-    {data.map((metadata: ISpatialMetadata) => {
-      const type = metadata.type;
-      const dwc = metadata.dwc;
+  const metadata = data[currentIndex]
+  const type = metadata?.type;
+  const dwc = metadata?.dwc;
 
-      if (!dwc || !Object.keys(dwc).length) {
-        return (
-          <ModalContentWrapper>
-            <MetadataHeader type={type} />
-            <NoMetadataAvailable />
-          </ModalContentWrapper>
-        );
-      }
+  if (!dwc || !Object.keys(dwc).length) {
+    return (
+      <ModalContentWrapper>
+        <MetadataHeader type={type} />
+        <NoMetadataAvailable />
+      </ModalContentWrapper>
+    );
+  }
 
-      return (
-        <ModalContentWrapper>
-          <Collapse in={isReady}>
-            <MetadataHeader type={type} date={dwc.eventDate} />
-            <Table className={classes.table}>
-              <TableBody>
-                {Object.entries(dwc).map(([key, value]) => (
-                  <TableRow key={key}>
-                    <TableCell className={classes.tableCell}>{key}</TableCell>
-                    <TableCell className={classes.tableCell}>{String(value)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Collapse>
-        </ModalContentWrapper>
-      );
-    })}
-  </>
+  return (
+    <ModalContentWrapper>
+      <MetadataHeader type={type} index={currentIndex} length={data.length} />
+      <Collapse in={isReady} className={classes.metadata}>
+        <Table className={classes.table}>
+          <TableBody>
+            {Object.entries(dwc).map(([key, value]) => (
+              <TableRow key={key}>
+                <TableCell className={classes.tableCell}>{key}</TableCell>
+                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Collapse>
+      {!isEmpty && length > 1 && (
+        <Box display='flex' sx={{ gap: 1 }} mt={1}>
+          <Button size='small' variant='contained' onClick={() => handlePrev()}>Prev</Button>
+          <Button size='small' variant='contained' color='primary' onClick={() => handleNext()}>Next</Button>
+        </Box>
+      )}
+    </ModalContentWrapper>
+  )
+
 };
 
 export default FeaturePopup;
