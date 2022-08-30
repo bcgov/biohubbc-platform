@@ -41,7 +41,7 @@ export const parseSpatialDataByType = (
   datasetVisibility: IDatasetVisibility = {}
 ) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
-  const boundaryStaticLayer: IStaticLayer = { dataset_id: '', layerName: LAYER_NAME.BOUNDARIES, features: [] };
+  const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
 
   for (const spatialRecord of spatialDataRecords) {
     if (isEmptyObject(spatialRecord.spatial_data)) {

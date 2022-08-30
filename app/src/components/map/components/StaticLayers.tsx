@@ -25,7 +25,6 @@ export interface IStaticLayerFeature {
 export interface IStaticLayer {
   layerName: string;
   features: IStaticLayerFeature[];
-  dataset_id: string;
 }
 
 export interface IStaticLayersProps {

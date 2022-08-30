@@ -129,7 +129,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         layers.push(staticLayerFeature);
         featureArray.push(feature);
       });
-      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, dataset_id: '' };
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
       staticLayers.push(staticLayer);
     });
 
