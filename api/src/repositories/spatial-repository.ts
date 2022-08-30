@@ -62,7 +62,7 @@ export type EmptyObject = Record<string, never>;
 
 export interface ISubmissionSpatialSearchResponseRow {
   spatial_component: {
-    dataset_id?: string;
+    dataset_id?: number;
     associated_taxa?: string;
     vernacular_name?: string;
     submission_spatial_component_id: number;
@@ -674,6 +674,15 @@ export class SpatialRepository extends BaseRepository {
           .select(
             knex.raw(
               'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
             'ssc.submission_id',
