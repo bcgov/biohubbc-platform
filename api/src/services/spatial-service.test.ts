@@ -566,11 +566,9 @@ describe('SpatialService', () => {
         const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-        const mockResponseRows = {} as unknown as ISubmissionSpatialSearchResponseRow;
-
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
-          .resolves(mockResponseRows);
+          .resolves(undefined);
 
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
 
@@ -584,11 +582,9 @@ describe('SpatialService', () => {
         const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-        const mockResponseRows = {} as unknown as ISubmissionSpatialSearchResponseRow;
-
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
-          .resolves(mockResponseRows);
+          .resolves(undefined);
 
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
 
@@ -601,11 +597,9 @@ describe('SpatialService', () => {
         const spatialService = new SpatialService(mockDBConnection);
         sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
-        const mockResponseRows = {} as unknown as ISubmissionSpatialSearchResponseRow;
-
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
-          .resolves(mockResponseRows);
+          .resolves(undefined);
 
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
 

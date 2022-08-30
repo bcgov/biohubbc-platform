@@ -158,7 +158,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
                     backgroundColor: '#ebedf2',
                     fontSize: '14px'
                   },
-                  '& li:first-child': {
+                  '& li:first-of-type': {
                     mt: 2,
                     borderTopLeftRadius: '4px',
                     borderTopRightRadius: '4px'
