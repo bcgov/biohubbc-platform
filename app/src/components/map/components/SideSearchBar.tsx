@@ -39,7 +39,6 @@ export interface SideSearchBarProps {
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
-  console.log('props: ', props);
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
 
   /**
