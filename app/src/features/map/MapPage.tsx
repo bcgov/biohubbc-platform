@@ -11,7 +11,9 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import useURL from 'hooks/useURL';
+import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
+import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
@@ -53,6 +55,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+  const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
+  const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -106,8 +110,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   };
 
   const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
-    // SET STATIC LAYER
     const staticLayers: IStaticLayer[] = [];
+    const featureArray: Feature[] = [];
+
     areas.forEach((area) => {
       const layers: IStaticLayerFeature[] = [];
       area.features.forEach((feature: Feature<Polygon>) => {
@@ -116,12 +121,31 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           tooltip: <AreaToolTip name={area.name} />
         };
         layers.push(staticLayerFeature);
+        featureArray.push(feature);
       });
       const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
       staticLayers.push(staticLayer);
     });
 
     setStaticLayers(staticLayers);
+    setBounds(featureArray);
+  };
+
+  const setBounds = (features: Feature[]) => {
+    const bounds = calculateUpdatedMapBounds(features);
+
+    if (bounds) {
+      const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+      setShouldUpdateBounds(true);
+      setUpdatedBounds(newBounds);
+    } else {
+      const boundsBC = calculateUpdatedMapBounds([ALL_OF_BC_BOUNDARY]);
+      if (boundsBC) {
+        const newBounds = new LatLngBounds(boundsBC[0] as LatLngTuple, boundsBC[1] as LatLngTuple);
+        setShouldUpdateBounds(true);
+        setUpdatedBounds(newBounds);
+      }
+    }
   };
 
   return (
@@ -147,7 +171,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           fullScreenControl={true}
           markerLayers={markerLayers}
           staticLayers={staticLayers}
-          // bounds={(shouldUpdateBounds && updatedBounds) || undefined}
+          bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>
     </Box>
