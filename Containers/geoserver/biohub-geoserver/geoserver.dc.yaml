@@ -1,9 +1,10 @@
-apiVersion: template.openshift.io/v1
 kind: Template
-labels:
-  template: geoserver-persistent-template
+apiVersion: template.openshift.io/v1
+description: A deployment config template that can be used to deploy an instance of GeoServer.
 metadata:
-  name: biohub-platform-geoserver-dc
+  name: geoserver-dc
+  labels:
+    template: geoserver-dc
 parameters:
   - name: NAME
     description: The name of the OpenShift Service exposed for geoserver .
@@ -15,6 +16,7 @@ parameters:
   - name: HOST
     description: Host name of the application
     required: true
+    value: 'geoserver-dev-biohub-platform.apps.silver.devops.gov.bc.ca'
   - name: IMAGE_STREAM_NAME
     description: The ImageStream name.
     required: true
@@ -22,9 +24,15 @@ parameters:
   - name: IMAGE_STREAM_VERSION
     description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
     required: true
+    value: 2.21.1
+  - name: IMAGE_STREAM_NAMESPACE
+    description: The OpenShift Namespace where the ImageStream resides.
+    required: true
+    value: 'a0ec71-tools'
   - name: VOLUME_CAPACITY
     description: Volume space available for data, e.g. 512Mi, 2Gi.
     required: true
+    value: '3Gi'
   - name: PORT_DEFAULT
     value: '8080'
   - name: PORT_DEFAULT_NAME
@@ -33,7 +41,7 @@ parameters:
   - name: CPU_REQUEST
     value: '10m'
   - name: CPU_LIMIT
-    value: '200m'
+    value: '400m'
   - name: MEMORY_REQUEST
     value: '512Mi'
   - name: MEMORY_LIMIT
@@ -148,6 +156,7 @@ objects:
             from:
               kind: ImageStreamTag
               name: '${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}'
+              namespace: '${IMAGE_STREAM_NAMESPACE}'
           type: ImageChange
         - type: ConfigChange
     status:

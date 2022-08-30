@@ -2,9 +2,9 @@ kind: Template
 apiVersion: template.openshift.io/v1
 description: A build config template that can be used to produce a GeoServer imagestream, from a specified Dockerfile.
 metadata:
+  name: geoserver-bc
   labels:
-    build: geoserver
-  name: geoserver
+    build: geoserver-bc
 parameters:
   - name: NAME
     description: The name assigned to all of the resources.
@@ -76,7 +76,6 @@ objects:
         app: ${APP_NAME}${SUFFIX}
         app-group: ${APP_GROUP}
     spec:
-      runPolicy: Serial
       source:
         type: Git
         git:
@@ -98,3 +97,5 @@ objects:
         limits:
           cpu: ${CPU_LIMIT}
           memory: ${MEMORY_LIMIT}
+      runPolicy: SerialLatestOnly
+      failedBuildsHistoryLimit: 5

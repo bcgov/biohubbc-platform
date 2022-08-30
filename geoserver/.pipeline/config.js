@@ -23,7 +23,7 @@ const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${ver
 //   dbSetupDockerfilePath = './.docker/db/Dockerfile.migrate';
 // }
 
-// const staticUrls = config.staticUrls;
+const staticUrlsGeoServer = config.staticUrlsGeoServer;
 
 const processOptions = (options) => {
   const result = { ...options };
@@ -60,9 +60,7 @@ const phases = {
     version: `${version}-${changeId}`,
     tag: tag,
     env: 'build',
-    // tz: config.timezone.db,
     branch: branch
-    // dbSetupDockerfilePath: dbSetupDockerfilePath
   },
   dev: {
     namespace: 'a0ec71-dev',
@@ -73,10 +71,9 @@ const phases = {
     instance: `${name}-dev-${deployChangeId}`,
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
-    host: `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+    host:
+      (isStaticDeployment && staticUrlsGeoServer.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev'
-    // tz: config.timezone.db
-    // dbSetupDockerfilePath: dbSetupDockerfilePath
   },
   test: {
     namespace: 'a0ec71-test',
@@ -87,9 +84,8 @@ const phases = {
     instance: `${name}-test`,
     version: `${version}`,
     tag: `test-${version}`,
+    host: staticUrlsGeoServer.test,
     env: 'test'
-    // tz: config.timezone.db
-    // dbSetupDockerfilePath: dbSetupDockerfilePath
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -100,9 +96,8 @@ const phases = {
     instance: `${name}-prod`,
     version: `${version}`,
     tag: `prod-${version}`,
+    host: staticUrlsGeoServer.prod,
     env: 'prod'
-    // tz: config.timezone.db
-    // dbSetupDockerfilePath: dbSetupDockerfilePath
   }
 };
 

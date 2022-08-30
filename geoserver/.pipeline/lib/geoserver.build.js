@@ -28,10 +28,9 @@ const dbBuild = (settings) => {
         SUFFIX: `${phases[phase].suffix}`,
         TARGET_IMAGE_VERSION: `${phases[phase].tag}`,
         GIT_REPO_URL: oc.git.http_url,
-        GIT_REF: phases[phase].branch || oc.git.ref
-        // SOURCE_IMAGE_NAME: 'gs-geoserver',
-        // SOURCE_IMAGE_VERSION: '2.21.1',
-        // SOURCE_IMAGE_NAMESPACE: 'a0ec71-tools',
+        GIT_REF: phases[phase].branch || oc.git.ref,
+        SOURCE_CONTEXT_DIR: 'geoserver/biohub-geoserver',
+        DOCKERFILE_PATH: 'Dockerfile'
       }
     })
   );
