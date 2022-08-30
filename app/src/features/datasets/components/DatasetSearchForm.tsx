@@ -118,7 +118,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           sx={{
             mb: 3
           }}>
-          Refine your search to a custom area by importing either a KML file or Shapefile.
+          Refine your search to a custom boundary by importing either KML files or Shapefiles.
         </Typography>
 
         <FieldArray
