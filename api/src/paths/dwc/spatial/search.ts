@@ -123,7 +123,7 @@ export function searchSpatialComponents(): RequestHandler {
       type: (req.query.type as string[]) || [],
       species: (req.query.species as string[]) || [],
       datasetID: (req.query.datasetID as string[]) || [],
-      boundary: boundaries || []
+      boundary: boundaries
     };
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();

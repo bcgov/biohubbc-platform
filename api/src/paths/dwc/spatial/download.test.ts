@@ -227,18 +227,11 @@ describe('download', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      const boundaryFeature: Feature = {
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [[]] }
-      };
+      mockReq.query = {};
 
-      mockReq.query = {
-        type: ['type'],
-        boundary: [JSON.stringify(boundaryFeature)]
-      };
-
-      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').throws(new Error('test error'));
+      const findSpatialComponentsByCriteriaStub = sinon
+        .stub(SpatialService.prototype, 'findSpatialComponentsByCriteria')
+        .throws(new Error('test error'));
 
       const requestHandler = download.downloadSpatialComponents();
 
@@ -249,7 +242,52 @@ describe('download', () => {
         expect((actualError as Error).message).to.equal('test error');
         expect(dbConnectionObj.rollback).to.have.been.calledOnce;
         expect(dbConnectionObj.release).to.have.been.calledOnce;
+        expect(findSpatialComponentsByCriteriaStub).to.be.calledWith({
+          type: [],
+          datasetID: [],
+          boundary: []
+        });
       }
+    });
+
+    it('uses getDBConnection', async () => {
+      const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
+      const getDBConnectionStub = sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {};
+
+      mockReq['keycloak_token'] = 'token';
+
+      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves([]);
+
+      const requestHandler = download.downloadSpatialComponents();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+
+      expect(getDBConnectionStub).to.be.calledWith('token');
+    });
+
+    it('uses getAPIUserDBConnection', async () => {
+      const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
+      const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {};
+
+      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves([]);
+
+      const requestHandler = download.downloadSpatialComponents();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+
+      expect(getAPIUserDBConnectionStub).to.be.calledOnce;
     });
 
     it('returns 200', async () => {
@@ -306,7 +344,9 @@ describe('download', () => {
         }
       ];
 
-      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves(mockData);
+      const findSpatialComponentsByCriteriaStub = sinon
+        .stub(SpatialService.prototype, 'findSpatialComponentsByCriteria')
+        .resolves(mockData);
 
       const requestHandler = download.downloadSpatialComponents();
       await requestHandler(mockReq, mockRes, mockNext);
@@ -322,6 +362,17 @@ describe('download', () => {
       });
       expect(dbConnectionObj.commit).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
+      expect(findSpatialComponentsByCriteriaStub).to.be.calledWith({
+        type: ['type'],
+        datasetID: [datasetID],
+        boundary: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [[]] }
+          }
+        ]
+      });
     });
   });
 });

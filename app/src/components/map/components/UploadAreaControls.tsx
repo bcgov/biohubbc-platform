@@ -24,9 +24,9 @@ const UploadAreaControls: React.FC<React.PropsWithChildren<any>> = (props) => {
   return (
     <>
       <EditDialog
-        dialogTitle={'Import Area of Interest'}
+        dialogTitle={'Import Custom Boundary'}
         open={openUploadArea}
-        dialogSaveButtonLabel={'Import'}
+        dialogSaveButtonLabel={'Import Boundary'}
         component={{
           element: <UploadArea />,
           initialValues: FormikAreaUploadInitialValues,

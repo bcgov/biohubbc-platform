@@ -1,5 +1,7 @@
-import { Alert, Box, Grid, Typography } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
 import { makeStyles } from '@mui/styles';
+import { mdiAlertCircle, mdiInformationOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 import FileUpload from 'components/attachments/FileUpload';
 import { IUploadHandler } from 'components/attachments/FileUploadItem';
 import CustomTextField from 'components/fields/CustomTextField';
@@ -31,8 +33,8 @@ export const FormikAreaUploadInitialValues: IFormikAreaUpload = {
 };
 
 export const AreaUploadYupSchema = yup.object().shape({
-  name: yup.string().required('Area name required').max(100, 'Cannot exceed 100 characters'),
-  features: yup.array().min(1, 'You must specify a project Area').required('You must specify a project Area')
+  name: yup.string().required('Enter a boundary name').max(100, 'Cannot exceed 100 characters'),
+  features: yup.array().min(1, 'Specify a boundary name and select a file to import').required('Specify a boundary name and select a file to import')
 });
 
 export const AreaToolTip: React.FC<React.PropsWithChildren<{ name: string }>> = (props) => {
@@ -68,29 +70,35 @@ const UploadArea: React.FC<React.PropsWithChildren<any>> = (props) => {
 
   return (
     <>
-      <Grid container spacing={2}>
-        <Grid item xs={12} mt={1}>
-          <CustomTextField
-            name="name"
-            label="Area Name"
-            other={{ multiline: false, rows: 1, error: !!formikProps.errors.name }}
-          />
-        </Grid>
-        <Grid item xs={12}>
-          {!formikProps.errors.features && (
-            <Alert severity="info">If uploading a shapefile, it must be configured with a valid projection.</Alert>
-          )}
-          {formikProps.errors.features && <Alert severity="error">{formikProps.errors.features?.toString()}</Alert>}
-          <FileUpload
-            uploadHandler={AreaUploadHandler()}
-            dropZoneProps={{
-              acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
-            }}
-            hideStatus={true}
-            multiple={false}
-          />
-        </Grid>
-      </Grid>
+      {!formikProps.errors.features && (
+        <Alert severity="info"
+          icon={<Icon path={mdiInformationOutline} size={1} />}
+        >
+          <strong>Note:</strong> Shapefiles must be configured with a valid projection.
+        </Alert>
+      )}
+      {formikProps.errors.features && 
+        <Alert severity="error" variant="filled"
+          icon={<Icon path={mdiAlertCircle} size={1} />}
+        >
+          {formikProps.errors.features?.toString()}
+        </Alert>
+      }
+      <Box my={3}>
+        <CustomTextField
+          name="name"
+          label="Boundary Name"
+          other={{ multiline: false, rows: 1, error: !!formikProps.errors.name }}
+        />
+      </Box>
+        <FileUpload
+          uploadHandler={AreaUploadHandler()}
+          dropZoneProps={{
+            acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
+          }}
+          hideStatus={true}
+          multiple={false}
+        />
     </>
   );
 };
