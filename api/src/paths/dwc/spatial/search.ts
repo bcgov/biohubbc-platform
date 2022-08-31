@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { Feature } from 'geojson';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-// import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
+import { GeoJSONFeatureCollection } from '../../../openapi/schemas/geoJson';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
@@ -75,12 +75,14 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              /*
-              required: ['submission_spatial_component_id', 'spatial_data'],
+              required: ['submission_spatial_component_ids', 'spatial_data'],
               properties: {
-                submission_spatial_component_id: {
-                  type: 'integer',
-                  minimum: 1
+                submission_spatial_component_ids: {
+                  type: 'array',
+                  items: {
+                    type: 'number',
+                    minimum: 1
+                  }
                 },
                 spatial_data: {
                   oneOf: [
@@ -99,7 +101,6 @@ GET.apiDoc = {
                   ]
                 }
               }
-              */
             }
           }
         }
@@ -129,7 +130,20 @@ export function searchSpatialComponents(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(response); //response.map((item) => item.spatial_component));
+      res.status(200).json(response.map((row) => {
+        const { submission_spatial_component_ids, spatial_component } = row
+
+        return {
+          submission_spatial_component_ids,
+          spatial_data: {
+            ...spatial_component.spatial_data,
+            features: spatial_component.spatial_data.features.map((feature) => {
+              delete feature?.properties?.dwc
+              return feature
+            })
+          }
+        }
+      }));
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();

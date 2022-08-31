@@ -15,7 +15,7 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { getFormattedDate } from 'utils/Utils';
+import { getFormattedDate, makeCsvObjectUrl } from 'utils/Utils';
 
 export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
 
@@ -34,6 +34,14 @@ export type BoundaryCentroidFeature = Feature & { properties: BoundaryCentroidFe
 export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };
+
+interface IMetadataHeaderProps {
+  type?: string;
+  date?: string;
+  index?: number;
+  length?: number;
+  downloadHref?: string
+}
 
 const useStyles = makeStyles(() => ({
   modalContent: {
@@ -79,10 +87,11 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   });
 
   dataLoader.load();
-
+  
   const { isLoading, isReady } = dataLoader;
   const data = dataLoader.data || []
   const isEmpty = !data || data.length === 0
+  const metadataObjectUrl = isEmpty ? undefined : makeCsvObjectUrl(data.map((row) => row.dwc))
 
   const handleNext = () => {
     if (isEmpty) {
@@ -107,14 +116,17 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     <div className={classes.modalContent}>{children}</div>
   );
 
-  const MetadataHeader: React.FC<React.PropsWithChildren<{ type?: string; date?: string; index?: number; length?: number }>> = (headerProps) => {
-    const { type, date, index, length } = headerProps
+  const MetadataHeader: React.FC<React.PropsWithChildren<IMetadataHeaderProps>> = (headerProps) => {
+    const { type, date, index, length, downloadHref } = headerProps
 
     return (
       <Box mb={1}>
         <Typography component="h6" variant="subtitle1" className={classes.pointType}>
           {type || 'Feature'} record {length && length > 0 && `(${(index || 0) + 1} of ${length})`}
         </Typography>
+        {downloadHref && (
+          <Button href={downloadHref}>Download Records as CSV</Button>
+        )}
         {date && (
           <Typography className={classes.date} component="h6" variant="subtitle1">
             {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, date)}
@@ -163,7 +175,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   return (
     <ModalContentWrapper>
-      <MetadataHeader type={type} index={currentIndex} length={data.length} />
+      <MetadataHeader type={type} index={currentIndex} length={data.length} downloadHref={metadataObjectUrl} />
       <Collapse in={isReady} className={classes.metadata}>
         <Table className={classes.table}>
           <TableBody>

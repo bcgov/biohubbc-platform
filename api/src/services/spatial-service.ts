@@ -1,11 +1,10 @@
-import { Geometry, Point } from 'geojson';
+// import { Geometry, Point } from 'geojson';
 import { IDBConnection } from '../database/db';
 import {
   IGetSecurityTransformRecord,
   IGetSpatialTransformRecord,
   IInsertSpatialTransform,
   ISpatialComponentsSearchCriteria,
-  ISubmissionSpatialSearchResponseGroup,
   ISubmissionSpatialSearchResponseRow,
   SpatialRepository
 } from '../repositories/spatial-repository';
@@ -169,64 +168,10 @@ export class SpatialService extends DBService {
    */
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
-  ): Promise<ISubmissionSpatialSearchResponseGroup[]> {
-
-
-
-    /**
-     * 
-     * >>>>> dev
-     * 
-    const userService = new UserService(this.connection);
-     
-    if (await userService.isSystemUserAdmin()) {
-      return this.spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(criteria);
-    }
-      
-    return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
-     * <<<<<
-     */
-
-
-
-
-    
-
+  ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const response = await this.spatialRepository.findSpatialComponentsByCriteria(criteria);
-    
-    const equals = (geoA: Geometry, geoB: Geometry): boolean => {
-      const coordinatesA = (geoA as Point).coordinates
-      const coordinatesB = (geoB as Point).coordinates
-      // console.log('matched ', coordinatesA, coordinatesB)
-      return coordinatesA[0] === coordinatesB[0] && coordinatesA[1] === coordinatesB[1]
-    }
 
-    // return response as unknown as ISubmissionSpatialSearchResponseGroup[];
-
-    return response.reduce((acc: ISubmissionSpatialSearchResponseGroup[], row: ISubmissionSpatialSearchResponseRow) => {
-
-      const groupIndex = acc.findIndex((item) => item.spatial_data.features.some((feature) => {
-        return equals(feature.geometry, row.spatial_component.spatial_data.features[0].geometry)
-      }))
-
-      if (groupIndex < 0) {
-        // console.log('no group found')
-        return [
-          ...acc,
-          {
-            spatial_data: row.spatial_component.spatial_data,
-            submission_spatial_component_id: []
-          }
-        ]
-      }
-      // console.log('Group found')
-
-      const group = acc[groupIndex]
-      group.submission_spatial_component_id.push(row.spatial_component.submission_spatial_component_id)
-      acc[groupIndex] = group
-
-      return acc
-    }, [])
+    return response;
   }
 
   /**
