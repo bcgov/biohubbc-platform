@@ -105,9 +105,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                   { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
                   { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
                   { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
-                  { value: 'M-OVCA-CA', label: 'Bighorn sheep (M-OVCA-CA)' },
-                  { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' },
-                  { value: 'B-SPOW-CA', label: 'Spotted Owl (B-SPOW-CA)' }
+                  { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' }
                 ]}
               />
 
