@@ -118,7 +118,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                   variant="contained"
                   color="primary"
                   size="large"
-                  type="submit"
+                  type="button"
                   data-testid="dataset-find-button"
                   sx={{
                     fontWeight: 700
