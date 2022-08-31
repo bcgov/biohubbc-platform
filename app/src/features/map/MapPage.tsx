@@ -171,7 +171,11 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           position: 'relative',
           zIndex: '999'
         }}>
-        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} onToggleDataVisibility={onToggleDataVisibility} />
+        <SideSearchBar
+          mapDataLoader={mapDataLoader}
+          onAreaUpdate={onAreaUpdate}
+          onToggleDataVisibility={onToggleDataVisibility}
+        />
       </Paper>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer

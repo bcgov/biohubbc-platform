@@ -54,7 +54,7 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
           <Typography variant="h6">Found {countGrouped(groupedSpatialData)} observations</Typography>
         </Grid>
         <Grid item xs={4}>
-          <Button onClick={() => props.backToSearch()} data-testid="RefineSearchButton" >
+          <Button onClick={() => props.backToSearch()} data-testid="RefineSearchButton">
             <Typography variant="body1" color="textPrimary">
               Refine Search
             </Typography>

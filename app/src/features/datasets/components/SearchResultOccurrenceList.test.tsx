@@ -1,4 +1,3 @@
-import { Checkbox } from '@mui/material';
 import { Feature, GeoJsonProperties, Geometry } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -22,21 +21,27 @@ const mockUseApi = {
 };
 
 const SearchResultComponent = () => {
-    const mockCallBack = jest.fn<any, any>().mockResolvedValue({});
-    const mockMapDataLoader = useDataLoader<
-      [
-        searchBoundary: Feature<Geometry, GeoJsonProperties>[],
-        searchType: string[],
-        species?: string[],
-        searchZoom?: number,
-        datasetID?: string
-      ],
-      ISpatialData[],
-      unknown
-    >(mockCallBack);
+  const mockCallBack = jest.fn<any, any>().mockResolvedValue({});
+  const mockMapDataLoader = useDataLoader<
+    [
+      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
+      searchType: string[],
+      species?: string[],
+      searchZoom?: number,
+      datasetID?: string
+    ],
+    ISpatialData[],
+    unknown
+  >(mockCallBack);
 
-    return <SearchResultOccurrenceList mapDataLoader={mockMapDataLoader} onToggleDataVisibility={mockOnToggleDataVisibility} backToSearch={mockBackToSearch}  />;
-  };
+  return (
+    <SearchResultOccurrenceList
+      mapDataLoader={mockMapDataLoader}
+      onToggleDataVisibility={mockOnToggleDataVisibility}
+      backToSearch={mockBackToSearch}
+    />
+  );
+};
 
 describe('SearchResultOccurrencelist', () => {
   beforeEach(() => {
@@ -55,16 +60,15 @@ describe('SearchResultOccurrencelist', () => {
 
   it('backToSearch is called', () => {
     const { getByTestId } = render(<SearchResultComponent />);
-    const button = getByTestId("RefineSearchButton");
-    button.click()
-    expect(mockBackToSearch).toBeCalled()
+    const button = getByTestId('RefineSearchButton');
+    button.click();
+    expect(mockBackToSearch).toBeCalled();
   });
 
   it('moose occurrences appear in list', () => {
     const { getByTestId } = render(<SearchResultComponent />);
-    const button = getByTestId("RefineSearchButton");
-    button.click()
-    expect(mockBackToSearch).toBeCalled()
+    const button = getByTestId('RefineSearchButton');
+    button.click();
+    expect(mockBackToSearch).toBeCalled();
   });
-
 });
