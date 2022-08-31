@@ -99,7 +99,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
               <DatasetSearchForm
                 onAreaUpdate={props.onAreaUpdate}
                 speciesList={[
-                  { value: 'M-ALAM', label: 'Moose (M-ALAM)' },
+                  { value: 'M-ALAL', label: 'Moose (M-ALAL)' },
                   { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
                   { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
                   { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
