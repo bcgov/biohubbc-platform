@@ -54,7 +54,7 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
           <Typography variant="h6">Found {countGrouped(groupedSpatialData)} observations</Typography>
         </Grid>
         <Grid item xs={4}>
-          <Button onClick={() => props.backToSearch()}>
+          <Button onClick={() => props.backToSearch()} data-testid="RefineSearchButton" >
             <Typography variant="body1" color="textPrimary">
               Refine Search
             </Typography>
@@ -70,6 +70,7 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
                 <Grid container direction="row" alignItems={'center'} key={`${key}-${index}`}>
                   <Grid item xs={2}>
                     <Checkbox
+                      data-testid={`ToggleCheckbox-${index}`}
                       checked={datasetVisibility[key] == undefined ? true : datasetVisibility[key]}
                       onChange={() => toggleVisibility(key)}
                     />
