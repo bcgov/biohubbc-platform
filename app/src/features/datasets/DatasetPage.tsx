@@ -54,7 +54,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
   const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialDataFile({
-      boundary: searchBoundary,
+      boundary: [searchBoundary],
       type: searchType,
       zoom: searchZoom,
       datasetID: datasetId
@@ -83,7 +83,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
 
   const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialData({
-      boundary: searchBoundary,
+      boundary: [searchBoundary],
       type: searchType,
       zoom: searchZoom,
       datasetID: datasetId

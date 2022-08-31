@@ -22,22 +22,6 @@ describe('download', () => {
 
       describe('should throw an error when', () => {
         describe('boundry', () => {
-          it('is undefined', async () => {
-            const request = {
-              headers: {
-                'content-type': 'application/json'
-              },
-              query: {
-                datasetID: []
-              }
-            };
-
-            const response = requestValidator.validateRequest(request);
-            expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal("must have required property 'boundary'");
-          });
-
           it('is null', async () => {
             const request = {
               headers: {
@@ -53,10 +37,10 @@ describe('download', () => {
 
             expect(response.status).to.equal(400);
             expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be array');
           });
 
-          it('is not a string', async () => {
+          it('is not a array', async () => {
             const request = {
               headers: {
                 'content-type': 'application/json'
@@ -71,7 +55,7 @@ describe('download', () => {
 
             expect(response.status).to.equal(400);
             expect(response.errors[0].path).to.equal('boundary');
-            expect(response.errors[0].message).to.equal('must be string');
+            expect(response.errors[0].message).to.equal('must be array');
           });
         });
 
@@ -82,7 +66,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 datasetID: [],
                 type: 'not an array'
               }
@@ -103,7 +87,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null'
+                boundary: []
               }
             };
 
@@ -120,7 +104,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 datasetID: null
               }
             };
@@ -138,7 +122,7 @@ describe('download', () => {
                 'content-type': 'application/json'
               },
               query: {
-                boundary: 'not null',
+                boundary: [],
                 type: [],
                 datasetID: 'not an array'
               }
@@ -243,18 +227,11 @@ describe('download', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      const boundaryFeature: Feature = {
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'Polygon', coordinates: [[]] }
-      };
+      mockReq.query = {};
 
-      mockReq.query = {
-        type: ['type'],
-        boundary: JSON.stringify(boundaryFeature)
-      };
-
-      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').throws(new Error('test error'));
+      const findSpatialComponentsByCriteriaStub = sinon
+        .stub(SpatialService.prototype, 'findSpatialComponentsByCriteria')
+        .throws(new Error('test error'));
 
       const requestHandler = download.downloadSpatialComponents();
 
@@ -265,7 +242,52 @@ describe('download', () => {
         expect((actualError as Error).message).to.equal('test error');
         expect(dbConnectionObj.rollback).to.have.been.calledOnce;
         expect(dbConnectionObj.release).to.have.been.calledOnce;
+        expect(findSpatialComponentsByCriteriaStub).to.be.calledWith({
+          type: [],
+          datasetID: [],
+          boundary: []
+        });
       }
+    });
+
+    it('uses getDBConnection', async () => {
+      const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
+      const getDBConnectionStub = sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {};
+
+      mockReq['keycloak_token'] = 'token';
+
+      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves([]);
+
+      const requestHandler = download.downloadSpatialComponents();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+
+      expect(getDBConnectionStub).to.be.calledWith('token');
+    });
+
+    it('uses getAPIUserDBConnection', async () => {
+      const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
+      const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
+
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.query = {};
+
+      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves([]);
+
+      const requestHandler = download.downloadSpatialComponents();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(mockRes.statusValue).to.equal(200);
+
+      expect(getAPIUserDBConnectionStub).to.be.calledOnce;
     });
 
     it('returns 200', async () => {
@@ -283,7 +305,7 @@ describe('download', () => {
 
       mockReq.query = {
         type: ['type'],
-        boundary: JSON.stringify(boundaryFeature),
+        boundary: [JSON.stringify(boundaryFeature)],
         datasetID: [datasetID]
       };
 
@@ -322,7 +344,9 @@ describe('download', () => {
         }
       ];
 
-      sinon.stub(SpatialService.prototype, 'findSpatialComponentsByCriteria').resolves(mockData);
+      const findSpatialComponentsByCriteriaStub = sinon
+        .stub(SpatialService.prototype, 'findSpatialComponentsByCriteria')
+        .resolves(mockData);
 
       const requestHandler = download.downloadSpatialComponents();
       await requestHandler(mockReq, mockRes, mockNext);
@@ -338,6 +362,17 @@ describe('download', () => {
       });
       expect(dbConnectionObj.commit).to.have.been.calledOnce;
       expect(dbConnectionObj.release).to.have.been.calledOnce;
+      expect(findSpatialComponentsByCriteriaStub).to.be.calledWith({
+        type: ['type'],
+        datasetID: [datasetID],
+        boundary: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [[]] }
+          }
+        ]
+      });
     });
   });
 });

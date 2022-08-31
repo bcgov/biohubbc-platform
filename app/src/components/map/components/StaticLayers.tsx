@@ -38,14 +38,14 @@ const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (pro
 
   const layerControls: ReactElement[] = [];
 
-  props.layers.forEach((layer) => {
+  props.layers.forEach((layer, index) => {
     if (!layer.features?.length) {
       return;
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked name={layer.layerName} key={`static-layer-${layer.layerName}`}>
-        <FeatureGroup key={`static-feature-group-${layer.layerName}`}>
+      <LayersControl.Overlay checked name={layer.layerName} key={`static-layer-${index}`}>
+        <FeatureGroup key={`static-feature-group-${index}`}>
           {layer.features.map((item, index) => {
             const id = item.key || item.geoJSON.id || index;
 

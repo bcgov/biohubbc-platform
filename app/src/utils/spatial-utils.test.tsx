@@ -10,16 +10,13 @@ describe('parseSpatialDataByType', () => {
 
     expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
 
-    expect(result.staticLayers).toEqual([
-      { layerName: LAYER_NAME.OCCURRENCES, features: [] },
-      { layerName: LAYER_NAME.BOUNDARIES, features: [] }
-    ]);
+    expect(result.staticLayers).toEqual([{ layerName: LAYER_NAME.BOUNDARIES, features: [] }]);
   });
 
   it('returns empty responses if featureCollections param is has no features', () => {
     const spatialData: ISpatialData[] = [
       {
-        submission_spatial_component_id: 1,
+        submission_spatial_component_ids: [1],
         spatial_data: {
           type: 'FeatureCollection',
           features: []
@@ -31,16 +28,13 @@ describe('parseSpatialDataByType', () => {
 
     expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
 
-    expect(result.staticLayers).toEqual([
-      { layerName: LAYER_NAME.OCCURRENCES, features: [] },
-      { layerName: LAYER_NAME.BOUNDARIES, features: [] }
-    ]);
+    expect(result.staticLayers).toEqual([{ layerName: LAYER_NAME.BOUNDARIES, features: [] }]);
   });
 
   it('returns non-empty responses if featureCollections has features', () => {
     const spatialData: ISpatialData[] = [
       {
-        submission_spatial_component_id: 1,
+        submission_spatial_component_ids: [1],
         spatial_data: {
           type: 'FeatureCollection',
           features: [
@@ -58,7 +52,7 @@ describe('parseSpatialDataByType', () => {
         }
       },
       {
-        submission_spatial_component_id: 2,
+        submission_spatial_component_ids: [2],
         spatial_data: {
           type: 'FeatureCollection',
           features: [
@@ -74,7 +68,7 @@ describe('parseSpatialDataByType', () => {
         }
       },
       {
-        submission_spatial_component_id: 3,
+        submission_spatial_component_ids: [3],
         spatial_data: {
           type: 'FeatureCollection',
           features: [
@@ -107,9 +101,8 @@ describe('parseSpatialDataByType', () => {
       ]
     });
 
-    expect(result.staticLayers.length).toEqual(2);
-    expect(result.staticLayers[0]).toEqual({ layerName: LAYER_NAME.OCCURRENCES, features: [] });
-    expect(result.staticLayers[1]).toMatchObject({
+    expect(result.staticLayers.length).toEqual(1);
+    expect(result.staticLayers[0]).toMatchObject({
       layerName: LAYER_NAME.BOUNDARIES,
       features: [
         {

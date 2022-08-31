@@ -489,7 +489,7 @@ describe('SpatialRepository', () => {
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
@@ -516,7 +516,7 @@ describe('SpatialRepository', () => {
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       const response = await spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
@@ -538,7 +538,7 @@ describe('SpatialRepository', () => {
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence', 'Boundary'],
         datasetID: ['111-111-111', '222-222-222'],
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       const response = await spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(mockSearchCriteria);
@@ -564,7 +564,7 @@ describe('SpatialRepository', () => {
       const spatialRepository = new SpatialRepository(mockDBConnection);
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
@@ -586,7 +586,7 @@ describe('SpatialRepository', () => {
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence', 'Boundary'],
         datasetID: ['111-111-111', '222-222-222'],
-        boundary: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }
+        boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };
 
       const response = await spatialRepository.findSpatialComponentsByCriteria(mockSearchCriteria);
