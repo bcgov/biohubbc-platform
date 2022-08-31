@@ -44,7 +44,7 @@ describe('SideSearchBar', () => {
     const { getByText } = render(<TestComponent />);
 
     expect(getByText('What do you want to find?', { exact: false })).toBeVisible();
-    expect(getByText('Define area of interest', { exact: false })).toBeVisible();
+    expect(getByText('Refine Search Area', { exact: false })).toBeVisible();
     expect(getByText('Find Data', { exact: false })).toBeVisible();
   });
 });
