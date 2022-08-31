@@ -94,8 +94,7 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
                     </Typography>
                   </Grid>
                   <Grid item xs={3}>
-                    <Typography variant="body1" color="textPrimary">
-                    </Typography>
+                    <Typography variant="body1" color="textPrimary"></Typography>
                   </Grid>
                 </Grid>
               );
