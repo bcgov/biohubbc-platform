@@ -34,10 +34,21 @@ const appTheme = createTheme({
     }
   },
   components: {
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          fontSize: '1rem'
+        }
+      }
+    },
     MuiButton: {
       styleOverrides: {
         root: {
           textTransform: 'none'
+        },
+        sizeLarge: {
+          fontSize: '1rem',
+          fontWeight: 700
         }
       }
     },
