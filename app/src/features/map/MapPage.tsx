@@ -7,6 +7,7 @@ import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/Sta
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -59,17 +60,21 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
   const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
 
+  const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
+
+  const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
+
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;
     }
 
-    const result = parseSpatialDataByType(mapDataLoader.data);
-
-    setStaticLayers([...staticLayers, result.staticLayers[0]]);
+    const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
     setMarkerLayers(result.markerLayers);
+    setStaticLayers(result.staticLayers);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapDataLoader.data]);
+  }, [mapDataLoader.data, datasetVisibility]);
 
   useEffect(() => {
     if (!loadedFromUrl.current) {
@@ -128,7 +133,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       staticLayers.push(staticLayer);
     });
 
-    setStaticLayers(staticLayers);
+    setAreaStaticLayers(staticLayers);
     setBounds(featureArray);
   };
 
@@ -149,9 +154,15 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
   };
 
+  const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
+    setDatasetVisibility(datasets);
+  };
+
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
-      <Paper square elevation={3}
+      <Paper
+        square
+        elevation={3}
         sx={{
           flex: '0 0 auto',
           width: '500px',
@@ -159,9 +170,12 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           px: 3,
           position: 'relative',
           zIndex: '999'
-        }}
-      >
-        <SideSearchBar mapDataLoader={mapDataLoader} onAreaUpdate={onAreaUpdate} />
+        }}>
+        <SideSearchBar
+          mapDataLoader={mapDataLoader}
+          onAreaUpdate={onAreaUpdate}
+          onToggleDataVisibility={onToggleDataVisibility}
+        />
       </Paper>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
@@ -180,7 +194,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           scrollWheelZoom={true}
           fullScreenControl={true}
           markerLayers={markerLayers}
-          staticLayers={staticLayers}
+          staticLayers={[...staticLayers, ...areaStaticLayers]}
           bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>

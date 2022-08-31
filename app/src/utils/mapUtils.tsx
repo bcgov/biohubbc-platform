@@ -5,7 +5,6 @@ import { Feature } from 'geojson';
 import JSZip from 'jszip';
 import get from 'lodash-es/get';
 import { read } from 'shapefile';
-
 /**
  * Function to handle zipped shapefile spatial boundary uploads
  *
@@ -23,38 +22,35 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
     return;
   }
 
-  await file.arrayBuffer().then(async (buffer) => {
-    return JSZip.loadAsync(buffer).then(async (zip) => {
-      // Sensitive
-      zip.forEach(async (relativePath, zipEntry) => {
-        if (zipEntry.name.includes('.shp')) {
-          const shpFile = await zip.file(zipEntry.name)?.async('arraybuffer');
+  const archive = await file.arrayBuffer().then((buffer) => JSZip.loadAsync(buffer));
 
-          if (shpFile) {
-            // Run the conversion
-            const collection = await read(shpFile);
-
-            const sanitizedGeoJSON: Feature[] = [];
-            if (Array.isArray(collection.features)) {
-              collection.features.forEach((feature) => {
-                if (feature.geometry && feature.geometry.type === 'Polygon') {
-                  sanitizedGeoJSON.push(feature);
-                }
-              });
-            }
-
-            setFieldValue(name, [...sanitizedGeoJSON, ...get(values, name)]);
-          } else {
-            setFieldError(
-              name,
-              'You must upload a valid shapefile (.zip format). .shp file is invalid. Please try again.'
-            );
-            return;
-          }
-        }
-      });
-    });
+  const shpFileName = Object.keys(archive.files).find((key) => {
+    return key.includes('.shp');
   });
+
+  if (!shpFileName) {
+    setFieldError(name, 'You must upload a valid shapefile (.zip format). That contains .shp file. Please try again.');
+    return;
+  }
+
+  const shpFile = await archive.file(shpFileName)?.async('arraybuffer');
+  if (!shpFile) {
+    setFieldError(name, 'You must upload a valid shapefile (.zip format). .shp file is invalid. Please try again.');
+    return;
+  }
+  // Run the conversion
+  const collection = await read(shpFile);
+
+  const sanitizedGeoJSON: Feature[] = [];
+  if (Array.isArray(collection.features)) {
+    collection.features.forEach((feature) => {
+      if (feature.geometry && feature.geometry.type === 'Polygon') {
+        sanitizedGeoJSON.push(feature);
+      }
+    });
+  }
+
+  setFieldValue(name, [...sanitizedGeoJSON, ...get(values, name)]);
 };
 
 /**

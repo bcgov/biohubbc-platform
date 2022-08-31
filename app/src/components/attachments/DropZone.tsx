@@ -91,17 +91,16 @@ export const DropZone: React.FC<React.PropsWithChildren<IDropZoneProps & IDropZo
                   mt: 1,
                   fontSize: '1.125rem',
                   fontWeight: 700
-                }}
-              >
+                }}>
                 Drag your {(multiple && 'files') || 'file'} here, or <Link underline="always">Browse Files</Link>
               </Box>
-              <Box textAlign="center"
+              <Box
+                textAlign="center"
                 sx={{
                   '& span + span': {
                     ml: 2
                   }
-                }}
-              >
+                }}>
                 {acceptedFileExtensions && (
                   <Typography component="span" variant="subtitle2" color="textSecondary">
                     {`Supported Files: ${acceptedFileExtensions}`}
