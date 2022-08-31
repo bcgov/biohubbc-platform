@@ -95,7 +95,6 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
                   </Grid>
                   <Grid item xs={3}>
                     <Typography variant="body1" color="textPrimary">
-                      {/* {0} records */}
                     </Typography>
                   </Grid>
                 </Grid>
