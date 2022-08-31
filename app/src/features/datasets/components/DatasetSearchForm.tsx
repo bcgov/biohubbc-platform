@@ -7,6 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import MultiSelectFieldWithList from 'components/fields/MultiSelectFieldWithList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import { FieldArray, useFormikContext } from 'formik';
@@ -95,6 +96,15 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           <MultiAutocompleteField
             id={`species_list`}
             label={'Select Species'}
+            options={props.speciesList}
+            required={false}
+          />
+        </Box>
+
+        <Box mt={3}>
+          <MultiSelectFieldWithList
+            id={`species_list`}
+            label={'Select Species With List'}
             options={props.speciesList}
             required={false}
           />
