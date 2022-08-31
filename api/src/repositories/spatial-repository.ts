@@ -62,6 +62,9 @@ export type EmptyObject = Record<string, never>;
 
 export interface ISubmissionSpatialSearchResponseRow {
   spatial_component: {
+    dataset_id?: number;
+    associated_taxa?: string;
+    vernacular_name?: string;
     submission_spatial_component_id: number;
     spatial_data: FeatureCollection | EmptyObject;
   };
@@ -379,7 +382,20 @@ export class SpatialRepository extends BaseRepository {
       .queryBuilder()
       .with('with_filtered_spatial_component', (qb1) => {
         // Get the spatial components that match the search filters
-        qb1.select().from('submission_spatial_component as ssc');
+        qb1
+          .select(
+            '*',
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
+            )
+          )
+          .from('submission_spatial_component as ssc');
 
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);
@@ -402,6 +418,12 @@ export class SpatialRepository extends BaseRepository {
             jsonb_build_object(
               'submission_spatial_component_id',
                 wfsc.submission_spatial_component_id,
+              'dataset_id',
+                wfsc.dataset_id,
+              'associated_taxa',
+                wfsc.associated_taxa,
+              'vernacular_name',
+                wfsc.vernacular_name,
               'spatial_data',
                 wfsc.spatial_component
             ) spatial_component
@@ -434,6 +456,15 @@ export class SpatialRepository extends BaseRepository {
           .select(
             knex.raw(
               'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
             'ssc.submission_id',
@@ -643,6 +674,15 @@ export class SpatialRepository extends BaseRepository {
             knex.raw(
               'array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms'
             ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+            ),
+            knex.raw(
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
+            ),
             'ssc.submission_spatial_component_id',
             'ssc.submission_id',
             'ssc.spatial_component',
@@ -703,7 +743,13 @@ export class SpatialRepository extends BaseRepository {
       submission_id,
       jsonb_build_object(
           'submission_spatial_component_id',
-          wfscwst.submission_spatial_component_id,
+            wfscwst.submission_spatial_component_id,
+          'dataset_id',
+            wfscwst.dataset_id,
+          'associated_taxa',
+            wfscwst.associated_taxa,
+          'vernacular_name',
+            wfscwst.vernacular_name,
           'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component

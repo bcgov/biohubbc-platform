@@ -38,7 +38,14 @@ describe('SideSearchBar', () => {
         unknown
       >(mockCallBack);
       const mockAreaUpdate = jest.fn();
-      return <SideSearchBar mapDataLoader={mockMapDataLoader} onAreaUpdate={mockAreaUpdate} />;
+      const mockOnToggleDataVisibility = jest.fn();
+      return (
+        <SideSearchBar
+          mapDataLoader={mockMapDataLoader}
+          onAreaUpdate={mockAreaUpdate}
+          onToggleDataVisibility={mockOnToggleDataVisibility}
+        />
+      );
     };
 
     const { getByText } = render(<TestComponent />);
