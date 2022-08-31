@@ -132,7 +132,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       )}
 
       {!showForm &&
-        (datasetType == 'Boundary Centroid' ? (
+        (datasetType === 'Boundary Centroid' ? (
           <SearchResultProjectList
             mapDataLoader={props.mapDataLoader}
             backToSearch={() => toggleForm()}

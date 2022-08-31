@@ -71,7 +71,7 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
                   <Grid item xs={2}>
                     <Checkbox
                       data-testid={`ToggleCheckbox-${index}`}
-                      checked={datasetVisibility[key] == undefined ? true : datasetVisibility[key]}
+                      checked={datasetVisibility[key] === undefined ? true : datasetVisibility[key]}
                       onChange={() => toggleVisibility(key)}
                     />
                   </Grid>
