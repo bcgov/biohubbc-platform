@@ -584,7 +584,6 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   _whereBoundaryIntersects(boundaries: Feature[], geoColumn: string, qb1: Knex.QueryBuilder) {
-    //TODO: geoJson not happy on search
     const generateSqlStatement = (geometry: Feature) => {
       return SQL`
       public.ST_INTERSECTS(`.append(`${geoColumn}`).append(`,

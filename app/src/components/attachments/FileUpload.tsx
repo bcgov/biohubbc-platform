@@ -244,16 +244,16 @@ export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (
         <DropZone multiple={props.multiple} onFiles={onFiles} {...props.dropZoneProps} />
       </Box>
       <Box>
-        <List disablePadding
+        <List
+          disablePadding
           sx={{
             '& li + li': {
               mt: 1
             },
-            '& li:first-child': {
+            '& li:first-of-type': {
               mt: 3
             }
-          }}
-        >
+          }}>
           {fileUploadItems}
         </List>
       </Box>

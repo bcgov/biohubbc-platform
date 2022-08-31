@@ -5,7 +5,6 @@ import { Feature } from 'geojson';
 import JSZip from 'jszip';
 import get from 'lodash-es/get';
 import { read } from 'shapefile';
-
 /**
  * Function to handle zipped shapefile spatial boundary uploads
  *
@@ -28,6 +27,7 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
   const shpFileName = Object.keys(archive.files).find((key) => {
     return key.includes('.shp');
   });
+
   if (!shpFileName) {
     setFieldError(name, 'You must upload a valid shapefile (.zip format). That contains .shp file. Please try again.');
     return;

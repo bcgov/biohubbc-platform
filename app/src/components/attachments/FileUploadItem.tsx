@@ -211,7 +211,8 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
   };
 
   return (
-    <ListItem key={file.name}
+    <ListItem
+      key={file.name}
       sx={{
         display: 'flex',
         flexDirection: 'row',
@@ -221,44 +222,42 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
         px: 2,
         border: '1px solid rgba(0,0,0,0.38)',
         borderRadius: '4px'
-      }}
-    >
-        <Icon path={mdiFileOutline} size={1.6} className={error ? classes.errorColor : classes.fileIconColor}/>
-        <Box flex="1 1 auto" ml={1.65}>
-          <Box display="flex" flexDirection="row" flex="1 1 auto" alignItems="center">
-            <Box flex="1 1 auto">
-              <Typography variant="body1" component="div">
-                <strong>{file.name}</strong>
-              </Typography>
-              <Typography variant="body2" component="div" color="textSecondary">
-                {error || status}
-              </Typography>
-            </Box>
-
-            {errors && (
-              <Box display="flex" alignItems="center">
-                <Button color="primary" onClick={() => setOpenDialog(!openDialog)}>
-                  Show Detailed Error Message
-                </Button>
-                <ComponentDialog
-                  open={openDialog}
-                  dialogTitle="Treatment File Errors"
-                  onClose={() => setOpenDialog(false)}>
-                  <ErrorDetailsList errors={errors} />
-                </ComponentDialog>
-              </Box>
-            )}
-            <Box display="flex" alignItems="center">
-              <MemoizedActionButton
-                hideStatus={props.hideStatus}
-                status={status}
-                onCancel={() => setInitiateCancel(true)}
-              />
-            </Box>
+      }}>
+      <Icon path={mdiFileOutline} size={1.6} className={error ? classes.errorColor : classes.fileIconColor} />
+      <Box flex="1 1 auto" ml={1.65}>
+        <Box display="flex" flexDirection="row" flex="1 1 auto" alignItems="center">
+          <Box flex="1 1 auto">
+            <Typography variant="body1" component="div">
+              <strong>{file.name}</strong>
+            </Typography>
+            <Typography variant="body2" component="div" color="textSecondary">
+              {error || status}
+            </Typography>
           </Box>
-          <MemoizedProgressBar hideStatus={props.hideStatus} status={status} progress={progress} />
-        </Box>
 
+          {errors && (
+            <Box display="flex" alignItems="center">
+              <Button color="primary" onClick={() => setOpenDialog(!openDialog)}>
+                Show Detailed Error Message
+              </Button>
+              <ComponentDialog
+                open={openDialog}
+                dialogTitle="Treatment File Errors"
+                onClose={() => setOpenDialog(false)}>
+                <ErrorDetailsList errors={errors} />
+              </ComponentDialog>
+            </Box>
+          )}
+          <Box display="flex" alignItems="center">
+            <MemoizedActionButton
+              hideStatus={props.hideStatus}
+              status={status}
+              onCancel={() => setInitiateCancel(true)}
+            />
+          </Box>
+        </Box>
+        <MemoizedProgressBar hideStatus={props.hideStatus} status={status} progress={progress} />
+      </Box>
     </ListItem>
   );
 };
@@ -286,6 +285,18 @@ interface IActionButtonProps {
 const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (props) => {
   const classes = useStyles();
 
+  if (props.status === UploadFileStatus.FAILED) {
+    return (
+      <IconButton
+        title="Remove File"
+        aria-label="remove file"
+        onClick={() => props.onCancel()}
+        className={classes.errorColor}>
+        <Icon path={mdiTrashCanOutline} size={1} />
+      </IconButton>
+    );
+  }
+
   if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED || props.hideStatus) {
     return (
       <IconButton title="Remove File" aria-label="remove file" onClick={() => props.onCancel()}>
@@ -307,18 +318,6 @@ const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (pro
       <Box display="flex" alignItems="center" p={'12px'}>
         <Icon path={mdiCheck} size={1} className={classes.completeColor} />
       </Box>
-    );
-  }
-
-  if (props.status === UploadFileStatus.FAILED) {
-    return (
-      <IconButton
-        title="Remove File"
-        aria-label="remove file"
-        onClick={() => props.onCancel()}
-        className={classes.errorColor}>
-        <Icon path={mdiTrashCanOutline} size={1} />
-      </IconButton>
     );
   }
 

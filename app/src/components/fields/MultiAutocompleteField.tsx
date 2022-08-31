@@ -44,7 +44,6 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     );
   };
 
-  //not getting triggered
   const handleGetOptionSelected = (
     option: IMultiAutocompleteFieldOption,
     value: IMultiAutocompleteFieldOption
