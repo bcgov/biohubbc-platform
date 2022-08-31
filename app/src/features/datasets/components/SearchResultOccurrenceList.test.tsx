@@ -53,8 +53,7 @@ describe('SearchResultOccurrencelist', () => {
   });
 
   it('renders an empty component', () => {
-    const { getByText, getByTestId } = render(<SearchResultComponent />);
-
+    const { getByText } = render(<SearchResultComponent />);
     expect(getByText('Found 0 observations', { exact: false })).toBeVisible();
   });
 
