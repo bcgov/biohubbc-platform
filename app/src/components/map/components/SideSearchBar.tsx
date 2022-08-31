@@ -73,9 +73,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
   useEffect(() => {
     setShowSpinner(true);
-    console.log('props.mapDataLoader.isLoading', props.mapDataLoader.isLoading);
-    console.log('props.mapDataLoader.isReady', props.mapDataLoader.isReady);
-
     if (props.mapDataLoader.isReady) {
       if (!props.mapDataLoader.data?.length) {
         setShowNoData(true);
