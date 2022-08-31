@@ -5,53 +5,49 @@ import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { Container } from '@mui/system';
 import React, { useEffect, useState } from 'react';
-import { groupSpatialDataBySpecies, ISpatialDataGroupedBySpecies } from 'utils/spatial-utils';
-import { IDatasetVisibility, ISearchResultListProps } from './SearchResultProjectList';
+export interface ISearchResult {
+  key: string,
+  name: string,
+  count: number,
+  visible: boolean,
+}
+
+export interface ISearchResultListProps {
+  searchResults: ISearchResult[];
+  onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
+  backToSearch: () => void;
+}
+
+export interface IDatasetVisibility {
+  [details: string]: boolean;
+}
 
 const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => {
-  const [groupedSpatialData, setGroupedSpatialData] = useState<ISpatialDataGroupedBySpecies>({});
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
-  const { mapDataLoader } = props;
-
+  const { searchResults } = props;
+  
   useEffect(() => {
-    if (!mapDataLoader.data) {
-      return;
-    }
-    const groupedData = groupSpatialDataBySpecies(mapDataLoader.data);
+    const visibility = datasetVisibility;
+    searchResults.forEach(item => {
+      visibility[item.key] = item.visible
+    });
 
-    const setup = {};
-    for (const key in groupedData) {
-      setup[key] = true;
-    }
-    setDatasetVisibility(setup);
-    setGroupedSpatialData(groupedData);
-  }, [mapDataLoader.data]);
+    setDatasetVisibility(visibility);
+  }, [searchResults]);
 
-  const toggleVisibility = (dataset_id: string) => {
+  const toggleVisibility = (key: string) => {
     const udpated = datasetVisibility;
-    const value = datasetVisibility[dataset_id];
-    udpated[dataset_id] = !udpated[dataset_id];
-    setDatasetVisibility({ ...datasetVisibility, [dataset_id]: !value });
+    const value = datasetVisibility[key];
+    udpated[key] = !udpated[key];
+    setDatasetVisibility({ ...datasetVisibility, [key]: !value });
     props.onToggleDataVisibility(udpated);
-  };
-
-  const countGrouped = (groupedData: ISpatialDataGroupedBySpecies) => {
-    let count = 0;
-    for (const key in groupedData) {
-      const item = groupedData[key];
-      if (item) {
-        count += item.length;
-      }
-    }
-
-    return count;
   };
 
   return (
     <>
       <Box mb={3} flexDirection={'column'}>
         <Grid item xs={8}>
-          <Typography variant="h6">Found {countGrouped(groupedSpatialData)} observations</Typography>
+          <Typography variant="h6">Found {searchResults.reduce((runningTotal, item) => runningTotal + item.count, 0)} observations</Typography>
         </Grid>
         <Grid item xs={4}>
           <Button onClick={() => props.backToSearch()} data-testid="RefineSearchButton">
@@ -64,25 +60,24 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
       <Container maxWidth="xl">
         <Box>
           <Grid container direction={'column'} justifyContent="center">
-            {Object.keys(groupedSpatialData).map((key: string, index: number) => {
-              const item = groupedSpatialData[key];
+            {searchResults.map(item => {
               return (
-                <Grid container direction="row" alignItems={'center'} key={`${key}-${index}`}>
+                <Grid container direction="row" alignItems={'center'} key={`${item.key}`}>
                   <Grid item xs={2}>
                     <Checkbox
-                      data-testid={`ToggleCheckbox-${index}`}
-                      checked={datasetVisibility[key] === undefined ? true : datasetVisibility[key]}
-                      onChange={() => toggleVisibility(key)}
+                      data-testid={`ToggleCheckbox-${item.key}`}
+                      checked={item.visible}
+                      onChange={() => toggleVisibility(item.key)}
                     />
                   </Grid>
                   <Grid item xs={7}>
                     <Typography variant="body1" color="textPrimary">
-                      {`${item[0].vernacular_name} (${key})`}
+                      {`${item.name}`}
                     </Typography>
                   </Grid>
                   <Grid item xs={3}>
                     <Typography variant="body1" color="textPrimary">
-                      {groupedSpatialData[key].length} records
+                      {item.count} records
                     </Typography>
                   </Grid>
                 </Grid>

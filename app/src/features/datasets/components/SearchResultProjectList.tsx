@@ -4,30 +4,9 @@ import Checkbox from '@mui/material/Checkbox';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 import { Container } from '@mui/system';
-import { Feature, GeoJsonProperties, Geometry } from 'geojson';
-import { DataLoader } from 'hooks/useDataLoader';
 import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import React, { useEffect, useState } from 'react';
-
-export interface ISearchResultListProps {
-  mapDataLoader: DataLoader<
-    [
-      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
-      searchType: string[],
-      species?: string[],
-      searchZoom?: number,
-      datasetID?: string
-    ],
-    ISpatialData[],
-    unknown
-  >;
-  onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
-  backToSearch: () => void;
-}
-
-export interface IDatasetVisibility {
-  [details: string]: boolean;
-}
+import { IDatasetVisibility, ISearchResultListProps } from './SearchResultOccurrenceList';
 
 const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});

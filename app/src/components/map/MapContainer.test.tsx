@@ -19,6 +19,7 @@ describe('MapContainer', () => {
   it('renders with static geometries', () => {
     const staticLayers: IStaticLayer[] = [
       {
+        visible: true, 
         layerName: 'test layer',
         features: [
           {
@@ -83,6 +84,7 @@ describe('MapContainer', () => {
   it('renders with markers', () => {
     const markerLayers: IMarkerLayer[] = [
       {
+        visible: true,
         layerName: 'test-marker-layer',
         markers: [{ position: [55, 128] }]
       }

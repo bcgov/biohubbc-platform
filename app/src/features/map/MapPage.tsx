@@ -7,7 +7,7 @@ import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/Sta
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
+import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultOccurrenceList';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -16,7 +16,7 @@ import useURL from 'hooks/useURL';
 import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
-import { parseSpatialDataByType } from 'utils/spatial-utils';
+import { ILayers, newParseSpatialDataByType, parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -59,19 +59,37 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
   const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
   const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
-
   const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
-
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
+
+  const [layers, setLayers] = useState<ILayers>({ markerLayer: {}, staticLayer: {} });
 
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;
     }
 
+    console.log("___ DATA VISIBILITY ___")
+    console.log(datasetVisibility)
+
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    setMarkerLayers(result.markerLayers);
-    setStaticLayers(result.staticLayers);
+    const results = newParseSpatialDataByType(mapDataLoader.data)
+    setLayers(results)
+
+    const markerLayers = Object.keys(results.markerLayer).map(key => {
+      const item = results.markerLayer[key];
+      item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      return item
+    })
+
+    const staticLayers = Object.keys(results.staticLayer).map(key => {
+      const item = results.staticLayer[key];
+      item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      return item
+    })
+
+    setMarkerLayers(markerLayers);
+    setStaticLayers(staticLayers);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
@@ -129,7 +147,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         layers.push(staticLayerFeature);
         featureArray.push(feature);
       });
-      const staticLayer: IStaticLayer = { layerName: area.name, features: layers };
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, visible: true };
       staticLayers.push(staticLayer);
     });
 
@@ -155,8 +173,35 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   };
 
   const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
+    console.log("IS THE TOGGLE RUNNING?")
     setDatasetVisibility(datasets);
   };
+
+  const converMarkerToSearchResult = () => {
+    return Object.keys(layers?.markerLayer).map(key => {
+      const item = layers?.markerLayer[key];
+      const searchResult = {
+        key: key,
+        name: item.layerName,
+        count: item.markers.length,
+        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      } as ISearchResult
+      return searchResult
+    })
+  }
+
+  const converStaticLayerToSearchResult = () => {
+    return Object.keys(layers?.staticLayer).map(key => {
+      const item = layers?.staticLayer[key];
+      const searchResult = {
+        key: key,
+        name: item.layerName,
+        count: item.features.length,
+        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      } as ISearchResult
+      return searchResult
+    })
+  }
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
@@ -172,6 +217,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zIndex: '999'
         }}>
         <SideSearchBar
+          searchResults={[... converMarkerToSearchResult(), ... converStaticLayerToSearchResult()]}
           mapDataLoader={mapDataLoader}
           onAreaUpdate={onAreaUpdate}
           onToggleDataVisibility={onToggleDataVisibility}

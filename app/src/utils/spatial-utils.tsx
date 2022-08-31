@@ -3,7 +3,7 @@ import { IStaticLayer } from 'components/map/components/StaticLayers';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultOccurrenceList';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
@@ -11,6 +11,11 @@ import { isObject } from './Utils';
 
 export interface ISpatialDataGroupedBySpecies {
   [species: string]: ISpatialData[];
+}
+
+export interface ILayers {
+  staticLayer: {[id: string]: IStaticLayer},
+  markerLayer: {[id: string]: IMarkerLayer}
 }
 
 export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) => {
@@ -36,12 +41,92 @@ export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) =>
   return grouped;
 };
 
+export const newParseSpatialDataByType = (
+  spatialDataRecords: ISpatialData[]
+) => {
+
+  const layerMap: ILayers = {
+    staticLayer: {},
+    markerLayer: {}
+  };
+
+  for (const spatialRecord of spatialDataRecords) {
+    if (isEmptyObject(spatialRecord.spatial_data)) {
+      continue;
+    }
+
+    for (const feature of spatialRecord.spatial_data.features) {
+      if (feature.geometry.type === 'GeometryCollection') {
+        // Not expecting or supporting geometry collections
+        continue;
+      }
+
+      // construct key to use for layers
+      const key = getFeatureLayerKey(spatialRecord, feature);
+
+      // is a marker
+      if (isOccurrenceFeature(feature)) {
+        if (!layerMap.markerLayer[key]) {
+          layerMap.markerLayer[key] = {
+            visible: true,
+            layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
+            markers: []
+          } as IMarkerLayer
+        }
+
+        layerMap.markerLayer[key].markers.push({
+          position: feature.geometry.coordinates as LatLngTuple,
+          key: feature.id || feature.properties.id,
+          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+        });
+      }
+
+      // is static
+      if (isBoundaryFeature(feature)) {
+        if (!layerMap.staticLayer[key]) {
+          layerMap.staticLayer[key] = {
+            visible: true,
+            layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
+            features: []
+          } as IStaticLayer
+        }
+
+        layerMap.staticLayer[key].features.push({
+          geoJSON: feature,
+          key: feature.id || feature.properties.id,
+          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+        });
+      }
+
+      // is static
+      if (isBoundaryCentroidFeature(feature)) {
+        console.log(spatialRecord)
+        if (!layerMap.staticLayer[key]) {
+          layerMap.staticLayer[key] = {
+            visible: true,
+            layerName: `${feature.properties.datasetTitle}`,
+            features: []
+          } as IStaticLayer
+        }
+
+        layerMap.staticLayer[key].features.push({
+          geoJSON: feature,
+          key: feature.id || feature.properties.id,
+          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+        });
+      }
+    }
+  }
+
+  return layerMap;
+};
+
 export const parseSpatialDataByType = (
   spatialDataRecords: ISpatialData[],
   datasetVisibility: IDatasetVisibility = {}
 ) => {
-  const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [] };
-  const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [] };
+  const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [], visible: true };
+  const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true };
 
   for (const spatialRecord of spatialDataRecords) {
     if (isEmptyObject(spatialRecord.spatial_data)) {
@@ -114,6 +199,30 @@ export const parseSpatialDataByType = (
 
   return { markerLayers: [occurrencesMarkerLayer], staticLayers: [boundaryStaticLayer] };
 };
+
+// checks which key should be used to identify the layer
+export const getFeatureLayerKey = (spatialRecord: ISpatialData, feature: Feature): string => {
+  let key = "";
+
+  if (isOccurrenceFeature(feature)) {
+    key = `${spatialRecord.associated_taxa}`;
+  }
+
+  if (isBoundaryFeature(feature)) {
+    key = `${spatialRecord.submission_spatial_component_id}`;
+  }
+
+  if (isBoundaryCentroidFeature(feature)) {
+    key = `${spatialRecord.submission_spatial_component_id}`;
+  }
+
+  return key
+}
+
+export const isStaticLayerVisible = (): boolean => {
+
+  return true;
+}
 
 export const isEmptyObject = (obj: any): obj is EmptyObject => {
   // Check if `obj` is an object with no keys (aka: an empty object)
