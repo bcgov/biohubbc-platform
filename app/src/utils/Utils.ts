@@ -244,21 +244,17 @@ export const jsonStringifyObjectProperties = (obj: Record<string, any>) => {
 };
 
 export const makeCsvObjectUrl = (entries: Array<Record<string, any>>) => {
-  const keys = [
-    ...new Set(
-      entries.reduce((acc: string[], entry) => acc.concat(Object.keys(entry)), [])
-    )
-  ]
+  const keys = [...new Set(entries.reduce((acc: string[], entry) => acc.concat(Object.keys(entry)), []))];
 
   const rows = entries.map((entry: Record<string, any>) => {
-    return keys.map((key) => String(entry[key]))
-  })
+    return keys.map((key) => String(entry[key]));
+  });
 
-  rows.unshift(keys)
+  rows.unshift(keys);
 
-  const csvContent = rows.map((row) => row.join(',')).join('\n')
+  const csvContent = rows.map((row) => row.join(',')).join('\n');
 
-  const blob = new Blob([csvContent], { type: 'text/csv' })
-  
-  return window.URL.createObjectURL(blob)
-}
+  const blob = new Blob([csvContent], { type: 'text/csv' });
+
+  return window.URL.createObjectURL(blob);
+};

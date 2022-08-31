@@ -8,13 +8,12 @@ import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
-import { Feature } from 'geojson';
-import { useState } from 'react';
-
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { useState } from 'react';
 import { getFormattedDate, makeCsvObjectUrl } from 'utils/Utils';
 
 export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
@@ -40,14 +39,13 @@ interface IMetadataHeaderProps {
   date?: string;
   index?: number;
   length?: number;
-  downloadHref?: string
 }
 
 const useStyles = makeStyles(() => ({
   modalContent: {
     position: 'relative',
     width: 300,
-    minHeight: 36,
+    minHeight: 36
   },
   metadata: {
     maxHeight: 300,
@@ -80,53 +78,50 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   const classes = useStyles();
   const api = useApi();
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const dataLoader = useDataLoader(() => {
     return api.search.getSpatialMetadata(submissionSpatialComponentIds);
   });
 
   dataLoader.load();
-  
+
   const { isLoading, isReady } = dataLoader;
-  const data = dataLoader.data || []
-  const isEmpty = !data || data.length === 0
-  const metadataObjectUrl = isEmpty ? undefined : makeCsvObjectUrl(data.map((row) => row.dwc))
+  const data = dataLoader.data || [];
+  const isEmpty = !data || data.length === 0;
+  const metadataObjectUrl = isEmpty ? undefined : makeCsvObjectUrl(data.map((row) => row.dwc));
 
   const handleNext = () => {
     if (isEmpty) {
-      return
+      return;
     }
 
-    setCurrentIndex((currentIndex + 1) % data.length)
-  }
+    setCurrentIndex((currentIndex + 1) % data.length);
+  };
 
   const handlePrev = () => {
     if (isEmpty) {
-      return
+      return;
     }
     if (currentIndex === 0) {
-      setCurrentIndex(data.length - 1)
+      setCurrentIndex(data.length - 1);
     } else {
-      setCurrentIndex(currentIndex - 1)
+      setCurrentIndex(currentIndex - 1);
     }
-  }
+  };
 
   const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className={classes.modalContent}>{children}</div>
   );
 
   const MetadataHeader: React.FC<React.PropsWithChildren<IMetadataHeaderProps>> = (headerProps) => {
-    const { type, date, index, length, downloadHref } = headerProps
+    const { type, date, index, length } = headerProps;
 
     return (
       <Box mb={1}>
         <Typography component="h6" variant="subtitle1" className={classes.pointType}>
           {type || 'Feature'} record {length && length > 0 && `(${(index || 0) + 1} of ${length})`}
         </Typography>
-        {downloadHref && (
-          <Button href={downloadHref}>Download Records as CSV</Button>
-        )}
         {date && (
           <Typography className={classes.date} component="h6" variant="subtitle1">
             {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, date)}
@@ -134,7 +129,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
         )}
       </Box>
     );
-  }
+  };
 
   const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
     <Typography className={classes.date} component="h6" variant="body1">
@@ -160,7 +155,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  const metadata = data[currentIndex]
+  const metadata = data[currentIndex];
   const type = metadata?.type;
   const dwc = metadata?.dwc;
 
@@ -175,7 +170,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   return (
     <ModalContentWrapper>
-      <MetadataHeader type={type} index={currentIndex} length={data.length} downloadHref={metadataObjectUrl} />
+      <MetadataHeader type={type} index={currentIndex} length={data.length} />
       <Collapse in={isReady} className={classes.metadata}>
         <Table className={classes.table}>
           <TableBody>
@@ -188,15 +183,19 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
           </TableBody>
         </Table>
       </Collapse>
-      {!isEmpty && length > 1 && (
-        <Box display='flex' sx={{ gap: 1 }} mt={1}>
-          <Button size='small' variant='contained' onClick={() => handlePrev()}>Prev</Button>
-          <Button size='small' variant='contained' color='primary' onClick={() => handleNext()}>Next</Button>
+      {metadataObjectUrl && <Button href={metadataObjectUrl}>Download Records</Button>}
+      {!isEmpty && data.length > 1 && (
+        <Box display="flex" sx={{ gap: 1 }} mt={1}>
+          <Button size="small" variant="contained" onClick={() => handlePrev()}>
+            Prev
+          </Button>
+          <Button size="small" variant="contained" color="primary" onClick={() => handleNext()}>
+            Next
+          </Button>
         </Box>
       )}
     </ModalContentWrapper>
-  )
-
+  );
 };
 
 export default FeaturePopup;

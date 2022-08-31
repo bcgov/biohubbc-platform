@@ -225,10 +225,14 @@ export class SpatialService extends DBService {
       submissionSpatialComponentIds
     );
 
-    return (response.map((submissionSpatialComponent) => submissionSpatialComponent.spatial_component.features[0]?.properties as Record<string, string>) || {});
+    return (
+      response.map(
+        (submissionSpatialComponent) =>
+          submissionSpatialComponent.spatial_component.features[0]?.properties as Record<string, string>
+      ) || {}
+    );
   }
 
-  
   async findSpatialMetadataBySubmissionSpatialComponentId(
     submissionSpatialComponentId: number
   ): Promise<Record<string, string>> {

@@ -60,10 +60,11 @@ GET.apiDoc = {
  */
 export function getSpatialMetadataByIds(): RequestHandler {
   return async (req, res) => {
-
     // console.log('req=', req)
 
-    const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[]).map((id) => Number(id));
+    const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[]).map((id) =>
+      Number(id)
+    );
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
@@ -71,14 +72,13 @@ export function getSpatialMetadataByIds(): RequestHandler {
       await connection.open();
 
       const spatialService = new SpatialService(connection);
-      console.log(spatialService)
+      console.log(spatialService);
 
       const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds(
         submissionSpatialComponentIds
       );
 
       await connection.commit();
-
 
       res.status(200).json(response);
     } catch (error) {

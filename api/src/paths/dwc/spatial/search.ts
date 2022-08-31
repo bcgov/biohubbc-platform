@@ -130,20 +130,22 @@ export function searchSpatialComponents(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(response.map((row) => {
-        const { submission_spatial_component_ids, spatial_component } = row
+      res.status(200).json(
+        response.map((row) => {
+          const { submission_spatial_component_ids, spatial_component } = row;
 
-        return {
-          submission_spatial_component_ids,
-          spatial_data: {
-            ...spatial_component.spatial_data,
-            features: spatial_component.spatial_data.features.map((feature) => {
-              delete feature?.properties?.dwc
-              return feature
-            })
-          }
-        }
-      }));
+          return {
+            submission_spatial_component_ids,
+            spatial_data: {
+              ...spatial_component.spatial_data,
+              features: spatial_component.spatial_data.features.map((feature) => {
+                delete feature?.properties?.dwc;
+                return feature;
+              })
+            }
+          };
+        })
+      );
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();

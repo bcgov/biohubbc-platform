@@ -103,23 +103,25 @@ const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  return <>
-    {data.map((metadata) => {
-      const datasetTitle = metadata.datasetTitle;
-      const datasetID = metadata.datasetID;
+  return (
+    <>
+      {data.map((metadata) => {
+        const datasetTitle = metadata.datasetTitle;
+        const datasetID = metadata.datasetID;
 
-      return (
-        <ModalContentWrapper>
-          <Collapse in={isReady}>
-            <MetadataHeader title={datasetTitle} />
-            <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
-              Go to Dataset
-            </Link>
-          </Collapse>
-        </ModalContentWrapper>
-      );
-    })}
-  </>
+        return (
+          <ModalContentWrapper>
+            <Collapse in={isReady}>
+              <MetadataHeader title={datasetTitle} />
+              <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
+                Go to Dataset
+              </Link>
+            </Collapse>
+          </ModalContentWrapper>
+        );
+      })}
+    </>
+  );
 };
 
 export default DatasetPopup;

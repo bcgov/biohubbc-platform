@@ -64,31 +64,24 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
     onBoundsChange
   } = props;
 
-  const filteredMarkerLayers
-  = markerLayers
-  const x
-  
-  = (markerLayers || []).reduce((acc: IMarkerLayer[], layer: IMarkerLayer) => {
+  const filteredMarkerLayers = markerLayers;
+  const x = (markerLayers || []).reduce((acc: IMarkerLayer[], layer: IMarkerLayer) => {
     const doPositionsMatch = (markerA: L.LatLngExpression, markerB: L.LatLngExpression): boolean => {
       return markerA[0] === markerB[0] && markerA[1] === markerB[1];
-    }
+    };
     return [
       ...acc,
       {
         ...layer,
         markers: layer.markers.reduce((markers: IMarker[], marker: IMarker) => {
-  
           if (markers.some((mark) => doPositionsMatch(mark.position, marker.position))) {
-            return markers
+            return markers;
           }
-          return [
-            ...markers,
-            marker
-          ]
+          return [...markers, marker];
         }, [])
       }
-    ]
-  }, [])
+    ];
+  }, []);
 
   const fullscreenControlProp = (fullScreenControl && { pseudoFullscreen: true }) || undefined;
 
