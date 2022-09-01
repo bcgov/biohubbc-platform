@@ -39,7 +39,9 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
     }
     const setup = {};
     mapDataLoader.data.forEach((item) => {
-      setup[item.submission_spatial_component_id] = true;
+      item.submission_spatial_component_ids.forEach((submission_spatial_component_id) => {
+        setup[submission_spatial_component_id] = true;
+      })
     });
     setDatasetVisibility(setup);
   }, [mapDataLoader.data]);
@@ -75,7 +77,7 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
                   container
                   direction="row"
                   alignItems={'center'}
-                  key={`${item.submission_spatial_component_id}-${index}`}>
+                  key={`${item.submission_spatial_component_ids.join('-')}-${index}`}>
                   <Grid item xs={2}>
                     <Checkbox
                       checked={
