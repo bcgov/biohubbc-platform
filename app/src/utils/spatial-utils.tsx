@@ -81,7 +81,7 @@ export const parseSpatialDataByType = (
         // check if dataset has been toggled
         if (spatialRecord.submission_spatial_component_ids) {
           visible =
-            false
+            true
             /*
             datasetVisibility[spatialRecord.submission_spatial_component_id] === undefined
               ? true
@@ -102,7 +102,7 @@ export const parseSpatialDataByType = (
         // check if dataset has been toggled
         if (spatialRecord.submission_spatial_component_ids) {
           visible =
-            false
+            true
             /*
             datasetVisibility[spatialRecord.submission_spatial_component_ids] === undefined
               ? true
