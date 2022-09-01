@@ -7,7 +7,7 @@ import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/Sta
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultOccurrenceList';
+import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -158,7 +158,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   };
 
   const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
-    console.log("IS THE TOGGLE RUNNING?")
     setDatasetVisibility(datasets);
   };
 

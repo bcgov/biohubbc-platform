@@ -22,7 +22,7 @@ export interface IDatasetVisibility {
   [details: string]: boolean;
 }
 
-const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => {
+const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
   const { searchResults } = props;
   
@@ -90,4 +90,4 @@ const SearchResultOccurrenceList: React.FC<ISearchResultListProps> = (props) => 
   );
 };
 
-export default SearchResultOccurrenceList;
+export default SearchResultList;

@@ -3,7 +3,7 @@ import { IStaticLayer } from 'components/map/components/StaticLayers';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility } from 'features/datasets/components/SearchResultOccurrenceList';
+import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
@@ -82,7 +82,6 @@ export const groupSpatialDataIntoLayers = (
 
       // is static
       if (isBoundaryCentroidFeature(feature)) {
-        console.log(spatialRecord)
         if (!layerMap.staticLayer[key]) {
           layerMap.staticLayer[key] = {
             visible: true,

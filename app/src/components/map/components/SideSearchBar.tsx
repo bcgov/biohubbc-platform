@@ -6,7 +6,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultOccurrenceList, { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultOccurrenceList';
+import SearchResultOccurrenceList, { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';

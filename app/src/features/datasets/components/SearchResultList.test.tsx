@@ -1,6 +1,6 @@
 import { useApi } from 'hooks/useApi';
 import { cleanup, render } from 'test-helpers/test-utils';
-import SearchResultOccurrenceList from './SearchResultOccurrenceList';
+import SearchResultList from './SearchResultList';
 
 jest.mock('../../../hooks/useApi');
 
@@ -20,7 +20,7 @@ const mockUseApi = {
 const SearchResultComponent = () => {
 
   return (
-    <SearchResultOccurrenceList
+    <SearchResultList
       searchResults={[]}
       onToggleDataVisibility={mockOnToggleDataVisibility}
       backToSearch={mockBackToSearch}
