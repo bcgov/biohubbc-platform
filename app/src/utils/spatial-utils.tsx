@@ -18,29 +18,11 @@ export interface ILayers {
   markerLayer: {[id: string]: IMarkerLayer}
 }
 
-export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) => {
-  const grouped: ISpatialDataGroupedBySpecies = {};
-
-  for (const spatialRecord of spatialDataRecords) {
-    // ignore empty objects
-    if (isEmptyObject(spatialRecord.spatial_data)) {
-      continue;
-    }
-
-    // check for taxa property
-    if (spatialRecord.associated_taxa) {
-      // start group for first item
-      if (!grouped[spatialRecord.associated_taxa]) {
-        grouped[spatialRecord.associated_taxa] = [];
-      }
-
-      grouped[spatialRecord.associated_taxa] = [...grouped[spatialRecord.associated_taxa], spatialRecord];
-    }
-  }
-
-  return grouped;
-};
-
+/**
+ * Groups Spatial Data based on type and species taxonomy
+ * @param {ISpatialData[]} spatialDataRecords Spatial Data to parse and group
+ * @returns {*} {ILayers}
+ */
 export const groupSpatialDataIntoLayers = (
   spatialDataRecords: ISpatialData[]
 ) => {

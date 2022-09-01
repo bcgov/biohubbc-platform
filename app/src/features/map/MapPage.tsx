@@ -71,20 +71,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
     const results = groupSpatialDataIntoLayers(mapDataLoader.data)
+    
     setLayers(results)
-
-    // const markerLayers = Object.keys(results.markerLayer).map(key => {
-    //   const item = results.markerLayer[key];
-    //   item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-    //   return item
-    // })
-
-    // const staticLayers = Object.keys(results.staticLayer).map(key => {
-    //   const item = results.staticLayer[key];
-    //   item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-    //   return item
-    // })
-
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
 
