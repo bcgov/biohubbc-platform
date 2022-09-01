@@ -41,7 +41,7 @@ export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) =>
   return grouped;
 };
 
-export const newParseSpatialDataByType = (
+export const groupSpatialDataIntoLayers = (
   spatialDataRecords: ISpatialData[]
 ) => {
 

@@ -16,7 +16,7 @@ import useURL from 'hooks/useURL';
 import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
-import { ILayers, newParseSpatialDataByType, parseSpatialDataByType } from 'utils/spatial-utils';
+import { groupSpatialDataIntoLayers, ILayers, parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -69,27 +69,24 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       return;
     }
 
-    console.log("___ DATA VISIBILITY ___")
-    console.log(datasetVisibility)
-
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    const results = newParseSpatialDataByType(mapDataLoader.data)
+    const results = groupSpatialDataIntoLayers(mapDataLoader.data)
     setLayers(results)
 
-    const markerLayers = Object.keys(results.markerLayer).map(key => {
-      const item = results.markerLayer[key];
-      item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      return item
-    })
+    // const markerLayers = Object.keys(results.markerLayer).map(key => {
+    //   const item = results.markerLayer[key];
+    //   item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+    //   return item
+    // })
 
-    const staticLayers = Object.keys(results.staticLayer).map(key => {
-      const item = results.staticLayer[key];
-      item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      return item
-    })
+    // const staticLayers = Object.keys(results.staticLayer).map(key => {
+    //   const item = results.staticLayer[key];
+    //   item.visible = datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+    //   return item
+    // })
 
-    setMarkerLayers(markerLayers);
-    setStaticLayers(staticLayers);
+    setMarkerLayers(result.markerLayers);
+    setStaticLayers(result.staticLayers);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);

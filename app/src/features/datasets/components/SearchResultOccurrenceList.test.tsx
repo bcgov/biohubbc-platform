@@ -1,7 +1,4 @@
-import { Feature, GeoJsonProperties, Geometry } from 'geojson';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { cleanup, render } from 'test-helpers/test-utils';
 import SearchResultOccurrenceList from './SearchResultOccurrenceList';
 
@@ -21,22 +18,10 @@ const mockUseApi = {
 };
 
 const SearchResultComponent = () => {
-  const mockCallBack = jest.fn<any, any>().mockResolvedValue({});
-  const mockMapDataLoader = useDataLoader<
-    [
-      searchBoundary: Feature<Geometry, GeoJsonProperties>[],
-      searchType: string[],
-      species?: string[],
-      searchZoom?: number,
-      datasetID?: string
-    ],
-    ISpatialData[],
-    unknown
-  >(mockCallBack);
 
   return (
     <SearchResultOccurrenceList
-      mapDataLoader={mockMapDataLoader}
+      searchResults={[]}
       onToggleDataVisibility={mockOnToggleDataVisibility}
       backToSearch={mockBackToSearch}
     />
