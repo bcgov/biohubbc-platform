@@ -143,12 +143,13 @@ export function searchSpatialComponents(): RequestHandler {
       res.status(200).json(
         response.map((row) => {
           const { submission_spatial_component_ids, spatial_component } = row;
-
+          const { spatial_data, ...rest } = spatial_component
           return {
             submission_spatial_component_ids,
+            ...rest,
             spatial_data: {
-              ...spatial_component.spatial_data,
-              features: spatial_component.spatial_data.features.map((feature) => {
+              ...spatial_data,
+              features: spatial_data.features.map((feature) => {
                 delete feature?.properties?.dwc;
                 return feature;
               })

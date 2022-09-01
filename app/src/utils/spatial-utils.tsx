@@ -14,6 +14,7 @@ export interface ISpatialDataGroupedBySpecies {
 }
 
 export const groupSpatialDataBySpecies = (spatialDataRecords: ISpatialData[]) => {
+  console.log(`groupSpatialDataBySpecies(${spatialDataRecords.length}):`, spatialDataRecords)
   const grouped: ISpatialDataGroupedBySpecies = {};
 
   for (const spatialRecord of spatialDataRecords) {
