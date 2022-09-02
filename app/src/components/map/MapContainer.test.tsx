@@ -19,7 +19,7 @@ describe('MapContainer', () => {
   it('renders with static geometries', () => {
     const staticLayers: IStaticLayer[] = [
       {
-        visible: true, 
+        visible: true,
         layerName: 'test layer',
         features: [
           {

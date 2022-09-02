@@ -6,7 +6,10 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultOccurrenceList, { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
+import SearchResultOccurrenceList, {
+  IDatasetVisibility,
+  ISearchResult
+} from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';
@@ -129,8 +132,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
         </Formik>
       )}
 
-      {!showForm &&
-        (<SearchResultOccurrenceList
+      {!showForm && (
+        <SearchResultOccurrenceList
           searchResults={props.searchResults}
           backToSearch={() => toggleForm()}
           onToggleDataVisibility={props.onToggleDataVisibility}

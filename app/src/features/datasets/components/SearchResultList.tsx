@@ -6,10 +6,10 @@ import Typography from '@mui/material/Typography';
 import { Container } from '@mui/system';
 import React, { useEffect, useState } from 'react';
 export interface ISearchResult {
-  key: string,
-  name: string,
-  count: number,
-  visible: boolean,
+  key: string;
+  name: string;
+  count: number;
+  visible: boolean;
 }
 
 export interface ISearchResultListProps {
@@ -25,11 +25,11 @@ export interface IDatasetVisibility {
 const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
   const { searchResults } = props;
-  
+
   useEffect(() => {
     const visibility = datasetVisibility;
-    searchResults.forEach(item => {
-      visibility[item.key] = item.visible
+    searchResults.forEach((item) => {
+      visibility[item.key] = item.visible;
     });
 
     setDatasetVisibility(visibility);
@@ -47,7 +47,9 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
     <>
       <Box mb={3} flexDirection={'column'}>
         <Grid item xs={8}>
-          <Typography variant="h6">Found {searchResults.reduce((runningTotal, item) => runningTotal + item.count, 0)} observations</Typography>
+          <Typography variant="h6">
+            Found {searchResults.reduce((runningTotal, item) => runningTotal + item.count, 0)} observations
+          </Typography>
         </Grid>
         <Grid item xs={4}>
           <Button onClick={() => props.backToSearch()} data-testid="RefineSearchButton">
@@ -60,7 +62,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
       <Container maxWidth="xl">
         <Box>
           <Grid container direction={'column'} justifyContent="center">
-            {searchResults.map(item => {
+            {searchResults.map((item) => {
               return (
                 <Grid container direction="row" alignItems={'center'} key={`${item.key}`}>
                   <Grid item xs={2}>

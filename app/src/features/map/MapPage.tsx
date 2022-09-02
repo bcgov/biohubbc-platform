@@ -70,9 +70,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    const results = groupSpatialDataIntoLayers(mapDataLoader.data)
-    
-    setLayers(results)
+    const results = groupSpatialDataIntoLayers(mapDataLoader.data);
+
+    setLayers(results);
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
 
@@ -162,30 +162,30 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   };
 
   const converMarkerToSearchResult = () => {
-    return Object.keys(layers?.markerLayer).map(key => {
+    return Object.keys(layers?.markerLayer).map((key) => {
       const item = layers?.markerLayer[key];
       const searchResult = {
         key: key,
         name: item.layerName,
         count: item.markers.length,
         visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      } as ISearchResult
-      return searchResult
-    })
-  }
+      } as ISearchResult;
+      return searchResult;
+    });
+  };
 
   const converStaticLayerToSearchResult = () => {
-    return Object.keys(layers?.staticLayer).map(key => {
+    return Object.keys(layers?.staticLayer).map((key) => {
       const item = layers?.staticLayer[key];
       const searchResult = {
         key: key,
         name: item.layerName,
         count: item.features.length,
         visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      } as ISearchResult
-      return searchResult
-    })
-  }
+      } as ISearchResult;
+      return searchResult;
+    });
+  };
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
@@ -201,7 +201,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zIndex: '999'
         }}>
         <SideSearchBar
-          searchResults={[... converMarkerToSearchResult(), ... converStaticLayerToSearchResult()]}
+          searchResults={[...converMarkerToSearchResult(), ...converStaticLayerToSearchResult()]}
           mapDataLoader={mapDataLoader}
           onAreaUpdate={onAreaUpdate}
           onToggleDataVisibility={onToggleDataVisibility}

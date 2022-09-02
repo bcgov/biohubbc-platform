@@ -1,6 +1,6 @@
 import { useApi } from 'hooks/useApi';
 import { cleanup, render } from 'test-helpers/test-utils';
-import SearchResultList from './SearchResultList';
+import SearchResultList, { ISearchResult } from './SearchResultList';
 
 jest.mock('../../../hooks/useApi');
 
@@ -18,17 +18,25 @@ const mockUseApi = {
 };
 
 const SearchResultComponent = () => {
+  const results: ISearchResult[] = [
+    {
+      key: 'TAXON-CODE',
+      name: 'Species A',
+      count: 1,
+      visible: true
+    }
+  ];
 
   return (
     <SearchResultList
-      searchResults={[]}
+      searchResults={results}
       onToggleDataVisibility={mockOnToggleDataVisibility}
       backToSearch={mockBackToSearch}
     />
   );
 };
 
-describe('SearchResultOccurrencelist', () => {
+describe('SearchResultList', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
   });
@@ -49,10 +57,14 @@ describe('SearchResultOccurrencelist', () => {
     expect(mockBackToSearch).toBeCalled();
   });
 
-  it('moose occurrences appear in list', () => {
+  it('checkbox selected', () => {
     const { getByTestId } = render(<SearchResultComponent />);
-    const button = getByTestId('RefineSearchButton');
-    button.click();
-    expect(mockBackToSearch).toBeCalled();
+    const checkbox = getByTestId('ToggleCheckbox-TAXON-CODE');
+    console.log('________________________________________________');
+    console.log(checkbox);
+    console.log('________________________________________________');
+
+    checkbox.click();
+    expect(mockOnToggleDataVisibility).toBeCalled();
   });
 });

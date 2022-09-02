@@ -14,8 +14,8 @@ export interface ISpatialDataGroupedBySpecies {
 }
 
 export interface ILayers {
-  staticLayer: {[id: string]: IStaticLayer},
-  markerLayer: {[id: string]: IMarkerLayer}
+  staticLayer: { [id: string]: IStaticLayer };
+  markerLayer: { [id: string]: IMarkerLayer };
 }
 
 /**
@@ -23,10 +23,7 @@ export interface ILayers {
  * @param {ISpatialData[]} spatialDataRecords Spatial Data to parse and group
  * @returns {*} {ILayers}
  */
-export const groupSpatialDataIntoLayers = (
-  spatialDataRecords: ISpatialData[]
-) => {
-
+export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) => {
   const layerMap: ILayers = {
     staticLayer: {},
     markerLayer: {}
@@ -53,7 +50,7 @@ export const groupSpatialDataIntoLayers = (
             visible: true,
             layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
             markers: []
-          } as IMarkerLayer
+          } as IMarkerLayer;
         }
 
         layerMap.markerLayer[key].markers.push({
@@ -70,7 +67,7 @@ export const groupSpatialDataIntoLayers = (
             visible: true,
             layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
             features: []
-          } as IStaticLayer
+          } as IStaticLayer;
         }
 
         layerMap.staticLayer[key].features.push({
@@ -87,7 +84,7 @@ export const groupSpatialDataIntoLayers = (
             visible: true,
             layerName: `${feature.properties.datasetTitle}`,
             features: []
-          } as IStaticLayer
+          } as IStaticLayer;
         }
 
         layerMap.staticLayer[key].features.push({
@@ -183,7 +180,7 @@ export const parseSpatialDataByType = (
 
 // checks which key should be used to identify the layer
 export const getFeatureLayerKey = (spatialRecord: ISpatialData, feature: Feature): string => {
-  let key = "";
+  let key = '';
 
   if (isOccurrenceFeature(feature)) {
     key = `${spatialRecord.associated_taxa}`;
@@ -197,13 +194,12 @@ export const getFeatureLayerKey = (spatialRecord: ISpatialData, feature: Feature
     key = `${spatialRecord.submission_spatial_component_id}`;
   }
 
-  return key
-}
+  return key;
+};
 
 export const isStaticLayerVisible = (): boolean => {
-
   return true;
-}
+};
 
 export const isEmptyObject = (obj: any): obj is EmptyObject => {
   // Check if `obj` is an object with no keys (aka: an empty object)
