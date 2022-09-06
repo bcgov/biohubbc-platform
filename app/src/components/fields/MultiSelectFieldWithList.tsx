@@ -1,115 +1,91 @@
-import CheckBox from '@mui/icons-material/CheckBox';
-import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
-import Autocomplete, { AutocompleteInputChangeReason, createFilterOptions } from '@mui/material/Autocomplete';
-import Checkbox from '@mui/material/Checkbox';
-import TextField from '@mui/material/TextField';
-import { useFormikContext } from 'formik';
-import get from 'lodash-es/get';
-import { useState } from 'react';
+import { mdiTrashCanOutline } from '@mdi/js';
+import Icon from '@mdi/react';
+import { List, ListItem } from '@mui/material';
+import IconButton from '@mui/material/IconButton';
+import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import { FieldArray, useFormikContext } from 'formik';
+import React from 'react';
 
-export interface IMultiAutocompleteFieldOption {
-  value: string | number;
-  label: string;
-}
-
-export interface IMultiAutocompleteField {
+export interface IMultiAutocompleteFieldWithListProps {
   id: string;
   label: string;
   options: IMultiAutocompleteFieldOption[];
+  list_name: string;
   required?: boolean;
   filterLimit?: number;
+  displayType?: string;
 }
 
-const MultiSelectFieldWithList: React.FC<IMultiAutocompleteField> = (props) => {
-  const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
-  const [inputValue, setInputValue] = useState('');
-  const [options, setOptions] = useState(props.options || []); // store options if provided
+export interface IMultiSelectFieldWithList {
+  list_name: { label: any; value: any }[];
+  onListUpdate: (item: any) => void;
+}
 
-  const getExistingValue = (existingValues: any[]): IMultiAutocompleteFieldOption[] => {
-    if (!existingValues) {
-      return [];
-    }
-    return options.filter((option) => existingValues.includes(option.value));
-  };
+const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> = (props) => {
+  console.log('props in Multiselect with List:', props);
 
-  const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
-    const selectedOptionsValue = selectedOptions.map((item) => item.value);
-    const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item.value));
+  const formikProps = useFormikContext<IMultiSelectFieldWithList>();
 
-    setOptions([...selectedOptions, ...remainingOptions]);
+  console.log('formikProps values in multiselect with List:', formikProps.values);
 
-    setFieldValue(
-      props.id,
-      selectedOptions.map((item) => item.value)
-    );
-  };
-
-  const handleGetOptionSelected = (
-    option: IMultiAutocompleteFieldOption,
-    value: IMultiAutocompleteFieldOption
-  ): boolean => {
-    if (!option?.value || !value?.value) {
-      return false;
-    }
-
-    return option.value === value.value;
-  };
-
-  const handleOnInputChange = (event: React.ChangeEvent<any>, value: string, reason: AutocompleteInputChangeReason) => {
-    if (event && event.type === 'blur') {
-      setInputValue('');
-    } else if (reason !== 'reset') {
-      setInputValue(value);
-    }
-  };
+  <FieldArray
+    name={props.list_name}
+    render={(arrayHelpers) => (
+      <>
+        <List
+          dense
+          disablePadding
+          sx={{
+            '& li': {
+              display: 'flex',
+              justifyContent: 'space-between',
+              py: 0.75,
+              px: 2,
+              border: '1px solid #ccc',
+              backgroundColor: '#ebedf2',
+              fontSize: '14px'
+            },
+            '& li:first-of-type': {
+              mt: 2,
+              borderTopLeftRadius: '4px',
+              borderTopRightRadius: '4px'
+            },
+            '& li:last-child': {
+              borderBottomLeftRadius: '4px',
+              borderBottomRightRadius: '4px'
+            },
+            '& li + li': {
+              mt: '-1px'
+            }
+          }}>
+          {!!formikProps.values[props.list_name].length &&
+            formikProps.values[props.list_name].map((data: any, index: any) => {
+              return (
+                <ListItem key={`${data.value}-area`}>
+                  {data.label}
+                  <IconButton
+                    aria-label="Delete boundary"
+                    onClick={() => {
+                      arrayHelpers.remove(index);
+                    }}>
+                    <Icon path={mdiTrashCanOutline} size={0.875} />
+                  </IconButton>
+                </ListItem>
+              );
+            })}
+        </List>
+      </>
+    )}
+  />;
 
   return (
-    <Autocomplete
-      multiple
-      autoHighlight={true}
-      value={getExistingValue(get(values, props.id))}
+    <MultiAutocompleteField
       id={props.id}
-      options={options}
-      getOptionLabel={(option) => option.label}
-      isOptionEqualToValue={handleGetOptionSelected}
-      filterOptions={createFilterOptions({ limit: props.filterLimit })}
-      disableCloseOnSelect
-      onChange={handleOnChange}
-      inputValue={inputValue}
-      onInputChange={handleOnInputChange}
-      renderOption={(_renderProps, option, { selected }) => {
-        return (
-          <li key={option.value} {..._renderProps}>
-            <Checkbox
-              icon={<CheckBoxOutlineBlank fontSize="small" />}
-              checkedIcon={<CheckBox fontSize="small" />}
-              style={{ marginRight: 8 }}
-              checked={selected}
-              disabled={(options && options?.indexOf(option) !== -1) || false}
-              value={option.value}
-              color="default"
-            />
-            {option.label}
-          </li>
-        );
-      }}
-      renderInput={(params) => (
-        <TextField
-          {...params}
-          required={props.required}
-          label={props.label}
-          variant="outlined"
-          fullWidth
-          error={get(touched, props.id) && Boolean(get(errors, props.id))}
-          helperText={get(touched, props.id) && get(errors, props.id)}
-          placeholder={'Begin typing to filter results...'}
-          InputLabelProps={{
-            shrink: true
-          }}
-        />
-      )}
+      label={props.label}
+      options={props.options}
+      required={props.required}
+      displayType={props.displayType}
     />
-
   );
 };
 

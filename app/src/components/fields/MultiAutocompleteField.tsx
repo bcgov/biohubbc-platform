@@ -18,9 +18,11 @@ export interface IMultiAutocompleteField {
   options: IMultiAutocompleteFieldOption[];
   required?: boolean;
   filterLimit?: number;
+  displayType?: string;
 }
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
+  console.log('props in multiautocomplete');
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState(props.options || []); // store options if provided
@@ -63,6 +65,23 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     }
   };
 
+  const defaultChipDisplay = (option: any, renderProps: any, checkedStatus: any) => {
+    return (
+      <li key={option.value} {...renderProps}>
+        <Checkbox
+          icon={<CheckBoxOutlineBlank fontSize="small" />}
+          checkedIcon={<CheckBox fontSize="small" />}
+          style={{ marginRight: 8 }}
+          checked={checkedStatus}
+          disabled={(options && options?.indexOf(option) !== -1) || false}
+          value={option.value}
+          color="default"
+        />
+        {option.label}
+      </li>
+    );
+  };
+
   return (
     <Autocomplete
       multiple
@@ -77,22 +96,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       onChange={handleOnChange}
       inputValue={inputValue}
       onInputChange={handleOnInputChange}
-      renderOption={(_renderProps, option, { selected }) => {
-        return (
-          <li key={option.value} {..._renderProps}>
-            <Checkbox
-              icon={<CheckBoxOutlineBlank fontSize="small" />}
-              checkedIcon={<CheckBox fontSize="small" />}
-              style={{ marginRight: 8 }}
-              checked={selected}
-              disabled={(options && options?.indexOf(option) !== -1) || false}
-              value={option.value}
-              color="default"
-            />
-            {option.label}
-          </li>
-        );
-      }}
+      renderOption={(_renderProps, option, { selected }) => defaultChipDisplay(option, _renderProps, selected)}
       renderInput={(params) => (
         <TextField
           {...params}

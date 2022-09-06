@@ -107,6 +107,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             label={'Select Species With List'}
             options={props.speciesList}
             required={false}
+            list_name="species_list"
           />
         </Box>
       </Box>
