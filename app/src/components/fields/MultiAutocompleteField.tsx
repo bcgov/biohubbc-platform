@@ -1,5 +1,6 @@
 import CheckBox from '@mui/icons-material/CheckBox';
 import CheckBoxOutlineBlank from '@mui/icons-material/CheckBoxOutlineBlank';
+import { Chip } from '@mui/material';
 import Autocomplete, { AutocompleteInputChangeReason, createFilterOptions } from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
@@ -31,18 +32,18 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     if (!existingValues) {
       return [];
     }
-    return options.filter((option) => existingValues.includes(option.value));
+    return options.filter((option) => existingValues.includes(option));
   };
 
   const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
-    const selectedOptionsValue = selectedOptions.map((item) => item.value);
-    const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item.value));
+    const selectedOptionsValue = selectedOptions.map((item) => item);
+    const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item));
 
     setOptions([...selectedOptions, ...remainingOptions]);
 
     setFieldValue(
       props.id,
-      selectedOptions.map((item) => item.value)
+      selectedOptions.map((item) => item)
     );
   };
 
@@ -50,11 +51,11 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     option: IMultiAutocompleteFieldOption,
     value: IMultiAutocompleteFieldOption
   ): boolean => {
-    if (!option?.value || !value?.value) {
+    if (!option || !value) {
       return false;
     }
 
-    return option.value === value.value;
+    return option === value;
   };
 
   const handleOnInputChange = (event: React.ChangeEvent<any>, value: string, reason: AutocompleteInputChangeReason) => {
@@ -81,7 +82,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       </li>
     );
   };
-
+  const visible = false;
   return (
     <Autocomplete
       multiple
@@ -96,6 +97,11 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       onChange={handleOnChange}
       inputValue={inputValue}
       onInputChange={handleOnInputChange}
+      renderTags={(tagValue, getTagProps) => {
+        if (visible) {
+          return tagValue.map((option, index) => <Chip label={option.label} {...getTagProps({ index })} />);
+        }
+      }}
       renderOption={(_renderProps, option, { selected }) => defaultChipDisplay(option, _renderProps, selected)}
       renderInput={(params) => (
         <TextField
