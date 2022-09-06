@@ -102,13 +102,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
         </Box>
 
         <Box mt={3}>
-          <MultiSelectFieldWithList
-            id={`species_list`}
-            label={'Select Species With List'}
-            options={props.speciesList}
-            required={false}
-            list_name="species_list"
-          />
+          <MultiSelectFieldWithList list_name={'species_list'} />
         </Box>
       </Box>
 
