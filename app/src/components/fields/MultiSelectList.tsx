@@ -11,11 +11,7 @@ export interface IMultiAutocompleteFieldWithListProps {
 }
 
 const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> = (props) => {
-  console.log('props in Multiselect with List:', props);
-
   const formikProps = useFormikContext<IDatasetSearchForm>();
-
-  console.log('formikProps values in multiselect with List:', formikProps.values);
 
   return (
     <FieldArray

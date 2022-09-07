@@ -1,5 +1,6 @@
 import { Box, Button } from '@mui/material';
 import simplify from '@turf/simplify';
+import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import DatasetSearchForm, {
   DatasetSearchFormInitialValues,
@@ -18,7 +19,7 @@ export interface IDatasetRequest {
   criteria: {
     boundary: Feature;
     type: string[];
-    species?: string[];
+    species?: IMultiAutocompleteFieldOption[];
     zoom?: number; // TODO include in request params when backend is updated to receive it
     datasetID?: string;
     datasetName?: string;
@@ -62,22 +63,16 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       });
     });
 
-    props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
+    const species_array: string[] = [];
+    values.species_list.forEach((item) => {
+      species_array.push(item.value.toString());
+    });
+
+    props.mapDataLoader.refresh(featureArray, [values.dataset], species_array);
     setFormData(values);
     setDatasetType(values.dataset);
     toggleForm();
   };
-
-  // //User uploads boundary for search
-  // const onAreaUpload = (area: IFormikAreaUpload) => {
-  //   //SET BOUNDS
-  //   const bounds = calculateUpdatedMapBounds(area.features);
-  //   if (bounds) {
-  //     const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
-  //     setShouldUpdateBounds(true);
-  //     setUpdatedBounds(newBounds);
-  //   }
-  // };
 
   const toggleForm = () => {
     setShowForm(!showForm);

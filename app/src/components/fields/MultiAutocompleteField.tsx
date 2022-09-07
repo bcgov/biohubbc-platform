@@ -19,11 +19,10 @@ export interface IMultiAutocompleteField {
   options: IMultiAutocompleteFieldOption[];
   required?: boolean;
   filterLimit?: number;
-  displayType?: string;
+  chipVisible?: boolean;
 }
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
-  console.log('props in multiautocomplete');
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
   const [inputValue, setInputValue] = useState('');
   const [options, setOptions] = useState(props.options || []); // store options if provided
@@ -51,11 +50,11 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     option: IMultiAutocompleteFieldOption,
     value: IMultiAutocompleteFieldOption
   ): boolean => {
-    if (!option || !value) {
+    if (!option?.value || !value?.value) {
       return false;
     }
 
-    return option === value;
+    return option.value === value.value;
   };
 
   const handleOnInputChange = (event: React.ChangeEvent<any>, value: string, reason: AutocompleteInputChangeReason) => {
@@ -82,7 +81,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       </li>
     );
   };
-  const visible = false;
+
   return (
     <Autocomplete
       multiple
@@ -98,7 +97,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       inputValue={inputValue}
       onInputChange={handleOnInputChange}
       renderTags={(tagValue, getTagProps) => {
-        if (visible) {
+        if (props.chipVisible) {
           return tagValue.map((option, index) => <Chip label={option.label} {...getTagProps({ index })} />);
         }
       }}

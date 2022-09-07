@@ -448,6 +448,7 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
+
     const queryBuilder = knex
       .queryBuilder()
       .with('with_filtered_spatial_component_with_security_transforms', (qb1) => {

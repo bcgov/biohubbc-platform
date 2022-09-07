@@ -7,7 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
-import MultiSelectFieldWithList from 'components/fields/MultiSelectFieldWithList';
+import MultiSelectList from 'components/fields/MultiSelectList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
 import { FieldArray, useFormikContext } from 'formik';
@@ -16,7 +16,7 @@ import yup from 'utils/YupSchema';
 
 export interface IDatasetSearchForm {
   dataset: string;
-  species_list: string[];
+  species_list: IMultiAutocompleteFieldOption[];
   area: IFormikAreaUpload[];
 }
 
@@ -98,11 +98,12 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             label={'Select Species'}
             options={props.speciesList}
             required={false}
+            chipVisible={false}
           />
         </Box>
 
         <Box mt={3}>
-          <MultiSelectFieldWithList list_name={'species_list'} />
+          <MultiSelectList list_name={'species_list'} />
         </Box>
       </Box>
 
