@@ -34,7 +34,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
     });
 
     setDatasetVisibility(visibility);
-  }, [searchResults]);
+  }, [searchResults, datasetVisibility]);
 
   const toggleVisibility = (key: string) => {
     const udpated = datasetVisibility;
