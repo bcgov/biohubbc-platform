@@ -195,8 +195,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         sx={{
           flex: '0 0 auto',
           width: '500px',
-          py: 4,
-          px: 3,
           position: 'relative',
           zIndex: '999'
         }}>

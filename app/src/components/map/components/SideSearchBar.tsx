@@ -96,38 +96,40 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
           validateOnChange={false}
           onSubmit={handleDatasetRequestCreation}>
           {(formikProps) => (
-            <Form>
-              <DatasetSearchForm
-                onAreaUpdate={props.onAreaUpdate}
-                speciesList={[
-                  { value: 'M-ALAL', label: 'Moose (M-ALAL)' },
-                  { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
-                  { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
-                  { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
-                  { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
-                  { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
-                  { value: 'M-OVCA-CA', label: 'Bighorn sheep (M-OVCA-CA)' },
-                  { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' },
-                  { value: 'B-SPOW-CA', label: 'Spotted Owl (B-SPOW-CA)' }
-                ]}
-              />
+            <Box py={4} px={3}>
+              <Form>
+                <DatasetSearchForm
+                  onAreaUpdate={props.onAreaUpdate}
+                  speciesList={[
+                    { value: 'M-ALAL', label: 'Moose (M-ALAL)' },
+                    { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
+                    { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
+                    { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
+                    { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
+                    { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
+                    { value: 'M-OVCA-CA', label: 'Bighorn sheep (M-OVCA-CA)' },
+                    { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' },
+                    { value: 'B-SPOW-CA', label: 'Spotted Owl (B-SPOW-CA)' }
+                  ]}
+                />
 
-              <Box mt={4}>
-                <Button
-                  fullWidth={true}
-                  onClick={formikProps.submitForm}
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  type="button"
-                  data-testid="dataset-find-button"
-                  sx={{
-                    fontWeight: 700
-                  }}>
-                  Find Data
-                </Button>
-              </Box>
-            </Form>
+                <Box mt={4}>
+                  <Button
+                    fullWidth={true}
+                    onClick={formikProps.submitForm}
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    type="button"
+                    data-testid="dataset-find-button"
+                    sx={{
+                      fontWeight: 700
+                    }}>
+                    Find Data
+                  </Button>
+                </Box>
+              </Form>
+            </Box>
           )}
         </Formik>
       )}
