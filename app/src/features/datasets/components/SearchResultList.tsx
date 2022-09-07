@@ -62,7 +62,6 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
       <List disablePadding>
         {searchResults.map((item) => {
           return (
-            <>
             <ListItem key={`${item.key}`}
               sx={{
                 display: "flex",
@@ -82,7 +81,6 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
               <Typography component="span" variant="subtitle2" color="textSecondary"
               >{item.count} records</Typography>
             </ListItem>
-            </>
           );
         })}
       </List>
