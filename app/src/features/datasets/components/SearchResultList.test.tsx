@@ -45,9 +45,9 @@ describe('SearchResultList', () => {
     cleanup();
   });
 
-  it('renders an empty component', () => {
+  it('renders a component', () => {
     const { getByText } = render(<SearchResultComponent />);
-    expect(getByText('Found 0 observations', { exact: false })).toBeVisible();
+    expect(getByText('Found 1 observations', { exact: false })).toBeVisible();
   });
 
   it('backToSearch is called', () => {
@@ -55,16 +55,5 @@ describe('SearchResultList', () => {
     const button = getByTestId('RefineSearchButton');
     button.click();
     expect(mockBackToSearch).toBeCalled();
-  });
-
-  it('checkbox selected', () => {
-    const { getByTestId } = render(<SearchResultComponent />);
-    const checkbox = getByTestId('ToggleCheckbox-TAXON-CODE');
-    console.log('________________________________________________');
-    console.log(checkbox);
-    console.log('________________________________________________');
-
-    checkbox.click();
-    expect(mockOnToggleDataVisibility).toBeCalled();
   });
 });
