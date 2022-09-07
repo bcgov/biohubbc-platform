@@ -50,11 +50,15 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
         <Typography variant="h3" component="h1">
           Found {searchResults.reduce((runningTotal, item) => runningTotal + item.count, 0)} records
         </Typography>
-        <Button variant="outlined" size="small" color="primary" onClick={() => props.backToSearch()} data-testid="RefineSearchButton"
+        <Button
+          variant="outlined"
+          size="small"
+          color="primary"
+          onClick={() => props.backToSearch()}
+          data-testid="RefineSearchButton"
           sx={{
             my: -1
-          }}
-        >
+          }}>
           Refine Search
         </Button>
       </Box>
@@ -62,29 +66,29 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
       <List disablePadding>
         {searchResults.map((item) => {
           return (
-            <ListItem key={`${item.key}`}
+            <ListItem
+              key={`${item.key}`}
               sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 py: 2,
                 px: 3,
                 borderTopWidth: '1px',
                 borderTopStyle: 'solid',
                 borderTopColor: 'grey.300'
-              }}
-            >
+              }}>
               <FormControlLabel
                 label={item.name}
-                control={<Checkbox checked={item.visible} onChange={() => toggleVisibility(item.key)}/>}
+                control={<Checkbox checked={item.visible} onChange={() => toggleVisibility(item.key)} />}
               />
-              <Typography component="span" variant="subtitle2" color="textSecondary"
-              >{item.count} records</Typography>
+              <Typography component="span" variant="subtitle2" color="textSecondary">
+                {item.count} records
+              </Typography>
             </ListItem>
           );
         })}
       </List>
-
     </>
   );
 };

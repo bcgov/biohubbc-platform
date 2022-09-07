@@ -55,20 +55,21 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
   return (
     <>
       <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
-        <Typography
-          variant="h3"
-          component="h1">
+        <Typography variant="h3" component="h1">
           Map Search
         </Typography>
-        {props.hasResults && 
-        <Button variant="outlined" size="small" color="primary" onClick={() => props.toggleForm()}
-          sx={{
-            my: -1
-          }}
-        >
-          Back to Results
-        </Button>
-        }
+        {props.hasResults && (
+          <Button
+            variant="outlined"
+            size="small"
+            color="primary"
+            onClick={() => props.toggleForm()}
+            sx={{
+              my: -1
+            }}>
+            Back to Results
+          </Button>
+        )}
       </Box>
       <Box component="fieldset">
         <Box
