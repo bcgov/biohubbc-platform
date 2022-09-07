@@ -6,7 +6,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultOccurrenceList, {
+import SearchResultList, {
   IDatasetVisibility,
   ISearchResult
 } from 'features/datasets/components/SearchResultList';
@@ -99,6 +99,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
             <Box py={4} px={3}>
               <Form>
                 <DatasetSearchForm
+                hasResults={props.searchResults.length > 0}
+                  toggleForm={toggleForm}
                   onAreaUpdate={props.onAreaUpdate}
                   speciesList={[
                     { value: 'M-ALAL', label: 'Moose (M-ALAL)' },
@@ -135,7 +137,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       )}
 
       {!showForm && (
-        <SearchResultOccurrenceList
+        <SearchResultList
           searchResults={props.searchResults}
           backToSearch={() => toggleForm()}
           onToggleDataVisibility={props.onToggleDataVisibility}
