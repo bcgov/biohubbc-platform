@@ -2,7 +2,6 @@ import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { List, ListItem } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
-import { IDatasetSearchForm } from 'features/datasets/components/DatasetSearchForm';
 import { FieldArray, useFormikContext } from 'formik';
 import React from 'react';
 
@@ -11,7 +10,7 @@ export interface IMultiAutocompleteFieldWithListProps {
 }
 
 const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> = (props) => {
-  const formikProps = useFormikContext<IDatasetSearchForm>();
+  const formikProps = useFormikContext<IMultiAutocompleteFieldWithListProps>();
 
   return (
     <FieldArray
@@ -47,8 +46,8 @@ const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> =
             {!!formikProps.values[props.list_name].length &&
               formikProps.values[props.list_name].map((data: any, index: any) => {
                 return (
-                  <ListItem key={`${data.value}-area`}>
-                    {data.label}
+                  <ListItem key={`${data.value ? data.value : props.list_name}-area`}>
+                    {data.label ? data.label : props.list_name}
                     <IconButton
                       aria-label="Delete boundary"
                       onClick={() => {
