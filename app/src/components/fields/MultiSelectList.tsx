@@ -46,10 +46,10 @@ const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> =
             {!!formikProps.values[props.list_name].length &&
               formikProps.values[props.list_name].map((data: any, index: any) => {
                 return (
-                  <ListItem key={`${data.value ? data.value : props.list_name}-area`}>
-                    {data.label ? data.label : props.list_name}
+                  <ListItem key={`${data.value ? data.value : data.name}-listItem`}>
+                    {data.label ? data.label : data.name}
                     <IconButton
-                      aria-label="Delete boundary"
+                      aria-label="Delete list item"
                       onClick={() => {
                         arrayHelpers.remove(index);
                       }}>

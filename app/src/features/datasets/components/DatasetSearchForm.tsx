@@ -1,6 +1,4 @@
-import { mdiTrashCanOutline } from '@mdi/js';
-import Icon from '@mdi/react';
-import { IconButton, InputLabel, List, ListItem } from '@mui/material';
+import { InputLabel } from '@mui/material';
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
@@ -10,7 +8,7 @@ import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'component
 import MultiSelectList from 'components/fields/MultiSelectList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
-import { FieldArray, useFormikContext } from 'formik';
+import { useFormikContext } from 'formik';
 import React, { useEffect } from 'react';
 import yup from 'utils/YupSchema';
 
@@ -127,56 +125,8 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           Refine your search to a custom boundary by importing either KML files or Shapefiles.
         </Typography>
 
-        <FieldArray
-          name="area"
-          render={(arrayHelpers) => (
-            <>
-              <UploadAreaControls />
-              <List
-                dense
-                disablePadding
-                sx={{
-                  '& li': {
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    py: 0.75,
-                    px: 2,
-                    border: '1px solid #ccc',
-                    backgroundColor: '#ebedf2',
-                    fontSize: '14px'
-                  },
-                  '& li:first-of-type': {
-                    mt: 2,
-                    borderTopLeftRadius: '4px',
-                    borderTopRightRadius: '4px'
-                  },
-                  '& li:last-child': {
-                    borderBottomLeftRadius: '4px',
-                    borderBottomRightRadius: '4px'
-                  },
-                  '& li + li': {
-                    mt: '-1px'
-                  }
-                }}>
-                {!!formikProps.values.area.length &&
-                  formikProps.values.area.map((areaData, index) => {
-                    return (
-                      <ListItem key={`${areaData.name}-area`}>
-                        {areaData.name}
-                        <IconButton
-                          aria-label="Delete boundary"
-                          onClick={() => {
-                            arrayHelpers.remove(index);
-                          }}>
-                          <Icon path={mdiTrashCanOutline} size={0.875} />
-                        </IconButton>
-                      </ListItem>
-                    );
-                  })}
-              </List>
-            </>
-          )}
-        />
+        <MultiSelectList list_name={'area'} />
+        <UploadAreaControls />
       </Box>
     </>
   );
