@@ -6,8 +6,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultOccurrenceList from 'features/datasets/components/SearchResultOccurrenceList';
-import SearchResultProjectList, { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
+import SearchResultList, { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';
@@ -37,6 +36,7 @@ export interface SideSearchBarProps {
     ISpatialData[],
     unknown
   >;
+  searchResults: ISearchResult[];
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
   onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
 }
@@ -44,7 +44,6 @@ export interface SideSearchBarProps {
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
   const [showForm, setShowForm] = useState(true);
-  const [datasetType, setDatasetType] = useState<string>('');
   const [formData, setFormData] = useState<IDatasetSearchForm | null>(null);
   /**
    * Handle dataset requests.
@@ -64,7 +63,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     props.mapDataLoader.refresh(featureArray, [values.dataset], values.species_list);
     setFormData(values);
-    setDatasetType(values.dataset);
     toggleForm();
   };
 
@@ -95,54 +93,53 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
           validateOnChange={false}
           onSubmit={handleDatasetRequestCreation}>
           {(formikProps) => (
-            <Form>
-              <DatasetSearchForm
-                onAreaUpdate={props.onAreaUpdate}
-                speciesList={[
-                  { value: 'M-ALAL', label: 'Moose (M-ALAL)' },
-                  { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
-                  { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
-                  { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
-                  { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
-                  { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
-                  { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' }
-                ]}
-              />
+            <Box py={4} px={3}>
+              <Form>
+                <DatasetSearchForm
+                  hasResults={props.searchResults.length > 0}
+                  toggleForm={toggleForm}
+                  onAreaUpdate={props.onAreaUpdate}
+                  speciesList={[
+                    { value: 'M-ALAL', label: 'Moose (M-ALAL)' },
+                    { value: 'M-ORAM', label: 'Mountain Goat (M-ORAM)' },
+                    { value: 'M-OVDA', label: 'Thinhorn sheep (M-OVDA)' },
+                    { value: 'M-OVDA-DA', label: 'Thinhorn sheep (M-OVDA-DA)' },
+                    { value: 'M-OVDA-ST', label: 'Thinhorn sheep (M-OVDA-ST)' },
+                    { value: 'M-OVCA', label: 'Bighorn sheep (M-OVCA)' },
+                    { value: 'M-OVCA-CA', label: 'Bighorn sheep (M-OVCA-CA)' },
+                    { value: 'B-SPOW', label: 'Spotted Owl (B-SPOW)' },
+                    { value: 'B-SPOW-CA', label: 'Spotted Owl (B-SPOW-CA)' }
+                  ]}
+                />
 
-              <Box mt={4}>
-                <Button
-                  fullWidth={true}
-                  onClick={formikProps.submitForm}
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  type="button"
-                  data-testid="dataset-find-button"
-                  sx={{
-                    fontWeight: 700
-                  }}>
-                  Find Data
-                </Button>
-              </Box>
-            </Form>
+                <Box mt={4}>
+                  <Button
+                    fullWidth={true}
+                    onClick={formikProps.submitForm}
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    type="button"
+                    data-testid="dataset-find-button"
+                    sx={{
+                      fontWeight: 700
+                    }}>
+                    Find Data
+                  </Button>
+                </Box>
+              </Form>
+            </Box>
           )}
         </Formik>
       )}
 
-      {!showForm &&
-        (datasetType === 'Boundary Centroid' ? (
-          <SearchResultProjectList
-            mapDataLoader={props.mapDataLoader}
-            backToSearch={() => toggleForm()}
-            onToggleDataVisibility={props.onToggleDataVisibility}
-          />
-        ) : (
-          <SearchResultOccurrenceList
-            mapDataLoader={props.mapDataLoader}
-            backToSearch={() => toggleForm()}
-            onToggleDataVisibility={props.onToggleDataVisibility}
-          />
-        ))}
+      {!showForm && (
+        <SearchResultList
+          searchResults={props.searchResults}
+          backToSearch={() => toggleForm()}
+          onToggleDataVisibility={props.onToggleDataVisibility}
+        />
+      )}
     </>
   );
 };
