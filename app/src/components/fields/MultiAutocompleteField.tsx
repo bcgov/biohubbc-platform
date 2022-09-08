@@ -6,7 +6,7 @@ import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import get from 'lodash-es/get';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface IMultiAutocompleteFieldOption {
   value: string | number;
@@ -20,12 +20,28 @@ export interface IMultiAutocompleteField {
   required?: boolean;
   filterLimit?: number;
   chipVisible?: boolean;
+  handleSearchResults?: (input: string) => Promise<void>;
 }
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
   const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
   const [inputValue, setInputValue] = useState('');
-  const [options, setOptions] = useState(props.options || []); // store options if provided
+  const [options, setOptions] = useState<IMultiAutocompleteFieldOption[]>(props.options || []); // store options if provided
+  const [selectedOptions, setSelectedOptions] = useState<IMultiAutocompleteFieldOption[]>([]);
+
+  useEffect(() => {
+    handleSortSelectedOption(selectedOptions, props.options);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.options]);
+
+  useEffect(() => {
+    if (props.handleSearchResults) {
+      props.handleSearchResults(inputValue);
+    }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputValue]);
 
   const getExistingValue = (existingValues: any[]): IMultiAutocompleteFieldOption[] => {
     if (!existingValues) {
@@ -34,12 +50,19 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     return options.filter((option) => existingValues.includes(option));
   };
 
+  const handleSortSelectedOption = (
+    selected: IMultiAutocompleteFieldOption[],
+    optionsLeft: IMultiAutocompleteFieldOption[]
+  ) => {
+    const selectedOptionsValue = selected.map((item) => item.value);
+    const remainingOptions = optionsLeft.filter((item) => !selectedOptionsValue.includes(item.value));
+
+    setOptions([...selected, ...remainingOptions]);
+  };
+
   const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
-    const selectedOptionsValue = selectedOptions.map((item) => item);
-    const remainingOptions = options.filter((item) => !selectedOptionsValue.includes(item));
-
-    setOptions([...selectedOptions, ...remainingOptions]);
-
+    handleSortSelectedOption(selectedOptions, options);
+    setSelectedOptions(selectedOptions);
     setFieldValue(
       props.id,
       selectedOptions.map((item) => item)
