@@ -9,8 +9,7 @@ import DatasetSearchForm, {
   DatasetSearchFormYupSchema,
   IDatasetSearchForm
 } from 'features/datasets/components/DatasetSearchForm';
-import SearchResultOccurrenceList from 'features/datasets/components/SearchResultOccurrenceList';
-import SearchResultProjectList, { IDatasetVisibility } from 'features/datasets/components/SearchResultProjectList';
+import SearchResultList, { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
 import { Form, Formik, FormikProps } from 'formik';
 import { Feature, GeoJsonProperties, Geometry, Polygon } from 'geojson';
 import { DataLoader } from 'hooks/useDataLoader';
@@ -40,6 +39,7 @@ export interface SideSearchBarProps {
     ISpatialData[],
     unknown
   >;
+  searchResults: ISearchResult[];
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
   onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
 }
@@ -49,7 +49,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   const [showForm, setShowForm] = useState(true);
   const [showNoData, setShowNoData] = useState(false);
   const [showSpinner, setShowSpinner] = useState(false);
-  const [datasetType, setDatasetType] = useState<string>('');
+
   const [formData, setFormData] = useState<IDatasetSearchForm | null>(null);
   /**
    * Handle dataset requests.
@@ -74,7 +74,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     props.mapDataLoader.refresh(featureArray, [values.dataset], species_array);
     setFormData(values);
-    setDatasetType(values.dataset);
     toggleForm();
   };
 
@@ -114,60 +113,59 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
           validateOnChange={false}
           onSubmit={handleDatasetRequestCreation}>
           {(formikProps) => (
-            <Form>
-              <DatasetSearchForm onAreaUpdate={props.onAreaUpdate} />
+            <Box py={4} px={3}>
+              <Form>
+                <DatasetSearchForm
+                  hasResults={props.searchResults.length > 0}
+                  toggleForm={toggleForm}
+                  onAreaUpdate={props.onAreaUpdate}
+                />
 
-              <Box mt={4}>
-                {showSpinner &&
-                  (props.mapDataLoader.isLoading ? (
-                    <LoadingButton
-                      fullWidth={true}
-                      loading
-                      variant="contained"
-                      color="primary"
-                      size="large"
-                      type="button"
-                      data-testid="dataset-find-button"
-                      sx={{
-                        fontWeight: 700
-                      }}>
-                      Submit
-                    </LoadingButton>
-                  ) : (
-                    <Button
-                      fullWidth={true}
-                      onClick={formikProps.submitForm}
-                      variant="contained"
-                      color="primary"
-                      size="large"
-                      type="button"
-                      data-testid="dataset-find-button"
-                      sx={{
-                        fontWeight: 700
-                      }}>
-                      Find Data
-                    </Button>
-                  ))}
-              </Box>
-            </Form>
+                <Box mt={4}>
+                  {showSpinner &&
+                    (props.mapDataLoader.isLoading ? (
+                      <LoadingButton
+                        fullWidth={true}
+                        loading
+                        variant="contained"
+                        color="primary"
+                        size="large"
+                        type="button"
+                        data-testid="dataset-find-button"
+                        sx={{
+                          fontWeight: 700
+                        }}>
+                        Submit
+                      </LoadingButton>
+                    ) : (
+                      <Button
+                        fullWidth={true}
+                        onClick={formikProps.submitForm}
+                        variant="contained"
+                        color="primary"
+                        size="large"
+                        type="button"
+                        data-testid="dataset-find-button"
+                        sx={{
+                          fontWeight: 700
+                        }}>
+                        Find Data
+                      </Button>
+                    ))}
+                </Box>
+              </Form>
+            </Box>
           )}
         </Formik>
       )}
 
-      {!showForm &&
-        (datasetType === 'Boundary Centroid' ? (
-          <SearchResultProjectList
-            mapDataLoader={props.mapDataLoader}
-            backToSearch={() => setShowForm(true)}
-            onToggleDataVisibility={props.onToggleDataVisibility}
-          />
-        ) : (
-          <SearchResultOccurrenceList
-            mapDataLoader={props.mapDataLoader}
-            backToSearch={() => setShowForm(true)}
-            onToggleDataVisibility={props.onToggleDataVisibility}
-          />
-        ))}
+      {!showForm && (
+        <SearchResultList
+          searchResults={props.searchResults}
+          backToSearch={() => toggleForm()}
+          onToggleDataVisibility={props.onToggleDataVisibility}
+        />
+      )}
     </>
   );
 };
