@@ -33,7 +33,6 @@ export const DatasetSearchFormYupSchema = yup.object().shape({
 
 export interface IDatasetSearchFormProps {
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
-  speciesList: IMultiAutocompleteFieldOption[];
 }
 
 /**
