@@ -21,9 +21,7 @@ export class TaxonomyService extends ESService {
   private sanitizeSpeciesData = (data: SearchHit<any>[]) => {
     return data.map((item) => {
       const label = [
-        item._source.code,
         [
-          [item._source.tty_kingdom, item._source.tty_name].filter(Boolean).join(' '),
           [item._source.unit_name1, item._source.unit_name2, item._source.unit_name3].filter(Boolean).join(' '),
           item._source.english_name
         ]
@@ -33,7 +31,7 @@ export class TaxonomyService extends ESService {
         .filter(Boolean)
         .join(': ');
 
-      return { id: item._id, label: label };
+      return { id: item._id, code: item._source.code, label: label };
     });
   };
 

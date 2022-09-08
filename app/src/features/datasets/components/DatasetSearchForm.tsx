@@ -50,11 +50,12 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   const convertOptions = (value: any): IMultiAutocompleteFieldOption[] =>
     value.map((item: any) => {
-      return { value: parseInt(item.id), label: item.label };
+      return { value: item.code, label: item.label };
     });
 
   const handleGetSpeciesList = async (value: string) => {
     const response = await api.taxonomy.searchSpecies(value);
+
     const convertedOptions = convertOptions(response.searchResponse);
 
     setSpeciesList(convertedOptions);
