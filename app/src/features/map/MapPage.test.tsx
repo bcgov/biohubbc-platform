@@ -1,10 +1,14 @@
 import { FeatureCollection } from 'geojson';
 import { createMemoryHistory } from 'history';
+import { useApi } from 'hooks/useApi';
 import { Router } from 'react-router';
 import { cleanup, render, waitFor } from 'test-helpers/test-utils';
 import MapPage from './MapPage';
 
 jest.mock('../../hooks/useApi');
+
+const mockBiohubApi = useApi as jest.Mock;
+
 const mockUseApi = {
   search: {
     getSpatialData: jest.fn()
@@ -21,12 +25,11 @@ const renderContainer = () => {
   );
 };
 
-// const mockBiohubApi = (useApi as unknown as jest.Mock<typeof mockUseApi>).mockReturnValue(mockUseApi);
+jest.mock('../../components/map/components/SideSearchBar', () => () => <div></div>);
 
 describe('MapPage', () => {
   beforeEach(() => {
-    // clear mocks before each test
-    mockUseApi.search.getSpatialData.mockClear();
+    mockBiohubApi.mockImplementation(() => mockUseApi);
   });
 
   afterEach(() => {

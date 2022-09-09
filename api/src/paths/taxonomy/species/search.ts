@@ -34,9 +34,12 @@ GET.apiDoc = {
                 items: {
                   title: 'Species',
                   type: 'object',
-                  required: ['id', 'label'],
+                  required: ['id', 'code', 'label'],
                   properties: {
                     id: {
+                      type: 'string'
+                    },
+                    code: {
                       type: 'string'
                     },
                     label: {
