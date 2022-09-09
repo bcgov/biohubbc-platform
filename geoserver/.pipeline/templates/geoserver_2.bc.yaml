@@ -10,6 +10,10 @@ parameters:
     description: The name assigned to all of the resources.
     required: true
     value: biohub-platform-geoserver
+  - name: SUFFIX
+    description: A name suffix used for all objects
+    required: false
+    value: '-dev'
   - name: TARGET_IMAGE_VERSION
     required: true
   - name: SOURCE_IMAGE_NAME

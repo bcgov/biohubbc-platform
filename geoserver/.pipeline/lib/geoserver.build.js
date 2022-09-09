@@ -22,15 +22,17 @@ const dbBuild = (settings) => {
   const objects = [];
 
   objects.push(
-    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/geoserver.bc.yaml`, {
+    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/geoserver_2.bc.yaml`, {
       param: {
         NAME: name,
         SUFFIX: `${phases[phase].suffix}`,
         TARGET_IMAGE_VERSION: `${phases[phase].tag}`,
-        GIT_REPO_URL: oc.git.http_url,
-        GIT_REF: phases[phase].branch || oc.git.ref,
-        SOURCE_CONTEXT_DIR: 'geoserver/biohub-geoserver',
-        DOCKERFILE_PATH: 'Dockerfile'
+        SOURCE_IMAGE_NAME: 'kartoza-geoserver',
+        SOURCE_IMAGE_VERSION: '2.21.1'
+        // GIT_REPO_URL: oc.git.http_url,
+        // GIT_REF: phases[phase].branch || oc.git.ref,
+        // SOURCE_CONTEXT_DIR: 'geoserver/biohub-geoserver',
+        // DOCKERFILE_PATH: 'Dockerfile'
       }
     })
   );
