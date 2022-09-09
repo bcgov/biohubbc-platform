@@ -127,6 +127,11 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       renderOption={(_renderProps, option, { selected }) => defaultChipDisplay(option, _renderProps, selected)}
       renderInput={(params) => (
         <TextField
+          onKeyDown={(event: any) => {
+            if (event.key === 'Backspace') {
+              event.stopPropagation();
+            }
+          }}
           {...params}
           required={props.required}
           label={props.label}
