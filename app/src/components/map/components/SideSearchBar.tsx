@@ -1,6 +1,4 @@
 import LoadingButton from '@mui/lab/LoadingButton';
-// import { mdiArrowRight } from '@mdi/js';
-// import Icon from '@mdi/react';
 import { Box, Button } from '@mui/material';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
@@ -78,7 +76,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     props.mapDataLoader.refresh(featureArray, [values.dataset], species_array);
     setFormData(values);
-    toggleForm();
   };
 
   const toggleForm = () => {
@@ -90,6 +87,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     if (props.mapDataLoader.isReady) {
       if (!props.mapDataLoader.data?.length) {
         setShowNoData(true);
+        setShowForm(true)
       } else {
         setShowForm(false);
       }
@@ -97,6 +95,10 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.mapDataLoader.isLoading, props.mapDataLoader.isReady]);
+
+  const hasResults = (): boolean => {
+    return props.searchResults.length > 0
+  }
 
   return (
     <>
@@ -114,18 +116,19 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
               <Typography variant="h3" component="h1">
                 Map Search
               </Typography>
-              {/* <Button
-                variant="text"
-                color="primary"
-                onClick={toggleForm}
-                endIcon={<Icon path={mdiArrowRight} size={0.75} />}
-                sx={{
-                  my: -1,
-                  fontWeight: 700,
-                  color: 'text.secondary'
-                }}>
-                BACK TO RESULTS
-              </Button> */}
+              {hasResults() && (
+                <Button
+                  variant="text"
+                  color="primary"
+                  onClick={toggleForm}
+                  sx={{
+                    my: -1,
+                    fontWeight: 700,
+                    color: 'text.secondary'
+                  }}>
+                  BACK TO RESULTS
+                </Button>
+              )}
             </Box>
             <Divider></Divider>
           </Box>
@@ -146,7 +149,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                 <Box py={4} px={3}>
                   <Form>
                     <DatasetSearchForm
-                      hasResults={props.searchResults.length > 0}
+                      hasResults={hasResults()}
                       toggleForm={toggleForm}
                       onAreaUpdate={props.onAreaUpdate}
                     />
@@ -191,7 +194,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
         </Box>
       )}
 
-      {!showForm && (
+      {!showForm && hasResults() && (
         <SearchResultList
           searchResults={props.searchResults}
           backToSearch={() => toggleForm()}
