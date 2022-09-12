@@ -76,7 +76,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
         flex="1 1 auto"
         mt="-1px"
         sx={{
-          overflowY: 'scroll'
+          overflowY: 'auto'
         }}>
         <List>
           {searchResults.map((item) => {

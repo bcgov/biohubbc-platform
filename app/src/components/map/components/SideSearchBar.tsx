@@ -101,8 +101,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   return (
     <>
       <ErrorDialog
-        dialogTitle="No Data Found"
-        dialogText="Please refine search"
+        dialogTitle="No Records Found"
+        dialogText="No records were found that matched your search criteria. Please refine your search and try again."
         open={showNoData}
         onClose={() => setShowNoData(false)}
         onOk={() => setShowNoData(false)}
@@ -132,7 +132,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
           <Box
             flex="1 1 auto"
             sx={{
-              overflowY: 'scroll'
+              overflowY: 'auto'
             }}>
             <Formik<IDatasetSearchForm>
               innerRef={formikRef}
