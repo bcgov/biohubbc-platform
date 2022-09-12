@@ -1,7 +1,10 @@
 import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import { List, ListItem } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Paper from '@mui/material/Paper';
 import { FieldArray, useFormikContext } from 'formik';
 import React from 'react';
 
@@ -17,44 +20,33 @@ const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> =
       name={props.list_name}
       render={(arrayHelpers) => (
         <>
-          <List
-            dense
-            disablePadding
-            sx={{
-              '& li': {
-                display: 'flex',
-                justifyContent: 'space-between',
-                py: 0.75,
-                px: 2,
-                border: '1px solid #ccc',
-                backgroundColor: '#ebedf2',
-                fontSize: '14px'
-              },
-              '& li:first-of-type': {
-                mt: 2,
-                borderTopLeftRadius: '4px',
-                borderTopRightRadius: '4px'
-              },
-              '& li:last-child': {
-                borderBottomLeftRadius: '4px',
-                borderBottomRightRadius: '4px'
-              },
-              '& li + li': {
-                mt: '-1px'
-              }
-            }}>
+          <List disablePadding>
             {!!formikProps.values[props.list_name].length &&
               formikProps.values[props.list_name].map((data: any, index: any) => {
                 return (
-                  <ListItem key={`${data.value ? data.value : data.name}-listItem`}>
-                    {data.label ? data.label : data.name}
-                    <IconButton
-                      aria-label="Delete list item"
-                      onClick={() => {
-                        arrayHelpers.remove(index);
-                      }}>
-                      <Icon path={mdiTrashCanOutline} size={0.875} />
-                    </IconButton>
+                  <ListItem
+                    component={Paper}
+                    elevation={1}
+                    sx={{
+                      mt: 1,
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      borderColor: 'grey.300'
+                    }}
+                    key={`${data.value ? data.value : data.name}-listItem`}
+                    secondaryAction={
+                      <IconButton
+                        aria-label="Delete list item"
+                        onClick={() => {
+                          arrayHelpers.remove(index);
+                        }}>
+                        <Icon path={mdiTrashCanOutline} size={0.875} />
+                      </IconButton>
+                    }>
+                    <ListItemText
+                      primary={data.label ? data.label : data.name}
+                      sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    />
                   </ListItem>
                 );
               })}
