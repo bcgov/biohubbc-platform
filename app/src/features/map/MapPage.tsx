@@ -49,11 +49,11 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     };
   });
 
-  const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
+  const [mapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
   const [type] = useState<string[]>(url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID]);
-  const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
+  const [zoom, setZoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
@@ -91,14 +91,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const getSearchBoundary = (boundary1?: Feature<Polygon>, boundary2?: Feature<Polygon>) => {
     return (boundary2 && boundary1 && intersect(boundary2, boundary1)) || boundary1 || boundary2 || ALL_OF_BC_BOUNDARY;
-  };
-
-  const onMapViewChange = (bounds: Feature<Polygon>, newZoom: number) => {
-    // Store map view boundary
-    setMapViewBoundary(bounds);
-
-    // Store map view bounds in URL
-    url.appendQueryParams({ mapViewBoundary: bounds, zoom: newZoom });
   };
 
   const onDrawChange = (features: Feature[]) => {
@@ -208,7 +200,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"
-          onBoundsChange={() => onMapViewChange}
+          onBoundsChange={(bounds: Feature<Polygon>, zoom: number) => {
+            setZoom(zoom)
+            setShouldUpdateBounds(false)
+          }}
           drawControls={{
             initialFeatures: drawnBoundary && [drawnBoundary],
             options: {
@@ -220,6 +215,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           }}
           onDrawChange={onDrawChange}
           scrollWheelZoom={true}
+          zoom={zoom}
           fullScreenControl={true}
           markerLayers={markerLayers}
           staticLayers={[...staticLayers, ...areaStaticLayers]}
