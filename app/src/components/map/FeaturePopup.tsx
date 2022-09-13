@@ -119,11 +119,11 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
     return (
       <Box mb={1}>
-        <Typography component="h6" variant="subtitle1" className={classes.pointType}>
+        <Typography variant="h6" className={classes.pointType}>
           {type || 'Feature'} record {length && length > 0 && `(${(index || 0) + 1} of ${length})`}
         </Typography>
         {date && (
-          <Typography className={classes.date} component="h6" variant="subtitle1">
+          <Typography className={classes.date} variant="subtitle1">
             {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, date)}
           </Typography>
         )}
@@ -132,7 +132,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   };
 
   const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
-    <Typography className={classes.date} component="h6" variant="body1">
+    <Typography className={classes.date} variant="body1">
       No metadata available.
     </Typography>
   );
@@ -183,17 +183,23 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
           </TableBody>
         </Table>
       </Collapse>
-      {metadataObjectUrl && <Button href={metadataObjectUrl}>Download Records</Button>}
-      {!isEmpty && data.length > 1 && (
-        <Box display="flex" sx={{ gap: 1 }} mt={1}>
-          <Button size="small" variant="contained" onClick={() => handlePrev()}>
-            Prev
-          </Button>
-          <Button size="small" variant="contained" color="primary" onClick={() => handleNext()}>
-            Next
-          </Button>
-        </Box>
-      )}
+      <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={2}>
+        {!isEmpty && data.length > 1 && (
+          <Box display="flex" sx={{ gap: 1 }}>
+            <Button size="small" variant="outlined" onClick={() => handlePrev()}>
+              Prev
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => handleNext()}>
+              Next
+            </Button>
+          </Box>
+        )}
+        {metadataObjectUrl && (
+          <Box>
+            <Button href={metadataObjectUrl} size="small" variant="contained" color="primary">Download Records</Button>
+          </Box>
+        )}
+      </Box>
     </ModalContentWrapper>
   );
 };

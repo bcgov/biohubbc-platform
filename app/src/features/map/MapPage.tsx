@@ -69,8 +69,12 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       return;
     }
 
-    const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    setMarkerLayers(result.markerLayers);
+    const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility)
+    console.log('result=', result)
+    setMarkerLayers(result.markerLayers.map((layer) => ({
+      ...layer,
+      helloworld: 'yes'
+    })));
     setStaticLayers(result.staticLayers);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -169,9 +169,13 @@ export class SpatialService extends DBService {
   async findSpatialComponentsByCriteria(
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
-    const response = await this.spatialRepository.findSpatialComponentsByCriteria(criteria);
+    const userService = new UserService(this.connection);
 
-    return response;
+    if (await userService.isSystemUserAdmin()) {
+      // return this.spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(criteria);
+    }
+
+    return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
   }
 
   /**

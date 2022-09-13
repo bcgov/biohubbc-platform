@@ -528,8 +528,6 @@ export class SpatialRepository extends BaseRepository {
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
 
-    const rawQuery = queryBuilder.toSQL().toNative()
-    console.log('$RAW=', String(rawQuery.sql))
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
     return response.rows;
   }

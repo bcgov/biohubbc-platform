@@ -70,7 +70,8 @@ export const parseSpatialDataByType = (
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
             key: feature.id || feature.properties.id,
-            popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
+            popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
+            count: spatialRecord.submission_spatial_component_ids.length
           });
         }
       }
@@ -94,7 +95,8 @@ export const parseSpatialDataByType = (
           boundaryStaticLayer.features.push({
             geoJSON: feature,
             key: feature.id || feature.properties.id,
-            popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
+            popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
+            // count: spatialRecord.submission_spatial_component_ids.length
           });
         }
       }
@@ -115,7 +117,8 @@ export const parseSpatialDataByType = (
           boundaryStaticLayer.features.push({
             geoJSON: feature,
             key: feature.id || feature.properties.id,
-            popup: <DatasetPopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
+            popup: <DatasetPopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
+            // count: spatialRecord.submission_spatial_component_ids.length
           });
         }
       }

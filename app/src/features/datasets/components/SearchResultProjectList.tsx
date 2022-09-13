@@ -81,11 +81,14 @@ const SearchResultProjectList: React.FC<ISearchResultListProps> = (props) => {
                   <Grid item xs={2}>
                     <Checkbox
                       checked={
+                        true
+                        /*
                         datasetVisibility[item.submission_spatial_component_id] === undefined
                           ? true
                           : datasetVisibility[item.submission_spatial_component_id]
+                        */
                       }
-                      onChange={() => toggleVisibility(`${item.submission_spatial_component_id}`)}
+                      onChange={() => null/*() => toggleVisibility(`${item.submission_spatial_component_id}`)*/}
                     />
                   </Grid>
                   <Grid item xs={7}>
