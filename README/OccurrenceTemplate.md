@@ -11,11 +11,11 @@ biohubbc/database/src/migrations/template_methodology_species_validations/new_te
 ```
 biohubbc/database/src/template_methodology_species_validations/picklist_variables/v0.2.ts
 ```
-4. Create a migration for new validation object. Use previous migrations as an example to get started. Your migration file should start with a timestamp in the format: YYYYMMDDHHmmss
+4. Create a migration for the new template validation object. Use previous template migrations as examples to get started. Your migration file name should start with a timestamp in the format: YYYYMMDDHHmmss
 ```
 biohubbc/database/src/migrations/YYYYMMDDHHmmss_new_migration.ts
 ```
-5. Start App and check the migration was successful.
+5. Run make commands to migrate the database.
 ```
 // run database setup and check the logs
 make db-setup
@@ -31,15 +31,18 @@ make log-db-setup
 
 
 A successful migration will look something like this
+
 ![Successful Migration](./images/templates/successful%20migration.png)
 
-6. Update Template Properties with `sims_template_id` and `sims_csm_id` values
+6. Update Template Properties with `sims_template_id` and `sims_csm_id` values. These are required so the system can find the correct template to validate with.
     1. Open the template in excel
     2. Navigate to File tab in the ribbon
     3. Then select Info -> Properties -> Advanced Properties
 ![Advanced Properties](./images/templates/advanced%20properties.png)
+
     4. In the new panel navigate to the Custom tab
-    ![Custom Tab](./images/templates/custom%20tab.png)
+![Custom Tab](./images/templates/custom%20tab.png)
+    
     5. Add `sims_template_id`. This values comes from `template_id` in the `template_methodology_species` table
     6. Add `sims_csm_id`. This values comes from `field_method_id` in the `template_methodology_species` table
 
