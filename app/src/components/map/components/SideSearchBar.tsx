@@ -89,7 +89,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     if (props.mapDataLoader.isReady) {
       if (!props.mapDataLoader.data?.length) {
         setShowNoData(true);
-        setShowForm(true)
+        setShowForm(true);
       } else {
         setShowForm(false);
       }
@@ -99,8 +99,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   }, [props.mapDataLoader.isLoading, props.mapDataLoader.isReady]);
 
   const hasResults = (): boolean => {
-    return props.searchResults.length > 0
-  }
+    return props.searchResults.length > 0;
+  };
 
   return (
     <>

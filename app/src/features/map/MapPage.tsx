@@ -201,8 +201,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
         <MapContainer
           mapId="boundary_map"
           onBoundsChange={(bounds: Feature<Polygon>, zoom: number) => {
-            setZoom(zoom)
-            setShouldUpdateBounds(false)
+            setZoom(zoom);
+            setShouldUpdateBounds(false);
           }}
           drawControls={{
             initialFeatures: drawnBoundary && [drawnBoundary],

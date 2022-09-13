@@ -34,7 +34,6 @@ const ContentLayout: React.FC<React.PropsWithChildren> = (props) => {
             return React.cloneElement(child);
           })}
         </Box>
-
       </DialogContextProvider>
     </Box>
   );
