@@ -22,7 +22,7 @@ const dbBuild = (settings) => {
   const objects = [];
 
   objects.push(
-    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/geoserver_2.bc.yaml`, {
+    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/geoserver.bc.yaml`, {
       param: {
         NAME: name,
         SUFFIX: `${phases[phase].suffix}`,

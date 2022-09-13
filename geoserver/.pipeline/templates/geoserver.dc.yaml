@@ -31,13 +31,13 @@ parameters:
     description: Default port name
     value: '8080-tcp'
   - name: CPU_REQUEST
-    value: '10m'
+    value: '100m'
   - name: CPU_LIMIT
-    value: '500m'
+    value: '1G'
   - name: MEMORY_REQUEST
     value: '512Mi'
   - name: MEMORY_LIMIT
-    value: '2Gi'
+    value: '4Gi'
   - name: REPLICAS
     value: '1'
 objects:
