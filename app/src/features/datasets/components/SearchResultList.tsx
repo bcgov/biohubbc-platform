@@ -101,7 +101,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                 }}>
                 <ListItemButton onClick={() => toggleVisibility(item.key)} dense>
                   <ListItemIcon>
-                    <Checkbox checked={item.visible} />
+                    <Checkbox size="small" checked={item.visible} />
                   </ListItemIcon>
                   <ListItemText primary={item.name} secondary={item.count + ' records'}></ListItemText>
                 </ListItemButton>

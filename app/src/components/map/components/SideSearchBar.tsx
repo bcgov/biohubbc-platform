@@ -1,3 +1,5 @@
+import { mdiArrowRight } from '@mdi/js';
+import Icon from '@mdi/react';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { Box, Button } from '@mui/material';
 import Divider from '@mui/material/Divider';
@@ -121,6 +123,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                   variant="text"
                   color="primary"
                   onClick={toggleForm}
+                  endIcon={<Icon path={mdiArrowRight} size={0.75} />}
                   sx={{
                     my: -1,
                     fontWeight: 700,

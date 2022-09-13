@@ -1,10 +1,10 @@
 import { mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
+import { grey } from '@mui/material/colors';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
-import Paper from '@mui/material/Paper';
 import { FieldArray, useFormikContext } from 'formik';
 import React from 'react';
 
@@ -20,16 +20,30 @@ const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> =
       name={props.list_name}
       render={(arrayHelpers) => (
         <>
-          <List disablePadding>
+          <List
+            disablePadding
+            sx={{
+              '& li': {
+                border: `1px solid ${grey[400]}`
+              },
+              '& li + li': {
+                borderTop: 'none'
+              },
+              '& li:first-of-type': {
+                mt: 1,
+                borderTopLeftRadius: '4px',
+                borderTopRightRadius: '4px'
+              },
+              '& li:last-of-type': {
+                borderBottomLeftRadius: '4px',
+                borderBottomRightRadius: '4px'
+              }
+            }}>
             {!!formikProps.values[props.list_name].length &&
               formikProps.values[props.list_name].map((data: any, index: any) => {
                 return (
                   <ListItem
-                    component={Paper}
-                    elevation={1}
                     sx={{
-                      mt: 1,
-                      borderWidth: '1px',
                       borderStyle: 'solid',
                       borderColor: 'grey.300'
                     }}
