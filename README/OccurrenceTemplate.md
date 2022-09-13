@@ -38,11 +38,12 @@ A successful migration will look something like this
     1. Open the template in excel
     2. Navigate to File tab in the ribbon
     3. Then select Info -> Properties -> Advanced Properties
-![Advanced Properties](./images/templates/advanced%20properties.png)
+            ![Advanced Properties](./images/templates/advanced%20properties.png)
 
     4. In the new panel navigate to the Custom tab
-![Custom Tab](./images/templates/custom%20tab.png)
-    
+
+        ![Custom Tab](./images/templates/custom%20tab.png)
+
     5. Add `sims_template_id`. This values comes from `template_id` in the `template_methodology_species` table
     6. Add `sims_csm_id`. This values comes from `field_method_id` in the `template_methodology_species` table
 
