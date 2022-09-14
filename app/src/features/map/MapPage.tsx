@@ -16,7 +16,7 @@ import useURL from 'hooks/useURL';
 import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
-import { groupSpatialDataIntoLayers, ILayers, parseSpatialDataByType } from 'utils/spatial-utils';
+import { parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -62,7 +62,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
 
-  const [layers, setLayers] = useState<ILayers>({ markerLayer: {}, staticLayer: {} });
+  const [parsedSearchResults, setParsedSearchResults] = useState<ISearchResult[]>([]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -70,11 +70,32 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    const results = groupSpatialDataIntoLayers(mapDataLoader.data);
 
-    setLayers(results);
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
+    console.log(result.markerLayers)
+
+
+    const taxaMap = {};
+    mapDataLoader.data.forEach(spatialData => {
+      spatialData.taxa_data.forEach(item => {
+        // need to check if it is an occurnece or not
+        if (item.associated_taxa) {
+          if (taxaMap[item.associated_taxa] === undefined) {
+            taxaMap[item.associated_taxa] = {
+              key: item.associated_taxa,
+              name: `${item.vernacular_name} (${item.associated_taxa})`,
+              count: 0, 
+              visible: datasetVisibility[item.associated_taxa] !== undefined ? datasetVisibility[item.associated_taxa] : true
+            } as ISearchResult
+          }
+
+          taxaMap[item.associated_taxa].count ++;
+        }
+      })
+    });
+
+    setParsedSearchResults(Object.keys(taxaMap).map(key => taxaMap[key]));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
@@ -161,33 +182,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     setDatasetVisibility(datasets);
   };
 
-  const converMarkerToSearchResult = () => {
-    return Object.keys(layers?.markerLayer).map((key) => {
-      const item = layers?.markerLayer[key];
-      const total: number = item?.markers.reduce((total, m) => total + m.count, 0);
-      const searchResult = {
-        key: key,
-        name: item.layerName,
-        count: total,
-        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      } as ISearchResult;
-      return searchResult;
-    });
-  };
-
-  const converStaticLayerToSearchResult = () => {
-    return Object.keys(layers?.staticLayer).map((key) => {
-      const item = layers?.staticLayer[key];
-      const searchResult = {
-        key: key,
-        name: item.layerName,
-        count: item.features.length,
-        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      } as ISearchResult;
-      return searchResult;
-    });
-  };
-
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
       <Paper
@@ -200,7 +194,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zIndex: '999'
         }}>
         <SideSearchBar
-          searchResults={[...converMarkerToSearchResult(), ...converStaticLayerToSearchResult()]}
+          searchResults={parsedSearchResults}
           mapDataLoader={mapDataLoader}
           onAreaUpdate={onAreaUpdate}
           onToggleDataVisibility={onToggleDataVisibility}

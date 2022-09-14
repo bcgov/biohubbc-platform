@@ -123,20 +123,29 @@ export const parseSpatialDataByType = (
 
       if (isOccurrenceFeature(feature)) {
         // check if species has been toggled on/ off
-        if (spatialRecord.associated_taxa) {
-          visible =
-            datasetVisibility[spatialRecord.associated_taxa] === undefined
-              ? true
-              : datasetVisibility[spatialRecord.associated_taxa];
-        }
 
-        if (visible) {
-          console.log(`Taxa: ${spatialRecord.associated_taxa} Items: ${spatialRecord.submission_spatial_component_ids.length}`)
+        const submission_ids: number[] = [];
+        spatialRecord.taxa_data.map(item => {
+          if (item.associated_taxa) {
+            visible =
+            datasetVisibility[item.associated_taxa] === undefined
+            ? true
+            : datasetVisibility[item.associated_taxa];
+          }
+          
+          if (visible) {
+            submission_ids.push(item.submission_spatial_component_id)
+          }
+        });
+        
+        // console.log(`SUBMISSION IDs: ${submission_ids.length}`)
+
+        if (submission_ids.length > 0) {
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
             key: feature.id || feature.properties.id,
-            popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
-            count: spatialRecord.submission_spatial_component_ids.length
+            popup: <FeaturePopup submissionSpatialComponentIds={submission_ids} />,
+            count: submission_ids.length
           });
         }
       }
