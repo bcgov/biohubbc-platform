@@ -93,7 +93,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
       <li key={option.value} {...renderProps}>
         <Checkbox
           icon={<CheckBoxOutlineBlank fontSize="small" />}
-          checkedIcon={<CheckBox fontSize="small" />}
+          checkedIcon={<CheckBox fontSize="small" color="primary" />}
           style={{ marginRight: 8 }}
           checked={checkedStatus}
           disabled={(options && options?.indexOf(option) !== -1) || false}

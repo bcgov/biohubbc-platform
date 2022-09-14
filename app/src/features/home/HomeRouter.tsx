@@ -1,4 +1,3 @@
-import ContentLayout from 'layouts/ContentLayout';
 import { Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import HomePage from './HomePage';
@@ -11,7 +10,7 @@ import HomePage from './HomePage';
 const HomeRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/" layout={ContentLayout}>
+      <AppRoute exact path="/">
         <HomePage />
       </AppRoute>
     </Switch>

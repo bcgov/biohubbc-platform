@@ -1,5 +1,9 @@
+import { mdiArrowRight } from '@mdi/js';
+import Icon from '@mdi/react';
 import LoadingButton from '@mui/lab/LoadingButton';
 import { Box, Button } from '@mui/material';
+import Divider from '@mui/material/Divider';
+import Typography from '@mui/material/Typography';
 import simplify from '@turf/simplify';
 import { ErrorDialog } from 'components/dialog/ErrorDialog';
 import { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
@@ -74,7 +78,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
 
     props.mapDataLoader.refresh(featureArray, [values.dataset], species_array);
     setFormData(values);
-    toggleForm();
   };
 
   const toggleForm = () => {
@@ -86,6 +89,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     if (props.mapDataLoader.isReady) {
       if (!props.mapDataLoader.data?.length) {
         setShowNoData(true);
+        setShowForm(true);
       } else {
         setShowForm(false);
       }
@@ -94,72 +98,106 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.mapDataLoader.isLoading, props.mapDataLoader.isReady]);
 
+  const hasResults = (): boolean => {
+    return props.searchResults.length > 0;
+  };
+
   return (
     <>
       <ErrorDialog
-        dialogTitle="No Data Found"
-        dialogText="Please refine search"
+        dialogTitle="No Records Found"
+        dialogText="No records were found that matched your search criteria. Please refine your search and try again."
         open={showNoData}
         onClose={() => setShowNoData(false)}
         onOk={() => setShowNoData(false)}
       />
       {showForm && (
-        <Formik<IDatasetSearchForm>
-          innerRef={formikRef}
-          enableReinitialize={true}
-          initialValues={formData || DatasetSearchFormInitialValues}
-          validationSchema={DatasetSearchFormYupSchema}
-          validateOnBlur={true}
-          validateOnChange={false}
-          onSubmit={handleDatasetRequestCreation}>
-          {(formikProps) => (
-            <Box py={4} px={3}>
-              <Form>
-                <DatasetSearchForm
-                  hasResults={props.searchResults.length > 0}
-                  toggleForm={toggleForm}
-                  onAreaUpdate={props.onAreaUpdate}
-                />
-
-                <Box mt={4}>
-                  {showSpinner &&
-                    (props.mapDataLoader.isLoading ? (
-                      <LoadingButton
-                        fullWidth={true}
-                        loading
-                        variant="contained"
-                        color="primary"
-                        size="large"
-                        type="button"
-                        data-testid="dataset-find-button"
-                        sx={{
-                          fontWeight: 700
-                        }}>
-                        Submit
-                      </LoadingButton>
-                    ) : (
-                      <Button
-                        fullWidth={true}
-                        onClick={formikProps.submitForm}
-                        variant="contained"
-                        color="primary"
-                        size="large"
-                        type="button"
-                        data-testid="dataset-find-button"
-                        sx={{
-                          fontWeight: 700
-                        }}>
-                        Find Data
-                      </Button>
-                    ))}
-                </Box>
-              </Form>
+        <Box display="flex" flexDirection="column" height="100%" overflow="hidden">
+          <Box flex="0 0 auto">
+            <Box display="flex" alignItems="center" justifyContent="space-between" p={3}>
+              <Typography variant="h3" component="h1">
+                Map Search
+              </Typography>
+              {hasResults() && (
+                <Button
+                  variant="text"
+                  color="primary"
+                  onClick={toggleForm}
+                  endIcon={<Icon path={mdiArrowRight} size={0.75} />}
+                  sx={{
+                    my: -1,
+                    fontWeight: 700,
+                    color: 'text.secondary'
+                  }}>
+                  BACK TO RESULTS
+                </Button>
+              )}
             </Box>
-          )}
-        </Formik>
+            <Divider></Divider>
+          </Box>
+          <Box
+            flex="1 1 auto"
+            sx={{
+              overflowY: 'auto'
+            }}>
+            <Formik<IDatasetSearchForm>
+              innerRef={formikRef}
+              enableReinitialize={true}
+              initialValues={formData || DatasetSearchFormInitialValues}
+              validationSchema={DatasetSearchFormYupSchema}
+              validateOnBlur={true}
+              validateOnChange={false}
+              onSubmit={handleDatasetRequestCreation}>
+              {(formikProps) => (
+                <Box py={4} px={3}>
+                  <Form>
+                    <DatasetSearchForm
+                      hasResults={hasResults()}
+                      toggleForm={toggleForm}
+                      onAreaUpdate={props.onAreaUpdate}
+                    />
+
+                    <Box mt={4}>
+                      {showSpinner &&
+                        (props.mapDataLoader.isLoading ? (
+                          <LoadingButton
+                            fullWidth={true}
+                            loading
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            type="button"
+                            data-testid="dataset-find-button"
+                            sx={{
+                              fontWeight: 700
+                            }}>
+                            Submit
+                          </LoadingButton>
+                        ) : (
+                          <Button
+                            fullWidth={true}
+                            onClick={formikProps.submitForm}
+                            variant="contained"
+                            color="primary"
+                            size="large"
+                            type="button"
+                            data-testid="dataset-find-button"
+                            sx={{
+                              fontWeight: 700
+                            }}>
+                            Find Data
+                          </Button>
+                        ))}
+                    </Box>
+                  </Form>
+                </Box>
+              )}
+            </Formik>
+          </Box>
+        </Box>
       )}
 
-      {!showForm && (
+      {!showForm && hasResults() && (
         <SearchResultList
           searchResults={props.searchResults}
           backToSearch={() => toggleForm()}

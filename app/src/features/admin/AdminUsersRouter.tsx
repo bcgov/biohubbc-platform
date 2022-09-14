@@ -1,4 +1,3 @@
-import ContentLayout from 'layouts/ContentLayout';
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import ManageUsersPage from './users/ManageUsersPage';
@@ -11,7 +10,7 @@ import ManageUsersPage from './users/ManageUsersPage';
 const AdminUsersRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/admin/users" layout={ContentLayout}>
+      <AppRoute exact path="/admin/users">
         <ManageUsersPage />
       </AppRoute>
 
