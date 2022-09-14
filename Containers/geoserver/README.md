@@ -17,6 +17,9 @@ Description of the files:
 
 The base geoserver image can be built in OpenShift from the steps below.
 
+See steps `1` and `2` for initial installation.  
+See step `3` for updates to an existing installation.
+
 # 1. Create Base GeoServer Image In OpenShift
 
 **_Note: All of these steps should be done in the OpenShift Tools Project (ie: `a0ec71-tools`)_**
