@@ -21,7 +21,7 @@ parameters:
     description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
     required: true
   # - name: VOLUME_CAPACITY
-  #   description: Volume space available for data, e.g. 512Mi, 2Gi.
+  #   description: Volume space available for data, e.g. 512M, 2G.
   #   required: true
   - name: PORT_DEFAULT
     value: '8080'
@@ -33,9 +33,9 @@ parameters:
   - name: CPU_LIMIT
     value: '1G'
   - name: MEMORY_REQUEST
-    value: '512Mi'
+    value: '512M'
   - name: MEMORY_LIMIT
-    value: '4Gi'
+    value: '4G'
   - name: REPLICAS
     value: '1'
 objects:

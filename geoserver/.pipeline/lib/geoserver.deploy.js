@@ -32,7 +32,7 @@ const dbDeploy = (settings) => {
         HOST: phases[phase].host,
         IMAGE_STREAM_NAME: name,
         IMAGE_STREAM_VERSION: phases[phase].tag
-        // VOLUME_CAPACITY: '3Gi'
+        // VOLUME_CAPACITY: '3G'
       }
     })
   );

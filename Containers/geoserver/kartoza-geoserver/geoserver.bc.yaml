@@ -39,22 +39,26 @@ parameters:
     description: The config map that contains the environment variables for this docker image build.
     required: true
     value: "kartoza-geoserver-cm"
+  - name: SECRET_NAME
+    description: The secret that contains the sensitive environment variables for this docker image build.
+    required: true
+    value: "kartoza-geoserver"
   - name: CPU_LIMIT
     description: The resources CPU limit (in cores) for this build; 0 = use default.
     required: true
     value: "0"
   - name: MEMORY_LIMIT
-    description: The resources Memory limit (in Mi, Gi, etc) for this build; 0Mi = use default.
+    description: The resources Memory limit (in M, Mi, G, Gi, etc) for this build; 0M = use default.
     required: true
-    value: 0Mi
+    value: 0M
   - name: CPU_REQUEST
     description: The resources CPU request (in cores) for this build; 0 = use default.
     required: true
     value: "0"
   - name: MEMORY_REQUEST
-    description: The resources Memory request (in Mi, Gi, etc) for this build; 0Mi = use default.
+    description: The resources Memory request (in M, Mi, G, Gi, etc) for this build; 0M = use default.
     required: true
-    value: 0Mi
+    value: 0M
 objects:
   - kind: ImageStream
     apiVersion: image.openshift.io/v1
@@ -87,9 +91,9 @@ objects:
                   key: GEOSERVER_ADMIN_USER
             - name: GEOSERVER_ADMIN_PASSWORD
               valueFrom:
-                configMapKeyRef:
-                  name: ${CONFIG_MAP_NAME}
-                  key: GEOSERVER_ADMIN_PASSWORD
+                secretKeyRef:
+                  name: ${SECRET_NAME}
+                  key: geoserver-admin-password
             - name: ROOT_WEBAPP_REDIRECT
               valueFrom:
                 configMapKeyRef:
@@ -108,7 +112,7 @@ objects:
             - name: MAXIMUM_MEMORY
               valueFrom:
                 configMapKeyRef:
-                  name: ${MAXIMUM_MEMORY}
+                  name: ${CONFIG_MAP_NAME}
                   key: MAXIMUM_MEMORY
       output:
         to:

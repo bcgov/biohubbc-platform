@@ -19,42 +19,47 @@ parameters:
     description: Host name of the application
     required: true
     value: "geoserver-dev-biohub-platform.apps.silver.devops.gov.bc.ca"
-  - name: IMAGE_STREAM_NAME
+  - name: TARGET_IMAGE_NAME
     description: The ImageStream name.
     required: true
     value: "kartoza-geoserver"
-  - name: IMAGE_STREAM_VERSION
+  - name: TARGET_IMAGE_VERSION
     description: Version of GeoServer image stream tag to be used (eg. 2.21.1 or latest).
     required: true
     value: latest
-  - name: IMAGE_STREAM_NAMESPACE
-    description: The OpenShift Namespace where the ImageStream resides.
+  - name: SOURCE_IMAGE_NAME
+    required: true
+    value: "kartoza-geoserver"
+  - name: SOURCE_IMAGE_VERSION
+    required: true
+    value: "latest"
+  - name: SOURCE_IMAGE_NAMESPACE
     required: true
     value: "a0ec71-tools"
   - name: VOLUME_CAPACITY
-    description: Volume space available for data, e.g. 512Mi, 2Gi.
+    description: Volume space available for data, e.g. 512M, 2Gi.
     required: true
-    value: 3Gi
+    value: 3G
   - name: PORT_DEFAULT
     value: "8080"
   - name: PORT_DEFAULT_NAME
     description: Default port name
     value: "8080-tcp"
   - name: CPU_REQUEST
-    value: "100m"
+    value: "100M"
   - name: CPU_LIMIT
-    value: "750m"
+    value: "750M"
   - name: MEMORY_REQUEST
-    value: "512Mi"
+    value: "512M"
   - name: MEMORY_LIMIT
-    value: "2Gi"
+    value: "2G"
   - name: REPLICAS
     value: "1"
 objects:
   - kind: Service
     apiVersion: v1
     metadata:
-      name: ${NAME}
+      name: ${NAME}${SUFFIX}
       labels:
         app: ${NAME}
     spec:
@@ -83,16 +88,26 @@ objects:
   - kind: ImageStream
     apiVersion: v1
     metadata:
-      name: "${IMAGE_STREAM_NAME}"
-      creationTimestamp:
+      name: "${TARGET_IMAGE_NAME}"
       labels:
         app: ${NAME}
         shared: "true"
       annotations: {}
-      role: geoserver
     spec:
       lookupPolicy:
         local: false
+      tags:
+        - name: "${TARGET_IMAGE_VERSION}"
+          annotations:
+          from:
+            kind: ImageStreamTag
+            name: "${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_VERSION}"
+            namespace: ${SOURCE_IMAGE_NAMESPACE}
+          generation: 1
+          importPolicy: {}
+          referencePolicy:
+            type: Source
+      successfulBuildsHistoryLimit: 5
 
   - kind: DeploymentConfig
     apiVersion: v1
@@ -162,8 +177,7 @@ objects:
               - geoserver
             from:
               kind: ImageStreamTag
-              name: "${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}"
-              namespace: "${IMAGE_STREAM_NAMESPACE}"
+              name: "${TARGET_IMAGE_NAME}:${TARGET_IMAGE_VERSION}"
           type: ImageChange
         - type: ConfigChange
     status:
