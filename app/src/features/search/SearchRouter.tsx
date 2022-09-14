@@ -1,4 +1,3 @@
-import ContentLayout from 'layouts/ContentLayout';
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import SearchPage from './SearchPage';
@@ -11,7 +10,7 @@ import SearchPage from './SearchPage';
 const SearchRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/search" layout={ContentLayout}>
+      <AppRoute exact path="/search">
         <SearchPage />
       </AppRoute>
 

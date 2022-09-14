@@ -1,7 +1,7 @@
 import { Feature } from 'geojson';
 
 export const MAP_DEFAULT_ZOOM = 6;
-export const MAP_MIN_ZOOM = 5;
+export const MAP_MIN_ZOOM = 6;
 export const MAP_MAX_ZOOM = 15;
 
 export const ALL_OF_BC_BOUNDARY: Feature = {

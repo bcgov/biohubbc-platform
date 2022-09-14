@@ -1,4 +1,4 @@
-import { Button, InputLabel } from '@mui/material';
+import { InputLabel } from '@mui/material';
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
@@ -71,23 +71,6 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   return (
     <>
-      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
-        <Typography variant="h3" component="h1">
-          Map Search
-        </Typography>
-        {props.hasResults && (
-          <Button
-            variant="outlined"
-            size="small"
-            color="primary"
-            onClick={() => props.toggleForm()}
-            sx={{
-              my: -1
-            }}>
-            Back to Results
-          </Button>
-        )}
-      </Box>
       <Box component="fieldset">
         <Box
           component="legend"
@@ -128,13 +111,10 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             handleSearchResults={handleGetSpeciesList}
           />
         </Box>
-
-        <Box mt={3}>
-          <MultiSelectList list_name={'species_list'} />
-        </Box>
+        <MultiSelectList list_name={'species_list'} />
       </Box>
 
-      <Box component="fieldset" mt={5}>
+      <Box component="fieldset" mt={4}>
         <Box
           component="legend"
           mb={1}
@@ -154,8 +134,8 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           Refine your search to a custom boundary by importing either KML files or Shapefiles.
         </Typography>
 
-        <MultiSelectList list_name={'area'} />
         <UploadAreaControls />
+        <MultiSelectList list_name={'area'} />
       </Box>
     </>
   );
