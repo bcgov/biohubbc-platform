@@ -1,17 +1,22 @@
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import SideSearchBar from 'components/map/components/SideSearchBar';
+import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
+import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
+import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
 import useURL from 'hooks/useURL';
-import { useEffect, useRef, useState } from 'react';
-import { parseSpatialDataByType } from 'utils/spatial-utils';
+import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
+import React, { useEffect, useRef, useState } from 'react';
+import { calculateUpdatedMapBounds } from 'utils/mapUtils';
+import { groupSpatialDataIntoLayers, ILayers, parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -23,8 +28,15 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     zoom: number | undefined;
   }>();
 
-  const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
-    api.search.getSpatialData({ boundary: searchBoundary, type: searchType, zoom: searchZoom })
+  const mapDataLoader = useDataLoader(
+    (searchBoundary: Feature[], searchType: string[], species?: string[], searchZoom?: number, datasetID?: string) =>
+      api.search.getSpatialData({
+        boundary: searchBoundary,
+        type: searchType,
+        species: species,
+        zoom: searchZoom,
+        datasetID: datasetID
+      })
   );
 
   const loadedFromUrl = useRef(false);
@@ -37,46 +49,48 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     };
   });
 
-  const [mapViewBoundary, setMapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
+  const [mapViewBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.mapViewBoundary);
   const [drawnBoundary, setDrawnBoundary] = useState<Feature<Polygon> | undefined>(url.queryParams.drawnBoundary);
 
   const [type] = useState<string[]>(url.queryParams.type || [SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID]);
-  const [zoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
+  const [zoom, setZoom] = useState<number>(url.queryParams.zoom || MAP_DEFAULT_ZOOM);
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+  const [shouldUpdateBounds, setShouldUpdateBounds] = useState<boolean>(false);
+  const [updatedBounds, setUpdatedBounds] = useState<LatLngBoundsExpression | undefined>(undefined);
+  const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
+  const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
+
+  const [layers, setLayers] = useState<ILayers>({ markerLayer: {}, staticLayer: {} });
 
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;
     }
 
-    const result = parseSpatialDataByType(mapDataLoader.data);
+    const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
+    const results = groupSpatialDataIntoLayers(mapDataLoader.data);
 
-    setStaticLayers(result.staticLayers);
+    setLayers(results);
     setMarkerLayers(result.markerLayers);
-  }, [mapDataLoader.data]);
+    setStaticLayers(result.staticLayers);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapDataLoader.data, datasetVisibility]);
 
   useEffect(() => {
     if (!loadedFromUrl.current) {
       loadedFromUrl.current = true;
       if (drawnBoundary) {
         const searchBoundary = getSearchBoundary(mapViewBoundary, drawnBoundary);
-        mapDataLoader.refresh(searchBoundary, type, zoom);
+        mapDataLoader.refresh([searchBoundary], type, [], zoom);
       }
     }
   });
 
   const getSearchBoundary = (boundary1?: Feature<Polygon>, boundary2?: Feature<Polygon>) => {
     return (boundary2 && boundary1 && intersect(boundary2, boundary1)) || boundary1 || boundary2 || ALL_OF_BC_BOUNDARY;
-  };
-
-  const onMapViewChange = (bounds: Feature<Polygon>, newZoom: number) => {
-    // Store map view boundary
-    setMapViewBoundary(bounds);
-
-    // Store map view bounds in URL
-    url.appendQueryParams({ mapViewBoundary: bounds, zoom: newZoom });
   };
 
   const onDrawChange = (features: Feature[]) => {
@@ -93,18 +107,103 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     // Store drawn bounds in URL
     url.appendQueryParams({ drawnBoundary: bounds });
 
-    mapDataLoader.refresh(searchBoundary, type, zoom);
+    mapDataLoader.refresh([searchBoundary], type, [], zoom);
+  };
+
+  const onAreaUpdate = (areas: IFormikAreaUpload[]) => {
+    const staticLayers: IStaticLayer[] = [];
+    const featureArray: Feature[] = [];
+
+    areas.forEach((area) => {
+      const layers: IStaticLayerFeature[] = [];
+      area.features.forEach((feature: Feature<Polygon>) => {
+        const staticLayerFeature: IStaticLayerFeature = {
+          geoJSON: feature,
+          tooltip: <AreaToolTip name={area.name} />
+        };
+        layers.push(staticLayerFeature);
+        featureArray.push(feature);
+      });
+      const staticLayer: IStaticLayer = { layerName: area.name, features: layers, visible: true };
+      staticLayers.push(staticLayer);
+    });
+
+    setAreaStaticLayers(staticLayers);
+    setBounds(featureArray);
+  };
+
+  const setBounds = (features: Feature[]) => {
+    const bounds = calculateUpdatedMapBounds(features);
+
+    if (bounds) {
+      const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+      setShouldUpdateBounds(true);
+      setUpdatedBounds(newBounds);
+    } else {
+      const boundsBC = calculateUpdatedMapBounds([ALL_OF_BC_BOUNDARY]);
+      if (boundsBC) {
+        const newBounds = new LatLngBounds(boundsBC[0] as LatLngTuple, boundsBC[1] as LatLngTuple);
+        setShouldUpdateBounds(true);
+        setUpdatedBounds(newBounds);
+      }
+    }
+  };
+
+  const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
+    setDatasetVisibility(datasets);
+  };
+
+  const converMarkerToSearchResult = () => {
+    return Object.keys(layers?.markerLayer).map((key) => {
+      const item = layers?.markerLayer[key];
+      const searchResult = {
+        key: key,
+        name: item.layerName,
+        count: item.markers.length,
+        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      } as ISearchResult;
+      return searchResult;
+    });
+  };
+
+  const converStaticLayerToSearchResult = () => {
+    return Object.keys(layers?.staticLayer).map((key) => {
+      const item = layers?.staticLayer[key];
+      const searchResult = {
+        key: key,
+        name: item.layerName,
+        count: item.features.length,
+        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      } as ISearchResult;
+      return searchResult;
+    });
   };
 
   return (
-    <Box width="100%" height="100%">
-      <Typography variant="h1" hidden>
-        Map
-      </Typography>
-      <Box width="100%" height="100%" data-testid="MapContainer">
+    <Box display="flex" justifyContent="space-between" width="100%" height="100%">
+      <Paper
+        square
+        elevation={3}
+        sx={{
+          flex: '0 0 auto',
+          width: '500px',
+          position: 'relative',
+          zIndex: '999'
+        }}>
+        <SideSearchBar
+          searchResults={[...converMarkerToSearchResult(), ...converStaticLayerToSearchResult()]}
+          mapDataLoader={mapDataLoader}
+          onAreaUpdate={onAreaUpdate}
+          onToggleDataVisibility={onToggleDataVisibility}
+        />
+      </Paper>
+      <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
         <MapContainer
           mapId="boundary_map"
-          onBoundsChange={onMapViewChange}
+          onBoundsChange={(bounds: Feature<Polygon>, zoom: number) => {
+            setZoom(zoom);
+            setShouldUpdateBounds(false);
+          }}
           drawControls={{
             initialFeatures: drawnBoundary && [drawnBoundary],
             options: {
@@ -116,9 +215,11 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           }}
           onDrawChange={onDrawChange}
           scrollWheelZoom={true}
+          zoom={zoom}
           fullScreenControl={true}
           markerLayers={markerLayers}
-          staticLayers={staticLayers}
+          staticLayers={[...staticLayers, ...areaStaticLayers]}
+          bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>
     </Box>

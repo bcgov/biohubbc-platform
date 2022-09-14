@@ -10,16 +10,8 @@ import { useContext } from 'react';
 import Dropzone, { FileRejection } from 'react-dropzone';
 
 const useStyles = makeStyles((theme: Theme) => ({
-  dropZoneTitle: {
-    marginBottom: theme.spacing(1),
-    fontSize: '1.125rem',
-    fontWeight: 700
-  },
   dropZoneIcon: {
-    color: theme.palette.text.primary + '55'
-  },
-  dropZoneRequirements: {
-    textAlign: 'center'
+    color: theme.palette.text.secondary
   }
 }));
 
@@ -92,32 +84,37 @@ export const DropZone: React.FC<React.PropsWithChildren<IDropZoneProps & IDropZo
         {({ getRootProps, getInputProps }) => (
           <Box {...getRootProps()}>
             <input {...getInputProps()} data-testid="drop-zone-input" />
-            <Box p={2} display="flex" flexDirection="column" alignItems="center">
+            <Box display="flex" flexDirection="column" alignItems="center" pt={4} pb={5} px={2}>
               <Icon className={classes.dropZoneIcon} path={mdiTrayArrowUp} size={1.5} />
-              <Box mt={0.5} className={classes.dropZoneTitle}>
+              <Box
+                sx={{
+                  mt: 1,
+                  fontSize: '1.125rem',
+                  fontWeight: 700
+                }}>
                 Drag your {(multiple && 'files') || 'file'} here, or <Link underline="always">Browse Files</Link>
               </Box>
-              <Box textAlign="center">
+              <Box
+                textAlign="center"
+                sx={{
+                  '& span + span': {
+                    ml: 2
+                  }
+                }}>
                 {acceptedFileExtensions && (
-                  <Box>
-                    <Typography component="span" variant="subtitle2" color="textSecondary">
-                      {`Accepted files: ${acceptedFileExtensions}`}
-                    </Typography>
-                  </Box>
+                  <Typography component="span" variant="subtitle2" color="textSecondary">
+                    {`Supported Files: ${acceptedFileExtensions}`}
+                  </Typography>
                 )}
                 {!!maxFileSize && maxFileSize !== Infinity && (
-                  <Box>
-                    <Typography component="span" variant="subtitle2" color="textSecondary">
-                      {`Maximum file size: ${Math.round(maxFileSize / BYTES_PER_MEGABYTE)} MB`}
-                    </Typography>
-                  </Box>
+                  <Typography component="span" variant="subtitle2" color="textSecondary">
+                    {`Max File Size: ${Math.round(maxFileSize / BYTES_PER_MEGABYTE)} MB`}
+                  </Typography>
                 )}
                 {!!maxNumFiles && (
-                  <Box>
-                    <Typography component="span" variant="subtitle2" color="textSecondary">
-                      {`Maximum files: ${maxNumFiles}`}
-                    </Typography>
-                  </Box>
+                  <Typography component="span" variant="subtitle2" color="textSecondary">
+                    {`Max Files: ${maxNumFiles}`}
+                  </Typography>
                 )}
               </Box>
             </Box>

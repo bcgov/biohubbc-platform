@@ -1,4 +1,3 @@
-import ContentLayout from 'layouts/ContentLayout';
 import { Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import MapPage from './MapPage';
@@ -11,7 +10,7 @@ import MapPage from './MapPage';
 const MapRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/map" layout={ContentLayout}>
+      <AppRoute exact path="/map">
         <MapPage />
       </AppRoute>
     </Switch>

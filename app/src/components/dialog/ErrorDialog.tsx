@@ -87,6 +87,7 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
   return (
     <Box>
       <Dialog
+        fullWidth
         open={props.open}
         onClose={props.onClose}
         aria-labelledby="alert-dialog-title"

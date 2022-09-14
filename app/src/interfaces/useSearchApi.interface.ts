@@ -19,6 +19,9 @@ export type EmptyObject = Record<string, never>;
 
 export interface ISpatialData {
   submission_spatial_component_id: number;
+  dataset_id?: string;
+  associated_taxa?: string;
+  vernacular_name?: string;
   spatial_data: FeatureCollection | EmptyObject;
 }
 

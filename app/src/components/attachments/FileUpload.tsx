@@ -100,6 +100,17 @@ export interface IFileUploadProps {
    */
   onReplace?: IReplaceHandler;
   dropZoneProps?: Partial<IDropZoneConfigProps>;
+  hideStatus?: boolean;
+  /**
+   * Allow selecting multiple files while browsing.
+   * Default: true
+   *
+   * Note: Does not impact drag/drop.
+   *
+   * @type {boolean}
+   * @memberof IDropZoneProps
+   */
+  multiple?: boolean;
 }
 
 export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (props) => {
@@ -179,6 +190,7 @@ export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (
         onCancel={() => setFileToRemove(file.name)}
         fileHandler={props.fileHandler}
         status={props.status}
+        hideStatus={props.hideStatus}
       />
     );
   };
@@ -229,10 +241,21 @@ export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (
   return (
     <Box>
       <Box className={classes.dropZone}>
-        <DropZone onFiles={onFiles} {...props.dropZoneProps} />
+        <DropZone multiple={props.multiple} onFiles={onFiles} {...props.dropZoneProps} />
       </Box>
       <Box>
-        <List>{fileUploadItems}</List>
+        <List
+          disablePadding
+          sx={{
+            '& li + li': {
+              mt: 1
+            },
+            '& li:first-of-type': {
+              mt: 3
+            }
+          }}>
+          {fileUploadItems}
+        </List>
       </Box>
     </Box>
   );

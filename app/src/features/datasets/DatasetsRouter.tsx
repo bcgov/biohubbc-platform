@@ -1,4 +1,3 @@
-import ContentLayout from 'layouts/ContentLayout';
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import DatasetPage from './DatasetPage';
@@ -12,11 +11,11 @@ import DatasetsPage from './DatasetsPage';
 const datasetsRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/datasets" layout={ContentLayout}>
+      <AppRoute exact path="/datasets">
         <DatasetsPage />
       </AppRoute>
 
-      <AppRoute exact path="/datasets/:id/details" layout={ContentLayout}>
+      <AppRoute exact path="/datasets/:id/details">
         <DatasetPage />
       </AppRoute>
 

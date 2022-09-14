@@ -34,10 +34,21 @@ const appTheme = createTheme({
     }
   },
   components: {
+    MuiAlert: {
+      styleOverrides: {
+        root: {
+          fontSize: '1rem'
+        }
+      }
+    },
     MuiButton: {
       styleOverrides: {
         root: {
           textTransform: 'none'
+        },
+        sizeLarge: {
+          fontSize: '1rem',
+          fontWeight: 700
         }
       }
     },
@@ -72,6 +83,15 @@ const appTheme = createTheme({
         root: {
           padding: '20px 24px'
         }
+      }
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: ({ ownerState, theme }) => ({
+          ...(ownerState && {
+            backgroundColor: theme.palette.grey[50]
+          })
+        })
       }
     }
   }
