@@ -3,8 +3,9 @@ apiVersion: v1
 description: A config map template that can be used to produce a Kartoza GeoServer config map, which is consumable by the sibling Kartoza Geoserver build config.
 metadata:
   name: kartoza-geoserver-cm
-## data is a copy of the contents of the kartoza geoserver `.env` file, with a few optional values commented out.
+## The variables under `data` is a copy of the contents of the kartoza geoserver `.env` file, with a few optional values commented out.
 ## See git repo `.env` and `env-data.sh` for default values for unset variables.
+## Note: environment variables below are not accessible by the image by default, to be accessible they also need to be specified in the geoserver build config template, under `env`.
 data:
   IMAGE_VERSION: 9.0-jdk11-openjdk-slim-buster
   GS_VERSION: 2.21.1

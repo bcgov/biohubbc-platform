@@ -29,10 +29,6 @@ const dbBuild = (settings) => {
         TARGET_IMAGE_VERSION: `${phases[phase].tag}`,
         SOURCE_IMAGE_NAME: 'kartoza-geoserver',
         SOURCE_IMAGE_VERSION: '2.21.1'
-        // GIT_REPO_URL: oc.git.http_url,
-        // GIT_REF: phases[phase].branch || oc.git.ref,
-        // SOURCE_CONTEXT_DIR: 'geoserver/biohub-geoserver',
-        // DOCKERFILE_PATH: 'Dockerfile'
       }
     })
   );
