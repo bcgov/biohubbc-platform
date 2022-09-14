@@ -17,11 +17,14 @@ export interface IGetSearchResultsResponse {
 
 export type EmptyObject = Record<string, never>;
 
-export interface ISpatialData {
-  submission_spatial_component_ids: number[];
-  dataset_id?: string;
+export interface ITaxaData {
   associated_taxa?: string;
   vernacular_name?: string;
+  submission_spatial_component_id: number;
+}
+export interface ISpatialData {
+  submission_spatial_component_ids: number[];
+  taxa_data: ITaxaData[];
   spatial_data: FeatureCollection | EmptyObject;
 }
 

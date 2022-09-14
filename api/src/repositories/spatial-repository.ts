@@ -60,13 +60,15 @@ export interface ISpatialComponentsSearchCriteria {
 
 export type EmptyObject = Record<string, never>;
 
+export interface ITaxaData {
+  associated_taxa?: string;
+  vernacular_name?: string;
+  submission_spatial_component_id: number;
+}
 export interface ISubmissionSpatialSearchResponseRow {
   submission_spatial_component_ids: number[];
+  taxa_data: ITaxaData[];
   spatial_component: {
-    dataset_id?: number;
-    associated_taxa?: string;
-    vernacular_name?: string;
-    // submission_spatial_component_id: number;
     spatial_data: FeatureCollection | EmptyObject;
   };
 }
@@ -434,12 +436,12 @@ export class SpatialRepository extends BaseRepository {
                 jsonb_build_object(
                   'submission_spatial_component_id',
                     wfsc.submission_spatial_component_id,
-                  'dataset_id',
-                    wfsc.dataset_id,
                   'associated_taxa',
                     wfsc.associated_taxa,
                   'vernacular_name',
-                    wfsc.vernacular_name,
+                    wfsc.vernacular_name
+                ) taxa_data_object,
+                jsonb_build_object(
                   'spatial_data',
                     wfsc.spatial_component
                 ) spatial_component
@@ -450,6 +452,7 @@ export class SpatialRepository extends BaseRepository {
       })
       .select(
         knex.raw('array_agg(submission_spatial_component_id) as submission_spatial_component_ids'),
+        knex.raw('array_agg(taxa_data_object) as taxa_data'),
         knex.raw('(array_agg(spatial_component))[1] as spatial_component'),
         'geography'
       )
