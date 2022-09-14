@@ -18,13 +18,6 @@ const useStyles = makeStyles((theme: Theme) => ({
   uploadProgress: {
     marginTop: theme.spacing(0.5)
   },
-  uploadListItemBox: {
-    width: '100%',
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: theme.palette.action.disabled,
-    borderRadius: '4px'
-  },
   uploadingColor: {
     color: theme.palette.primary.main
   },
@@ -41,7 +34,7 @@ const useStyles = makeStyles((theme: Theme) => ({
     background: theme.palette.error.main + '44'
   },
   fileIconColor: {
-    color: theme.palette.action.disabled
+    color: theme.palette.text.secondary
   }
 }));
 
@@ -80,6 +73,7 @@ export interface IFileUploadItemProps {
   onCancel: () => void;
   fileHandler?: IFileHandler;
   status?: UploadFileStatus;
+  hideStatus?: boolean;
 }
 
 const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = (props) => {
@@ -217,41 +211,52 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
   };
 
   return (
-    <ListItem key={file.name} disableGutters>
-      <Box className={classes.uploadListItemBox}>
-        <Box display="flex" flexDirection="row" alignItems="center" p={2} width="100%">
-          <Icon path={mdiFileOutline} size={1.5} className={error ? classes.errorColor : classes.fileIconColor} />
-          <Box pl={1.5} flex="1 1 auto">
-            <Box display="flex" flexDirection="row" flex="1 1 auto" alignItems="center" height="3rem">
-              <Box flex="1 1 auto">
-                <Typography variant="body2" component="div">
-                  <strong>{file.name}</strong>
-                </Typography>
-                <Typography variant="caption" component="div">
-                  {error || status}
-                </Typography>
-              </Box>
+    <ListItem
+      key={file.name}
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'center',
+        mt: 1,
+        py: 1.75,
+        px: 2,
+        border: '1px solid rgba(0,0,0,0.38)',
+        borderRadius: '4px'
+      }}>
+      <Icon path={mdiFileOutline} size={1.6} className={error ? classes.errorColor : classes.fileIconColor} />
+      <Box flex="1 1 auto" ml={1.65}>
+        <Box display="flex" flexDirection="row" flex="1 1 auto" alignItems="center">
+          <Box flex="1 1 auto">
+            <Typography variant="body1" component="div">
+              <strong>{file.name}</strong>
+            </Typography>
+            <Typography variant="body2" component="div" color="textSecondary">
+              {error || status}
+            </Typography>
+          </Box>
 
-              {errors && (
-                <Box display="flex" alignItems="center">
-                  <Button color="primary" onClick={() => setOpenDialog(!openDialog)}>
-                    Show Detailed Error Message
-                  </Button>
-                  <ComponentDialog
-                    open={openDialog}
-                    dialogTitle="Treatment File Errors"
-                    onClose={() => setOpenDialog(false)}>
-                    <ErrorDetailsList errors={errors} />
-                  </ComponentDialog>
-                </Box>
-              )}
-              <Box display="flex" alignItems="center">
-                <MemoizedActionButton status={status} onCancel={() => setInitiateCancel(true)} />
-              </Box>
+          {errors && (
+            <Box display="flex" alignItems="center">
+              <Button color="primary" onClick={() => setOpenDialog(!openDialog)}>
+                Show Detailed Error Message
+              </Button>
+              <ComponentDialog
+                open={openDialog}
+                dialogTitle="Treatment File Errors"
+                onClose={() => setOpenDialog(false)}>
+                <ErrorDetailsList errors={errors} />
+              </ComponentDialog>
             </Box>
-            <MemoizedProgressBar status={status} progress={progress} />
+          )}
+          <Box display="flex" alignItems="center">
+            <MemoizedActionButton
+              hideStatus={props.hideStatus}
+              status={status}
+              onCancel={() => setInitiateCancel(true)}
+            />
           </Box>
         </Box>
+        <MemoizedProgressBar hideStatus={props.hideStatus} status={status} progress={progress} />
       </Box>
     </ListItem>
   );
@@ -266,6 +271,7 @@ export const MemoizedFileUploadItem = memo(FileUploadItem, (prevProps, nextProps
 interface IActionButtonProps {
   status: UploadFileStatus;
   onCancel: () => void;
+  hideStatus?: boolean;
 }
 
 /**
@@ -279,7 +285,19 @@ interface IActionButtonProps {
 const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (props) => {
   const classes = useStyles();
 
-  if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED) {
+  if (props.status === UploadFileStatus.FAILED) {
+    return (
+      <IconButton
+        title="Remove File"
+        aria-label="remove file"
+        onClick={() => props.onCancel()}
+        className={classes.errorColor}>
+        <Icon path={mdiTrashCanOutline} size={1} />
+      </IconButton>
+    );
+  }
+
+  if (props.status === UploadFileStatus.PENDING || props.status === UploadFileStatus.STAGED || props.hideStatus) {
     return (
       <IconButton title="Remove File" aria-label="remove file" onClick={() => props.onCancel()}>
         <Icon path={mdiTrashCanOutline} size={1} />
@@ -303,18 +321,6 @@ const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (pro
     );
   }
 
-  if (props.status === UploadFileStatus.FAILED) {
-    return (
-      <IconButton
-        title="Remove File"
-        aria-label="remove file"
-        onClick={() => props.onCancel()}
-        className={classes.errorColor}>
-        <Icon path={mdiTrashCanOutline} size={1} />
-      </IconButton>
-    );
-  }
-
   // status is FINISHING_UPLOAD, show no action button
   return <Box width="4rem" />;
 };
@@ -326,6 +332,7 @@ export const MemoizedActionButton = memo(ActionButton, (prevProps, nextProps) =>
 interface IProgressBarProps {
   status: UploadFileStatus;
   progress: number;
+  hideStatus?: boolean;
 }
 
 /**
@@ -339,7 +346,7 @@ interface IProgressBarProps {
 const ProgressBar: React.FC<React.PropsWithChildren<IProgressBarProps>> = (props) => {
   const classes = useStyles();
 
-  if (props.status === UploadFileStatus.STAGED) {
+  if (props.status === UploadFileStatus.STAGED || props.hideStatus) {
     return <></>;
   }
 

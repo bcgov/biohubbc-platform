@@ -28,6 +28,7 @@ export interface IMarker {
 }
 
 export interface IMarkerLayer {
+  visible: boolean;
   layerName: string;
   markers: IMarker[];
 }
@@ -49,7 +50,7 @@ const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> 
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
+      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
         <ReactLeafletMarkerClusterGroup chunkedLoading>
           {layer.markers.map((item, index: number) => {
             const id = item.key || index;
