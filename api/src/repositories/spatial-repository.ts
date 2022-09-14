@@ -451,6 +451,7 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
+
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)

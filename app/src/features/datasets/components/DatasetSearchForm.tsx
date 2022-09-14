@@ -1,21 +1,21 @@
-import { mdiTrashCanOutline } from '@mdi/js';
-import Icon from '@mdi/react';
-import { IconButton, InputLabel, List, ListItem } from '@mui/material';
+import { Button, InputLabel } from '@mui/material';
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import MultiSelectList from 'components/fields/MultiSelectList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
-import { FieldArray, useFormikContext } from 'formik';
-import React, { useEffect } from 'react';
+import { useFormikContext } from 'formik';
+import { useApi } from 'hooks/useApi';
+import React, { useEffect, useState } from 'react';
 import yup from 'utils/YupSchema';
 
 export interface IDatasetSearchForm {
   dataset: string;
-  species_list: string[];
+  species_list: IMultiAutocompleteFieldOption[];
   area: IFormikAreaUpload[];
 }
 
@@ -33,7 +33,9 @@ export const DatasetSearchFormYupSchema = yup.object().shape({
 
 export interface IDatasetSearchFormProps {
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
-  speciesList: IMultiAutocompleteFieldOption[];
+
+  toggleForm: () => void;
+  hasResults: boolean;
 }
 
 /**
@@ -42,7 +44,24 @@ export interface IDatasetSearchFormProps {
  * @return {*}
  */
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
+  const api = useApi();
+
   const formikProps = useFormikContext<IDatasetSearchForm>();
+
+  const [speciesList, setSpeciesList] = useState<IMultiAutocompleteFieldOption[]>([]);
+
+  const convertOptions = (value: any): IMultiAutocompleteFieldOption[] =>
+    value.map((item: any) => {
+      return { value: item.code, label: item.label };
+    });
+
+  const handleGetSpeciesList = async (value: string) => {
+    const response = await api.taxonomy.searchSpecies(value);
+
+    const convertedOptions = convertOptions(response.searchResponse);
+
+    setSpeciesList(convertedOptions);
+  };
 
   useEffect(() => {
     props.onAreaUpdate(formikProps.values.area);
@@ -52,14 +71,23 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
   return (
     <>
-      <Typography
-        variant="h3"
-        component="h1"
-        sx={{
-          mb: 4
-        }}>
-        Map Search
-      </Typography>
+      <Box display="flex" alignItems="center" justifyContent="space-between" sx={{ mb: 4 }}>
+        <Typography variant="h3" component="h1">
+          Map Search
+        </Typography>
+        {props.hasResults && (
+          <Button
+            variant="outlined"
+            size="small"
+            color="primary"
+            onClick={() => props.toggleForm()}
+            sx={{
+              my: -1
+            }}>
+            Back to Results
+          </Button>
+        )}
+      </Box>
       <Box component="fieldset">
         <Box
           component="legend"
@@ -95,9 +123,14 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           <MultiAutocompleteField
             id={`species_list`}
             label={'Select Species'}
-            options={props.speciesList}
+            options={speciesList}
             required={false}
+            handleSearchResults={handleGetSpeciesList}
           />
+        </Box>
+
+        <Box mt={3}>
+          <MultiSelectList list_name={'species_list'} />
         </Box>
       </Box>
 
@@ -121,56 +154,8 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           Refine your search to a custom boundary by importing either KML files or Shapefiles.
         </Typography>
 
-        <FieldArray
-          name="area"
-          render={(arrayHelpers) => (
-            <>
-              <UploadAreaControls />
-              <List
-                dense
-                disablePadding
-                sx={{
-                  '& li': {
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    py: 0.75,
-                    px: 2,
-                    border: '1px solid #ccc',
-                    backgroundColor: '#ebedf2',
-                    fontSize: '14px'
-                  },
-                  '& li:first-of-type': {
-                    mt: 2,
-                    borderTopLeftRadius: '4px',
-                    borderTopRightRadius: '4px'
-                  },
-                  '& li:last-child': {
-                    borderBottomLeftRadius: '4px',
-                    borderBottomRightRadius: '4px'
-                  },
-                  '& li + li': {
-                    mt: '-1px'
-                  }
-                }}>
-                {!!formikProps.values.area.length &&
-                  formikProps.values.area.map((areaData, index) => {
-                    return (
-                      <ListItem key={`${areaData.name}-area`}>
-                        {areaData.name}
-                        <IconButton
-                          aria-label="Delete boundary"
-                          onClick={() => {
-                            arrayHelpers.remove(index);
-                          }}>
-                          <Icon path={mdiTrashCanOutline} size={0.875} />
-                        </IconButton>
-                      </ListItem>
-                    );
-                  })}
-              </List>
-            </>
-          )}
-        />
+        <MultiSelectList list_name={'area'} />
+        <UploadAreaControls />
       </Box>
     </>
   );

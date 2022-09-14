@@ -8,9 +8,9 @@ describe('parseSpatialDataByType', () => {
 
     const result = parseSpatialDataByType(spatialData);
 
-    expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
+    expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [], visible: true }]);
 
-    expect(result.staticLayers).toEqual([{ layerName: LAYER_NAME.BOUNDARIES, features: [] }]);
+    expect(result.staticLayers).toEqual([{ layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true }]);
   });
 
   it('returns empty responses if featureCollections param is has no features', () => {
@@ -26,9 +26,9 @@ describe('parseSpatialDataByType', () => {
 
     const result = parseSpatialDataByType(spatialData);
 
-    expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [] }]);
+    expect(result.markerLayers).toEqual([{ layerName: LAYER_NAME.OCCURRENCES, markers: [], visible: true }]);
 
-    expect(result.staticLayers).toEqual([{ layerName: LAYER_NAME.BOUNDARIES, features: [] }]);
+    expect(result.staticLayers).toEqual([{ layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true }]);
   });
 
   it('returns non-empty responses if featureCollections has features', () => {
