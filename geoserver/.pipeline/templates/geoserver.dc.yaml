@@ -1,5 +1,6 @@
 kind: Template
 apiVersion: template.openshift.io/v1
+description: A template that can be used to produce a GeoServer DeploymentConfig and related artifacts (routes, services, etc).
 metadata:
   name: biohub-platform-geoserver-dc
 parameters:
@@ -29,20 +30,22 @@ parameters:
     description: Default port name
     value: '8080-tcp'
   - name: CPU_REQUEST
-    value: '100m'
+    value: "100M"
   - name: CPU_LIMIT
-    value: '1G'
+    value: "750M"
   - name: MEMORY_REQUEST
-    value: '512M'
+    value: "512M"
   - name: MEMORY_LIMIT
-    value: '4G'
+    value: "2G"
   - name: REPLICAS
-    value: '1'
+    value: "1"
 objects:
   - kind: Service
     apiVersion: v1
     metadata:
       name: ${NAME}${SUFFIX}
+      labels:
+        app: ${NAME}
     spec:
       ports:
         - name: ${NAME}-${PORT_DEFAULT_NAME}
@@ -70,8 +73,8 @@ objects:
     apiVersion: v1
     metadata:
       name: '${IMAGE_STREAM_NAME}'
-      creationTimestamp:
       labels:
+        app: ${NAME}
         shared: 'true'
       annotations: {}
       role: geoserver
@@ -82,9 +85,11 @@ objects:
   - kind: DeploymentConfig
     apiVersion: v1
     metadata:
+      name: '${NAME}${SUFFIX}'
+      labels:
+        app: ${NAME}
       annotations:
         template.alpha.openshift.io/wait-for-ready: 'true'
-      name: '${NAME}${SUFFIX}'
       role: geoserver
     spec:
       replicas: '${{REPLICAS}}'
@@ -159,10 +164,11 @@ objects:
   - kind: Route
     apiVersion: route.openshift.io/v1
     metadata:
+      name: ${NAME}${SUFFIX}
+      labels:
+        app: ${NAME}
       annotations: {}
       creationTimestamp: null
-      labels: {}
-      name: ${NAME}${SUFFIX}
     spec:
       host: ${HOST}
       tls:

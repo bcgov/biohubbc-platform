@@ -313,14 +313,7 @@ services:
       dockerfile: ./Dockerfile
     ports:
       - ${GEOSERVER_PORT}:8080
-    healthcheck:
-      test: curl --fail -s http://localhost:8080 || exit 1
-      interval: 5s
-      timeout: 5s
-      retries: 30
     environment:
-      - GEOSERVER_DATA_DIR=${GEOSERVER_DATA_DIR}
-      - GEOWEBCACHE_CACHE_DIR=${GEOWEBCACHE_CACHE_DIR}
       - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER}
       - GEOSERVER_ADMIN_PASSWORD=${GEOSERVER_ADMIN_PASSWORD}
       - TIMEZONE=${GEOSERVER_TIMEZONE}

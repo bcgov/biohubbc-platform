@@ -1,6 +1,6 @@
 kind: Template
 apiVersion: template.openshift.io/v1
-description: A deployment config template that can be used to produce a GeoServer DeploymentConfig.
+description: A template that can be used to produce a GeoServer DeploymentConfig and related artifacts (routes, services, etc).
 labels:
   template: kartoza-geoserver-dc
 metadata:
@@ -36,10 +36,10 @@ parameters:
   - name: SOURCE_IMAGE_NAMESPACE
     required: true
     value: "a0ec71-tools"
-  - name: VOLUME_CAPACITY
-    description: Volume space available for data, e.g. 512M, 2Gi.
-    required: true
-    value: 3G
+  # - name: VOLUME_CAPACITY
+  #   description: Volume space available for data, e.g. 512M, 2Gi.
+  #   required: true
+  #   value: 3G
   - name: PORT_DEFAULT
     value: "8080"
   - name: PORT_DEFAULT_NAME

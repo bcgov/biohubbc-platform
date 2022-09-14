@@ -1,6 +1,6 @@
 kind: Template
 apiVersion: template.openshift.io/v1
-description: A build config template that can be used to produce a GeoServer BuildConfig and ImageStream.
+description: A template that can be used to produce a GeoServer BuildConfig and ImageStream.
 metadata:
   name: kartoza-geoserver-bc
   labels:

@@ -31,6 +31,7 @@ objects:
     metadata:
       name: '${NAME}'
       labels:
+        app: ${NAME}
         shared: 'true'
       annotations: {}
     spec:
