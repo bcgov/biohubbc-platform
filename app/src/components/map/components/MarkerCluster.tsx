@@ -1,10 +1,10 @@
-import { createLayerComponent, createPathComponent, LeafletContextInterface } from '@react-leaflet/core'
-import L, { LeafletMouseEventHandlerFn, LatLngExpression, Layer } from 'leaflet';
+import { createLayerComponent } from '@react-leaflet/core'
+import L, { LatLngExpression } from 'leaflet';
 import { LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import React, { Fragment, ReactElement, useEffect } from 'react'
+import React, { Fragment, ReactElement } from 'react'
 
 export interface IMarker {
   position: LatLngExpression;
@@ -119,7 +119,7 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
             return (
               <>
               <Marker
-                count={item.count}
+                count={item.count || 0}
                 key={`marker-cluster-${id}`}
                 position={[item.position[1], item.position[0]]}
                 {...item.MarkerProps}>
