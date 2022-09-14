@@ -1,13 +1,23 @@
-# GeoServer Installation
+# GeoServer
+
+Dockerized GeoServer comes from https://github.com/NickPhura/docker-geoserver which is a modified fork of https://github.com/kartoza/docker-geoserver
+
+- Modifications were needed to make the original kartoza docker setup compatible with OpenShift, specifically due to how OpenShift controls users/permissions within its pods (containers).
+
+The GeoServer project, and its documentation, can be found here: https://geoserver.org/
+
+Description of the files:
 
 `./kartoza-geoserver`: contains OpenShift templates for building a GeoServer build config and image stream.  
 `./kartoza-geoserver/geoserver.cm.yaml`: an OpenShift config map template.  
 `./kartoza-geoserver/geoserver.bc.yaml`: an OpenShift build config template.  
 `./kartoza-geoserver/geoserver.dc.yaml`: an OpenShift deployment config template.
 
-The base kartoza geoserver image can be built in OpenShift from the steps below. See [Creating Base GeoServer Image in OpenShift](#creating-base-geoserver-image-in-openshift)
+# Installation
 
-# Create Base GeoServer Image In OpenShift
+The base geoserver image can be built in OpenShift from the steps below.
+
+# 1. Create Base GeoServer Image In OpenShift
 
 **_Note: All of these steps should be done in the OpenShift Tools Project (ie: `a0ec71-tools`)_**
 
@@ -61,7 +71,7 @@ _Note: Any modifications that are not intended to be temporary should be persist
     - Keep an eye on the build logs to ensure it builds correctly. This may take several minutes.
       - If successful, it will finish with a log message like: `Successfully pushed image-registry.openshift-image-registry ...`
 
-# Deploy GeoServer Image In OpenShift
+# 2. Deploy GeoServer Image In OpenShift
 
 **_Note: All of these steps should be done in the OpenShift Dev/Test/Prod Project (ie: a0ec71-dev)_**
 
@@ -81,7 +91,7 @@ _Note: Any modifications that are not intended to be temporary should be persist
     - Keep an eye on the build logs to ensure it builds correctly. This may take several minutes.
       - If successful, it will finish with a log message like: `Successfully pushed image-registry.openshift-image-registry ...`
 
-# Updating The Base Image In OpenShift And Re-Deploying
+# 3. Updating The Base Image In OpenShift And Re-Deploying
 
 If there is a newer version of the geoserver project available, follow the below steps to update the base image and deploy the new version.
 
