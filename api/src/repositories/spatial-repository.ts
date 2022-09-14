@@ -387,7 +387,6 @@ export class SpatialRepository extends BaseRepository {
         // Get the spatial components that match the search filters
         qb1
           .select(
-            '*',
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
@@ -396,9 +395,18 @@ export class SpatialRepository extends BaseRepository {
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
-            )
+            ),
+            'ssc.submission_spatial_component_id',
+            'ssc.submission_id',
+            'ssc.spatial_component',
+            'ssc.geography'
           )
-          .from('submission_spatial_component as ssc');
+          .from('submission_spatial_component as ssc')
+          .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
+          .groupBy('ssc.submission_spatial_component_id')
+          .groupBy('ssc.submission_id')
+          .groupBy('ssc.spatial_component')
+          .groupBy('ssc.geography');
 
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);
@@ -414,26 +422,42 @@ export class SpatialRepository extends BaseRepository {
 
         this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
       })
+      .with('with_coalesced_spatial_components', (qb7) => {
+        qb7
+          .select(
+            // Select the non-secure spatial component from the search results
+            knex.raw(
+              `
+                submission_spatial_component_id,
+                submission_id,
+                geography,
+                jsonb_build_object(
+                  'submission_spatial_component_id',
+                    wfsc.submission_spatial_component_id,
+                  'dataset_id',
+                    wfsc.dataset_id,
+                  'associated_taxa',
+                    wfsc.associated_taxa,
+                  'vernacular_name',
+                    wfsc.vernacular_name,
+                  'spatial_data',
+                    wfsc.spatial_component
+                ) spatial_component
+              `
+            )
+          )
+          .from(knex.raw('with_filtered_spatial_component as wfsc'));
+      })
       .select(
-        // Select the non-secure spatial component from the search results
-        knex.raw(
-          `
-            jsonb_build_object(
-              'submission_spatial_component_id',
-                wfsc.submission_spatial_component_id,
-              'dataset_id',
-                wfsc.dataset_id,
-              'associated_taxa',
-                wfsc.associated_taxa,
-              'vernacular_name',
-                wfsc.vernacular_name,
-              'spatial_data',
-                wfsc.spatial_component
-            ) spatial_component
-          `
-        )
+        knex.raw('array_agg(submission_spatial_component_id) as submission_spatial_component_ids'),
+        knex.raw('(array_agg(spatial_component))[1] as spatial_component'),
+        'geography'
       )
-      .from(knex.raw('with_filtered_spatial_component as wfsc'));
+      .from('with_coalesced_spatial_components')
+      // Filter out secure spatial components that have no spatial representation
+      // The user is not allowed to see any aspect of these particular spatial components
+      .whereRaw("spatial_component->'spatial_data' != '{}'")
+      .groupBy('geography');
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -530,6 +554,7 @@ export class SpatialRepository extends BaseRepository {
       .groupBy('geography');
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+
     return response.rows;
   }
 

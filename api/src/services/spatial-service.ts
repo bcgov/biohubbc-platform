@@ -172,7 +172,7 @@ export class SpatialService extends DBService {
     const userService = new UserService(this.connection);
 
     if (await userService.isSystemUserAdmin()) {
-      // return this.spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(criteria);
+      return this.spatialRepository.findSpatialComponentsByCriteriaAsAdminUser(criteria);
     }
 
     return this.spatialRepository.findSpatialComponentsByCriteria(criteria);
