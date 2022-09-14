@@ -1,11 +1,11 @@
 name: Test Checks
 
 on: workflow_dispatch
-  # pull_request:
-  #   types: [opened, reopened, synchronize, ready_for_review]
-  # push:
-  #   branches:
-  #     - dev
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches:
+      - dev
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.number }}
