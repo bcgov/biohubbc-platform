@@ -1,5 +1,5 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
   name: biohub-platform-geoserver
   labels:
@@ -21,7 +21,7 @@ parameters:
     value: geoserver
   - name: SOURCE_IMAGE_VERSION
     required: true
-    value: 2.21.1
+    value: latest
   - name: SOURCE_IMAGE_NAMESPACE
     required: true
     value: a0ec71-tools

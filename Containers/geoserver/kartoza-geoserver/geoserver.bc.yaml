@@ -1,10 +1,11 @@
 kind: Template
 apiVersion: template.openshift.io/v1
-description: A build config template that can be used to produce a GeoServer imagestream, from a specified Dockerfile.
+description: A build config template that can be used to produce a GeoServer BuildConfig and ImageStream.
 metadata:
   name: kartoza-geoserver-bc
   labels:
     build: kartoza-geoserver-bc
+    app: kartoza-geoserver
 parameters:
   - name: NAME
     description: The name assigned to all of the resources.
@@ -14,14 +15,6 @@ parameters:
     description: A name suffix used for all objects
     required: false
     value: ""
-  - name: APP_NAME
-    description: Used to group components together in the OpenShift console.
-    required: true
-    value: kartoza-geoserver
-  - name: APP_GROUP
-    description: The name assigned to all of the deployments in this project.
-    required: true
-    value: biohubbc
   - name: GIT_REPO_URL
     description: The git repo containing the Dockerfile for this build.
     required: true
@@ -41,7 +34,7 @@ parameters:
   - name: VERSION
     description: The image steam tag.
     required: true
-    value: 2.21.1
+    value: latest
   - name: CONFIG_MAP_NAME
     description: The config map that contains the environment variables for this docker image build.
     required: true
@@ -68,17 +61,13 @@ objects:
     metadata:
       name: ${NAME}
       labels:
-        name: ${NAME}
-        app: ${APP_NAME}${SUFFIX}
-        app-group: ${APP_GROUP}
+        app: ${NAME}
   - kind: BuildConfig
     apiVersion: build.openshift.io/v1
     metadata:
       name: ${NAME}
       labels:
-        name: ${NAME}
-        app: ${APP_NAME}${SUFFIX}
-        app-group: ${APP_GROUP}
+        app: ${NAME}
     spec:
       source:
         type: Git

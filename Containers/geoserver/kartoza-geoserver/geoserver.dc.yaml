@@ -1,48 +1,62 @@
 kind: Template
 apiVersion: template.openshift.io/v1
+description: A deployment config template that can be used to produce a GeoServer DeploymentConfig.
+labels:
+  template: kartoza-geoserver-dc
 metadata:
-  name: biohub-platform-geoserver-dc
+  name: kartoza-geoserver-dc
+  labels:
+    app: kartoza-geoserver
 parameters:
   - name: NAME
     description: The name of the OpenShift Service exposed for geoserver .
     required: true
-    value: 'biohub-platform-geoserver'
+    value: "kartoza-geoserver"
   - name: SUFFIX
     required: true
-    value: '-dev'
+    value: "-dev"
   - name: HOST
     description: Host name of the application
     required: true
+    value: "geoserver-dev-biohub-platform.apps.silver.devops.gov.bc.ca"
   - name: IMAGE_STREAM_NAME
     description: The ImageStream name.
     required: true
-    value: 'biohub-platform-geoserver'
+    value: "kartoza-geoserver"
   - name: IMAGE_STREAM_VERSION
-    description: Version of GeoServer image to be used (eg. 2.21.1 or latest).
+    description: Version of GeoServer image stream tag to be used (eg. 2.21.1 or latest).
     required: true
-  # - name: VOLUME_CAPACITY
-  #   description: Volume space available for data, e.g. 512Mi, 2Gi.
-  #   required: true
+    value: latest
+  - name: IMAGE_STREAM_NAMESPACE
+    description: The OpenShift Namespace where the ImageStream resides.
+    required: true
+    value: "a0ec71-tools"
+  - name: VOLUME_CAPACITY
+    description: Volume space available for data, e.g. 512Mi, 2Gi.
+    required: true
+    value: 3Gi
   - name: PORT_DEFAULT
-    value: '8080'
+    value: "8080"
   - name: PORT_DEFAULT_NAME
     description: Default port name
-    value: '8080-tcp'
+    value: "8080-tcp"
   - name: CPU_REQUEST
-    value: '100m'
+    value: "100m"
   - name: CPU_LIMIT
-    value: '1G'
+    value: "750m"
   - name: MEMORY_REQUEST
-    value: '512Mi'
+    value: "512Mi"
   - name: MEMORY_LIMIT
-    value: '4Gi'
+    value: "2Gi"
   - name: REPLICAS
-    value: '1'
+    value: "1"
 objects:
   - kind: Service
     apiVersion: v1
     metadata:
-      name: ${NAME}${SUFFIX}
+      name: ${NAME}
+      labels:
+        app: ${NAME}
     spec:
       ports:
         - name: ${NAME}-${PORT_DEFAULT_NAME}
@@ -69,10 +83,11 @@ objects:
   - kind: ImageStream
     apiVersion: v1
     metadata:
-      name: '${IMAGE_STREAM_NAME}'
+      name: "${IMAGE_STREAM_NAME}"
       creationTimestamp:
       labels:
-        shared: 'true'
+        app: ${NAME}
+        shared: "true"
       annotations: {}
       role: geoserver
     spec:
@@ -82,12 +97,14 @@ objects:
   - kind: DeploymentConfig
     apiVersion: v1
     metadata:
+      name: "${NAME}${SUFFIX}"
+      labels:
+        app: ${NAME}
       annotations:
-        template.alpha.openshift.io/wait-for-ready: 'true'
-      name: '${NAME}${SUFFIX}'
+        template.alpha.openshift.io/wait-for-ready: "true"
       role: geoserver
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: "${{REPLICAS}}"
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -108,13 +125,13 @@ objects:
           annotations: null
           creationTimestamp: null
           labels:
-            deploymentConfig: '${NAME}${SUFFIX}'
-            name: '${NAME}${SUFFIX}'
+            deploymentConfig: "${NAME}${SUFFIX}"
+            name: "${NAME}${SUFFIX}"
             role: geoserver
         spec:
           containers:
             - capabilities: {}
-              image: ' '
+              image: " "
               imagePullPolicy: Always
               name: geoserver
               ports:
@@ -122,13 +139,13 @@ objects:
                   protocol: TCP
               resources:
                 requests:
-                  cpu: '${CPU_REQUEST}'
-                  memory: '${MEMORY_REQUEST}'
+                  cpu: "${CPU_REQUEST}"
+                  memory: "${MEMORY_REQUEST}"
                 limits:
-                  cpu: '${CPU_LIMIT}'
-                  memory: '${MEMORY_LIMIT}'
+                  cpu: "${CPU_LIMIT}"
+                  memory: "${MEMORY_LIMIT}"
               securityContext: {}
-              terminationMessagePath: '/dev/termination-log'
+              terminationMessagePath: "/dev/termination-log"
               # volumeMounts:
               #   - mountPath: '/usr/share/geoserver/data_dir'
               #     name: '${NAME}${SUFFIX}-data'
@@ -145,7 +162,8 @@ objects:
               - geoserver
             from:
               kind: ImageStreamTag
-              name: '${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}'
+              name: "${IMAGE_STREAM_NAME}:${IMAGE_STREAM_VERSION}"
+              namespace: "${IMAGE_STREAM_NAMESPACE}"
           type: ImageChange
         - type: ConfigChange
     status:
@@ -159,10 +177,11 @@ objects:
   - kind: Route
     apiVersion: route.openshift.io/v1
     metadata:
+      name: ${NAME}${SUFFIX}
+      labels:
+        app: ${NAME}
       annotations: {}
       creationTimestamp: null
-      labels: {}
-      name: ${NAME}${SUFFIX}
     spec:
       host: ${HOST}
       tls:

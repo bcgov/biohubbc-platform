@@ -9,9 +9,6 @@
 # Apply the contents of the .env to the terminal, so that the docker-compose file can use them in its builds
 export $(shell sed 's/=.*//' .env)
 
-.DEFAULT : help
-.PHONY : setup close clean build-backend run-backend build-web run-web database app api db-setup db-migrate db-rollback n8n-setup n8n-export clamav install test cypress lint lint-fix format format-fix help
-
 ## ------------------------------------------------------------------------------
 ## Alias Commands
 ## - Performs logical groups of commands for your convenience
@@ -35,7 +32,7 @@ n8n-setup: | build-n8n-setup run-n8n-setup ## Performs all commands necessary to
 n8n-export: | build-n8n-export run-n8n-export ## Performs all commands necessary to export the latest n8n credentials and workflows
 
 clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
-geoserver: | close build-geoserver run-geoserver ## Performs all commands necessary to run the geoserver project (db, geoserver) in docker
+geoserver: | build-geoserver run-geoserver ## Performs all commands necessary to run the geoserver project (db, geoserver) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -410,12 +407,6 @@ log-geoserver: ## Runs `docker logs <container> -f` for the n8n nginx container
 	@echo "Running docker logs for the geoserver container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-geoserver-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-geoserver-nginx: ## Runs `docker logs <container> -f` for the n8n nginx container
-	@echo "==============================================="
-	@echo "Running docker logs for the geoserver-nginx container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-geoserver-nginx-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Help

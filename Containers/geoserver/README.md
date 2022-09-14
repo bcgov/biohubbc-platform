@@ -7,49 +7,34 @@
 
 The base kartoza geoserver image can be built in OpenShift from the steps below. See [Creating Base GeoServer Image in OpenShift](#creating-base-geoserver-image-in-openshift)
 
-# Creating Base GeoServer Image In OpenShift
+# Create Base GeoServer Image In OpenShift
 
 _Note: All of these steps should be done in the OpenShift Tools Project (ie: `a0ec71-tools`)_
 
-## 1. Create Template
+## 1. Upload Templates
 
 ### 1.1 Upload ConfigMap Template
 
 - Ensure the environment values in `geoserver.cm.yaml` specify the correct values.
   - These can be easily changed after the template is uploaded, but should be persisted in `geoserver.cm.yaml` for backup.
 - Follow the steps in [How to Upload a Template](#how-to-upload-a-template).
+- This will automatically create a new ConfigMap (no template processing needed)
 
 _Note: This config map is simply a placeholder for the env vars. To make them accessible by the build config, you still need to include an entry in the `env` section of `geoserver.bc.yaml` for each variable. Similar to how secrets are added as variables to build/deployment configs._
 
-### 1.2. Upload Template To OpenShift
+### 1.2. Upload BuildConfig Template
 
 - Ensure the environment values in `geoserver.bc.yaml` specify the correct values.
   - In particular, the variables related to the repo url/ref, context/dockerfile paths, and version.
 - Follow the steps in [How to Upload a Template](#how-to-upload-a-template).
 
-## 2. Create BuildConfig
+## 2. Process The BuildConfig Template
 
-### 2.1. Generate A BuildConfig From The Template
+- See [Process A Template](#process-a-template)
 
-#### 2.1.1 Process A New Template (That Has Not Been Processed Before)
+### 3. Run The BuildConfig
 
-- In a compatible cli, where you have logged into the OpenShift CLI, execute the following:
-
-  - ```
-    oc process <template name> | oc create -f -
-    ```
-
-- You should be able to see your new build config under `Builds -> BuildConfigs` and new ImageStream under `Builds -> ImageStreams`.
-
-#### 2.1.2 Process An Existing Template (That Has Been Processed Before, But Has Since Been Updated)
-
-- In a compatible cli, where you have logged into the OpenShift CLI, execute the following:
-  - ```
-      oc process <template name> | oc replace -f -
-    ```
-- You should be able to see your updated build config under `Builds -> BuildConfigs` and updated ImageStream under `Builds -> ImageStreams`.
-
-### 2.2. Modify The BuildConfig (If Needed)
+### 3.1 Modify The BuildConfig (If Temporary Changes Are Needed)
 
 - You can still make modifications to the BuildConfig at this stage.
   - Click on your build config (under `Builds -> BuildConfigs`)
@@ -58,9 +43,27 @@ _Note: This config map is simply a placeholder for the env vars. To make them ac
 
 _Note: Any modifications that are not intended to be temporary should be persisted in `geoserver.cm.yaml` for backup._
 
-## 3. Create ImageStream
+### 3.2. Run The BuildConfig
 
-### 3.1. Run The BuildConfig
+- From the build config page, under the `Actions` drop down, click `Start Build`.
+  - This will generate a new item under `Builds -> Builds`, which will in turn create a new item under the `Builds -> ImageStreams`.
+    - Keep an eye on the build logs to ensure it builds correctly. This may take several minutes.
+      - If successful, it will finish with a log message like: `Successfully pushed image-registry.openshift-image-registry ...`
+
+# Deploy GeoServer Image In OpenShift
+
+_Note: All of these steps should be done in the OpenShift Dev/Test/Prod Project (ie: a0ec71-dev)_
+
+## 1. Upload DeploymentConfig Template
+
+- Ensure the environment values in `geoserver.dc.yaml` specify the correct values.
+- Follow the steps in [How to Upload a Template](#how-to-upload-a-template).
+
+## 2. Process The DeploymentConfig Template
+
+- See [Process A Template](#process-a-template)
+
+## 3. Run the DeploymentConfig
 
 - From the build config page, under the `Actions` drop down, click `Start Build`.
   - This will generate a new item under `Builds -> Builds`, which will in turn create a new item under the `Builds -> ImageStreams`.
@@ -82,7 +85,17 @@ _Note: Any modifications that are not intended to be temporary should be persist
 - Click `Instances` from the subsequent page.
 - From here you can view, edit, delete the template uploaded in the previous step.
 
-# Template Related OC Commands
+# Process A Template
+
+- In a compatible cli, where you have logged into the OpenShift CLI, execute the following command:
+
+  ```
+  oc process <template name> | oc [create|replace] -f -
+  ```
+
+  _Note: See [Template OC Commands](#template-oc-commands) for details._
+
+# Template OC Commands
 
 - Process a template, creating/replacing any OpenShift artifacts specified in the template.
   ```

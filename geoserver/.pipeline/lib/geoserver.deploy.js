@@ -31,8 +31,8 @@ const dbDeploy = (settings) => {
         SUFFIX: phases[phase].suffix,
         HOST: phases[phase].host,
         IMAGE_STREAM_NAME: name,
-        IMAGE_STREAM_VERSION: phases[phase].tag,
-        VOLUME_CAPACITY: '3Gi'
+        IMAGE_STREAM_VERSION: phases[phase].tag
+        // VOLUME_CAPACITY: '3Gi'
       }
     })
   );
