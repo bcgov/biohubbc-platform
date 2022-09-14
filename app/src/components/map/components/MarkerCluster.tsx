@@ -8,7 +8,7 @@ import React, { Fragment, ReactElement } from 'react'
 
 export interface IMarker {
   position: LatLngExpression;
-  count?: number
+  count: number
   key?: string | number;
   MarkerProps?: Partial<MarkerProps>;
   popup?: ReactElement;

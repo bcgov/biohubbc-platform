@@ -164,10 +164,11 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const converMarkerToSearchResult = () => {
     return Object.keys(layers?.markerLayer).map((key) => {
       const item = layers?.markerLayer[key];
+      const total: number = item?.markers.reduce((total, m) => total + m.count, 0);
       const searchResult = {
         key: key,
         name: item.layerName,
-        count: item.markers.length,
+        count: total,
         visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
       } as ISearchResult;
       return searchResult;

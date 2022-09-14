@@ -49,14 +49,16 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
           layerMap.markerLayer[key] = {
             visible: true,
             layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
-            markers: []
+            markers: [],
+            count: 0
           } as IMarkerLayer;
         }
 
         layerMap.markerLayer[key].markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
+          count: spatialRecord.submission_spatial_component_ids.length
         });
       }
 
@@ -73,7 +75,7 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
         layerMap.staticLayer[key].features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
         });
       }
 
@@ -90,7 +92,7 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
         layerMap.staticLayer[key].features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentId={spatialRecord.submission_spatial_component_id} />
+          popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
         });
       }
     }
@@ -129,6 +131,7 @@ export const parseSpatialDataByType = (
         }
 
         if (visible) {
+          console.log(`Taxa: ${spatialRecord.associated_taxa} Items: ${spatialRecord.submission_spatial_component_ids.length}`)
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
             key: feature.id || feature.properties.id,
@@ -199,11 +202,11 @@ export const getFeatureLayerKey = (spatialRecord: ISpatialData, feature: Feature
   }
 
   if (isBoundaryFeature(feature)) {
-    key = `${spatialRecord.submission_spatial_component_id}`;
+    key = `${spatialRecord.submission_spatial_component_ids}`;
   }
 
   if (isBoundaryCentroidFeature(feature)) {
-    key = `${spatialRecord.submission_spatial_component_id}`;
+    key = `${spatialRecord.submission_spatial_component_ids}`;
   }
 
   return key;
