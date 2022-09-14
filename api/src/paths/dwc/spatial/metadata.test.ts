@@ -4,11 +4,11 @@ import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-re
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../../database/db';
-import { SpatialService } from '../../../../services/spatial-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import * as metadata from '../metadata';
-import { GET } from '../metadata';
+import * as db from '../../../database/db';
+import { SpatialService } from '../../../services/spatial-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import * as metadata from './metadata';
+import { GET } from './metadata';
 
 chai.use(sinonChai);
 
@@ -133,7 +133,7 @@ describe('metadata', () => {
     });
   });
 
-  describe('getSpatialMetadataById', () => {
+  describe('getSpatialMetadataByIds', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -144,13 +144,13 @@ describe('metadata', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = { submissionSpatialComponentId: '1' };
+      mockReq.query = { submissionSpatialComponentIds: ['1'] };
 
       sinon
         .stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
         .throws(new Error('test error'));
 
-      const requestHandler = metadata.getSpatialMetadataById();
+      const requestHandler = metadata.getSpatialMetadataByIds();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -168,13 +168,13 @@ describe('metadata', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.params = { submissionSpatialComponentId: '1' };
+      mockReq.query = { submissionSpatialComponentIds: ['1'] };
 
       const mockResponse = { prop1: 'val1' };
 
       sinon.stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId').resolves(mockResponse);
 
-      const requestHandler = metadata.getSpatialMetadataById();
+      const requestHandler = metadata.getSpatialMetadataByIds();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
