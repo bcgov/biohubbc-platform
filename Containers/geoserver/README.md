@@ -1,4 +1,4 @@
-# GeoServer Folders
+# GeoServer
 
 `./kartoza-geoserver`: contains OpenShift templates for building a GeoServer build config and image stream.  
 `./kartoza-geoserver/geoserver.cm.yaml`: an OpenShift config map template.  
