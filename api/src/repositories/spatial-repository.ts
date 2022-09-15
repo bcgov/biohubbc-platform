@@ -66,7 +66,7 @@ export interface ITaxaData {
   submission_spatial_component_id: number;
 }
 export interface ISubmissionSpatialSearchResponseRow {
-  submission_spatial_component_ids: number[];
+  // submission_spatial_component_ids: number[]; // @TODO to be removed
   taxa_data: ITaxaData[];
   spatial_component: {
     spatial_data: FeatureCollection | EmptyObject;

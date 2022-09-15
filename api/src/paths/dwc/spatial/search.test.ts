@@ -165,7 +165,9 @@ describe('search', () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
-              submission_spatial_component_id: 1,
+              taxa_data: [
+                { submission_spatial_component_id: 1 }
+              ],
               spatial_data: {
                 type: 'Feature',
                 properties: {},
@@ -214,7 +216,9 @@ describe('search', () => {
         it('required values are valid', async () => {
           const apiResponse = [
             {
-              submission_spatial_component_id: 1,
+              taxa_data: [
+                { submission_spatial_component_id: 1 }
+              ],
               spatial_data: {
                 type: 'FeatureCollection',
                 features: [
@@ -252,7 +256,9 @@ describe('search', () => {
               }
             },
             {
-              submission_spatial_component_id: 2,
+              taxa_data: [
+                { submission_spatial_component_id: 2 }
+              ],
               spatial_data: {
                 type: 'FeatureCollection',
                 features: [
@@ -369,8 +375,10 @@ describe('search', () => {
 
       const mockResponse: ISubmissionSpatialSearchResponseRow[] = [
         {
+          taxa_data: [
+            { submission_spatial_component_id: 1 }
+          ],
           spatial_component: {
-            submission_spatial_component_id: 1,
             spatial_data: {
               type: 'FeatureCollection',
               features: [
@@ -384,8 +392,10 @@ describe('search', () => {
           }
         },
         {
+          taxa_data: [
+            { submission_spatial_component_id: 2 }
+          ],
           spatial_component: {
-            submission_spatial_component_id: 2,
             spatial_data: {
               type: 'FeatureCollection',
               features: [
