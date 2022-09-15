@@ -80,18 +80,21 @@ GET.apiDoc = {
               required: ['taxa_data', 'spatial_data'],
               properties: {
                 taxa_data: {
-                  type: 'object',
-                  required: ['submission_spatial_component_id'],
-                  properties: {
-                    submission_spatial_component_id: {
-                      type: 'number',
-                      minimum: 1
-                    },
-                    associated_taxa: {
-                      type: 'string'
-                    },
-                    vernacular_name: {
-                      type: 'string'
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    required: ['submission_spatial_component_id'],
+                    properties: {
+                      submission_spatial_component_id: {
+                        type: 'number',
+                        minimum: 1
+                      },
+                      associated_taxa: {
+                        type: 'string'
+                      },
+                      vernacular_name: {
+                        type: 'string'
+                      }
                     }
                   }
                 },                
