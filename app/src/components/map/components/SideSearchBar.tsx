@@ -44,11 +44,13 @@ export interface SideSearchBarProps {
     unknown
   >;
   searchResults: ISearchResult[];
+  datasetVisibility: IDatasetVisibility;
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
-  onToggleDataVisibility: (datasets: IDatasetVisibility) => void;
+  onChangeDatasetVisibility: (visibility: IDatasetVisibility) => void;
 }
 
 const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
+  const { searchResults, datasetVisibility } = props
   const formikRef = useRef<FormikProps<IDatasetSearchForm>>(null);
   const [showForm, setShowForm] = useState(true);
   const [showNoData, setShowNoData] = useState(false);
@@ -84,6 +86,19 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     setShowForm(!showForm);
   };
 
+  /**
+   * @TODO delete this commented out code; it should be redundant
+   * 
+  useEffect(() => {
+    const visibility = datasetVisibility;
+    searchResults.forEach((item) => {
+      visibility[item.key] = item.visible;
+    });
+
+    props.onChangeDatasetVisibility(visibility);
+  }, [searchResults, datasetVisibility]);
+  */
+
   useEffect(() => {
     setShowSpinner(true);
     if (props.mapDataLoader.isReady) {
@@ -98,9 +113,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.mapDataLoader.isLoading, props.mapDataLoader.isReady]);
 
-  const hasResults = (): boolean => {
-    return props.searchResults.length > 0;
-  };
+  const hasResults = searchResults.length > 0;
 
   return (
     <>
@@ -118,7 +131,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
               <Typography variant="h3" component="h1">
                 Map Search
               </Typography>
-              {hasResults() && (
+              {hasResults && (
                 <Button
                   variant="text"
                   color="primary"
@@ -152,7 +165,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                 <Box py={4} px={3}>
                   <Form>
                     <DatasetSearchForm
-                      hasResults={hasResults()}
+                      hasResults={hasResults}
                       toggleForm={toggleForm}
                       onAreaUpdate={props.onAreaUpdate}
                     />
@@ -197,11 +210,12 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
         </Box>
       )}
 
-      {!showForm && hasResults() && (
+      {!showForm && hasResults && (
         <SearchResultList
           searchResults={props.searchResults}
           backToSearch={() => toggleForm()}
-          onToggleDataVisibility={props.onToggleDataVisibility}
+          datasetVisibility={datasetVisibility}
+          onChangeDatasetVisibility={props.onChangeDatasetVisibility}
         />
       )}
     </>

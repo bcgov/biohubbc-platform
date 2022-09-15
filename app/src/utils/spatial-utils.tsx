@@ -21,13 +21,12 @@ export interface ILayers {
 /**
  * Groups Spatial Data based on type and species taxonomy
  * @param {ISpatialData[]} spatialDataRecords Spatial Data to parse and group
+ * @deprecated 
  * @returns {*} {ILayers}
  */
-export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) => {
-  const layerMap: ILayers = {
-    staticLayer: {},
-    markerLayer: {}
-  };
+export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]): ILayers => {
+  const staticLayer = {}
+  const markerLayer = {}
 
   for (const spatialRecord of spatialDataRecords) {
     if (isEmptyObject(spatialRecord.spatial_data)) {
@@ -45,8 +44,8 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
 
       // is a marker
       if (isOccurrenceFeature(feature)) {
-        if (!layerMap.markerLayer[key]) {
-          layerMap.markerLayer[key] = {
+        if (!markerLayer[key]) {
+          markerLayer[key] = {
             visible: true,
             layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
             markers: [],
@@ -54,7 +53,7 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
           } as IMarkerLayer;
         }
 
-        layerMap.markerLayer[key].markers.push({
+        markerLayer[key].markers.push({
           position: feature.geometry.coordinates as LatLngTuple,
           key: feature.id || feature.properties.id,
           popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
@@ -64,15 +63,15 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
 
       // is static
       if (isBoundaryFeature(feature)) {
-        if (!layerMap.staticLayer[key]) {
-          layerMap.staticLayer[key] = {
+        if (!staticLayer[key]) {
+          staticLayer[key] = {
             visible: true,
             layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
             features: []
           } as IStaticLayer;
         }
 
-        layerMap.staticLayer[key].features.push({
+        staticLayer[key].features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
           popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
@@ -81,15 +80,15 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
 
       // is static
       if (isBoundaryCentroidFeature(feature)) {
-        if (!layerMap.staticLayer[key]) {
-          layerMap.staticLayer[key] = {
+        if (!staticLayer[key]) {
+          staticLayer[key] = {
             visible: true,
             layerName: `${feature.properties.datasetTitle}`,
             features: []
           } as IStaticLayer;
         }
 
-        layerMap.staticLayer[key].features.push({
+        staticLayer[key].features.push({
           geoJSON: feature,
           key: feature.id || feature.properties.id,
           popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
@@ -98,8 +97,9 @@ export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]) =
     }
   }
 
-  return layerMap;
+  return { staticLayer, markerLayer }
 };
+
 
 export const parseSpatialDataByType = (
   spatialDataRecords: ISpatialData[],

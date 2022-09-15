@@ -65,17 +65,20 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [parsedSearchResults, setParsedSearchResults] = useState<ISearchResult[]>([]);
 
   useEffect(() => {
+    console.log('ran-the-useeffect')
+    console.log('current datasetVisibilit', datasetVisibility)
     if (!mapDataLoader.data) {
       return;
     }
 
+    console.log('const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);')
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
 
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
-    console.log(result.markerLayers)
+    //console.log(result.markerLayers)
 
-    console.log(result.markerLayers.length)
+    //console.log(result.markerLayers.length)
     const taxaMap = {};
     mapDataLoader.data.forEach(spatialData => {
       spatialData.taxa_data.forEach(item => {
@@ -95,7 +98,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       })
     });
 
-    console.log(taxaMap)
+    console.log('taxMap:', taxaMap)
     setParsedSearchResults(Object.keys(taxaMap).map(key => taxaMap[key]));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,9 +174,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
   };
 
-  const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
-    setDatasetVisibility(datasets);
-  };
+  const handleChangeDatasetVisibility = (visibility: IDatasetVisibility) => {
+    console.log('handleChangeDatasetVisibility:', visibility)
+    setDatasetVisibility({ ...visibility })
+  }
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
@@ -190,7 +194,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           searchResults={parsedSearchResults}
           mapDataLoader={mapDataLoader}
           onAreaUpdate={onAreaUpdate}
-          onToggleDataVisibility={onToggleDataVisibility}
+          datasetVisibility={datasetVisibility}
+          onChangeDatasetVisibility={(visibility) => handleChangeDatasetVisibility(visibility)}
         />
       </Paper>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
@@ -214,7 +219,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zoom={zoom}
           fullScreenControl={true}
           markerLayers={markerLayers}
-          staticLayers={[]}
+          staticLayers={staticLayers}
           bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>

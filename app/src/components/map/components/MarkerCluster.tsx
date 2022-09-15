@@ -99,6 +99,7 @@ const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => vo
 const MarkerClusterGroup = Fragment
 
 const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
+  console.log('layers::', props.layers)
   if (!props.layers?.length) {
     return null;
   }
@@ -117,7 +118,6 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
             const id = item.key || index;
 
             return (
-              <>
               <Marker
                 count={item.count || 0}
                 key={`marker-cluster-${id}`}
@@ -139,8 +139,6 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
                   </Popup>
                 )}
               </Marker>
-              
-              </>
             );
           })}
         </MarkerClusterGroup>
