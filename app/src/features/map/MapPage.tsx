@@ -174,8 +174,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
   };
 
-  const handleChangeDatasetVisibility = (visibility: IDatasetVisibility) => {
-    console.log('handleChangeDatasetVisibility:', visibility)
+  const onToggleDataVisibility  = (visibility: IDatasetVisibility) => {
     setDatasetVisibility({ ...visibility })
   }
 
@@ -194,8 +193,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           searchResults={parsedSearchResults}
           mapDataLoader={mapDataLoader}
           onAreaUpdate={onAreaUpdate}
-          datasetVisibility={datasetVisibility}
-          onChangeDatasetVisibility={(visibility) => handleChangeDatasetVisibility(visibility)}
+          onToggleDataVisibility={onToggleDataVisibility}
         />
       </Paper>
       <Box flex="1 1 auto" height="100%" data-testid="MapContainer">
