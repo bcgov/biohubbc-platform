@@ -1,6 +1,6 @@
-import { createLayerComponent } from '@react-leaflet/core'
+import { createLayerComponent, useLeafletContext } from '@react-leaflet/core'
 import L, { LatLngExpression } from 'leaflet';
-import { LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
+import { FeatureGroup, LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import 'leaflet.markercluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -99,7 +99,6 @@ const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => vo
 const MarkerClusterGroup = Fragment
 
 const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
-  console.log('layers::', props.layers)
   if (!props.layers?.length) {
     return null;
   }
@@ -112,36 +111,37 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}-${index}`}>
-        <MarkerClusterGroup>
-          {layer.markers.map((item, index: number) => {
-            const id = item.key || index;
-
-            return (
-              <Marker
-                count={item.count || 0}
-                key={`marker-cluster-${id}`}
-                position={[item.position[1], item.position[0]]}
-                {...item.MarkerProps}>
-                {item.tooltip && (
-                  <Tooltip key={`marker-cluster-tooltip-${id}`} direction="top" {...item.TooltipProps}>
-                    {item.tooltip}
-                  </Tooltip>
-                )}
-                {item.popup && (
-                  <Popup
-                    key={`marker-cluster-popup-${id}`}
-                    keepInView={false}
-                    closeButton={false}
-                    autoPan={false}
-                    {...item.PopupProps}>
-                    {item.popup}
-                  </Popup>
-                )}
-              </Marker>
-            );
-          })}
-        </MarkerClusterGroup>
+      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}}`}>
+        <FeatureGroup>
+          <MarkerClusterGroup>
+            {layer.markers.map((item, index: number) => {
+              const id = item.key || index;
+              return (
+                <Marker
+                  count={item.count || 0}
+                  key={`marker-cluster-${id}`}
+                  position={[item.position[1], item.position[0]]}
+                  {...item.MarkerProps}>
+                  {item.tooltip && (
+                    <Tooltip key={`marker-cluster-tooltip-${id}`} direction="top" {...item.TooltipProps}>
+                      {item.tooltip}
+                    </Tooltip>
+                  )}
+                  {item.popup && (
+                    <Popup
+                      key={`marker-cluster-popup-${id}`}
+                      keepInView={false}
+                      closeButton={false}
+                      autoPan={false}
+                      {...item.PopupProps}>
+                      {item.popup}
+                    </Popup>
+                  )}
+                </Marker>
+              );
+            })}
+          </MarkerClusterGroup>
+        </FeatureGroup>
       </LayersControl.Overlay>
     );
   });

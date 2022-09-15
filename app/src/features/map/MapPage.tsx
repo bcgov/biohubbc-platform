@@ -65,20 +65,15 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [parsedSearchResults, setParsedSearchResults] = useState<ISearchResult[]>([]);
 
   useEffect(() => {
-    console.log('ran-the-useeffect')
-    console.log('current datasetVisibilit', datasetVisibility)
     if (!mapDataLoader.data) {
       return;
     }
 
-    console.log('const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);')
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
 
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
-    //console.log(result.markerLayers)
 
-    //console.log(result.markerLayers.length)
     const taxaMap = {};
     mapDataLoader.data.forEach(spatialData => {
       spatialData.taxa_data.forEach(item => {
@@ -217,7 +212,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zoom={zoom}
           fullScreenControl={true}
           markerLayers={markerLayers}
-          staticLayers={staticLayers}
+          staticLayers={[...staticLayers, ...areaStaticLayers]}
           bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>

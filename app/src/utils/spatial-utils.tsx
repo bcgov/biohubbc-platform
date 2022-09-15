@@ -18,89 +18,6 @@ export interface ILayers {
   markerLayer: { [id: string]: IMarkerLayer };
 }
 
-/**
- * Groups Spatial Data based on type and species taxonomy
- * @param {ISpatialData[]} spatialDataRecords Spatial Data to parse and group
- * @deprecated 
- * @returns {*} {ILayers}
- */
-export const groupSpatialDataIntoLayers = (spatialDataRecords: ISpatialData[]): ILayers => {
-  const staticLayer = {}
-  const markerLayer = {}
-
-  for (const spatialRecord of spatialDataRecords) {
-    if (isEmptyObject(spatialRecord.spatial_data)) {
-      continue;
-    }
-
-    for (const feature of spatialRecord.spatial_data.features) {
-      if (feature.geometry.type === 'GeometryCollection') {
-        // Not expecting or supporting geometry collections
-        continue;
-      }
-
-      // construct key to use for layers
-      const key = getFeatureLayerKey(spatialRecord, feature);
-
-      // is a marker
-      if (isOccurrenceFeature(feature)) {
-        if (!markerLayer[key]) {
-          markerLayer[key] = {
-            visible: true,
-            layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
-            markers: [],
-            count: 0
-          } as IMarkerLayer;
-        }
-
-        markerLayer[key].markers.push({
-          position: feature.geometry.coordinates as LatLngTuple,
-          key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
-          count: spatialRecord.submission_spatial_component_ids.length
-        });
-      }
-
-      // is static
-      if (isBoundaryFeature(feature)) {
-        if (!staticLayer[key]) {
-          staticLayer[key] = {
-            visible: true,
-            layerName: `${spatialRecord.vernacular_name} (${spatialRecord.associated_taxa})`,
-            features: []
-          } as IStaticLayer;
-        }
-
-        staticLayer[key].features.push({
-          geoJSON: feature,
-          key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
-        });
-      }
-
-      // is static
-      if (isBoundaryCentroidFeature(feature)) {
-        if (!staticLayer[key]) {
-          staticLayer[key] = {
-            visible: true,
-            layerName: `${feature.properties.datasetTitle}`,
-            features: []
-          } as IStaticLayer;
-        }
-
-        staticLayer[key].features.push({
-          geoJSON: feature,
-          key: feature.id || feature.properties.id,
-          popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />
-        });
-      }
-    }
-  }
-
-  return { staticLayer, markerLayer }
-};
-
-
 export const parseSpatialDataByType = (
   spatialDataRecords: ISpatialData[],
   datasetVisibility: IDatasetVisibility = {}
@@ -123,7 +40,6 @@ export const parseSpatialDataByType = (
 
       if (isOccurrenceFeature(feature)) {
         // check if species has been toggled on/ off
-
         const submission_ids: number[] = [];
         spatialRecord.taxa_data.map(item => {
           if (item.associated_taxa) {
@@ -135,16 +51,13 @@ export const parseSpatialDataByType = (
           
           if (visible) {
             submission_ids.push(item.submission_spatial_component_id)
-            console.log(`Taxa: ${item.associated_taxa} Count: ${submission_ids.length}`)
           }
         });
 
         if (submission_ids.length > 0) {
-          console.log(`VISISBLE COUNT: ${submission_ids.length}`)
-          console.log("")
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
-            key: feature.id || feature.properties.id,
+            key: submission_ids.join("-"),
             popup: <FeaturePopup submissionSpatialComponentIds={submission_ids} />,
             count: submission_ids.length
           });
@@ -201,25 +114,6 @@ export const parseSpatialDataByType = (
   }
 
   return { markerLayers: [occurrencesMarkerLayer], staticLayers: [boundaryStaticLayer] };
-};
-
-// checks which key should be used to identify the layer
-export const getFeatureLayerKey = (spatialRecord: ISpatialData, feature: Feature): string => {
-  let key = '';
-
-  if (isOccurrenceFeature(feature)) {
-    key = `${spatialRecord.associated_taxa}`;
-  }
-
-  if (isBoundaryFeature(feature)) {
-    key = `${spatialRecord.submission_spatial_component_ids}`;
-  }
-
-  if (isBoundaryCentroidFeature(feature)) {
-    key = `${spatialRecord.submission_spatial_component_ids}`;
-  }
-
-  return key;
 };
 
 export const isStaticLayerVisible = (): boolean => {
