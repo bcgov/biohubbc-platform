@@ -135,10 +135,13 @@ export const parseSpatialDataByType = (
           
           if (visible) {
             submission_ids.push(item.submission_spatial_component_id)
+            console.log(`Taxa: ${item.associated_taxa} Count: ${submission_ids.length}`)
           }
         });
 
         if (submission_ids.length > 0) {
+          console.log(`VISISBLE COUNT: ${submission_ids.length}`)
+          console.log("")
           occurrencesMarkerLayer.markers.push({
             position: feature.geometry.coordinates as LatLngTuple,
             key: feature.id || feature.properties.id,

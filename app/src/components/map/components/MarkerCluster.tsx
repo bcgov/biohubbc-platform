@@ -105,13 +105,13 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
 
   const layerControls: ReactElement[] = [];
 
-  props.layers.forEach((layer) => {
+  props.layers.forEach((layer, index) => {
     if (!layer.markers?.length) {
       return;
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
+      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}-${index}`}>
         <MarkerClusterGroup>
           {layer.markers.map((item, index: number) => {
             const id = item.key || index;

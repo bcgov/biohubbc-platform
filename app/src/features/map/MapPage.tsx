@@ -75,7 +75,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     setStaticLayers(result.staticLayers);
     console.log(result.markerLayers)
 
-
+    console.log(result.markerLayers.length)
     const taxaMap = {};
     mapDataLoader.data.forEach(spatialData => {
       spatialData.taxa_data.forEach(item => {
@@ -95,6 +95,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       })
     });
 
+    console.log(taxaMap)
     setParsedSearchResults(Object.keys(taxaMap).map(key => taxaMap[key]));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -213,7 +214,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zoom={zoom}
           fullScreenControl={true}
           markerLayers={markerLayers}
-          staticLayers={[...staticLayers, ...areaStaticLayers]}
+          staticLayers={[]}
           bounds={(shouldUpdateBounds && updatedBounds) || undefined}
         />
       </Box>
