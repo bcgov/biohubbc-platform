@@ -137,8 +137,6 @@ export const parseSpatialDataByType = (
             submission_ids.push(item.submission_spatial_component_id)
           }
         });
-        
-        // console.log(`SUBMISSION IDs: ${submission_ids.length}`)
 
         if (submission_ids.length > 0) {
           occurrencesMarkerLayer.markers.push({

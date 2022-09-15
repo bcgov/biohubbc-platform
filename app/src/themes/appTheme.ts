@@ -84,6 +84,15 @@ const appTheme = createTheme({
           padding: '20px 24px'
         }
       }
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: ({ ownerState, theme }) => ({
+          ...(ownerState && {
+            backgroundColor: theme.palette.grey[50]
+          })
+        })
+      }
     }
   }
 });
