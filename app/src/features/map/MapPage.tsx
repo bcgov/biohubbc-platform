@@ -74,6 +74,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
 
+    // move into a function...
     const taxaMap = {};
     mapDataLoader.data.forEach(spatialData => {
       spatialData.taxa_data.forEach(item => {
@@ -93,7 +94,6 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
       })
     });
 
-    console.log('taxMap:', taxaMap)
     setParsedSearchResults(Object.keys(taxaMap).map(key => taxaMap[key]));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

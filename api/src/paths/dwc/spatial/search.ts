@@ -90,10 +90,12 @@ GET.apiDoc = {
                         minimum: 1
                       },
                       associated_taxa: {
-                        type: 'string'
+                        type: 'string',
+                        nullable: true
                       },
                       vernacular_name: {
-                        type: 'string'
+                        type: 'string',
+                        nullable: true
                       }
                     }
                   }
@@ -157,7 +159,6 @@ export function searchSpatialComponents(): RequestHandler {
           const { /*submission_spatial_component_ids, TODO: remove */ spatial_component, taxa_data } = row;
           const { spatial_data, ...rest } = spatial_component
           return {
-            // submission_spatial_component_ids,
             taxa_data,
             ...rest,
             spatial_data: {
