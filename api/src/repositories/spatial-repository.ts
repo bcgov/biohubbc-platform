@@ -546,6 +546,7 @@ export class SpatialRepository extends BaseRepository {
       })
       .select(
         knex.raw('array_agg(submission_spatial_component_id) as submission_spatial_component_ids'),
+        knex.raw('array_agg(taxa_data_object) as taxa_data'),
         knex.raw('(array_agg(spatial_component))[1] as spatial_component'),
         'geography'
       )
@@ -801,18 +802,18 @@ export class SpatialRepository extends BaseRepository {
     return knex.raw(
       `
       submission_spatial_component_id,
-      geography,
       submission_id,
+      geography,
       jsonb_build_object(
-          'submission_spatial_component_id',
-            wfscwst.submission_spatial_component_id,
-          'dataset_id',
-            wfscwst.dataset_id,
-          'associated_taxa',
-            wfscwst.associated_taxa,
-          'vernacular_name',
-            wfscwst.vernacular_name,
-          'spatial_data',
+        'submission_spatial_component_id',
+          wfscwst.submission_spatial_component_id,
+        'associated_taxa',
+          wfscwst.associated_taxa,
+        'vernacular_name',
+          wfscwst.vernacular_name
+      ) taxa_data_object,
+      jsonb_build_object(
+        'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component
             -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
