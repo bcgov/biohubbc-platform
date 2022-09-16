@@ -35,31 +35,33 @@ const makeCountIcon = (count: number) => {
   })
 }
 
-const CountMarker = L.Marker.extend({
-  options: {
-    count: 1
-  },
+const CountMarker = L.Marker
+  .extend({
+    options: {
+      count: 1
+    },
 
-  setCount(s: number) {
-    this.options.count = s
-  },
+    setCount(s: number) {
+      this.options.count = s
+    },
 
-	initialize(latlng: number[], { count, ...options}: {count: number, [x: string]: any;}) {
-		L.Util.setOptions(this, { count, ...options });
-		L.CircleMarker.prototype.initialize.call(this, latlng, {
-      count,
-      ...options,
-      icon: makeCountIcon(count)
-    });
-	}
-});
+    initialize(latlng: number[], { count, ...options}: {count: number}) {
+      L.Util.setOptions(this, {
+        count,
+        ...options
+      });
 
-interface P extends MarkerProps {
-  count: number
-}
+      L.CircleMarker.prototype.initialize.call(this, latlng, {
+        count,
+        ...options,
+        icon: makeCountIcon(count)
+      });
+
+    }
+  })
 
 const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => void }, MarkerProps & { count: number }>(
-  ({ position, ...options }: P, ctx) => {
+  ({ position, ...options }: MarkerProps & { count: number }, ctx) => {
     const instance = new CountMarker(position, options)
     return {
       instance,

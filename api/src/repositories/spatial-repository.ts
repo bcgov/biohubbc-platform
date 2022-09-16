@@ -375,7 +375,6 @@ export class SpatialRepository extends BaseRepository {
    * @param {ISpatialComponentsSearchCriteria} criteria
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
    * @memberof SpatialRepository
-   * @TODO check query
    */
   async findSpatialComponentsByCriteriaAsAdminUser(
     criteria: ISpatialComponentsSearchCriteria

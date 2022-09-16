@@ -18,10 +18,7 @@ export interface ILayers {
   markerLayer: { [id: string]: IMarkerLayer };
 }
 
-export const parseSpatialDataByType = (
-  spatialDataRecords: ISpatialData[],
-  datasetVisibility: IDatasetVisibility = {}
-) => {
+export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datasetVisibility: IDatasetVisibility = {}) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [], visible: true };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true };
 
@@ -31,7 +28,7 @@ export const parseSpatialDataByType = (
     }
 
     for (const feature of spatialRecord.spatial_data.features) {
-      let visible = true;
+      let visible = true
 
       if (feature.geometry.type === 'GeometryCollection') {
         // Not expecting or supporting geometry collections
@@ -46,18 +43,14 @@ export const parseSpatialDataByType = (
         }
       }
 
-      /**
-       * @TODO
-       */
       if (isBoundaryFeature(feature)) {
         // check if dataset has been toggled
         const ids = spatialRecord.taxa_data.map(item => item.submission_spatial_component_id);
         const key = ids.join("-")
         if (ids.length > 0) {
-          visible =
-              datasetVisibility[key] === undefined
-                ? true
-                : datasetVisibility[key];
+          visible = datasetVisibility[key] === undefined
+            ? true
+            : datasetVisibility[key];
         }
 
         if (visible) {
@@ -65,29 +58,25 @@ export const parseSpatialDataByType = (
             geoJSON: feature,
             key: feature.id || feature.properties.id,
             popup: <FeaturePopup submissionSpatialComponentIds={ids} />,
-            // count: spatialRecord.submission_spatial_component_ids.length
           });
         }
       }
 
       if (isBoundaryCentroidFeature(feature)) {
         // check if dataset has been toggled
-        if (spatialRecord.submission_spatial_component_ids) {
-          visible =
-            true
-            /*
-            datasetVisibility[spatialRecord.submission_spatial_component_ids] === undefined
-              ? true
-              : datasetVisibility[spatialRecord.submission_spatial_component_ids];
-            */
+        const ids = spatialRecord.taxa_data.map(item => item.submission_spatial_component_id);
+        const key = ids.join("-")
+        if (ids.length > 0) {
+          visible = datasetVisibility[key] === undefined
+            ? true
+            : datasetVisibility[key];
         }
 
         if (visible) {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
             key: feature.id || feature.properties.id,
-            popup: <DatasetPopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
-            // count: spatialRecord.submission_spatial_component_ids.length
+            popup: <DatasetPopup submissionSpatialComponentIds={ids} />,
           });
         }
       }
@@ -98,20 +87,16 @@ export const parseSpatialDataByType = (
 };
 
 const occurrenceMarkerSetup = (latLng: LatLngTuple, taxaData: ITaxaData[], datasetVisibility: IDatasetVisibility): IMarker | null => {
-  let visible = true
-  const submission_ids: number[] = [];
-  taxaData.map(item => {
-    if (item.associated_taxa) {
-      visible =
-      datasetVisibility[item.associated_taxa] === undefined
-      ? true
-      : datasetVisibility[item.associated_taxa];
-    }
-    
-    if (visible) {
-      submission_ids.push(item.submission_spatial_component_id)
-    }
-  });
+  const submission_ids: number[] = taxaData
+    .filter((item: ITaxaData) => {
+      if (item.associated_taxa) {
+        return datasetVisibility[item.associated_taxa] === undefined
+          ? true
+          : datasetVisibility[item.associated_taxa]
+      }
+      return false
+    })
+    .map((item: ITaxaData) => item.submission_spatial_component_id)
 
   if (submission_ids.length > 0) {
     return {
@@ -124,8 +109,6 @@ const occurrenceMarkerSetup = (latLng: LatLngTuple, taxaData: ITaxaData[], datas
 
   return null
 }
-
-
 
 export const isStaticLayerVisible = (): boolean => {
   return true;

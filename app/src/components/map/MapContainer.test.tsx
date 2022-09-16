@@ -86,7 +86,7 @@ describe('MapContainer', () => {
       {
         visible: true,
         layerName: 'test-marker-layer',
-        markers: [{ position: [55, 128] }]
+        markers: [{ position: [55, 128], key: 'key', count: 1 }]
       }
     ];
 
