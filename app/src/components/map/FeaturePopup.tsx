@@ -34,6 +34,32 @@ export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };
 
+export enum COMMON_METADATA_PROPERTIES {
+  'vernacularName' = 'Species',
+  'individualCount' = 'Count',
+  'eventDate' = 'Date',
+  'lifeStage' = 'Life Stage',
+  'sex' = 'Sex'
+}
+
+export enum UNCOMMON_METADATA_PROPERTIES {
+  'type' = 'Type',
+  'datasetID' = 'Dataset ID',
+  'verbatimSRS' = 'Verbatim SRS',
+  'occurrenceID' = 'Occurrence ID',
+  'basisOfRecord' = 'Basis of Record',
+  'associatedTaxa' = 'Associated Taxa',
+  'verbatimCoordinates' = 'Verbatim Coordinates'
+}
+
+export const ALL_METADATA_PROPERTIES = {
+  ...COMMON_METADATA_PROPERTIES, ...UNCOMMON_METADATA_PROPERTIES
+}
+
+export const formatMetadataProperty: Partial<Record<keyof typeof COMMON_METADATA_PROPERTIES, (property: string) => string>> = {
+  'eventDate': (dateString: string) => getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, dateString)
+}
+
 interface IMetadataHeaderProps {
   type?: string;
   date?: string;
@@ -157,7 +183,14 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   const metadata = data[currentIndex];
   const type = metadata?.type;
-  const dwc = metadata?.dwc;
+  const dwc: Record<string, unknown> = metadata?.dwc || {};
+  const filteredMetadata = Object
+    .entries(COMMON_METADATA_PROPERTIES)
+    .filter(([key]) => Boolean(dwc[key]));
+
+  const hiddenMetadataProperties = Object
+    .keys(ALL_METADATA_PROPERTIES)
+    .filter(key => Boolean(dwc[key]) && !filteredMetadata.some(([k]) => k === key))
 
   if (!dwc || !Object.keys(dwc).length) {
     return (
@@ -172,18 +205,26 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     <ModalContentWrapper>
       <MetadataHeader type={type} index={currentIndex} length={data.length} />
       <Collapse in={isReady} className={classes.metadata}>
-        <Table className={classes.table}>
+        <Table className={classes.table} sx={{ mb: 1 }}>
           <TableBody>
-            {Object.entries(dwc).map(([key, value]) => (
-              <TableRow key={key}>
-                <TableCell className={classes.tableCell}>{key}</TableCell>
-                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
-              </TableRow>
-            ))}
+            {filteredMetadata.map(([key, propertyName]) => {
+                // delete hiddenMetadata.key;
+                return (
+                  <TableRow key={key}>
+                    <TableCell className={classes.tableCell}>{propertyName}</TableCell>
+                    <TableCell className={classes.tableCell}>
+                      {(formatMetadataProperty[key] || String)(dwc[key])}
+                    </TableCell>
+                  </TableRow>
+                )
+            })}
           </TableBody>
         </Table>
       </Collapse>
-      <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={2}>
+      {hiddenMetadataProperties.length > 0 && (
+        <Typography variant='subtitle2'>... and {hiddenMetadataProperties.length} hidden row(s)</Typography>
+      )}
+      <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={1}>
         {!isEmpty && data.length > 1 && (
           <Box display="flex" sx={{ gap: 1 }}>
             <Button size="small" variant="outlined" onClick={() => handlePrev()}>
