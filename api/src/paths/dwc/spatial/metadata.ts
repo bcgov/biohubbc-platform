@@ -7,7 +7,7 @@ import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
 
-export const GET: Operation = [getSpatialMetadataByIds()];
+export const GET: Operation = [getSpatialMetadataBySubmissionSpatialComponentIds()];
 
 GET.apiDoc = {
   description: 'Retrieves spatial component metadata based on submission spatial component id',
@@ -55,7 +55,7 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function getSpatialMetadataByIds(): RequestHandler {
+export function getSpatialMetadataBySubmissionSpatialComponentIds(): RequestHandler {
   return async (req, res) => {
     const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[]).map(Number);
 

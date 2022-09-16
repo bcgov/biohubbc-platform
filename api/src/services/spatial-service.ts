@@ -223,37 +223,18 @@ export class SpatialService extends DBService {
    */
   async findSpatialMetadataBySubmissionSpatialComponentIds(
     submissionSpatialComponentIds: number[]
-  ): Promise<Array<Record<string, string>>> {
-    const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds(
-      submissionSpatialComponentIds
-    );
-
-    return (
-      response.map(
-        (submissionSpatialComponent) =>
-          submissionSpatialComponent.spatial_component.features[0]?.properties as Record<string, string>
-      ) || {}
-    );
-  }
-
-  async findSpatialMetadataBySubmissionSpatialComponentId(
-    submissionSpatialComponentId: number
-  ): Promise<Record<string, string>> {
+  ): Promise<Array<Record<string, any>>> {
     const userService = new UserService(this.connection);
+    const isAdmin = await userService.isSystemUserAdmin()
 
-    if (await userService.isSystemUserAdmin()) {
-      const adminResponse = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdasAdmin(
-        submissionSpatialComponentId
-      );
-      return (
-        (adminResponse?.spatial_component?.spatial_data?.features?.[0]?.properties as Record<string, string>) || {}
-      );
-    }
+    const response = await (isAdmin
+      ? this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin
+      : this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds
+    )(submissionSpatialComponentIds);
 
-    const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentId(
-      submissionSpatialComponentId
-    );
+    return response
+      .map((row) => row.spatial_component_properties)
+      .filter((row): row is Record<string, any> => Boolean(row))
 
-    return (response?.spatial_component?.spatial_data?.features?.[0]?.properties as Record<string, string>) || {};
   }
 }

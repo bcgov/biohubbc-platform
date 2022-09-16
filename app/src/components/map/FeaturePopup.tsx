@@ -144,12 +144,12 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   );
 
   const MetadataHeader: React.FC<React.PropsWithChildren<IMetadataHeaderProps>> = (headerProps) => {
-    const { type, date, index, length } = headerProps;
+    const { date, index, length } = headerProps;
 
     return (
       <Box mb={1}>
         <Typography variant="h6" className={classes.pointType}>
-          {type || 'Feature'} record {length && length > 0 && `(${(index || 0) + 1} of ${length})`}
+          {length && length > 1 ? `Records (${(index || 0) + 1} of ${length})` : 'Record'}
         </Typography>
         {date && (
           <Typography className={classes.date} variant="subtitle1">

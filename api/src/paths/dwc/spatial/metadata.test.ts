@@ -144,7 +144,7 @@ describe('metadata', () => {
     });
   });
 
-  describe('getSpatialMetadataByIds', () => {
+  describe('getSpatialMetadataBySubmissionSpatialComponentIds', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -161,7 +161,7 @@ describe('metadata', () => {
         .stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
         .throws(new Error('test error'));
 
-      const requestHandler = metadata.getSpatialMetadataByIds();
+      const requestHandler = metadata.getSpatialMetadataBySubmissionSpatialComponentIds();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -185,7 +185,7 @@ describe('metadata', () => {
 
       sinon.stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds').resolves(mockResponse);
 
-      const requestHandler = metadata.getSpatialMetadataByIds();
+      const requestHandler = metadata.getSpatialMetadataBySubmissionSpatialComponentIds();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
