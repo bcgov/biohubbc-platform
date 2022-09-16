@@ -40,7 +40,7 @@ GET.apiDoc = {
           schema: {
             type: 'array',
             items: {
-              type: 'object',
+              type: 'object'
             }
           }
         }
@@ -57,9 +57,7 @@ GET.apiDoc = {
  */
 export function getSpatialMetadataByIds(): RequestHandler {
   return async (req, res) => {
-
-    const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[])
-      .map(Number);
+    const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[]).map(Number);
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 

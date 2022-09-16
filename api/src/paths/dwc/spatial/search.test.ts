@@ -165,9 +165,7 @@ describe('search', () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
-              taxa_data: [
-                { submission_spatial_component_id: 1 }
-              ],
+              taxa_data: [{ submission_spatial_component_id: 1 }],
               spatial_data: {
                 type: 'Feature',
                 properties: {},
@@ -206,9 +204,7 @@ describe('search', () => {
         it('returns invalid response (missing submission_spatial_component_id)', async () => {
           const apiResponse = [
             {
-              taxa_data: [
-                { associated_taxa: 'M-ALAM' }
-              ],
+              taxa_data: [{ associated_taxa: 'M-ALAM' }],
               spatial_data: {
                 type: 'FeatureCollection',
                 properties: {},
@@ -237,9 +233,7 @@ describe('search', () => {
         it('required values are valid', async () => {
           const apiResponse = [
             {
-              taxa_data: [
-                { submission_spatial_component_id: 1 }
-              ],
+              taxa_data: [{ submission_spatial_component_id: 1 }],
               spatial_data: {
                 type: 'FeatureCollection',
                 features: [
@@ -277,9 +271,7 @@ describe('search', () => {
               }
             },
             {
-              taxa_data: [
-                { submission_spatial_component_id: 2 }
-              ],
+              taxa_data: [{ submission_spatial_component_id: 2 }],
               spatial_data: {
                 type: 'FeatureCollection',
                 features: [
@@ -396,9 +388,7 @@ describe('search', () => {
 
       const mockResponse: ISubmissionSpatialSearchResponseRow[] = [
         {
-          taxa_data: [
-            { submission_spatial_component_id: 1 }
-          ],
+          taxa_data: [{ submission_spatial_component_id: 1 }],
           spatial_component: {
             spatial_data: {
               type: 'FeatureCollection',
@@ -413,9 +403,7 @@ describe('search', () => {
           }
         },
         {
-          taxa_data: [
-            { submission_spatial_component_id: 2 }
-          ],
+          taxa_data: [{ submission_spatial_component_id: 2 }],
           spatial_component: {
             spatial_data: {
               type: 'FeatureCollection',
@@ -442,9 +430,7 @@ describe('search', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([
         {
-          taxa_data: [
-            { submission_spatial_component_id: 1 }
-          ],
+          taxa_data: [{ submission_spatial_component_id: 1 }],
           spatial_data: {
             type: 'FeatureCollection',
             features: [
@@ -457,9 +443,7 @@ describe('search', () => {
           }
         },
         {
-          taxa_data: [
-            { submission_spatial_component_id: 2 }
-          ],
+          taxa_data: [{ submission_spatial_component_id: 2 }],
           spatial_data: {
             type: 'FeatureCollection',
             features: [

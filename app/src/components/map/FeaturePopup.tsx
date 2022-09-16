@@ -196,7 +196,9 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
         )}
         {metadataObjectUrl && (
           <Box>
-            <Button href={metadataObjectUrl} size="small" variant="contained" color="primary">Download Records</Button>
+            <Button href={metadataObjectUrl} size="small" variant="contained" color="primary">
+              Download Records
+            </Button>
           </Box>
         )}
       </Box>

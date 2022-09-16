@@ -40,8 +40,8 @@ describe('parseSpatialDataByType', () => {
       {
         taxa_data: [
           {
-            associated_taxa: "M-ALAM",
-            vernacular_name: "Moose",
+            associated_taxa: 'M-ALAM',
+            vernacular_name: 'Moose',
             submission_spatial_component_id: 1
           }
         ],
@@ -108,13 +108,13 @@ describe('parseSpatialDataByType', () => {
     const result = parseSpatialDataByType(spatialData);
 
     expect(result.markerLayers.length).toEqual(1);
-    console.log(result.markerLayers[0])
+    console.log(result.markerLayers[0]);
     expect(result.markerLayers[0]).toMatchObject({
       layerName: LAYER_NAME.OCCURRENCES,
       markers: [
         {
           position: [123, 456],
-          key: "1",
+          key: '1',
           popup: expect.any(Object)
         }
       ]

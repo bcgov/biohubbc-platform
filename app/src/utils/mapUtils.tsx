@@ -39,7 +39,7 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
     return;
   }
   // Run the conversion
-  const collection = await read(shpFile) as FeatureCollection;
+  const collection = (await read(shpFile)) as FeatureCollection;
 
   const sanitizedGeoJSON: Feature[] = [];
   if (Array.isArray(collection.features)) {

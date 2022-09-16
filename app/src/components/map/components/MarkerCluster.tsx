@@ -1,14 +1,14 @@
-import { createLayerComponent } from '@react-leaflet/core'
+import { createLayerComponent } from '@react-leaflet/core';
 import L, { LatLngExpression } from 'leaflet';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import React, { Fragment, ReactElement } from 'react';
 import { FeatureGroup, LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
-import 'leaflet.markercluster'
-import 'leaflet.markercluster/dist/MarkerCluster.css'
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
-import React, { Fragment, ReactElement } from 'react'
 
 export interface IMarker {
   position: LatLngExpression;
-  count: number
+  count: number;
   key: string | number;
   MarkerProps?: Partial<MarkerProps>;
   popup?: ReactElement;
@@ -32,37 +32,35 @@ const makeCountIcon = (count: number) => {
     html: `<div><span>${count}</span></div>`,
     className: 'marker-cluster marker-cluster-small',
     iconSize: new L.Point(40, 40)
-  })
-}
+  });
+};
 
-const CountMarker: any = L.Marker
-  .extend({
-    options: {
-      count: 1
-    },
+const CountMarker: any = L.Marker.extend({
+  options: {
+    count: 1
+  },
 
-    setCount(s: number) {
-      this.options.count = s
-    },
+  setCount(s: number) {
+    this.options.count = s;
+  },
 
-    initialize(latlng: number[], { count, ...options}: {count: number}) {
-      L.Util.setOptions(this, {
-        count,
-        ...options
-      });
+  initialize(latlng: number[], { count, ...options }: { count: number }) {
+    L.Util.setOptions(this, {
+      count,
+      ...options
+    });
 
-      (L.CircleMarker.prototype as any).initialize.call(this, latlng, {
-        count,
-        ...options,
-        icon: makeCountIcon(count)
-      });
-
-    }
-  })
+    (L.CircleMarker.prototype as any).initialize.call(this, latlng, {
+      count,
+      ...options,
+      icon: makeCountIcon(count)
+    });
+  }
+});
 
 const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => void }, MarkerProps & { count: number }>(
   ({ position, ...options }: MarkerProps & { count: number }, ctx) => {
-    const instance = new CountMarker(position, options)
+    const instance = new CountMarker(position, options);
     return {
       instance,
       context: { ...ctx, overlayContainer: instance }
@@ -98,7 +96,7 @@ const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => vo
   }
 );
 
-const MarkerClusterGroup = Fragment
+const MarkerClusterGroup = Fragment;
 
 const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
   if (!props.layers?.length) {

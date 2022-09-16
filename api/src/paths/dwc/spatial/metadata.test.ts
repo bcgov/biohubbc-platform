@@ -81,7 +81,7 @@ describe('metadata', () => {
             }
           };
           const response = requestValidator.validateRequest(request);
-          console.log('RES=', response)
+          console.log('RES=', response);
 
           expect(response).to.be.undefined;
         });
