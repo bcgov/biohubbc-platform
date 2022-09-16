@@ -461,7 +461,7 @@ export class SpatialRepository extends BaseRepository {
       .groupBy('geography');
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-    console.log(response.rows[0].taxa_data);
+
     return response.rows;
   }
 

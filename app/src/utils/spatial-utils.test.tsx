@@ -108,7 +108,6 @@ describe('parseSpatialDataByType', () => {
     const result = parseSpatialDataByType(spatialData);
 
     expect(result.markerLayers.length).toEqual(1);
-    console.log(result.markerLayers[0]);
     expect(result.markerLayers[0]).toMatchObject({
       layerName: LAYER_NAME.OCCURRENCES,
       markers: [
