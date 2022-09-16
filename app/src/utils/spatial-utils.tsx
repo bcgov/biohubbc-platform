@@ -13,11 +13,6 @@ export interface ISpatialDataGroupedBySpecies {
   [species: string]: ISpatialData[];
 }
 
-export interface ILayers {
-  staticLayer: { [id: string]: IStaticLayer };
-  markerLayer: { [id: string]: IMarkerLayer };
-}
-
 export const parseSpatialDataByType = (spatialDataRecords: ISpatialData[], datasetVisibility: IDatasetVisibility = {}) => {
   const occurrencesMarkerLayer: IMarkerLayer = { layerName: LAYER_NAME.OCCURRENCES, markers: [], visible: true };
   const boundaryStaticLayer: IStaticLayer = { layerName: LAYER_NAME.BOUNDARIES, features: [], visible: true };

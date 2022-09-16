@@ -16,7 +16,11 @@ describe('parseSpatialDataByType', () => {
   it('returns empty responses if featureCollections param is has no features', () => {
     const spatialData: ISpatialData[] = [
       {
-        submission_spatial_component_ids: [1],
+        taxa_data: [
+          {
+            submission_spatial_component_id: 1
+          }
+        ],
         spatial_data: {
           type: 'FeatureCollection',
           features: []
@@ -34,7 +38,13 @@ describe('parseSpatialDataByType', () => {
   it('returns non-empty responses if featureCollections has features', () => {
     const spatialData: ISpatialData[] = [
       {
-        submission_spatial_component_ids: [1],
+        taxa_data: [
+          {
+            associated_taxa: "M-ALAM",
+            vernacular_name: "Moose",
+            submission_spatial_component_id: 1
+          }
+        ],
         spatial_data: {
           type: 'FeatureCollection',
           features: [
@@ -52,7 +62,11 @@ describe('parseSpatialDataByType', () => {
         }
       },
       {
-        submission_spatial_component_ids: [2],
+        taxa_data: [
+          {
+            submission_spatial_component_id: 2
+          }
+        ],
         spatial_data: {
           type: 'FeatureCollection',
           features: [
@@ -68,7 +82,11 @@ describe('parseSpatialDataByType', () => {
         }
       },
       {
-        submission_spatial_component_ids: [3],
+        taxa_data: [
+          {
+            submission_spatial_component_id: 3
+          }
+        ],
         spatial_data: {
           type: 'FeatureCollection',
           features: [
@@ -90,12 +108,13 @@ describe('parseSpatialDataByType', () => {
     const result = parseSpatialDataByType(spatialData);
 
     expect(result.markerLayers.length).toEqual(1);
+    console.log(result.markerLayers[0])
     expect(result.markerLayers[0]).toMatchObject({
       layerName: LAYER_NAME.OCCURRENCES,
       markers: [
         {
           position: [123, 456],
-          key: undefined,
+          key: "1",
           popup: expect.any(Object)
         }
       ]
