@@ -35,7 +35,7 @@ const makeCountIcon = (count: number) => {
   })
 }
 
-const CountMarker = L.Marker
+const CountMarker: any = L.Marker
   .extend({
     options: {
       count: 1
@@ -51,7 +51,7 @@ const CountMarker = L.Marker
         ...options
       });
 
-      L.CircleMarker.prototype.initialize.call(this, latlng, {
+      (L.CircleMarker.prototype as any).initialize.call(this, latlng, {
         count,
         ...options,
         icon: makeCountIcon(count)
