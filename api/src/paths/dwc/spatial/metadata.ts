@@ -38,13 +38,10 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            /*
             type: 'array',
             items: {
               type: 'object',
-              properties: {}
             }
-            */
           }
         }
       }
@@ -60,11 +57,9 @@ GET.apiDoc = {
  */
 export function getSpatialMetadataByIds(): RequestHandler {
   return async (req, res) => {
-    // console.log('req=', req)
 
-    const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[]).map((id) =>
-      Number(id)
-    );
+    const submissionSpatialComponentIds = ((req.query.submissionSpatialComponentIds || []) as string[])
+      .map(Number);
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
@@ -72,7 +67,6 @@ export function getSpatialMetadataByIds(): RequestHandler {
       await connection.open();
 
       const spatialService = new SpatialService(connection);
-      console.log(spatialService);
 
       const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds(
         submissionSpatialComponentIds
@@ -82,7 +76,7 @@ export function getSpatialMetadataByIds(): RequestHandler {
 
       res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getSpatialMetadataById', message: 'error', error });
+      defaultLog.error({ label: 'getSpatialMetadataBySubmissionSpatialComponentIds', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

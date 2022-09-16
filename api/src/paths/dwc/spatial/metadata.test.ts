@@ -18,20 +18,20 @@ describe('metadata', () => {
       const requestValidator = new OpenAPIRequestValidator(GET.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       describe('should throw an error when', () => {
-        describe('submissionSpatialComponentId', () => {
+        describe('submissionSpatialComponentIds', () => {
           it('is undefined', async () => {
             const request = {
               headers: {
                 'content-type': 'application/json'
               },
-              params: {}
+              query: {}
             };
 
             const response = requestValidator.validateRequest(request);
 
             expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('submissionSpatialComponentId');
-            expect(response.errors[0].message).to.equal("must have required property 'submissionSpatialComponentId'");
+            expect(response.errors[0].path).to.equal('submissionSpatialComponentIds');
+            expect(response.errors[0].message).to.equal("must have required property 'submissionSpatialComponentIds'");
           });
 
           it('is null', async () => {
@@ -39,16 +39,16 @@ describe('metadata', () => {
               headers: {
                 'content-type': 'application/json'
               },
-              params: {
-                submissionSpatialComponentId: null
+              query: {
+                submissionSpatialComponentIds: null
               }
             };
 
             const response = requestValidator.validateRequest(request);
 
             expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('submissionSpatialComponentId');
-            expect(response.errors[0].message).to.equal('must be integer');
+            expect(response.errors[0].path).to.equal('submissionSpatialComponentIds');
+            expect(response.errors[0].message).to.equal('must be array');
           });
 
           it('is zero', async () => {
@@ -56,15 +56,15 @@ describe('metadata', () => {
               headers: {
                 'content-type': 'application/json'
               },
-              params: {
-                submissionSpatialComponentId: 0
+              query: {
+                submissionSpatialComponentIds: [0]
               }
             };
 
             const response = requestValidator.validateRequest(request);
 
             expect(response.status).to.equal(400);
-            expect(response.errors[0].path).to.equal('submissionSpatialComponentId');
+            expect(response.errors[0].path).to.equal('submissionSpatialComponentIds.0');
             expect(response.errors[0].message).to.equal('must be >= 1');
           });
         });
@@ -76,11 +76,12 @@ describe('metadata', () => {
             headers: {
               'content-type': 'application/json'
             },
-            params: {
-              submissionSpatialComponentId: 1
+            query: {
+              submissionSpatialComponentIds: [1]
             }
           };
           const response = requestValidator.validateRequest(request);
+          console.log('RES=', response)
 
           expect(response).to.be.undefined;
         });
@@ -98,24 +99,35 @@ describe('metadata', () => {
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].path).to.equal('response');
-          expect(response.errors[0].message).to.equal('must be object');
+          expect(response.errors[0].message).to.equal('must be array');
         });
 
-        it('returns invalid response (not an object)', async () => {
+        it('returns invalid response (not an array)', async () => {
           // array of `Feature` rather than `FeatureCollection`
-          const apiResponse = 'not an object';
+          const apiResponse = 'not an array';
 
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].path).to.equal('response');
+          expect(response.errors[0].message).to.equal('must be array');
+        });
+
+        it('returns invalid response (not an object)', async () => {
+          // array of `Feature` rather than `FeatureCollection`
+          const apiResponse = ['not an object'];
+
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].path).to.equal('0');
           expect(response.errors[0].message).to.equal('must be object');
         });
       });
 
       describe('should succeed when', () => {
         it('required values are valid (empty)', async () => {
-          const apiResponse = {};
+          const apiResponse: Record<string, any>[] = [];
 
           const response = responseValidator.validateResponse(200, apiResponse);
 
@@ -123,7 +135,7 @@ describe('metadata', () => {
         });
 
         it('required values are valid', async () => {
-          const apiResponse = { prop1: 'val1' };
+          const apiResponse = [{ prop1: 'val1' }];
 
           const response = responseValidator.validateResponse(200, apiResponse);
 
@@ -147,7 +159,7 @@ describe('metadata', () => {
       mockReq.query = { submissionSpatialComponentIds: ['1'] };
 
       sinon
-        .stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+        .stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
         .throws(new Error('test error'));
 
       const requestHandler = metadata.getSpatialMetadataByIds();
@@ -170,9 +182,9 @@ describe('metadata', () => {
 
       mockReq.query = { submissionSpatialComponentIds: ['1'] };
 
-      const mockResponse = { prop1: 'val1' };
+      const mockResponse = [{ prop1: 'val1' }];
 
-      sinon.stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId').resolves(mockResponse);
+      sinon.stub(SpatialService.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds').resolves(mockResponse);
 
       const requestHandler = metadata.getSpatialMetadataByIds();
 
