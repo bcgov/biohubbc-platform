@@ -209,7 +209,6 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
         <Table className={classes.table} sx={{ mb: 1 }}>
           <TableBody>
             {filteredMetadata.map(([key, propertyName]) => {
-              // delete hiddenMetadata.key;
               return (
                 <TableRow key={key}>
                   <TableCell className={classes.tableCell}>{propertyName}</TableCell>

@@ -156,7 +156,7 @@ export function searchSpatialComponents(): RequestHandler {
 
       res.status(200).json(
         response.map((row) => {
-          const { /*submission_spatial_component_ids, TODO: remove */ spatial_component, taxa_data } = row;
+          const { spatial_component, taxa_data } = row;
           const { spatial_data, ...rest } = spatial_component;
           return {
             taxa_data,

@@ -1,4 +1,3 @@
-// import { Geometry, Point } from 'geojson';
 import { IDBConnection } from '../database/db';
 import {
   IGetSecurityTransformRecord,
