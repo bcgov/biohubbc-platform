@@ -3,7 +3,7 @@ import { IStaticLayer } from 'components/map/components/StaticLayers';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
+import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
 import { Feature } from 'geojson';
 import { EmptyObject, ISpatialData, ITaxaData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
@@ -108,6 +108,50 @@ const occurrenceMarkerSetup = (latLng: LatLngTuple, taxaData: ITaxaData[], datas
   }
 
   return null
+}
+
+export const parseProjectResults = (data: ISpatialData[], datasetVisibility: IDatasetVisibility): ISearchResult[] => {
+  const results: ISearchResult[] = []
+  data.forEach(item => {
+    if (item.spatial_data.features[0]) {
+      if (item.spatial_data.features[0].properties) {
+        if (item.spatial_data.features[0].properties.type === SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID) {
+          const key = item.taxa_data.map(temp => temp.submission_spatial_component_id).join("-")
+          results.push({
+            key: key,
+            name: `${item.spatial_data.features[0].properties.datasetTitle}`,
+            count: 0, 
+            visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+          } as ISearchResult)
+        }
+      }
+    }
+  })
+
+  return results
+}
+
+export const parseOccurrenceResults = (data: ISpatialData[], datasetVisibility: IDatasetVisibility): ISearchResult[] => {
+  const taxaMap = {};
+  data.forEach(spatialData => {
+    spatialData.taxa_data.forEach(item => {
+      // need to check if it is an occurnece or not
+      if (item.associated_taxa) {
+        if (taxaMap[item.associated_taxa] === undefined) {
+          taxaMap[item.associated_taxa] = {
+            key: item.associated_taxa,
+            name: `${item.vernacular_name} (${item.associated_taxa})`,
+            count: 0, 
+            visible: datasetVisibility[item.associated_taxa] !== undefined ? datasetVisibility[item.associated_taxa] : true
+          } as ISearchResult
+        }
+
+        taxaMap[item.associated_taxa].count ++;
+      }
+    })
+  });
+  
+  return Object.keys(taxaMap).map(key => taxaMap[key]);
 }
 
 export const isStaticLayerVisible = (): boolean => {

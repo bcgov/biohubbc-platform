@@ -16,7 +16,7 @@ import useURL from 'hooks/useURL';
 import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
-import { parseSpatialDataByType } from 'utils/spatial-utils';
+import { parseOccurrenceResults, parseProjectResults, parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -74,27 +74,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
 
-    // move into a function...
-    const taxaMap = {};
-    mapDataLoader.data.forEach(spatialData => {
-      spatialData.taxa_data.forEach(item => {
-        // need to check if it is an occurnece or not
-        if (item.associated_taxa) {
-          if (taxaMap[item.associated_taxa] === undefined) {
-            taxaMap[item.associated_taxa] = {
-              key: item.associated_taxa,
-              name: `${item.vernacular_name} (${item.associated_taxa})`,
-              count: 0, 
-              visible: datasetVisibility[item.associated_taxa] !== undefined ? datasetVisibility[item.associated_taxa] : true
-            } as ISearchResult
-          }
-
-          taxaMap[item.associated_taxa].count ++;
-        }
-      })
-    });
-
-    setParsedSearchResults(Object.keys(taxaMap).map(key => taxaMap[key]));
+    setParsedSearchResults([...parseOccurrenceResults(mapDataLoader.data, datasetVisibility), ...parseProjectResults(mapDataLoader.data, datasetVisibility)]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
