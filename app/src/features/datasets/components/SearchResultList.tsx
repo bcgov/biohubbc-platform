@@ -103,7 +103,10 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                   <ListItemIcon>
                     <Checkbox size="small" checked={item.visible} />
                   </ListItemIcon>
-                  <ListItemText primary={item.name} secondary={item.count > 0 && `${item.count} record${item.count > 1 && 's'}`} />
+                  <ListItemText
+                    primary={item.name}
+                    secondary={item.count > 0 && `${item.count} record${item.count > 1 && 's'}`}
+                  />
                 </ListItemButton>
               </ListItem>
             );

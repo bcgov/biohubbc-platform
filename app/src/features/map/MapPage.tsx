@@ -74,7 +74,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
 
-    setParsedSearchResults([...parseOccurrenceResults(mapDataLoader.data, datasetVisibility), ...parseProjectResults(mapDataLoader.data, datasetVisibility)]);
+    setParsedSearchResults([
+      ...parseOccurrenceResults(mapDataLoader.data, datasetVisibility),
+      ...parseProjectResults(mapDataLoader.data, datasetVisibility)
+    ]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
@@ -149,9 +152,9 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
   };
 
-  const onToggleDataVisibility  = (visibility: IDatasetVisibility) => {
-    setDatasetVisibility({ ...visibility })
-  }
+  const onToggleDataVisibility = (visibility: IDatasetVisibility) => {
+    setDatasetVisibility({ ...visibility });
+  };
 
   return (
     <Box display="flex" justifyContent="space-between" width="100%" height="100%">
