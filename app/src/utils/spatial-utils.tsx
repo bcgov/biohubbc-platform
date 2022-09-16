@@ -1,11 +1,11 @@
-import { IMarkerLayer } from 'components/map/components/MarkerCluster';
+import { IMarker, IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { IDatasetVisibility } from 'features/datasets/components/SearchResultList';
 import { Feature } from 'geojson';
-import { EmptyObject, ISpatialData } from 'interfaces/useSearchApi.interface';
+import { EmptyObject, ISpatialData, ITaxaData } from 'interfaces/useSearchApi.interface';
 import { LatLngTuple } from 'leaflet';
 import { isObject } from './Utils';
 
@@ -40,27 +40,9 @@ export const parseSpatialDataByType = (
 
       if (isOccurrenceFeature(feature)) {
         // check if species has been toggled on/ off
-        const submission_ids: number[] = [];
-        spatialRecord.taxa_data.map(item => {
-          if (item.associated_taxa) {
-            visible =
-            datasetVisibility[item.associated_taxa] === undefined
-            ? true
-            : datasetVisibility[item.associated_taxa];
-          }
-          
-          if (visible) {
-            submission_ids.push(item.submission_spatial_component_id)
-          }
-        });
-
-        if (submission_ids.length > 0) {
-          occurrencesMarkerLayer.markers.push({
-            position: feature.geometry.coordinates as LatLngTuple,
-            key: submission_ids.join("-"),
-            popup: <FeaturePopup submissionSpatialComponentIds={submission_ids} />,
-            count: submission_ids.length
-          });
+        const marker = occurrenceMarkerSetup(feature.geometry.coordinates as LatLngTuple, spatialRecord.taxa_data, datasetVisibility);
+        if (marker) {
+          occurrencesMarkerLayer.markers.push(marker)
         }
       }
 
@@ -69,21 +51,20 @@ export const parseSpatialDataByType = (
        */
       if (isBoundaryFeature(feature)) {
         // check if dataset has been toggled
-        if (spatialRecord.submission_spatial_component_ids) {
+        const ids = spatialRecord.taxa_data.map(item => item.submission_spatial_component_id);
+        const key = ids.join("-")
+        if (ids.length > 0) {
           visible =
-            true
-            /*
-            datasetVisibility[spatialRecord.submission_spatial_component_id] === undefined
-              ? true
-              : datasetVisibility[spatialRecord.submission_spatial_component_id];
-            */
+              datasetVisibility[key] === undefined
+                ? true
+                : datasetVisibility[key];
         }
 
         if (visible) {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
             key: feature.id || feature.properties.id,
-            popup: <FeaturePopup submissionSpatialComponentIds={spatialRecord.submission_spatial_component_ids} />,
+            popup: <FeaturePopup submissionSpatialComponentIds={ids} />,
             // count: spatialRecord.submission_spatial_component_ids.length
           });
         }
@@ -115,6 +96,36 @@ export const parseSpatialDataByType = (
 
   return { markerLayers: [occurrencesMarkerLayer], staticLayers: [boundaryStaticLayer] };
 };
+
+const occurrenceMarkerSetup = (latLng: LatLngTuple, taxaData: ITaxaData[], datasetVisibility: IDatasetVisibility): IMarker | null => {
+  let visible = true
+  const submission_ids: number[] = [];
+  taxaData.map(item => {
+    if (item.associated_taxa) {
+      visible =
+      datasetVisibility[item.associated_taxa] === undefined
+      ? true
+      : datasetVisibility[item.associated_taxa];
+    }
+    
+    if (visible) {
+      submission_ids.push(item.submission_spatial_component_id)
+    }
+  });
+
+  if (submission_ids.length > 0) {
+    return {
+      position: latLng,
+      key: submission_ids.join("-"),
+      popup: <FeaturePopup submissionSpatialComponentIds={submission_ids} />,
+      count: submission_ids.length
+    }
+  }
+
+  return null
+}
+
+
 
 export const isStaticLayerVisible = (): boolean => {
   return true;

@@ -1,4 +1,4 @@
-import { createLayerComponent, useLeafletContext } from '@react-leaflet/core'
+import { createLayerComponent } from '@react-leaflet/core'
 import L, { LatLngExpression } from 'leaflet';
 import { FeatureGroup, LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 import 'leaflet.markercluster'
@@ -9,7 +9,7 @@ import React, { Fragment, ReactElement } from 'react'
 export interface IMarker {
   position: LatLngExpression;
   count: number
-  key?: string | number;
+  key: string | number;
   MarkerProps?: Partial<MarkerProps>;
   popup?: ReactElement;
   PopupProps?: Partial<PopupProps>;
@@ -44,7 +44,7 @@ const CountMarker = L.Marker.extend({
     this.options.count = s
   },
 
-	initialize(latlng, { count, ...options}) {
+	initialize(latlng: number[], { count, ...options}: {count: number, [x: string]: any;}) {
 		L.Util.setOptions(this, { count, ...options });
 		L.CircleMarker.prototype.initialize.call(this, latlng, {
       count,
@@ -114,8 +114,8 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
       <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}}`}>
         <FeatureGroup>
           <MarkerClusterGroup>
-            {layer.markers.map((item, index: number) => {
-              const id = item.key || index;
+            {layer.markers.map((item) => {
+              const id = item.key;
               return (
                 <Marker
                   count={item.count || 0}
