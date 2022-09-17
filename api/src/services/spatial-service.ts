@@ -225,16 +225,13 @@ export class SpatialService extends DBService {
     submissionSpatialComponentIds: number[]
   ): Promise<Array<Record<string, any>>> {
     const userService = new UserService(this.connection);
-    const isAdmin = await userService.isSystemUserAdmin()
 
-    const response = await (isAdmin
-      ? this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin
-      : this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds
-    )(submissionSpatialComponentIds);
+    const response = (await userService.isSystemUserAdmin())
+      ? this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin(submissionSpatialComponentIds)
+      : this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds(submissionSpatialComponentIds);
 
-    return response
+    return (await response)
       .map((row) => row.spatial_component_properties)
       .filter((row): row is Record<string, any> => Boolean(row))
-
   }
 }

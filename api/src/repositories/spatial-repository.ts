@@ -695,7 +695,6 @@ export class SpatialRepository extends BaseRepository {
       )
       .from(knex.raw('with_filtered_spatial_component as wfsc'));
 
-    console.log(String(queryBuilder.toSQL().toNative().sql))
     const response = await this.connection.knex<ISpatialComponentFeaturePropertiesRow>(queryBuilder);
 
     return response.rows;
@@ -765,7 +764,6 @@ export class SpatialRepository extends BaseRepository {
       // The user is not allowed to see any aspect of these particular spatial components
       .whereRaw("spatial_component->'spatial_data' != '{}'");
 
-    console.log(String(queryBuilder.toSQL().toNative().sql))
     const spatialComponentResponse = await this.connection.knex<ISpatialComponentFeaturePropertiesRow>(queryBuilder);
 
     return spatialComponentResponse.rows;
