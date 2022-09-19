@@ -424,7 +424,7 @@ export class SpatialRepository extends BaseRepository {
           this._whereDatasetIDIn(criteria.datasetID, qb1);
         }
 
-        this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
+        this._whereBoundaryIntersects(criteria.boundary, 'ssc.geography', qb1);
       })
       .with('with_coalesced_spatial_components', (qb7) => {
         qb7
@@ -463,6 +463,10 @@ export class SpatialRepository extends BaseRepository {
       // The user is not allowed to see any aspect of these particular spatial components
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
+
+    console.log('**************** query bulder: ************************');
+
+    console.log(queryBuilder.toSQL().toNative().sql);
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
