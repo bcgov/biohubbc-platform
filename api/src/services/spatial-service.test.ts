@@ -496,7 +496,10 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
+        expect(response).to.be.eql([
+          { prop1: 'val1', prop2: 'val2' },
+          { prop3: 'val3', prop4: 'val4' }
+        ]);
       });
     });
 
@@ -529,7 +532,10 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
+        expect(response).to.be.eql([
+          { prop1: 'val1', prop2: 'val2' },
+          { prop3: 'val3', prop4: 'val4' }
+        ]);
       });
 
       it('should return spatial component metadata as data admin', async () => {
@@ -560,7 +566,10 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
+        expect(response).to.be.eql([
+          { prop1: 'val1', prop2: 'val2' },
+          { prop3: 'val3', prop4: 'val4' }
+        ]);
       });
 
       it('should return non secure spatial component metadata when user is not admin', async () => {
@@ -590,7 +599,10 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
+        expect(response).to.be.eql([
+          { prop1: 'val1', prop2: 'val2' },
+          { prop3: 'val3', prop4: 'val4' }
+        ]);
       });
     });
 
