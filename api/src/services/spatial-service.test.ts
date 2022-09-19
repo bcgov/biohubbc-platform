@@ -439,7 +439,7 @@ describe('SpatialService', () => {
     });
   });
 
-  describe('findSpatialMetadataBySubmissionSpatialComponentId', () => {
+  describe('findSpatialMetadataBySubmissionSpatialComponentIds', () => {
     describe('with multiple features', () => {
       it('should return spatial component metadata', async () => {
         const mockDBConnection = getMockDBConnection();
@@ -463,7 +463,7 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({ prop1: 'val1' });
+        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }]);
       });
     });
 
@@ -496,7 +496,7 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({ prop1: 'val1' });
+        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
       });
     });
 
@@ -529,7 +529,7 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({ prop1: 'val1' });
+        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
       });
 
       it('should return spatial component metadata as data admin', async () => {
@@ -560,7 +560,7 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({ prop1: 'val1' });
+        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
       });
 
       it('should return non secure spatial component metadata when user is not admin', async () => {
@@ -590,12 +590,12 @@ describe('SpatialService', () => {
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({ prop1: 'val1' });
+        expect(response).to.be.eql([{ prop1: 'val1', prop2: 'val2' }, { prop3: 'val3', prop4: 'val4' }]);
       });
     });
 
     describe('with no features', () => {
-      it('should return {} as system admin', async () => {
+      it('should return [] as system admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
         const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
@@ -603,15 +603,15 @@ describe('SpatialService', () => {
 
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin')
-          .resolves(undefined);
+          .resolves([]);
 
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({});
+        expect(response).to.be.eql([]);
       });
 
-      it('should return {} as data admin', async () => {
+      it('should return [] as data admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
         const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
@@ -619,27 +619,27 @@ describe('SpatialService', () => {
 
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin')
-          .resolves(undefined);
+          .resolves([]);
 
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({});
+        expect(response).to.be.eql([]);
       });
 
-      it('should return {} when user is not admin', async () => {
+      it('should return [] when user is not admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
         sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
         const repo = sinon
           .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
-          .resolves(undefined);
+          .resolves([]);
 
         const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
-        expect(response).to.be.eql({});
+        expect(response).to.be.eql([]);
       });
     });
   });
