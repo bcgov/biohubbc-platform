@@ -189,10 +189,6 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   const dwc: Record<string, unknown> = metadata?.dwc || {};
   const filteredMetadata = Object.entries(COMMON_METADATA_PROPERTIES).filter(([key]) => Boolean(dwc[key]));
 
-  const hiddenMetadataProperties = Object.keys(ALL_METADATA_PROPERTIES).filter(
-    (key) => Boolean(dwc[key]) && !filteredMetadata.some(([k]) => k === key)
-  );
-
   if (!dwc || !Object.keys(dwc).length) {
     return (
       <ModalContentWrapper>
@@ -221,9 +217,6 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
           </TableBody>
         </Table>
       </Collapse>
-      {hiddenMetadataProperties.length > 0 && (
-        <Typography variant="subtitle2">... and {hiddenMetadataProperties.length} hidden row(s)</Typography>
-      )}
       <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={1}>
         {!isEmpty && data.length > 1 && (
           <Box display="flex" sx={{ gap: 1 }}>

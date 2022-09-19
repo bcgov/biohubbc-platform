@@ -9,6 +9,7 @@ import {
   IGetSecurityTransformRecord,
   IGetSpatialTransformRecord,
   IInsertSpatialTransform,
+  ISpatialComponentFeaturePropertiesRow,
   ISpatialComponentsSearchCriteria,
   ISubmissionSpatialSearchResponseRow,
   SpatialRepository
@@ -446,18 +447,20 @@ describe('SpatialService', () => {
         const mockUserObject = { role_names: [] } as unknown as UserObject;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-        const mockResponseRows = {
-          spatial_component: {
-            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
-            submission_spatial_component_id: 1
+        const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
+          {
+            spatial_component_properties: {
+              prop1: 'val1',
+              prop2: 'val2'
+            }
           }
-        } as unknown as ISubmissionSpatialSearchResponseRow;
+        ];
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
           .resolves(mockResponseRows);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
@@ -471,18 +474,26 @@ describe('SpatialService', () => {
         const mockUserObject = { role_names: [] } as unknown as UserObject;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-        const mockResponseRows = {
-          spatial_component: {
-            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
-            submission_spatial_component_id: 1
+        const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
+          {
+            spatial_component_properties: {
+              prop1: 'val1',
+              prop2: 'val2'
+            }
+          },
+          {
+            spatial_component_properties: {
+              prop3: 'val3',
+              prop4: 'val4'
+            }
           }
-        } as unknown as ISubmissionSpatialSearchResponseRow;
+        ];
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
           .resolves(mockResponseRows);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
@@ -496,18 +507,26 @@ describe('SpatialService', () => {
         const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-        const mockResponseRows = {
-          spatial_component: {
-            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
-            submission_spatial_component_id: 1
+        const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
+          {
+            spatial_component_properties: {
+              prop1: 'val1',
+              prop2: 'val2'
+            }
+          },
+          {
+            spatial_component_properties: {
+              prop3: 'val3',
+              prop4: 'val4'
+            }
           }
-        } as unknown as ISubmissionSpatialSearchResponseRow;
+        ];
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin')
           .resolves(mockResponseRows);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
@@ -519,18 +538,26 @@ describe('SpatialService', () => {
         const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
-        const mockResponseRows = {
-          spatial_component: {
-            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
-            submission_spatial_component_id: 1
+        const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
+          {
+            spatial_component_properties: {
+              prop1: 'val1',
+              prop2: 'val2'
+            }
+          },
+          {
+            spatial_component_properties: {
+              prop3: 'val3',
+              prop4: 'val4'
+            }
           }
-        } as unknown as ISubmissionSpatialSearchResponseRow;
+        ];
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin')
           .resolves(mockResponseRows);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
@@ -541,18 +568,26 @@ describe('SpatialService', () => {
         const spatialService = new SpatialService(mockDBConnection);
         sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
-        const mockResponseRows = {
-          spatial_component: {
-            spatial_data: { features: [{ properties: { prop1: 'val1' } }, { properties: { prop2: 'val2' } }] },
-            submission_spatial_component_id: 1
+        const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
+          {
+            spatial_component_properties: {
+              prop1: 'val1',
+              prop2: 'val2'
+            }
+          },
+          {
+            spatial_component_properties: {
+              prop3: 'val3',
+              prop4: 'val4'
+            }
           }
-        } as unknown as ISubmissionSpatialSearchResponseRow;
+        ];
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
           .resolves(mockResponseRows);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({ prop1: 'val1' });
@@ -567,10 +602,10 @@ describe('SpatialService', () => {
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin')
           .resolves(undefined);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({});
@@ -583,10 +618,10 @@ describe('SpatialService', () => {
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdasAdmin')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin')
           .resolves(undefined);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({});
@@ -598,10 +633,10 @@ describe('SpatialService', () => {
         sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
         const repo = sinon
-          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentId')
+          .stub(SpatialRepository.prototype, 'findSpatialMetadataBySubmissionSpatialComponentIds')
           .resolves(undefined);
 
-        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentId(3);
+        const response = await spatialService.findSpatialMetadataBySubmissionSpatialComponentIds([3]);
 
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql({});

@@ -73,7 +73,7 @@ export interface ISubmissionSpatialSearchResponseRow {
 }
 
 export interface ISpatialComponentFeaturePropertiesRow {
-  spatial_component_properties: GeoJsonProperties
+  spatial_component_properties: GeoJsonProperties;
 }
 
 export class SpatialRepository extends BaseRepository {
@@ -683,9 +683,10 @@ export class SpatialRepository extends BaseRepository {
       .queryBuilder()
       .with('with_filtered_spatial_component', (qb1) => {
         // Get the spatial components that match the search filters
-        qb1.select()
+        qb1
+          .select()
           .from('submission_spatial_component as ssc')
-          .whereIn('submission_spatial_component_id', submission_spatial_component_ids)
+          .whereIn('submission_spatial_component_id', submission_spatial_component_ids);
       })
       .select(
         // Select the non-secure spatial component from the search results
@@ -745,9 +746,7 @@ export class SpatialRepository extends BaseRepository {
       })
       .with('with_coalesced_spatial_components', (qb7) => {
         qb7
-          .select(
-            this._buildSelectForSecureNonSecureSpatialComponents()
-          )
+          .select(this._buildSelectForSecureNonSecureSpatialComponents())
           .from(
             knex.raw(
               'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'

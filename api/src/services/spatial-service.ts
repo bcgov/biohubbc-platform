@@ -232,6 +232,6 @@ export class SpatialService extends DBService {
 
     return (await response)
       .map((row) => row.spatial_component_properties)
-      .filter((row): row is Record<string, any> => Boolean(row))
+      .filter((row): row is Record<string, any> => Boolean(row));
   }
 }
