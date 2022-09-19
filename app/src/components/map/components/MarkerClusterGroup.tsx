@@ -1,6 +1,6 @@
 import { createPathComponent, LeafletContextInterface } from '@react-leaflet/core';
 import L, { LeafletMouseEventHandlerFn } from 'leaflet';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
 type ClusterType = Record<string, any>;
 
@@ -38,7 +38,8 @@ const getPropsAndEvents = (props: MarkerClusterControl) => {
 
 const CreateMarkerCluster = (props: MarkerClusterControl, context: LeafletContextInterface) => {
   const [clusterProps, clusterEvents] = getPropsAndEvents(props);
-  const clusterGroup = new L.MarkerClusterGroup(clusterProps);
+
+  const clusterGroup = useMemo(() => new L.MarkerClusterGroup(clusterProps), [clusterProps]);
 
   useEffect(() => {
     Object.entries(clusterEvents).forEach(([eventAsProp, callback]) => {
