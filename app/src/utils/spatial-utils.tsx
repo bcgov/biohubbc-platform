@@ -47,8 +47,8 @@ export const parseSpatialDataByType = (
 
       if (isBoundaryFeature(feature)) {
         // check if dataset has been toggled
-        const ids = spatialRecord.taxa_data.map((item) => item.submission_spatial_component_id);
-        const key = ids.join('-');
+        const ids = getSubmissionSpatialComponentIds(spatialRecord);
+        const key = makeKeyFromIds(ids);
         if (ids.length > 0) {
           visible = datasetVisibility[key] === undefined ? true : datasetVisibility[key];
         }
@@ -64,8 +64,8 @@ export const parseSpatialDataByType = (
 
       if (isBoundaryCentroidFeature(feature)) {
         // check if dataset has been toggled
-        const ids = spatialRecord.taxa_data.map((item) => item.submission_spatial_component_id);
-        const key = ids.join('-');
+        const ids = getSubmissionSpatialComponentIds(spatialRecord);
+        const key = makeKeyFromIds(ids);
         if (ids.length > 0) {
           visible = datasetVisibility[key] === undefined ? true : datasetVisibility[key];
         }
@@ -84,6 +84,33 @@ export const parseSpatialDataByType = (
   return { markerLayers: [occurrencesMarkerLayer], staticLayers: [boundaryStaticLayer] };
 };
 
+/**
+ * Helper function to *consistently* make React keys from an array of submission_spatial_component_ids.
+ * @param submissionSpatialComponentIds A list of IDs
+ * @returns A string joining all the id's by a seperator
+ */
+const makeKeyFromIds = (submissionSpatialComponentIds: number[]): string => {
+  return submissionSpatialComponentIds.join('-');
+};
+
+/**
+ * Gleans submission spatial component IDs from a spatial component.
+ * @param spatialRecord A spatial component record
+ * @returns an array of submission_spatial_component_ids
+ */
+const getSubmissionSpatialComponentIds = (spatialRecord: ISpatialData): number[] => {
+  return spatialRecord.taxa_data.map((record) => record.submission_spatial_component_id);
+};
+
+/**
+ * Takes a geographic point, an array of taxonomy data, and a Record denoting dataset visibility,
+ * and produces an IMarker whose FeaturePopup contains submission spatial component IDs
+ * commensurate with the given dataset visibility.
+ * @param latLng The geograhic point of the marker
+ * @param taxaData The taxonomic data for the point (namely submission_spatial_component_ids)
+ * @param datasetVisibility The dataset visiblity record
+ * @returns An IMarker
+ */
 const occurrenceMarkerSetup = (
   latLng: LatLngTuple,
   taxaData: ITaxaData[],
@@ -101,7 +128,7 @@ const occurrenceMarkerSetup = (
   if (submission_ids.length > 0) {
     return {
       position: latLng,
-      key: submission_ids.join('-'),
+      key: makeKeyFromIds(submission_ids),
       popup: <FeaturePopup submissionSpatialComponentIds={submission_ids} />,
       count: submission_ids.length
     };
@@ -110,36 +137,49 @@ const occurrenceMarkerSetup = (
   return null;
 };
 
-export const parseProjectResults = (data: ISpatialData[], datasetVisibility: IDatasetVisibility): ISearchResult[] => {
+/**
+ * Takes an array of ISpatialData and maps it to an ISearchResult array denoting visibility based
+ * on the given datasetVisibility Record.
+ * @param data The array of spatial data
+ * @param datasetVisibility a Record denoting dataset visiblity
+ * @returns an array of type ISearchResult
+ */
+export const parseBoundaryCentroidResults = (
+  data: ISpatialData[],
+  datasetVisibility: IDatasetVisibility
+): ISearchResult[] => {
   const results: ISearchResult[] = [];
-  data.forEach((item) => {
-    if (item.spatial_data.features[0]) {
-      if (item.spatial_data.features[0].properties) {
-        if (item.spatial_data.features[0].properties.type === SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID) {
-          const key = item.taxa_data.map((temp) => temp.submission_spatial_component_id).join('-');
-          results.push({
-            key: key,
-            name: `${item.spatial_data.features[0].properties.datasetTitle}`,
-            count: 0,
-            visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-          } as ISearchResult);
-        }
-      }
+  data.forEach((spatialData: ISpatialData) => {
+    if (isBoundaryCentroidFeature(spatialData.spatial_data.features[0])) {
+      const key = makeKeyFromIds(getSubmissionSpatialComponentIds(spatialData));
+      results.push({
+        key: key,
+        name: `${spatialData.spatial_data?.features[0]?.properties?.datasetTitle}`,
+        count: 0,
+        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
+      });
     }
   });
 
   return results;
 };
 
+/**
+ * Takes an array of ISpatialData and maps it to an ISearchResult array denoting visibility based
+ * on the given datasetVisibility Record, while numerating the count of each species.
+ * @param data The array of spatial data
+ * @param datasetVisibility a Record denoting dataset visiblity
+ * @returns an array of type ISearchResult
+ */
 export const parseOccurrenceResults = (
   data: ISpatialData[],
   datasetVisibility: IDatasetVisibility
 ): ISearchResult[] => {
-  const taxaMap = {};
+  const taxaMap: Record<string, ISearchResult> = {};
   data.forEach((spatialData) => {
     spatialData.taxa_data.forEach((item) => {
-      // need to check if it is an occurnece or not
-      if (item.associated_taxa) {
+      // need to check if it is an occurrence or not
+      if (isOccurrenceFeature(spatialData.spatial_data.features[0]) && item.associated_taxa) {
         if (taxaMap[item.associated_taxa] === undefined) {
           taxaMap[item.associated_taxa] = {
             key: item.associated_taxa,
@@ -147,7 +187,7 @@ export const parseOccurrenceResults = (
             count: 0,
             visible:
               datasetVisibility[item.associated_taxa] !== undefined ? datasetVisibility[item.associated_taxa] : true
-          } as ISearchResult;
+          };
         }
 
         taxaMap[item.associated_taxa].count++;
@@ -155,26 +195,33 @@ export const parseOccurrenceResults = (
     });
   });
 
-  return Object.keys(taxaMap).map((key) => taxaMap[key]);
+  return Object.values(taxaMap);
 };
 
-export const isStaticLayerVisible = (): boolean => {
-  return true;
-};
-
+/**
+ * Checks if `obj` is an object with no keys (aka: an empty object)
+ */
 export const isEmptyObject = (obj: any): obj is EmptyObject => {
-  // Check if `obj` is an object with no keys (aka: an empty object)
   return !!(isObject(obj) && !Object.keys(obj).length);
 };
 
+/**
+ * Asserts if a feature is an OccurrenceFeature.
+ */
 export const isOccurrenceFeature = (feature: Feature): feature is OccurrenceFeature => {
   return feature.geometry.type === 'Point' && feature.properties?.['type'] === SPATIAL_COMPONENT_TYPE.OCCURRENCE;
 };
 
+/**
+ * Asserts if a feature is an BoundaryFeature.
+ */
 export const isBoundaryFeature = (feature: Feature): feature is BoundaryFeature => {
   return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY;
 };
 
+/**
+ * Asserts if a feature is an BoundaryCentroidFeature.
+ */
 export const isBoundaryCentroidFeature = (feature: Feature): feature is BoundaryCentroidFeature => {
   return feature?.properties?.['type'] === SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };

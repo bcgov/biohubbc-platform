@@ -231,7 +231,6 @@ export class SpatialService extends DBService {
       ? this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin(submissionSpatialComponentIds)
       : this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds(submissionSpatialComponentIds);
 
-    return (await response)
-      .map((row) => row.spatial_component_properties)
+    return (await response).map((row) => row.spatial_component_properties);
   }
 }

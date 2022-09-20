@@ -1,10 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { Feature, GeoJsonProperties } from 'geojson';
-import {
-  IGetSearchResultsResponse,
-  IKeywordSearchResponse,
-  ISpatialData
-} from 'interfaces/useSearchApi.interface';
+import { IGetSearchResultsResponse, IKeywordSearchResponse, ISpatialData } from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with search functionality

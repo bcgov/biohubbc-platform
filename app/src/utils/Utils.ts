@@ -256,6 +256,7 @@ export const makeCsvObjectUrl = (entries: Array<Record<string, any>>) => {
     return keys.map((key) => String(entry[key]));
   });
 
+  // Prepend the column names (object keys) to the CSV.
   rows.unshift(keys);
 
   const csvContent = rows.map((row) => row.join(',')).join('\n');

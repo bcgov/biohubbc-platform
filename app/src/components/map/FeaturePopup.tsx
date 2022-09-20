@@ -10,7 +10,7 @@ import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { Feature } from 'geojson';
+import { Feature, GeoJsonProperties } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { useState } from 'react';
@@ -70,6 +70,8 @@ interface IMetadataHeaderProps {
   length?: number;
 }
 
+type IDwCMetadata = ({ dwc: Record<string, any> } & GeoJsonProperties) | null;
+
 const useStyles = makeStyles(() => ({
   modalContent: {
     position: 'relative',
@@ -109,16 +111,15 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   const api = useApi();
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const dataLoader = useDataLoader(() => {
-    return api.search.getSpatialMetadata(submissionSpatialComponentIds);
+  const metadataLoader = useDataLoader(() => {
+    return api.search.getSpatialMetadata<IDwCMetadata>(submissionSpatialComponentIds);
   });
 
-  dataLoader.load();
+  metadataLoader.load();
 
-  const { isLoading, isReady } = dataLoader;
-  const data = dataLoader.data || [];
-  const isEmpty = !data || data.length === 0;
-  const metadataObjectUrl = isEmpty ? undefined : makeCsvObjectUrl(data.map((row) => row.dwc));
+  const data = metadataLoader.data || [];
+  const isEmpty = data.length === 0;
+  const metadataObjectUrl = isEmpty ? undefined : makeCsvObjectUrl(data.map((row) => row?.dwc || {}));
 
   const handleNext = () => {
     if (isEmpty) {
@@ -166,7 +167,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     </Typography>
   );
 
-  if (isLoading) {
+  if (metadataLoader.isLoading) {
     return (
       <ModalContentWrapper>
         <div className={classes.loading}>
@@ -201,7 +202,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   return (
     <ModalContentWrapper>
       <MetadataHeader type={type} index={currentIndex} length={data.length} />
-      <Collapse in={isReady} className={classes.metadata}>
+      <Collapse in={metadataLoader.isReady} className={classes.metadata}>
         <Table className={classes.table} sx={{ mb: 1 }}>
           <TableBody>
             {filteredMetadata.map(([key, propertyName]) => {

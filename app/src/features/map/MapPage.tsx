@@ -16,7 +16,7 @@ import useURL from 'hooks/useURL';
 import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
-import { parseOccurrenceResults, parseProjectResults, parseSpatialDataByType } from 'utils/spatial-utils';
+import { parseBoundaryCentroidResults, parseOccurrenceResults, parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -76,7 +76,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
     setParsedSearchResults([
       ...parseOccurrenceResults(mapDataLoader.data, datasetVisibility),
-      ...parseProjectResults(mapDataLoader.data, datasetVisibility)
+      ...parseBoundaryCentroidResults(mapDataLoader.data, datasetVisibility)
     ]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
