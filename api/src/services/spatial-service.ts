@@ -1,3 +1,4 @@
+import { GeoJsonProperties } from 'geojson';
 import { IDBConnection } from '../database/db';
 import {
   IGetSecurityTransformRecord,
@@ -223,7 +224,7 @@ export class SpatialService extends DBService {
    */
   async findSpatialMetadataBySubmissionSpatialComponentIds(
     submissionSpatialComponentIds: number[]
-  ): Promise<Array<Record<string, any>>> {
+  ): Promise<GeoJsonProperties[]> {
     const userService = new UserService(this.connection);
 
     const response = (await userService.isSystemUserAdmin())
@@ -232,6 +233,5 @@ export class SpatialService extends DBService {
 
     return (await response)
       .map((row) => row.spatial_component_properties)
-      .filter((row): row is Record<string, any> => Boolean(row));
   }
 }
