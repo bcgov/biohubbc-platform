@@ -77,11 +77,28 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['submission_spatial_component_id', 'spatial_data'],
+              required: ['taxa_data', 'spatial_data'],
               properties: {
-                submission_spatial_component_id: {
-                  type: 'integer',
-                  minimum: 1
+                taxa_data: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    required: ['submission_spatial_component_id'],
+                    properties: {
+                      submission_spatial_component_id: {
+                        type: 'number',
+                        minimum: 1
+                      },
+                      associated_taxa: {
+                        type: 'string',
+                        nullable: true
+                      },
+                      vernacular_name: {
+                        type: 'string',
+                        nullable: true
+                      }
+                    }
+                  }
                 },
                 spatial_data: {
                   oneOf: [
@@ -137,7 +154,23 @@ export function searchSpatialComponents(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(response.map((item) => item.spatial_component));
+      res.status(200).json(
+        response.map((row) => {
+          const { spatial_component, taxa_data } = row;
+          const { spatial_data, ...rest } = spatial_component;
+          return {
+            taxa_data,
+            ...rest,
+            spatial_data: {
+              ...spatial_data,
+              features: spatial_data.features.map((feature) => {
+                delete feature?.properties?.dwc;
+                return feature;
+              })
+            }
+          };
+        })
+      );
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();

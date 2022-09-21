@@ -140,7 +140,6 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data);
-
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
@@ -186,7 +185,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
                     aria-label={'Download occurrence'}
                     startIcon={<Icon path={mdiDownload} size={1} />}
                     onClick={() => downloadDataSet()}>
-                    EXPORT OCCURRENCES
+                    Export Occurrences
                   </Button>
                 </Box>
               </Grid>

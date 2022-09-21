@@ -165,7 +165,7 @@ describe('search', () => {
           // array of `Feature` rather than `FeatureCollection`
           const apiResponse = [
             {
-              submission_spatial_component_id: 1,
+              taxa_data: [{ submission_spatial_component_id: 1 }],
               spatial_data: {
                 type: 'Feature',
                 properties: {},
@@ -183,7 +183,7 @@ describe('search', () => {
           expect(response.errors[1].message).to.equal('must be equal to one of the allowed values');
         });
 
-        it('returns invalid response (missing submission_spatial_component_id)', async () => {
+        it('returns invalid response (missing taxa_data)', async () => {
           const apiResponse = [
             {
               spatial_data: {
@@ -198,6 +198,25 @@ describe('search', () => {
 
           expect(response.message).to.equal('The response was not valid.');
           expect(response.errors[0].path).to.equal('0');
+          expect(response.errors[0].message).to.equal("must have required property 'taxa_data'");
+        });
+
+        it('returns invalid response (missing submission_spatial_component_id)', async () => {
+          const apiResponse = [
+            {
+              taxa_data: [{ associated_taxa: 'M-ALAM' }],
+              spatial_data: {
+                type: 'FeatureCollection',
+                properties: {},
+                geometry: { type: 'Point', coordinates: [-123.43791961669922, 48.63449682909913] }
+              }
+            }
+          ];
+
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].path).to.equal('0/taxa_data/0');
           expect(response.errors[0].message).to.equal("must have required property 'submission_spatial_component_id'");
         });
       });
@@ -214,7 +233,7 @@ describe('search', () => {
         it('required values are valid', async () => {
           const apiResponse = [
             {
-              submission_spatial_component_id: 1,
+              taxa_data: [{ submission_spatial_component_id: 1 }],
               spatial_data: {
                 type: 'FeatureCollection',
                 features: [
@@ -252,7 +271,7 @@ describe('search', () => {
               }
             },
             {
-              submission_spatial_component_id: 2,
+              taxa_data: [{ submission_spatial_component_id: 2 }],
               spatial_data: {
                 type: 'FeatureCollection',
                 features: [
@@ -369,8 +388,8 @@ describe('search', () => {
 
       const mockResponse: ISubmissionSpatialSearchResponseRow[] = [
         {
+          taxa_data: [{ submission_spatial_component_id: 1 }],
           spatial_component: {
-            submission_spatial_component_id: 1,
             spatial_data: {
               type: 'FeatureCollection',
               features: [
@@ -384,8 +403,8 @@ describe('search', () => {
           }
         },
         {
+          taxa_data: [{ submission_spatial_component_id: 2 }],
           spatial_component: {
-            submission_spatial_component_id: 2,
             spatial_data: {
               type: 'FeatureCollection',
               features: [
@@ -411,7 +430,7 @@ describe('search', () => {
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([
         {
-          submission_spatial_component_id: 1,
+          taxa_data: [{ submission_spatial_component_id: 1 }],
           spatial_data: {
             type: 'FeatureCollection',
             features: [
@@ -424,7 +443,7 @@ describe('search', () => {
           }
         },
         {
-          submission_spatial_component_id: 2,
+          taxa_data: [{ submission_spatial_component_id: 2 }],
           spatial_data: {
             type: 'FeatureCollection',
             features: [

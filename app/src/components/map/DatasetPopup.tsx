@@ -46,21 +46,21 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = ({
-  submissionSpatialComponentId
+const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentIds: number[] }>> = ({
+  submissionSpatialComponentIds
 }) => {
   const classes = useStyles();
   const api = useApi();
   const history = useHistory();
 
   const dataLoader = useDataLoader(() => {
-    return api.search.getSpatialMetadata(submissionSpatialComponentId);
+    return api.search.getSpatialMetadata(submissionSpatialComponentIds);
   });
 
   dataLoader.load();
 
   const { isLoading, isReady } = dataLoader;
-  const data = dataLoader.data as BoundaryCentroidFeatureProperties;
+  const data = (dataLoader.data || []) as BoundaryCentroidFeatureProperties[];
 
   const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className={classes.modalContent}>{children}</div>
@@ -103,18 +103,24 @@ const DatasetPopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  const datasetTitle = data.datasetTitle;
-  const datasetID = data.datasetID;
-
   return (
-    <ModalContentWrapper>
-      <Collapse in={isReady}>
-        <MetadataHeader title={datasetTitle} />
-        <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
-          Go to Dataset
-        </Link>
-      </Collapse>
-    </ModalContentWrapper>
+    <>
+      {data.map((metadata) => {
+        const datasetTitle = metadata.datasetTitle;
+        const datasetID = metadata.datasetID;
+
+        return (
+          <ModalContentWrapper>
+            <Collapse in={isReady}>
+              <MetadataHeader title={datasetTitle} />
+              <Link color="primary" onClick={() => history.push(`/datasets/${datasetID}/details`)}>
+                Go to Dataset
+              </Link>
+            </Collapse>
+          </ModalContentWrapper>
+        );
+      })}
+    </>
   );
 };
 

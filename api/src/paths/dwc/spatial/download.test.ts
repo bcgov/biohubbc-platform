@@ -163,8 +163,8 @@ describe('download', () => {
         it('returns a response that can be turned back into object', async () => {
           const mockData: ISubmissionSpatialSearchResponseRow[] = [
             {
+              taxa_data: [{ submission_spatial_component_id: 1 }],
               spatial_component: {
-                submission_spatial_component_id: 1,
                 spatial_data: {
                   type: 'FeatureCollection',
                   features: [
@@ -178,8 +178,8 @@ describe('download', () => {
               }
             },
             {
+              taxa_data: [{ submission_spatial_component_id: 2 }],
               spatial_component: {
-                submission_spatial_component_id: 2,
                 spatial_data: {
                   type: 'FeatureCollection',
                   features: [
@@ -311,8 +311,8 @@ describe('download', () => {
 
       const mockData: ISubmissionSpatialSearchResponseRow[] = [
         {
+          taxa_data: [{ submission_spatial_component_id: 1 }],
           spatial_component: {
-            submission_spatial_component_id: 1,
             spatial_data: {
               type: 'FeatureCollection',
               features: [
@@ -326,8 +326,8 @@ describe('download', () => {
           }
         },
         {
+          taxa_data: [{ submission_spatial_component_id: 2 }],
           spatial_component: {
-            submission_spatial_component_id: 2,
             spatial_data: {
               type: 'FeatureCollection',
               features: [
