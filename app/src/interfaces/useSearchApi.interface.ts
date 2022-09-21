@@ -28,11 +28,6 @@ export interface ISpatialData {
 }
 
 /**
- * An interface for Spatial Metadata. Type synonymous with `GeoJsonProperties`.
- */
-// @TODO remvoe export type ISpatialMetadata = Record<string, any>;
-
-/**
  * An interface for an instance of filter fields for search results
  */
 export interface ISearchResultsAdvancedFilterRequest {
