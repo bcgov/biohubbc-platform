@@ -1,25 +1,15 @@
+import { createLayerComponent } from '@react-leaflet/core';
 import L, { LatLngExpression } from 'leaflet';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { ReactElement } from 'react';
-import { LayersControl, Marker, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
-import { default as ReactLeafletMarkerClusterGroup } from 'react-leaflet-cluster';
-
-const MARKER_SVG = {
-  DOT: '<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20"><path fill="{color}" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2z"/></svg>'
-};
-
-export const MARKER_ICON = {
-  DOT: L.divIcon({
-    className: 'leaflet-data-marker',
-    html: L.Util.template(MARKER_SVG.DOT, { color: '#2F5982' }),
-    iconAnchor: [10, 10],
-    iconSize: [20, 20],
-    popupAnchor: [0, -10]
-  })
-};
+import { FeatureGroup, LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 
 export interface IMarker {
   position: LatLngExpression;
-  key?: string | number;
+  count: number;
+  key: string | number;
   MarkerProps?: Partial<MarkerProps>;
   popup?: ReactElement;
   PopupProps?: Partial<PopupProps>;
@@ -37,27 +27,95 @@ export interface IMarkerLayersProps {
   layers?: IMarkerLayer[];
 }
 
-const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
+const makeCountIcon = (count: number) => {
+  return L.divIcon({
+    html: `<div><span>${count}</span></div>`,
+    className: 'marker-cluster marker-cluster-small',
+    iconSize: new L.Point(40, 40)
+  });
+};
+
+const CountMarker: any = L.Marker.extend({
+  options: {
+    count: 1
+  },
+
+  setCount(s: number) {
+    this.options.count = s;
+  },
+
+  initialize(latlng: number[], { count, ...options }: { count: number }) {
+    L.Util.setOptions(this, {
+      count,
+      ...options
+    });
+
+    (L.CircleMarker.prototype as any).initialize.call(this, latlng, {
+      count,
+      ...options,
+      icon: makeCountIcon(count)
+    });
+  }
+});
+
+const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => void }, MarkerProps & { count: number }>(
+  ({ position, ...options }: MarkerProps & { count: number }, ctx) => {
+    const instance = new CountMarker(position, options);
+    return {
+      instance,
+      context: { ...ctx, overlayContainer: instance }
+    };
+  },
+  (marker, props, prevProps) => {
+    if (props.count !== prevProps.count) {
+      marker.setCount(props.count);
+    }
+    if (props.position !== prevProps.position) {
+      marker.setLatLng(props.position);
+    }
+
+    if (props.icon != null && props.icon !== prevProps.icon) {
+      marker.setIcon(props.icon);
+    }
+
+    if (props.zIndexOffset != null && props.zIndexOffset !== prevProps.zIndexOffset) {
+      marker.setZIndexOffset(props.zIndexOffset);
+    }
+
+    if (props.opacity != null && props.opacity !== prevProps.opacity) {
+      marker.setOpacity(props.opacity);
+    }
+
+    if (marker.dragging != null && props.draggable !== prevProps.draggable) {
+      if (props.draggable === true) {
+        marker.dragging.enable();
+      } else {
+        marker.dragging.disable();
+      }
+    }
+  }
+);
+
+const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
   if (!props.layers?.length) {
     return null;
   }
 
   const layerControls: ReactElement[] = [];
 
-  props.layers.forEach((layer) => {
+  props.layers.forEach((layer, index) => {
     if (!layer.markers?.length) {
       return;
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}`}>
-        <ReactLeafletMarkerClusterGroup chunkedLoading>
-          {layer.markers.map((item, index: number) => {
-            const id = item.key || index;
-
+      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}}`}>
+        <FeatureGroup>
+          {layer.markers.map((item) => {
+            const id = item.key;
             return (
               <Marker
-                icon={MARKER_ICON.DOT}
+                count={item.count || 0}
                 key={`marker-cluster-${id}`}
                 position={[item.position[1], item.position[0]]}
                 {...item.MarkerProps}>
@@ -79,7 +137,7 @@ const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> 
               </Marker>
             );
           })}
-        </ReactLeafletMarkerClusterGroup>
+        </FeatureGroup>
       </LayersControl.Overlay>
     );
   });
@@ -87,4 +145,4 @@ const MarkerClusterGroup: React.FC<React.PropsWithChildren<IMarkerLayersProps>> 
   return <>{layerControls}</>;
 };
 
-export default MarkerClusterGroup;
+export default MarkerCluster;

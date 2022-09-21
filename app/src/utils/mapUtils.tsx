@@ -1,7 +1,7 @@
 import { kml } from '@tmcw/togeojson';
 import bbox from '@turf/bbox';
 import { FormikContextType } from 'formik';
-import { Feature } from 'geojson';
+import { Feature, FeatureCollection } from 'geojson';
 import JSZip from 'jszip';
 import get from 'lodash-es/get';
 import { read } from 'shapefile';
@@ -39,7 +39,7 @@ export const handleShapefileUpload = async <T,>(file: File, name: string, formik
     return;
   }
   // Run the conversion
-  const collection = await read(shpFile);
+  const collection = (await read(shpFile)) as FeatureCollection;
 
   const sanitizedGeoJSON: Feature[] = [];
   if (Array.isArray(collection.features)) {

@@ -17,18 +17,15 @@ export interface IGetSearchResultsResponse {
 
 export type EmptyObject = Record<string, never>;
 
-export interface ISpatialData {
-  submission_spatial_component_id: number;
-  dataset_id?: string;
+export interface ITaxaData {
   associated_taxa?: string;
   vernacular_name?: string;
+  submission_spatial_component_id: number;
+}
+export interface ISpatialData {
+  taxa_data: ITaxaData[];
   spatial_data: FeatureCollection | EmptyObject;
 }
-
-/**
- * An interface for Spatial Metadata. Type synonymous with `GeoJsonProperties`.
- */
-export type ISpatialMetadata = Record<string, any>;
 
 /**
  * An interface for an instance of filter fields for search results

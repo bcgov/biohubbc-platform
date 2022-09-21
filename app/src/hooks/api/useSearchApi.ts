@@ -1,11 +1,6 @@
 import { AxiosInstance } from 'axios';
-import { Feature } from 'geojson';
-import {
-  IGetSearchResultsResponse,
-  IKeywordSearchResponse,
-  ISpatialData,
-  ISpatialMetadata
-} from 'interfaces/useSearchApi.interface';
+import { Feature, GeoJsonProperties } from 'geojson';
+import { IGetSearchResultsResponse, IKeywordSearchResponse, ISpatialData } from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with search functionality
@@ -44,8 +39,10 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpatialMetadata = async (submissionSpatialComponentId: number): Promise<ISpatialMetadata> => {
-    const { data } = await axios.get(`/api/dwc/spatial/${submissionSpatialComponentId}/metadata`);
+  const getSpatialMetadata = async <T = GeoJsonProperties>(submissionSpatialComponentIds: number[]): Promise<T[]> => {
+    const { data } = await axios.get<T[]>(`/api/dwc/spatial/metadata`, {
+      params: { submissionSpatialComponentIds }
+    });
 
     return data;
   };

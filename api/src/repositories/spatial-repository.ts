@@ -1,4 +1,4 @@
-import { Feature, FeatureCollection } from 'geojson';
+import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { getKnex } from '../database/db';
@@ -41,7 +41,7 @@ export interface ITransformSecureRow {
 }
 
 export interface ISubmissionSpatialComponent {
-  submission_spatial_component_id: number;
+  submission_spatial_component_ids: number[];
   submission_id: number;
   spatial_component: FeatureCollection;
   geometry: null;
@@ -60,14 +60,20 @@ export interface ISpatialComponentsSearchCriteria {
 
 export type EmptyObject = Record<string, never>;
 
+export interface ITaxaData {
+  associated_taxa?: string;
+  vernacular_name?: string;
+  submission_spatial_component_id: number;
+}
 export interface ISubmissionSpatialSearchResponseRow {
+  taxa_data: ITaxaData[];
   spatial_component: {
-    dataset_id?: number;
-    associated_taxa?: string;
-    vernacular_name?: string;
-    submission_spatial_component_id: number;
     spatial_data: FeatureCollection | EmptyObject;
   };
+}
+
+export interface ISpatialComponentFeaturePropertiesRow {
+  spatial_component_properties: GeoJsonProperties;
 }
 
 export class SpatialRepository extends BaseRepository {
@@ -380,11 +386,11 @@ export class SpatialRepository extends BaseRepository {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
+      .with('distinct_geographic_points', this._withDistinctGeographicPoints)
       .with('with_filtered_spatial_component', (qb1) => {
         // Get the spatial components that match the search filters
         qb1
           .select(
-            '*',
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
@@ -393,9 +399,18 @@ export class SpatialRepository extends BaseRepository {
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
-            )
+            ),
+            'ssc.submission_spatial_component_id',
+            'ssc.submission_id',
+            'ssc.spatial_component',
+            'ssc.geography'
           )
-          .from('submission_spatial_component as ssc');
+          .from('submission_spatial_component as ssc')
+          .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
+          .groupBy('ssc.submission_spatial_component_id')
+          .groupBy('ssc.submission_id')
+          .groupBy('ssc.spatial_component')
+          .groupBy('ssc.geography');
 
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);
@@ -409,28 +424,45 @@ export class SpatialRepository extends BaseRepository {
           this._whereDatasetIDIn(criteria.datasetID, qb1);
         }
 
-        this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
+        this._whereBoundaryIntersects(criteria.boundary, 'ssc.geography', qb1);
+      })
+      .with('with_coalesced_spatial_components', (qb7) => {
+        qb7
+          .select(
+            // Select the non-secure spatial component from the search results
+            knex.raw(
+              `
+                submission_spatial_component_id,
+                submission_id,
+                geography,
+                jsonb_build_object(
+                  'submission_spatial_component_id',
+                    wfsc.submission_spatial_component_id,
+                  'associated_taxa',
+                    wfsc.associated_taxa,
+                  'vernacular_name',
+                    wfsc.vernacular_name
+                ) taxa_data_object,
+                jsonb_build_object(
+                  'spatial_data',
+                    wfsc.spatial_component
+                ) spatial_component
+              `
+            )
+          )
+          .from(knex.raw('with_filtered_spatial_component as wfsc'));
       })
       .select(
-        // Select the non-secure spatial component from the search results
-        knex.raw(
-          `
-            jsonb_build_object(
-              'submission_spatial_component_id',
-                wfsc.submission_spatial_component_id,
-              'dataset_id',
-                wfsc.dataset_id,
-              'associated_taxa',
-                wfsc.associated_taxa,
-              'vernacular_name',
-                wfsc.vernacular_name,
-              'spatial_data',
-                wfsc.spatial_component
-            ) spatial_component
-          `
-        )
+        knex.raw('array_agg(submission_spatial_component_id) as submission_spatial_component_ids'),
+        knex.raw('array_agg(taxa_data_object) as taxa_data'),
+        knex.raw('(array_agg(spatial_component))[1] as spatial_component'),
+        'geography'
       )
-      .from(knex.raw('with_filtered_spatial_component as wfsc'));
+      .from('with_coalesced_spatial_components')
+      // Filter out secure spatial components that have no spatial representation
+      // The user is not allowed to see any aspect of these particular spatial components
+      .whereRaw("spatial_component->'spatial_data' != '{}'")
+      .groupBy('geography');
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -451,6 +483,7 @@ export class SpatialRepository extends BaseRepository {
 
     const queryBuilder = knex
       .queryBuilder()
+      .with('distinct_geographic_points', this._withDistinctGeographicPoints)
       .with('with_filtered_spatial_component_with_security_transforms', (qb1) => {
         // Get the spatial components that match the search filters, and for each record, build the array of spatial security transforms that ran against that row
         qb1
@@ -470,9 +503,11 @@ export class SpatialRepository extends BaseRepository {
             'ssc.submission_spatial_component_id',
             'ssc.submission_id',
             'ssc.spatial_component',
-            'ssc.secured_spatial_component'
+            'ssc.secured_spatial_component',
+            'ssc.geography'
           )
           .from('submission_spatial_component as ssc')
+          .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
           .leftJoin(
             'security_transform_submission as sts',
             'sts.submission_spatial_component_id',
@@ -482,7 +517,8 @@ export class SpatialRepository extends BaseRepository {
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_id')
           .groupBy('ssc.spatial_component')
-          .groupBy('ssc.secured_spatial_component');
+          .groupBy('ssc.secured_spatial_component')
+          .groupBy('ssc.geography');
         if (criteria.type?.length) {
           this._whereTypeIn(criteria.type, qb1);
         }
@@ -494,7 +530,7 @@ export class SpatialRepository extends BaseRepository {
           this._whereDatasetIDIn(criteria.datasetID, qb1);
         }
 
-        this._whereBoundaryIntersects(criteria.boundary, 'geography', qb1);
+        this._whereBoundaryIntersects(criteria.boundary, 'ssc.geography', qb1);
       })
       .with('with_user_security_transform_exceptions', (qb6) => {
         this._buildSpatialSecurityExceptions(qb6, this.connection.systemUserId());
@@ -502,7 +538,9 @@ export class SpatialRepository extends BaseRepository {
       .with('with_coalesced_spatial_components', (qb7) => {
         qb7
           .select(
-            // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
+            'submission_spatial_component_id',
+            'submission_id',
+            'geography',
             this._buildSelectForSecureNonSecureSpatialComponents()
           )
           .from(
@@ -511,13 +549,20 @@ export class SpatialRepository extends BaseRepository {
             )
           );
       })
-      .select()
+      .select(
+        knex.raw('array_agg(submission_spatial_component_id) as submission_spatial_component_ids'),
+        knex.raw('array_agg(taxa_data_object) as taxa_data'),
+        knex.raw('(array_agg(spatial_component))[1] as spatial_component'),
+        'geography'
+      )
       .from('with_coalesced_spatial_components')
       // Filter out secure spatial components that have no spatial representation
       // The user is not allowed to see any aspect of these particular spatial components
-      .whereRaw("spatial_component->'spatial_data' != '{}'");
+      .whereRaw("spatial_component->'spatial_data' != '{}'")
+      .groupBy('geography');
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+
     return response.rows;
   }
 
@@ -613,6 +658,15 @@ export class SpatialRepository extends BaseRepository {
     });
   }
 
+  _withDistinctGeographicPoints(qb1: Knex.QueryBuilder) {
+    qb1
+      .distinct()
+      .select('geography')
+      .from('submission_spatial_component')
+      .whereRaw(`geometrytype(geography) = 'POINT'`)
+      .whereRaw(`jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "Occurrence")')`);
+  }
+
   /**
    * Query builder to find spatial component from a given submission id, specifically for admin users that bypass all security
    * rules.
@@ -621,50 +675,35 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ISubmissionSpatialComponent>}
    * @memberof SpatialRepository
    */
-  async findSpatialMetadataBySubmissionSpatialComponentIdasAdmin(
-    submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialSearchResponseRow> {
+  async findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin(
+    submission_spatial_component_ids: number[]
+  ): Promise<ISpatialComponentFeaturePropertiesRow[]> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
       .with('with_filtered_spatial_component', (qb1) => {
         // Get the spatial components that match the search filters
-        qb1.select().from('submission_spatial_component as ssc').where({ submission_spatial_component_id });
+        qb1
+          .select()
+          .from('submission_spatial_component as ssc')
+          .whereIn('submission_spatial_component_id', submission_spatial_component_ids);
       })
       .select(
         // Select the non-secure spatial component from the search results
         knex.raw(
-          `
-            jsonb_build_object(
-              'submission_spatial_component_id',
-                wfsc.submission_spatial_component_id,
-              'spatial_data',
-                wfsc.spatial_component
-            ) spatial_component,
-            'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
-            'ssc.geometry',
-            'ssc.geography'
-          `
+          `jsonb_array_elements(wfsc.spatial_component -> 'features') #> '{properties}' as spatial_component_properties`
         )
       )
       .from(knex.raw('with_filtered_spatial_component as wfsc'));
 
-    const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+    const response = await this.connection.knex<ISpatialComponentFeaturePropertiesRow>(queryBuilder);
 
-    return response.rows[0];
+    return response.rows;
   }
 
-  /**
-   * Query builder to find a spatial component from a given submission id.
-   *
-   * @param {number} submission_spatial_component_id
-   * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow>}
-   * @memberof SpatialRepository
-   */
-  async findSpatialMetadataBySubmissionSpatialComponentId(
-    submission_spatial_component_id: number
-  ): Promise<ISubmissionSpatialSearchResponseRow | undefined> {
+  async findSpatialMetadataBySubmissionSpatialComponentIds(
+    submission_spatial_component_ids: number[]
+  ): Promise<ISpatialComponentFeaturePropertiesRow[]> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
@@ -695,7 +734,7 @@ export class SpatialRepository extends BaseRepository {
             'sts.submission_spatial_component_id',
             'ssc.submission_spatial_component_id'
           )
-          .whereIn('ssc.submission_spatial_component_id', [submission_spatial_component_id])
+          .whereIn('ssc.submission_spatial_component_id', submission_spatial_component_ids)
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_id')
@@ -707,25 +746,26 @@ export class SpatialRepository extends BaseRepository {
       })
       .with('with_coalesced_spatial_components', (qb7) => {
         qb7
-          .select(
-            // Select either the non-secure or secure spatial component from the search results, based on whether or not the record had security transforms applied to it and whether or not the user has the necessary exceptions
-            this._buildSelectForSecureNonSecureSpatialComponents()
-          )
+          .select(this._buildSelectForSecureNonSecureSpatialComponents())
           .from(
             knex.raw(
               'with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste'
             )
           );
       })
-      .select()
+      .select(
+        knex.raw(
+          `jsonb_array_elements(spatial_component -> 'spatial_data' -> 'features') #> '{properties}' as spatial_component_properties`
+        )
+      )
       .from('with_coalesced_spatial_components')
       // Filter out secure spatial components that have no spatial representation
       // The user is not allowed to see any aspect of these particular spatial components
       .whereRaw("spatial_component->'spatial_data' != '{}'");
 
-    const spatialComponentResponse = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+    const spatialComponentResponse = await this.connection.knex<ISpatialComponentFeaturePropertiesRow>(queryBuilder);
 
-    return spatialComponentResponse.rows?.[0];
+    return spatialComponentResponse.rows;
   }
 
   /**
@@ -740,18 +780,16 @@ export class SpatialRepository extends BaseRepository {
     const knex = getKnex();
     return knex.raw(
       `
-      submission_spatial_component_id,
-      submission_id,
       jsonb_build_object(
-          'submission_spatial_component_id',
-            wfscwst.submission_spatial_component_id,
-          'dataset_id',
-            wfscwst.dataset_id,
-          'associated_taxa',
-            wfscwst.associated_taxa,
-          'vernacular_name',
-            wfscwst.vernacular_name,
-          'spatial_data',
+        'submission_spatial_component_id',
+          wfscwst.submission_spatial_component_id,
+        'associated_taxa',
+          wfscwst.associated_taxa,
+        'vernacular_name',
+          wfscwst.vernacular_name
+      ) taxa_data_object,
+      jsonb_build_object(
+        'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component
             -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)

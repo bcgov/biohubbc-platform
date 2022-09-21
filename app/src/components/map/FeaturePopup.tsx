@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
 import Table from '@mui/material/Table';
@@ -7,10 +8,13 @@ import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
-import { Feature } from 'geojson';
+import { Feature, GeoJsonProperties } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { useState } from 'react';
+import { getFormattedDate, makeCsvObjectUrl } from 'utils/Utils';
 
 export type OccurrenceFeature = Feature & { properties: OccurrenceFeatureProperties };
 
@@ -30,11 +34,53 @@ export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
 };
 
+export enum COMMON_METADATA_PROPERTIES {
+  'vernacularName' = 'Species',
+  'individualCount' = 'Count',
+  'eventDate' = 'Date',
+  'lifeStage' = 'Life Stage',
+  'sex' = 'Sex'
+}
+
+export enum UNCOMMON_METADATA_PROPERTIES {
+  'type' = 'Type',
+  'datasetID' = 'Dataset ID',
+  'verbatimSRS' = 'Verbatim SRS',
+  'occurrenceID' = 'Occurrence ID',
+  'basisOfRecord' = 'Basis of Record',
+  'associatedTaxa' = 'Associated Taxa',
+  'verbatimCoordinates' = 'Verbatim Coordinates'
+}
+
+export const ALL_METADATA_PROPERTIES = {
+  ...COMMON_METADATA_PROPERTIES,
+  ...UNCOMMON_METADATA_PROPERTIES
+};
+
+export const formatMetadataProperty: Partial<
+  Record<keyof typeof COMMON_METADATA_PROPERTIES, (property: string) => string>
+> = {
+  eventDate: (dateString: string) => getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, dateString)
+};
+
+interface IMetadataHeaderProps {
+  type?: string;
+  date?: string;
+  index?: number;
+  length?: number;
+}
+
+type IDwCMetadata = ({ dwc: Record<string, any> } & GeoJsonProperties) | null;
+
 const useStyles = makeStyles(() => ({
   modalContent: {
     position: 'relative',
     width: 300,
     minHeight: 36
+  },
+  metadata: {
+    maxHeight: 300,
+    overflowY: 'scroll'
   },
   loading: {
     position: 'absolute',
@@ -58,52 +104,70 @@ const useStyles = makeStyles(() => ({
   }
 }));
 
-const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentId: number }>> = (props) => {
-  const { submissionSpatialComponentId } = props;
+const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponentIds: number[] }>> = (props) => {
+  const { submissionSpatialComponentIds } = props;
 
   const classes = useStyles();
   const api = useApi();
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const dataLoader = useDataLoader(() => {
-    return api.search.getSpatialMetadata(submissionSpatialComponentId);
+  const metadataLoader = useDataLoader(() => {
+    return api.search.getSpatialMetadata<IDwCMetadata>(submissionSpatialComponentIds);
   });
 
-  /**
-   * @TODO Replace this with moment/luxon date formatter
-   */
-  const formatDate = (dateString: string) => {
-    const d = new Date(dateString);
-    return d instanceof Date && !isNaN(d as unknown as number) ? d.toDateString() : dateString;
+  metadataLoader.load();
+
+  const data = metadataLoader.data || [];
+  const isEmpty = data.length === 0;
+  const metadataObjectUrl = isEmpty ? undefined : makeCsvObjectUrl(data.map((row) => row?.dwc || {}));
+
+  const handleNext = () => {
+    if (isEmpty) {
+      return;
+    }
+
+    setCurrentIndex((currentIndex + 1) % data.length);
   };
 
-  dataLoader.load();
-
-  const { isLoading, data, isReady } = dataLoader;
+  const handlePrev = () => {
+    if (isEmpty) {
+      return;
+    }
+    if (currentIndex === 0) {
+      setCurrentIndex(data.length - 1);
+    } else {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
 
   const ModalContentWrapper: React.FC<React.PropsWithChildren> = ({ children }) => (
     <div className={classes.modalContent}>{children}</div>
   );
 
-  const MetadataHeader: React.FC<React.PropsWithChildren<{ type: string; date?: string }>> = (props) => (
-    <Box mb={1}>
-      <Typography variant="overline" className={classes.pointType}>
-        {props.type || 'Feature'}
-      </Typography>
-      {props.date && (
-        <Typography className={classes.date} component="h6" variant="subtitle1">
-          {formatDate(props.date)}
+  const MetadataHeader: React.FC<React.PropsWithChildren<IMetadataHeaderProps>> = (headerProps) => {
+    const { date, index, length } = headerProps;
+
+    return (
+      <Box mb={1}>
+        <Typography variant="h6" className={classes.pointType}>
+          {length && length > 1 ? `Records (${(index || 0) + 1} of ${length})` : 'Record'}
         </Typography>
-      )}
-    </Box>
-  );
+        {date && (
+          <Typography className={classes.date} variant="subtitle1">
+            {getFormattedDate(DATE_FORMAT.ShortMediumDateFormat, date)}
+          </Typography>
+        )}
+      </Box>
+    );
+  };
 
   const NoMetadataAvailable: React.FC<React.PropsWithChildren> = () => (
-    <Typography className={classes.date} component="h6" variant="body1">
+    <Typography className={classes.date} variant="body1">
       No metadata available.
     </Typography>
   );
 
-  if (isLoading) {
+  if (metadataLoader.isLoading) {
     return (
       <ModalContentWrapper>
         <div className={classes.loading}>
@@ -113,7 +177,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  if (!data) {
+  if (data.length === 0) {
     return (
       <ModalContentWrapper>
         <NoMetadataAvailable />
@@ -121,8 +185,10 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     );
   }
 
-  const type = data.type;
-  const dwc = data.dwc;
+  const metadata = data[currentIndex];
+  const type = metadata?.type;
+  const dwc: Record<string, unknown> = metadata?.dwc || {};
+  const filteredMetadata = Object.entries(COMMON_METADATA_PROPERTIES).filter(([key]) => Boolean(dwc[key]));
 
   if (!dwc || !Object.keys(dwc).length) {
     return (
@@ -135,19 +201,42 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
 
   return (
     <ModalContentWrapper>
-      <Collapse in={isReady}>
-        <MetadataHeader type={type} date={dwc.eventDate} />
-        <Table className={classes.table}>
+      <MetadataHeader type={type} index={currentIndex} length={data.length} />
+      <Collapse in={metadataLoader.isReady} className={classes.metadata}>
+        <Table className={classes.table} sx={{ mb: 1 }}>
           <TableBody>
-            {Object.entries(dwc).map(([key, value]) => (
-              <TableRow key={key}>
-                <TableCell className={classes.tableCell}>{key}</TableCell>
-                <TableCell className={classes.tableCell}>{String(value)}</TableCell>
-              </TableRow>
-            ))}
+            {filteredMetadata.map(([key, propertyName]) => {
+              return (
+                <TableRow key={key}>
+                  <TableCell className={classes.tableCell}>{propertyName}</TableCell>
+                  <TableCell className={classes.tableCell}>
+                    {(formatMetadataProperty[key] || String)(dwc[key])}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </Collapse>
+      <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={1}>
+        {!isEmpty && data.length > 1 && (
+          <Box display="flex" sx={{ gap: 1 }}>
+            <Button size="small" variant="outlined" onClick={() => handlePrev()}>
+              Prev
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => handleNext()}>
+              Next
+            </Button>
+          </Box>
+        )}
+        {metadataObjectUrl && (
+          <Box>
+            <Button href={metadataObjectUrl} size="small" variant="contained" color="primary">
+              Download Records
+            </Button>
+          </Box>
+        )}
+      </Box>
     </ModalContentWrapper>
   );
 };

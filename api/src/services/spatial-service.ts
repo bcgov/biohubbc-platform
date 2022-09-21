@@ -1,3 +1,4 @@
+import { GeoJsonProperties } from 'geojson';
 import { IDBConnection } from '../database/db';
 import {
   IGetSecurityTransformRecord,
@@ -221,24 +222,15 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
    * @memberof SpatialService
    */
-  async findSpatialMetadataBySubmissionSpatialComponentId(
-    submissionSpatialComponentId: number
-  ): Promise<Record<string, string>> {
+  async findSpatialMetadataBySubmissionSpatialComponentIds(
+    submissionSpatialComponentIds: number[]
+  ): Promise<GeoJsonProperties[]> {
     const userService = new UserService(this.connection);
 
-    if (await userService.isSystemUserAdmin()) {
-      const adminResponse = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdasAdmin(
-        submissionSpatialComponentId
-      );
-      return (
-        (adminResponse?.spatial_component?.spatial_data?.features?.[0]?.properties as Record<string, string>) || {}
-      );
-    }
+    const response = (await userService.isSystemUserAdmin())
+      ? this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIdsAsAdmin(submissionSpatialComponentIds)
+      : this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds(submissionSpatialComponentIds);
 
-    const response = await this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentId(
-      submissionSpatialComponentId
-    );
-
-    return (response?.spatial_component?.spatial_data?.features?.[0]?.properties as Record<string, string>) || {};
+    return (await response).map((row) => row.spatial_component_properties);
   }
 }

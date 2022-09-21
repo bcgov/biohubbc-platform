@@ -16,7 +16,7 @@ import useURL from 'hooks/useURL';
 import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
-import { groupSpatialDataIntoLayers, ILayers, parseSpatialDataByType } from 'utils/spatial-utils';
+import { parseBoundaryCentroidResults, parseOccurrenceResults, parseSpatialDataByType } from 'utils/spatial-utils';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
@@ -62,7 +62,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
   const [areaStaticLayers, setAreaStaticLayers] = useState<IStaticLayer[]>([]);
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
 
-  const [layers, setLayers] = useState<ILayers>({ markerLayer: {}, staticLayer: {} });
+  const [parsedSearchResults, setParsedSearchResults] = useState<ISearchResult[]>([]);
 
   useEffect(() => {
     if (!mapDataLoader.data) {
@@ -70,11 +70,14 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data, datasetVisibility);
-    const results = groupSpatialDataIntoLayers(mapDataLoader.data);
 
-    setLayers(results);
     setMarkerLayers(result.markerLayers);
     setStaticLayers(result.staticLayers);
+
+    setParsedSearchResults([
+      ...parseOccurrenceResults(mapDataLoader.data, datasetVisibility),
+      ...parseBoundaryCentroidResults(mapDataLoader.data, datasetVisibility)
+    ]);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapDataLoader.data, datasetVisibility]);
@@ -149,34 +152,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
     }
   };
 
-  const onToggleDataVisibility = (datasets: IDatasetVisibility) => {
-    setDatasetVisibility(datasets);
-  };
-
-  const converMarkerToSearchResult = () => {
-    return Object.keys(layers?.markerLayer).map((key) => {
-      const item = layers?.markerLayer[key];
-      const searchResult = {
-        key: key,
-        name: item.layerName,
-        count: item.markers.length,
-        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      } as ISearchResult;
-      return searchResult;
-    });
-  };
-
-  const converStaticLayerToSearchResult = () => {
-    return Object.keys(layers?.staticLayer).map((key) => {
-      const item = layers?.staticLayer[key];
-      const searchResult = {
-        key: key,
-        name: item.layerName,
-        count: item.features.length,
-        visible: datasetVisibility[key] !== undefined ? datasetVisibility[key] : true
-      } as ISearchResult;
-      return searchResult;
-    });
+  const onToggleDataVisibility = (visibility: IDatasetVisibility) => {
+    setDatasetVisibility({ ...visibility });
   };
 
   return (
@@ -191,7 +168,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           zIndex: '999'
         }}>
         <SideSearchBar
-          searchResults={[...converMarkerToSearchResult(), ...converStaticLayerToSearchResult()]}
+          searchResults={parsedSearchResults}
           mapDataLoader={mapDataLoader}
           onAreaUpdate={onAreaUpdate}
           onToggleDataVisibility={onToggleDataVisibility}
