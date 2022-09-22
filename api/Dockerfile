@@ -4,7 +4,7 @@
 
 FROM node:16.13.0-alpine
 
-RUN apk update && apk add python2 make g++
+RUN yum update && yum install -y python2 make g++
 
 ENV HOME=/opt/app-root/src
 

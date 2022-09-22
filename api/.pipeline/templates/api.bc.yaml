@@ -101,9 +101,10 @@ objects:
           ref: '${SOURCE_REPOSITORY_REF}'
         type: Git
       strategy:
-        # from:
-        #   kind: ImageStreamTag
-        #   name: ${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_TAG}
+        dockerStrategy:
+          from:
+            kind: ImageStreamTag
+            name: ${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_TAG}
         type: Docker
       successfulBuildsHistoryLimit: 5
       triggers:
