@@ -1,17 +1,15 @@
-FROM node:14
+FROM node:16.13.0-alpine
 
-# RUN apt-get -qq update
-# RUN npm install -g npm
+RUN apk update && apk add python2 make g++
 
 # set variables
-ENV HOME_ROOT=/opt/app-root
 ENV HOME=/opt/app-root/src
 
 RUN mkdir -p $HOME
 
-WORKDIR $HOME_ROOT
-
 WORKDIR $HOME
+
+ENV PATH $HOME/node_modules/.bin:$PATH
 
 COPY . .
 

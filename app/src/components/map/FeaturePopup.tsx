@@ -221,10 +221,22 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
       <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={1}>
         {!isEmpty && data.length > 1 && (
           <Box display="flex" sx={{ gap: 1 }}>
-            <Button size="small" variant="outlined" onClick={() => handlePrev()}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={(event) => {
+                event.stopPropagation();
+                handlePrev();
+              }}>
               Prev
             </Button>
-            <Button size="small" variant="outlined" onClick={() => handleNext()}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleNext();
+              }}>
               Next
             </Button>
           </Box>

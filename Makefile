@@ -9,9 +9,6 @@
 # Apply the contents of the .env to the terminal, so that the docker-compose file can use them in its builds
 export $(shell sed 's/=.*//' .env)
 
-.DEFAULT : help
-.PHONY : setup close clean build-backend run-backend build-web run-web database app api db-setup db-migrate db-rollback n8n-setup n8n-export clamav install test cypress lint lint-fix format format-fix help
-
 ## ------------------------------------------------------------------------------
 ## Alias Commands
 ## - Performs logical groups of commands for your convenience
@@ -237,9 +234,9 @@ install: ## Runs `npm install` for all projects
 	@echo "==============================================="
 	@cd api && npm install && cd ..
 	@echo "==============================================="
-	@echo "Running /app install"
+	@echo "Running /app install --legacy-peer-deps"
 	@echo "==============================================="
-	@cd app && npm install && cd ..
+	@cd app && npm install --legacy-peer-deps && cd ..
 	@echo "==============================================="
 	@echo "Running /database install"
 	@echo "==============================================="
