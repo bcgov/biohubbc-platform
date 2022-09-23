@@ -4,7 +4,7 @@
 
 FROM node:16.13.0-alpine
 
-RUN yum update && yum install -y python2 make g++
+RUN yum -y update && yum -y install python2 make g++
 
 ENV HOME=/opt/app-root/src
 
@@ -20,7 +20,6 @@ ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.
 COPY ./package*.json ./
 
 RUN npm install
-
 
 # Copy the rest of the files
 COPY . ./
