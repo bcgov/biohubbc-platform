@@ -13,7 +13,7 @@ ENV PATH $HOME/node_modules/.bin:$PATH
 
 COPY . .
 
-RUN npm install --only=production
+RUN npm install
 
 # rollback the latest batch of database migrations
 CMD [ "npm", "run", "migrate-rollback" ]

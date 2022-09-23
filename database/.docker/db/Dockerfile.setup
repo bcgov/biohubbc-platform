@@ -14,7 +14,7 @@ ENV PATH $HOME/node_modules/.bin:$PATH
 
 COPY . .
 
-RUN npm install --only=production
+RUN npm install
 
 # run the database migrations and seeding
 CMD [ "npm", "run", "setup" ]
