@@ -311,7 +311,7 @@ jobs:
       - name: Build APP Image
         working-directory: "./app/.pipeline/"
         run: |
-          npm install --only=production
+          npm install --legacy-peer-deps --only=production
           DEBUG=* npm run build -- --pr=$PR_NUMBER
 
   # Deploy Database image
