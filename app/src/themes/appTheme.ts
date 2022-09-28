@@ -19,6 +19,10 @@ const appTheme = createTheme({
     h4: {
       fontSize: '1.25rem',
       fontWeight: 700
+    },
+    h5: {
+      fontSize: '1rem',
+      fontWeight: 700
     }
   },
   palette: {

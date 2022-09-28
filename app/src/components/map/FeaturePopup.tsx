@@ -1,4 +1,7 @@
+import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
@@ -78,10 +81,6 @@ const useStyles = makeStyles(() => ({
     width: 300,
     minHeight: 36
   },
-  metadata: {
-    maxHeight: 300,
-    overflowY: 'scroll'
-  },
   loading: {
     position: 'absolute',
     top: '50%',
@@ -94,13 +93,6 @@ const useStyles = makeStyles(() => ({
   date: {
     margin: 0,
     lineHeight: 'unset'
-  },
-  table: {
-    marginTop: 16
-  },
-  tableCell: {
-    padding: 8,
-    fontSize: '0.625rem'
   }
 }));
 
@@ -148,8 +140,8 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
     const { date, index, length } = headerProps;
 
     return (
-      <Box mb={1}>
-        <Typography variant="h6" className={classes.pointType}>
+      <Box pt={0.5} pb={0.75}>
+        <Typography variant="h5" component="h3" className={classes.pointType}>
           {length && length > 1 ? `Records (${(index || 0) + 1} of ${length})` : 'Record'}
         </Typography>
         {date && (
@@ -202,36 +194,64 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
   return (
     <ModalContentWrapper>
       <MetadataHeader type={type} index={currentIndex} length={data.length} />
-      <Collapse in={metadataLoader.isReady} className={classes.metadata}>
-        <Table className={classes.table} sx={{ mb: 1 }}>
+      <Divider sx={{ mt: 1 }}></Divider>
+      <Collapse in={metadataLoader.isReady}>
+        <Table sx={{ '& td': { py: '8px', px: 0, fontSize: '13px' } }}>
           <TableBody>
             {filteredMetadata.map(([key, propertyName]) => {
               return (
                 <TableRow key={key}>
-                  <TableCell className={classes.tableCell}>{propertyName}</TableCell>
-                  <TableCell className={classes.tableCell}>
-                    {(formatMetadataProperty[key] || String)(dwc[key])}
-                  </TableCell>
+                  <TableCell>{propertyName}</TableCell>
+                  <TableCell>{(formatMetadataProperty[key] || String)(dwc[key])}</TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       </Collapse>
-      <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={1}>
+      <Box display="flex" justifyContent="space-between" sx={{ gap: 1 }} mt={1.5}>
         {!isEmpty && data.length > 1 && (
           <Box display="flex" sx={{ gap: 1 }}>
-            <Button size="small" variant="outlined" onClick={() => handlePrev()}>
-              Prev
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<Icon path={mdiChevronLeft} size={1} />}
+              onClick={() => handlePrev()}
+              sx={{
+                fontWeight: 700,
+                color: 'text.secondary',
+                '& .MuiButton-startIcon': {
+                  mr: 0.2
+                }
+              }}>
+              PREV
             </Button>
-            <Button size="small" variant="outlined" onClick={() => handleNext()}>
-              Next
+            <Button
+              size="small"
+              variant="text"
+              endIcon={<Icon path={mdiChevronRight} size={1} />}
+              onClick={() => handleNext()}
+              sx={{
+                fontWeight: 700,
+                color: 'text.secondary',
+                '& .MuiButton-endIcon': {
+                  ml: 0.2
+                }
+              }}>
+              NEXT
             </Button>
           </Box>
         )}
         {metadataObjectUrl && (
           <Box>
-            <Button href={metadataObjectUrl} size="small" variant="contained" color="primary">
+            <Button
+              href={metadataObjectUrl}
+              size="small"
+              variant="contained"
+              color="primary"
+              sx={{
+                color: '#ffffff !important',
+              }}>
               Download Records
             </Button>
           </Box>
