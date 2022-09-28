@@ -3,8 +3,6 @@ kind: Template
 metadata:
   name: postgresql
   creationTimestamp: null
-annotations:
-  iconClass: iconpostgresql
 parameters:
   - name: NAME
     displayName: Name
