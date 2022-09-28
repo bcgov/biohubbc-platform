@@ -1,10 +1,10 @@
 import { mdiChevronLeft, mdiChevronRight } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
+import Divider from '@mui/material/Divider';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -250,7 +250,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
               variant="contained"
               color="primary"
               sx={{
-                color: '#ffffff !important',
+                color: '#ffffff !important'
               }}>
               Download Records
             </Button>
