@@ -1,8 +1,8 @@
 import { createLayerComponent } from '@react-leaflet/core';
 import L, { LatLngExpression } from 'leaflet';
 import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+// import 'leaflet.markercluster/dist/MarkerCluster.css';
+// import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { ReactElement } from 'react';
 import { FeatureGroup, LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
 
@@ -31,7 +31,7 @@ const makeCountIcon = (count: number) => {
   return L.divIcon({
     html: `<div><span>${count}</span></div>`,
     className: 'marker-cluster marker-cluster-small',
-    iconSize: new L.Point(40, 40)
+    iconSize: new L.Point(24, 24)
   });
 };
 
