@@ -15,7 +15,8 @@
   "module": {
     "db": "biohub-platform-db",
     "api": "biohub-platform-api",
-    "app": "biohub-platform-app"
+    "app": "biohub-platform-app",
+    "geoserver": "biohub-platform-geoserver"
   },
   "staticUrls": {
     "dev": "dev-biohub-platform.apps.silver.devops.gov.bc.ca",
@@ -26,6 +27,11 @@
     "dev": "api-dev-biohub-platform.apps.silver.devops.gov.bc.ca",
     "test": "api-test-biohub-platform.apps.silver.devops.gov.bc.ca",
     "prod": "api-biohub-platform.apps.silver.devops.gov.bc.ca"
+  },
+  "staticUrlsGeoServer": {
+    "dev": "geoserver-dev-biohub-platform.apps.silver.devops.gov.bc.ca",
+    "test": "geoserver-test-biohub-platform.apps.silver.devops.gov.bc.ca",
+    "prod": "geoserver-biohub-platform.apps.silver.devops.gov.bc.ca"
   },
   "staticUrlsN8N": {
     "dev": "n8n-dev.apps.silver.devops.gov.bc.ca",

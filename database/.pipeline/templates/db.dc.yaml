@@ -5,8 +5,6 @@ labels:
 metadata:
   creationTimestamp: null
   name: biohub-platform-db-dc
-annotations:
-  iconClass: iconpostgresql
 parameters:
   - description: The name of the OpenShift Service exposed for the database.
     displayName: Database Service Name
