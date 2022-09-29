@@ -1,0 +1,129 @@
+kind: Template
+apiVersion: template.openshift.io/v1
+description: A template that can be used to produce a GeoServer BuildConfig and ImageStream.
+metadata:
+  name: kartoza-geoserver-bc
+  labels:
+    build: kartoza-geoserver-bc
+    app: kartoza-geoserver
+parameters:
+  - name: NAME
+    description: The name assigned to all of the resources.
+    required: true
+    value: kartoza-geoserver
+  - name: SUFFIX
+    description: A name suffix used for all objects
+    required: false
+    value: ""
+  - name: GIT_REPO_URL
+    description: The git repo containing the Dockerfile for this build.
+    required: true
+    value: https://github.com/NickPhura/docker-geoserver.git
+  - name: GIT_REF
+    description: The specific repo reference (eg. dev, 1.0.0, <commit sha>)
+    required: true
+    value: develop
+  - name: SOURCE_CONTEXT_DIR
+    description: The repository path to the Dockerfile.
+    required: true
+    value: /
+  - name: DOCKERFILE_PATH
+    description: The path to the docker file (note. this is relative to the SOURCE_CONTEXT_DIR).
+    required: true
+    value: Dockerfile
+  - name: VERSION
+    description: The image steam tag.
+    required: true
+    value: latest
+  - name: CONFIG_MAP_NAME
+    description: The config map that contains the environment variables for this docker image build.
+    required: true
+    value: "kartoza-geoserver-cm"
+  - name: SECRET_NAME
+    description: The secret that contains the sensitive environment variables for this docker image build.
+    required: true
+    value: "kartoza-geoserver"
+  - name: CPU_LIMIT
+    description: The resources CPU limit (in cores) for this build; 0 = use default.
+    required: true
+    value: "0"
+  - name: MEMORY_LIMIT
+    description: The resources Memory limit (in M, Mi, G, Gi, etc) for this build; 0M = use default.
+    required: true
+    value: 0M
+  - name: CPU_REQUEST
+    description: The resources CPU request (in cores) for this build; 0 = use default.
+    required: true
+    value: "0"
+  - name: MEMORY_REQUEST
+    description: The resources Memory request (in M, Mi, G, Gi, etc) for this build; 0M = use default.
+    required: true
+    value: 0M
+objects:
+  - kind: ImageStream
+    apiVersion: image.openshift.io/v1
+    metadata:
+      name: ${NAME}
+      labels:
+        app: ${NAME}
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      name: ${NAME}
+      labels:
+        app: ${NAME}
+    spec:
+      source:
+        type: Git
+        git:
+          uri: ${GIT_REPO_URL}
+          ref: ${GIT_REF}
+        contextDir: ${SOURCE_CONTEXT_DIR}
+      strategy:
+        type: Docker
+        dockerStrategy:
+          dockerfilePath: "${DOCKERFILE_PATH}"
+          env:
+            - name: GEOSERVER_ADMIN_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ${CONFIG_MAP_NAME}
+                  key: GEOSERVER_ADMIN_USER
+            - name: GEOSERVER_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ${SECRET_NAME}
+                  key: geoserver-admin-password
+            - name: ROOT_WEBAPP_REDIRECT
+              valueFrom:
+                configMapKeyRef:
+                  name: ${CONFIG_MAP_NAME}
+                  key: ROOT_WEBAPP_REDIRECT
+            - name: TIMEZONE
+              valueFrom:
+                configMapKeyRef:
+                  name: ${CONFIG_MAP_NAME}
+                  key: TIMEZONE
+            - name: INITIAL_MEMORY
+              valueFrom:
+                configMapKeyRef:
+                  name: ${CONFIG_MAP_NAME}
+                  key: INITIAL_MEMORY
+            - name: MAXIMUM_MEMORY
+              valueFrom:
+                configMapKeyRef:
+                  name: ${CONFIG_MAP_NAME}
+                  key: MAXIMUM_MEMORY
+      output:
+        to:
+          kind: ImageStreamTag
+          name: "${NAME}:${VERSION}"
+      resources:
+        requests:
+          cpu: ${CPU_REQUEST}
+          memory: ${MEMORY_REQUEST}
+        limits:
+          cpu: ${CPU_LIMIT}
+          memory: ${MEMORY_LIMIT}
+      runPolicy: SerialLatestOnly
+      failedBuildsHistoryLimit: 5
