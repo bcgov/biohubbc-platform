@@ -25,7 +25,7 @@ const renderContainer = () => {
   );
 };
 
-jest.mock('../../components/map/components/SideSearchBar', () => () => <div></div>);
+jest.mock('./SideSearchBar', () => () => <div></div>);
 
 describe('MapPage', () => {
   beforeEach(() => {
