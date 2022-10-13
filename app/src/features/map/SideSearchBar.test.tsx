@@ -5,7 +5,7 @@ import { ISpatialData } from 'interfaces/useSearchApi.interface';
 import { cleanup, render } from 'test-helpers/test-utils';
 import SideSearchBar from './SideSearchBar';
 
-jest.mock('../../../hooks/useApi');
+jest.mock('../../hooks/useApi');
 
 const mockBiohubApi = useApi as jest.Mock;
 
