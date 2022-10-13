@@ -4,7 +4,10 @@ import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
-import MultiAutocompleteField, { handleSortSelectedOption, IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import MultiAutocompleteField, {
+  handleSortSelectedOption,
+  IMultiAutocompleteFieldOption
+} from 'components/fields/MultiAutocompleteField';
 import MultiSelectList from 'components/fields/MultiSelectList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
@@ -47,11 +50,10 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
   const formikProps = useFormikContext<IDatasetSearchForm>();
   const [speciesList, setSpeciesList] = useState<IMultiAutocompleteFieldOption[]>([]);
 
-  const convertOptions = (value: any): IMultiAutocompleteFieldOption[] => (
+  const convertOptions = (value: any): IMultiAutocompleteFieldOption[] =>
     value.map((item: any) => {
       return { value: item.code, label: item.label };
-    })
-  );
+    });
 
   const handleGetSpeciesList = async (value: string) => {
     const response = await api.taxonomy.searchSpecies(value);
@@ -67,7 +69,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formikProps.values.area]);
 
-  const curatedSpeciesList = handleSortSelectedOption(formikProps?.values?.species_list || [], speciesList)
+  const curatedSpeciesList = handleSortSelectedOption(formikProps?.values?.species_list || [], speciesList);
 
   return (
     <>

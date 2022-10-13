@@ -54,14 +54,13 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
   }, [inputValue]);
 
   const getExistingValue = (formikValues: IMultiAutocompleteFieldOption[]): IMultiAutocompleteFieldOption[] => {
-    const existingValues: IMultiAutocompleteFieldOption[] = get(formikValues, props.id)
+    const existingValues: IMultiAutocompleteFieldOption[] = get(formikValues, props.id);
     if (!existingValues) {
       return [];
     }
 
     return options.filter((option) => existingValues.includes(option));
   };
-
 
   const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
     setOptions(handleSortSelectedOption(selectedOptions, options));
