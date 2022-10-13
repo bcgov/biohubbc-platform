@@ -23,14 +23,24 @@ export interface IMultiAutocompleteField {
   handleSearchResults?: (input: string) => Promise<void>;
 }
 
+export const handleSortSelectedOption = (
+  selected: IMultiAutocompleteFieldOption[],
+  optionsLeft: IMultiAutocompleteFieldOption[]
+) => {
+  const selectedOptionsValue = selected.map((item) => item.value);
+  const remainingOptions = optionsLeft.filter((item) => !selectedOptionsValue.includes(item.value));
+
+  return [...selected, ...remainingOptions];
+};
+
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
-  const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption>();
-  const [inputValue, setInputValue] = useState('');
+  const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption[]>();
   const [options, setOptions] = useState<IMultiAutocompleteFieldOption[]>(props.options || []); // store options if provided
+  const [inputValue, setInputValue] = useState('');
   const [selectedOptions, setSelectedOptions] = useState<IMultiAutocompleteFieldOption[]>([]);
 
   useEffect(() => {
-    handleSortSelectedOption(selectedOptions, props.options);
+    setOptions(handleSortSelectedOption(selectedOptions, props.options));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.options]);
@@ -43,25 +53,18 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue]);
 
-  const getExistingValue = (existingValues: any[]): IMultiAutocompleteFieldOption[] => {
+  const getExistingValue = (formikValues: IMultiAutocompleteFieldOption[]): IMultiAutocompleteFieldOption[] => {
+    const existingValues: IMultiAutocompleteFieldOption[] = get(formikValues, props.id)
     if (!existingValues) {
       return [];
     }
+
     return options.filter((option) => existingValues.includes(option));
   };
 
-  const handleSortSelectedOption = (
-    selected: IMultiAutocompleteFieldOption[],
-    optionsLeft: IMultiAutocompleteFieldOption[]
-  ) => {
-    const selectedOptionsValue = selected.map((item) => item.value);
-    const remainingOptions = optionsLeft.filter((item) => !selectedOptionsValue.includes(item.value));
-
-    setOptions([...selected, ...remainingOptions]);
-  };
 
   const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
-    handleSortSelectedOption(selectedOptions, options);
+    setOptions(handleSortSelectedOption(selectedOptions, options));
     setSelectedOptions(selectedOptions);
     setFieldValue(
       props.id,
@@ -109,7 +112,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     <Autocomplete
       multiple
       autoHighlight={true}
-      value={getExistingValue(get(values, props.id))}
+      value={getExistingValue(values)}
       id={props.id}
       options={options}
       getOptionLabel={(option) => option.label}

@@ -4,7 +4,7 @@ import FormControl from '@mui/material/FormControl';
 import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
-import MultiAutocompleteField, { IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
+import MultiAutocompleteField, { handleSortSelectedOption, IMultiAutocompleteFieldOption } from 'components/fields/MultiAutocompleteField';
 import MultiSelectList from 'components/fields/MultiSelectList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
 import { IFormikAreaUpload } from 'components/upload/UploadArea';
@@ -33,8 +33,7 @@ export const DatasetSearchFormYupSchema = yup.object().shape({
 
 export interface IDatasetSearchFormProps {
   onAreaUpdate: (area: IFormikAreaUpload[]) => void;
-
-  toggleForm: () => void;
+  toggleShowForm: () => void;
   hasResults: boolean;
 }
 
@@ -45,15 +44,14 @@ export interface IDatasetSearchFormProps {
  */
 const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
   const api = useApi();
-
   const formikProps = useFormikContext<IDatasetSearchForm>();
-
   const [speciesList, setSpeciesList] = useState<IMultiAutocompleteFieldOption[]>([]);
 
-  const convertOptions = (value: any): IMultiAutocompleteFieldOption[] =>
+  const convertOptions = (value: any): IMultiAutocompleteFieldOption[] => (
     value.map((item: any) => {
       return { value: item.code, label: item.label };
-    });
+    })
+  );
 
   const handleGetSpeciesList = async (value: string) => {
     const response = await api.taxonomy.searchSpecies(value);
@@ -68,6 +66,8 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formikProps.values.area]);
+
+  const curatedSpeciesList = handleSortSelectedOption(formikProps?.values?.species_list || [], speciesList)
 
   return (
     <>
@@ -106,7 +106,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           <MultiAutocompleteField
             id={`species_list`}
             label={'Select Species'}
-            options={speciesList}
+            options={curatedSpeciesList}
             required={false}
             handleSearchResults={handleGetSpeciesList}
           />
