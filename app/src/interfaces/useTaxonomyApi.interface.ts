@@ -6,7 +6,7 @@ export interface ITaxonomySearchResponse {
   }>;
 }
 
-export interface ITaxonomyListRespone {
+export interface ITaxonomyListResponse {
   searchResponse: Array<{
     id: string;
     label: string;

@@ -5,7 +5,6 @@ import Autocomplete, { AutocompleteInputChangeReason, createFilterOptions } from
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
-import get from 'lodash-es/get';
 import { useEffect, useState } from 'react';
 
 export interface IMultiAutocompleteFieldOption {
@@ -34,9 +33,11 @@ export const handleSortSelectedOption = (
 };
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
-  const { values, touched, errors, setFieldValue } = useFormikContext<IMultiAutocompleteFieldOption[]>();
-  const [options, setOptions] = useState<IMultiAutocompleteFieldOption[]>(props.options || []); // store options if provided
+  const { getFieldMeta, setFieldValue } = useFormikContext()
+  const { value, touched, error } = getFieldMeta<IMultiAutocompleteFieldOption[]>(props.id);
+
   const [inputValue, setInputValue] = useState('');
+  const [options, setOptions] = useState<IMultiAutocompleteFieldOption[]>(props.options || []); // store options if provided
   const [selectedOptions, setSelectedOptions] = useState<IMultiAutocompleteFieldOption[]>([]);
 
   useEffect(() => {
@@ -52,15 +53,6 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue]);
-
-  const getExistingValue = (formikValues: IMultiAutocompleteFieldOption[]): IMultiAutocompleteFieldOption[] => {
-    const existingValues: IMultiAutocompleteFieldOption[] = get(formikValues, props.id);
-    if (!existingValues) {
-      return [];
-    }
-
-    return options.filter((option) => existingValues.includes(option));
-  };
 
   const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
     setOptions(handleSortSelectedOption(selectedOptions, options));
@@ -107,11 +99,15 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     );
   };
 
+  const existingValues: IMultiAutocompleteFieldOption[] = value && value.length > 0
+    ? options.filter((option) => value.includes(option))
+    : [];
+
   return (
     <Autocomplete
       multiple
       autoHighlight={true}
-      value={getExistingValue(values)}
+      value={existingValues}
       id={props.id}
       options={options}
       getOptionLabel={(option) => option.label}
@@ -139,8 +135,8 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
           label={props.label}
           variant="outlined"
           fullWidth
-          error={get(touched, props.id) && Boolean(get(errors, props.id))}
-          helperText={get(touched, props.id) && get(errors, props.id)}
+          error={touched && Boolean(error)}
+          helperText={touched && error}
           placeholder={'Begin typing to filter results...'}
           InputLabelProps={{
             shrink: true

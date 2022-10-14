@@ -7,7 +7,7 @@ import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
-import SideSearchBar from 'features/map/SideSearchBar';
+import SideSearchBar from './SideSearchBar';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';

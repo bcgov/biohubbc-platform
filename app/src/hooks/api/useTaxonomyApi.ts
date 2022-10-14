@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { ITaxonomyListRespone, ITaxonomySearchResponse } from 'interfaces/useTaxonomyApi.interface';
+import { ITaxonomyListResponse, ITaxonomySearchResponse } from 'interfaces/useTaxonomyApi.interface';
 import qs from 'qs';
 
 const useTaxonomyApi = (axios: AxiosInstance) => {
@@ -11,7 +11,7 @@ const useTaxonomyApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSpeciesFromIds = async (value: number[]): Promise<ITaxonomyListRespone> => {
+  const getSpeciesFromIds = async (value: number[]): Promise<ITaxonomyListResponse> => {
     axios.defaults.params = { ids: qs.stringify(value) };
 
     const { data } = await axios.get(`/api/taxonomy/species/list`);
