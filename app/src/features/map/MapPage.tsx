@@ -7,7 +7,6 @@ import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { IDatasetVisibility, ISearchResult } from 'features/datasets/components/SearchResultList';
-import SideSearchBar from './SideSearchBar';
 import { Feature, Polygon } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -17,6 +16,7 @@ import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseBoundaryCentroidResults, parseOccurrenceResults, parseSpatialDataByType } from 'utils/spatial-utils';
+import SideSearchBar from './SideSearchBar';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();

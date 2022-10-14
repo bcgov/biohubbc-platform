@@ -33,7 +33,7 @@ export const handleSortSelectedOption = (
 };
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
-  const { getFieldMeta, setFieldValue } = useFormikContext()
+  const { getFieldMeta, setFieldValue } = useFormikContext();
   const { value, touched, error } = getFieldMeta<IMultiAutocompleteFieldOption[]>(props.id);
 
   const [inputValue, setInputValue] = useState('');
@@ -99,9 +99,8 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
     );
   };
 
-  const existingValues: IMultiAutocompleteFieldOption[] = value && value.length > 0
-    ? options.filter((option) => value.includes(option))
-    : [];
+  const existingValues: IMultiAutocompleteFieldOption[] =
+    value && value.length > 0 ? options.filter((option) => value.includes(option)) : [];
 
   return (
     <Autocomplete
