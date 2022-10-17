@@ -29,8 +29,6 @@ describe('Header', () => {
         username: 'testusername',
         displayName: 'IDID / testusername',
         email: 'test@email',
-        firstName: 'testfirst',
-        lastName: 'testlast',
         refresh: () => {}
       }
     });
@@ -67,8 +65,6 @@ describe('Header', () => {
         username: 'testusername',
         displayName: 'testdisplayname',
         email: 'test@email.com',
-        firstName: 'testfirst',
-        lastName: 'testlast',
         refresh: () => {}
       }
     });
@@ -101,8 +97,6 @@ describe('Header', () => {
         username: 'testusername',
         displayName: 'testdisplayname',
         email: 'test@email.com',
-        firstName: 'testfirst',
-        lastName: 'testlast',
         refresh: () => {}
       }
     });
@@ -136,8 +130,6 @@ describe('Header', () => {
           username: 'testusername',
           displayName: 'testdisplayname',
           email: 'test@email.com',
-          firstName: 'testfirst',
-          lastName: 'testlast',
           refresh: () => {}
         }
       });

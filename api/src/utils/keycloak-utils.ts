@@ -10,6 +10,7 @@ const raw_idir_identity_sources = ['IDIR'];
  * @return {*} {(string | null)}
  */
 export const getUserIdentifier = (keycloakToken: object): string | null => {
+  return 'nphura';
   const userIdentifier = keycloakToken?.['preferred_username']?.split('@')?.[0];
 
   if (!userIdentifier) {
@@ -27,6 +28,7 @@ export const getUserIdentifier = (keycloakToken: object): string | null => {
  * @return {*} {SYSTEM_IDENTITY_SOURCE}
  */
 export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
+  return SYSTEM_IDENTITY_SOURCE.IDIR;
   const userIdentitySource = keycloakToken?.['preferred_username']?.split('@')?.[1]?.toUpperCase();
 
   if (raw_bceid_identity_sources.includes(userIdentitySource)) {

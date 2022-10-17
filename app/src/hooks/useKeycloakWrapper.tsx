@@ -12,20 +12,30 @@ export enum SYSTEM_IDENTITY_SOURCE {
 const raw_bceid_identity_sources = ['BCEID-BASIC-AND-BUSINESS', 'BCEID'];
 const raw_idir_identity_sources = ['IDIR'];
 
-/**
- * IUserInfo interface, represents the userinfo provided by keycloak.
- *
- * @export
- * @interface IUserInfo
- */
 export interface IUserInfo {
-  name?: string;
-  preferred_username?: string;
-  given_name?: string;
-  username?: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
+  sub: string;
+  email_verified: boolean;
+  preferred_username: string;
+  display_name: string;
+  email: string;
+}
+
+export interface IIDIRUserInfo extends IUserInfo {
+  idir_user_guid: string;
+  idir_username: string;
+  name: string;
+  given_name: string;
+  family_name: string;
+}
+
+interface IBCEIDBasicUserInfo extends IUserInfo {
+  bceid_user_guid: string;
+  bceid_username: string;
+}
+
+export interface IBCEIDBusinessUserInfo extends IBCEIDBasicUserInfo {
+  bceid_business_guid: string;
+  bceid_business_name: string;
 }
 
 /**
@@ -84,8 +94,6 @@ export interface IKeycloakWrapper {
   username: string | undefined;
   displayName: string | undefined;
   email: string | undefined;
-  firstName: string | undefined;
-  lastName: string | undefined;
   systemUserId: number;
   /**
    * Force this keycloak wrapper to refresh its data.
@@ -109,7 +117,11 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   const biohubApi = useApi();
 
   const keycloakUserDataLoader = useDataLoader(async () => {
-    return (keycloak && (keycloak.loadUserInfo() as IUserInfo)) || undefined;
+    return (
+      (keycloak &&
+        (keycloak.loadUserInfo() as unknown as IIDIRUserInfo | IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)) ||
+      undefined
+    );
   });
 
   const userDataLoader = useDataLoader(() => biohubApi.user.getUser());
@@ -142,13 +154,16 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @return {*} {(string | null)}
    */
   const getUserIdentifier = useCallback((): string | null => {
-    const userIdentifier = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[0];
+    // const userIdentifier = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[0];
+    const userIdentifier =
+      (keycloakUserDataLoader.data as IIDIRUserInfo)?.idir_username ||
+      (keycloakUserDataLoader.data as IBCEIDBasicUserInfo)?.bceid_username;
 
     if (!userIdentifier) {
       return null;
     }
 
-    return userIdentifier;
+    return userIdentifier.toLowerCase();
   }, [keycloakUserDataLoader.data]);
 
   /**
@@ -198,23 +213,18 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   const username = (): string | undefined => {
-    return keycloakUserDataLoader.data?.preferred_username;
+    return (
+      (keycloakUserDataLoader.data as IIDIRUserInfo)?.idir_username ||
+      (keycloakUserDataLoader.data as IBCEIDBasicUserInfo)?.bceid_username
+    );
   };
 
   const displayName = (): string | undefined => {
-    return keycloakUserDataLoader.data?.name || keycloakUserDataLoader.data?.preferred_username;
+    return keycloakUserDataLoader.data?.display_name;
   };
 
   const email = (): string | undefined => {
     return keycloakUserDataLoader.data?.email;
-  };
-
-  const firstName = (): string | undefined => {
-    return keycloakUserDataLoader.data?.firstName;
-  };
-
-  const lastName = (): string | undefined => {
-    return keycloakUserDataLoader.data?.lastName;
   };
 
   const refresh = () => {
@@ -233,8 +243,6 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     username: username(),
     email: email(),
     displayName: displayName(),
-    firstName: firstName(),
-    lastName: lastName(),
     systemUserId: systemUserId(),
     refresh
   };

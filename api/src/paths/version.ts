@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { KeycloakService } from '../services/keycloak-service';
 
 export const GET: Operation = [getVersionInformation()];
 
@@ -43,7 +44,14 @@ GET.apiDoc = {
  * @returns {RequestHandler}
  */
 export function getVersionInformation(): RequestHandler {
-  return (req, res) => {
+  return async (req, res) => {
+    const keycloakService = new KeycloakService();
+
+    const response = await keycloakService.getUserByUsername('c13ed91ba1fa4d8faac95ca0e4dc73f3@bceidbusiness');
+
+    console.log('======================================');
+    console.log(JSON.stringify(response));
+
     const versionInfo = {
       version: process.env.VERSION,
       environment: process.env.NODE_ENV,

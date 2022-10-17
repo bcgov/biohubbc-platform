@@ -15,8 +15,6 @@ const SystemUserAuthState: IAuthState = {
     username: 'testusername',
     displayName: 'testdisplayname',
     email: 'test@email.com',
-    firstName: 'testfirst',
-    lastName: 'testlast',
     systemUserId: 1,
     refresh: () => {
       // do nothing
