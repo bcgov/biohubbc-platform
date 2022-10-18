@@ -1,8 +1,8 @@
 import { Formik } from 'formik';
 import { render } from 'test-helpers/test-utils';
 import MultiAutocompleteField, {
-  sortAutocompleteOptions,
-  IMultiAutocompleteFieldOption
+  IMultiAutocompleteFieldOption,
+  sortAutocompleteOptions
 } from './MultiAutocompleteField';
 
 describe('MultiAutocompleteField', () => {
