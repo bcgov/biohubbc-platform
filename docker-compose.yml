@@ -305,6 +305,23 @@ services:
         condition: service_healthy
     command: ["npm", "run", "migrate-rollback"]
 
+  geoserver:
+    image: ${DOCKER_PROJECT_NAME}-geoserver-${DOCKER_NAMESPACE}-img
+    container_name: ${DOCKER_PROJECT_NAME}-geoserver-${DOCKER_NAMESPACE}-container
+    build:
+      context: https://github.com/NickPhura/docker-geoserver.git#develop
+      dockerfile: ./Dockerfile
+    ports:
+      - ${GEOSERVER_PORT}:8080
+    environment:
+      - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER}
+      - GEOSERVER_ADMIN_PASSWORD=${GEOSERVER_ADMIN_PASSWORD}
+      - TIMEZONE=${GEOSERVER_TIMEZONE}
+      - ROOT_WEBAPP_REDIRECT=${ROOT_WEBAPP_REDIRECT}
+      - TOMCAT_EXTRAS=false
+    networks:
+      - biohubbc-network
+
 networks:
   biohubbc-network:
     driver: bridge
