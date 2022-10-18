@@ -20,7 +20,7 @@
  */
 const express = require('express');
 const path = require('path');
-const request = require('request');
+const axios = require('axios');
 
 /**
  * @description Bootstrap script to start app web server
@@ -37,7 +37,7 @@ const request = require('request');
   app.use(express.static(resourcePath));
 
   // App config
-  app.use('/config', (_, resp) => {
+  app.use('/config', (_, res) => {
     const config = {
       API_HOST: process.env.REACT_APP_API_HOST || 'localhost',
       N8N_HOST: process.env.REACT_APP_N8N_HOST,
@@ -54,22 +54,22 @@ const request = require('request');
       MAX_UPLOAD_NUM_FILES: Number(process.env.REACT_APP_MAX_UPLOAD_NUM_FILES) || 10,
       MAX_UPLOAD_FILE_SIZE: Number(process.env.REACT_APP_MAX_UPLOAD_FILE_SIZE) || 52428800
     };
-    resp.status(200).json(config);
+    res.status(200).json(config);
   });
 
   // Health check
-  app.use('/healthcheck', (_, resp) => {
+  app.use('/healthcheck', (_, res) => {
     // Request server api
     const host = process.env.REACT_APP_API_HOST || process.env.LOCAL_API_HOST || 'localhost';
-    request(`https://${host}/`, (err, res) => {
+    axios(`https://${host}/`).then((err, res) => {
       if (err) {
         console.log(`Error: ${err}, host: ${host}`);
-        resp.status(404).json({ error: `${err}`, host: host });
+        res.status(404).json({ error: `${err}`, host: host });
       } else {
         if (res.statusCode === 200) {
-          resp.status(200).json({ success: true });
+          res.status(200).json({ success: true });
         } else {
-          resp.status(404).json({ error: 'API not responding' });
+          res.status(404).json({ error: 'API not responding' });
         }
       }
     });

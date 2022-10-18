@@ -72,7 +72,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     const signingKey = key.getPublicKey();
 
     // Verify token using public signing key
-    const verifiedToken = verify(tokenString, signingKey, { issuer: [KEYCLOAK_ISSUER] });
+    const verifiedToken = verify(tokenString, signingKey, { issuer: [KEYCLOAK_ISSUER] }); // TODO add audience check here
 
     if (!verifiedToken) {
       throw new HTTP401('Access Denied');
