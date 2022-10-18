@@ -22,14 +22,24 @@ export interface IMultiAutocompleteField {
   handleSearchResults?: (input: string) => Promise<void>;
 }
 
-export const handleSortSelectedOption = (
-  selected: IMultiAutocompleteFieldOption[],
-  optionsLeft: IMultiAutocompleteFieldOption[]
+/**
+ * Sorts a set of autocomplete options so that selected options become prepended to the start
+ * of the options list. Because the Autocomplete component uses both the list of selected values
+ * and the list of options in order to display selected autocomplete values, prepending selected
+ * options to the start of the list ensures that they will be included when the selected options
+ * are rendered.
+ * @param selectedOptions The list of options that are selected by an Autocomplete.
+ * @param remainingOptions The total list of options that are selectable by an Autocomplete.
+ * @returns The total list of options selectable by an Autocomplete, with the selected options
+ * prepended to the start of the list, without duplicates.
+ */
+export const sortAutocompleteOptions = (
+  selectedOptions: IMultiAutocompleteFieldOption[],
+  remainingOptions: IMultiAutocompleteFieldOption[]
 ) => {
-  const selectedOptionsValue = selected.map((item) => item.value);
-  const remainingOptions = optionsLeft.filter((item) => !selectedOptionsValue.includes(item.value));
+  const selectedValues = selectedOptions.map((item) => item.value);
 
-  return [...selected, ...remainingOptions];
+  return [...selectedOptions, ...remainingOptions.filter((item) => !selectedValues.includes(item.value))];
 };
 
 const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
@@ -41,7 +51,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
   const [selectedOptions, setSelectedOptions] = useState<IMultiAutocompleteFieldOption[]>([]);
 
   useEffect(() => {
-    setOptions(handleSortSelectedOption(selectedOptions, props.options));
+    setOptions(sortAutocompleteOptions(selectedOptions, props.options));
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.options]);
@@ -55,7 +65,7 @@ const MultiAutocompleteField: React.FC<IMultiAutocompleteField> = (props) => {
   }, [inputValue]);
 
   const handleOnChange = (_event: React.ChangeEvent<any>, selectedOptions: IMultiAutocompleteFieldOption[]) => {
-    setOptions(handleSortSelectedOption(selectedOptions, options));
+    setOptions(sortAutocompleteOptions(selectedOptions, options));
     setSelectedOptions(selectedOptions);
     setFieldValue(
       props.id,

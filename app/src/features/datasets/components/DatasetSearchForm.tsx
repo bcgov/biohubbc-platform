@@ -5,8 +5,8 @@ import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import MultiAutocompleteField, {
-  handleSortSelectedOption,
-  IMultiAutocompleteFieldOption
+  IMultiAutocompleteFieldOption,
+  sortAutocompleteOptions
 } from 'components/fields/MultiAutocompleteField';
 import MultiSelectList from 'components/fields/MultiSelectList';
 import UploadAreaControls from 'components/map/components/UploadAreaControls';
@@ -69,8 +69,6 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formikProps.values.area]);
 
-  const curatedSpeciesList = handleSortSelectedOption(formikProps?.values?.species_list || [], speciesList);
-
   return (
     <>
       <Box component="fieldset">
@@ -108,7 +106,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           <MultiAutocompleteField
             id={`species_list`}
             label={'Select Species'}
-            options={curatedSpeciesList}
+            options={sortAutocompleteOptions(formikProps?.values?.species_list || [], speciesList)}
             required={false}
             handleSearchResults={handleGetSpeciesList}
           />

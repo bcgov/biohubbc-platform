@@ -1,7 +1,7 @@
 import { Formik } from 'formik';
 import { render } from 'test-helpers/test-utils';
 import MultiAutocompleteField, {
-  handleSortSelectedOption,
+  sortAutocompleteOptions,
   IMultiAutocompleteFieldOption
 } from './MultiAutocompleteField';
 
@@ -32,7 +32,7 @@ describe('MultiAutocompleteField', () => {
         { value: 'value3', label: 'Value_3' }
       ];
 
-      const sorted = handleSortSelectedOption(selected, []);
+      const sorted = sortAutocompleteOptions(selected, []);
       expect(sorted.length).toEqual(3);
     });
 
@@ -48,7 +48,7 @@ describe('MultiAutocompleteField', () => {
         { value: 'value5', label: 'Value_5' }
       ];
 
-      const sorted = handleSortSelectedOption(selected, optionsLeft);
+      const sorted = sortAutocompleteOptions(selected, optionsLeft);
       expect(sorted.length).toEqual(5);
       expect(sorted[0].value).toEqual('value1');
     });
@@ -66,7 +66,7 @@ describe('MultiAutocompleteField', () => {
         { value: 'value4', label: 'Value_4' }
       ];
 
-      const sorted = handleSortSelectedOption(selected, optionsLeft);
+      const sorted = sortAutocompleteOptions(selected, optionsLeft);
       expect(sorted.length).toEqual(4);
     });
 
@@ -77,7 +77,7 @@ describe('MultiAutocompleteField', () => {
         { value: 'value4', label: 'Value_4' }
       ];
 
-      const sorted = handleSortSelectedOption([], optionsLeft);
+      const sorted = sortAutocompleteOptions([], optionsLeft);
       expect(sorted.length).toEqual(3);
       expect(sorted[0].value).toEqual('value2');
     });
