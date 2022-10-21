@@ -1,7 +1,16 @@
+import { Theme } from '@mui/material';
+import { makeStyles } from '@mui/styles';
 import Handlebars from 'handlebars';
-import React from 'react';
+import appTheme from 'themes/appTheme';
+
+const useStyles = makeStyles((theme: Theme) => ({
+  dropZoneIcon: {
+    color: '#ff0000'
+  }
+}));
 
 const RenderWithHandlebars: React.FC = () => {
+  const classes = useStyles();
   const data = {
     name: 'Alan',
     hometown: 'Somewhere, TX',
@@ -39,6 +48,9 @@ const RenderWithHandlebars: React.FC = () => {
     }
   };
 
+  const myStyle = '#036';
+  const myClass = "hbr-color";
+
   const hbr = `<b>Rendering a variable, array length, and list</b>
   <p>Hello, my name is {{name}}. I am from {{hometown}}. I have
   {{kids.length}} kids:</p>
@@ -54,24 +66,24 @@ const RenderWithHandlebars: React.FC = () => {
 
   <h3>These are my friends, their ages and hobbies</h3>
 
-  <ul>{{#friends1}}
+  <ul style="background-color:${myStyle};">{{#friends1}}
     <p><b>name: {{name}}</b></p>
     <p>age:{{age}}</p>
     <p>Hobbies:</p>
     <ul>{{#hobbies}}
-      <li> {{first}} and {{second}}</li>
+      <li  > {{first}} and {{second}}</li>
     {{/hobbies}}</ul>
   {{/friends1}}</ul>
 
+  <p class="${myClass}"> this section is testing the css classes. class = '${myClass}'</p>
+
   <h3>I live in </h3>
 
-
-  {{#with city as | city |}}
+  {{#with  city as | city |}}
     {{#with city.location as | loc |}}
       {{city.name}}: {{loc.north}} {{loc.east}}
     {{/with}}
   {{/with}}
-
   `;
 
   let resultPreCompiled;
@@ -89,7 +101,8 @@ const RenderWithHandlebars: React.FC = () => {
     const handlebarsFunction = eval(encodedHandlebarsFunction);
     console.log('3: eval - ', handlebarsFunction);
 
-    const template = handlebarsFunction(Handlebars);
+    //const template = handlebarsFunction(Handlebars);
+    const template = Handlebars.compile(hbr);
     console.log('4: resulting template - ', template);
 
     resultPreCompiled = template(data);
