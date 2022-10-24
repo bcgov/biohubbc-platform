@@ -1,16 +1,6 @@
-import { Theme } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import Handlebars from 'handlebars';
-import appTheme from 'themes/appTheme';
-
-const useStyles = makeStyles((theme: Theme) => ({
-  dropZoneIcon: {
-    color: '#ff0000'
-  }
-}));
 
 const RenderWithHandlebars: React.FC = () => {
-  const classes = useStyles();
   const data = {
     name: 'Alan',
     hometown: 'Somewhere, TX',
@@ -21,6 +11,57 @@ const RenderWithHandlebars: React.FC = () => {
     author: true,
     book_name: 'this is my book',
     friends1: [
+      {
+        name: 'Jimmy',
+        age: '20',
+        hobbies: [{ first: 'a', second: 'b' }]
+      },
+      {
+        name: 'Sally',
+        age: '30',
+        hobbies: [{ first: 'c', second: 'd' }]
+      },
+      {
+        name: 'Erin',
+        age: '40',
+        hobbies: [{ first: 'e', second: 'f' }]
+      }
+    ],
+    friends2: [
+      {
+        name: 'Jimmy',
+        age: '20',
+        hobbies: [{ first: 'a', second: 'b' }]
+      },
+      {
+        name: 'Sally',
+        age: '30',
+        hobbies: [{ first: 'c', second: 'd' }]
+      },
+      {
+        name: 'Erin',
+        age: '40',
+        hobbies: [{ first: 'e', second: 'f' }]
+      }
+    ],
+    friends3: [
+      {
+        name: 'Jimmy',
+        age: '20',
+        hobbies: [{ first: 'a', second: 'b' }]
+      },
+      {
+        name: 'Sally',
+        age: '30',
+        hobbies: [{ first: 'c', second: 'd' }]
+      },
+      {
+        name: 'Erin',
+        age: '40',
+        hobbies: [{ first: 'e', second: 'f' }]
+      }
+    ],
+    friends4: [
       {
         name: 'Jimmy',
         age: '20',
@@ -48,8 +89,10 @@ const RenderWithHandlebars: React.FC = () => {
     }
   };
 
-  const myStyle = '#036';
-  const myClass = "hbr-color";
+  const myStyle1 = '#036';
+  const myStyle2 = '#ea213a';
+  const myStyle3 = '#ba68c8';
+  const myClass = 'hbr-color';
 
   const hbr = `<b>Rendering a variable, array length, and list</b>
   <p>Hello, my name is {{name}}. I am from {{hometown}}. I have
@@ -64,9 +107,21 @@ const RenderWithHandlebars: React.FC = () => {
     <h3>Just pretending to be an author</h3>
   {{/if}}
 
+  <h3>I live in </h3>
+
+  {{#with  city as | city |}}
+    {{#with city.location as | loc |}}
+      {{city.name}}: {{loc.north}} {{loc.east}}
+    {{/with}}
+  {{/with}}
+
+  <p class="${myClass}"> this section is testing the css classes. class = '${myClass}'</p>
+
   <h3>These are my friends, their ages and hobbies</h3>
 
-  <ul style="background-color:${myStyle};">{{#friends1}}
+  <p> **************Friends 1***************</p>
+
+  <ul style="background-color:${myStyle1};">{{#friends1}}
     <p><b>name: {{name}}</b></p>
     <p>age:{{age}}</p>
     <p>Hobbies:</p>
@@ -77,42 +132,65 @@ const RenderWithHandlebars: React.FC = () => {
 
   <p class="${myClass}"> this section is testing the css classes. class = '${myClass}'</p>
 
-  <h3>I live in </h3>
 
-  {{#with  city as | city |}}
-    {{#with city.location as | loc |}}
-      {{city.name}}: {{loc.north}} {{loc.east}}
-    {{/with}}
-  {{/with}}
+ <p> **************Friends 2***************</p>
+
+  <ul style="background-color:${myStyle2};">{{#friends2}}
+  <p><b>name: {{name}}</b></p>
+  <p>age:{{age}}</p>
+  <p>Hobbies:</p>
+  <ul>{{#hobbies}}
+    <li  > {{first}} and {{second}}</li>
+  {{/hobbies}}</ul>
+{{/friends2}}</ul>
+<p> **************Friends 3***************</p>
+
+<ul style="background-color:${myStyle3};">{{#friends3}}
+<p><b>name: {{name}}</b></p>
+<p>age:{{age}}</p>
+<p>Hobbies:</p>
+<ul>{{#hobbies}}
+  <li  > {{first}} and {{second}}</li>
+{{/hobbies}}</ul>
+{{/friends3}}</ul>
   `;
 
   let resultPreCompiled;
+  console.log(resultPreCompiled);
+  let resultCompiled;
+  console.log(resultCompiled);
+
   try {
-    const parsedHbr = Handlebars.parse(hbr);
+    //VERSION 1 (USING PRECOMPILE)
+    // const parsedHbr = Handlebars.parse(hbr);
 
-    const preCompiled = Handlebars.precompile(parsedHbr);
-    //console.log('1: parsed - ', preCompiled);
+    // const preCompiled = Handlebars.precompile(parsedHbr);
+    // const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiled})`;
+    // console.log('1: encoded - ', encodedHandlebarsFunction);
 
-    //fs.writeFileSync("preCompiled.txt", preCompiled);
+    // const handlebarsFunction = eval(encodedHandlebarsFunction);
+    // const template = handlebarsFunction(Handlebars);
+    // console.log('2: resulting PRECOMPILE template - ', template);
 
-    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiled})`;
-    console.log('2: encoded - ', encodedHandlebarsFunction);
+    // resultPreCompiled = template(data);
+    // console.log('3: result - ', resultPreCompiled);
 
-    const handlebarsFunction = eval(encodedHandlebarsFunction);
-    console.log('3: eval - ', handlebarsFunction);
+    //VERSION 2 - USING COMPILE
 
-    //const template = handlebarsFunction(Handlebars);
     const template = Handlebars.compile(hbr);
-    console.log('4: resulting template - ', template);
+    console.log('2: resulting COMPILE template - ', template);
 
-    resultPreCompiled = template(data);
-    console.log('5: result - ', resultPreCompiled);
+    resultCompiled = template(data);
+    console.log('3: result - ', resultCompiled);
+
   } catch (error) {
-    console.log('********* this is the preCompile error ***************');
+    console.log('********* this is the error ***************');
     console.log(error);
   } finally {
     // eslint-disable-next-line no-unsafe-finally
-    return <div>{<div dangerouslySetInnerHTML={{ __html: resultPreCompiled }} />}</div>;
+    //return <div>{<div dangerouslySetInnerHTML={{ __html: resultPreCompiled }} />}</div>;
+    // eslint-disable-next-line no-unsafe-finally
+    return <div>{<div dangerouslySetInnerHTML={{ __html: resultCompiled }} />}</div>;
   }
 };
 
