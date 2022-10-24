@@ -182,7 +182,6 @@ const RenderWithHandlebars: React.FC = () => {
 
     resultCompiled = template(data);
     console.log('3: result - ', resultCompiled);
-
   } catch (error) {
     console.log('********* this is the error ***************');
     console.log(error);
@@ -190,7 +189,7 @@ const RenderWithHandlebars: React.FC = () => {
     // eslint-disable-next-line no-unsafe-finally
     //return <div>{<div dangerouslySetInnerHTML={{ __html: resultPreCompiled }} />}</div>;
     // eslint-disable-next-line no-unsafe-finally
-    return <div>{<div dangerouslySetInnerHTML={{ __html: resultCompiled }} />}</div>;
+    return <div>{<div dangerouslySetInnerHTML={{ __html: resultCompiled as string }} />}</div>;
   }
 };
 

@@ -108,7 +108,6 @@ declare module '@mui/material/styles' {
   interface Palette {
     bcgovblue: Palette['primary'];
     city: Palette['primary'];
-
   }
 
   // allow configuration using `createTheme`
