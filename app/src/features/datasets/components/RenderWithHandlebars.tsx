@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import * as DOMPurify from 'dompurify';
 import Handlebars from 'handlebars';
 
 export interface IRenderWithHandleBarProps {
@@ -142,6 +143,8 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
 
   const simsHbr = `
   <h1>${dataset['eml:eml'].dataset.title}</h1>
+
+  <p>Published: ${dataset['eml:eml'].dataset.pubDate}</p>
   <p>Creator:
 Organization: ${dataset['eml:eml'].dataset.creator.organizationName}
 Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
@@ -204,7 +207,7 @@ Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
     // eslint-disable-next-line no-unsafe-finally
     return (
       <Box>
-        <div>{<div dangerouslySetInnerHTML={{ __html: resultCompiled as string }} />}</div>
+        <div>{<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(resultCompiled as string) }} />}</div>
       </Box>
     );
   }

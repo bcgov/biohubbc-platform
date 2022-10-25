@@ -162,7 +162,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
         <Container maxWidth="xl">
-        <RenderWithHandlebars dataset={datasetDataLoader}></RenderWithHandlebars>
+          <RenderWithHandlebars dataset={datasetDataLoader}></RenderWithHandlebars>
         </Container>
       </Paper>
       <Container maxWidth="xl">
