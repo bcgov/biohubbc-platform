@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import Handlebars from 'handlebars';
 
 export interface IRenderWithHandleBarProps {
@@ -6,8 +7,6 @@ export interface IRenderWithHandleBarProps {
 
 const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   const dataset = props.dataset.data;
-
-  console.log('dataset is: ', dataset);
 
   // const data = {
   //   name: 'Alan',
@@ -97,7 +96,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   //   }
   // };
 
-  const myStyle1 = '#036';
+  const color1 = '#036';
   // const myStyle2 = '#ea213a';
   // const myStyle3 = '#ba68c8';
   const myClass = 'hbr-color';
@@ -129,7 +128,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
 
   <p> **************Friends 1***************</p>
 
-  <ul style="background-color:${myStyle1};">{{#friends1}}
+  <ul style="background-color:${color1};">{{#friends1}}
     <p><b>name: {{name}}</b></p>
     <p>age:{{age}}</p>
     <p>Hobbies:</p>
@@ -166,10 +165,10 @@ Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
 <p>Email: ${dataset['eml:eml'].dataset.contact.electronicMailAddress}</p>
 <p>Role: ${dataset['eml:eml'].dataset.project.personnel.role}</p>
   </div>
-
+  <div>
+  <ul> <li><a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/">My document</a></li></ul>
+  </div>
   `;
-
-  console.log('email address is: ', simsHbr);
 
   // let resultPreCompiled;
   // console.log(resultPreCompiled);
@@ -203,9 +202,11 @@ Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
     console.log(error);
   } finally {
     // eslint-disable-next-line no-unsafe-finally
-    //return <div>{<div dangerouslySetInnerHTML={{ __html: resultPreCompiled }} />}</div>;
-    // eslint-disable-next-line no-unsafe-finally
-    return <div>{<div dangerouslySetInnerHTML={{ __html: resultCompiled as string }} />}</div>;
+    return (
+      <Box>
+        <div>{<div dangerouslySetInnerHTML={{ __html: resultCompiled as string }} />}</div>
+      </Box>
+    );
   }
 };
 

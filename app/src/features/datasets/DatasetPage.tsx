@@ -9,7 +9,6 @@ import CircularProgress from '@mui/material/CircularProgress/CircularProgress';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
 import { Buffer } from 'buffer';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
@@ -163,15 +162,9 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
         <Container maxWidth="xl">
-          <Typography variant="h1">{datasetDataLoader.data['eml:eml'].dataset.title}</Typography>
-
-          <Typography variant="h1">
-            {datasetDataLoader.data['eml:eml'].dataset.contact.electronicMailAddress}
-          </Typography>
+        <RenderWithHandlebars dataset={datasetDataLoader}></RenderWithHandlebars>
         </Container>
       </Paper>
-
-      <RenderWithHandlebars dataset={datasetDataLoader}></RenderWithHandlebars>
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">
