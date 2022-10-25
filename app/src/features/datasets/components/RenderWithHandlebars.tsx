@@ -1,100 +1,108 @@
 import Handlebars from 'handlebars';
 
-const RenderWithHandlebars: React.FC = () => {
-  const data = {
-    name: 'Alan',
-    hometown: 'Somewhere, TX',
-    kids: [
-      { name: 'Jimmy', age: '12' },
-      { name: 'Sally', age: '4' }
-    ],
-    author: true,
-    book_name: 'this is my book',
-    friends1: [
-      {
-        name: 'Jimmy',
-        age: '20',
-        hobbies: [{ first: 'a', second: 'b' }]
-      },
-      {
-        name: 'Sally',
-        age: '30',
-        hobbies: [{ first: 'c', second: 'd' }]
-      },
-      {
-        name: 'Erin',
-        age: '40',
-        hobbies: [{ first: 'e', second: 'f' }]
-      }
-    ],
-    friends2: [
-      {
-        name: 'Jimmy',
-        age: '20',
-        hobbies: [{ first: 'a', second: 'b' }]
-      },
-      {
-        name: 'Sally',
-        age: '30',
-        hobbies: [{ first: 'c', second: 'd' }]
-      },
-      {
-        name: 'Erin',
-        age: '40',
-        hobbies: [{ first: 'e', second: 'f' }]
-      }
-    ],
-    friends3: [
-      {
-        name: 'Jimmy',
-        age: '20',
-        hobbies: [{ first: 'a', second: 'b' }]
-      },
-      {
-        name: 'Sally',
-        age: '30',
-        hobbies: [{ first: 'c', second: 'd' }]
-      },
-      {
-        name: 'Erin',
-        age: '40',
-        hobbies: [{ first: 'e', second: 'f' }]
-      }
-    ],
-    friends4: [
-      {
-        name: 'Jimmy',
-        age: '20',
-        hobbies: [{ first: 'a', second: 'b' }]
-      },
-      {
-        name: 'Sally',
-        age: '30',
-        hobbies: [{ first: 'c', second: 'd' }]
-      },
-      {
-        name: 'Erin',
-        age: '40',
-        hobbies: [{ first: 'e', second: 'f' }]
-      }
-    ],
-    city: {
-      name: 'San Francisco',
-      summary: 'San Francisco is the <b>cultural center</b> of <b>Northern California</b>',
-      location: {
-        north: '37.73,',
-        east: -122.44
-      },
-      population: 883305
-    }
-  };
+export interface IRenderWithHandleBarProps {
+  dataset: any;
+}
+
+const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
+  const dataset = props.dataset.data;
+
+  console.log('dataset is: ', dataset);
+
+  // const data = {
+  //   name: 'Alan',
+  //   hometown: 'Somewhere, TX',
+  //   kids: [
+  //     { name: 'Jimmy', age: '12' },
+  //     { name: 'Sally', age: '4' }
+  //   ],
+  //   author: true,
+  //   book_name: 'this is my book',
+  //   friends1: [
+  //     {
+  //       name: 'Jimmy',
+  //       age: '20',
+  //       hobbies: [{ first: 'a', second: 'b' }]
+  //     },
+  //     {
+  //       name: 'Sally',
+  //       age: '30',
+  //       hobbies: [{ first: 'c', second: 'd' }]
+  //     },
+  //     {
+  //       name: 'Erin',
+  //       age: '40',
+  //       hobbies: [{ first: 'e', second: 'f' }]
+  //     }
+  //   ],
+  //   friends2: [
+  //     {
+  //       name: 'Jimmy',
+  //       age: '20',
+  //       hobbies: [{ first: 'a', second: 'b' }]
+  //     },
+  //     {
+  //       name: 'Sally',
+  //       age: '30',
+  //       hobbies: [{ first: 'c', second: 'd' }]
+  //     },
+  //     {
+  //       name: 'Erin',
+  //       age: '40',
+  //       hobbies: [{ first: 'e', second: 'f' }]
+  //     }
+  //   ],
+  //   friends3: [
+  //     {
+  //       name: 'Jimmy',
+  //       age: '20',
+  //       hobbies: [{ first: 'a', second: 'b' }]
+  //     },
+  //     {
+  //       name: 'Sally',
+  //       age: '30',
+  //       hobbies: [{ first: 'c', second: 'd' }]
+  //     },
+  //     {
+  //       name: 'Erin',
+  //       age: '40',
+  //       hobbies: [{ first: 'e', second: 'f' }]
+  //     }
+  //   ],
+  //   friends4: [
+  //     {
+  //       name: 'Jimmy',
+  //       age: '20',
+  //       hobbies: [{ first: 'a', second: 'b' }]
+  //     },
+  //     {
+  //       name: 'Sally',
+  //       age: '30',
+  //       hobbies: [{ first: 'c', second: 'd' }]
+  //     },
+  //     {
+  //       name: 'Erin',
+  //       age: '40',
+  //       hobbies: [{ first: 'e', second: 'f' }]
+  //     }
+  //   ],
+  //   city: {
+  //     name: 'San Francisco',
+  //     summary: 'San Francisco is the <b>cultural center</b> of <b>Northern California</b>',
+  //     location: {
+  //       north: '37.73,',
+  //       east: -122.44
+  //     },
+  //     population: 883305
+  //   }
+  // };
 
   const myStyle1 = '#036';
-  const myStyle2 = '#ea213a';
-  const myStyle3 = '#ba68c8';
+  // const myStyle2 = '#ea213a';
+  // const myStyle3 = '#ba68c8';
   const myClass = 'hbr-color';
 
-  const hbr = `<b>Rendering a variable, array length, and list</b>
+  const hbrForOurLearning = `<b>Rendering a variable, array length, and list</b>
   <p>Hello, my name is {{name}}. I am from {{hometown}}. I have
   {{kids.length}} kids:</p>
   <ul>{{#kids}}
@@ -129,39 +137,47 @@ const RenderWithHandlebars: React.FC = () => {
       <li  > {{first}} and {{second}}</li>
     {{/hobbies}}</ul>
   {{/friends1}}</ul>
-
-  <p class="${myClass}"> this section is testing the css classes. class = '${myClass}'</p>
-
-
- <p> **************Friends 2***************</p>
-
-  <ul style="background-color:${myStyle2};">{{#friends2}}
-  <p><b>name: {{name}}</b></p>
-  <p>age:{{age}}</p>
-  <p>Hobbies:</p>
-  <ul>{{#hobbies}}
-    <li  > {{first}} and {{second}}</li>
-  {{/hobbies}}</ul>
-{{/friends2}}</ul>
-<p> **************Friends 3***************</p>
-
-<ul style="background-color:${myStyle3};">{{#friends3}}
-<p><b>name: {{name}}</b></p>
-<p>age:{{age}}</p>
-<p>Hobbies:</p>
-<ul>{{#hobbies}}
-  <li  > {{first}} and {{second}}</li>
-{{/hobbies}}</ul>
-{{/friends3}}</ul>
   `;
 
-  let resultPreCompiled;
-  console.log(resultPreCompiled);
+  console.log(hbrForOurLearning);
+
+  const simsHbr = `
+  <h1>${dataset['eml:eml'].dataset.title}</h1>
+  <p>Creator:
+Organization: ${dataset['eml:eml'].dataset.creator.organizationName}
+Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
+  </p>
+
+  <div>Provider:
+  <p>Organization: ${dataset['eml:eml'].dataset.metadataProvider.organizationName}</p>
+  <p>URL: ${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}</p>
+    </div>
+
+  <div>
+    <p>Objectives: ${dataset['eml:eml'].dataset.project.abstract.section[0].para}</p>
+  <p>Published: ${dataset['eml:eml'].dataset.pubDate}</p>
+
+  <p>Rights: Copyright © 2022, Province of British Columbia</p>
+
+  <div>
+  Contacts:
+  <p>Individual: ${dataset['eml:eml'].dataset.contact.individualName.givenName} ${dataset['eml:eml'].dataset.contact.individualName.surName}  </p>
+<p>Organization: ${dataset['eml:eml'].dataset.contact.organizationName}</p>
+<p>Email: ${dataset['eml:eml'].dataset.contact.electronicMailAddress}</p>
+<p>Role: ${dataset['eml:eml'].dataset.project.personnel.role}</p>
+  </div>
+
+  `;
+
+  console.log('email address is: ', simsHbr);
+
+  // let resultPreCompiled;
+  // console.log(resultPreCompiled);
   let resultCompiled;
   console.log(resultCompiled);
 
   try {
-    //VERSION 1 (USING PRECOMPILE)
+    //DO_NOT DELETE : VERSION 1 (USING PRECOMPILE)
     // const parsedHbr = Handlebars.parse(hbr);
 
     // const preCompiled = Handlebars.precompile(parsedHbr);
@@ -177,11 +193,11 @@ const RenderWithHandlebars: React.FC = () => {
 
     //VERSION 2 - USING COMPILE
 
-    const template = Handlebars.compile(hbr);
-    console.log('2: resulting COMPILE template - ', template);
+    const template = Handlebars.compile(simsHbr);
+    //console.log('2: resulting COMPILE template - ', template);
 
-    resultCompiled = template(data);
-    console.log('3: result - ', resultCompiled);
+    resultCompiled = template(dataset);
+    //console.log('3: result - ', resultCompiled);
   } catch (error) {
     console.log('********* this is the error ***************');
     console.log(error);

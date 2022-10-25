@@ -24,6 +24,7 @@ import useDataLoaderError from 'hooks/useDataLoaderError';
 import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
+import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
@@ -163,8 +164,14 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
         <Container maxWidth="xl">
           <Typography variant="h1">{datasetDataLoader.data['eml:eml'].dataset.title}</Typography>
+
+          <Typography variant="h1">
+            {datasetDataLoader.data['eml:eml'].dataset.contact.electronicMailAddress}
+          </Typography>
         </Container>
       </Paper>
+
+      <RenderWithHandlebars dataset={datasetDataLoader}></RenderWithHandlebars>
       <Container maxWidth="xl">
         <Box py={5}>
           <Card data-testid="MapContainer">

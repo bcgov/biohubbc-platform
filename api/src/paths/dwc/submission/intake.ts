@@ -95,6 +95,8 @@ export function intakeDataset(): RequestHandler {
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
+    console.log('surcesystem:', sourceSystem);
+
     if (!sourceSystem) {
       throw new HTTP400('Failed to identify known submission source system', [
         'token did not contain a clientId/azp or clientId/azp value is unknown'
