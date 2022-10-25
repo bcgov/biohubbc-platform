@@ -230,7 +230,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
         <div class="meta-body-container">
           <ul>
             <li>
-              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/">My document</a>
+              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/">${dataset['eml:eml'].additionalMetadata[6].metadata.projectAttachments.projectAttachment[1].file_name}</a>
             </li>
           </ul>
         </div>
