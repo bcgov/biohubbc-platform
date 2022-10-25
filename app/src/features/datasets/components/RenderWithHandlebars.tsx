@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import * as DOMPurify from 'dompurify';
 import Handlebars from 'handlebars';
+import 'styles/handlebar.scss';
 
 export interface IRenderWithHandleBarProps {
   dataset: any;
@@ -102,75 +103,140 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   // const myStyle3 = '#ba68c8';
   const myClass = 'hbr-color';
 
-  const hbrForOurLearning = `<b>Rendering a variable, array length, and list</b>
-  <p>Hello, my name is {{name}}. I am from {{hometown}}. I have
-  {{kids.length}} kids:</p>
-  <ul>{{#kids}}
-  <li>{{name}} is {{age}}</li>{{/kids}}</ul>
+  const hbrForOurLearning = `
+    <b>Rendering a variable, array length, and list</b>
+    <p>Hello, my name is {{name}}. I am from {{hometown}}. I have
+    {{kids.length}} kids:</p>
+    <ul>{{#kids}}
+    <li>{{name}} is {{age}}</li>{{/kids}}</ul>
 
 
-  {{#if author}}
-    <h3>{{book_name}}</h3>
-  {{else}}
-    <h3>Just pretending to be an author</h3>
-  {{/if}}
+    {{#if author}}
+      <h3>{{book_name}}</h3>
+    {{else}}
+      <h3>Just pretending to be an author</h3>
+    {{/if}}
 
-  <h3>I live in </h3>
+    <h3>I live in </h3>
 
-  {{#with  city as | city |}}
-    {{#with city.location as | loc |}}
-      {{city.name}}: {{loc.north}} {{loc.east}}
+    {{#with  city as | city |}}
+      {{#with city.location as | loc |}}
+        {{city.name}}: {{loc.north}} {{loc.east}}
+      {{/with}}
     {{/with}}
-  {{/with}}
 
-  <p class="${myClass}"> this section is testing the css classes. class = '${myClass}'</p>
+    <p class="hbr-color"> this section is testing the css classes. class = '${myClass}'</p>
 
-  <h3>These are my friends, their ages and hobbies</h3>
+    <h3>These are my friends, their ages and hobbies</h3>
 
-  <p> **************Friends 1***************</p>
+    <p> **************Friends 1***************</p>
 
-  <ul style="background-color:${color1};">{{#friends1}}
-    <p><b>name: {{name}}</b></p>
-    <p>age:{{age}}</p>
-    <p>Hobbies:</p>
-    <ul>{{#hobbies}}
-      <li  > {{first}} and {{second}}</li>
-    {{/hobbies}}</ul>
-  {{/friends1}}</ul>
+    <ul style="background-color:${color1};">{{#friends1}}
+      <p><b>name: {{name}}</b></p>
+      <p>age:{{age}}</p>
+      <p>Hobbies:</p>
+      <ul>{{#hobbies}}
+        <li>{{first}} and {{second}}</li>
+      {{/hobbies}}</ul>
+    {{/friends1}}</ul>
   `;
 
   console.log(hbrForOurLearning);
 
   const simsHbr = `
-  <h1>${dataset['eml:eml'].dataset.title}</h1>
+    <div class="hbr-container">
 
-  <p>Published: ${dataset['eml:eml'].dataset.pubDate}</p>
-  <p>Creator:
-Organization: ${dataset['eml:eml'].dataset.creator.organizationName}
-Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
-  </p>
+      <div>
+        <h1>${dataset['eml:eml'].dataset.title}</h1>
+      </div>
 
-  <div>Provider:
-  <p>Organization: ${dataset['eml:eml'].dataset.metadataProvider.organizationName}</p>
-  <p>URL: ${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}</p>
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+            Published
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <p>${dataset['eml:eml'].dataset.pubDate}</p>
+        </div>
+      </div>
+
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+            Creator
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <p>Organization: ${dataset['eml:eml'].dataset.creator.organizationName}</p>
+          <p>Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}</p>
+        </div>
+      </div>
+
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+            Provider
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <p>Organization: ${dataset['eml:eml'].dataset.metadataProvider.organizationName}</p>
+          <p>URL: <a href=${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}>${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}</a></p>
+        </div>
+      </div>
+
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+          Objectives
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <p>${dataset['eml:eml'].dataset.project.abstract.section[0].para}</p>
+        </div>
+      </div>
+
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+            Rights
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <p>Copyright © 2022, Province of British Columbia</p>
+        </div>
+      </div>
+
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+          Contacts
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <p>Individual: ${dataset['eml:eml'].dataset.contact.individualName.givenName} ${dataset['eml:eml'].dataset.contact.individualName.surName}</p>
+          <p>Organization: ${dataset['eml:eml'].dataset.contact.organizationName}</p>
+          <p>Email: ${dataset['eml:eml'].dataset.contact.electronicMailAddress}</p>
+          <p>Role: ${dataset['eml:eml'].dataset.project.personnel.role}</p>
+        </div>
+      </div>
+
+      <div class="meta-container">
+        <div class="meta-title-container">
+          <div class="meta-title">
+            Documents
+          </div>
+        </div>
+        <div class="meta-body-container">
+          <ul>
+            <li>
+              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/">My document</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
     </div>
-
-  <div>
-    <p>Objectives: ${dataset['eml:eml'].dataset.project.abstract.section[0].para}</p>
-  <p>Published: ${dataset['eml:eml'].dataset.pubDate}</p>
-
-  <p>Rights: Copyright © 2022, Province of British Columbia</p>
-
-  <div>
-  Contacts:
-  <p>Individual: ${dataset['eml:eml'].dataset.contact.individualName.givenName} ${dataset['eml:eml'].dataset.contact.individualName.surName}  </p>
-<p>Organization: ${dataset['eml:eml'].dataset.contact.organizationName}</p>
-<p>Email: ${dataset['eml:eml'].dataset.contact.electronicMailAddress}</p>
-<p>Role: ${dataset['eml:eml'].dataset.project.personnel.role}</p>
-  </div>
-  <div>
-  <ul> <li><a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/">My document</a></li></ul>
-  </div>
   `;
 
   // let resultPreCompiled;
