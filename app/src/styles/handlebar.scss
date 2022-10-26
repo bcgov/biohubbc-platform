@@ -12,19 +12,17 @@
   .meta-container {
     display: flex;
     flex-wrap: nowrap;
-    width: 100%;
+    & + .meta-container {
+      margin-top: 1rem;
+    }
 
     .meta-title-container {
-      flex: 0 0 auto;
-
-      .meta-title {
-        font-weight: 700;
-        width: 10rem;
-      }
+      flex: 0 0 150px;
     }
 
     .meta-body-container {
       flex: 1 1 auto;
+      max-width: 92ch;
     }
   }
 }

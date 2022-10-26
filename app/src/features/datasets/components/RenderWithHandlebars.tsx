@@ -152,58 +152,53 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
 
       <div class="meta-container">
         <div class="meta-title-container">
-          <div class="meta-title">
             Published
-          </div>
         </div>
         <div class="meta-body-container">
-          <p>${dataset['eml:eml'].dataset.pubDate}</p>
+          ${dataset['eml:eml'].dataset.pubDate}
         </div>
       </div>
 
       <div class="meta-container">
         <div class="meta-title-container">
-          <div class="meta-title">
             Creator
-          </div>
         </div>
         <div class="meta-body-container">
-          <p>Organization: ${dataset['eml:eml'].dataset.creator.organizationName}</p>
-          <p>Email: ${dataset['eml:eml'].dataset.creator.electronicMailAddress}</p>
+          <div>
+          <div>
+          ${dataset['eml:eml'].dataset.creator.organizationName}
+          </div>
+            <a href="mailto:${dataset['eml:eml'].dataset.creator.electronicMailAddress}">
+              ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
+            </a>
+          </div>
         </div>
       </div>
 
       <div class="meta-container">
         <div class="meta-title-container">
-          <div class="meta-title">
             Provider
-          </div>
         </div>
         <div class="meta-body-container">
-          <p>Organization: ${dataset['eml:eml'].dataset.metadataProvider.organizationName}</p>
-          <p>URL: <a href=${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}>${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}</a></p>
+          <a href=${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}>${dataset['eml:eml'].dataset.metadataProvider.organizationName} </a>
         </div>
       </div>
 
       <div class="meta-container">
         <div class="meta-title-container">
-          <div class="meta-title">
           Objectives
-          </div>
         </div>
         <div class="meta-body-container">
-          <p>${dataset['eml:eml'].dataset.project.abstract.section[0].para}</p>
+        ${dataset['eml:eml'].dataset.project.abstract.section[0].para}
         </div>
       </div>
 
       <div class="meta-container">
         <div class="meta-title-container">
-          <div class="meta-title">
             Rights
-          </div>
         </div>
         <div class="meta-body-container">
-          <p>Copyright © 2022, Province of British Columbia</p>
+         Copyright © 2022, Province of British Columbia
         </div>
       </div>
 
@@ -214,10 +209,18 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
           </div>
         </div>
         <div class="meta-body-container">
-          <p>Individual: ${dataset['eml:eml'].dataset.contact.individualName.givenName} ${dataset['eml:eml'].dataset.contact.individualName.surName}</p>
-          <p>Organization: ${dataset['eml:eml'].dataset.contact.organizationName}</p>
-          <p>Email: ${dataset['eml:eml'].dataset.contact.electronicMailAddress}</p>
-          <p>Role: ${dataset['eml:eml'].dataset.project.personnel.role}</p>
+          <div>
+            ${dataset['eml:eml'].dataset.contact.individualName.givenName} ${dataset['eml:eml'].dataset.contact.individualName.surName}
+          </div>
+          <div>
+             ${dataset['eml:eml'].dataset.contact.organizationName}
+          </div>
+          <div>
+            <a href="mailto:${dataset['eml:eml'].dataset.creator.electronicMailAddress}">
+              ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
+            </a>
+          </div>
+
         </div>
       </div>
 
@@ -235,7 +238,6 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
           </ul>
         </div>
       </div>
-
     </div>
   `;
 
@@ -260,6 +262,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
     // console.log('3: result - ', resultPreCompiled);
 
     //VERSION 2 - USING COMPILE
+
 
     const template = Handlebars.compile(simsHbr);
     //console.log('2: resulting COMPILE template - ', template);
