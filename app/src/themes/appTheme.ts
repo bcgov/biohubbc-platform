@@ -30,13 +30,9 @@ const appTheme = createTheme({
       default: '#f7f8fa'
     },
     primary: {
-      main: '#040'
+      main: '#036'
     },
     bcgovblue: {
-      main: '#036',
-      contrastText: '#fff'
-    },
-    city: {
       main: '#036',
       contrastText: '#fff'
     }
@@ -107,13 +103,11 @@ const appTheme = createTheme({
 declare module '@mui/material/styles' {
   interface Palette {
     bcgovblue: Palette['primary'];
-    city: Palette['primary'];
   }
 
   // allow configuration using `createTheme`
   interface PaletteOptions {
     bcgovblue?: PaletteOptions['primary'];
-    city?: PaletteOptions['primary'];
   }
 }
 
@@ -121,7 +115,6 @@ declare module '@mui/material/styles' {
 declare module '@mui/material/Button' {
   interface ButtonPropsColorOverrides {
     bcgovblue: true;
-    city: true;
   }
 }
 
