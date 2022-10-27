@@ -13,127 +13,155 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   const simsHbr = `
     <div class="hbr-container">
 
-      <div>
-        <h1>${dataset['eml:eml'].dataset.title}</h1>
-      </div>
+      {{#if eml:eml.dataset.title}}
+        <div>
+          <h1> {{eml:eml.dataset.title}}</h1>
+        </div>
+      {{/if}}
 
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Published
-        </div>
-        <div class="meta-body-container">
-          ${dataset['eml:eml'].dataset.pubDate}
-        </div>
-      </div>
-
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Creator
-        </div>
-        <div class="meta-body-container">
-          <div>
-          <div>
-          ${dataset['eml:eml'].dataset.creator.organizationName}
-          </div>
-            <a href="mailto:${dataset['eml:eml'].dataset.creator.electronicMailAddress}">
-              ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
-            </a>
+      {{#if eml:eml.dataset.pubDate}}
+        <div>
+          <div class="meta-container">
+            <div class="meta-title-container">
+              Published
+            </div>
+            <div class="meta-body-container">
+              {{eml:eml.dataset.pubDate}}
+            </div>
           </div>
         </div>
-      </div>
+      {{/if}}
 
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Provider
-        </div>
-        <div class="meta-body-container">
-          <a href=${dataset['eml:eml'].dataset.metadataProvider.onlineUrl}>${dataset['eml:eml'].dataset.metadataProvider.organizationName} </a>
-        </div>
-      </div>
+      {{#if eml:eml.dataset.creator}}
+        <div class="meta-container">
+          <div class="meta-title-container">
+              Creator
+          </div>
+          <div class="meta-body-container">
+            <div>
+              {{#if eml:eml.dataset.creator.organizationName}}
+                <div>
+                  {{eml:eml.dataset.creator.organizationName}}
+                </div>
+              {{/if}}
 
-      <div class="meta-container">
-        <div class="meta-title-container">
-          Objectives
-        </div>
-        <div class="meta-body-container">
-        ${dataset['eml:eml'].dataset.project.abstract.section[0].para}
-        </div>
-      </div>
-
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Rights
-        </div>
-        <div class="meta-body-container">
-         Copyright © 2022, Province of British Columbia
-        </div>
-      </div>
-
-      <div class="meta-container">
-        <div class="meta-title-container">
-          <div class="meta-title">
-          Contacts
+              {{#if eml:eml.dataset.creator.electronicMailAddress}}
+                <div>
+                  <a href="mailto: {{eml:eml.dataset.creator.electronicMailAddress}}">
+                    {{eml:eml.dataset.creator.electronicMailAddress}}
+                  </a>
+                </div>
+              {{/if}}
+            </div>
           </div>
         </div>
-        <div class="meta-body-container">
-          <div>
-            ${dataset['eml:eml'].dataset.contact.individualName.givenName} ${dataset['eml:eml'].dataset.contact.individualName.surName}
-          </div>
-          <div>
-             ${dataset['eml:eml'].dataset.contact.organizationName}
-          </div>
-          <div>
-            <a href="mailto:${dataset['eml:eml'].dataset.creator.electronicMailAddress}">
-              ${dataset['eml:eml'].dataset.creator.electronicMailAddress}
-            </a>
-          </div>
+      {{/if}}
 
+      {{#if eml:eml.dataset.metadataProvider}}
+        <div class="meta-container">
+          <div class="meta-title-container">
+              Provider
+          </div>
+          <div class="meta-body-container">
+            <div>
+              <a href="mailto: {{eml:eml.dataset.metadataProvider.onlineUrl}}">
+                {{eml:eml.dataset.metadataProvider.organizationName}}
+              </a>
+            </div>
+          </div>
         </div>
-      </div>
+      {{/if}}
+
+      {{#each eml:eml.dataset.project.abstract.section as | section |}}
+        {{#if (isEqual section.title "Objectives")}}
+          <div class="meta-container">
+            <div class="meta-title-container">
+              Objectives
+            </div>
+            <div class="meta-body-container">
+              {{section.para}}
+            </div>
+          </div>
+        {{/if}}
+      {{/each}}
+
+      {{#if eml:eml.dataset.contact}}
+        <div class="meta-container">
+          <div class="meta-title-container">
+            <div class="meta-title">
+            Contacts
+            </div>
+          </div>
+          <div class="meta-body-container">
+            <div>
+              {{#if eml:eml.dataset.contact.individualName.givenName}}
+                {{eml:eml.dataset.contact.individualName.givenName}}
+              {{/if}}
+              {{#if eml:eml.dataset.contact.individualName.surName}}
+                {{eml:eml.dataset.contact.individualName.surName}}
+              {{/if}}
+            </div>
+            <div>
+              {{#if eml:eml.dataset.contact.organizationName}}
+                {{eml:eml.dataset.contact.organizationName}}
+              {{/if}}
+            </div>
+            <div>
+              {{#if eml:eml.dataset.creator.electronicMailAddress}}
+                <a href="mailto:eml:eml.dataset.creator.electronicMailAddress}">
+                  {{eml:eml.dataset.creator.electronicMailAddress}}
+                </a>
+              {{/if}}
+            </div>
+
+          </div>
+        </div>
+      {{/if}}
 
       <div class="meta-container">
-        <div class="meta-title-container">
-          <div class="meta-title">
-            Documents
-          </div>
-        </div>
-        <div class="meta-body-container">
-          {{#each eml:eml.additionalMetadata as | amd |}}
-            {{#with (lookup amd.metadata "projectAttachments") as | attachments | ~}}
-                {{#each attachments.projectAttachment as | a |}}
-                  <div>
-                    <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{a.file_name}}</a>
-                    {{#if a.is_secure}}
-                      (secured)
-                    {{else}}
-                      (public)
-                  {{/if}}
-                  </div>
-                {{/each}}
-           {{/with}}
-          {{/each}}
-        </div>
-      </div>
-
-      <div class="meta-container">
-      <div class="meta-title-container">
-        <div class="meta-title">
-          Reports
-        </div>
-      </div>
-      <div class="meta-body-container">
         {{#each eml:eml.additionalMetadata as | amd |}}
-          {{#with (lookup amd.metadata "projectReportAttachments") as | attachments | ~}}
-            <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectReportAttachment.file_name}}</a>
-            {{#if attachments.projectReportAttachment.is_secure}}
-              (secured)
-            {{else}}
-              (public)
-            {{/if}}
+          {{#with (lookup amd.metadata "projectAttachments") as | attachments | ~}}
+            <div class="meta-title-container">
+              <div class="meta-title">
+                Documents
+              </div>
+            </div>
+            <div class="meta-body-container">
+              {{#each attachments.projectAttachment as | a |}}
+                <div>
+                  <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{a.file_name}}</a>
+                  {{#if a.is_secure}}
+                    (secured)
+                  {{else}}
+                    (public)
+                  {{/if}}
+                </div>
+              {{/each}}
+            </div>
           {{/with}}
         {{/each}}
       </div>
-    </div>
+
+
+      <div class="meta-container">
+        {{#each eml:eml.additionalMetadata as | amd |}}
+          {{#with (lookup amd.metadata "projectReportAttachments") as | attachments | ~}}
+            <div class="meta-title-container">
+              <div class="meta-title">
+                Reports
+              </div>
+            </div>
+            <div class="meta-body-container">
+              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectReportAttachment.file_name}}</a>
+              {{#if attachments.projectReportAttachment.is_secure}}
+                (secured)
+              {{else}}
+                (public)
+              {{/if}}
+            </div>
+          {{/with}}
+        {{/each}}
+      </div>
     </div>
   `;
 
@@ -157,7 +185,12 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
     // console.log('3: result - ', result);
 
     //VERSION 2 - USING COMPILE
+
     const template = Handlebars.compile(simsHbr);
+
+    Handlebars.registerHelper('isEqual', (value1, value2, options) => {
+      return value1 === value2;
+    });
 
     result = template(dataset);
   } catch (error) {
