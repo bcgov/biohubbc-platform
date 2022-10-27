@@ -14,7 +14,7 @@
     "test": "react-scripts test --ci --watchAll=false --runInBand",
     "test:watch": "react-scripts test",
     "coverage": "react-scripts test --ci --coverage --testResultsProcessor jest-sonar-reporter --watchAll=false --runInBand",
-    "update-snapshots": "react-app-rewired test --ci --watchAll=false --updateSnapshot",
+    "update-snapshots": "react-scripts test --ci --watchAll=false --updateSnapshot",
     "lint": "eslint src/ --ext .jsx,.js,.ts,.tsx",
     "lint-fix": "npm run lint -- --fix",
     "format": "prettier --check \"./src/**/*.{js,jsx,ts,tsx,css,scss}\"",
