@@ -10,6 +10,7 @@ export interface IRenderWithHandleBarProps {
 const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   const dataset = props.dataset.data;
 
+  //For project attachments and reports, we need to handle the case where the documents are in an array or as a single object
   const simsHbr = `
     <div class="hbr-container">
 
@@ -93,6 +94,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
             </div>
           </div>
           <div class="meta-body-container">
+
             <div>
               {{#if eml:eml.dataset.contact.individualName.givenName}}
                 {{eml:eml.dataset.contact.individualName.givenName}}
@@ -101,11 +103,13 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
                 {{eml:eml.dataset.contact.individualName.surName}}
               {{/if}}
             </div>
+
             <div>
               {{#if eml:eml.dataset.contact.organizationName}}
                 {{eml:eml.dataset.contact.organizationName}}
               {{/if}}
             </div>
+
             <div>
               {{#if eml:eml.dataset.creator.electronicMailAddress}}
                 <a href="mailto:eml:eml.dataset.creator.electronicMailAddress}">
@@ -121,12 +125,15 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
       <div class="meta-container">
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#with (lookup amd.metadata "projectAttachments") as | attachments | ~}}
+
             <div class="meta-title-container">
               <div class="meta-title">
                 Documents
               </div>
             </div>
+
             <div class="meta-body-container">
+
               {{#each attachments.projectAttachment as | a |}}
                 <div>
                   <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{a.file_name}}</a>
@@ -137,7 +144,17 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
                   {{/if}}
                 </div>
               {{/each}}
+
+              {{#if attachments.projectAttachment.file_name}}
+                <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectAttachment.file_name}}</a>
+                {{#if attachments.projectAttachment.is_secure}}
+                  (secured)
+                {{else}}
+                  (public)
+                {{/if}}
+              {{/if}}
             </div>
+
           {{/with}}
         {{/each}}
       </div>
@@ -145,6 +162,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
 
       <div class="meta-container">
         {{#each eml:eml.additionalMetadata as | amd |}}
+
           {{#with (lookup amd.metadata "projectReportAttachments") as | attachments | ~}}
             <div class="meta-title-container">
               <div class="meta-title">
@@ -152,14 +170,33 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
               </div>
             </div>
             <div class="meta-body-container">
-              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectReportAttachment.file_name}}</a>
-              {{#if attachments.projectReportAttachment.is_secure}}
-                (secured)
-              {{else}}
-                (public)
+
+              {{#each attachments.projectReportAttachment as | a |}}
+
+              {{#if a.file_name}}
+                  <div>
+                    <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{a.file_name}}</a>
+                    {{#if a.is_secure}}
+                      (secured)
+                    {{else}}
+                      (public)
+                    {{/if}}
+                  </div>
+                {{/if}}
+              {{/each}}
+
+
+              {{#if attachments.projectReportAttachment.file_name}}
+                <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectReportAttachment.file_name}}</a>
+                {{#if attachments.projectReportAttachment.is_secure}}
+                  (secured)
+                {{else}}
+                  (public)
+                {{/if}}
               {{/if}}
             </div>
           {{/with}}
+
         {{/each}}
       </div>
     </div>
