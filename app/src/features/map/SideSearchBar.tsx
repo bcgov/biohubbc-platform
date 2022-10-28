@@ -80,7 +80,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     setFormData(values);
   };
 
-  const toggleForm = () => {
+  const toggleShowForm = () => {
     setShowForm(!showForm);
   };
 
@@ -98,9 +98,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.mapDataLoader.isLoading, props.mapDataLoader.isReady]);
 
-  const hasResults = (): boolean => {
-    return props.searchResults.length > 0;
-  };
+  const hasResults = props.searchResults.length > 0;
 
   return (
     <>
@@ -118,18 +116,19 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
               <Typography variant="h3" component="h1">
                 Map Search
               </Typography>
-              {hasResults() && (
+              {hasResults && (
                 <Button
                   variant="text"
                   color="primary"
-                  onClick={toggleForm}
+                  onClick={toggleShowForm}
                   endIcon={<Icon path={mdiArrowRight} size={0.75} />}
                   sx={{
                     my: -1,
                     fontWeight: 700,
-                    color: 'text.secondary'
+                    color: 'text.secondary',
+                    textTransform: 'uppercase'
                   }}>
-                  BACK TO RESULTS
+                  Back to Results
                 </Button>
               )}
             </Box>
@@ -152,8 +151,8 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                 <Box py={4} px={3}>
                   <Form>
                     <DatasetSearchForm
-                      hasResults={hasResults()}
-                      toggleForm={toggleForm}
+                      hasResults={hasResults}
+                      toggleShowForm={toggleShowForm}
                       onAreaUpdate={props.onAreaUpdate}
                     />
 
@@ -197,10 +196,10 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
         </Box>
       )}
 
-      {!showForm && hasResults() && (
+      {!showForm && hasResults && (
         <SearchResultList
           searchResults={props.searchResults}
-          backToSearch={() => toggleForm()}
+          backToSearch={() => toggleShowForm()}
           onToggleDataVisibility={props.onToggleDataVisibility}
         />
       )}

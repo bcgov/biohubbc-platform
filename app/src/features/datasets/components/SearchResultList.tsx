@@ -64,9 +64,10 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
             sx={{
               my: -1,
               fontWeight: 700,
-              color: 'text.secondary'
+              color: 'text.secondary',
+              textTransform: 'uppercase'
             }}>
-            REFINE SEARCH
+            Refine Search
           </Button>
         </Box>
         <Divider></Divider>
@@ -92,7 +93,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                   borderTopWidth: '1px',
                   borderTopStyle: 'solid',
                   borderTopColor: 'grey.200',
-                  '&:first-child': {
+                  '&:first-of-type': {
                     borderTop: 'none'
                   },
                   '& .MuiListItemText-primary': {
