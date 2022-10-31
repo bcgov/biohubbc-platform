@@ -11,7 +11,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   const dataset = props.dataset.data;
   const rawTemplate = props.rawTemplate;
 
-  const template = useHandlebars().compile(rawTemplate);
+  const template = useHandlebars().compileFromRawTemplate(rawTemplate);
 
   const result = template(dataset);
 

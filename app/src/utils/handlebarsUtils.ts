@@ -30,13 +30,23 @@ export const useHandlebars = () => {
     });
   };
 
-  const compile = (template: any): HandlebarsTemplateDelegate => {
+  const compileFromRawTemplate = (template: any): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
     return Handlebars.compile(template);
   };
 
+  // const parsedHbr = Handlebars.parse(hbr);
+
+  // const preCompiled = Handlebars.precompile(parsedHbr);
+  // const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiled})`;
+
+  // const handlebarsFunction = eval(encodedHandlebarsFunction);
+  // const template = handlebarsFunction(Handlebars);
+
+  // result = template(data);
+
   return {
-    compile
+    compileFromRawTemplate
   };
 };
 
