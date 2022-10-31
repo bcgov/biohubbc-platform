@@ -1,7 +1,6 @@
-//import Box from '@mui/material/Box';
 import * as DOMPurify from 'dompurify';
-import Handlebars, { HelperOptions } from 'handlebars';
 import 'styles/handlebar.scss';
+import { useHandlebars } from 'utils/handlebarsUtils';
 
 export interface IRenderWithHandleBarProps {
   dataset: any;
@@ -12,34 +11,7 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   const dataset = props.dataset.data;
   const rawTemplate = props.rawTemplate;
 
-  const template = Handlebars.compile(rawTemplate);
-
-  Handlebars.registerHelper('ifCond', (v1, operator, v2, options: HelperOptions) => {
-    switch (operator) {
-      case '==':
-        return v1 === v2 ? options.fn(this) : options.inverse(this);
-      case '===':
-        return v1 === v2 ? options.fn(this) : options.inverse(this);
-      case '!=':
-        return v1 !== v2 ? options.fn(this) : options.inverse(this);
-      case '!==':
-        return v1 !== v2 ? options.fn(this) : options.inverse(this);
-      case '<':
-        return v1 < v2 ? options.fn(this) : options.inverse(this);
-      case '<=':
-        return v1 <= v2 ? options.fn(this) : options.inverse(this);
-      case '>':
-        return v1 > v2 ? options.fn(this) : options.inverse(this);
-      case '>=':
-        return v1 >= v2 ? options.fn(this) : options.inverse(this);
-      case '&&':
-        return v1 && v2 ? options.fn(this) : options.inverse(this);
-      case '||':
-        return v1 || v2 ? options.fn(this) : options.inverse(this);
-      default:
-        return options.inverse(this);
-    }
-  });
+  const template = useHandlebars().compile(rawTemplate);
 
   const result = template(dataset);
 
