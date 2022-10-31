@@ -10,7 +10,6 @@ export interface IRenderWithHandleBarProps {
 const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
   const dataset = props.dataset.data;
 
-  //For project attachments and reports, we need to handle the case where the documents are in an array or as a single object
   const simsHbr = `
     <div class="hbr-container">
 
@@ -202,44 +201,31 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
     </div>
   `;
 
-  // let resultPreCompiled;
-  // console.log(resultPreCompiled);
-  let result;
+  //DO_NOT DELETE : VERSION 1 (USING PRECOMPILE)
+  // const parsedHbr = Handlebars.parse(hbr);
 
-  try {
-    //DO_NOT DELETE : VERSION 1 (USING PRECOMPILE)
-    // const parsedHbr = Handlebars.parse(hbr);
+  // const preCompiled = Handlebars.precompile(parsedHbr);
+  // const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiled})`;
+  // console.log('1: encoded - ', encodedHandlebarsFunction);
 
-    // const preCompiled = Handlebars.precompile(parsedHbr);
-    // const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiled})`;
-    // console.log('1: encoded - ', encodedHandlebarsFunction);
+  // const handlebarsFunction = eval(encodedHandlebarsFunction);
+  // const template = handlebarsFunction(Handlebars);
+  // console.log('2: resulting PRECOMPILE template - ', template);
 
-    // const handlebarsFunction = eval(encodedHandlebarsFunction);
-    // const template = handlebarsFunction(Handlebars);
-    // console.log('2: resulting PRECOMPILE template - ', template);
+  // result = template(data);
+  // console.log('3: result - ', result);
 
-    // result = template(data);
-    // console.log('3: result - ', result);
+  //VERSION 2 - USING COMPILE
 
-    //VERSION 2 - USING COMPILE
+  const template = Handlebars.compile(simsHbr);
 
-    const template = Handlebars.compile(simsHbr);
+  Handlebars.registerHelper('isEqual', (value1, value2, options) => {
+    return value1 === value2;
+  });
 
-    Handlebars.registerHelper('isEqual', (value1, value2, options) => {
-      return value1 === value2;
-    });
+  const result = template(dataset);
 
-    result = template(dataset);
-  } catch (error) {
-    console.log(error);
-  } finally {
-    // eslint-disable-next-line no-unsafe-finally
-    return (
-      <Box>
-        <div>{<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result as string) }} />}</div>
-      </Box>
-    );
-  }
+  return <Box>{<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result as string) }} />}</Box>;
 };
 
 export default RenderWithHandlebars;
