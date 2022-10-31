@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import * as DOMPurify from 'dompurify';
-import Handlebars from 'handlebars';
+import Handlebars, { HelperOptions } from 'handlebars';
 import 'styles/handlebar.scss';
 
 export interface IRenderWithHandleBarProps {
@@ -73,17 +73,17 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
       {{/if}}
 
       {{#each eml:eml.dataset.project.abstract.section as | section |}}
-        {{#if (isEqual section.title "Objectives")}}
-          <div class="meta-container">
-            <div class="meta-title-container">
-              Objectives
-            </div>
-            <div class="meta-body-container">
-              {{section.para}}
-            </div>
+      {{#ifCond section.title '===' "Objectives"}}
+        <div class="meta-container">
+          <div class="meta-title-container">
+            Objectives
           </div>
-        {{/if}}
-      {{/each}}
+          <div class="meta-body-container">
+            {{section.para}}
+          </div>
+        </div>
+      {{/ifCond}}
+    {{/each}}
 
       {{#if eml:eml.dataset.contact}}
         <div class="meta-container">
@@ -216,8 +216,31 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
 
   const template = Handlebars.compile(simsHbr);
 
-  Handlebars.registerHelper('isEqual', (value1, value2, options) => {
-    return value1 === value2;
+  Handlebars.registerHelper('ifCond', (v1, operator, v2, options: HelperOptions) => {
+    switch (operator) {
+      case '==':
+        return v1 === v2 ? options.fn(this) : options.inverse(this);
+      case '===':
+        return v1 === v2 ? options.fn(this) : options.inverse(this);
+      case '!=':
+        return v1 !== v2 ? options.fn(this) : options.inverse(this);
+      case '!==':
+        return v1 !== v2 ? options.fn(this) : options.inverse(this);
+      case '<':
+        return v1 < v2 ? options.fn(this) : options.inverse(this);
+      case '<=':
+        return v1 <= v2 ? options.fn(this) : options.inverse(this);
+      case '>':
+        return v1 > v2 ? options.fn(this) : options.inverse(this);
+      case '>=':
+        return v1 >= v2 ? options.fn(this) : options.inverse(this);
+      case '&&':
+        return v1 && v2 ? options.fn(this) : options.inverse(this);
+      case '||':
+        return v1 || v2 ? options.fn(this) : options.inverse(this);
+      default:
+        return options.inverse(this);
+    }
   });
 
   const result = template(dataset);
