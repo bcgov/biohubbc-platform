@@ -206,14 +206,11 @@ const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
 
   // const preCompiled = Handlebars.precompile(parsedHbr);
   // const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiled})`;
-  // console.log('1: encoded - ', encodedHandlebarsFunction);
 
   // const handlebarsFunction = eval(encodedHandlebarsFunction);
   // const template = handlebarsFunction(Handlebars);
-  // console.log('2: resulting PRECOMPILE template - ', template);
 
   // result = template(data);
-  // console.log('3: result - ', result);
 
   //VERSION 2 - USING COMPILE
 
