@@ -66,27 +66,31 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async create(file: Express.Multer.File, dataPackageId: string): Promise<void> {
-    const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
+    try {
+      const submissionId = await this.create_step1_ingestDWC(file, dataPackageId);
 
-    if (!submissionId) {
-      throw new ApiGeneralError('The Darwin Core submission could not be processed');
+      if (!submissionId) {
+        throw new ApiGeneralError('The Darwin Core submission could not be processed');
+      }
+
+      await this.create_step2_uploadRecordToS3(submissionId, file);
+
+      await this.create_step3_validateSubmission(submissionId);
+
+      await this.create_step4_ingestEML(submissionId);
+
+      await this.create_step5_convertEMLToJSON(submissionId);
+
+      await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
+
+      await this.create_step7_normalizeSubmissionDWCA(submissionId);
+
+      await this.create_step8_runSpatialTransforms(submissionId);
+
+      await this.create_step9_runSecurityTransforms(submissionId);
+    } catch (error: any) {
+      throw new ApiGeneralError('Error in processing a new DwCA submission', error.message);
     }
-
-    await this.create_step2_uploadRecordToS3(submissionId, file);
-
-    await this.create_step3_validateSubmission(submissionId);
-
-    await this.create_step4_ingestEML(submissionId);
-
-    await this.create_step5_convertEMLToJSON(submissionId);
-
-    await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
-
-    await this.create_step7_normalizeSubmissionDWCA(submissionId);
-
-    await this.create_step8_runSpatialTransforms(submissionId);
-
-    await this.create_step9_runSecurityTransforms(submissionId);
   }
 
   /**
@@ -137,8 +141,7 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
       );
-
-      return;
+      throw new ApiGeneralError('Upload record to S3 failed', error.message);
     }
   }
 
@@ -164,7 +167,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      return;
+      throw new ApiGeneralError('Submission validation failed', error.message);
     }
   }
 
@@ -190,7 +193,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      return;
+      throw new ApiGeneralError('Ingesting EML failed', error.message);
     }
   }
   /**
@@ -215,7 +218,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      return;
+      throw new ApiGeneralError('Converting EML to JSON failed', error.message);
     }
   }
 
@@ -242,7 +245,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      return;
+      throw new ApiGeneralError('Transforming and uploading metadata', error.message);
     }
   }
 
@@ -269,8 +272,7 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
       );
-
-      return;
+      throw new ApiGeneralError('Normalizing the darwin core failed', error.message);
     }
   }
 
@@ -299,7 +301,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      return;
+      throw new ApiGeneralError('Running spatial transforms failed', error.message);
     }
   }
 
@@ -326,7 +328,7 @@ export class DarwinCoreService extends DBService {
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
       );
-      return;
+      throw new ApiGeneralError('Run security transforms failed', error.message);
     }
   }
 
