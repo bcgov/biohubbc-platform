@@ -2,7 +2,7 @@ import Handlebars, { HelperOptions } from 'handlebars';
 
 export const useHandlebars = () => {
   /**
-   *This functions allows to conditionally check values
+   * This functions allows us to conditionally check values
    *
    */
   const applyConditionalChecks = () => {
@@ -34,18 +34,20 @@ export const useHandlebars = () => {
     });
   };
 
+  /**
+   * This function converts a rawTemplate to a template
+   *
+   * @param {string} template
+   * @return {*}  {HandlebarsTemplateDelegate}
+   */
   const compileFromRawTemplate = (template: string): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
     return Handlebars.compile(template);
   };
 
   /**
-   *This call requires a precompiled string from the DB, derived with the following steps,
-   * functionally similar to:
-   *
-   * registeredConditions: useHandlebars().applyConditionalChecks();
-   * parse: Handlebars.parse(rawTemplate);
-   * preCompile" : Handlebars.precompile(parsedHbr);
+   * This function converts a precompiled template
+   * see Readme/handlebars.md for more information
    *
    * @param {TemplateSpecification} preCompiledtemplate
    * @return {*}  {HandlebarsTemplateDelegate}
@@ -60,8 +62,7 @@ export const useHandlebars = () => {
 
   return {
     compileFromRawTemplate,
-    compileFromPrecompiledTemplate,
-    applyConditionalChecks
+    compileFromPrecompiledTemplate
   };
 };
 
