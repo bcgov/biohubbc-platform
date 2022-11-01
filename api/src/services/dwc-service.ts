@@ -89,7 +89,7 @@ export class DarwinCoreService extends DBService {
 
       await this.create_step9_runSecurityTransforms(submissionId);
     } catch (error: any) {
-      throw new ApiGeneralError('Error in processing a new DwCA submission', error.message);
+      throw new ApiGeneralError('The Darwin Core submission could not be processed', error.message);
     }
   }
 
