@@ -40,7 +40,7 @@ export const useHandlebars = () => {
    * @param {string} template
    * @return {*}  {HandlebarsTemplateDelegate}
    */
-  const compileFromRawTemplate = (template: string): HandlebarsTemplateDelegate => {
+  const compileFromRawTemplate = (template: TemplateSpecification): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
     return Handlebars.compile(template);
   };
@@ -53,11 +53,14 @@ export const useHandlebars = () => {
    * @return {*}  {HandlebarsTemplateDelegate}
    */
   const compileFromPrecompiledTemplate = (preCompiledtemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
-    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledtemplate})`;
-    const handlebarsFunction = eval(encodedHandlebarsFunction);
-    const template = handlebarsFunction(Handlebars);
+    // This is a workaround to using Handlebars.template(preCompiledTemplate)
+    // in order to avoid an unknown object exception
 
-    return template;
+    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledtemplate})`;
+    // eslint-disable-next-line no-eval
+    const handlebarsFunction = eval(encodedHandlebarsFunction);
+
+    return handlebarsFunction(Handlebars);
   };
 
   return {

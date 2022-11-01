@@ -2,13 +2,20 @@ import * as DOMPurify from 'dompurify';
 import 'styles/handlebar.scss';
 import { useHandlebars } from 'utils/handlebarsUtils';
 
-export interface IRenderWithHandleBarProps {
-  dataset: any;
-  rawTemplate: any;
+export interface IRenderWithHandlebarsProps {
+  datasetEML: {
+    data: {
+      'eml:eml': {
+        dataset: any;
+        additionalMetadata: any;
+      };
+    };
+  };
+  rawTemplate: TemplateSpecification;
 }
 
-const RenderWithHandlebars: React.FC<IRenderWithHandleBarProps> = (props) => {
-  const dataset = props.dataset.data;
+const RenderWithHandlebars: React.FC<IRenderWithHandlebarsProps> = (props) => {
+  const dataset = props.datasetEML.data;
   const rawTemplate = props.rawTemplate;
 
   const template = useHandlebars().compileFromRawTemplate(rawTemplate);

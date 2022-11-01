@@ -42,7 +42,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const rawTemplate = `
+const simsHandlebarsTemplate = `
   <div class="hbr-container">
 
     {{#if eml:eml.dataset.title}}
@@ -353,7 +353,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
         <Container maxWidth="xl">
-          <RenderWithHandlebars dataset={datasetDataLoader} rawTemplate={rawTemplate as string}></RenderWithHandlebars>
+          <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={simsHandlebarsTemplate} />
         </Container>
       </Paper>
       <Container maxWidth="xl">
