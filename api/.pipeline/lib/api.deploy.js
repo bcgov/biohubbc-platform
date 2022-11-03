@@ -56,6 +56,4 @@ const apiDeploy = async (settings) => {
   oc.applyAndDeploy(objects, phases[phase].instance);
 };
 
-
-
 module.exports = { apiDeploy };
