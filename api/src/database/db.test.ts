@@ -144,7 +144,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item instanceof Error).to.be.true;
+              expect(item).to.be.instanceOf(Error);
               if (item instanceof Error) {
                 expect(item.message).to.be.eql('DBPool is not initialized');
               }
@@ -231,7 +231,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item instanceof Error).to.be.true;
+              expect(item).to.be.instanceOf(Error);
               if (item instanceof Error) {
                 expect(item.message).to.be.eql('DBConnection is not open');
               }
@@ -286,7 +286,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item instanceof Error).to.be.true;
+              expect(item).to.be.instanceOf(Error);
               if (item instanceof Error) {
                 expect(item.message).to.be.eql('DBConnection is not open');
               }
@@ -325,7 +325,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item instanceof Error).to.be.true;
+              expect(item).to.be.instanceOf(Error);
               if (item instanceof Error) {
                 expect(item.message).to.be.eql('DBConnection is not open');
               }
@@ -380,7 +380,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item instanceof Error).to.be.true;
+              expect(item).to.be.instanceOf(Error);
               if (item instanceof Error) {
                 expect(item.message).to.be.eql('DBConnection is not open');
               }
