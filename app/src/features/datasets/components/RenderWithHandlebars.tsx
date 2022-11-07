@@ -5,10 +5,7 @@ import { useHandlebars } from 'utils/handlebarsUtils';
 export interface IRenderWithHandlebarsProps {
   datasetEML: {
     data: {
-      'eml:eml': {
-        dataset: any;
-        additionalMetadata: any;
-      };
+      'eml:eml': any;
     };
   };
   rawTemplate: TemplateSpecification;
