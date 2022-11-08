@@ -314,12 +314,17 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const data = fileDataLoader.data;
+
     const content = Buffer.from(data, 'hex');
+
     const blob = new Blob([content], { type: 'application/zip' });
+
     const link = document.createElement('a');
 
     link.download = `${datasetId}.zip`;
+
     link.href = URL.createObjectURL(blob);
+
     link.click();
 
     URL.revokeObjectURL(link.href);
@@ -374,6 +379,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
                     variant="outlined"
                     disableElevation
                     aria-label={'Download occurrence'}
+                    data-testid="export-occurrence"
                     startIcon={<Icon path={mdiDownload} size={1} />}
                     onClick={() => downloadDataSet()}>
                     Export Occurrences
