@@ -28,9 +28,6 @@ const mockUseApi = {
   search: {
     getSpatialData: jest.fn(),
     getSpatialDataFile: jest.fn()
-  },
-  download: {
-    downloadDataSet: jest.fn()
   }
 };
 
@@ -53,7 +50,6 @@ describe('DatasetPage', () => {
     mockUseApi.dataset.getDatasetEML.mockResolvedValue([]);
 
     const { getByTestId } = renderContainer();
-    // eslint-disable-next-line no-restricted-globals
 
     await waitFor(() => {
       expect(getByTestId('MapContainer')).toBeVisible();
