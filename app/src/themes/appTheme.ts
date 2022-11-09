@@ -100,7 +100,6 @@ const appTheme = createTheme({
     }
   }
 });
-
 declare module '@mui/material/styles' {
   interface Palette {
     bcgovblue: Palette['primary'];
