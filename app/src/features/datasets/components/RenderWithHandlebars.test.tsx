@@ -1,5 +1,4 @@
-//import { useApi } from 'hooks/useApi';
-import { cleanup, render, screen } from 'test-helpers/test-utils';
+import { cleanup, render } from 'test-helpers/test-utils';
 import useHandlebars from 'utils/handlebarsUtils';
 import RenderWithHandlebars from './RenderWithHandlebars';
 

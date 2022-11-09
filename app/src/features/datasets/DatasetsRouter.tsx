@@ -10,6 +10,8 @@ import DatasetPage from './DatasetPage';
 const datasetsRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
+      <Redirect exact from="/datasets/:id" to="/datasets/:id/details" />
+
       <AppRoute exact path="/datasets/:id/details">
         <DatasetPage />
       </AppRoute>
