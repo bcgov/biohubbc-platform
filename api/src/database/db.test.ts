@@ -6,7 +6,6 @@ import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
-import { Queries } from '../queries';
 import * as db from './db';
 import {
   DB_CLIENT,
@@ -93,10 +92,10 @@ describe('db', () => {
             expect(getDBPoolStub).to.have.been.calledOnce;
             expect(connectStub).to.have.been.calledOnce;
 
-            const expectedSystemUserContextSQL = Queries.database.setSystemUserContextSQL(
-              'test',
+            const expectedSystemUserContextSQL = SQL`select api_set_context(${'test'}, ${
               SYSTEM_IDENTITY_SOURCE.IDIR
-            );
+            });`;
+
             expect(queryStub).to.have.been.calledWith(
               expectedSystemUserContextSQL?.text,
               expectedSystemUserContextSQL?.values

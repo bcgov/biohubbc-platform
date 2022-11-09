@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiError } from '../errors/api-error';
 import { IgcNotifyGenericMessage } from '../interfaces/gcnotify.interface';
+import { getMockDBConnection } from '../__mocks__/db';
 import { GCNotifyService } from './gcnotify-service';
 
 chai.use(sinonChai);
@@ -26,7 +27,8 @@ describe('GCNotifyService', () => {
     };
 
     it('should throw a 400 error when no email is given', async () => {
-      const gcNotifyServiece = new GCNotifyService();
+      const mockDBConnection = getMockDBConnection();
+      const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       sinon.stub(axios, 'post').resolves({ data: null });
 
@@ -39,7 +41,8 @@ describe('GCNotifyService', () => {
     });
 
     it('should throw a 400 error when no data is given', async () => {
-      const gcNotifyServiece = new GCNotifyService();
+      const mockDBConnection = getMockDBConnection();
+      const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       sinon.stub(axios, 'post').resolves({ data: null });
 
@@ -52,7 +55,8 @@ describe('GCNotifyService', () => {
     });
 
     it('should not throw an error on success', async () => {
-      const gcNotifyServiece = new GCNotifyService();
+      const mockDBConnection = getMockDBConnection();
+      const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       sinon.stub(axios, 'post').resolves({ data: 201 });
 
@@ -78,7 +82,8 @@ describe('GCNotifyService', () => {
     };
 
     it('should throw a 400 error when no phone number is given', async () => {
-      const gcNotifyServiece = new GCNotifyService();
+      const mockDBConnection = getMockDBConnection();
+      const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       sinon.stub(axios, 'post').resolves({ data: null });
 
@@ -91,7 +96,8 @@ describe('GCNotifyService', () => {
     });
 
     it('should throw a 400 error when no data is given', async () => {
-      const gcNotifyServiece = new GCNotifyService();
+      const mockDBConnection = getMockDBConnection();
+      const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       sinon.stub(axios, 'post').resolves({ data: null });
 
@@ -104,7 +110,8 @@ describe('GCNotifyService', () => {
     });
 
     it('should not throw an error on success', async () => {
-      const gcNotifyServiece = new GCNotifyService();
+      const mockDBConnection = getMockDBConnection();
+      const gcNotifyServiece = new GCNotifyService(mockDBConnection);
 
       sinon.stub(axios, 'post').resolves({ data: 201 });
 

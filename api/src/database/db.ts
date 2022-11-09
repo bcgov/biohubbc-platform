@@ -1,9 +1,8 @@
 import knex, { Knex } from 'knex';
 import * as pg from 'pg';
-import { SQLStatement } from 'sql-template-strings';
+import SQL, { SQLStatement } from 'sql-template-strings';
 import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
-import * as UserQueries from '../queries/database/user-context-queries';
 import { getUserIdentifier, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
 
@@ -331,7 +330,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
     }
 
     // Set the user context for all queries made using this connection
-    const setSystemUserContextSQLStatement = UserQueries.setSystemUserContextSQL(userIdentifier, userIdentitySource);
+    const setSystemUserContextSQLStatement = SQL`select api_set_context(${userIdentifier}, ${userIdentitySource});`;
 
     if (!setSystemUserContextSQLStatement) {
       throw new ApiExecuteSQLError('Failed to build SQL user context statement');
