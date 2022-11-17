@@ -15,9 +15,8 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
 import EditDialog from 'components/dialog/EditDialog';
-import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
-import { DeleteSystemUserI18N } from 'constants/i18n';
+import { AddSystemUserI18N, DeleteSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
@@ -73,22 +72,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
 
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
 
-  const defaultErrorDialogProps = {
-    dialogTitle: DeleteSystemUserI18N.deleteErrorTitle,
-    dialogText: DeleteSystemUserI18N.deleteErrorText,
-    open: false,
-    onClose: () => {
-      dialogContext.setErrorDialog({ open: false });
-    },
-    onOk: () => {
-      dialogContext.setErrorDialog({ open: false });
-    }
-  };
-
-  const showErrorDialog = (textDialogProps?: Partial<IErrorDialogProps>) => {
-    dialogContext.setErrorDialog({ ...defaultErrorDialogProps, ...textDialogProps, open: true });
-  };
-
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
@@ -98,8 +81,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       dialogTitle: 'Remove user?',
       dialogContent: (
         <Typography variant="body1" component="div" color="textSecondary">
-          Removing user <strong>{row.user_identifier}</strong> will revoke their access to this application. Are you
-          sure you want to proceed?
+          Removing user <strong>{row.user_identifier}</strong> will revoke their access to this application and all
+          related projects. Are you sure you want to proceed?
         </Typography>
       ),
       yesButtonLabel: 'Remove User',
@@ -140,7 +123,20 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       props.refresh();
     } catch (error) {
       const apiError = error as APIError;
-      showErrorDialog({ dialogText: apiError.message, dialogErrorDetails: apiError.errors, open: true });
+
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: DeleteSystemUserI18N.deleteUserErrorTitle,
+        dialogText: DeleteSystemUserI18N.deleteUserErrorText,
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => {
+          dialogContext.setErrorDialog({ open: false });
+        },
+        onOk: () => {
+          dialogContext.setErrorDialog({ open: false });
+        }
+      });
     }
   };
 
@@ -192,7 +188,19 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       props.refresh();
     } catch (error) {
       const apiError = error as APIError;
-      showErrorDialog({ dialogText: apiError.message, dialogErrorDetails: apiError.errors, open: true });
+      dialogContext.setErrorDialog({
+        open: true,
+        dialogTitle: UpdateSystemUserI18N.updateUserErrorTitle,
+        dialogText: UpdateSystemUserI18N.updateUserErrorText,
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => {
+          dialogContext.setErrorDialog({ open: false });
+        },
+        onOk: () => {
+          dialogContext.setErrorDialog({ open: false });
+        }
+      });
     }
   };
 
@@ -219,11 +227,19 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
         )
       });
     } catch (error) {
+      const apiError = error as APIError;
       dialogContext.setErrorDialog({
-        ...defaultErrorDialogProps,
         open: true,
-        dialogError: (error as APIError).message,
-        dialogErrorDetails: (error as APIError).errors
+        dialogTitle: AddSystemUserI18N.addUserErrorTitle,
+        dialogText: AddSystemUserI18N.addUserErrorText,
+        dialogError: apiError.message,
+        dialogErrorDetails: apiError.errors,
+        onClose: () => {
+          dialogContext.setErrorDialog({ open: false });
+        },
+        onOk: () => {
+          dialogContext.setErrorDialog({ open: false });
+        }
       });
     }
   };

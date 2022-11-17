@@ -4,6 +4,7 @@ import * as pg from 'pg';
 import Sinon, { SinonStub } from 'sinon';
 import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
 import { Queries } from '../queries';
 import * as db from './db';
@@ -130,16 +131,24 @@ describe('db', () => {
           it('throws an error', async () => {
             const getDBPoolStub = sinonSandbox.stub(db, 'getDBPool').returns(undefined);
 
-            let expectedError: Error;
+            let expectedError: ApiExecuteSQLError;
             try {
               await connection.open();
 
               expect.fail('Expected an error to be thrown');
             } catch (error) {
-              expectedError = error as Error;
+              expectedError = error as ApiExecuteSQLError;
             }
 
-            expect(expectedError.message).to.equal('DBPool is not initialized');
+            expect(expectedError.message).to.equal('Failed to execute SQL');
+
+            expect(expectedError.errors?.length).to.be.greaterThan(0);
+            expectedError.errors?.forEach((item) => {
+              expect(item).to.be.instanceOf(Error);
+              if (item instanceof Error) {
+                expect(item.message).to.be.eql('DBPool is not initialized');
+              }
+            });
 
             expect(getDBPoolStub).to.have.been.calledOnce;
 
@@ -209,16 +218,24 @@ describe('db', () => {
           it('throws an error', async () => {
             sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
-            let expectedError: Error;
+            let expectedError: ApiExecuteSQLError;
             try {
               await connection.commit();
 
               expect.fail('Expected an error to be thrown');
             } catch (error) {
-              expectedError = error as Error;
+              expectedError = error as ApiExecuteSQLError;
             }
 
-            expect(expectedError.message).to.equal('DBConnection is not open');
+            expect(expectedError.message).to.equal('Failed to execute SQL');
+
+            expect(expectedError.errors?.length).to.be.greaterThan(0);
+            expectedError.errors?.forEach((item) => {
+              expect(item).to.be.instanceOf(Error);
+              if (item instanceof Error) {
+                expect(item.message).to.be.eql('DBConnection is not open');
+              }
+            });
           });
         });
       });
@@ -254,7 +271,7 @@ describe('db', () => {
           it('throws an error', async () => {
             sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
-            let expectedError: Error;
+            let expectedError: ApiExecuteSQLError;
             try {
               const queryStatement = `query ${123}`;
 
@@ -262,10 +279,18 @@ describe('db', () => {
 
               expect.fail('Expected an error to be thrown');
             } catch (error) {
-              expectedError = error as Error;
+              expectedError = error as ApiExecuteSQLError;
             }
 
-            expect(expectedError.message).to.equal('DBConnection is not open');
+            expect(expectedError.message).to.equal('Failed to execute SQL');
+
+            expect(expectedError.errors?.length).to.be.greaterThan(0);
+            expectedError.errors?.forEach((item) => {
+              expect(item).to.be.instanceOf(Error);
+              if (item instanceof Error) {
+                expect(item.message).to.be.eql('DBConnection is not open');
+              }
+            });
           });
         });
       });
@@ -287,16 +312,24 @@ describe('db', () => {
           it('throws an error', async () => {
             sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
-            let expectedError: Error;
+            let expectedError: ApiExecuteSQLError;
             try {
               await connection.rollback();
 
               expect.fail('Expected an error to be thrown');
             } catch (error) {
-              expectedError = error as Error;
+              expectedError = error as ApiExecuteSQLError;
             }
 
-            expect(expectedError.message).to.equal('DBConnection is not open');
+            expect(expectedError.message).to.equal('Failed to execute SQL');
+
+            expect(expectedError.errors?.length).to.be.greaterThan(0);
+            expectedError.errors?.forEach((item) => {
+              expect(item).to.be.instanceOf(Error);
+              if (item instanceof Error) {
+                expect(item.message).to.be.eql('DBConnection is not open');
+              }
+            });
           });
         });
       });
@@ -332,7 +365,7 @@ describe('db', () => {
           it('throws an error', async () => {
             sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
 
-            let expectedError: Error;
+            let expectedError: ApiExecuteSQLError;
             try {
               const sqlStatement = SQL`sql query ${123}`;
 
@@ -340,10 +373,18 @@ describe('db', () => {
 
               expect.fail('Expected an error to be thrown');
             } catch (error) {
-              expectedError = error as Error;
+              expectedError = error as ApiExecuteSQLError;
             }
 
-            expect(expectedError.message).to.equal('DBConnection is not open');
+            expect(expectedError.message).to.equal('Failed to execute SQL');
+
+            expect(expectedError.errors?.length).to.be.greaterThan(0);
+            expectedError.errors?.forEach((item) => {
+              expect(item).to.be.instanceOf(Error);
+              if (item instanceof Error) {
+                expect(item.message).to.be.eql('DBConnection is not open');
+              }
+            });
           });
         });
       });

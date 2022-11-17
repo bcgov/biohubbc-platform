@@ -1,7 +1,6 @@
 import { Redirect, Switch } from 'react-router';
 import AppRoute from 'utils/AppRoute';
 import DatasetPage from './DatasetPage';
-import DatasetsPage from './DatasetsPage';
 
 /**
  * Router for all `/datasets/*` pages.
@@ -11,9 +10,7 @@ import DatasetsPage from './DatasetsPage';
 const datasetsRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/datasets">
-        <DatasetsPage />
-      </AppRoute>
+      <Redirect exact from="/datasets/:id" to="/datasets/:id/details" />
 
       <AppRoute exact path="/datasets/:id/details">
         <DatasetPage />

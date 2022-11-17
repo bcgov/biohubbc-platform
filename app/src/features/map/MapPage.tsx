@@ -2,7 +2,6 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import intersect from '@turf/intersect';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import SideSearchBar from 'components/map/components/SideSearchBar';
 import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
@@ -17,6 +16,7 @@ import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import React, { useEffect, useRef, useState } from 'react';
 import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseBoundaryCentroidResults, parseOccurrenceResults, parseSpatialDataByType } from 'utils/spatial-utils';
+import SideSearchBar from './SideSearchBar';
 
 const MapPage: React.FC<React.PropsWithChildren> = () => {
   const api = useApi();
