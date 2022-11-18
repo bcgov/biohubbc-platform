@@ -12,6 +12,7 @@ services:
         - POSTGRES_VERSION=${POSTGRES_VERSION}
         - POSTGIS_VERSION=${POSTGIS_VERSION}
         - TZ=${DB_TZ}
+        - SIZE=${DB_SIZE}
     ports:
       - ${DB_PORT}:5432
     healthcheck:
