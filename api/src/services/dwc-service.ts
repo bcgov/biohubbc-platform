@@ -85,8 +85,8 @@ export class DarwinCoreService extends DBService {
 
       const isOnlyMetadata = await this.isSubmissionMetadataOnly(submissionId);
 
-      // the following steps are for processing occurrence data
-      // skip these if the submission only contains metadata (no occurrence data)
+      // the following steps are for processing Darwin Core occurrence data
+      // skip these steps if the submission only contains metadata (no occurrence data)
       if (!isOnlyMetadata) {
         await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
