@@ -507,7 +507,7 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe('create', () => {
+  describe.only('create', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -519,6 +519,8 @@ describe('DarwinCoreService', () => {
         originalname: 'file1.txt',
         buffer: Buffer.from('file1data')
       } as unknown as Express.Multer.File;
+
+      sinon.stub(DarwinCoreService.prototype, 'isSubmissionMetadataOnly').resolves(false);
 
       const ingestDWCStub = sinon.stub(DarwinCoreService.prototype, 'create_step1_ingestDWC').resolves(1);
 
