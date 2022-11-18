@@ -83,11 +83,17 @@ export class DarwinCoreService extends DBService {
 
       await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
 
-      await this.create_step7_normalizeSubmissionDWCA(submissionId);
+      const isOnlyMetadata = await this.isSubmissionMetadataOnly(submissionId);
 
-      await this.create_step8_runSpatialTransforms(submissionId);
+      // the following steps are for processing Darwin Core occurrence data
+      // skip these steps if the submission only contains metadata (no occurrence data)
+      if (!isOnlyMetadata) {
+        await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
-      await this.create_step9_runSecurityTransforms(submissionId);
+        await this.create_step8_runSpatialTransforms(submissionId);
+
+        await this.create_step9_runSecurityTransforms(submissionId);
+      }
     } catch (error: any) {
       throw new ApiGeneralError('The Darwin Core submission could not be processed', error.message);
     }
@@ -624,5 +630,15 @@ export class DarwinCoreService extends DBService {
     const esClient = await this.getEsClient();
 
     return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
+  }
+
+  /**
+   * Gets DwCArchive from submission ID and returns true/false if the submission is only metadata
+   * @param {number} submissionId
+   * @returns {*} {Promise<boolean>}
+   */
+  async isSubmissionMetadataOnly(submissionId: number): Promise<boolean> {
+    const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+    return dwcArchive.isMetaDataOnly();
   }
 }
