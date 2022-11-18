@@ -87,17 +87,17 @@ export class DWCArchive {
 
   /**
    * This function checks worksheet data if the DwCArchive only contains metadata
-   *
+   * 
    * @returns {boolean} True if no worksheet data is present
    */
   isMetaDataOnly(): boolean {
     return (
-      this.eml != null &&
-      this.worksheets.event == null &&
-      this.worksheets.measurementorfact == null &&
-      this.worksheets.occurrence == null &&
-      this.worksheets.resourcerelationship == null &&
-      this.worksheets.taxon == null
+      this.eml !== undefined &&
+      !this.worksheets.event &&
+      !this.worksheets.measurementorfact &&
+      !this.worksheets.occurrence &&
+      !this.worksheets.resourcerelationship &&
+      !this.worksheets.taxon
     );
   }
 
