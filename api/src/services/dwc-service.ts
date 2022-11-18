@@ -83,14 +83,14 @@ export class DarwinCoreService extends DBService {
 
       await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
 
-      // check if more than eml file exists
-      const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+      const isOnlyMetadata = await this.isSubmissionMetadataOnly(submissionId);
 
-      if (dwcArchive.isMetaDataOnly()) {
+      // skip these if the submission only contains metadata
+      if (!isOnlyMetadata) {
         await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
         await this.create_step8_runSpatialTransforms(submissionId);
-  
+
         await this.create_step9_runSecurityTransforms(submissionId);
       }
     } catch (error: any) {
@@ -264,7 +264,7 @@ export class DarwinCoreService extends DBService {
   async create_step7_normalizeSubmissionDWCA(submissionId: number) {
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-      
+
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
@@ -629,5 +629,15 @@ export class DarwinCoreService extends DBService {
     const esClient = await this.getEsClient();
 
     return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
+  }
+
+  /**
+   * Gets DwCArchive from submission ID and returns true/false if the submission is only metadata
+   * @param submissionId
+   * @returns
+   */
+  async isSubmissionMetadataOnly(submissionId: number): Promise<boolean> {
+    const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+    return dwcArchive.isMetaDataOnly();
   }
 }

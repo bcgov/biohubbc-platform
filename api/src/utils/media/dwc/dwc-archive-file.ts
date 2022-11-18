@@ -87,7 +87,14 @@ export class DWCArchive {
 
   // checks if this DwCArchive only has meta data
   isMetaDataOnly(): boolean {
-    return this.eml != null && this.worksheets.event == null && this.worksheets.measurementorfact == null && this.worksheets.occurrence == null && this.worksheets.resourcerelationship == null && this.worksheets.taxon == null
+    return (
+      this.eml != null &&
+      this.worksheets.event == null &&
+      this.worksheets.measurementorfact == null &&
+      this.worksheets.occurrence == null &&
+      this.worksheets.resourcerelationship == null &&
+      this.worksheets.taxon == null
+    );
   }
 
   isMediaValid(validationSchemaParser: ValidationSchemaParser): IMediaState {
