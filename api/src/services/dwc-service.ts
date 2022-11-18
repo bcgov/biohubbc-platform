@@ -83,11 +83,16 @@ export class DarwinCoreService extends DBService {
 
       await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
 
-      await this.create_step7_normalizeSubmissionDWCA(submissionId);
+      // check if more than eml file exists
+      const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-      await this.create_step8_runSpatialTransforms(submissionId);
+      if (dwcArchive.isMetaDataOnly()) {
+        await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
-      await this.create_step9_runSecurityTransforms(submissionId);
+        await this.create_step8_runSpatialTransforms(submissionId);
+  
+        await this.create_step9_runSecurityTransforms(submissionId);
+      }
     } catch (error: any) {
       throw new ApiGeneralError('The Darwin Core submission could not be processed', error.message);
     }
@@ -259,7 +264,7 @@ export class DarwinCoreService extends DBService {
   async create_step7_normalizeSubmissionDWCA(submissionId: number) {
     try {
       const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
-
+      
       await this.normalizeSubmissionDWCA(submissionId, dwcArchive);
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.NORMALIZED);
