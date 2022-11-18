@@ -85,7 +85,8 @@ export class DarwinCoreService extends DBService {
 
       const isOnlyMetadata = await this.isSubmissionMetadataOnly(submissionId);
 
-      // skip these if the submission only contains metadata
+      // the following steps are for processing occurrence data
+      // skip these if the submission only contains metadata (no occurrence data)
       if (!isOnlyMetadata) {
         await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
@@ -633,8 +634,8 @@ export class DarwinCoreService extends DBService {
 
   /**
    * Gets DwCArchive from submission ID and returns true/false if the submission is only metadata
-   * @param submissionId
-   * @returns
+   * @param {number} submissionId
+   * @returns {*} {Promise<boolean>}
    */
   async isSubmissionMetadataOnly(submissionId: number): Promise<boolean> {
     const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);

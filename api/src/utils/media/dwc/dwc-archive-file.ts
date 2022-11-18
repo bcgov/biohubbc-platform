@@ -85,7 +85,11 @@ export class DWCArchive {
     }
   }
 
-  // checks if this DwCArchive only has meta data
+  /**
+   * This function checks worksheet data if the DwCArchive only contains metadata
+   *
+   * @returns {boolean} True if no worksheet data is present
+   */
   isMetaDataOnly(): boolean {
     return (
       this.eml != null &&
