@@ -507,7 +507,7 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe.only('create', () => {
+  describe('create', () => {
     afterEach(() => {
       sinon.restore();
     });
