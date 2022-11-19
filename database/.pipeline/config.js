@@ -76,7 +76,7 @@ const phases = {
     tag: `dev-${version}-${deployChangeId}`,
     env: 'dev',
     tz: config.timezone.db,
-    size: '450Mi',
+    size: '1Gi',
     dbSetupDockerfilePath: dbSetupDockerfilePath
   },
   test: {
