@@ -34,7 +34,7 @@ const dbDeploy = (settings) => {
         POSTGRESQL_DATABASE: 'biohubbc',
         TZ: phases[phase].tz,
         IMAGE_STREAM_NAMESPACE: phases.build.namespace,
-        VOLUME_CAPACITY: '3Gi'//phases[phase].size
+        VOLUME_CAPACITY: phases[phase].size
       }
     })
   );
