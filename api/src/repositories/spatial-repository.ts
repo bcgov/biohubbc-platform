@@ -248,12 +248,13 @@ export class SpatialRepository extends BaseRepository {
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
-    if (response.rowCount <= 0) {
-      throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
-        'SpatialRepository->runSpatialTransformOnSubmissionId',
-        'rowCount was null or undefined, expected rowCount >= 1'
-      ]);
-    }
+    // TODO this throws an error if no occurrence data is made available, I don't think this is an actual error
+    // if (response.rowCount <= 0) {
+    //   throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
+    //     'SpatialRepository->runSpatialTransformOnSubmissionId',
+    //     'rowCount was null or undefined, expected rowCount >= 1'
+    //   ]);
+    // }
 
     return response.rows;
   }
