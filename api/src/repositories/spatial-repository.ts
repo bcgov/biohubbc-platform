@@ -138,6 +138,32 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+   /**
+   * get spatial transform records for project metadata
+   *
+   * @param
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialRepository
+   */
+    async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
+      const sqlStatement = SQL`
+        SELECT
+          spatial_transform_id,
+          name,
+          description,
+          notes,
+          transform
+        FROM
+          spatial_transform
+        WHERE
+          name LIKE '%EML Dataset Boundaries%';
+      `;
+  
+      const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
+  
+      return response.rows;
+    }
+
   /**
    *get security transform records
    *
@@ -248,13 +274,12 @@ export class SpatialRepository extends BaseRepository {
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
-    // TODO this throws an error if no occurrence data is made available, I don't think this is an actual error
-    // if (response.rowCount <= 0) {
-    //   throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
-    //     'SpatialRepository->runSpatialTransformOnSubmissionId',
-    //     'rowCount was null or undefined, expected rowCount >= 1'
-    //   ]);
-    // }
+    if (response.rowCount <= 0) {
+      throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
+        'SpatialRepository->runSpatialTransformOnSubmissionId',
+        'rowCount was null or undefined, expected rowCount >= 1'
+      ]);
+    }
 
     return response.rows;
   }

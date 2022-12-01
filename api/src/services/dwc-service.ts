@@ -85,15 +85,17 @@ export class DarwinCoreService extends DBService {
 
       await this.create_step7_normalizeSubmissionDWCA(submissionId);
       
-      await this.create_step8_runSpatialTransforms(submissionId);
-      
-      await this.create_step9_runSecurityTransforms(submissionId);
-      
-      // the following steps are for processing Darwin Core occurrence data
-      // skip these steps if the submission only contains metadata (no occurrence data)
+      // the following if statement decides if occurrence data is present or not
+      // skip step 9 as it is specific to transforming occurrence data
       const isOnlyMetadata = await this.isSubmissionMetadataOnly(submissionId);
-      if (!isOnlyMetadata) {
+      if (isOnlyMetadata) {
+        await this.create_step8_runSpatialTransforms(submissionId, isOnlyMetadata);
+      } else {
+        // these two steps require occurrence data to be present in the submission to succeed
+        await this.create_step8_runSpatialTransforms(submissionId);
+        await this.create_step9_runSecurityTransforms(submissionId);
       }
+      
     } catch (error: any) {
       throw new ApiGeneralError('The Darwin Core submission could not be processed', error.message);
     }
@@ -289,9 +291,9 @@ export class DarwinCoreService extends DBService {
    * @return {*}
    * @memberof DarwinCoreService
    */
-  async create_step8_runSpatialTransforms(submissionId: number) {
+  async create_step8_runSpatialTransforms(submissionId: number, metadataOnly: boolean = false) {
     try {
-      await this.spatialService.runSpatialTransforms(submissionId);
+      await this.spatialService.runSpatialTransforms(submissionId, metadataOnly);
 
       await this.submissionService.insertSubmissionStatus(
         submissionId,

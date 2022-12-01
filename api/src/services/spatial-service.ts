@@ -45,6 +45,16 @@ export class SpatialService extends DBService {
   }
 
   /**
+   * get spatial transform records for project metadata
+   *
+   * @return {*}  {Promise<IGetSpatialTransformRecord>}
+   * @memberof SpatialService
+   */
+   async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
+    return this.spatialRepository.getSpatialTransformRecordsForProjectMetadata();
+  }
+
+  /**
    * get security transform record from name
    *
    * @param {string} spatialTransformName
@@ -98,8 +108,13 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSpatialTransforms(submissionId: number): Promise<void> {
-    const spatialTransformRecords = await this.getSpatialTransformRecords();
+  async runSpatialTransforms(submissionId: number, metadataOnly: boolean = false): Promise<void> {
+    let spatialTransformRecords;
+    if (metadataOnly) {
+      spatialTransformRecords = await this.getSpatialTransformRecordsForProjectMetadata();
+    } else {
+      spatialTransformRecords = await this.getSpatialTransformRecords();
+    }
 
     const promises1 = spatialTransformRecords.map(async (transformRecord) => {
       const transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(
