@@ -138,15 +138,15 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
-   /**
+  /**
    * get spatial transform records for project metadata
    *
    * @param
    * @return {*}  {Promise<IGetSpatialTransformRecord>}
    * @memberof SpatialRepository
    */
-    async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
-      const sqlStatement = SQL`
+  async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
+    const sqlStatement = SQL`
         SELECT
           spatial_transform_id,
           name,
@@ -158,11 +158,11 @@ export class SpatialRepository extends BaseRepository {
         WHERE
           name LIKE '%EML Dataset Boundaries%';
       `;
-  
-      const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
-  
-      return response.rows;
-    }
+
+    const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
+
+    return response.rows;
+  }
 
   /**
    *get security transform records

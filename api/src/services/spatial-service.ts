@@ -50,7 +50,7 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<IGetSpatialTransformRecord>}
    * @memberof SpatialService
    */
-   async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
+  async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
     return this.spatialRepository.getSpatialTransformRecordsForProjectMetadata();
   }
 
@@ -105,10 +105,11 @@ export class SpatialService extends DBService {
    * Collect transforms from db, run transformations on submission id, save result to spatial component table
    *
    * @param {number} submissionId
+   * @param {boolean} metadataOnly A flag to determine if occurrence transforms need to be run
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSpatialTransforms(submissionId: number, metadataOnly: boolean = false): Promise<void> {
+  async runSpatialTransforms(submissionId: number, metadataOnly = false): Promise<void> {
     let spatialTransformRecords;
     if (metadataOnly) {
       spatialTransformRecords = await this.getSpatialTransformRecordsForProjectMetadata();
