@@ -45,16 +45,6 @@ export class SpatialService extends DBService {
   }
 
   /**
-   * get spatial transform records for project metadata
-   *
-   * @return {*}  {Promise<IGetSpatialTransformRecord>}
-   * @memberof SpatialService
-   */
-  async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
-    return this.spatialRepository.getSpatialTransformRecordsForProjectMetadata();
-  }
-
-  /**
    * get security transform record from name
    *
    * @param {string} spatialTransformName
@@ -105,17 +95,11 @@ export class SpatialService extends DBService {
    * Collect transforms from db, run transformations on submission id, save result to spatial component table
    *
    * @param {number} submissionId
-   * @param {boolean} metadataOnly A flag to determine if occurrence transforms need to be run
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSpatialTransforms(submissionId: number, metadataOnly = false): Promise<void> {
-    let spatialTransformRecords;
-    if (metadataOnly) {
-      spatialTransformRecords = await this.getSpatialTransformRecordsForProjectMetadata();
-    } else {
-      spatialTransformRecords = await this.getSpatialTransformRecords();
-    }
+  async runSpatialTransforms(submissionId: number): Promise<void> {
+    const spatialTransformRecords = await this.getSpatialTransformRecords();
 
     const promises1 = spatialTransformRecords.map(async (transformRecord) => {
       const transformed = await this.spatialRepository.runSpatialTransformOnSubmissionId(

@@ -139,32 +139,6 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * get spatial transform records for project metadata
-   *
-   * @param
-   * @return {*}  {Promise<IGetSpatialTransformRecord>}
-   * @memberof SpatialRepository
-   */
-  async getSpatialTransformRecordsForProjectMetadata(): Promise<IGetSpatialTransformRecord[]> {
-    const sqlStatement = SQL`
-        SELECT
-          spatial_transform_id,
-          name,
-          description,
-          notes,
-          transform
-        FROM
-          spatial_transform
-        WHERE
-          name LIKE '%EML Dataset Boundaries%';
-      `;
-
-    const response = await this.connection.sql<IGetSpatialTransformRecord>(sqlStatement);
-
-    return response.rows;
-  }
-
-  /**
    *get security transform records
    *
    * @return {*}  {Promise<IGetSecurityTransformRecord[]>}
@@ -274,13 +248,6 @@ export class SpatialRepository extends BaseRepository {
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
-    if (response.rowCount <= 0) {
-      throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
-        'SpatialRepository->runSpatialTransformOnSubmissionId',
-        'rowCount was null or undefined, expected rowCount >= 1'
-      ]);
-    }
-
     return response.rows;
   }
 
@@ -294,13 +261,6 @@ export class SpatialRepository extends BaseRepository {
    */
   async runSecurityTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSecureRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
-
-    if (response.rowCount <= 0) {
-      throw new ApiExecuteSQLError('Failed to run security transform on submission id', [
-        'SpatialRepository->runSecurityTransformOnSubmissionId',
-        'rowCount was null or undefined, expected rowCount >= 1'
-      ]);
-    }
 
     return response.rows;
   }
