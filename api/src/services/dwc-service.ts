@@ -86,9 +86,8 @@ export class DarwinCoreService extends DBService {
       await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
       await this.create_step8_runSpatialTransforms(submissionId);
-      
-      await this.create_step9_runSecurityTransforms(submissionId);
 
+      await this.create_step9_runSecurityTransforms(submissionId);
     } catch (error: any) {
       throw new ApiGeneralError('The Darwin Core submission could not be processed', error.message);
     }
