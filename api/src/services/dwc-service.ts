@@ -83,17 +83,11 @@ export class DarwinCoreService extends DBService {
 
       await this.create_step6_transformAndUploadMetaData(submissionId, dataPackageId);
 
-      const isOnlyMetadata = await this.isSubmissionMetadataOnly(submissionId);
+      await this.create_step7_normalizeSubmissionDWCA(submissionId);
 
-      // the following steps are for processing Darwin Core occurrence data
-      // skip these steps if the submission only contains metadata (no occurrence data)
-      if (!isOnlyMetadata) {
-        await this.create_step7_normalizeSubmissionDWCA(submissionId);
+      await this.create_step8_runSpatialTransforms(submissionId);
 
-        await this.create_step8_runSpatialTransforms(submissionId);
-
-        await this.create_step9_runSecurityTransforms(submissionId);
-      }
+      await this.create_step9_runSecurityTransforms(submissionId);
     } catch (error: any) {
       throw new ApiGeneralError('The Darwin Core submission could not be processed', error.message);
     }
@@ -286,6 +280,7 @@ export class DarwinCoreService extends DBService {
    * Step 8 in processing a DWC archive file: run spatial transforms
    *
    * @param {number} submissionId
+   * @param {boolean} metadataOnly A flag to determine if occurrence transforms need to be run
    * @return {*}
    * @memberof DarwinCoreService
    */
