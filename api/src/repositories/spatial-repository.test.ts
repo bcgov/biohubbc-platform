@@ -232,25 +232,6 @@ describe('SpatialRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when transform sql query fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        query: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const spatialRepository = new SpatialRepository(mockDBConnection);
-
-      try {
-        await spatialRepository.runSpatialTransformOnSubmissionId(1, 'string');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to run spatial transform on submission id');
-      }
-    });
-
     it('should succeed with valid data', async () => {
       const mockQueryResponse = {
         rowCount: 1,
@@ -288,25 +269,6 @@ describe('SpatialRepository', () => {
   describe('runSecurityTransformOnSubmissionId', () => {
     afterEach(() => {
       sinon.restore();
-    });
-
-    it('should throw an error when transform sql query fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        query: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const spatialRepository = new SpatialRepository(mockDBConnection);
-
-      try {
-        await spatialRepository.runSecurityTransformOnSubmissionId(1, 'string');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to run security transform on submission id');
-      }
     });
 
     it('should succeed with valid data', async () => {
