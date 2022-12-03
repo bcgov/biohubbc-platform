@@ -91,7 +91,8 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
         open={props.open}
         onClose={props.onClose}
         aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description">
+        aria-describedby="alert-dialog-description"
+      >
         <DialogTitle id="alert-dialog-title">{props.dialogTitle}</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">{props.dialogText}</DialogContentText>

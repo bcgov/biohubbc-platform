@@ -40,7 +40,8 @@ const UploadAreaControls: React.FC<React.PropsWithChildren<any>> = (props) => {
         data-testid="Area_file-upload"
         variant="outlined"
         startIcon={<Icon path={mdiTrayArrowUp} size={1} />}
-        onClick={() => setOpenUploadArea(true)}>
+        onClick={() => setOpenUploadArea(true)}
+      >
         Import
       </Button>
     </>

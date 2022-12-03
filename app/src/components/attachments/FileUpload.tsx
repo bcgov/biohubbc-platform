@@ -253,7 +253,8 @@ export const FileUpload: React.FC<React.PropsWithChildren<IFileUploadProps>> = (
             '& li:first-of-type': {
               mt: 3
             }
-          }}>
+          }}
+        >
           {fileUploadItems}
         </List>
       </Box>

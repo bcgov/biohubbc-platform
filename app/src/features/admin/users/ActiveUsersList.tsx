@@ -252,7 +252,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             variant="h1"
             sx={{
               mt: -2
-            }}>
+            }}
+          >
             Manage Users
           </Typography>
           <Button
@@ -266,7 +267,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             sx={{
               mt: -2,
               fontWeight: 700
-            }}>
+            }}
+          >
             Add Users
           </Button>
         </Box>
@@ -275,7 +277,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             sx={{
               pl: { sm: 2 },
               pr: { xs: 1, sm: 1 }
-            }}>
+            }}
+          >
             <Typography variant="h4" component="h2">
               Active Users{' '}
               <Typography sx={{ fontSize: 'inherit' }} color="textSecondary" component="span">

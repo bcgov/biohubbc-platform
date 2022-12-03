@@ -8,7 +8,8 @@ describe('BCeIDRequestForm', () => {
       <Formik
         initialValues={BCeIDRequestFormInitialValues}
         validationSchema={BCeIDRequestFormYupSchema}
-        onSubmit={async () => {}}>
+        onSubmit={async () => {}}
+      >
         {() => <BCeIDRequestForm />}
       </Formik>
     );

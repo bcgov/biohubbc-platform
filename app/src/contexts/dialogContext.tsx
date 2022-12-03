@@ -146,7 +146,8 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
         errorDialogProps,
         setSnackbar,
         snackbarProps
-      }}>
+      }}
+    >
       {props.children}
       <YesNoDialog {...yesNoDialogProps} />
       <ErrorDialog {...errorDialogProps} />

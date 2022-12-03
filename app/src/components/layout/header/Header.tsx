@@ -131,7 +131,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     '& a:hover': {
                       textDecoration: 'underline'
                     }
-                  }}>
+                  }}
+                >
                   <Link to="/" id="menu_home">
                     Home
                   </Link>
@@ -154,7 +155,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   onClick={showSupportDialog}
                   sx={{
                     color: 'bcgovblue.contrastText'
-                  }}>
+                  }}
+                >
                   <Icon path={mdiHelpCircle} size={1} />
                 </IconButton>
                 <Box>
@@ -197,7 +199,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
             <OtherLink
               href="mailto:biohub@gov.bc.ca?subject=BioHub - Secure Document Access Request"
               underline="always"
-              onClick={preventDefault}>
+              onClick={preventDefault}
+            >
               biohub@gov.bc.ca
             </OtherLink>
             .

@@ -64,7 +64,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <NoRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
+                  fallback={<div data-testid="fallback-child-component" />}
+                >
                   <div data-testid="child-component" />
                 </NoRoleGuard>
               </AuthStateContext.Provider>
@@ -87,7 +88,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <NoRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
+                  fallback={<div data-testid="fallback-child-component" />}
+                >
                   <div data-testid="child-component" />
                 </NoRoleGuard>
               </AuthStateContext.Provider>
@@ -112,7 +114,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <NoRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}>
+                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}
+                >
                   <div data-testid="child-component" />
                 </NoRoleGuard>
               </AuthStateContext.Provider>
@@ -135,7 +138,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <NoRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}>
+                  fallback={() => <div data-testid="fallback-child-component">{'123'}</div>}
+                >
                   <div data-testid="child-component" />
                 </NoRoleGuard>
               </AuthStateContext.Provider>
@@ -205,7 +209,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <SystemRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
+                  fallback={<div data-testid="fallback-child-component" />}
+                >
                   <div data-testid="child-component" />
                 </SystemRoleGuard>
               </AuthStateContext.Provider>
@@ -228,7 +233,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <SystemRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
+                  fallback={<div data-testid="fallback-child-component" />}
+                >
                   <div data-testid="child-component" />
                 </SystemRoleGuard>
               </AuthStateContext.Provider>
@@ -253,7 +259,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <SystemRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component" />}>
+                  fallback={() => <div data-testid="fallback-child-component" />}
+                >
                   <div data-testid="child-component" />
                 </SystemRoleGuard>
               </AuthStateContext.Provider>
@@ -276,7 +283,8 @@ describe('Guards', () => {
               <AuthStateContext.Provider value={authState}>
                 <SystemRoleGuard
                   validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component" />}>
+                  fallback={() => <div data-testid="fallback-child-component" />}
+                >
                   <div data-testid="child-component" />
                 </SystemRoleGuard>
               </AuthStateContext.Provider>

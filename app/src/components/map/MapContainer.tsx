@@ -80,7 +80,8 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
       ]}
       maxBoundsViscosity={1}
       fullscreenControl={fullscreenControlProp}
-      {...LeafletMapContainerProps}>
+      {...LeafletMapContainerProps}
+    >
       <FullScreenScrollingEventHandler bounds={bounds} scrollWheelZoom={scrollWheelZoom || false} />
 
       <SetMapBounds bounds={bounds} />

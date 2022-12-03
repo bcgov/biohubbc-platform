@@ -201,7 +201,8 @@ const AccessRequestList: React.FC<React.PropsWithChildren<IAccessRequestListProp
                         <Button
                           color="primary"
                           variant="outlined"
-                          onClick={() => setActiveReviewDialog({ open: true, request: row })}>
+                          onClick={() => setActiveReviewDialog({ open: true, request: row })}
+                        >
                           <strong>Review</strong>
                         </Button>
                       )}

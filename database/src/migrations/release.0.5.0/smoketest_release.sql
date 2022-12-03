@@ -238,7 +238,7 @@ declare
 				<abstract>
 					<section>
 						<title>Objectives</title>
-						<para>With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn’t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.</para>
+						<para>With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn''t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.</para>
 					</section>
 					<section>
 						<title>Caveates</title>
@@ -615,20 +615,22 @@ declare
 	_spatial_transform_id spatial_transform.spatial_transform_id%type;
 	_security_transform_id security_transform.security_transform_id%type;
 	_submission_spatial_component_id submission_spatial_component.submission_spatial_component_id%type;
+	_persecution_or_harm_id persecution_or_harm.persecution_or_harm_id%type;
 begin
   -- set security context
   select api_set_context('SIMS-SVC', 'SYSTEM') into _system_user_id;
   --select api_set_context('biohub_api', 'DATABASE') into _system_user_id;
+	select persecution_or_harm_id into _persecution_or_harm_id from persecution_or_harm where name = 'Big Brown Bat winter hibernation sites and maternity roosts';
 
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
 
 	-- source transform
-	insert into source_transform (system_user_id, version, metadata_index, metadata_transform)
+	insert into source_transform (system_user_id, version, metadata_index, metadata_transform) 
 		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
 	-- security transform
-	insert into security_transform (name, transform, record_effective_date) values ('test security transform', 'select * from submission', now()) returning security_transform_id into _security_transform_id;
+	insert into security_transform (persecution_or_harm_id, name, transform) values (_persecution_or_harm_id, 'test security transform', 'select * from submission') returning security_transform_id into _security_transform_id;
 	-- test system user
 	insert into system_user (user_identity_source_id, user_identifier, record_effective_date) values((select user_identity_source_id from user_identity_source where name = 'IDIR'), 'CHUCK', now());
 
@@ -639,15 +641,15 @@ begin
   insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;
   select count(1) into _count from submission_spatial_component;
   assert _count = 1, 'FAIL submission_spatial_component(1)';
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Ingested'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   -- transpose comments on next three lines to test deletion of published surveys by system administrator
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Awaiting Curation'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Validated'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Published'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
 	-- xrefs
 	insert into spatial_transform_submission (spatial_transform_id, submission_spatial_component_id) values (_spatial_transform_id, _submission_spatial_component_id);
 	insert into security_transform_submission (submission_spatial_component_id, security_transform_id) values (_submission_spatial_component_id, _security_transform_id);
-	insert into system_user_security_exception (security_transform_id, system_user_id, record_effective_date) values (_security_transform_id, (select system_user_id from system_user where user_identifier = 'CHUCK'), now());
-
+	insert into system_user_security_exception (persecution_or_harm_id, system_user_id) values (_persecution_or_harm_id, (select system_user_id from system_user where user_identifier = 'CHUCK'));
+  
   -- submission 2
   insert into submission (source_transform_id, record_effective_date) values (_source_transform_id, now()) returning submission_id into _submission_id;
   select count(1) into _count from submission;
@@ -655,13 +657,13 @@ begin
   insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}');
   select count(1) into _count from submission_spatial_component;
   assert _count = 2, 'FAIL submission_spatial_component(2)';
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()) returning submission_status_id into _submission_status_id;
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Ingested'), now()) returning submission_status_id into _submission_status_id;
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Rejected'), now()) returning submission_status_id into _submission_status_id;
-  insert into submission_message (submission_status_id, submission_message_type_id, event_timestamp, message) values (_submission_status_id, (select submission_message_type_id from submission_message_type where name = 'Missing Required Field'), now(), 'Some required field was not supplied.');
+  insert into submission_message (submission_status_id, submission_message_type_id, event_timestamp, message) values (_submission_status_id, (select submission_message_type_id from submission_message_type where name = 'Notice'), now(), 'Some required field was not supplied.');
   select count(1) into _count from submission_status;
   assert _count = 5, 'FAIL submission_status';
   select count(1) into _count from submission_message;
-  assert _count = 1, 'FAIL submission_message';
+  assert _count = 1, 'FAIL submission_message';  
 
   raise notice 'smoketest_release(2): PASS';
 end

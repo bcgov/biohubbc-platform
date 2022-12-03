@@ -47,7 +47,8 @@ const AccessDenied = () => {
               size="large"
               variant="contained"
               color="primary"
-              data-testid="request_access">
+              data-testid="request_access"
+            >
               Request Access
             </Button>
           )}

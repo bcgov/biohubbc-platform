@@ -1,9 +1,18 @@
+ create or replace view artifact as select * from biohub.artifact;
+ create or replace view artifact_government_interest as select * from biohub.artifact_government_interest;
+ create or replace view artifact_persecution as select * from biohub.artifact_persecution;
+ create or replace view artifact_proprietary as select * from biohub.artifact_proprietary;
+ create or replace view government_interest as select * from biohub.government_interest;
+ create or replace view persecution_or_harm as select * from biohub.persecution_or_harm;
+ create or replace view persecution_or_harm_type as select * from biohub.persecution_or_harm_type;
+ create or replace view proprietary_type as select * from biohub.proprietary_type;
  create or replace view security_transform as select * from biohub.security_transform;
  create or replace view security_transform_submission as select * from biohub.security_transform_submission;
  create or replace view source_transform as select * from biohub.source_transform;
  create or replace view spatial_transform as select * from biohub.spatial_transform;
  create or replace view spatial_transform_submission as select * from biohub.spatial_transform_submission;
  create or replace view submission as select * from biohub.submission;
+ create or replace view submission_government_interest as select * from biohub.submission_government_interest;
  create or replace view submission_message as select * from biohub.submission_message;
  create or replace view submission_message_class as select * from biohub.submission_message_class;
  create or replace view submission_message_type as select * from biohub.submission_message_type;

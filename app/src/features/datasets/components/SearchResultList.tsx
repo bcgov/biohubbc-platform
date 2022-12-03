@@ -66,7 +66,8 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
               fontWeight: 700,
               color: 'text.secondary',
               textTransform: 'uppercase'
-            }}>
+            }}
+          >
             Refine Search
           </Button>
         </Box>
@@ -78,7 +79,8 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
         mt="-1px"
         sx={{
           overflowY: 'auto'
-        }}>
+        }}
+      >
         <List>
           {searchResults.map((item) => {
             return (
@@ -99,7 +101,8 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                   '& .MuiListItemText-primary': {
                     fontSize: '1rem'
                   }
-                }}>
+                }}
+              >
                 <ListItemButton onClick={() => toggleVisibility(item.key)} dense>
                   <ListItemIcon>
                     <Checkbox size="small" checked={item.visible} />

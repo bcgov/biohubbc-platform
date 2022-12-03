@@ -16,7 +16,8 @@ export const AuthStateContextProvider: React.FC<React.PropsWithChildren> = (prop
     <AuthStateContext.Provider
       value={{
         keycloakWrapper
-      }}>
+      }}
+    >
       {props.children}
     </AuthStateContext.Provider>
   );

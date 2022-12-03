@@ -87,7 +87,8 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                           value={systemUser.system_role}
                           onChange={handleChange}
                           error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}
-                          inputProps={{ 'aria-label': 'System Role' }}>
+                          inputProps={{ 'aria-label': 'System Role' }}
+                        >
                           {props?.system_roles?.map((item) => (
                             <MenuItem key={item.value} value={item.value}>
                               {item.label}
@@ -101,7 +102,8 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                       <FormControl
                         fullWidth
                         required
-                        error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}>
+                        error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}
+                      >
                         <InputLabel id="loginMethod">Login Method</InputLabel>
                         <Select
                           id={`systemUsers.[${index}].identitySource`}
@@ -111,7 +113,8 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                           value={systemUser.identitySource}
                           onChange={handleChange}
                           error={identitySourceMeta.touched && Boolean(identitySourceMeta.error)}
-                          inputProps={{ 'aria-label': 'Login Method' }}>
+                          inputProps={{ 'aria-label': 'Login Method' }}
+                        >
                           <MenuItem key={SYSTEM_IDENTITY_SOURCE.IDIR} value={SYSTEM_IDENTITY_SOURCE.IDIR}>
                             IDIR
                           </MenuItem>
@@ -126,7 +129,8 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                       <IconButton
                         data-testid="delete-icon"
                         aria-label="Remove user"
-                        onClick={() => arrayHelpers.remove(index)}>
+                        onClick={() => arrayHelpers.remove(index)}
+                      >
                         <Icon path={mdiTrashCanOutline} size={1} />
                       </IconButton>
                     </Box>
@@ -141,7 +145,8 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                 color="primary"
                 data-testid="add-participant-button"
                 startIcon={<Icon path={mdiPlus} size={1} />}
-                onClick={() => arrayHelpers.push(AddSystemUsersFormArrayItemInitialValues)}>
+                onClick={() => arrayHelpers.push(AddSystemUsersFormArrayItemInitialValues)}
+              >
                 Add user
               </Button>
             </Box>
