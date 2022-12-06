@@ -2,7 +2,6 @@
  create or replace view artifact_government_interest as select * from biohub.artifact_government_interest;
  create or replace view artifact_persecution as select * from biohub.artifact_persecution;
  create or replace view artifact_proprietary as select * from biohub.artifact_proprietary;
- create or replace view government_interest as select * from biohub.government_interest;
  create or replace view persecution_or_harm as select * from biohub.persecution_or_harm;
  create or replace view persecution_or_harm_type as select * from biohub.persecution_or_harm_type;
  create or replace view proprietary_type as select * from biohub.proprietary_type;

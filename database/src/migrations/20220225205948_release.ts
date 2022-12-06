@@ -61,9 +61,6 @@ export async function up(knex: Knex): Promise<void> {
   const populate_persecution_or_harm = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_persecution_or_harm.sql')
   );
-  const populate_government_interest = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_government_interest.sql')
-  );
 
   const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
 
@@ -118,7 +115,6 @@ export async function up(knex: Knex): Promise<void> {
     ${populate_proprietary_type}
     ${populate_persecution_or_harm_type}
     ${populate_persecution_or_harm}
-    ${populate_government_interest}
 
     -- create the views
     set search_path = biohub_dapi_v1;

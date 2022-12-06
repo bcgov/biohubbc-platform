@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Friday, December 02, 2022 15:41:03
+-- Date Created : Tuesday, December 06, 2022 10:48:35
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -72,7 +72,9 @@ COMMENT ON TABLE artifact IS 'A list of submission artifacts.'
 CREATE TABLE artifact_government_interest(
     artifact_government_interest_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     artifact_id                        integer           NOT NULL,
-    government_interest_id             integer           NOT NULL,
+    wldtaxonomic_units_id              integer           NOT NULL,
+    data_type                          varchar(300),
+    description                        varchar(3000),
     create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                        integer           NOT NULL,
     update_date                        timestamptz(6),
@@ -88,7 +90,11 @@ COMMENT ON COLUMN artifact_government_interest.artifact_government_interest_id I
 ;
 COMMENT ON COLUMN artifact_government_interest.artifact_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN artifact_government_interest.government_interest_id IS 'System generated surrogate primary key identifier.'
+COMMENT ON COLUMN artifact_government_interest.wldtaxonomic_units_id IS 'A foreign reference to the taxonomic unit id.'
+;
+COMMENT ON COLUMN artifact_government_interest.data_type IS 'A description of the type of data that is secured.'
+;
+COMMENT ON COLUMN artifact_government_interest.description IS 'The description of the record.'
 ;
 COMMENT ON COLUMN artifact_government_interest.create_date IS 'The datetime the record was created.'
 ;
@@ -151,7 +157,7 @@ CREATE TABLE artifact_proprietary(
     artifact_id                integer           NOT NULL,
     proprietary_type_id        integer           NOT NULL,
     first_nations_id           integer,
-    proprietor                 varchar(30)       NOT NULL,
+    proprietor                 varchar(30),
     description                varchar(3000),
     start_date                 date,
     end_date                   date,
@@ -228,59 +234,6 @@ COMMENT ON COLUMN audit_log.before_value IS 'The JSON representation of the befo
 COMMENT ON COLUMN audit_log.after_value IS 'The JSON representation of the after value of the record.'
 ;
 COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire database.'
-;
-
--- 
--- TABLE: government_interest 
---
-
-CREATE TABLE government_interest(
-    government_interest_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    wldtaxonomic_units_id     integer,
-    perceived_risk            varchar(300)      NOT NULL,
-    rationale                 varchar(3000),
-    start_date                date,
-    end_date                  date,
-    record_effective_date     date              DEFAULT now() NOT NULL,
-    record_end_date           date,
-    create_date               timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user               integer           NOT NULL,
-    update_date               timestamptz(6),
-    update_user               integer,
-    revision_count            integer           DEFAULT 0 NOT NULL,
-    CONSTRAINT government_interest_pk PRIMARY KEY (government_interest_id)
-)
-;
-
-
-
-COMMENT ON COLUMN government_interest.government_interest_id IS 'System generated surrogate primary key identifier.'
-;
-COMMENT ON COLUMN government_interest.wldtaxonomic_units_id IS 'A foreign reference to the taxonomic unit id.'
-;
-COMMENT ON COLUMN government_interest.perceived_risk IS 'The perceived risk associated with the government interest. Perceived risk is a short form for the rationale of the government interest.'
-;
-COMMENT ON COLUMN government_interest.rationale IS 'The descriptive rationale of the government interest.'
-;
-COMMENT ON COLUMN government_interest.start_date IS 'The record start date.'
-;
-COMMENT ON COLUMN government_interest.end_date IS 'The record end date.'
-;
-COMMENT ON COLUMN government_interest.record_effective_date IS 'Record level effective date.'
-;
-COMMENT ON COLUMN government_interest.record_end_date IS 'Record level end date.'
-;
-COMMENT ON COLUMN government_interest.create_date IS 'The datetime the record was created.'
-;
-COMMENT ON COLUMN government_interest.create_user IS 'The id of the user who created the record as identified in the system user table.'
-;
-COMMENT ON COLUMN government_interest.update_date IS 'The datetime the record was updated.'
-;
-COMMENT ON COLUMN government_interest.update_user IS 'The id of the user who updated the record as identified in the system user table.'
-;
-COMMENT ON COLUMN government_interest.revision_count IS 'Revision count used for concurrency control.'
-;
-COMMENT ON TABLE government_interest IS 'Described government interests. Government interests are candidate persecution or harm security concerns.'
 ;
 
 -- 
@@ -715,8 +668,10 @@ COMMENT ON TABLE submission IS 'Provides a historical listing of published dates
 
 CREATE TABLE submission_government_interest(
     submission_government_interest_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    government_interest_id               integer           NOT NULL,
     submission_id                        integer           NOT NULL,
+    wldtaxonomic_units_id                integer           NOT NULL,
+    data_type                            varchar(300)      NOT NULL,
+    description                          varchar(3000),
     create_date                          timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                          integer           NOT NULL,
     update_date                          timestamptz(6),
@@ -730,9 +685,13 @@ CREATE TABLE submission_government_interest(
 
 COMMENT ON COLUMN submission_government_interest.submission_government_interest_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN submission_government_interest.government_interest_id IS 'System generated surrogate primary key identifier.'
-;
 COMMENT ON COLUMN submission_government_interest.submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_government_interest.wldtaxonomic_units_id IS 'A foreign reference to the taxonomic unit id.'
+;
+COMMENT ON COLUMN submission_government_interest.data_type IS 'A description of the type of data that is secured.'
+;
+COMMENT ON COLUMN submission_government_interest.description IS 'The description of the record.'
 ;
 COMMENT ON COLUMN submission_government_interest.create_date IS 'The datetime the record was created.'
 ;
@@ -1347,19 +1306,13 @@ CREATE INDEX "Ref165191" ON artifact(submission_id)
 -- INDEX: artifact_government_interest_uk1 
 --
 
-CREATE UNIQUE INDEX artifact_government_interest_uk1 ON artifact_government_interest(artifact_id, government_interest_id)
+CREATE UNIQUE INDEX artifact_government_interest_uk1 ON artifact_government_interest(artifact_id)
 ;
 -- 
 -- INDEX: "Ref228199" 
 --
 
 CREATE INDEX "Ref228199" ON artifact_government_interest(artifact_id)
-;
--- 
--- INDEX: "Ref239200" 
---
-
-CREATE INDEX "Ref239200" ON artifact_government_interest(government_interest_id)
 ;
 -- 
 -- INDEX: artifact_persecution_uk1 
@@ -1390,12 +1343,6 @@ CREATE INDEX "Ref228194" ON artifact_proprietary(artifact_id)
 --
 
 CREATE INDEX "Ref233196" ON artifact_proprietary(proprietary_type_id)
-;
--- 
--- INDEX: government_interest_nuk1 
---
-
-CREATE UNIQUE INDEX government_interest_nuk1 ON government_interest(wldtaxonomic_units_id, perceived_risk, (record_end_date is NULL)) where record_end_date is null
 ;
 -- 
 -- INDEX: persecution_or_harm_uk1 
@@ -1503,13 +1450,7 @@ CREATE INDEX "Ref199182" ON submission(source_transform_id)
 -- INDEX: submission_government_interest_uk1 
 --
 
-CREATE UNIQUE INDEX submission_government_interest_uk1 ON submission_government_interest(government_interest_id, submission_id)
-;
--- 
--- INDEX: "Ref239197" 
---
-
-CREATE INDEX "Ref239197" ON submission_government_interest(government_interest_id)
+CREATE UNIQUE INDEX submission_government_interest_uk1 ON submission_government_interest(submission_id)
 ;
 -- 
 -- INDEX: "Ref165198" 
@@ -1662,11 +1603,6 @@ ALTER TABLE artifact_government_interest ADD CONSTRAINT "Refartifact199"
     REFERENCES artifact(artifact_id)
 ;
 
-ALTER TABLE artifact_government_interest ADD CONSTRAINT "Refgovernment_interest200" 
-    FOREIGN KEY (government_interest_id)
-    REFERENCES government_interest(government_interest_id)
-;
-
 
 -- 
 -- TABLE: artifact_persecution 
@@ -1771,11 +1707,6 @@ ALTER TABLE submission ADD CONSTRAINT "Refsource_transform182"
 -- 
 -- TABLE: submission_government_interest 
 --
-
-ALTER TABLE submission_government_interest ADD CONSTRAINT "Refgovernment_interest197" 
-    FOREIGN KEY (government_interest_id)
-    REFERENCES government_interest(government_interest_id)
-;
 
 ALTER TABLE submission_government_interest ADD CONSTRAINT "Refsubmission198" 
     FOREIGN KEY (submission_id)
