@@ -223,8 +223,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
                 '& .MuiButton-startIcon': {
                   mr: 0.2
                 }
-              }}
-            >
+              }}>
               PREV
             </Button>
             <Button
@@ -238,8 +237,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
                 '& .MuiButton-endIcon': {
                   ml: 0.2
                 }
-              }}
-            >
+              }}>
               NEXT
             </Button>
           </Box>
@@ -253,8 +251,7 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
               color="primary"
               sx={{
                 color: '#ffffff !important'
-              }}
-            >
+              }}>
               Download Records
             </Button>
           </Box>

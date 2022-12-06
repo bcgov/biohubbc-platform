@@ -166,8 +166,7 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           width: '500px',
           position: 'relative',
           zIndex: '999'
-        }}
-      >
+        }}>
         <SideSearchBar
           searchResults={parsedSearchResults}
           mapDataLoader={mapDataLoader}

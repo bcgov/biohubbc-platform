@@ -35,8 +35,7 @@ export const H3ButtonToolbar: React.FC<React.PropsWithChildren<IButtonToolbarPro
         startIcon={props.buttonStartIcon}
         endIcon={props.buttonEndIcon}
         onClick={() => props.buttonOnClick()}
-        {...props.buttonProps}
-      >
+        {...props.buttonProps}>
         <strong>{props.buttonLabel}</strong>
       </Button>
     </ActionToolbar>
@@ -58,8 +57,7 @@ export const H2ButtonToolbar: React.FC<React.PropsWithChildren<IButtonToolbarPro
         startIcon={props.buttonStartIcon}
         endIcon={props.buttonEndIcon}
         onClick={() => props.buttonOnClick()}
-        {...props.buttonProps}
-      >
+        {...props.buttonProps}>
         <strong>{props.buttonLabel}</strong>
       </Button>
     </ActionToolbar>
@@ -125,8 +123,7 @@ export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButto
         startIcon={props.buttonStartIcon}
         endIcon={props.buttonEndIcon}
         onClick={handleClick}
-        {...props.buttonProps}
-      >
+        {...props.buttonProps}>
         {props.buttonLabel}
       </Button>
       <Menu
@@ -143,8 +140,7 @@ export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButto
         }}
         MenuListProps={{
           'aria-labelledby': 'basic-button'
-        }}
-      >
+        }}>
         {props.menuItems.map((menuItem) => {
           const menuItemId = `custom-menu-button-item-${menuItem.menuLabel.replace(/\s/g, '')}`;
           return (
@@ -152,8 +148,7 @@ export const CustomMenuButton: React.FC<React.PropsWithChildren<ICustomMenuButto
               id={menuItemId}
               key={menuItemId}
               data-testid={menuItemId}
-              onClick={() => closeMenuOnItemClick(menuItem.menuOnClick)}
-            >
+              onClick={() => closeMenuOnItemClick(menuItem.menuOnClick)}>
               {menuItem.menuIcon && <ListItemIcon>{menuItem.menuIcon}</ListItemIcon>}
               {menuItem.menuLabel}
             </MenuItem>
@@ -201,8 +196,7 @@ export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuI
         aria-controls="basic-icon-menu"
         aria-haspopup="true"
         aria-expanded={open ? 'true' : undefined}
-        onClick={handleClick}
-      >
+        onClick={handleClick}>
         {props.buttonIcon}
       </IconButton>
       <Menu
@@ -219,8 +213,7 @@ export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuI
         }}
         MenuListProps={{
           'aria-labelledby': 'basic-button'
-        }}
-      >
+        }}>
         {props.menuItems.map((menuItem) => {
           const menuItemId = `custom-menu-icon-item-${menuItem.menuLabel.replace(/\s/g, '')}`;
           return (
@@ -228,8 +221,7 @@ export const CustomMenuIconButton: React.FC<React.PropsWithChildren<ICustomMenuI
               id={menuItemId}
               key={menuItemId}
               data-testid={menuItemId}
-              onClick={() => closeMenuOnItemClick(menuItem.menuOnClick)}
-            >
+              onClick={() => closeMenuOnItemClick(menuItem.menuOnClick)}>
               {menuItem.menuIcon && <ListItemIcon>{menuItem.menuIcon}</ListItemIcon>}
               {menuItem.menuLabel}
             </MenuItem>

@@ -78,8 +78,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           p={0}
           sx={{
             fontWeight: 700
-          }}
-        >
+          }}>
           What do you want to find?
         </Box>
         <FormControl fullWidth>
@@ -94,8 +93,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
             inputProps={{ 'aria-label': 'Dataset' }}
             onChange={(item) => {
               formikProps.setFieldValue('dataset', item.target.value);
-            }}
-          >
+            }}>
             <MenuItem key={1} value={'Occurrence'}>
               Species Observations
             </MenuItem>
@@ -123,8 +121,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           p={0}
           sx={{
             fontWeight: 700
-          }}
-        >
+          }}>
           Refine Search Area
         </Box>
 
@@ -133,8 +130,7 @@ const DatasetSearchForm: React.FC<IDatasetSearchFormProps> = (props) => {
           color="textSecondary"
           sx={{
             mb: 3
-          }}
-        >
+          }}>
           Refine your search to a custom boundary by importing either KML files or Shapefiles.
         </Typography>
 

@@ -127,8 +127,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                     fontWeight: 700,
                     color: 'text.secondary',
                     textTransform: 'uppercase'
-                  }}
-                >
+                  }}>
                   Back to Results
                 </Button>
               )}
@@ -139,8 +138,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
             flex="1 1 auto"
             sx={{
               overflowY: 'auto'
-            }}
-          >
+            }}>
             <Formik<IDatasetSearchForm>
               innerRef={formikRef}
               enableReinitialize={true}
@@ -148,8 +146,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
               validationSchema={DatasetSearchFormYupSchema}
               validateOnBlur={true}
               validateOnChange={false}
-              onSubmit={handleDatasetRequestCreation}
-            >
+              onSubmit={handleDatasetRequestCreation}>
               {(formikProps) => (
                 <Box py={4} px={3}>
                   <Form>
@@ -172,8 +169,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                             data-testid="dataset-find-button"
                             sx={{
                               fontWeight: 700
-                            }}
-                          >
+                            }}>
                             Submit
                           </LoadingButton>
                         ) : (
@@ -187,8 +183,7 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
                             data-testid="dataset-find-button"
                             sx={{
                               fontWeight: 700
-                            }}
-                          >
+                            }}>
                             Find Data
                           </Button>
                         ))}

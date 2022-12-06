@@ -118,8 +118,7 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
                 count={item.count || 0}
                 key={`marker-cluster-${id}`}
                 position={[item.position[1], item.position[0]]}
-                {...item.MarkerProps}
-              >
+                {...item.MarkerProps}>
                 {item.tooltip && (
                   <Tooltip key={`marker-cluster-tooltip-${id}`} direction="top" {...item.TooltipProps}>
                     {item.tooltip}
@@ -131,8 +130,7 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
                     keepInView={false}
                     closeButton={false}
                     autoPan={false}
-                    {...item.PopupProps}
-                  >
+                    {...item.PopupProps}>
                     {item.popup}
                   </Popup>
                 )}

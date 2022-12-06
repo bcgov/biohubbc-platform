@@ -34,8 +34,7 @@ export const EnvironmentLabel = () => {
   return (
     <sup
       className={classes.appPhaseTag}
-      aria-label={`This application is currently being run in the ${config?.REACT_APP_NODE_ENV} environment`}
-    >
+      aria-label={`This application is currently being run in the ${config?.REACT_APP_NODE_ENV} environment`}>
       & {config?.REACT_APP_NODE_ENV}
     </sup>
   );

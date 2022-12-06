@@ -90,8 +90,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       validateOnChange={false}
       onSubmit={(values) => {
         props.onSave(values);
-      }}
-    >
+      }}>
       {(formikProps) => (
         <Dialog
           fullScreen={fullScreen}
@@ -99,8 +98,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           maxWidth="md"
           open={props.open}
           aria-labelledby="edit-dialog-title"
-          aria-describedby="edit-dialog-description"
-        >
+          aria-describedby="edit-dialog-description">
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>
           <DialogContent>{props.component.element}</DialogContent>
           <DialogActions>
@@ -109,8 +107,7 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
               color="primary"
               variant="contained"
               autoFocus
-              data-testid="edit-dialog-save-button"
-            >
+              data-testid="edit-dialog-save-button">
               {props.dialogSaveButtonLabel || 'Save Changes'}
             </Button>
             <Button onClick={props.onCancel} color="primary" variant="outlined" data-testid="edit-dialog-cancel-button">

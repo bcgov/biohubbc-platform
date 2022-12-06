@@ -24,8 +24,7 @@ const App: React.FC<React.PropsWithChildren> = () => {
               <ReactKeycloakProvider
                 authClient={keycloak}
                 initOptions={{ pkceMethod: 'S256' }}
-                LoadingComponent={<CircularProgress className="pageProgress" size={40} />}
-              >
+                LoadingComponent={<CircularProgress className="pageProgress" size={40} />}>
                 <AuthStateContextProvider>
                   <BrowserRouter>
                     <AppRouter />

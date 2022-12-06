@@ -369,8 +369,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
                 <Box px={2}>
                   <CardHeader
                     title="Occurrences"
-                    titleTypographyProps={{ variant: 'h4', component: 'h2' }}
-                  ></CardHeader>
+                    titleTypographyProps={{ variant: 'h4', component: 'h2' }}></CardHeader>
                 </Box>
               </Grid>
               <Grid item>
@@ -382,8 +381,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
                     aria-label={'Download occurrence'}
                     data-testid="export-occurrence"
                     startIcon={<Icon path={mdiDownload} size={1} />}
-                    onClick={() => downloadDataSet()}
-                  >
+                    onClick={() => downloadDataSet()}>
                     Export Occurrences
                   </Button>
                 </Box>

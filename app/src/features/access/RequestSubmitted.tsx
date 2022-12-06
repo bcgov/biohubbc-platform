@@ -44,8 +44,7 @@ const RequestSubmitted = () => {
             size="large"
             variant="contained"
             color="primary"
-            data-testid="logout-button"
-          >
+            data-testid="logout-button">
             Log Out
           </Button>
         </Box>

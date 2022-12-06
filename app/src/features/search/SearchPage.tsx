@@ -171,16 +171,14 @@ const SearchPage = () => {
         elevation={0}
         sx={{
           py: 7
-        }}
-      >
+        }}>
         <Container maxWidth="xl">
           <Typography
             variant="h1"
             sx={{
               mt: -2,
               mb: 4
-            }}
-          >
+            }}>
             Find BioHub Datasets
           </Typography>
           <Formik<IAdvancedSearch>
@@ -188,8 +186,7 @@ const SearchPage = () => {
             initialValues={formikValues}
             onSubmit={handleSubmit}
             onReset={handleReset}
-            enableReinitialize={true}
-          >
+            enableReinitialize={true}>
             <SearchComponent />
           </Formik>
         </Container>
@@ -206,8 +203,7 @@ const SearchPage = () => {
                   <Typography
                     variant="inherit"
                     component="span"
-                    color="textSecondary"
-                  >{` for '${formikRef.current?.values.keywords}'`}</Typography>
+                    color="textSecondary">{` for '${formikRef.current?.values.keywords}'`}</Typography>
                 </>
               )}
             </Typography>
@@ -224,8 +220,7 @@ const SearchPage = () => {
                       color="primary"
                       aria-current="page"
                       variant="h3"
-                      href={`datasets/${result.datasetId}/details`}
-                    >
+                      href={`datasets/${result.datasetId}/details`}>
                       {result.title}
                     </Link>
                   </Box>

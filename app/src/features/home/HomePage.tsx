@@ -29,16 +29,14 @@ const HomePage = () => {
           flexDirection: 'column',
           justifyContent: 'center',
           height: '30rem'
-        }}
-      >
+        }}>
         <Typography
           variant="h1"
           sx={{
             mt: -4,
             fontSize: '3rem',
             letterSpacing: '-0.03rem'
-          }}
-        >
+          }}>
           Biodiversity Hub B.C.
         </Typography>
         <Typography
@@ -50,8 +48,7 @@ const HomePage = () => {
             maxWidth: '45ch',
             fontSize: '1.75rem',
             lineHeight: '1.25'
-          }}
-        >
+          }}>
           Open access to British Columbia's terrestrial, aquatic species and habitat inventory data
         </Typography>
         <Box>

@@ -61,8 +61,7 @@ const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (pro
                   return new L.Marker([latlng.lat, latlng.lng]);
                 }}
                 data={item.geoJSON}
-                {...item.GeoJSONProps}
-              >
+                {...item.GeoJSONProps}>
                 {item.tooltip && (
                   <Tooltip key={`static-feature-tooltip-${id}`} direction="top" {...item.TooltipProps}>
                     {item.tooltip}
@@ -74,8 +73,7 @@ const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (pro
                     keepInView={false}
                     closeButton={false}
                     autoPan={false}
-                    {...item.PopupProps}
-                  >
+                    {...item.PopupProps}>
                     {item.popup}
                   </Popup>
                 )}

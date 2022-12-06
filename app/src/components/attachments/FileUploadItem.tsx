@@ -222,8 +222,7 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
         px: 2,
         border: '1px solid rgba(0,0,0,0.38)',
         borderRadius: '4px'
-      }}
-    >
+      }}>
       <Icon path={mdiFileOutline} size={1.6} className={error ? classes.errorColor : classes.fileIconColor} />
       <Box flex="1 1 auto" ml={1.65}>
         <Box display="flex" flexDirection="row" flex="1 1 auto" alignItems="center">
@@ -244,8 +243,7 @@ const FileUploadItem: React.FC<React.PropsWithChildren<IFileUploadItemProps>> = 
               <ComponentDialog
                 open={openDialog}
                 dialogTitle="Treatment File Errors"
-                onClose={() => setOpenDialog(false)}
-              >
+                onClose={() => setOpenDialog(false)}>
                 <ErrorDetailsList errors={errors} />
               </ComponentDialog>
             </Box>
@@ -293,8 +291,7 @@ const ActionButton: React.FC<React.PropsWithChildren<IActionButtonProps>> = (pro
         title="Remove File"
         aria-label="remove file"
         onClick={() => props.onCancel()}
-        className={classes.errorColor}
-      >
+        className={classes.errorColor}>
         <Icon path={mdiTrashCanOutline} size={1} />
       </IconButton>
     );

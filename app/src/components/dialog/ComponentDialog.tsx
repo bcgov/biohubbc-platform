@@ -60,8 +60,7 @@ const ComponentDialog: React.FC<React.PropsWithChildren<IComponentDialogProps>> 
       open={props.open}
       aria-labelledby="component-dialog-title"
       aria-describedby="component-dialog-description"
-      {...props.dialogProps}
-    >
+      {...props.dialogProps}>
       <DialogTitle id="component-dialog-title">{props.dialogTitle}</DialogTitle>
       <DialogContent>{props.children}</DialogContent>
       <DialogActions>

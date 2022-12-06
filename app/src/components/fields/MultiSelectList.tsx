@@ -38,8 +38,7 @@ const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> =
                 borderBottomLeftRadius: '4px',
                 borderBottomRightRadius: '4px'
               }
-            }}
-          >
+            }}>
             {!!formikProps.values[props.list_name].length &&
               formikProps.values[props.list_name].map((data: any, index: any) => {
                 return (
@@ -54,12 +53,10 @@ const MultiSelectFieldWithList: React.FC<IMultiAutocompleteFieldWithListProps> =
                         aria-label="Delete list item"
                         onClick={() => {
                           arrayHelpers.remove(index);
-                        }}
-                      >
+                        }}>
                         <Icon path={mdiTrashCanOutline} size={0.875} />
                       </IconButton>
-                    }
-                  >
+                    }>
                     <ListItemText
                       primary={data.label ? data.label : data.name}
                       sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}

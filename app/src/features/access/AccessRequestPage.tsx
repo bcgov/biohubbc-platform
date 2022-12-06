@@ -153,8 +153,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
           onSubmit={(values) => {
             setIsSubmittingRequest(true);
             handleSubmitAccessRequest(values);
-          }}
-        >
+          }}>
           {({ handleSubmit }) => (
             <Box component={Paper} p={3}>
               <Typography variant="h1">Request Access</Typography>
@@ -173,8 +172,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
                         variant="contained"
                         color="primary"
                         className={classes.actionButton}
-                        disabled={isSubmittingRequest}
-                      >
+                        disabled={isSubmittingRequest}>
                         <strong>Submit Request</strong>
                       </Button>
                       {isSubmittingRequest && (
@@ -198,8 +196,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
                         history.push('/logout');
                       }}
                       className={classes.actionButton}
-                      data-testid="logout-button"
-                    >
+                      data-testid="logout-button">
                       Log out
                     </Button>
                   </Box>

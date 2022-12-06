@@ -39,8 +39,7 @@ export const LoggedInUserControls = () => {
         data-testid="menu_log_out"
         sx={{
           color: 'bcgovblue.contrastText'
-        }}
-      >
+        }}>
         Log out
       </Link>
     </Box>
@@ -59,8 +58,7 @@ export const NotLoggedInUserControls = () => {
       color="bcgovblue"
       disableElevation
       startIcon={<Icon path={mdiLoginVariant} size={1.12} />}
-      data-testid="login"
-    >
+      data-testid="login">
       Log In
     </Button>
   );

@@ -91,8 +91,7 @@ const SearchComponent: React.FC<React.PropsWithChildren> = () => {
           disableElevation
           disableRipple
           className={classes.searchInputBtn}
-          onClick={() => handleSubmit()}
-        >
+          onClick={() => handleSubmit()}>
           Search
         </Button>
       </Box>
