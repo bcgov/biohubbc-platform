@@ -280,6 +280,7 @@ export class DarwinCoreService extends DBService {
    * Step 8 in processing a DWC archive file: run spatial transforms
    *
    * @param {number} submissionId
+   * @param {boolean} metadataOnly A flag to determine if occurrence transforms need to be run
    * @return {*}
    * @memberof DarwinCoreService
    */
@@ -624,5 +625,15 @@ export class DarwinCoreService extends DBService {
     const esClient = await this.getEsClient();
 
     return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
+  }
+
+  /**
+   * Gets DwCArchive from submission ID and returns true/false if the submission is only metadata
+   * @param {number} submissionId
+   * @returns {*} {Promise<boolean>}
+   */
+  async isSubmissionMetadataOnly(submissionId: number): Promise<boolean> {
+    const dwcArchive = await this.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+    return dwcArchive.isMetaDataOnly();
   }
 }

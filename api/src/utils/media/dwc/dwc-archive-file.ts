@@ -85,6 +85,22 @@ export class DWCArchive {
     }
   }
 
+  /**
+   * This function checks worksheet data if the DwCArchive only contains metadata
+   *
+   * @returns {boolean} True if no worksheet data is present
+   */
+  isMetaDataOnly(): boolean {
+    return (
+      this.eml !== undefined &&
+      !this.worksheets.event &&
+      !this.worksheets.measurementorfact &&
+      !this.worksheets.occurrence &&
+      !this.worksheets.resourcerelationship &&
+      !this.worksheets.taxon
+    );
+  }
+
   isMediaValid(validationSchemaParser: ValidationSchemaParser): IMediaState {
     const validators = validationSchemaParser.getSubmissionValidations();
 
