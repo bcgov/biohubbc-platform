@@ -21,7 +21,7 @@ const systemUsers = [
     identifier: 'aagahche',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
-    user_guid: 'df86c48fad244498b0881af8dbb7645f'
+    user_guid: ''
   },
 
   {
