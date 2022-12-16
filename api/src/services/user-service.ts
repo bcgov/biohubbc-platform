@@ -44,7 +44,10 @@ export class UserService extends DBService {
    * @memberof UserService
    */
   async getUserByIdentifier(userIdentifier: string): Promise<Models.user.UserObject | null> {
+    console.log('getUserByIdentifier - userIdentifier: ', userIdentifier);
     const response = await this.userRepository.getUserByIdentifier(userIdentifier);
+
+    console.log('response in getUserByIdentifier: ', response);
 
     if (response.length !== 1) {
       return null;

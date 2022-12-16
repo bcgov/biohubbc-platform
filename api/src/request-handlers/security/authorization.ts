@@ -50,6 +50,8 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
   try {
     const authorizationScheme: AuthorizationScheme = req['authorization_scheme'];
 
+    console.log('function authorizeRequest: authorization scheme: ', authorizationScheme);
+
     if (!authorizationScheme) {
       // No authorization scheme specified, all authenticated users are authorized
       return true;
@@ -61,6 +63,8 @@ export const authorizeRequest = async (req: Request): Promise<boolean> => {
       systemUser: req['system_user'],
       keycloakToken: req['keycloak_token']
     });
+
+    console.log('function authorizeRequest: authorizationService: ', authorizationService);
 
     const isAuthorized =
       (await authorizationService.authorizeSystemAdministrator()) ||

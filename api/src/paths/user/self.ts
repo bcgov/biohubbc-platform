@@ -85,6 +85,10 @@ export function getUser(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
+    console.log('********************************************')
+
+    console.log('keycloak token is: ', req['keycloak_token']);
+
     try {
       await connection.open();
 

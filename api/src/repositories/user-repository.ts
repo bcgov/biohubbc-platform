@@ -6,6 +6,7 @@ import { BaseRepository } from './base-repository';
 export interface IGetUser {
   system_user_id: number;
   user_identifier: number;
+  user_guid: string;
   record_end_date: string;
   role_ids: number[];
   role_names: string[];
@@ -98,11 +99,12 @@ export class UserRepository extends BaseRepository {
    * @return {*}  {Promise<IGetUser>}
    * @memberof UserRepository
    */
-  async getUserByIdentifier(userIdentifier: string): Promise<IGetUser[]> {
+  async getUserByIdentifier(userGuid: string): Promise<IGetUser[]> {
     const sqlStatement = SQL`
     SELECT
       su.system_user_id,
       su.user_identifier,
+      su.user_guid,
       su.record_end_date,
       array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
       array_remove(array_agg(sr.name), NULL) AS role_names
@@ -117,11 +119,12 @@ export class UserRepository extends BaseRepository {
     ON
       sur.system_role_id = sr.system_role_id
     WHERE
-      su.user_identifier = ${userIdentifier}
+      su.user_guid = ${userGuid}
     GROUP BY
       su.system_user_id,
       su.record_end_date,
-      su.user_identifier;
+      su.user_identifier,
+      su.user_guid;
   `;
 
     const response = await this.connection.sql<IGetUser>(sqlStatement);

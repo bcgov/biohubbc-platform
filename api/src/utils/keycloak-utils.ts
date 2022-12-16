@@ -1,8 +1,5 @@
 import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 
-const raw_bceid_identity_sources = ['BCEID-BASIC-AND-BUSINESS', 'BCEID'];
-const raw_idir_identity_sources = ['IDIR'];
-
 /**
  * Parses out the preferred_username name from the token.
  *
@@ -10,8 +7,8 @@ const raw_idir_identity_sources = ['IDIR'];
  * @return {*} {(string | null)}
  */
 export const getUserIdentifier = (keycloakToken: object): string | null => {
-  return 'nphura';
-  const userIdentifier = keycloakToken?.['preferred_username']?.split('@')?.[0];
+  const userIdentifier = keycloakToken?.['idir_user_guid']?.toLowerCase();
+  console.log('userIdenfier is: ', userIdentifier);
 
   if (!userIdentifier) {
     return null;
@@ -28,14 +25,19 @@ export const getUserIdentifier = (keycloakToken: object): string | null => {
  * @return {*} {SYSTEM_IDENTITY_SOURCE}
  */
 export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
-  return SYSTEM_IDENTITY_SOURCE.IDIR;
-  const userIdentitySource = keycloakToken?.['preferred_username']?.split('@')?.[1]?.toUpperCase();
+  const userIdentitySource = keycloakToken?.['identity_provider']?.toUpperCase();
 
-  if (raw_bceid_identity_sources.includes(userIdentitySource)) {
+  console.log('userIdentitySource is:', userIdentitySource);
+
+  const idir_user_guid = keycloakToken?.['idir_user_guid'];
+
+  console.log('idir_user_guid is: ', idir_user_guid);
+
+  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.BCEID) {
     return SYSTEM_IDENTITY_SOURCE.BCEID;
   }
 
-  if (raw_idir_identity_sources.includes(userIdentitySource)) {
+  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.IDIR) {
     return SYSTEM_IDENTITY_SOURCE.IDIR;
   }
 
@@ -46,6 +48,8 @@ export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SO
   if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.SYSTEM) {
     return SYSTEM_IDENTITY_SOURCE.SYSTEM;
   }
+
+  console.log('************* we do not have a proper identity source');
 
   // Covers users created directly in keycloak, that wouldn't have identity source
   return SYSTEM_IDENTITY_SOURCE.DATABASE;

@@ -47,7 +47,7 @@ POST.apiDoc = {
             },
             identitySource: {
               type: 'string',
-              enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID]
+              enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID, SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS]
             },
             roleId: {
               type: 'number',

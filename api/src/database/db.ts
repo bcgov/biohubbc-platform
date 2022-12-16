@@ -183,6 +183,9 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
 
   const _token = keycloakToken;
 
+  console.log('token inside getDBConnection: **************');
+  console.log(_token);
+
   /**
    * Opens a new connection, begins a transaction, and sets the user context.
    *
@@ -323,15 +326,20 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * Sets the _systemUserId if successful.
    */
   const _setUserContext = async () => {
-    const userIdentifier = getUserIdentifier(_token);
+    const userGuid = getUserIdentifier(_token);
+
     const userIdentitySource = getUserIdentitySource(_token);
 
-    if (!userIdentifier || !userIdentitySource) {
+    console.log('user GUID in setUserContext: ', userGuid);
+
+    console.log('user Identity source in setUserContext: ', userIdentitySource);
+
+    if (!userGuid || !userIdentitySource) {
       throw new ApiGeneralError('Failed to identify authenticated user');
     }
 
     // Set the user context for all queries made using this connection
-    const setSystemUserContextSQLStatement = UserQueries.setSystemUserContextSQL(userIdentifier, userIdentitySource);
+    const setSystemUserContextSQLStatement = UserQueries.setSystemUserContextSQL(userGuid, userIdentitySource);
 
     if (!setSystemUserContextSQLStatement) {
       throw new ApiExecuteSQLError('Failed to build SQL user context statement');
@@ -344,6 +352,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
       );
 
       _systemUserId = response?.rows?.[0].api_set_context;
+
     } catch (error) {
       throw new ApiExecuteSQLError('Failed to set user context', [error as object]);
     }
@@ -370,7 +379,11 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  * @return {*}  {IDBConnection}
  */
 export const getAPIUserDBConnection = (): IDBConnection => {
-  return getDBConnection({ preferred_username: 'biohub_api@database' });
+  return getDBConnection({
+    idir_user_guid: 'biohub_api',
+    identity_provider: 'database'
+  });
+  //return getDBConnection({ preferred_username: 'biohub_api@database' });
 };
 
 /**

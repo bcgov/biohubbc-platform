@@ -5,6 +5,7 @@ import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
 
 export enum SYSTEM_IDENTITY_SOURCE {
+  BCEID_BUSINESS = 'BCEID_BUSINESS',
   BCEID = 'BCEID',
   IDIR = 'IDIR'
 }

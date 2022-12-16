@@ -7,6 +7,7 @@ export enum SYSTEM_IDENTITY_SOURCE {
   DATABASE = 'DATABASE',
   IDIR = 'IDIR',
   BCEID = 'BCEID',
+  BCEID_BUSINESS = 'BCEID_BUSINESS',
   SYSTEM = 'SYSTEM'
 }
 
@@ -16,24 +17,99 @@ export enum SYSTEM_USER_ROLE_ID {
 }
 
 const systemUsers = [
-  { identifier: 'aagahche', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'cgarrett', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'cupshall', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'jxdunsdo', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'keinarss', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'mbaerg', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'nphura', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'robmunro', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'rstens', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'zochampi', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'test1', type: SYSTEM_IDENTITY_SOURCE.BCEID, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'test2', type: SYSTEM_IDENTITY_SOURCE.BCEID },
-  { identifier: 'test3', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'test4', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR },
-  { identifier: 'test5', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.DATA_ADMINISTRATOR },
-  { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR },
-  { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR },
-  { identifier: 'cypress', type: SYSTEM_IDENTITY_SOURCE.IDIR, roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR }
+  {
+    identifier: 'aagahche',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: 'df86c48fad244498b0881af8dbb7645f'
+  },
+  {
+    identifier: 'cgarrett',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'cupshall',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'jxdunsdo',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'keinarss',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'mbaerg',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'nphura',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'robmunro',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'rstens',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'zochampi',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'test1',
+    type: SYSTEM_IDENTITY_SOURCE.BCEID,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  { identifier: 'test2', type: SYSTEM_IDENTITY_SOURCE.BCEID, user_guid: '' },
+  {
+    identifier: 'test3',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'test4',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  },
+  {
+    identifier: 'test5',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.DATA_ADMINISTRATOR,
+    system_user_user_guidguid: ''
+  },
+  { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR, user_guid: '' },
+  { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR, user_guid: '' },
+  {
+    identifier: 'cypress',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: ''
+  }
 ];
 
 /**
@@ -57,7 +133,7 @@ export async function seed(knex: Knex): Promise<void> {
     if (!response?.rows?.[0]) {
       // Add system user
       await knex.raw(`
-        ${insertSystemUserSQL(systemUser.identifier, systemUser.type)}
+        ${insertSystemUserSQL(systemUser.identifier, systemUser.type, systemUser.user_guid)}
       `);
 
       if (systemUser.roleId) {
@@ -90,20 +166,22 @@ const getSystemUserSQL = (userIdentifier: string) => `
  * @param {string} userIdentifier
  * @param {string} userType
  */
-const insertSystemUserSQL = (userIdentifier: string, userType: string) => `
+const insertSystemUserSQL = (userIdentifier: string, userType: string, userGuid?: string) => `
   INSERT INTO system_user (
     user_identity_source_id,
     user_identifier,
     record_effective_date,
     create_date,
-    create_user
+    create_user,
+    user_guid
   )
   SELECT
     user_identity_source_id,
     '${userIdentifier}',
     now(),
     now(),
-    (SELECT system_user_id from system_user where user_identifier = '${DB_ADMIN}')
+    (SELECT system_user_id from system_user where user_identifier = '${DB_ADMIN}'),
+    '${userGuid}'
   FROM
     user_identity_source
   WHERE
