@@ -23,6 +23,7 @@ const systemUsers = [
     roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
     user_guid: 'df86c48fad244498b0881af8dbb7645f'
   },
+
   {
     identifier: 'cgarrett',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
@@ -100,7 +101,7 @@ const systemUsers = [
     identifier: 'test5',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     roleId: SYSTEM_USER_ROLE_ID.DATA_ADMINISTRATOR,
-    system_user_user_guidguid: ''
+    user_guid: ''
   },
   { identifier: 'test6', type: SYSTEM_IDENTITY_SOURCE.IDIR, user_guid: '' },
   { identifier: 'test7', type: SYSTEM_IDENTITY_SOURCE.IDIR, user_guid: '' },

@@ -49,8 +49,6 @@ export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SO
     return SYSTEM_IDENTITY_SOURCE.SYSTEM;
   }
 
-  console.log('************* we do not have a proper identity source');
-
   // Covers users created directly in keycloak, that wouldn't have identity source
   return SYSTEM_IDENTITY_SOURCE.DATABASE;
 };

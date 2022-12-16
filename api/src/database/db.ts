@@ -330,10 +330,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
 
     const userIdentitySource = getUserIdentitySource(_token);
 
-    console.log('user GUID in setUserContext: ', userGuid);
-
-    console.log('user Identity source in setUserContext: ', userIdentitySource);
-
     if (!userGuid || !userIdentitySource) {
       throw new ApiGeneralError('Failed to identify authenticated user');
     }
@@ -352,7 +348,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
       );
 
       _systemUserId = response?.rows?.[0].api_set_context;
-
     } catch (error) {
       throw new ApiExecuteSQLError('Failed to set user context', [error as object]);
     }
