@@ -34,7 +34,7 @@ const systemUsers = [
     identifier: 'cupshall',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
-    user_guid: ''
+    user_guid: 'c3226c56-d629-4159-aa39-9e82bc1af00d'
   },
   {
     identifier: 'jxdunsdo',
