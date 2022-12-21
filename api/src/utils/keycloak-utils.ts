@@ -33,8 +33,8 @@ export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SO
 
   console.log('idir_user_guid is: ', idir_user_guid);
 
-  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.BCEID) {
-    return SYSTEM_IDENTITY_SOURCE.BCEID;
+  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.BCEID_BASIC) {
+    return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
   }
 
   if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.IDIR) {

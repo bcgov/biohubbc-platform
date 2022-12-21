@@ -1,6 +1,7 @@
 import axios from 'axios';
 import qs from 'qs';
 import { ApiGeneralError } from '../errors/api-error';
+import { getLogger } from '../utils/logger';
 
 type KeycloakUserData = {
   username: string;
@@ -34,6 +35,8 @@ export type KeycloakUser = {
   attributes: IDIRAttributes | BCEIDBusinessAttributes;
 };
 
+const defaultLog = getLogger('services/keycloak-service');
+
 /**
  * Service for calling the keycloak admin API.
  *
@@ -63,6 +66,8 @@ export class KeycloakService {
    * @memberof KeycloakService
    */
   async getKeycloakToken(): Promise<string> {
+    defaultLog.debug({ label: 'getKeycloakToken', keycloakTokenHost: this.keycloakTokenHost });
+
     try {
       const { data } = await axios.post(
         this.keycloakTokenHost,

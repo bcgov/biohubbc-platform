@@ -55,7 +55,11 @@ PUT.apiDoc = {
             },
             identitySource: {
               type: 'string',
-              enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID, SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS]
+              enum: [
+                SYSTEM_IDENTITY_SOURCE.IDIR,
+                SYSTEM_IDENTITY_SOURCE.BCEID_BASIC,
+                SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS
+              ]
             },
             requestId: {
               type: 'number',
