@@ -1,13 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../constants/roles';
-import { getDBConnection } from '../database/db';
-import { defaultErrorResponses } from '../openapi/schemas/http-responses';
-import * as AdministrativeActivityQueries from '../queries/administrative-activity/administrative-activity-queries';
-import { authorizeRequestHandler } from '../request-handlers/security/authorization';
-import { getLogger } from '../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { AdministrativeService } from '../../../services/administrative-service';
+import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative-activities');
+const defaultLog = getLogger('paths/administrative/activity/list');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -125,27 +125,24 @@ GET.apiDoc = {
 export function getAdministrativeActivities(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
+    const administrativeService = new AdministrativeService(connection);
 
     try {
-      const administrativeActivityTypeName = (req.query?.type as string) || undefined;
+      const administrativeActivityTypeName = (req.query?.type as string) || '';
 
       const administrativeActivityStatusTypes: string[] =
         (req.query?.status as string[]) || getAllAdministrativeActivityStatusTypes();
 
-      const sqlStatement = AdministrativeActivityQueries.getAdministrativeActivitiesSQL(
+      await connection.open();
+
+      const response = await administrativeService.getAdministrativeActivities(
         administrativeActivityTypeName,
         administrativeActivityStatusTypes
       );
 
-      await connection.open();
-
-      const response = await connection.sql(sqlStatement);
-
       await connection.commit();
 
-      const result = (response && response.rowCount && response.rows) || [];
-
-      return res.status(200).json(result);
+      return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'getAdministrativeActivities', message: 'error', error });
       throw error;
