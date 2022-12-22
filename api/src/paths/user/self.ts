@@ -1,24 +1,16 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
+import { UserObject } from '../../models/user';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { UserService } from '../../services/user-service';
+import { getUserGuid, getUserIdentifier, getUserIdentitySource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/user/self');
 
 export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
   getUser()
 ];
 
@@ -83,30 +75,60 @@ GET.apiDoc = {
  */
 export function getUser(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const keycloakToken = req['keycloak_token']
+    let userService: UserService;
+    let userId: number;
+    let userObject: UserObject | null = null;
+
+    // Contains user context
+    const connection = getDBConnection(keycloakToken);
+
+    // Use APIUser connection to create a new system user if they don't exist
+    const apiConnection = getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      const userId = connection.systemUserId();
+      // Gets the currently authenticated user's `userId` from the connection's user context. If one isn't set, we attempt to
+      // create the user, which will succeed if they don't exist, or do nothing if they do exist.
+      userId = connection.systemUserId();
 
       if (!userId) {
-        throw new HTTP400('Failed to identify system user ID');
+        console.log("!userId")
+        connection.release();
+        await apiConnection.open();
+
+        userService = new UserService(apiConnection);
+
+        const identitySource = getUserIdentitySource(keycloakToken)
+        const userIdentifier = getUserIdentifier(keycloakToken)
+        const userGuid = getUserGuid(keycloakToken)
+
+        if (!userGuid || !userIdentifier) {
+          throw new HTTP400("Failed to retreive user's identifier or GUID");
+        }
+
+        userObject = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+        userId = userObject.id
       }
 
-      const userService = new UserService(connection);
-
-      const userObject = await userService.getUserById(userId);
-
+      if (!userId) {
+        userService = new UserService(connection);
+        userObject = await userService.getUserById(userId);
+      }
+      
+      await apiConnection.commit();
       await connection.commit();
 
       return res.status(200).json(userObject);
     } catch (error) {
       defaultLog.error({ label: 'getUser', message: 'error', error });
       await connection.rollback();
+      await apiConnection.rollback();
       throw error;
     } finally {
       connection.release();
+      apiConnection.release();
     }
   };
 }

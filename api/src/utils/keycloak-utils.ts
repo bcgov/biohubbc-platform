@@ -1,14 +1,16 @@
 import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 
 /**
- * Parses out the preferred_username name from the token.
- *
+ * Parses out the user's GUID from a keycloak token, which is extracted from the 
+ * `preferred_username` property.
+ * 
+ * @example getUserGuid({ preferred_username: 'aaabbaaa@idir' }) // => 'aaabbaaa'
+ * 
  * @param {object} keycloakToken
  * @return {*} {(string | null)}
  */
-export const getUserIdentifier = (keycloakToken: object): string | null => {
-  const userIdentifier = keycloakToken?.['idir_user_guid']?.toLowerCase();
-  console.log('userIdenfier is: ', userIdentifier);
+export const getUserGuid = (keycloakToken: object): string | null => {
+  const userIdentifier = keycloakToken?.['preferred_username']?.split('@')?.[0];
 
   if (!userIdentifier) {
     return null;
@@ -18,39 +20,53 @@ export const getUserIdentifier = (keycloakToken: object): string | null => {
 };
 
 /**
- * Parses out the preferred_username identity source (idir, bceid, etc) from the token and maps it to a known
+ * Parses out the preferred_username identity source ('idir', 'bceidbasic', etc.) from the token and maps it to a known
  * `SYSTEM_IDENTITY_SOURCE`.
  *
+ * @example getUserIdentitySource({ ...token, identity_provider: 'idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
+ * 
  * @param {object} keycloakToken
  * @return {*} {SYSTEM_IDENTITY_SOURCE}
  */
 export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
-  const userIdentitySource = keycloakToken?.['identity_provider']?.toUpperCase();
+  const userIdentitySource: string = keycloakToken?.['identity_provider']?.toUpperCase();
 
-  console.log('userIdentitySource is:', userIdentitySource);
+  // Coerce the raw ketcloak token identity provider value into an system identity source enum value
+  switch (userIdentitySource) {
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+      return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
 
-  const idir_user_guid = keycloakToken?.['idir_user_guid'];
+    case SYSTEM_IDENTITY_SOURCE.IDIR:
+      return SYSTEM_IDENTITY_SOURCE.IDIR;
 
-  console.log('idir_user_guid is: ', idir_user_guid);
+    case SYSTEM_IDENTITY_SOURCE.SYSTEM:
+      return SYSTEM_IDENTITY_SOURCE.SYSTEM;
 
-  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.BCEID_BASIC) {
-    return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
+    case SYSTEM_IDENTITY_SOURCE.DATABASE:
+      return SYSTEM_IDENTITY_SOURCE.DATABASE;
+  
+    default:
+      // Covers a user created directly in keycloak which wouldn't have an identity source
+      return SYSTEM_IDENTITY_SOURCE.DATABASE;
+  }
+};
+
+/**
+ * Parses out the user's identifier from a keycloak token.
+ * 
+ * @example getUserIdentifier({ ....token, bceid_username: 'jsmith@idir' }) => 'jsmith'
+ * 
+ * @param {object} keycloakToken
+ * @return {*} {(string | null)}
+ */
+export const getUserIdentifier = (keycloakToken: object): string | null => {
+  const userIdentifier = keycloakToken?.['idir_username'] || keycloakToken?.['bceid_username']
+
+  if (!userIdentifier) {
+    return null;
   }
 
-  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.IDIR) {
-    return SYSTEM_IDENTITY_SOURCE.IDIR;
-  }
-
-  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.DATABASE) {
-    return SYSTEM_IDENTITY_SOURCE.DATABASE;
-  }
-
-  if (userIdentitySource === SYSTEM_IDENTITY_SOURCE.SYSTEM) {
-    return SYSTEM_IDENTITY_SOURCE.SYSTEM;
-  }
-
-  // Covers users created directly in keycloak, that wouldn't have identity source
-  return SYSTEM_IDENTITY_SOURCE.DATABASE;
+  return userIdentifier;
 };
 
 /**

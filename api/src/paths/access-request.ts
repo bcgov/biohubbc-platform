@@ -49,9 +49,13 @@ PUT.apiDoc = {
           type: 'object',
           required: ['userIdentifier', 'identitySource', 'requestId', 'requestStatusTypeId'],
           properties: {
+            userGuid: {
+              type: 'string',
+              description: 'The GUID for the user.'
+            },
             userIdentifier: {
               type: 'string',
-              description: 'The user identifier for the user.'
+              description: 'The identifier for the user.'
             },
             identitySource: {
               type: 'string',
@@ -105,11 +109,16 @@ export function updateAccessRequest(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'updateAccessRequest', message: 'params', req_body: req.body });
 
+    const userGuid = req.body?.userGuid || null;
     const userIdentifier = req.body?.userIdentifier || null;
     const identitySource = req.body?.identitySource || null;
     const administrativeActivityId = Number(req.body?.requestId) || null;
     const administrativeActivityStatusTypeId = Number(req.body?.requestStatusTypeId) || null;
     const roleIds: number[] = req.body?.roleIds || [];
+
+    if (!userGuid) {
+      throw new HTTP400('Missing required body param: userGuid');
+    }
 
     if (!userIdentifier) {
       throw new HTTP400('Missing required body param: userIdentifier');
@@ -135,7 +144,7 @@ export function updateAccessRequest(): RequestHandler {
       const userService = new UserService(connection);
 
       // Get the system user (adding or activating them if they already existed).
-      const systemUserObject = await userService.ensureSystemUser(userIdentifier, identitySource);
+      const systemUserObject = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
 
       // Filter out any system roles that have already been added to the user
       const rolesIdsToAdd = roleIds.filter((roleId) => !systemUserObject.role_ids.includes(roleId));

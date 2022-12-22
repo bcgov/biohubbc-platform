@@ -4,7 +4,7 @@ import { SQLStatement } from 'sql-template-strings';
 import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import * as UserQueries from '../queries/database/user-context-queries';
-import { getUserIdentifier, getUserIdentitySource } from '../utils/keycloak-utils';
+import { getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
 
 export const DB_CLIENT = 'pg';
@@ -326,7 +326,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * Sets the _systemUserId if successful.
    */
   const _setUserContext = async () => {
-    const userGuid = getUserIdentifier(_token);
+    const userGuid = getUserGuid(_token);
 
     const userIdentitySource = getUserIdentitySource(_token);
 

@@ -47,7 +47,7 @@ export class UserRepository extends BaseRepository {
   }
 
   /**
-   * Fetch a single system user by their ID.
+   * Fetch a single system user by their system user ID.
    *
    * @param {number} systemUserId
    * @return {*}  {Promise<IGetUser>}
@@ -93,13 +93,13 @@ export class UserRepository extends BaseRepository {
   }
 
   /**
-   * Get an existing system user.
+   * Get an existing system user by their GUID.
    *
-   * @param {string} userIdentifier
+   * @param {string} userGuid the user's GUID
    * @return {*}  {Promise<IGetUser>}
    * @memberof UserRepository
    */
-  async getUserByIdentifier(userGuid: string): Promise<IGetUser[]> {
+  async getUserByGuid(userGuid: string): Promise<IGetUser[]> {
     const sqlStatement = SQL`
     SELECT
       su.system_user_id,
@@ -137,19 +137,32 @@ export class UserRepository extends BaseRepository {
    *
    * Note: Will fail if the system user already exists.
    *
+   * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
    * @return {*}  {Promise<IInsertUser>}
    * @memberof UserRepository
    */
-  async addSystemUser(userIdentifier: string, identitySource: string): Promise<IInsertUser> {
+  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<IInsertUser> {
     const sqlStatement = SQL`
-    INSERT INTO system_user (
+    INSERT INTO
+      system_user
+    (
+      user_guid,
       user_identity_source_id,
       user_identifier,
       record_effective_date
-    ) VALUES (
-      (Select user_identity_source_id FROM user_identity_source WHERE name = ${identitySource.toUpperCase()}),
+    )
+    VALUES (
+      ${userGuid},
+      (
+        SELECT
+          user_identity_source_id
+        FROM
+          user_identity_source
+        WHERE
+          name = ${identitySource.toUpperCase()}
+      ),
       ${userIdentifier},
       now()
     )
@@ -181,6 +194,7 @@ export class UserRepository extends BaseRepository {
     const sqlStatement = SQL`
     SELECT
       su.system_user_id,
+      su.user_guid,
       su.user_identifier,
       su.record_end_date,
       array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
@@ -203,6 +217,7 @@ export class UserRepository extends BaseRepository {
       su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}, ${SYSTEM_IDENTITY_SOURCE.SYSTEM})
     GROUP BY
       su.system_user_id,
+      su.user_guid,
       su.record_end_date,
       su.user_identifier;
   `;
