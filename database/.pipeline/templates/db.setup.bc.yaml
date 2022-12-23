@@ -41,27 +41,27 @@ parameters:
     required: true
     value: 16-ubi8
 objects:
-  - kind: ImageStream
-    apiVersion: v1
-    metadata:
-      name: ${SOURCE_IMAGE_NAME}
-      creationTimestamp: null
-      annotations:
-        description: Nodejs Base Image
-      labels:
-        shared: 'true'
-    spec:
-      lookupPolicy:
-        local: false
-      tags:
-        - name: ${SOURCE_IMAGE_TAG}
-          annotations: null
-          from:
-            kind: DockerImage
-            name: ${BASE_IMAGE_URL}
-          importPolicy: {}
-          referencePolicy:
-            type: Local
+  # - kind: ImageStream
+  #   apiVersion: v1
+  #   metadata:
+  #     name: ${SOURCE_IMAGE_NAME}
+  #     creationTimestamp: null
+  #     annotations:
+  #       description: Nodejs Base Image
+  #     labels:
+  #       shared: 'true'
+  #   spec:
+  #     lookupPolicy:
+  #       local: false
+  #     tags:
+  #       - name: ${SOURCE_IMAGE_TAG}
+  #         annotations: null
+  #         from:
+  #           kind: DockerImage
+  #           name: ${BASE_IMAGE_URL}
+  #         importPolicy: {}
+  #         referencePolicy:
+  #           type: Local
   - kind: ImageStream
     apiVersion: v1
     metadata:
@@ -106,9 +106,9 @@ objects:
       strategy:
         dockerStrategy:
           dockerfilePath: '${DB_SETUP_DOCKERFILE_PATH}'
-          from:
-            kind: ImageStreamTag
-            name: ${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_TAG}
+          # from:
+          #   kind: ImageStreamTag
+          #   name: ${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_TAG}
         type: Docker
       successfulBuildsHistoryLimit: 5
       triggers:
