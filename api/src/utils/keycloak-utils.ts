@@ -31,10 +31,13 @@ export const getUserGuid = (keycloakToken: object): string | null => {
 export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
   const userIdentitySource: string = keycloakToken?.['identity_provider']?.toUpperCase();
 
-  // Coerce the raw ketcloak token identity provider value into an system identity source enum value
+  // Coerce the raw keycloak token identity provider value into an system identity source enum value
   switch (userIdentitySource) {
     case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
       return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
+
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+      return SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS;
 
     case SYSTEM_IDENTITY_SOURCE.IDIR:
       return SYSTEM_IDENTITY_SOURCE.IDIR;

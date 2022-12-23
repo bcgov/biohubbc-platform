@@ -50,7 +50,6 @@ export class UserRepository extends BaseRepository {
   /**
    * Fetch a single system user by their system user ID.
    *
-   * @TODO left join onto identity_source
    * 
    * @param {number} systemUserId
    * @return {*}  {Promise<IGetUser>}
@@ -61,10 +60,9 @@ export class UserRepository extends BaseRepository {
     SELECT
       su.system_user_id,
       su.user_identifier,
-
-
       su.user_guid,
       su.record_end_date,
+      uis.name AS identity_source,
       array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
       array_remove(array_agg(sr.name), NULL) AS role_names
     FROM
@@ -77,12 +75,18 @@ export class UserRepository extends BaseRepository {
       system_role sr
     ON
       sur.system_role_id = sr.system_role_id
+    LEFT JOIN
+      user_identity_source uis
+    ON
+      uis.user_identity_source_id = su.user_identity_source_id
     WHERE
       su.system_user_id = ${systemUserId}
     AND
       su.record_end_date IS NULL
     GROUP BY
       su.system_user_id,
+      uis.name,
+      su.user_guid,
       su.record_end_date,
       su.user_identifier;
   `;
@@ -112,6 +116,7 @@ export class UserRepository extends BaseRepository {
       su.user_identifier,
       su.user_guid,
       su.record_end_date,
+      uis.name AS identity_source,
       array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
       array_remove(array_agg(sr.name), NULL) AS role_names
     FROM
@@ -124,13 +129,18 @@ export class UserRepository extends BaseRepository {
       system_role sr
     ON
       sur.system_role_id = sr.system_role_id
+    LEFT JOIN
+      user_identity_source uis
+    ON
+      uis.user_identity_source_id = su.user_identity_source_id
     WHERE
       su.user_guid = ${userGuid}
     GROUP BY
       su.system_user_id,
       su.record_end_date,
       su.user_identifier,
-      su.user_guid;
+      su.user_guid,
+      uis.name;
   `;
 
     const response = await this.connection.sql<IGetUser>(sqlStatement);
@@ -203,6 +213,7 @@ export class UserRepository extends BaseRepository {
       su.user_guid,
       su.user_identifier,
       su.record_end_date,
+      uis.name AS identity_source,
       array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
       array_remove(array_agg(sr.name), NULL) AS role_names
     FROM
@@ -225,7 +236,8 @@ export class UserRepository extends BaseRepository {
       su.system_user_id,
       su.user_guid,
       su.record_end_date,
-      su.user_identifier;
+      su.user_identifier,
+      uis.name;
   `;
     const response = await this.connection.sql<IGetUser>(sqlStatement);
 

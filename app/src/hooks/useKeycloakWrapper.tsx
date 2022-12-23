@@ -4,20 +4,11 @@ import { useCallback } from 'react';
 import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
 
-/**
- * @TODO needs to be fixd
- */
 export enum SYSTEM_IDENTITY_SOURCE {
-  BCEID_BUSINESS = 'BCEID_BUSINESS',
-  BCEID = 'BCEID',
+  BCEID_BUSINESS = 'BCEIDBUSINESS',
+  BCEID_BASIC = 'BCEIDBASIC',
   IDIR = 'IDIR'
 }
-
-/**
- * @TODO
- */
-const raw_bceid_identity_sources = ['BCEID-BASIC-AND-BUSINESS', 'BCEID'];
-const raw_idir_identity_sources = ['IDIR'];
 
 /**
  * @TODO these interfaces need to be fixed
@@ -26,6 +17,7 @@ export interface IUserInfo {
   sub: string;
   email_verified: boolean;
   preferred_username: string;
+  identity_source: string
   display_name: string;
   email: string;
 }
@@ -158,6 +150,30 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   }
 
   /**
+   * Coerces a string into a user identity source, e.g. BCEID, IDIR, etc.
+   * 
+   * @example _inferIdentitySource('idir') => SYSTEM_IDENTITY_SOURCE.IDIR
+   * 
+   * @param userIdentitySource The user identity source string
+   * @returns {*} {SYSTEM_IDENTITY_SOURCE | null}
+   */
+  const _inferIdentitySource = (userIdentitySource: string | undefined): SYSTEM_IDENTITY_SOURCE | null => {
+    switch (userIdentitySource) {
+      case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+        return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
+  
+      case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+        return SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS;
+  
+      case SYSTEM_IDENTITY_SOURCE.IDIR:
+        return SYSTEM_IDENTITY_SOURCE.IDIR;
+      
+      default:
+        return null;
+    }
+  }
+
+  /**
    * Parses out the username portion of the preferred_username from the token.
    *
    * @param {object} keycloakToken
@@ -183,21 +199,16 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @return {*} {(string | null)}
    */
   const getIdentitySource = useCallback((): SYSTEM_IDENTITY_SOURCE | null => {
-    const identitySource = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[1].toUpperCase();
+    console.log({ keycloakData: keycloakUserDataLoader.data, userData: userDataLoader.data })
+    const userIdentitySource =
+      userDataLoader.data?.['identity_source'] ||
+      keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[1].toUpperCase();
 
-    if (!identitySource) {
+    if (!userIdentitySource) {
       return null;
     }
 
-    if (raw_bceid_identity_sources.includes(identitySource)) {
-      return SYSTEM_IDENTITY_SOURCE.BCEID;
-    }
-
-    if (raw_idir_identity_sources.includes(identitySource)) {
-      return SYSTEM_IDENTITY_SOURCE.IDIR;
-    }
-
-    return null;
+    return _inferIdentitySource(userIdentitySource);
   }, [keycloakUserDataLoader.data]);
 
   const systemUserId = (): number => {
