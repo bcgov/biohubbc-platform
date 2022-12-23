@@ -4,15 +4,24 @@ import { useCallback } from 'react';
 import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
 
+/**
+ * @TODO needs to be fixd
+ */
 export enum SYSTEM_IDENTITY_SOURCE {
   BCEID_BUSINESS = 'BCEID_BUSINESS',
   BCEID = 'BCEID',
   IDIR = 'IDIR'
 }
 
+/**
+ * @TODO
+ */
 const raw_bceid_identity_sources = ['BCEID-BASIC-AND-BUSINESS', 'BCEID'];
 const raw_idir_identity_sources = ['IDIR'];
 
+/**
+ * @TODO these interfaces need to be fixed
+ */
 export interface IUserInfo {
   sub: string;
   email_verified: boolean;

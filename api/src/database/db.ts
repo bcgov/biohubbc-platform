@@ -9,6 +9,8 @@ import { getLogger } from '../utils/logger';
 
 export const DB_CLIENT = 'pg';
 
+const DB_USER_API = 'biohub_api';
+
 const defaultLog = getLogger('database/db');
 
 const DB_HOST = process.env.DB_HOST;
@@ -375,10 +377,9 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  */
 export const getAPIUserDBConnection = (): IDBConnection => {
   return getDBConnection({
-    idir_user_guid: 'biohub_api',
+    preferred_username: `${DB_USER_API}@database`,
     identity_provider: 'database'
   });
-  //return getDBConnection({ preferred_username: 'biohub_api@database' });
 };
 
 /**

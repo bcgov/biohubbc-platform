@@ -5,8 +5,9 @@ import { BaseRepository } from './base-repository';
 
 export interface IGetUser {
   system_user_id: number;
-  user_identifier: number;
   user_guid: string;
+  user_identifier: number;
+  identity_source: string;
   record_end_date: string;
   role_ids: number[];
   role_names: string[];
@@ -49,6 +50,8 @@ export class UserRepository extends BaseRepository {
   /**
    * Fetch a single system user by their system user ID.
    *
+   * @TODO left join onto identity_source
+   * 
    * @param {number} systemUserId
    * @return {*}  {Promise<IGetUser>}
    * @memberof UserRepository
@@ -58,6 +61,9 @@ export class UserRepository extends BaseRepository {
     SELECT
       su.system_user_id,
       su.user_identifier,
+
+
+      su.user_guid,
       su.record_end_date,
       array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
       array_remove(array_agg(sr.name), NULL) AS role_names
