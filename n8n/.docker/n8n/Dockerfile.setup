@@ -1,21 +1,17 @@
-FROM node:14
+FROM node:16-slim
 
-# set variables
-ENV HOME_ROOT=/opt/app-root
+RUN apt-get update -y
+RUN apt-get install -y g++ make python2
+
 ENV HOME=/opt/app-root/src
 
 RUN mkdir -p $HOME
-
-WORKDIR $HOME_ROOT
 
 WORKDIR $HOME
 
 COPY . .
 
-# If you are building your code for production
-# RUN npm install --only=production
-# RUN npm set progress=false
 RUN npm install
 
-# run the database migrations and seeding
+# run the n8n workflow import
 CMD [ "npm", "run", "import" ]

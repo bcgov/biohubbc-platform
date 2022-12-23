@@ -2,7 +2,10 @@
 # This DockerFile is used for deployments only, please do not change for other purposes. It will break our deployment.
 # ####################################################################################################################
 
-FROM node:14
+FROM node:16-slim
+
+RUN apt-get update -y
+RUN apt-get install -y g++ make python2
 
 ENV HOME=/opt/app-root/src
 

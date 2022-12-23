@@ -8,8 +8,8 @@
     "url": "https://github.com/bcgov/biohubbc-platform.git"
   },
   "engines": {
-    "node": ">= 14.0.0",
-    "npm": ">= 6.0.0"
+    "node": ">= 16.0.0",
+    "npm": ">= 8.0.0"
   },
   "scripts": {
     "setup": "npm-run-all -l -s migrate-latest seed",
@@ -22,7 +22,7 @@
     "format-fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
   },
   "dependencies": {
-    "knex": "~1.0.1",
+    "knex": "~2.3.0",
     "pg": "~8.3.0",
     "typescript": "~4.1.6"
   },

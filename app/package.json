@@ -21,8 +21,8 @@
     "format-fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
   },
   "engines": {
-    "node": ">= 14.0.0",
-    "npm": ">= 6.0.0"
+    "node": ">= 16.0.0",
+    "npm": ">= 8.0.0"
   },
   "dependencies": {
     "@bcgov/bc-sans": "~1.0.1",
@@ -58,7 +58,7 @@
     "leaflet.markercluster": "^1.5.3",
     "lodash-es": "~4.17.21",
     "moment": "~2.29.2",
-    "node-sass": "~4.14.1",
+    "node-sass": "~7.0.3",
     "pug": "^3.0.2",
     "qs": "~6.9.4",
     "react": "^17.0.2",
@@ -90,7 +90,7 @@
     "@types/leaflet.markercluster": "^1.5.1",
     "@types/lodash-es": "~4.17.4",
     "@types/node": "~14.14.31",
-    "@types/node-sass": "~4.11.2",
+    "@types/node-sass": "~4.11.3",
     "@types/pug": "^2.0.6",
     "@types/qs": "~6.9.5",
     "@types/react": "^18.0.17",

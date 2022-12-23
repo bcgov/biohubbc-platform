@@ -258,9 +258,9 @@ install: ## Runs `npm install` for all projects
 	@echo "==============================================="
 	@cd api && npm install && cd ..
 	@echo "==============================================="
-	@echo "Running /app install"
+	@echo "Running /app install --legacy-peer-deps"
 	@echo "==============================================="
-	@cd app && npm install && cd ..
+	@cd app && npm install --legacy-peer-deps && cd ..
 	@echo "==============================================="
 	@echo "Running /database install"
 	@echo "==============================================="

@@ -2,7 +2,10 @@
 # This DockerFile is used for deployments only, please do not change for other purposes. It will break our deployment.
 # ####################################################################################################################
 
-FROM node:14
+FROM node:16-slim
+
+RUN apt-get update -y
+RUN apt-get install -y g++ make python2
 
 ENV HOME=/opt/app-root/src
 
@@ -14,7 +17,7 @@ WORKDIR $HOME
 # A wildcard is used to ensure both package.json AND package-lock.json are copied where available (npm@5+)
 COPY ./package*.json ./
 
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.npm-global/bin/:${HOME}/bin:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
