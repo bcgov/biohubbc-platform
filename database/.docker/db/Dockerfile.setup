@@ -1,5 +1,6 @@
 FROM node:16-slim
 
+# Install additional packages needed to use node 16 that aren't part of the 'slim' image
 RUN apt-get update -y
 RUN apt-get install -y g++ make python2
 
@@ -9,9 +10,13 @@ RUN mkdir -p $HOME
 
 WORKDIR $HOME
 
-COPY . .
+# Copy the package files only
+COPY ./package*.json ./
 
 RUN npm install
+
+# Copy the rest of the files
+COPY . .
 
 # run the database migrations and seeding
 CMD [ "npm", "run", "setup" ]

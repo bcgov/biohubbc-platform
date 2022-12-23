@@ -28,15 +28,15 @@ parameters:
   - name: SOURCE_REPOSITORY_REF
     required: false
     value: dev
-  - name: BASE_IMAGE_URL
-    required: true
-    value: image-registry.openshift-image-registry.svc:5000/openshift/nodejs:16-ubi8
-  - name: SOURCE_IMAGE_NAME
-    required: true
-    value: nodejs
-  - name: SOURCE_IMAGE_TAG
-    required: true
-    value: 16-ubi8
+  # - name: BASE_IMAGE_URL
+  #   required: true
+  #   value: image-registry.openshift-image-registry.svc:5000/openshift/nodejs:16-ubi8
+  # - name: SOURCE_IMAGE_NAME
+  #   required: true
+  #   value: nodejs
+  # - name: SOURCE_IMAGE_TAG
+  #   required: true
+  #   value: 16-ubi8
 objects:
   # - kind: ImageStream
   #   apiVersion: v1

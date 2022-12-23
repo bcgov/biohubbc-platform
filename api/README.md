@@ -4,9 +4,9 @@
 
 | Technology | Version | Website                              | Description          |
 | ---------- | ------- | ------------------------------------ | -------------------- |
-| node       | 14.x.x  | https://nodejs.org/en/               | JavaScript Runtime   |
-| npm        | 6.x.x   | https://www.npmjs.com/               | Node Package Manager |
-| PostgreSQL | 9.6     | https://www.postgresql.org/download/ | PSQL database        |
+| node       | 16.x.x  | https://nodejs.org/en/               | JavaScript Runtime   |
+| npm        | 8.x.x   | https://www.npmjs.com/               | Node Package Manager |
+| PostgreSQL | 14      | https://www.postgresql.org/download/ | PSQL database        |
 
 <br />
 

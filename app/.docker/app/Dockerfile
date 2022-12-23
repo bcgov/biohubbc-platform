@@ -1,5 +1,6 @@
 FROM node:16-slim
 
+# Install additional packages needed to use node 16 that aren't part of the 'slim' image
 RUN apt-get update -y
 RUN apt-get install -y g++ make python2
 
@@ -10,16 +11,15 @@ RUN mkdir -p $HOME
 WORKDIR $HOME
 
 # Copy the package files only
-# A wildcard is used to ensure both package.json AND package-lock.json are copied where available (npm@5+)
 COPY package*.json ./
 
 # Install packages
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
-ENV PATH ${HOME}/node_modules/.bin/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
+# ENV PATH ${HOME}/node_modules/.bin/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
 
 # Copy the rest of the files
-COPY . ./
+COPY . .
 
 VOLUME ${HOME}
 

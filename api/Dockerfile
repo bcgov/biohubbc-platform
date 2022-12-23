@@ -4,6 +4,7 @@
 
 FROM node:16-slim
 
+# Install additional packages needed to use node 16 that aren't part of the 'slim' image
 RUN apt-get update -y
 RUN apt-get install -y g++ make python2
 
@@ -14,15 +15,14 @@ RUN mkdir -p $HOME
 WORKDIR $HOME
 
 # Copy the package files only
-# A wildcard is used to ensure both package.json AND package-lock.json are copied where available (npm@5+)
 COPY ./package*.json ./
 
 RUN npm install
 
-ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.npm-global/bin/:${HOME}/bin:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.npm-global/bin/:${HOME}/bin:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Copy the rest of the files
-COPY . ./
+COPY . .
 
 # Cleaning any existing generated file
 RUN rm -rf ./dist
@@ -31,7 +31,7 @@ RUN rm -rf ./dist
 RUN npm run build
 
 # Application VOLUME
-VOLUME ${HOME}
+# VOLUME ${HOME}
 
 EXPOSE 6100
 
