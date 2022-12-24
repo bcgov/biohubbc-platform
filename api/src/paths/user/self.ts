@@ -9,9 +9,7 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/user/self');
 
-export const GET: Operation = [
-  getUser()
-];
+export const GET: Operation = [getUser()];
 
 GET.apiDoc = {
   description: 'Get user details for the currently authenticated user.',
@@ -74,7 +72,7 @@ GET.apiDoc = {
  */
 export function getUser(): RequestHandler {
   return async (req, res) => {
-    const keycloakToken = req['keycloak_token']
+    const keycloakToken = req['keycloak_token'];
 
     // Use APIUser connection to get or create a new system user if they don't exist
     const connection = getAPIUserDBConnection();

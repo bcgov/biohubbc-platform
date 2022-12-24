@@ -17,7 +17,7 @@ export interface IUserInfo {
   sub: string;
   email_verified: boolean;
   preferred_username: string;
-  identity_source: string
+  identity_source: string;
   display_name: string;
   email: string;
 }
@@ -151,9 +151,9 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   /**
    * Coerces a string into a user identity source, e.g. BCEID, IDIR, etc.
-   * 
+   *
    * @example _inferIdentitySource('idir') => SYSTEM_IDENTITY_SOURCE.IDIR
-   * 
+   *
    * @param userIdentitySource The user identity source string
    * @returns {*} {SYSTEM_IDENTITY_SOURCE | null}
    */
@@ -161,17 +161,17 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     switch (userIdentitySource) {
       case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
         return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
-  
+
       case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
         return SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS;
-  
+
       case SYSTEM_IDENTITY_SOURCE.IDIR:
         return SYSTEM_IDENTITY_SOURCE.IDIR;
-      
+
       default:
         return null;
     }
-  }
+  };
 
   /**
    * Parses out the username portion of the preferred_username from the token.
@@ -199,7 +199,6 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @return {*} {(string | null)}
    */
   const getIdentitySource = useCallback((): SYSTEM_IDENTITY_SOURCE | null => {
-    console.log({ keycloakData: keycloakUserDataLoader.data, userData: userDataLoader.data })
     const userIdentitySource =
       userDataLoader.data?.['identity_source'] ||
       keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[1].toUpperCase();

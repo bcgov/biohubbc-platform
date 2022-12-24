@@ -20,7 +20,6 @@ export const LoggedInUserControls = () => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const identitySource = keycloakWrapper?.getIdentitySource() || '';
-  console.log({identitySource})
   const userIdentifier = keycloakWrapper?.getUserIdentifier() || '';
 
   let accountTypeDisplayName = '';
@@ -30,8 +29,8 @@ export const LoggedInUserControls = () => {
       accountTypeDisplayName = 'BCeID';
       break;
     case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
-        accountTypeDisplayName = 'BCeID';
-        break;
+      accountTypeDisplayName = 'BCeID';
+      break;
     case SYSTEM_IDENTITY_SOURCE.IDIR:
       accountTypeDisplayName = 'IDIR';
       break;
@@ -39,7 +38,7 @@ export const LoggedInUserControls = () => {
 
   const loggedInUserDisplayName = accountTypeDisplayName
     ? `${accountTypeDisplayName} / ${userIdentifier}`
-    : userIdentifier
+    : userIdentifier;
 
   return (
     <Box display="flex" alignItems="center" pl={2}>

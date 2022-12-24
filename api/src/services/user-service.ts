@@ -69,7 +69,11 @@ export class UserService extends DBService {
    * @return {*}  {Promise<Models.user.UserObject>}
    * @memberof UserService
    */
-  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<Models.user.UserObject> {
+  async addSystemUser(
+    userGuid: string,
+    userIdentifier: string,
+    identitySource: string
+  ): Promise<Models.user.UserObject> {
     const response = await this.userRepository.addSystemUser(userGuid, userIdentifier, identitySource);
 
     return new Models.user.UserObject(response);
@@ -97,7 +101,11 @@ export class UserService extends DBService {
    * @return {*}  {Promise<Models.user.UserObject>}
    * @memberof UserService
    */
-  async ensureSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<Models.user.UserObject> {
+  async ensureSystemUser(
+    userGuid: string,
+    userIdentifier: string,
+    identitySource: string
+  ): Promise<Models.user.UserObject> {
     // Check if the user exists
     let userObject = await this.getUserByGuid(userGuid);
 
@@ -134,7 +142,11 @@ export class UserService extends DBService {
    * @return {*}  {Promise<Models.user.UserObject>}
    * @memberof UserService
    */
-  async getOrCreateSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<Models.user.UserObject> {
+  async getOrCreateSystemUser(
+    userGuid: string,
+    userIdentifier: string,
+    identitySource: string
+  ): Promise<Models.user.UserObject> {
     defaultLog.debug({ label: 'getUserByGuid', userGuid, userIdentifier, identitySource });
 
     // Check if the user exists

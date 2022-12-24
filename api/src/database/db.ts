@@ -185,9 +185,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
 
   const _token = keycloakToken;
 
-  console.log('token inside getDBConnection: **************');
-  console.log(_token);
-
   /**
    * Opens a new connection, begins a transaction, and sets the user context.
    *

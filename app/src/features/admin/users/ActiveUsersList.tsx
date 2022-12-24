@@ -309,7 +309,9 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                     <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
                       <TableCell>{row.user_identifier || 'No identifier'}</TableCell>
                       <TableCell>
-                        <Typography sx={{ fontFamily: 'Monospace', display: 'inline' }}>{row.user_guid.substring(0, 4)}</Typography>
+                        <Typography sx={{ fontFamily: 'Monospace', display: 'inline' }}>
+                          {row.user_guid.substring(0, 4)}
+                        </Typography>
                         {'\u0020\u0020\u2022\u2006\u2022\u2006\u2022\u2006'}
                       </TableCell>
                       <TableCell>
@@ -391,7 +393,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
         }}
         onCancel={() => setOpenAddUserDialog(false)}
         onSave={(values) => {
-          console.log('onSave()');
           handleAddSystemUsersSave(values);
           setOpenAddUserDialog(false);
         }}

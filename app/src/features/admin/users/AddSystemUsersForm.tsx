@@ -54,7 +54,7 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
   const { values, handleChange, handleSubmit, getFieldMeta } = useFormikContext<IAddSystemUsersForm>();
 
   return (
-    <form onSubmit={(e) => {console.log('onSubmit'); handleSubmit(e);}}>
+    <form onSubmit={handleSubmit}>
       <FieldArray
         name="systemUsers"
         render={(arrayHelpers) => (
@@ -134,7 +134,9 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                           <MenuItem key={SYSTEM_IDENTITY_SOURCE.BCEID_BASIC} value={SYSTEM_IDENTITY_SOURCE.BCEID_BASIC}>
                             BCeID Basic
                           </MenuItem>
-                          <MenuItem key={SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS} value={SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS}>
+                          <MenuItem
+                            key={SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS}
+                            value={SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS}>
                             BCeID Business
                           </MenuItem>
                         </Select>
