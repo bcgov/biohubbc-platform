@@ -10,9 +10,6 @@ export enum SYSTEM_IDENTITY_SOURCE {
   IDIR = 'IDIR'
 }
 
-/**
- * @TODO these interfaces need to be fixed
- */
 export interface IUserInfo {
   sub: string;
   email_verified: boolean;
@@ -174,13 +171,12 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   /**
-   * Parses out the username portion of the preferred_username from the token.
+   * Parses out the username from a keycloak token, from either the `idir_username` or `bceid_username` field.
    *
    * @param {object} keycloakToken
    * @return {*} {(string | null)}
    */
   const getUserIdentifier = useCallback((): string | null => {
-    // const userIdentifier = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[0];
     const userIdentifier =
       (keycloakUserDataLoader.data as IIDIRUserInfo)?.idir_username ||
       (keycloakUserDataLoader.data as IBCEIDBasicUserInfo)?.bceid_username;
