@@ -89,7 +89,9 @@ export function getUser(): RequestHandler {
       const userIdentifier = getUserIdentifier(keycloakToken);
       const userIdentitySource = getUserIdentitySource(keycloakToken);
 
-      if (!userGuid || !userIdentifier) {
+      defaultLog.debug({ label: 'getUser', userGuid, userIdentifier, userIdentitySource });
+
+      if (!userGuid || !userIdentifier || !userIdentitySource) {
         throw new HTTP400("Failed to retreive user's identifier or GUID");
       }
 

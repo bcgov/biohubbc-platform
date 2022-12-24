@@ -141,13 +141,6 @@ export class UserService extends DBService {
     let userObject = await this.getUserByGuid(userGuid);
 
     if (!userObject) {
-      // ID of the current authenticated user
-      const systemUserId = this.connection.systemUserId();
-
-      if (!systemUserId) {
-        throw new ApiExecuteSQLError('Failed to identify system user ID');
-      }
-
       // Found no existing user, add them
       userObject = await this.addSystemUser(userGuid, userIdentifier, identitySource);
     }
