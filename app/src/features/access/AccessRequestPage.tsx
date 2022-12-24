@@ -132,7 +132,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
   let initialValues: any;
   let validationSchema: any;
   let requestForm: any;
-  if (keycloakWrapper?.getIdentitySource() === SYSTEM_IDENTITY_SOURCE.BCEID) {
+  if (keycloakWrapper?.getIdentitySource() === SYSTEM_IDENTITY_SOURCE.BCEID_BASIC) {
     initialValues = BCeIDRequestFormInitialValues;
     validationSchema = BCeIDRequestFormYupSchema;
     requestForm = <BCeIDRequestForm />;

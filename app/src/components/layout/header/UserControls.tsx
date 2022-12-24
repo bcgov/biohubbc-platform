@@ -20,11 +20,26 @@ export const LoggedInUserControls = () => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const identitySource = keycloakWrapper?.getIdentitySource() || '';
-
+  console.log({identitySource})
   const userIdentifier = keycloakWrapper?.getUserIdentifier() || '';
 
-  const loggedInUserDisplayName =
-    identitySource === SYSTEM_IDENTITY_SOURCE.BCEID ? `BCEID / ${userIdentifier}` : `IDIR / ${userIdentifier}`;
+  let accountTypeDisplayName = '';
+
+  switch (identitySource) {
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+      accountTypeDisplayName = 'BCeID';
+      break;
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+        accountTypeDisplayName = 'BCeID';
+        break;
+    case SYSTEM_IDENTITY_SOURCE.IDIR:
+      accountTypeDisplayName = 'IDIR';
+      break;
+  }
+
+  const loggedInUserDisplayName = accountTypeDisplayName
+    ? `${accountTypeDisplayName} / ${userIdentifier}`
+    : userIdentifier
 
   return (
     <Box display="flex" alignItems="center" pl={2}>
