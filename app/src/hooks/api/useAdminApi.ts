@@ -43,7 +43,7 @@ const useAdminApi = (axios: AxiosInstance) => {
     status: AdministrativeActivityStatusType[] = []
   ): Promise<IGetAccessRequestsListResponse[]> => {
     return [];
-    // const { data } = await axios.get(`/api/administrative-activities`, {
+    // const { data } = await axios.get(`/api/administrative/activity/list`, {
     //   params: { type: AdministrativeActivityType.SYSTEM_ACCESS, status },
     //   paramsSerializer: (params) => {
     //     return qs.stringify(params);
@@ -70,7 +70,7 @@ const useAdminApi = (axios: AxiosInstance) => {
     requestStatusTypeId: number,
     roleIds: number[] = []
   ): Promise<void> => {
-    const { data } = await axios.put(`/api/access-request`, {
+    const { data } = await axios.put(`/api/administrative/access-request/update`, {
       userIdentifier,
       identitySource,
       requestId,
@@ -91,7 +91,7 @@ const useAdminApi = (axios: AxiosInstance) => {
     administrativeActivityId: number,
     administrativeActivityStatusTypeId: number
   ): Promise<void> => {
-    const { data } = await axios.put(`/api/administrative-activity`, {
+    const { data } = await axios.put(`/api/administrative/activity/update`, {
       id: administrativeActivityId,
       status: administrativeActivityStatusTypeId
     });
@@ -108,7 +108,7 @@ const useAdminApi = (axios: AxiosInstance) => {
   const createAdministrativeActivity = async (
     administrativeActivityData: unknown
   ): Promise<IGetAccessRequestsListResponse> => {
-    const { data } = await axios.post('/api/administrative-activity', administrativeActivityData);
+    const { data } = await axios.post('/api/administrative/activity/create', administrativeActivityData);
 
     return data;
   };
@@ -119,7 +119,7 @@ const useAdminApi = (axios: AxiosInstance) => {
    * @return {*} {Promise<number>}
    */
   const hasPendingAdministrativeActivities = async (): Promise<number> => {
-    const { data } = await axios.get('/api/administrative-activity');
+    const { data } = await axios.get('/api/administrative/access-request/count');
 
     return data;
   };

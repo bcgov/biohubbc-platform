@@ -40,7 +40,7 @@ describe('useAdminApi', () => {
       }
     ];
 
-    mock.onGet(`/api/administrative-activities`).reply(200, response);
+    mock.onGet(`/api/administrative/activity/list`).reply(200, response);
 
     const result = await useAdminApi(axios).getAccessRequests();
 
@@ -48,7 +48,7 @@ describe('useAdminApi', () => {
   });
 
   it('updateAccessRequest works as expected', async () => {
-    mock.onPut(`/api/access-request`).reply(200, true);
+    mock.onPut(`/api/administrative/access-request/update`).reply(200, true);
 
     const result = await useAdminApi(axios).updateAccessRequest('userIdentifier', 'identitySource', 2, 2, [1, 2, 3]);
 
@@ -56,7 +56,7 @@ describe('useAdminApi', () => {
   });
 
   it('updateAdministrativeActivity works as expected', async () => {
-    mock.onPut(`/api/administrative-activity`).reply(200, true);
+    mock.onPut(`/api/administrative/activity/update`).reply(200, true);
 
     const result = await useAdminApi(axios).updateAdministrativeActivity(2, 2);
 
@@ -64,7 +64,7 @@ describe('useAdminApi', () => {
   });
 
   it('createAdministrativeActivity works as expected', async () => {
-    mock.onPost('/api/administrative-activity').reply(200, {
+    mock.onPost('/api/administrative/activity/create').reply(200, {
       id: 2,
       date: '2020/04/04'
     });
@@ -78,7 +78,7 @@ describe('useAdminApi', () => {
   });
 
   it('hasPendingAdministrativeActivities works as expected', async () => {
-    mock.onGet('/api/administrative-activity').reply(200, 10);
+    mock.onGet('/api/administrative/access-request/count').reply(200, 10);
 
     const result = await useAdminApi(axios).hasPendingAdministrativeActivities();
 
