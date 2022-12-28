@@ -157,8 +157,8 @@ export class UserService extends DBService {
       userObject = await this.addSystemUser(userGuid, userIdentifier, identitySource);
     }
 
-    // get the newly created user
-    return this.getUserById(userObject.id);
+    // return the user object
+    return userObject;
   }
 
   /**

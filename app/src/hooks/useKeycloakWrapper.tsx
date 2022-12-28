@@ -179,7 +179,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   const getUserIdentifier = useCallback((): string | null => {
     const userIdentifier =
       (keycloakUserDataLoader.data as IIDIRUserInfo)?.idir_username ||
-      (keycloakUserDataLoader.data as IBCEIDBasicUserInfo)?.bceid_username;
+      (keycloakUserDataLoader.data as IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)?.bceid_username;
 
     if (!userIdentifier) {
       return null;

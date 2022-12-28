@@ -36,7 +36,7 @@ export const defaultPoolConfig: pg.PoolConfig = {
 
 // Custom type handler for psq `DATE` type to prevent local time/zone information from being added.
 // Why? By default, node-postgres assumes local time/zone for any psql `DATE` or `TIME` types that don't have timezone information.
-// This Can lead to unexpected behaviour when the original psql `DATE` value was intentionally omitting time/zone information.
+// This Can lead to unexpected behavior when the original psql `DATE` value was intentionally omitting time/zone information.
 // PSQL date types: https://www.postgresql.org/docs/12/datatype-datetime.html
 // node-postgres type handling (see bottom of page): https://node-postgres.com/features/types
 pg.types.setTypeParser(pg.types.builtins.DATE, (stringValue: string) => {

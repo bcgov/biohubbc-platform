@@ -90,10 +90,10 @@ export function getUser(): RequestHandler {
       defaultLog.debug({ label: 'getUser', userGuid, userIdentifier, userIdentitySource });
 
       if (!userGuid || !userIdentifier || !userIdentitySource) {
-        throw new HTTP400("Failed to retreive user's identifier or GUID");
+        throw new HTTP400("Failed to retrieve user's identifier or GUID");
       }
 
-      // Retreives the system user if they exist, or creates a system user if they do not
+      // Retrieves the system user if they exist, or creates a system user if they do not
       const userObject = await userService.getOrCreateSystemUser(userGuid, userIdentifier, userIdentitySource);
 
       await connection.commit();

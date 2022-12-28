@@ -3,6 +3,10 @@ import qs from 'qs';
 import { ApiGeneralError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 
+
+/**
+ * @TODO revise KeycloakService type definitions. See `app/src/hooks/useKeycloakWrapper`
+ */
 type KeycloakUserData = {
   username: string;
   email: string;
