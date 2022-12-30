@@ -3,10 +3,6 @@ import qs from 'qs';
 import { ApiGeneralError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 
-
-/**
- * @TODO revise KeycloakService type definitions. See `app/src/hooks/useKeycloakWrapper`
- */
 type KeycloakUserData = {
   username: string;
   email: string;
@@ -17,17 +13,20 @@ type KeycloakUserData = {
 
 type IDIRAttributes = {
   idir_user_guid: [string];
-  idir_userid: [string];
   idir_username: [string];
   display_name: [string];
-  displayName: [string];
+  given_name: [string];
+  family_name: [string];
 };
 
-type BCEIDBusinessAttributes = {
-  bceid_business_guid: [string];
-  bceid_business_name: [string];
+interface BCEIDBasicAttributes {
   bceid_user_guid: [string];
   bceid_username: [string];
+}
+
+type BCEIDBusinessAttributes = BCEIDBasicAttributes & {
+  bceid_business_guid: [string];
+  bceid_business_name: [string];
   display_name: [string];
 };
 
