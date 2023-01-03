@@ -26,18 +26,14 @@ export const getUserGuid = (keycloakToken: object): string | null => {
  *
  * @example getUserIdentitySource({ ...token, identity_provider: 'bceidbasic' }) => SYSTEM_IDENTITY_SOURCE.BCEID_BASIC
  * @example getUserIdentitySource({ preferred_username: 'aaaa@idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
- * 
+ *
  * @param {object} keycloakToken
  * @return {*} {SYSTEM_IDENTITY_SOURCE}
  */
 export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
   const userIdentitySource: string = (
-    keycloakToken?.['identity_provider']
-    || keycloakToken?.['preferred_username']?.split('@')?.[1]
+    keycloakToken?.['identity_provider'] || keycloakToken?.['preferred_username']?.split('@')?.[1]
   )?.toUpperCase();
-
-  //console.log('userIdentitySource:', userIdentitySource);
-  //console.log('keycloakToken:', keycloakToken);
 
   // Coerce the raw keycloak token identity provider value into an system identity source enum value
   switch (userIdentitySource) {
