@@ -17,7 +17,7 @@ describe('getUserGuid', () => {
   });
 
   it('returns their guid', () => {
-    const response = getUserGuid({ preferred_username: 'aaaaa@idir'});
+    const response = getUserGuid({ preferred_username: 'aaaaa@idir' });
 
     expect(response).to.equal('aaaaa');
   });

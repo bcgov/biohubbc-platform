@@ -363,9 +363,8 @@ describe('UserService', () => {
         role_ids: [1],
         role_names: ['Editor']
       });
-      
-      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid')
-        .resolves(existingInactiveSystemUser);
+
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingInactiveSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 
@@ -398,8 +397,7 @@ describe('UserService', () => {
         role_names: ['Editor']
       });
 
-      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 

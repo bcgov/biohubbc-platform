@@ -4,7 +4,7 @@ delete from user_identity_source;
 
 insert into user_identity_source(name, record_effective_date, description, create_date, create_user) values ('DATABASE', now(), 'DATABASE user source system.', now(), 1);
 insert into user_identity_source(name, record_effective_date, description, create_date, create_user) values ('IDIR', now(), 'IDIR user source system.', now(), 1);
-insert into user_identity_source(name, record_effective_date, description, create_date, create_user) values ('BCEID', now(), 'BCEID user source system.', now(), 1);
+insert into user_identity_source(name, record_effective_date, description, create_date, create_user) values ('BCEIDBASIC', now(), 'BCEID BASIC user source system.', now(), 1);
 insert into user_identity_source(name, record_effective_date, description, create_date, create_user) values ('BCEIDBUSINESS', now(), 'BCEID BUSINESS user source system.', now(), 1);
 insert into user_identity_source(name, record_effective_date, description, create_date, create_user) values ('SYSTEM', now(), 'SYSTEM user is a platform application.', now(), 1);
 

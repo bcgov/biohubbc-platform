@@ -76,7 +76,7 @@ describe('getUser', () => {
     const dbConnectionObj = getMockDBConnection({ systemUserId: () => 1 });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-    
+
     mockReq['keycloak_token'] = {
       preferred_username: 'aaaa@idir',
       identity_source: 'idir',
