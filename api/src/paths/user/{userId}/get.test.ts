@@ -76,6 +76,8 @@ describe('user', () => {
       sinon.stub(UserService.prototype, 'getUserById').resolves({
         id: 1,
         user_identifier: 'user_identifier',
+        user_guid: 'aaaa',
+        identity_source: 'idir',
         record_end_date: '',
         role_ids: [],
         role_names: []

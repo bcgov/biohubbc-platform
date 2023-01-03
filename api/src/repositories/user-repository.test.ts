@@ -76,7 +76,7 @@ describe('UserRepository', () => {
     });
   });
 
-  describe('getUserByIdentifier', () => {
+  describe('getUserByGuid', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -91,14 +91,22 @@ describe('UserRepository', () => {
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.getUserByIdentifier('user');
+      const response = await userRepository.getUserByGuid('user');
 
       expect(response).to.eql([]);
     });
 
-    it('should get user by id', async () => {
+    it('should get user by guid', async () => {
       const mockResponse = [
-        { system_user_id: 1, user_identifier: 1, record_end_date: 'data', role_ids: [1], role_names: ['admin'] }
+        {
+          system_user_id: 1,
+          user_identifier: 1,
+          user_guid: 'aaaa',
+          identity_source: 'idir',
+          record_end_date: 'data',
+          role_ids: [1],
+          role_names: ['admin']
+        }
       ];
       const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
 
@@ -110,7 +118,7 @@ describe('UserRepository', () => {
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.getUserByIdentifier('user');
+      const response = await userRepository.getUserByGuid('aaaa');
 
       expect(response).to.equal(mockResponse);
     });
@@ -132,7 +140,7 @@ describe('UserRepository', () => {
       const userRepository = new UserRepository(mockDBConnection);
 
       try {
-        await userRepository.addSystemUser('user', 'idir');
+        await userRepository.addSystemUser('user-guid', 'user', 'idir');
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to insert new user');
@@ -144,7 +152,8 @@ describe('UserRepository', () => {
         {
           system_user_id: 1,
           user_identity_source_id: 1,
-          user_identifier: 1,
+          user_identifier: 'user',
+          user_guid: 'aaaa',
           record_end_date: 'data',
           record_effective_date: 'date'
         }
@@ -159,7 +168,7 @@ describe('UserRepository', () => {
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.addSystemUser('user', 'idir');
+      const response = await userRepository.addSystemUser('aaaa', 'user', 'idir');
 
       expect(response).to.equal(mockResponse[0]);
     });
