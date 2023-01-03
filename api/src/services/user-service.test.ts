@@ -321,6 +321,107 @@ describe('UserService', () => {
     });
   });
 
+  describe('getOrCreateSystemUser', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('creates a new system user if one does not already exist', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const existingSystemUser = null;
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
+
+      const addedSystemUser = new Models.user.UserObject({ system_user_id: 2, record_end_date: null });
+      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser').resolves(addedSystemUser);
+
+      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
+
+      const userIdentifier = 'username';
+      const userGuid = 'aaaa';
+      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+
+      expect(result.id).to.equal(2);
+      expect(result.record_end_date).to.equal(null);
+
+      expect(getUserByGuidStub).to.have.been.calledOnce;
+      expect(addSystemUserStub).to.have.been.calledOnce;
+      expect(activateSystemUserStub).not.to.have.been.called;
+    });
+
+    it('gets an existing system user that is activate', async () => {
+      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
+
+      const existingInactiveSystemUser = new Models.user.UserObject({
+        system_user_id: 2,
+        user_identifier: SYSTEM_IDENTITY_SOURCE.IDIR,
+        record_end_date: null,
+        role_ids: [1],
+        role_names: ['Editor']
+      });
+      
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid')
+        .resolves(existingInactiveSystemUser);
+
+      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
+
+      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
+
+      const userIdentifier = 'username';
+      const userGuid = 'aaaa';
+      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+
+      expect(result.id).to.equal(2);
+      expect(result.record_end_date).to.equal(null);
+
+      expect(getUserByGuidStub).to.have.been.calledOnce;
+      expect(addSystemUserStub).not.to.have.been.called;
+      expect(activateSystemUserStub).not.to.have.been.called;
+    });
+
+    it('gets an existing system user that is not active and does not re-activate it', async () => {
+      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
+
+      const existingSystemUser = new Models.user.UserObject({
+        system_user_id: 2,
+        user_identifier: SYSTEM_IDENTITY_SOURCE.IDIR,
+        record_end_date: '2021-11-22',
+        role_ids: [1],
+        role_names: ['Editor']
+      });
+
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid')
+        .resolves(existingSystemUser);
+
+      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
+
+      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
+
+      const userIdentifier = 'username';
+      const userGuid = 'aaaa';
+      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+
+      expect(result.id).to.equal(2);
+      expect(result.record_end_date).to.equal('2021-11-22');
+
+      expect(getUserByGuidStub).to.have.been.calledOnce;
+      expect(addSystemUserStub).not.to.have.been.called;
+      expect(activateSystemUserStub).to.not.have.been.calledOnce;
+    });
+  });
+
   describe('activateSystemUser', function () {
     afterEach(() => {
       sinon.restore();

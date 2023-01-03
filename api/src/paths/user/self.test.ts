@@ -6,6 +6,7 @@ import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { UserRepository } from '../../repositories/user-repository';
+import { UserService } from '../../services/user-service';
 // import { UserService } from '../../services/user-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
@@ -69,6 +70,28 @@ describe('getUser', () => {
     expect(mockRes.jsonValue.identity_source).to.equal('idir');
     expect(mockRes.jsonValue.role_ids).to.eql([1, 2]);
     expect(mockRes.jsonValue.role_names).to.eql(['role 1', 'role 2']);
+  });
+
+  it('should parse out user guid, identifier and identity source from the keycloak token', async () => {
+    const dbConnectionObj = getMockDBConnection({ systemUserId: () => 1 });
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+    
+    mockReq['keycloak_token'] = {
+      preferred_username: 'aaaa@idir',
+      identity_source: 'idir',
+      idir_username: 'username'
+    };
+
+    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+
+    const userServiceStub = sinon.stub(UserService.prototype, 'getOrCreateSystemUser');
+
+    const requestHandler = self.getUser();
+
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(userServiceStub).to.be.calledWith('aaaa', 'username', SYSTEM_IDENTITY_SOURCE.IDIR);
   });
 
   it('should throw an error when a failure occurs', async () => {

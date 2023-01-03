@@ -1,7 +1,27 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
-import { getUserIdentifier, getUserIdentitySource } from './keycloak-utils';
+import { getUserGuid, getUserIdentifier, getUserIdentitySource } from './keycloak-utils';
+
+describe('getUserGuid', () => {
+  it('returns null response when null keycloakToken provided', () => {
+    const response = getUserGuid(null as unknown as object);
+
+    expect(response).to.be.null;
+  });
+
+  it('returns null response when a keycloakToken is provided with a missing preferred_username field', () => {
+    const response = getUserGuid({ idir_username: 'username' });
+
+    expect(response).to.be.null;
+  });
+
+  it('returns their guid', () => {
+    const response = getUserGuid({ preferred_username: 'aaaaa@idir'});
+
+    expect(response).to.equal('aaaaa');
+  });
+});
 
 describe('getUserIdentifier', () => {
   it('returns null response when null keycloakToken provided', () => {
@@ -42,7 +62,7 @@ describe('getUserIdentitySource', () => {
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
   });
 
-  it('returns non null  esponse when valid keycloakToken provided with null preferred_username', () => {
+  it('returns non null response when valid keycloakToken provided with null preferred_username', () => {
     const response = getUserIdentitySource({ preferred_username: null });
 
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
