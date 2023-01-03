@@ -196,9 +196,7 @@ describe('UserService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => null as unknown as number });
 
       const existingSystemUser = null;
-      const getUserByGuidStub = sinon
-        .stub(UserService.prototype, 'getUserByGuid')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
       const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
@@ -225,9 +223,7 @@ describe('UserService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
 
       const existingSystemUser = null;
-      const getUserByGuidStub = sinon
-        .stub(UserService.prototype, 'getUserByGuid')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addedSystemUser = new Models.user.UserObject({ system_user_id: 2, record_end_date: null });
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser').resolves(addedSystemUser);
@@ -260,9 +256,7 @@ describe('UserService', () => {
         role_ids: [1],
         role_names: ['Editor']
       });
-      const getUserByGuidStub = sinon
-      .stub(UserService.prototype, 'getUserByGuid')
-        .resolves(existingInactiveSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingInactiveSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 
@@ -294,9 +288,7 @@ describe('UserService', () => {
         role_ids: [1],
         role_names: ['Editor']
       });
-      const getUserByGuidStub = sinon
-        .stub(UserService.prototype, 'getUserByGuid')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 

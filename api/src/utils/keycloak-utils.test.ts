@@ -10,45 +10,39 @@ describe('getUserIdentifier', () => {
     expect(response).to.be.null;
   });
 
-  it('returns null response when valid keycloakToken provided with no preferred_username', () => {
-    const response = getUserIdentifier({});
+  it('returns null response when a keycloakToken is provided with a missing username field', () => {
+    const response = getUserIdentifier({ preferred_username: 'aaaaa@idir' });
 
     expect(response).to.be.null;
   });
 
-  it('returns null response when valid keycloakToken provided with null preferred_username', () => {
-    const response = getUserIdentifier({ preferred_username: null });
+  it('returns the identifier from their IDIR username', () => {
+    const response = getUserIdentifier({ preferred_username: 'aaaaa@idir', idir_username: 'idiruser' });
 
-    expect(response).to.be.null;
+    expect(response).to.equal('idiruser');
   });
 
-  it('returns null response when valid keycloakToken provided with no username', () => {
-    const response = getUserIdentifier({ preferred_username: '@source' });
+  it('returns the identifier from their BCeID username', () => {
+    const response = getUserIdentifier({ preferred_username: 'aaaaa@idir', bceid_username: 'bceiduser' });
 
-    expect(response).to.be.null;
-  });
-
-  it('returns non null response when valid keycloakToken provided', () => {
-    const response = getUserIdentifier({ preferred_username: 'username@source' });
-
-    expect(response).to.not.be.null;
+    expect(response).to.equal('bceiduser');
   });
 });
 
 describe('getUserIdentitySource', () => {
-  it('returns non null  response when null keycloakToken provided', () => {
+  it('returns non null response when null keycloakToken provided', () => {
     const response = getUserIdentitySource(null as unknown as object);
 
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
   });
 
-  it('returns non null  response when valid keycloakToken provided with no preferred_username', () => {
+  it('returns non null response when valid keycloakToken provided with no preferred_username', () => {
     const response = getUserIdentitySource({});
 
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
   });
 
-  it('returns non null  response when valid keycloakToken provided with null preferred_username', () => {
+  it('returns non null  esponse when valid keycloakToken provided with null preferred_username', () => {
     const response = getUserIdentitySource({ preferred_username: null });
 
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.DATABASE);
@@ -66,10 +60,16 @@ describe('getUserIdentitySource', () => {
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.IDIR);
   });
 
-  it('returns non null response when valid keycloakToken provided with bceid source', () => {
-    const response = getUserIdentitySource({ preferred_username: 'username@bceid-basic-and-business' });
+  it('returns non null response when valid keycloakToken provided with bceid basic source', () => {
+    const response = getUserIdentitySource({ preferred_username: 'username@bceidbasic' });
 
     expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.BCEID_BASIC);
+  });
+
+  it('returns non null response when valid keycloakToken provided with bceid business source', () => {
+    const response = getUserIdentitySource({ preferred_username: 'username@bceidbusiness' });
+
+    expect(response).to.equal(SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS);
   });
 
   it('returns non null response when valid keycloakToken provided with database source', () => {
