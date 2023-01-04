@@ -194,7 +194,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    */
   const _open = async () => {
     if (_client || _isOpen) {
-      console.log('connection is open');
       return;
     }
 
@@ -326,15 +325,9 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    * Sets the _systemUserId if successful.
    */
   const _setUserContext = async () => {
-    console.log('**************** inside _setUserContext *********************');
     const userGuid = getUserGuid(_token);
-    console.log('now back in _setUserContext');
-
-    console.log('inside _setUserContext: - userguid:', userGuid);
 
     const userIdentitySource = getUserIdentitySource(_token);
-
-    console.log('inside _setUserContext: - userIdentitySource:', userIdentitySource);
 
     if (!userGuid || !userIdentitySource) {
       throw new ApiGeneralError('Failed to identify authenticated user');
@@ -342,8 +335,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
 
     // Set the user context for all queries made using this connection
     const setSystemUserContextSQLStatement = UserQueries.setSystemUserContextSQL(userGuid, userIdentitySource);
-
-    console.log('inside _setUserContext: setSystemUserContextSQLStatement', setSystemUserContextSQLStatement);
 
     if (!setSystemUserContextSQLStatement) {
       throw new ApiExecuteSQLError('Failed to build SQL user context statement');
@@ -356,8 +347,6 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
       );
 
       _systemUserId = response?.rows?.[0].api_set_context;
-
-      console.log('inside _setUserContext: - _systemUserId: ', _systemUserId);
     } catch (error) {
       throw new ApiExecuteSQLError('Failed to set user context', [error as object]);
     }
@@ -400,9 +389,6 @@ export const getAPIUserDBConnection = (): IDBConnection => {
  * @return {*}  {IDBConnection}
  */
 export const getServiceAccountDBConnection = (sourceSystem: SOURCE_SYSTEM): IDBConnection => {
-  console.log('source system in getServiceAccountDBConnection: ', sourceSystem);
-  console.log('preferred username for service accounts: ', `${sourceSystem}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`);
-
   return getDBConnection({
     preferred_username: `service-account-${sourceSystem}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
     identity_provider: 'system'

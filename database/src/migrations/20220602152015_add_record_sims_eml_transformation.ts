@@ -16,7 +16,7 @@ export async function up(knex: Knex): Promise<void> {
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
 
     insert into source_transform (system_user_id, version, metadata_index, metadata_transform)
-		values ((select system_user_id from system_user where user_identifier = 'service-account-sims-svc-4464'), '1.0', 'biohub_metadata', $transform$with submission as (select * from submission where submission_id = ?)
+		values ((select system_user_id from system_user where user_identifier = 'service-account-SIMS-SVC-4464'), '1.0', 'biohub_metadata', $transform$with submission as (select * from submission where submission_id = ?)
     , eml as (select jsonb_path_query(eml_json_source, '$."eml:eml"') eml from submission)
     , datasets as (select jsonb_path_query(eml, '$.**.dataset') dataset from eml)
     , projects as (select p.proj_n, 'project' project_type, p.project from datasets, jsonb_path_query_first(dataset, '$.**.project') with ordinality p(project, proj_n))

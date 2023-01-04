@@ -3,7 +3,6 @@ import qs from 'qs';
 import { ApiGeneralError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 
-
 /**
  * @TODO revise KeycloakService type definitions. See `app/src/hooks/useKeycloakWrapper`
  */
@@ -107,12 +106,6 @@ export class KeycloakService {
     const token = await this.getKeycloakToken();
 
     try {
-      console.log(token);
-      console.log(
-        `https://api.loginproxy.gov.bc.ca/api/v1/integrations/${this.keycloakIntegrationId}/${
-          this.keycloakEnvironment
-        }/user-role-mappings?${qs.stringify({ username: username })}`
-      );
       const { data } = await axios.get<{ users: KeycloakUserData[]; roles: Record<string, string>[] }>(
         `https://api.loginproxy.gov.bc.ca/api/v1/integrations/${this.keycloakIntegrationId}/${
           this.keycloakEnvironment

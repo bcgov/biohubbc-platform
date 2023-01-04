@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SOURCE_SYSTEM } from '../../../constants/database';
 import { getServiceAccountDBConnection } from '../../../database/db';
+//import { getDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
@@ -17,7 +18,7 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['sims-svc-4464']],
+          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -95,8 +96,6 @@ export function intakeDataset(): RequestHandler {
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
-    console.log('sourceSystem is: ', sourceSystem);
-
     if (!sourceSystem) {
       throw new HTTP400('Failed to identify known submission source system', [
         'token did not contain a clientId/azp or clientId/azp value is unknown'
@@ -108,8 +107,6 @@ export function intakeDataset(): RequestHandler {
     res.status(200).json({ data_package_id: dataPackageId });
 
     const connection = getServiceAccountDBConnection(sourceSystem);
-
-    console.log('got a service account db connection');
 
     try {
       await connection.open();

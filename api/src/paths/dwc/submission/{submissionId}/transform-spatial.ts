@@ -16,7 +16,7 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['service-account-sims-svc-4464']],
+          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]

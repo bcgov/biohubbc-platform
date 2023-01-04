@@ -20,7 +20,6 @@ const KEYCLOAK_CLIENT_ID = `${process.env.KEYCLOAK_CLIENT_ID}`;
  * @throws {HTTP401} if the bearer token is missing or invalid
  */
 export const authenticateRequest = async function (req: Request): Promise<true> {
-  console.log('request is:', req.headers.authorization);
   try {
     if (!req?.headers?.authorization) {
       defaultLog.warn({ label: 'authenticate', message: 'authorization headers were null or missing' });
@@ -54,7 +53,6 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
 
     // Get token header kid (key id)
     const kid = decodedToken.header && decodedToken.header.kid;
-    console.log('kid is:', kid);
 
     if (!kid) {
       defaultLog.warn({ label: 'authenticate', message: 'decoded token header kid was null' });
