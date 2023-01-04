@@ -40,6 +40,8 @@ const appDeploy = (settings) => {
     })
   );
 
+  console.log('***************** objects in app: *****************', objects);
+
   oc.applyRecommendedLabels(objects, phases[phase].name, phase, `${changeId}`, phases[phase].instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);
 
