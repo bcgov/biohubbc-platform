@@ -189,12 +189,20 @@ objects:
                   value: '5432'
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
-                - name: KEYCLOAK_CLIENT_ID
-                  value: ${KEYCLOAK_CLIENT_ID}
+                - name: KEYCLOAK_API_HOST
+                  value: ${KEYCLOAK_API_HOST}
                 - name: KEYCLOAK_REALM
                   value: ${KEYCLOAK_REALM}
+                - name: KEYCLOAK_CLIENT_ID
+                  value: ${KEYCLOAK_CLIENT_ID}
+                - name: KEYCLOAK_INTEGRATION_ID
+                  value: ${KEYCLOAK_INTEGRATION_ID}
+                - name: KEYCLOAK_ADMIN_HOST
+                  value: ${KEYCLOAK_ADMIN_HOST}
                 - name: KEYCLOAK_ADMIN_USERNAME
                   value: ${KEYCLOAK_ADMIN_USERNAME}
+                - name: KEYCLOAK_ENVIRONMENT
+                  value: ${KEYCLOAK_ENVIRONMENT}
                 - name: KEYCLOAK_ADMIN_PASSWORD
                   valueFrom:
                     secretKeyRef:
