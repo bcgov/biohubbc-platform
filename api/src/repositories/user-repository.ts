@@ -6,9 +6,9 @@ import { BaseRepository } from './base-repository';
 export interface IGetUser {
   system_user_id: number;
   user_guid: string;
-  user_identifier: number;
+  user_identifier: string;
   identity_source: string;
-  record_end_date: string;
+  record_end_date: string | null;
   role_ids: number[];
   role_names: string[];
 }

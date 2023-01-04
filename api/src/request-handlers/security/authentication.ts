@@ -73,7 +73,10 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     const signingKey = key.getPublicKey();
 
     // Verify token using public signing key
-    const verifiedToken = verify(tokenString, signingKey, { issuer: KEYCLOAK_ISSUER, audience: KEYCLOAK_CLIENT_ID });
+    const verifiedToken = verify(tokenString, signingKey, {
+      issuer: KEYCLOAK_ISSUER,
+      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464']
+    });
 
     if (!verifiedToken) {
       throw new HTTP401('Access Denied');
