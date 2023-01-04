@@ -60,7 +60,7 @@ parameters:
   - name: KEYCLOAK_INTEGRATION_ID
     description: keycloak integration id
     required: true
-    value: 4430
+    value: '4430'
   - name: KEYCLOAK_API_HOST
     description: keycloak API host
     required: true
