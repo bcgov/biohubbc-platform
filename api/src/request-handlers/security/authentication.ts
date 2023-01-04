@@ -72,6 +72,8 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     // Parse out public portion of signing key
     const signingKey = key.getPublicKey();
 
+    console.log('KEYCLOAK_CLIENT_ID: ', KEYCLOAK_CLIENT_ID);
+
     // Verify token using public signing key
     const verifiedToken = verify(tokenString, signingKey, {
       issuer: KEYCLOAK_ISSUER,
