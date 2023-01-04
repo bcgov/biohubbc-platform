@@ -60,12 +60,11 @@ parameters:
   - name: KEYCLOAK_INTEGRATION_ID
     description: keycloak integration id
     required: true
-  - name: KEYCLOAK_ENVIRONMENT
-    description: keycloak environment
-    required: true
+    value: 4430
   - name: KEYCLOAK_API_HOST
     description: keycloak API host
     required: true
+    value: 'https://api.loginproxy.gov.bc.ca/api/v1'
   - name: KEYCLOAK_CLIENT_ID
     description: Client Id for application
     required: true
@@ -210,8 +209,6 @@ objects:
                   value: ${KEYCLOAK_ADMIN_HOST}
                 - name: KEYCLOAK_ADMIN_USERNAME
                   value: ${KEYCLOAK_ADMIN_USERNAME}
-                - name: KEYCLOAK_ENVIRONMENT
-                  value: ${KEYCLOAK_ENVIRONMENT}
                 - name: KEYCLOAK_ADMIN_PASSWORD
                   valueFrom:
                     secretKeyRef:
