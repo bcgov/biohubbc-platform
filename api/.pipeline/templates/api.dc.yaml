@@ -57,6 +57,15 @@ parameters:
   - name: KEYCLOAK_REALM
     description: Realm identifier or name
     required: true
+  - name: KEYCLOAK_INTEGRATION_ID
+    description: keycloak integration id
+    required: true
+  - name: KEYCLOAK_ENVIRONMENT
+    description: keycloak environment
+    required: true
+  - name: KEYCLOAK_API_HOST
+    description: keycloak API host
+    required: true
   - name: KEYCLOAK_CLIENT_ID
     description: Client Id for application
     required: true
