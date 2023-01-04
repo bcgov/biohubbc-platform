@@ -23,6 +23,8 @@ export function authorizeRequestHandler(authorizationSchemeCallback: Authorizati
   return async (req, res, next) => {
     req['authorization_scheme'] = authorizationSchemeCallback(req);
 
+    console.log('authorization scheme is: ', req['authorization_scheme']);
+
     const isAuthorized = await authorizeRequest(req);
 
     if (!isAuthorized) {

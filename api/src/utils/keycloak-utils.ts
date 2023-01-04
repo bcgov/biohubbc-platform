@@ -10,11 +10,16 @@ import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
  * @return {*} {(string | null)}
  */
 export const getUserGuid = (keycloakToken: object): string | null => {
+  console.log('keycloakToken in getUserGuid: ', keycloakToken);
   const userIdentifier = keycloakToken?.['preferred_username']?.split('@')?.[0];
+
+  console.log('userIdentifier in getUserGuid *******************: ', userIdentifier);
 
   if (!userIdentifier) {
     return null;
   }
+
+  console.log('here');
 
   return userIdentifier;
 };
@@ -30,6 +35,8 @@ export const getUserGuid = (keycloakToken: object): string | null => {
  */
 export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
   const userIdentitySource: string = keycloakToken?.['identity_provider']?.toUpperCase();
+
+  console.log('inside getUserIdentitySource: userIdentitySource: ', userIdentitySource);
 
   // Coerce the raw keycloak token identity provider value into an system identity source enum value
   switch (userIdentitySource) {
@@ -81,14 +88,18 @@ export const getUserIdentifier = (keycloakToken: object): string | null => {
  */
 export const getKeycloakSource = (keycloakToken: object): SOURCE_SYSTEM | null => {
   const clientId = keycloakToken?.['clientId']?.toUpperCase();
+
+  console.log('clientId is: ', clientId);
   const azp = keycloakToken?.['azp']?.toUpperCase();
+  console.log('azp is: ', azp);
 
   if (!clientId && !azp) {
     return null;
   }
 
-  if ([clientId, azp].includes(SOURCE_SYSTEM['SIMS-SVC'])) {
-    return SOURCE_SYSTEM['SIMS-SVC'];
+  if ([clientId, azp].includes(SOURCE_SYSTEM['SIMS-SVC-4464'])) {
+    console.log('should return source system');
+    return SOURCE_SYSTEM['SIMS-SVC-4464'];
   }
 
   return null;

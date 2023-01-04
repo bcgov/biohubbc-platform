@@ -17,7 +17,7 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC']],
+          validServiceClientIDs: [SOURCE_SYSTEM['sims-svc-4464']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -95,6 +95,8 @@ export function intakeDataset(): RequestHandler {
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
+    console.log('sourceSystem is: ', sourceSystem);
+
     if (!sourceSystem) {
       throw new HTTP400('Failed to identify known submission source system', [
         'token did not contain a clientId/azp or clientId/azp value is unknown'
@@ -106,6 +108,8 @@ export function intakeDataset(): RequestHandler {
     res.status(200).json({ data_package_id: dataPackageId });
 
     const connection = getServiceAccountDBConnection(sourceSystem);
+
+    console.log('got a service account db connection');
 
     try {
       await connection.open();

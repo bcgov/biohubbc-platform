@@ -204,7 +204,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     }
 
     return _inferIdentitySource(userIdentitySource);
-  }, [keycloakUserDataLoader.data]);
+  }, [keycloakUserDataLoader.data, userDataLoader.data]);
 
   const systemUserId = (): number => {
     return userDataLoader.data?.id || 0;

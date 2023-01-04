@@ -20,6 +20,7 @@ const KEYCLOAK_CLIENT_ID = `${process.env.KEYCLOAK_CLIENT_ID}`;
  * @throws {HTTP401} if the bearer token is missing or invalid
  */
 export const authenticateRequest = async function (req: Request): Promise<true> {
+  console.log('request is:', req.headers.authorization);
   try {
     if (!req?.headers?.authorization) {
       defaultLog.warn({ label: 'authenticate', message: 'authorization headers were null or missing' });
@@ -53,6 +54,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
 
     // Get token header kid (key id)
     const kid = decodedToken.header && decodedToken.header.kid;
+    console.log('kid is:', kid);
 
     if (!kid) {
       defaultLog.warn({ label: 'authenticate', message: 'decoded token header kid was null' });
@@ -73,7 +75,10 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     const signingKey = key.getPublicKey();
 
     // Verify token using public signing key
-    const verifiedToken = verify(tokenString, signingKey, { issuer: KEYCLOAK_ISSUER, audience: KEYCLOAK_CLIENT_ID });
+    const verifiedToken = verify(tokenString, signingKey, {
+      issuer: KEYCLOAK_ISSUER,
+      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464']
+    });
 
     if (!verifiedToken) {
       throw new HTTP401('Access Denied');
