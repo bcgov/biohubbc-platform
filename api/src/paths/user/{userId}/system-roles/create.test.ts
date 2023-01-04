@@ -92,6 +92,8 @@ describe('getAddSystemRolesHandler', () => {
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       id: 1,
       user_identifier: 'test name',
+      user_guid: 'aaaa',
+      identity_source: 'idir',
       record_end_date: '',
       role_ids: [11, 22],
       role_names: ['role 11', 'role 22']
@@ -135,6 +137,8 @@ describe('getAddSystemRolesHandler', () => {
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       id: 1,
       user_identifier: 'test name',
+      user_guid: 'aaaa',
+      identity_source: 'idir',
       record_end_date: '',
       role_ids: [1, 2],
       role_names: ['role 1', 'role 2']
@@ -173,6 +177,8 @@ describe('getAddSystemRolesHandler', () => {
     sinon.stub(UserService.prototype, 'getUserById').resolves({
       id: 1,
       user_identifier: 'test name',
+      user_guid: 'aaaa',
+      identity_source: 'idir',
       record_end_date: '',
       role_ids: [],
       role_names: ['role 11', 'role 22']

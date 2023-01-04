@@ -408,7 +408,7 @@ describe('getSystemUserWithRoles', function () {
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
     const userObjectMock = new Models.user.UserObject();
-    sinon.stub(UserService.prototype, 'getUserByIdentifier').resolves(userObjectMock);
+    sinon.stub(UserService.prototype, 'getUserByGuid').resolves(userObjectMock);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
       keycloakToken: { preferred_username: 'userIdentifier@IDIR' }

@@ -56,19 +56,19 @@ describe('UserService', () => {
     });
   });
 
-  describe('getUserByIdentifier', function () {
+  describe('getUserByGuid', function () {
     afterEach(() => {
       sinon.restore();
     });
 
     it('returns null if the query response has no rows', async function () {
       const mockDBConnection = getMockDBConnection();
-      const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserByIdentifier');
+      const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserByGuid');
       mockUserRepository.resolves([]);
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.getUserByIdentifier('identifier');
+      const result = await userService.getUserByGuid('aaaa');
 
       expect(result).to.be.null;
       expect(mockUserRepository).to.have.been.calledOnce;
@@ -78,12 +78,12 @@ describe('UserService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockResponseRow = [{ system_user_id: 123 }];
-      const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserByIdentifier');
+      const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserByGuid');
       mockUserRepository.resolves(mockResponseRow as unknown as IGetUser[]);
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.getUserByIdentifier('identifier');
+      const result = await userService.getUserByGuid('aaaa');
 
       expect(result).to.eql(new Models.user.UserObject(mockResponseRow[0]));
       expect(mockUserRepository).to.have.been.calledOnce;
@@ -141,9 +141,10 @@ describe('UserService', () => {
       const userService = new UserService(mockDBConnection);
 
       const userIdentifier = 'username';
+      const userGuid = 'aaaa';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
 
-      const result = await userService.addSystemUser(userIdentifier, identitySource);
+      const result = await userService.addSystemUser(userGuid, userIdentifier, identitySource);
 
       expect(result).to.eql(new Models.user.UserObject(mockRowObj));
       expect(mockUserRepository).to.have.been.calledOnce;
@@ -195,26 +196,25 @@ describe('UserService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => null as unknown as number });
 
       const existingSystemUser = null;
-      const getUserByIdentifierStub = sinon
-        .stub(UserService.prototype, 'getUserByIdentifier')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
       const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
 
       const userIdentifier = 'username';
+      const userGuid = 'aaaa';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
 
       const userService = new UserService(mockDBConnection);
 
       try {
-        await userService.ensureSystemUser(userIdentifier, identitySource);
+        await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiError).message).to.equal('Failed to identify system user ID');
       }
 
-      expect(getUserByIdentifierStub).to.have.been.calledOnce;
+      expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
       expect(activateSystemUserStub).not.to.have.been.called;
     });
@@ -223,9 +223,7 @@ describe('UserService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
 
       const existingSystemUser = null;
-      const getUserByIdentifierStub = sinon
-        .stub(UserService.prototype, 'getUserByIdentifier')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addedSystemUser = new Models.user.UserObject({ system_user_id: 2, record_end_date: null });
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser').resolves(addedSystemUser);
@@ -233,16 +231,17 @@ describe('UserService', () => {
       const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
 
       const userIdentifier = 'username';
+      const userGuid = 'aaaa';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.ensureSystemUser(userIdentifier, identitySource);
+      const result = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
 
       expect(result.id).to.equal(2);
       expect(result.record_end_date).to.equal(null);
 
-      expect(getUserByIdentifierStub).to.have.been.calledOnce;
+      expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).to.have.been.calledOnce;
       expect(activateSystemUserStub).not.to.have.been.called;
     });
@@ -257,25 +256,24 @@ describe('UserService', () => {
         role_ids: [1],
         role_names: ['Editor']
       });
-      const getUserByIdentifierStub = sinon
-        .stub(UserService.prototype, 'getUserByIdentifier')
-        .resolves(existingInactiveSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingInactiveSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 
       const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
 
       const userIdentifier = 'username';
+      const userGuid = 'aaaa';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.ensureSystemUser(userIdentifier, identitySource);
+      const result = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
 
       expect(result.id).to.equal(2);
       expect(result.record_end_date).to.equal(null);
 
-      expect(getUserByIdentifierStub).to.have.been.calledOnce;
+      expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
       expect(activateSystemUserStub).not.to.have.been.called;
     });
@@ -290,9 +288,7 @@ describe('UserService', () => {
         role_ids: [1],
         role_names: ['Editor']
       });
-      const getUserByIdentifierStub = sinon
-        .stub(UserService.prototype, 'getUserByIdentifier')
-        .resolves(existingSystemUser);
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
 
       const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
 
@@ -308,19 +304,119 @@ describe('UserService', () => {
       const getUserByIdStub = sinon.stub(UserService.prototype, 'getUserById').resolves(activatedSystemUser);
 
       const userIdentifier = 'username';
+      const userGuid = 'aaaa';
       const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
 
       const userService = new UserService(mockDBConnection);
 
-      const result = await userService.ensureSystemUser(userIdentifier, identitySource);
+      const result = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
 
       expect(result.id).to.equal(2);
       expect(result.record_end_date).to.equal(null);
 
-      expect(getUserByIdentifierStub).to.have.been.calledOnce;
+      expect(getUserByGuidStub).to.have.been.calledOnce;
       expect(addSystemUserStub).not.to.have.been.called;
       expect(activateSystemUserStub).to.have.been.calledOnce;
       expect(getUserByIdStub).to.have.been.calledOnce;
+    });
+  });
+
+  describe('getOrCreateSystemUser', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('creates a new system user if one does not already exist', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const existingSystemUser = null;
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
+
+      const addedSystemUser = new Models.user.UserObject({ system_user_id: 2, record_end_date: null });
+      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser').resolves(addedSystemUser);
+
+      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
+
+      const userIdentifier = 'username';
+      const userGuid = 'aaaa';
+      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+
+      expect(result.id).to.equal(2);
+      expect(result.record_end_date).to.equal(null);
+
+      expect(getUserByGuidStub).to.have.been.calledOnce;
+      expect(addSystemUserStub).to.have.been.calledOnce;
+      expect(activateSystemUserStub).not.to.have.been.called;
+    });
+
+    it('gets an existing system user that is activate', async () => {
+      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
+
+      const existingInactiveSystemUser = new Models.user.UserObject({
+        system_user_id: 2,
+        user_identifier: SYSTEM_IDENTITY_SOURCE.IDIR,
+        record_end_date: null,
+        role_ids: [1],
+        role_names: ['Editor']
+      });
+
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingInactiveSystemUser);
+
+      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
+
+      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
+
+      const userIdentifier = 'username';
+      const userGuid = 'aaaa';
+      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+
+      expect(result.id).to.equal(2);
+      expect(result.record_end_date).to.equal(null);
+
+      expect(getUserByGuidStub).to.have.been.calledOnce;
+      expect(addSystemUserStub).not.to.have.been.called;
+      expect(activateSystemUserStub).not.to.have.been.called;
+    });
+
+    it('gets an existing system user that is not active and does not re-activate it', async () => {
+      const mockDBConnection = getMockDBConnection({ systemUserId: () => 1 });
+
+      const existingSystemUser = new Models.user.UserObject({
+        system_user_id: 2,
+        user_identifier: SYSTEM_IDENTITY_SOURCE.IDIR,
+        record_end_date: '2021-11-22',
+        role_ids: [1],
+        role_names: ['Editor']
+      });
+
+      const getUserByGuidStub = sinon.stub(UserService.prototype, 'getUserByGuid').resolves(existingSystemUser);
+
+      const addSystemUserStub = sinon.stub(UserService.prototype, 'addSystemUser');
+
+      const activateSystemUserStub = sinon.stub(UserService.prototype, 'activateSystemUser');
+
+      const userIdentifier = 'username';
+      const userGuid = 'aaaa';
+      const identitySource = SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      const userService = new UserService(mockDBConnection);
+
+      const result = await userService.getOrCreateSystemUser(userGuid, userIdentifier, identitySource);
+
+      expect(result.id).to.equal(2);
+      expect(result.record_end_date).to.equal('2021-11-22');
+
+      expect(getUserByGuidStub).to.have.been.calledOnce;
+      expect(addSystemUserStub).not.to.have.been.called;
+      expect(activateSystemUserStub).to.not.have.been.calledOnce;
     });
   });
 

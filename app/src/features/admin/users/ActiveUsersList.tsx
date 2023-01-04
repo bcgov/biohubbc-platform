@@ -289,7 +289,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
               <TableHead>
                 <TableRow>
                   <TableCell>Username</TableCell>
-                  <TableCell>GUID</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell align="center" width="100">
                     Actions
@@ -308,12 +307,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                   activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
                     <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
                       <TableCell>{row.user_identifier || 'No identifier'}</TableCell>
-                      <TableCell>
-                        <Typography sx={{ fontFamily: 'Monospace', display: 'inline' }}>
-                          {row.user_guid.substring(0, 4)}
-                        </Typography>
-                        {'\u0020\u0020\u2022\u2006\u2022\u2006\u2022\u2006'}
-                      </TableCell>
                       <TableCell>
                         <CustomMenuButton
                           buttonLabel={row.role_names.join(', ') || 'No assigned role'}
