@@ -45,19 +45,19 @@
   },
   "sso": {
     "dev": {
-      "url": "https://dev.oidc.gov.bc.ca/auth",
-      "clientId": "biohub-platform",
-      "realm": "35r1iman"
+      "url": "https://dev.loginproxy.gov.bc.ca/auth",
+      "clientId": "bio-hub-browser-4230",
+      "realm": "standard"
     },
     "test": {
-      "url": "https://test.oidc.gov.bc.ca/auth",
+      "url": "https://test.loginproxy.gov.bc.ca/auth",
       "clientId": "biohub-platform",
-      "realm": "35r1iman"
+      "realm": "standard"
     },
     "prod": {
-      "url": "https://oidc.gov.bc.ca/auth",
+      "url": "https://loginproxy.gov.bc.ca/auth",
       "clientId": "biohub-platform",
-      "realm": "35r1iman"
+      "realm": "standard"
     }
   }
 }
