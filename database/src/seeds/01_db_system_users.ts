@@ -18,12 +18,17 @@ export enum SYSTEM_USER_ROLE_ID {
 
 const systemUsers = [
   {
+    identifier: 'arosenth',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
+    user_guid: 'DFE2CC5E345E4B1E813EC1DC10852064'
+  },
+  {
     identifier: 'aagahche',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     roleId: SYSTEM_USER_ROLE_ID.SYSTEM_ADMINISTRATOR,
     user_guid: 'DF86C48FAD244498B0881AF8DBB7645F'
   },
-
   {
     identifier: 'cgarrett',
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
