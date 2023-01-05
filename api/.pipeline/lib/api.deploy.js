@@ -36,20 +36,22 @@ const apiDeploy = async (settings) => {
         ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
-        KEYCLOAK_ADMIN_USERNAME: 'biohubbc-svc',
+        KEYCLOAK_ADMIN_USERNAME: 'biohubbc-svc-4466',
         KEYCLOAK_SECRET: 'keycloak-admin-password',
         KEYCLOAK_SECRET_ADMIN_PASSWORD: 'keycloak_admin_password',
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         KEYCLOAK_HOST: phases[phase].sso.url,
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         KEYCLOAK_REALM: phases[phase].sso.realm,
+        KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
+        KEYCLOAK_ADMIN_HOST: phases[phase].sso.adminHost,
+        KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
         REPLICAS: phases[phase].replicas || 1,
         REPLICA_MAX: phases[phase].maxReplicas || 1,
         LOG_LEVEL: phases[phase].logLevel || 'info'
       }
     })
   );
-
 
   oc.applyRecommendedLabels(objects, phases[phase].name, phase, `${changeId}`, phases[phase].instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);

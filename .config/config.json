@@ -47,17 +47,29 @@
     "dev": {
       "url": "https://dev.loginproxy.gov.bc.ca/auth",
       "clientId": "bio-hub-browser-4230",
-      "realm": "standard"
+      "realm": "standard",
+      "integrationId": "4430",
+      "adminHost": "https://loginproxy.gov.bc.ca/auth",
+      "adminUserName": "biohub-svc-4466",
+      "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1"
     },
     "test": {
       "url": "https://test.loginproxy.gov.bc.ca/auth",
       "clientId": "bio-hub-browser-4230",
-      "realm": "standard"
+      "realm": "standard",
+      "integrationId": "4430",
+      "adminHost": "https://loginproxy.gov.bc.ca/auth",
+      "adminUserName": "biohub-svc-4466",
+      "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1"
     },
     "prod": {
       "url": "https://loginproxy.gov.bc.ca/auth",
       "clientId": "bio-hub-browser-4230",
-      "realm": "standard"
+      "realm": "standard",
+      "integrationId": "4430",
+      "adminHost": "https://loginproxy.gov.bc.ca/auth",
+      "adminUserName": "biohub-svc-4466",
+      "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1"
     }
   }
 }
