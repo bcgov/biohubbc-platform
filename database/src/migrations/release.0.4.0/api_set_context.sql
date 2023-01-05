@@ -17,6 +17,9 @@ $$
 -- charlie.garrettjones@quartech.com
 --                  2021-01-03  initial release
 --                  2021-04-16  adjusted to accepted defined user identity source
+-- curtis.upshall@quartech.com
+--                  2023-01-04  updated identifier to reflect user GUID instead
+--                              of user identifier
 -- *******************************************************************
 declare
   _system_user_id system_user.system_user_id%type;
