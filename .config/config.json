@@ -51,12 +51,12 @@
     },
     "test": {
       "url": "https://test.loginproxy.gov.bc.ca/auth",
-      "clientId": "biohub-platform",
+      "clientId": "bio-hub-browser-4230",
       "realm": "standard"
     },
     "prod": {
       "url": "https://loginproxy.gov.bc.ca/auth",
-      "clientId": "biohub-platform",
+      "clientId": "bio-hub-browser-4230",
       "realm": "standard"
     }
   }
