@@ -94,7 +94,7 @@ describe('db', () => {
             await connection.open();
 
             expect(getDBPoolStub).to.have.been.calledOnce;
-            //expect(connectStub).to.have.been.calledOnce;
+            expect(connectStub).to.have.been.calledOnce;
 
             const expectedSystemUserContextSQL = SQL`select api_set_context(${'testguid'}, ${
               SYSTEM_IDENTITY_SOURCE.IDIR
@@ -105,7 +105,7 @@ describe('db', () => {
               expectedSystemUserContextSQL?.values
             );
 
-            // expect(queryStub).to.have.been.calledWith('BEGIN');
+            expect(queryStub).to.have.been.calledWith('BEGIN');
           });
         });
 
@@ -402,8 +402,10 @@ describe('db', () => {
 
       getAPIUserDBConnection();
 
+      const DB_USERNAME = process.env.DB_USER_API;
+
       expect(getDBConnectionStub).to.have.been.calledWith({
-        preferred_username: 'biohub_api@database',
+        preferred_username: `${DB_USERNAME}@database`,
         identity_provider: 'database'
       });
     });
