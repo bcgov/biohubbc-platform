@@ -3,14 +3,6 @@ import qs from 'qs';
 import { ApiGeneralError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 
-type KeycloakUserData = {
-  username: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  attributes: IDIRAttributes | BCEIDBusinessAttributes;
-};
-
 type IDIRAttributes = {
   idir_user_guid: [string];
   idir_username: [string];
@@ -29,6 +21,11 @@ type BCEIDBusinessAttributes = BCEIDBasicAttributes & {
   bceid_business_name: [string];
   display_name: [string];
 };
+
+interface KeycloakGetUserResponse {
+  users: KeycloakUser[];
+  roles: Record<string, string>[]
+}
 
 export type KeycloakUser = {
   username: string;
@@ -106,14 +103,12 @@ export class KeycloakService {
     const token = await this.getKeycloakToken();
 
     try {
-      const { data } = await axios.get<{ users: KeycloakUserData[]; roles: Record<string, string>[] }>(
+      const { data } = await axios.get<KeycloakGetUserResponse>(
         `${this.keycloakApiHost}/integrations/${this.keycloakIntegrationId}/${
           this.keycloakEnvironment
-        }/user-role-mappings?${qs.stringify({ username: username })}`,
+        }/user-role-mappings?${qs.stringify({ username })}`,
         {
-          headers: {
-            authorization: `Bearer ${token}`
-          }
+          headers: { authorization: `Bearer ${token}` }
         }
       );
 
