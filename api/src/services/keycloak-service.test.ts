@@ -14,8 +14,8 @@ describe.only('KeycloakService', () => {
     process.env.KEYCLOAK_API_HOST = 'api-host';
     process.env.KEYCLOAK_ADMIN_USERNAME = 'admin';
     process.env.KEYCLOAK_ADMIN_PASSWORD = 'password';
-    process.env.KEYCLOAK_INTEGRATION_ID = '1234'
-    process.env.KEYCLOAK_ENVIRONMENT = 'test-env'
+    process.env.KEYCLOAK_INTEGRATION_ID = '1234';
+    process.env.KEYCLOAK_ENVIRONMENT = 'test-env';
   });
 
   afterEach(() => {

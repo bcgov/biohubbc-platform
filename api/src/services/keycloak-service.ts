@@ -24,7 +24,7 @@ type BCEIDBusinessAttributes = BCEIDBasicAttributes & {
 
 interface KeycloakGetUserResponse {
   users: KeycloakUser[];
-  roles: Record<string, string>[]
+  roles: Record<string, string>[];
 }
 
 export type KeycloakUser = {
