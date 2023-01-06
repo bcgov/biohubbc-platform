@@ -53,7 +53,7 @@
       "adminUserName": "biohub-svc-4466",
       "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1",
       "keycloakSecret": "keycloak-admin-password",
-      "keycloakSecretAdminPassword": "'keycloak_admin_password"
+      "keycloakSecretAdminPassword": "keycloak_admin_password"
     },
     "test": {
       "url": "https://test.loginproxy.gov.bc.ca/auth",
@@ -64,7 +64,7 @@
       "adminUserName": "biohub-svc-4466",
       "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1",
       "keycloakSecret": "keycloak-admin-password",
-      "keycloakSecretAdminPassword": "'keycloak_admin_password"
+      "keycloakSecretAdminPassword": "keycloak_admin_password"
     },
     "prod": {
       "url": "https://loginproxy.gov.bc.ca/auth",
@@ -75,7 +75,7 @@
       "adminUserName": "biohub-svc-4466",
       "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1",
       "keycloakSecret": "keycloak-admin-password",
-      "keycloakSecretAdminPassword": "'keycloak_admin_password"
+      "keycloakSecretAdminPassword": "keycloak_admin_password"
     }
   }
 }
