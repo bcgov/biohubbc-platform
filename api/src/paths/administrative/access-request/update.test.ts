@@ -71,6 +71,8 @@ describe('updateAccessRequest', () => {
     const mockSystemUser: Models.user.UserObject = {
       id: systemUserId,
       user_identifier: '',
+      user_guid: '',
+      identity_source: '',
       record_end_date: '',
       role_ids: existingRoleIds,
       role_names: []

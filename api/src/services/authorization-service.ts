@@ -2,7 +2,7 @@ import { SOURCE_SYSTEM } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { Models } from '../models';
-import { getKeycloakSource, getUserIdentifier } from '../utils/keycloak-utils';
+import { getKeycloakSource, getUserGuid } from '../utils/keycloak-utils';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
@@ -271,12 +271,12 @@ export class AuthorizationService extends DBService {
       return null;
     }
 
-    const userIdentifier = getUserIdentifier(this._keycloakToken);
+    const userGuid = getUserGuid(this._keycloakToken);
 
-    if (!userIdentifier) {
+    if (!userGuid) {
       return null;
     }
 
-    return this._userService.getUserByIdentifier(userIdentifier);
+    return this._userService.getUserByGuid(userGuid);
   }
 }

@@ -606,7 +606,7 @@ declare
 		<describes>cad7c99c-a1e7-442c-9239-1db953c83a87</describes>
 		<metadata>
 			<biohubEML>
-				<source>SIMS-SVC</source>
+				<source>SIMS-SVC-4464</source>
 				<version>1.0</version>
 			</biohubEML>
 		</metadata>
@@ -617,14 +617,14 @@ declare
 	_submission_spatial_component_id submission_spatial_component.submission_spatial_component_id%type;
 begin
   -- set security context
-  select api_set_context('SIMS-SVC', 'SYSTEM') into _system_user_id;
+  select api_set_context('SIMS-SVC-4464', 'SYSTEM') into _system_user_id;
   --select api_set_context('biohub_api', 'DATABASE') into _system_user_id;
 
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
 
 	-- source transform
 	insert into source_transform (system_user_id, version, metadata_index, metadata_transform)
-		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
+		values ((select system_user_id from system_user where user_identifier = 'service-account-sims-svc-4464'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
 	-- security transform

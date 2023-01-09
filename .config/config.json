@@ -45,19 +45,37 @@
   },
   "sso": {
     "dev": {
-      "url": "https://dev.oidc.gov.bc.ca/auth",
-      "clientId": "biohub-platform",
-      "realm": "35r1iman"
+      "url": "https://dev.loginproxy.gov.bc.ca/auth",
+      "clientId": "bio-hub-browser-4230",
+      "realm": "standard",
+      "integrationId": "4430",
+      "adminHost": "https://loginproxy.gov.bc.ca/auth",
+      "adminUserName": "biohub-svc-4466",
+      "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1",
+      "keycloakSecret": "keycloak-admin-password",
+      "keycloakSecretAdminPassword": "keycloak_admin_password"
     },
     "test": {
-      "url": "https://test.oidc.gov.bc.ca/auth",
-      "clientId": "biohub-platform",
-      "realm": "35r1iman"
+      "url": "https://test.loginproxy.gov.bc.ca/auth",
+      "clientId": "bio-hub-browser-4230",
+      "realm": "standard",
+      "integrationId": "4430",
+      "adminHost": "https://loginproxy.gov.bc.ca/auth",
+      "adminUserName": "biohub-svc-4466",
+      "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1",
+      "keycloakSecret": "keycloak-admin-password",
+      "keycloakSecretAdminPassword": "keycloak_admin_password"
     },
     "prod": {
-      "url": "https://oidc.gov.bc.ca/auth",
-      "clientId": "biohub-platform",
-      "realm": "35r1iman"
+      "url": "https://loginproxy.gov.bc.ca/auth",
+      "clientId": "bio-hub-browser-4230",
+      "realm": "standard",
+      "integrationId": "4430",
+      "adminHost": "https://loginproxy.gov.bc.ca/auth",
+      "adminUserName": "biohub-svc-4466",
+      "apiHost": "https://api.loginproxy.gov.bc.ca/api/v1",
+      "keycloakSecret": "keycloak-admin-password",
+      "keycloakSecretAdminPassword": "keycloak_admin_password"
     }
   }
 }

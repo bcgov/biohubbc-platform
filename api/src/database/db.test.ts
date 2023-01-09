@@ -60,7 +60,11 @@ describe('db', () => {
     describe('DBConnection', () => {
       const sinonSandbox = Sinon.createSandbox();
 
-      const mockKeycloakToken = { preferred_username: 'test@idir' };
+      const mockKeycloakToken = {
+        preferred_username: 'testguid@idir',
+        idir_username: 'testuser',
+        identity_provider: SYSTEM_IDENTITY_SOURCE.IDIR
+      };
 
       let queryStub: SinonStub;
       let releaseStub: SinonStub;
@@ -92,7 +96,7 @@ describe('db', () => {
             expect(getDBPoolStub).to.have.been.calledOnce;
             expect(connectStub).to.have.been.calledOnce;
 
-            const expectedSystemUserContextSQL = SQL`select api_set_context(${'test'}, ${
+            const expectedSystemUserContextSQL = SQL`select api_set_context(${'testguid'}, ${
               SYSTEM_IDENTITY_SOURCE.IDIR
             });`;
 
@@ -398,7 +402,12 @@ describe('db', () => {
 
       getAPIUserDBConnection();
 
-      expect(getDBConnectionStub).to.have.been.calledWith({ preferred_username: 'biohub_api@database' });
+      const DB_USERNAME = process.env.DB_USER_API;
+
+      expect(getDBConnectionStub).to.have.been.calledWith({
+        preferred_username: `${DB_USERNAME}@database`,
+        identity_provider: 'database'
+      });
     });
   });
 
