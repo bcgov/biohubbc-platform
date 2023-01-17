@@ -39,15 +39,23 @@ PUT.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['userIdentifier', 'identitySource', 'requestId', 'requestStatusTypeId'],
+          required: ['userGuid', 'userIdentifier', 'identitySource', 'requestId', 'requestStatusTypeId'],
           properties: {
+            userGuid: {
+              type: 'string',
+              description: 'The GUID for the user.'
+            },
             userIdentifier: {
               type: 'string',
               description: 'The user identifier for the user.'
             },
             identitySource: {
               type: 'string',
-              enum: [SYSTEM_IDENTITY_SOURCE.IDIR, SYSTEM_IDENTITY_SOURCE.BCEID]
+              enum: [
+                SYSTEM_IDENTITY_SOURCE.IDIR,
+                SYSTEM_IDENTITY_SOURCE.BCEID_BASIC,
+                SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS
+              ]
             },
             requestId: {
               type: 'number',
@@ -93,6 +101,7 @@ export function updateAccessRequest(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'updateAccessRequest', message: 'params', req_body: req.body });
 
+    const userGuid = req.body?.userGuid;
     const userIdentifier = req.body?.userIdentifier;
     const identitySource = req.body?.identitySource;
     const administrativeActivityId = Number(req.body?.requestId);
@@ -109,7 +118,7 @@ export function updateAccessRequest(): RequestHandler {
       const userService = new UserService(connection);
 
       // Get the system user (adding or activating them if they already existed).
-      const systemUserObject = await userService.ensureSystemUser(userIdentifier, identitySource);
+      const systemUserObject = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
 
       // Filter out any system roles that have already been added to the user
       const rolesIdsToAdd = roleIds.filter((roleId) => !systemUserObject.role_ids.includes(roleId));

@@ -50,7 +50,7 @@
     "formik": "~2.2.6",
     "handlebars": "^4.7.7",
     "jszip": "^3.10.1",
-    "keycloak-js": "^19.0.1",
+    "keycloak-js": "^20.0.2",
     "leaflet": "^1.8.0",
     "leaflet-draw": "~1.0.4",
     "leaflet-fullscreen": "~1.0.2",

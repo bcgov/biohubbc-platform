@@ -1235,6 +1235,7 @@ CREATE TABLE system_user(
     system_user_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     user_identity_source_id    integer           NOT NULL,
     user_identifier            varchar(200)      NOT NULL,
+    user_guid                  varchar(200)      NOT NULL,
     record_effective_date      timestamptz(6)    DEFAULT now() NOT NULL,
     record_end_date            timestamptz(6),
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,

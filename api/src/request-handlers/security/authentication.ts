@@ -8,6 +8,7 @@ const defaultLog = getLogger('request-handlers/security/authentication');
 
 const KEYCLOAK_URL = `${process.env.KEYCLOAK_HOST}/realms/${process.env.KEYCLOAK_REALM}/protocol/openid-connect/certs`;
 const KEYCLOAK_ISSUER = `${process.env.KEYCLOAK_HOST}/realms/${process.env.KEYCLOAK_REALM}`;
+const KEYCLOAK_CLIENT_ID = `${process.env.KEYCLOAK_CLIENT_ID}`;
 
 /**
  * Authenticate the request by validating the authorization bearer token (JWT).
@@ -72,7 +73,10 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     const signingKey = key.getPublicKey();
 
     // Verify token using public signing key
-    const verifiedToken = verify(tokenString, signingKey, { issuer: [KEYCLOAK_ISSUER] });
+    const verifiedToken = verify(tokenString, signingKey, {
+      issuer: KEYCLOAK_ISSUER,
+      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464']
+    });
 
     if (!verifiedToken) {
       throw new HTTP401('Access Denied');

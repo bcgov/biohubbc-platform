@@ -211,8 +211,9 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       for (const systemUser of values.systemUsers) {
         await biohubApi.admin.addSystemUser(
           systemUser.userIdentifier,
+          systemUser.userGuid,
           systemUser.identitySource,
-          systemUser.system_role
+          systemUser.systemRole
         );
       }
 
@@ -305,7 +306,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                 {activeUsers.length > 0 &&
                   activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
                     <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
-                      <TableCell>{row.user_identifier || 'No assigned role'}</TableCell>
+                      <TableCell>{row.user_identifier || 'No identifier'}</TableCell>
                       <TableCell>
                         <CustomMenuButton
                           buttonLabel={row.role_names.join(', ') || 'No assigned role'}

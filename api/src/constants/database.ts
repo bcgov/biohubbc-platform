@@ -7,7 +7,8 @@
 export enum SYSTEM_IDENTITY_SOURCE {
   DATABASE = 'DATABASE',
   IDIR = 'IDIR',
-  BCEID = 'BCEID',
+  BCEID_BASIC = 'BCEIDBASIC',
+  BCEID_BUSINESS = 'BCEIDBUSINESS',
   SYSTEM = 'SYSTEM'
 }
 
@@ -23,5 +24,5 @@ export enum SYSTEM_IDENTITY_SOURCE {
  * @enum {number}
  */
 export enum SOURCE_SYSTEM {
-  'SIMS-SVC' = 'SIMS-SVC'
+  'SIMS-SVC-4464' = 'SIMS-SVC-4464'
 }
