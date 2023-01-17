@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Tuesday, December 13, 2022 12:32:22
+-- Date Created : Tuesday, January 17, 2023 11:00:16
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -11,44 +11,44 @@
 --
 
 CREATE TABLE artifact(
-    artifact_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    submission_id             integer           NOT NULL,
-    uuid                      uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    file_name                 varchar(300)      NOT NULL,
-    file_type                 varchar(300)      NOT NULL,
-    title                     varchar(300),
-    description               varchar(250),
-    file_size                 integer,
-    modified_timestamp        timestamptz(6)    NOT NULL,
-    foi_reason_description    varchar(3000),
-    create_date               timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user               integer           NOT NULL,
-    update_date               timestamptz(6),
-    update_user               integer,
-    revision_count            integer           DEFAULT 0 NOT NULL,
+    artifact_id                  integer           NOT NULL,
+    submission_id                integer           NOT NULL,
+    uuid                         uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    file_name                    varchar(300)      NOT NULL,
+    file_type                    varchar(300)      NOT NULL,
+    title                        varchar(300),
+    description                  varchar(250),
+    file_size                    integer,
+    security_review_timestamp    timestamptz(6),
+    foi_reason_description       varchar(3000),
+    create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                  integer           NOT NULL,
+    update_date                  timestamptz(6),
+    update_user                  integer,
+    revision_count               integer           DEFAULT 0 NOT NULL,
     CONSTRAINT artifact_pk PRIMARY KEY (artifact_id)
 )
 ;
 
 
 
-COMMENT ON COLUMN artifact.artifact_id IS 'System generated surrogate primary key identifier.'
+COMMENT ON COLUMN artifact.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
 ;
 COMMENT ON COLUMN artifact.submission_id IS 'System generated surrogate primary key identifier.'
 ;
 COMMENT ON COLUMN artifact.uuid IS 'The universally unique identifier for the record.'
 ;
-COMMENT ON COLUMN artifact.file_name IS 'The name of the file attachment.'
+COMMENT ON COLUMN artifact.file_name IS 'The name of the artifact.'
 ;
-COMMENT ON COLUMN artifact.file_type IS 'The attachment type. Attachment type examples include video, audio and field data.'
+COMMENT ON COLUMN artifact.file_type IS 'The artifact type. Artifact type examples include video, audio and field data.'
 ;
-COMMENT ON COLUMN artifact.title IS 'The title of the file.'
+COMMENT ON COLUMN artifact.title IS 'The title of the artifact.'
 ;
 COMMENT ON COLUMN artifact.description IS 'The description of the record.'
 ;
-COMMENT ON COLUMN artifact.file_size IS 'The size of the file in bytes.'
+COMMENT ON COLUMN artifact.file_size IS 'The size of the artifact in bytes.'
 ;
-COMMENT ON COLUMN artifact.modified_timestamp IS 'The last modified timestamp of the file.'
+COMMENT ON COLUMN artifact.security_review_timestamp IS 'The timestamp that the security review of the submission artifact was completed.'
 ;
 COMMENT ON COLUMN artifact.foi_reason_description IS 'The description of the Freedom of Information reason for securing of the artifact.'
 ;
@@ -62,7 +62,8 @@ COMMENT ON COLUMN artifact.update_user IS 'The id of the user who updated the re
 ;
 COMMENT ON COLUMN artifact.revision_count IS 'Revision count used for concurrency control.'
 ;
-COMMENT ON TABLE artifact IS 'A list of submission artifacts.'
+COMMENT ON TABLE artifact IS 'A listing of historical data submission artifacts. The record with the most recent security review timestamp is the currently published data set for each artifact identified by UUID.
+'
 ;
 
 -- 
@@ -71,10 +72,10 @@ COMMENT ON TABLE artifact IS 'A list of submission artifacts.'
 
 CREATE TABLE artifact_government_interest(
     artifact_government_interest_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    artifact_id                        integer           NOT NULL,
     wldtaxonomic_units_id              integer           NOT NULL,
     data_type                          varchar(300),
     description                        varchar(3000),
+    artifact_id                        integer           NOT NULL,
     create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                        integer           NOT NULL,
     update_date                        timestamptz(6),
@@ -88,13 +89,13 @@ CREATE TABLE artifact_government_interest(
 
 COMMENT ON COLUMN artifact_government_interest.artifact_government_interest_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN artifact_government_interest.artifact_id IS 'System generated surrogate primary key identifier.'
-;
 COMMENT ON COLUMN artifact_government_interest.wldtaxonomic_units_id IS 'A foreign reference to the taxonomic unit id.'
 ;
 COMMENT ON COLUMN artifact_government_interest.data_type IS 'A description of the type of data that is secured.'
 ;
 COMMENT ON COLUMN artifact_government_interest.description IS 'The description of the record.'
+;
+COMMENT ON COLUMN artifact_government_interest.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
 ;
 COMMENT ON COLUMN artifact_government_interest.create_date IS 'The datetime the record was created.'
 ;
@@ -115,8 +116,8 @@ COMMENT ON TABLE artifact_government_interest IS 'An intersection table relating
 
 CREATE TABLE artifact_persecution(
     artifact_persecution_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    artifact_id                integer           NOT NULL,
     persecution_or_harm_id     integer           NOT NULL,
+    artifact_id                integer           NOT NULL,
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
     update_date                timestamptz(6),
@@ -130,9 +131,9 @@ CREATE TABLE artifact_persecution(
 
 COMMENT ON COLUMN artifact_persecution.artifact_persecution_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN artifact_persecution.artifact_id IS 'System generated surrogate primary key identifier.'
-;
 COMMENT ON COLUMN artifact_persecution.persecution_or_harm_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN artifact_persecution.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
 ;
 COMMENT ON COLUMN artifact_persecution.create_date IS 'The datetime the record was created.'
 ;
@@ -154,13 +155,13 @@ COMMENT ON TABLE artifact_persecution IS 'An intersection table defining associa
 
 CREATE TABLE artifact_proprietary(
     artifact_proprietary_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    artifact_id                integer           NOT NULL,
     proprietary_type_id        integer           NOT NULL,
     first_nations_id           integer,
     proprietor                 varchar(30),
     description                varchar(3000),
-    start_date                 date,
-    end_date                   date,
+    start_date                 timestamptz(6),
+    end_date                   timestamptz(6),
+    artifact_id                integer           NOT NULL,
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
     update_date                timestamptz(6),
@@ -174,8 +175,6 @@ CREATE TABLE artifact_proprietary(
 
 COMMENT ON COLUMN artifact_proprietary.artifact_proprietary_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN artifact_proprietary.artifact_id IS 'System generated surrogate primary key identifier.'
-;
 COMMENT ON COLUMN artifact_proprietary.proprietary_type_id IS 'System generated surrogate primary key identifier.'
 ;
 COMMENT ON COLUMN artifact_proprietary.first_nations_id IS 'A foreign reference to the first nations id.'
@@ -187,6 +186,8 @@ COMMENT ON COLUMN artifact_proprietary.description IS 'The description of the re
 COMMENT ON COLUMN artifact_proprietary.start_date IS 'The record start date.'
 ;
 COMMENT ON COLUMN artifact_proprietary.end_date IS 'The record end date.'
+;
+COMMENT ON COLUMN artifact_proprietary.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
 ;
 COMMENT ON COLUMN artifact_proprietary.create_date IS 'The datetime the record was created.'
 ;
@@ -246,8 +247,8 @@ CREATE TABLE persecution_or_harm(
     wldtaxonomic_units_id          integer,
     name                           varchar(300)      NOT NULL,
     description                    varchar(3000),
-    start_date                     date,
-    end_date                       date,
+    start_date                     timestamptz(6),
+    end_date                       timestamptz(6),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
     update_date                    timestamptz(6),
@@ -294,8 +295,8 @@ CREATE TABLE persecution_or_harm_type(
     persecution_or_harm_type_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                           varchar(100)      NOT NULL,
     description                    varchar(3000),
-    record_effective_date          date              DEFAULT now() NOT NULL,
-    record_end_date                date,
+    record_effective_date          timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date                timestamptz(6),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
     update_date                    timestamptz(6),
@@ -338,8 +339,8 @@ CREATE TABLE proprietary_type(
     proprietary_type_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                     varchar(100)      NOT NULL,
     description              varchar(3000),
-    record_effective_date    date              DEFAULT now() NOT NULL,
-    record_end_date          date,
+    record_effective_date    timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date          timestamptz(6),
     create_date              timestamptz(6)    DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
     update_date              timestamptz(6),
@@ -469,8 +470,8 @@ CREATE TABLE source_transform(
     version                  varchar(20)       NOT NULL,
     metadata_transform       text              NOT NULL,
     metadata_index           varchar(100)      NOT NULL,
-    record_effective_date    date              DEFAULT now() NOT NULL,
-    record_end_date          date,
+    record_effective_date    timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date          timestamptz(6),
     create_date              timestamptz(6)    DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
     update_date              timestamptz(6),
@@ -519,8 +520,8 @@ CREATE TABLE spatial_transform(
     description              varchar(3000),
     notes                    varchar(3000),
     transform                text              NOT NULL,
-    record_effective_date    date              DEFAULT now() NOT NULL,
-    record_end_date          date,
+    record_effective_date    timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date          timestamptz(6),
     create_date              timestamptz(6)    DEFAULT now() NOT NULL,
     create_user              integer           NOT NULL,
     update_date              timestamptz(6),
@@ -602,24 +603,14 @@ COMMENT ON TABLE spatial_transform_submission IS 'A associative entity that join
 --
 
 CREATE TABLE submission(
-    submission_id                  integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    source_transform_id            integer           NOT NULL,
-    uuid                           uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    input_key                      varchar(1000),
-    input_file_name                varchar(300),
-    eml_source                     text,
-    eml_json_source                jsonb,
-    darwin_core_source             character(10),
-    record_effective_date          date              DEFAULT now() NOT NULL,
-    record_end_date                date,
-    foi_reason_description         varchar(3000),
-    security_review_timestamp      timestamptz(6),
-    submission_security_request    jsonb,
-    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                    integer           NOT NULL,
-    update_date                    timestamptz(6),
-    update_user                    integer,
-    revision_count                 integer           DEFAULT 0 NOT NULL,
+    submission_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    source_transform_id    integer           NOT NULL,
+    uuid                   uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    create_date            timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user            integer           NOT NULL,
+    update_date            timestamptz(6),
+    update_user            integer,
+    revision_count         integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_pk PRIMARY KEY (submission_id)
 )
 ;
@@ -632,26 +623,6 @@ COMMENT ON COLUMN submission.source_transform_id IS 'System generated surrogate 
 ;
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.'
 ;
-COMMENT ON COLUMN submission.input_key IS 'The identifying key to the file in the storage system. The target is the input data file or template. For example, a custom data submission template.'
-;
-COMMENT ON COLUMN submission.input_file_name IS 'The name of the file submitted. The target is the input data file or template. For example, a custom data submission template.'
-;
-COMMENT ON COLUMN submission.eml_source IS 'The Ecological Metadata Language source as extracted from the submission.'
-;
-COMMENT ON COLUMN submission.eml_json_source IS 'The JSON representation of the Ecological Metadata Language source for the submission.'
-;
-COMMENT ON COLUMN submission.darwin_core_source IS 'The denormalized Darwin Core source as extracted from the submission.'
-;
-COMMENT ON COLUMN submission.record_effective_date IS 'Record level effective date.'
-;
-COMMENT ON COLUMN submission.record_end_date IS 'Record level end date.'
-;
-COMMENT ON COLUMN submission.foi_reason_description IS 'The description of the Freedom of Information reason for securing of the artifact. At the survey level, the description relates to all occurrences.'
-;
-COMMENT ON COLUMN submission.security_review_timestamp IS 'The datetime that the security review for the submission was completed.'
-;
-COMMENT ON COLUMN submission.submission_security_request IS 'A JSON document describing a submitters desire the secure submission data.'
-;
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.'
 ;
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.'
@@ -662,7 +633,7 @@ COMMENT ON COLUMN submission.update_user IS 'The id of the user who updated the 
 ;
 COMMENT ON COLUMN submission.revision_count IS 'Revision count used for concurrency control.'
 ;
-COMMENT ON TABLE submission IS 'Provides a historical listing of published dates and pointers to raw data versions for data submissions.'
+COMMENT ON TABLE submission IS 'Provides a listing of data submissions.'
 ;
 
 -- 
@@ -707,6 +678,51 @@ COMMENT ON COLUMN submission_government_interest.update_user IS 'The id of the u
 COMMENT ON COLUMN submission_government_interest.revision_count IS 'Revision count used for concurrency control.'
 ;
 COMMENT ON TABLE submission_government_interest IS 'An intersection table relating submissions to government interests.'
+;
+
+-- 
+-- TABLE: submission_job_queue 
+--
+
+CREATE TABLE submission_job_queue(
+    submission_job_queue_id    integer           NOT NULL,
+    submission_id              integer           NOT NULL,
+    job_start_timestamp        timestamptz(6),
+    job_end_timestamp          timestamptz(6),
+    security_request           jsonb,
+    create_date                timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                integer           NOT NULL,
+    update_date                timestamptz(6),
+    update_user                integer,
+    revision_count             integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT submission_job_queue_pk PRIMARY KEY (submission_job_queue_id)
+)
+;
+
+
+
+COMMENT ON COLUMN submission_job_queue.submission_job_queue_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.
+'
+;
+COMMENT ON COLUMN submission_job_queue.submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_job_queue.job_start_timestamp IS 'The timestamp of the job process instantiation.'
+;
+COMMENT ON COLUMN submission_job_queue.job_end_timestamp IS 'The timestamp of the job process completion.'
+;
+COMMENT ON COLUMN submission_job_queue.security_request IS 'A document supplied by the submitter outlining a security request for submission observations.'
+;
+COMMENT ON COLUMN submission_job_queue.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN submission_job_queue.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_job_queue.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN submission_job_queue.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_job_queue.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE submission_job_queue IS 'A listing of data submission job processes and their details including start and end times.'
 ;
 
 -- 
@@ -761,8 +777,8 @@ CREATE TABLE submission_message_class(
     submission_message_class_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                           varchar(50)       NOT NULL,
     description                    varchar(250),
-    record_effective_date          date              DEFAULT now() NOT NULL,
-    record_end_date                date,
+    record_effective_date          timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date                timestamptz(6),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
     update_date                    timestamptz(6),
@@ -805,8 +821,8 @@ CREATE TABLE submission_message_type(
     submission_message_type_id     integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     submission_message_class_id    integer           NOT NULL,
     name                           varchar(50)       NOT NULL,
-    record_end_date                date,
-    record_effective_date          date              DEFAULT now() NOT NULL,
+    record_end_date                timestamptz(6),
+    record_effective_date          timestamptz(6)    DEFAULT now() NOT NULL,
     description                    varchar(250),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
@@ -845,12 +861,106 @@ COMMENT ON TABLE submission_message_type IS 'The types of submission messages av
 ;
 
 -- 
+-- TABLE: submission_metadata 
+--
+
+CREATE TABLE submission_metadata(
+    submission_metadata_id        integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_id                 integer           NOT NULL,
+    eml_source                    text              NOT NULL,
+    eml_json_source               jsonb,
+    record_effective_timestamp    timestamptz(6),
+    record_end_timestamp          timestamptz(6),
+    create_date                   timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                   integer           NOT NULL,
+    update_date                   timestamptz(6),
+    update_user                   integer,
+    revision_count                integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT submission_metadata_pk PRIMARY KEY (submission_metadata_id)
+)
+;
+
+
+
+COMMENT ON COLUMN submission_metadata.submission_metadata_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_metadata.submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_metadata.eml_source IS 'The Ecological Metadata Language source as extracted from the submission.'
+;
+COMMENT ON COLUMN submission_metadata.eml_json_source IS 'The JSON representation of the Ecological Metadata Language source for the submission.'
+;
+COMMENT ON COLUMN submission_metadata.record_effective_timestamp IS 'Record level effective timestamp.'
+;
+COMMENT ON COLUMN submission_metadata.record_end_timestamp IS 'Record level end timestamp.'
+;
+COMMENT ON COLUMN submission_metadata.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN submission_metadata.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_metadata.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN submission_metadata.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_metadata.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE submission_metadata IS 'Provides a historical listing of data submission metadata.'
+;
+
+-- 
+-- TABLE: submission_observation 
+--
+
+CREATE TABLE submission_observation(
+    submission_observation_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_id                  integer           NOT NULL,
+    darwin_core_source             jsonb             NOT NULL,
+    submission_security_request    jsonb,
+    security_review_timestamp      timestamptz(6),
+    foi_reason_description         varchar(3000),
+    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                    integer           NOT NULL,
+    update_date                    timestamptz(6),
+    update_user                    integer,
+    revision_count                 integer           DEFAULT 0 NOT NULL,
+    CONSTRAINT submission_observation_pk PRIMARY KEY (submission_observation_id)
+)
+;
+
+
+
+COMMENT ON COLUMN submission_observation.submission_observation_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_observation.submission_id IS 'System generated surrogate primary key identifier.'
+;
+COMMENT ON COLUMN submission_observation.darwin_core_source IS 'The denormalized Darwin Core source as extracted from the submission.'
+;
+COMMENT ON COLUMN submission_observation.submission_security_request IS 'A JSON document describing a submitters desire the secure submission data.'
+;
+COMMENT ON COLUMN submission_observation.security_review_timestamp IS 'The timestamp of the associated event.'
+;
+COMMENT ON COLUMN submission_observation.foi_reason_description IS 'The description of the Freedom of Information reason for securing of the artifact.'
+;
+COMMENT ON COLUMN submission_observation.create_date IS 'The datetime the record was created.'
+;
+COMMENT ON COLUMN submission_observation.create_user IS 'The id of the user who created the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_observation.update_date IS 'The datetime the record was updated.'
+;
+COMMENT ON COLUMN submission_observation.update_user IS 'The id of the user who updated the record as identified in the system user table.'
+;
+COMMENT ON COLUMN submission_observation.revision_count IS 'Revision count used for concurrency control.'
+;
+COMMENT ON TABLE submission_observation IS 'A listing of historical data submission observation data. The record with the most recent security review timestamp is the currently published data set for each submission.'
+;
+
+-- 
 -- TABLE: submission_spatial_component 
 --
 
 CREATE TABLE submission_spatial_component(
     submission_spatial_component_id    integer                     GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    submission_id                      integer                     NOT NULL,
+    submission_observation_id          integer                     NOT NULL,
     spatial_component                  jsonb                       NOT NULL,
     geometry                           geometry(geometry, 3005),
     geography                          geography(geometry),
@@ -870,7 +980,7 @@ CREATE TABLE submission_spatial_component(
 
 COMMENT ON COLUMN submission_spatial_component.submission_spatial_component_id IS 'System generated surrogate primary key identifier.'
 ;
-COMMENT ON COLUMN submission_spatial_component.submission_id IS 'System generated surrogate primary key identifier.'
+COMMENT ON COLUMN submission_spatial_component.submission_observation_id IS 'System generated surrogate primary key identifier.'
 ;
 COMMENT ON COLUMN submission_spatial_component.spatial_component IS 'A spatial component is a JSON attribute representation of a viewable map object.'
 ;
@@ -946,8 +1056,8 @@ CREATE TABLE submission_status_type(
     submission_status_type_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                         varchar(50)       NOT NULL,
     description                  varchar(250),
-    record_effective_date        date              DEFAULT now() NOT NULL,
-    record_end_date              date,
+    record_effective_date        timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date              timestamptz(6),
     create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                  integer           NOT NULL,
     update_date                  timestamptz(6),
@@ -1077,8 +1187,8 @@ COMMENT ON TABLE system_metadata_constant IS 'A list of system metadata constant
 CREATE TABLE system_role(
     system_role_id           integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                     varchar(50)       NOT NULL,
-    record_effective_date    date              DEFAULT now() NOT NULL,
-    record_end_date          date,
+    record_effective_date    timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date          timestamptz(6),
     description              varchar(250)      NOT NULL,
     notes                    varchar(3000),
     create_date              timestamptz(6)    DEFAULT now() NOT NULL,
@@ -1125,8 +1235,8 @@ CREATE TABLE system_user(
     system_user_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     user_identity_source_id    integer           NOT NULL,
     user_identifier            varchar(200)      NOT NULL,
-    record_effective_date      date              DEFAULT now() NOT NULL,
-    record_end_date            date,
+    record_effective_date      timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date            timestamptz(6),
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
     update_date                timestamptz(6),
@@ -1207,8 +1317,8 @@ CREATE TABLE system_user_security_exception(
     system_user_security_exception_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     system_user_id                       integer           NOT NULL,
     persecution_or_harm_id               integer           NOT NULL,
-    start_date                           date,
-    end_date                             date,
+    start_date                           timestamptz(6),
+    end_date                             timestamptz(6),
     notes                                varchar(3000),
     create_date                          timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                          integer           NOT NULL,
@@ -1253,8 +1363,8 @@ COMMENT ON TABLE system_user_security_exception IS 'Identifies persecution or ha
 CREATE TABLE user_identity_source(
     user_identity_source_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     name                       varchar(50)       NOT NULL,
-    record_effective_date      date              DEFAULT now() NOT NULL,
-    record_end_date            date,
+    record_effective_date      timestamptz(6)    DEFAULT now() NOT NULL,
+    record_end_date            timestamptz(6),
     description                varchar(250),
     notes                      varchar(3000),
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
@@ -1294,22 +1404,10 @@ COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. Thi
 ;
 
 -- 
--- INDEX: artifact_uk1 
---
-
-CREATE UNIQUE INDEX artifact_uk1 ON artifact(submission_id, uuid)
-;
--- 
 -- INDEX: "Ref165191" 
 --
 
 CREATE INDEX "Ref165191" ON artifact(submission_id)
-;
--- 
--- INDEX: artifact_government_interest_uk1 
---
-
-CREATE UNIQUE INDEX artifact_government_interest_uk1 ON artifact_government_interest(artifact_id)
 ;
 -- 
 -- INDEX: "Ref228199" 
@@ -1321,7 +1419,7 @@ CREATE INDEX "Ref228199" ON artifact_government_interest(artifact_id)
 -- INDEX: artifact_persecution_uk1 
 --
 
-CREATE UNIQUE INDEX artifact_persecution_uk1 ON artifact_persecution(artifact_id, persecution_or_harm_id)
+CREATE UNIQUE INDEX artifact_persecution_uk1 ON artifact_persecution(persecution_or_harm_id)
 ;
 -- 
 -- INDEX: "Ref228195" 
@@ -1363,13 +1461,13 @@ CREATE INDEX "Ref252201" ON persecution_or_harm(persecution_or_harm_type_id)
 -- INDEX: persecution_or_harm_type_nuk1 
 --
 
-CREATE UNIQUE INDEX persecution_or_harm_type_nuk1 ON persecution_or_harm_type(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX persecution_or_harm_type_nuk1 ON persecution_or_harm_type(name, record_end_date)
 ;
 -- 
 -- INDEX: proprietary_type_nuk1 
 --
 
-CREATE UNIQUE INDEX proprietary_type_nuk1 ON proprietary_type(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX proprietary_type_nuk1 ON proprietary_type(name, record_end_date)
 ;
 -- 
 -- INDEX: security_transform_uk1 
@@ -1405,7 +1503,7 @@ CREATE INDEX "Ref218187" ON security_transform_submission(security_transform_id)
 -- INDEX: source_transform_nuk1 
 --
 
-CREATE UNIQUE INDEX source_transform_nuk1 ON source_transform(system_user_id, version, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX source_transform_nuk1 ON source_transform(system_user_id, version, record_end_date)
 ;
 -- 
 -- INDEX: "Ref191183" 
@@ -1417,7 +1515,7 @@ CREATE INDEX "Ref191183" ON source_transform(system_user_id)
 -- INDEX: spatial_transform_nuk1 
 --
 
-CREATE UNIQUE INDEX spatial_transform_nuk1 ON spatial_transform(name, record_effective_date)
+CREATE UNIQUE INDEX spatial_transform_nuk1 ON spatial_transform(name, record_end_date)
 ;
 -- 
 -- INDEX: spatial_transform_submission_uk1 
@@ -1438,10 +1536,10 @@ CREATE INDEX "Ref207184" ON spatial_transform_submission(spatial_transform_id)
 CREATE INDEX "Ref169185" ON spatial_transform_submission(submission_spatial_component_id)
 ;
 -- 
--- INDEX: submission_nuk1 
+-- INDEX: submission_uk1 
 --
 
-CREATE UNIQUE INDEX submission_nuk1 ON submission(uuid, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX submission_uk1 ON submission(uuid)
 ;
 -- 
 -- INDEX: "Ref199182" 
@@ -1462,6 +1560,12 @@ CREATE UNIQUE INDEX submission_government_interest_uk1 ON submission_government_
 CREATE INDEX "Ref165198" ON submission_government_interest(submission_id)
 ;
 -- 
+-- INDEX: "Ref165208" 
+--
+
+CREATE INDEX "Ref165208" ON submission_job_queue(submission_id)
+;
+-- 
 -- INDEX: "Ref184166" 
 --
 
@@ -1477,13 +1581,13 @@ CREATE INDEX "Ref182167" ON submission_message(submission_message_type_id)
 -- INDEX: submission_message_class_nuk1 
 --
 
-CREATE UNIQUE INDEX submission_message_class_nuk1 ON submission_message_class(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX submission_message_class_nuk1 ON submission_message_class(name, record_end_date)
 ;
 -- 
 -- INDEX: submission_message_type_nuk1 
 --
 
-CREATE UNIQUE INDEX submission_message_type_nuk1 ON submission_message_type(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX submission_message_type_nuk1 ON submission_message_type(name, record_end_date)
 ;
 -- 
 -- INDEX: "Ref189177" 
@@ -1492,10 +1596,28 @@ CREATE UNIQUE INDEX submission_message_type_nuk1 ON submission_message_type(name
 CREATE INDEX "Ref189177" ON submission_message_type(submission_message_class_id)
 ;
 -- 
--- INDEX: "Ref165161" 
+-- INDEX: submission_metadata_nuk1 
 --
 
-CREATE INDEX "Ref165161" ON submission_spatial_component(submission_id)
+CREATE UNIQUE INDEX submission_metadata_nuk1 ON submission_metadata(submission_id, record_end_timestamp)
+;
+-- 
+-- INDEX: "Ref165207" 
+--
+
+CREATE INDEX "Ref165207" ON submission_metadata(submission_id)
+;
+-- 
+-- INDEX: "Ref165205" 
+--
+
+CREATE INDEX "Ref165205" ON submission_observation(submission_id)
+;
+-- 
+-- INDEX: "Ref255206" 
+--
+
+CREATE INDEX "Ref255206" ON submission_spatial_component(submission_observation_id)
 ;
 -- 
 -- INDEX: "Ref165163" 
@@ -1513,7 +1635,7 @@ CREATE INDEX "Ref183164" ON submission_status(submission_status_type_id)
 -- INDEX: submission_status_type_nuk1 
 --
 
-CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX submission_status_type_nuk1 ON submission_status_type(name, record_end_date)
 ;
 -- 
 -- INDEX: system_constant_uk1 
@@ -1531,13 +1653,13 @@ CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(con
 -- INDEX: system_role_nuk1 
 --
 
-CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, record_end_date)
 ;
 -- 
 -- INDEX: system_user_nuk1 
 --
 
-CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, record_end_date)
 ;
 -- 
 -- INDEX: "Ref190178" 
@@ -1585,7 +1707,7 @@ CREATE INDEX "Ref254204" ON system_user_security_exception(persecution_or_harm_i
 -- INDEX: user_identity_source_nuk1 
 --
 
-CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null
+CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, record_end_date)
 ;
 -- 
 -- TABLE: artifact 
@@ -1718,6 +1840,16 @@ ALTER TABLE submission_government_interest ADD CONSTRAINT "Refsubmission198"
 
 
 -- 
+-- TABLE: submission_job_queue 
+--
+
+ALTER TABLE submission_job_queue ADD CONSTRAINT "Refsubmission208" 
+    FOREIGN KEY (submission_id)
+    REFERENCES submission(submission_id)
+;
+
+
+-- 
 -- TABLE: submission_message 
 --
 
@@ -1743,12 +1875,32 @@ ALTER TABLE submission_message_type ADD CONSTRAINT "Refsubmission_message_class1
 
 
 -- 
+-- TABLE: submission_metadata 
+--
+
+ALTER TABLE submission_metadata ADD CONSTRAINT "Refsubmission207" 
+    FOREIGN KEY (submission_id)
+    REFERENCES submission(submission_id)
+;
+
+
+-- 
+-- TABLE: submission_observation 
+--
+
+ALTER TABLE submission_observation ADD CONSTRAINT "Refsubmission205" 
+    FOREIGN KEY (submission_id)
+    REFERENCES submission(submission_id)
+;
+
+
+-- 
 -- TABLE: submission_spatial_component 
 --
 
-ALTER TABLE submission_spatial_component ADD CONSTRAINT "Refsubmission161" 
-    FOREIGN KEY (submission_id)
-    REFERENCES submission(submission_id)
+ALTER TABLE submission_spatial_component ADD CONSTRAINT "Refsubmission_observation206" 
+    FOREIGN KEY (submission_observation_id)
+    REFERENCES submission_observation(submission_observation_id)
 ;
 
 

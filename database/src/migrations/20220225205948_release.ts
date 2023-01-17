@@ -5,7 +5,7 @@ import path from 'path';
 const DB_USER_API_PASS = process.env.DB_USER_API_PASS;
 const DB_USER_API = process.env.DB_USER_API;
 
-const DB_RELEASE = 'release.0.6.0';
+const DB_RELEASE = 'release.0.7.0';
 
 /**
  * Apply biohub-platform release changes.
@@ -39,6 +39,7 @@ export async function up(knex: Knex): Promise<void> {
   const api_get_system_metadata_constant = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'api_get_system_metadata_constant.sql')
   );
+  const create_sequences = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'create_sequences.sql'));
 
   const populate_system_constants = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_constant.sql'));
   const populate_system_role = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_role.sql'));
@@ -103,6 +104,7 @@ export async function up(knex: Knex): Promise<void> {
     ${tr_generated_journal_triggers}
     ${api_get_system_constant}
     ${api_get_system_metadata_constant}
+    ${create_sequences}
 
     -- populate look up tables
     set search_path = biohub, public;

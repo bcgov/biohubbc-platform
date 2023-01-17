@@ -53,6 +53,7 @@ alter role biohub_api set search_path to biohub_dapi_v1, biohub, public, topolog
 \i tr_generated_journal_triggers.sql
 \i api_get_system_constant.sql
 \i api_get_system_metadata_constant.sql
+\i create_sequences.sql
 
 -- populate look up tables
 \i populate_system_constant.sql

@@ -12,9 +12,12 @@
  create or replace view spatial_transform_submission as select * from biohub.spatial_transform_submission;
  create or replace view submission as select * from biohub.submission;
  create or replace view submission_government_interest as select * from biohub.submission_government_interest;
+ create or replace view submission_job_queue as select * from biohub.submission_job_queue;
  create or replace view submission_message as select * from biohub.submission_message;
  create or replace view submission_message_class as select * from biohub.submission_message_class;
  create or replace view submission_message_type as select * from biohub.submission_message_type;
+ create or replace view submission_metadata as select * from biohub.submission_metadata;
+ create or replace view submission_observation as select * from biohub.submission_observation;
  create or replace view submission_spatial_component as select * from biohub.submission_spatial_component;
  create or replace view submission_status as select * from biohub.submission_status;
  create or replace view submission_status_type as select * from biohub.submission_status_type;
