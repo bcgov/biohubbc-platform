@@ -10,13 +10,13 @@ declare
   _system_user system_user%rowtype;
   _system_user_id system_user.system_user_id%type;
 begin
-  select * into _system_user from system_user where user_identifier = 'myIDIR';
+  select * into _system_user from system_user where user_guid = 'myIDIR';
   if _system_user.system_user_id is not null then
     delete from system_user_role where system_user_id = _system_user.system_user_id;
     delete from system_user where system_user_id = _system_user.system_user_id;
   end if;
 
-  insert into system_user (user_identity_source_id, user_identifier, record_effective_date) values ((select user_identity_source_id from user_identity_source where name = 'IDIR' and record_end_date is null), 'myIDIR', now()) returning system_user_id into _system_user_id;
+  insert into system_user (user_identity_source_id, user_guid, user_identifier, record_effective_date) values ((select user_identity_source_id from user_identity_source where name = 'IDIR' and record_end_date is null), 'myIDIR', 'myIDIR',now()) returning system_user_id into _system_user_id;
   insert into system_user_role (system_user_id, system_role_id) values (_system_user_id, (select system_role_id from system_role where name =  'System Administrator'));
 
   select count(1) into _count from system_user;
@@ -617,7 +617,7 @@ declare
 	_persecution_or_harm_id persecution_or_harm.persecution_or_harm_id%type;
 begin
   -- set security context
-  select api_set_context('SIMS-SVC', 'SYSTEM') into _system_user_id;
+  select api_set_context('myIDIR', 'IDIR') into _system_user_id;
   --select api_set_context('biohub_api', 'DATABASE') into _system_user_id;
 	select persecution_or_harm_id into _persecution_or_harm_id from persecution_or_harm where name = 'Big Brown Bat winter hibernation sites and maternity roosts';
 
@@ -625,13 +625,13 @@ begin
 
 	-- source transform
 	insert into source_transform (system_user_id, version, metadata_index, metadata_transform) 
-		values ((select system_user_id from system_user where user_identifier = 'SIMS-SVC'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
+		values ((select system_user_id from system_user where user_guid = 'myIDIR'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
 	-- security transform
 	insert into security_transform (persecution_or_harm_id, name, transform) values (_persecution_or_harm_id, 'test security transform', 'select * from submission') returning security_transform_id into _security_transform_id;
 	-- test system user
-	insert into system_user (user_identity_source_id, user_identifier, record_effective_date) values((select user_identity_source_id from user_identity_source where name = 'IDIR'), 'CHUCK', now());
+	insert into system_user (user_identity_source_id, user_guid, user_identifier, record_effective_date) values((select user_identity_source_id from user_identity_source where name = 'IDIR'), 'CHUCK', 'CHUCK', now());
 
   -- submission 1
   insert into submission (source_transform_id, uuid) values (_source_transform_id, 'cc688fda-5460-4057-b6cc-ce237c78e422') returning submission_id into _submission_id;
@@ -645,7 +645,7 @@ begin
 	-- xrefs
 	insert into spatial_transform_submission (spatial_transform_id, submission_spatial_component_id) values (_spatial_transform_id, _submission_spatial_component_id);
 	insert into security_transform_submission (submission_spatial_component_id, security_transform_id) values (_submission_spatial_component_id, _security_transform_id);
-	insert into system_user_security_exception (persecution_or_harm_id, system_user_id) values (_persecution_or_harm_id, (select system_user_id from system_user where user_identifier = 'CHUCK'));
+	insert into system_user_security_exception (persecution_or_harm_id, system_user_id) values (_persecution_or_harm_id, (select system_user_id from system_user where user_guid = 'CHUCK'));
 	insert into submission_job_queue (submission_job_queue_id, submission_id) values ((select nextval('submission_job_queue_seq')), _submission_id);
 	insert into artifact (artifact_id, submission_id, uuid, file_name, file_type) values ((select nextval('artifact_seq')), _submission_id, '34ae204d-a2fd-4fed-aa80-521d7e266f36', 'test.pdf', 'pdf');
 
