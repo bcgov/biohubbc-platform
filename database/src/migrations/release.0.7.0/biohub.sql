@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Tuesday, January 17, 2023 11:00:16
+-- Date Created : Thursday, January 19, 2023 12:27:27
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -918,6 +918,8 @@ CREATE TABLE submission_observation(
     submission_security_request    jsonb,
     security_review_timestamp      timestamptz(6),
     foi_reason_description         varchar(3000),
+    record_effective_timestamp     timestamptz(6),
+    record_end_timestamp           timestamptz(6),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
     update_date                    timestamptz(6),
@@ -940,6 +942,10 @@ COMMENT ON COLUMN submission_observation.submission_security_request IS 'A JSON 
 COMMENT ON COLUMN submission_observation.security_review_timestamp IS 'The timestamp of the associated event.'
 ;
 COMMENT ON COLUMN submission_observation.foi_reason_description IS 'The description of the Freedom of Information reason for securing of the artifact.'
+;
+COMMENT ON COLUMN submission_observation.record_effective_timestamp IS 'Record level effective timestamp.'
+;
+COMMENT ON COLUMN submission_observation.record_end_timestamp IS 'Record level end timestamp.'
 ;
 COMMENT ON COLUMN submission_observation.create_date IS 'The datetime the record was created.'
 ;
