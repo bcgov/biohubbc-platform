@@ -1,11 +1,17 @@
 import { XMLParser } from 'fast-xml-parser';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import {
+  ISubmissionJobQueue,
+  ISubmissionMetadataRecord,
+  SUBMISSION_MESSAGE_TYPE,
+  SUBMISSION_STATUS_TYPE
+} from '../repositories/submission-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
@@ -55,6 +61,34 @@ export class DarwinCoreService extends DBService {
     }
 
     return this.create(file, dataPackageId);
+  }
+
+  async intakeJob(intakeRecord: ISubmissionJobQueue): Promise<void> {
+    const submissionMetadata: ISubmissionMetadataRecord = {
+      submission_id: intakeRecord.submission_id,
+      eml_source: '',
+      eml_json_source: '',
+      record_effective_timestamp: null,
+      record_end_timestamp: null
+    };
+
+    await this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
+
+    const file = await this.getSubmissionRecordAndConvertToDWCArchive(intakeRecord.submission_job_queue_id);
+
+    if (file.eml) {
+      await this.submissionService.updateSubmissionRecordEMLSource(intakeRecord.submission_id, file.eml);
+
+      const jsonData = await this.convertSubmissionEMLtoJSON_V2(file.eml);
+
+      await this.submissionService.updateSubmissionRecordEMLJSONSource(
+        intakeRecord.submission_id,
+        JSON.stringify(jsonData)
+      );
+
+      await this.submissionService
+
+    }
   }
 
   /**
@@ -398,8 +432,9 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<DWCArchive>}
    * @memberof DarwinCoreService
    */
-  async getSubmissionRecordAndConvertToDWCArchive(submissionId: number): Promise<DWCArchive> {
-    const file = await this.submissionService.getIntakeFileFromS3(submissionId);
+  async getSubmissionRecordAndConvertToDWCArchive(submissionJobQueueId: number): Promise<DWCArchive> {
+    const fileLocation = `/UUID/DwCA/${submissionJobQueueId}`;
+    const file = await this.submissionService.getIntakeFileFromS3(fileLocation);
 
     if (!file) {
       throw new ApiGeneralError('The source file is not available');
@@ -483,6 +518,25 @@ export class DarwinCoreService extends DBService {
 
       return eml_json_source;
     }
+  }
+
+  //TODO: fix return type and name
+  convertSubmissionEMLtoJSON_V2(file: EMLFile): any {
+    const options = {
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_',
+      parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
+        const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
+        if (tagsArray.includes(tagName)) return true;
+        return false;
+      }
+    };
+    const parser = new XMLParser(options);
+    const eml_json_source = parser.parse(file.emlFile.buffer.toString() as string);
+
+    return eml_json_source;
   }
 
   /**

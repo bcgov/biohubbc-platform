@@ -5,6 +5,8 @@ import {
   IInsertSubmissionRecord,
   ISearchSubmissionCriteria,
   ISourceTransformModel,
+  ISubmissionJobQueue,
+  ISubmissionMetadataRecord,
   ISubmissionModel,
   ISubmissionModelWithStatus,
   ISubmissionRecordWithSpatial,
@@ -256,21 +258,12 @@ export class SubmissionService extends DBService {
   /**
    * Returns Intake file from S3
    *
-   * @param {number} submissionId
+   * @param {string} s3FileLocation
    * @return {*}  {Promise<GetObjectOutput>}
    * @memberof SubmissionService
    */
-  async getIntakeFileFromS3(submissionId: number): Promise<GetObjectOutput> {
-    const transformRecord = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
-
-    if (!transformRecord.input_key) {
-      throw new ApiGeneralError('Failed to retrieve input file name', [
-        'SubmissionRepository->getInputFileNameKey',
-        'input file name was null'
-      ]);
-    }
-
-    return this.getFileFromS3(transformRecord.input_key);
+  async getIntakeFileFromS3(s3FileLocation: string): Promise<GetObjectOutput> {
+    return this.getFileFromS3(s3FileLocation);
   }
 
   /**
@@ -381,5 +374,15 @@ export class SubmissionService extends DBService {
       source: submissionEMLJSON,
       observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
     };
+  }
+
+  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
+    return this.submissionRepository.getSubmissionJobQueue(submissionId);
+  }
+
+  async insertSubmissionMetadataRecord(
+    submissonMetadata: ISubmissionMetadataRecord
+  ): Promise<{ submission_metadata_id: number }> {
+    return this.submissionRepository.insertSubmissionMetadataRecord(submissonMetadata);
   }
 }
