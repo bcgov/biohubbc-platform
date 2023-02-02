@@ -13,10 +13,8 @@ WORKDIR $HOME
 # Copy the package files only
 COPY package*.json ./
 
-# Install packages
+# Install packages with legacy-peer-deps enabled. See good explanation of why here: https://stackoverflow.com/a/66620869/3461093
 RUN npm install --legacy-peer-deps
-
-# ENV PATH ${HOME}/node_modules/.bin/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
 
 # Copy the rest of the files
 COPY . .

@@ -19,21 +19,17 @@ COPY ./package*.json ./
 
 RUN npm install
 
-# ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.npm-global/bin/:${HOME}/bin:${HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
 # Copy the rest of the files
 COPY . .
-
-# Cleaning any existing generated file
-RUN rm -rf ./dist
 
 # Build api
 RUN npm run build
 
-# Application VOLUME
-# VOLUME ${HOME}
+RUN rm -rf !dist
+
+RUN mv dist/* .
 
 EXPOSE 6100
 
 # Application Entry point
-CMD ["npm", "run", "start"]
+CMD ["node", "start"]

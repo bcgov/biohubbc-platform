@@ -11,7 +11,9 @@
   "scripts": {
     "start": "ts-node src/app",
     "clean": "gulp clean",
-    "build": "gulp build",
+    "prebuild": "rm -rf ./dist",
+    "build": "npx tsc -p tsconfig.build.json",
+    "deploy_start": "node ./dist/app",
     "start-reload": "./node_modules/.bin/nodemon src/app.ts --exec ts-node",
     "migrate-latest": "knex migrate-latest",
     "migrate-rollback": "knex migrate-rollback",

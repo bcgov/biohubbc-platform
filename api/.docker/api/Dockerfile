@@ -16,8 +16,6 @@ COPY package*.json ./
 # Install packages
 RUN npm install
 
-# ENV PATH ${HOME}/node_modules/.bin/:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
-
 # Copy the rest of the files
 COPY . .
 

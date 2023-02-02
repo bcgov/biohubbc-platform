@@ -36,6 +36,18 @@ geoserver: | build-geoserver run-geoserver ## Performs all commands necessary to
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
+build-api: ## Builds all backend containers
+	@echo "==============================================="
+	@echo "Make: build-backend - building backend images"
+	@echo "==============================================="
+	@docker-compose -f docker-compose.yml build api
+
+run-api: ## Runs all backend containers
+	@echo "==============================================="
+	@echo "Make: run-backend - running backend images"
+	@echo "==============================================="
+	@docker-compose -f docker-compose.yml up api
+
 ## ------------------------------------------------------------------------------
 ## Setup/Cleanup Commands
 ## ------------------------------------------------------------------------------
@@ -259,6 +271,7 @@ install: ## Runs `npm install` for all projects
 	@cd api && npm install && cd ..
 	@echo "==============================================="
 	@echo "Running /app install --legacy-peer-deps"
+	@echo "Install packages with legacy-peer-deps enabled. See good explanation of why here: https://stackoverflow.com/a/66620869/3461093"
 	@echo "==============================================="
 	@cd app && npm install --legacy-peer-deps && cd ..
 	@echo "==============================================="

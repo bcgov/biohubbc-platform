@@ -30,9 +30,9 @@ objects:
           ref: ${GIT_REF}
           uri: ${GIT_REPO_URL}
         contextDir: ${SOURCE_CONTEXT_DIR}
-        secrets:
+        secrets:  
         - secret:
-            name: etc-pki-entitlement
+            name: platform-services-controlled-etc-pki-entitlement
           destinationDir: etc-pki-entitlement
         configMaps:
         - configMap:
@@ -100,7 +100,7 @@ parameters:
     displayName: Source Context Directory
     description: The source context directory.
     required: false
-    value: containers/postgres12-postgis31
+    value: Containers/postgres12-postgis31
   - name: OUTPUT_IMAGE_TAG
     displayName: Output Image Tag
     description: The tag given to the built image.
