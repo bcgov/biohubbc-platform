@@ -53,6 +53,7 @@ alter role biohub_api set search_path to biohub_dapi_v1, biohub, public, topolog
 \i tr_generated_journal_triggers.sql
 \i api_get_system_constant.sql
 \i api_get_system_metadata_constant.sql
+\i create_sequences.sql
 
 -- populate look up tables
 \i populate_system_constant.sql
@@ -61,6 +62,9 @@ alter role biohub_api set search_path to biohub_dapi_v1, biohub, public, topolog
 \i populate_submission_status_type.sql
 \i populate_submission_message_class.sql
 \i populate_submission_message_type.sql
+\i populate_proprietary_type.sql
+\i populate_persecution_or_harm_type.sql
+\i populate_persecution_or_harm.sql
 
 -- create the views
 set search_path = biohub_dapi_v1;

@@ -4,20 +4,19 @@
 set role postgres;
 set search_path=biohub;
 
-/**
 do $$
 declare
   _count integer = 0;
   _system_user system_user%rowtype;
   _system_user_id system_user.system_user_id%type;
 begin
-  select * into _system_user from system_user where user_identifier = 'myIDIR';
+  select * into _system_user from system_user where user_guid = 'myIDIR';
   if _system_user.system_user_id is not null then
     delete from system_user_role where system_user_id = _system_user.system_user_id;
     delete from system_user where system_user_id = _system_user.system_user_id;
   end if;
 
-  insert into system_user (user_identity_source_id, user_identifier, record_effective_date) values ((select user_identity_source_id from user_identity_source where name = 'IDIR' and record_end_date is null), 'myIDIR', now()) returning system_user_id into _system_user_id;
+  insert into system_user (user_identity_source_id, user_guid, user_identifier, record_effective_date) values ((select user_identity_source_id from user_identity_source where name = 'IDIR' and record_end_date is null), 'myIDIR', 'myIDIR',now()) returning system_user_id into _system_user_id;
   insert into system_user_role (system_user_id, system_role_id) values (_system_user_id, (select system_role_id from system_role where name =  'System Administrator'));
 
   select count(1) into _count from system_user;
@@ -31,7 +30,6 @@ begin
   raise notice 'smoketest_release(1): PASS';
 end
 $$;
-**/
 
 set role biohub_api;
 set search_path to biohub_dapi_v1, biohub, public, topology;
@@ -40,10 +38,11 @@ declare
   _count integer = 0;
   _system_user_id system_user.system_user_id%type;
   _submission_id submission.submission_id%type;
+	_submission_observation_id submission_observation.submission_observation_id%type;
   _submission_status_id submission_status.submission_status_id%type;
   _geography submission_spatial_component.geography%type;
   _source_transform_id source_transform.source_transform_id%type;
-  _eml_source submission.eml_source%type = '<?xml version="1.0" encoding="UTF-8"?>
+  _eml_source submission_metadata.eml_source%type = '<?xml version="1.0" encoding="UTF-8"?>
 <eml:eml packageId="urn:uuid:cad7c99c-a1e7-442c-9239-1db953c83a87" system="https://biohub.gov.bc.ca"
 	xmlns:eml="https://eml.ecoinformatics.org/eml-2.2.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -238,7 +237,7 @@ declare
 				<abstract>
 					<section>
 						<title>Objectives</title>
-						<para>With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn’t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.</para>
+						<para>With traditional stop word schemes, you must first create a list of stop words. Every domain is unique when it comes to stop words: there are no pre-made stop word lists on the internet. As an example, consider the word video. For most businesses, video is an important word – it shouldn''t be removed. But if you are Youtube, video is probably mentioned in thousands of places…it is definitely a stop word in this context. Traditional stop word removal would need a human to sit down, compile a list of domain-specific stop words, add it to Elasticsearch and then routinely maintain the list with additions/deletions.</para>
 					</section>
 					<section>
 						<title>Caveates</title>
@@ -606,7 +605,7 @@ declare
 		<describes>cad7c99c-a1e7-442c-9239-1db953c83a87</describes>
 		<metadata>
 			<biohubEML>
-				<source>SIMS-SVC-4464</source>
+				<source>SIMS-SVC</source>
 				<version>1.0</version>
 			</biohubEML>
 		</metadata>
@@ -615,53 +614,78 @@ declare
 	_spatial_transform_id spatial_transform.spatial_transform_id%type;
 	_security_transform_id security_transform.security_transform_id%type;
 	_submission_spatial_component_id submission_spatial_component.submission_spatial_component_id%type;
+	_persecution_or_harm_id persecution_or_harm.persecution_or_harm_id%type;
 begin
   -- set security context
-  select api_set_context('SIMS-SVC-4464', 'SYSTEM') into _system_user_id;
+  select api_set_context('myIDIR', 'IDIR') into _system_user_id;
   --select api_set_context('biohub_api', 'DATABASE') into _system_user_id;
+	select persecution_or_harm_id into _persecution_or_harm_id from persecution_or_harm where name = 'Big Brown Bat winter hibernation sites and maternity roosts';
 
   select st_GeomFromEWKT('SRID=4326;POINT(-123.920288 48.592142)') into _geography;
 
 	-- source transform
-	insert into source_transform (system_user_id, version, metadata_index, metadata_transform)
-		values ((select system_user_id from system_user where user_identifier = 'service-account-sims-svc-4464'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
+	insert into source_transform (system_user_id, version, metadata_index, metadata_transform) 
+		values ((select system_user_id from system_user where user_guid = 'myIDIR'), '2.0', 'biohub_metadata', 'select jsonb_build_object(''datasetTitle'', '''') from submissions where submission_id = ?') returning source_transform_id into _source_transform_id;
 	-- spatial transform
 	insert into spatial_transform (name, transform, record_effective_date) values ('test spatial transform', 'select * from submission', now()) returning spatial_transform_id into _spatial_transform_id;
 	-- security transform
-	insert into security_transform (name, transform, record_effective_date) values ('test security transform', 'select * from submission', now()) returning security_transform_id into _security_transform_id;
+	insert into security_transform (persecution_or_harm_id, name, transform) values (_persecution_or_harm_id, 'test security transform', 'select * from submission') returning security_transform_id into _security_transform_id;
 	-- test system user
-	insert into system_user (user_identity_source_id, user_identifier, record_effective_date) values((select user_identity_source_id from user_identity_source where name = 'IDIR'), 'CHUCK', now());
+	insert into system_user (user_identity_source_id, user_guid, user_identifier, record_effective_date) values((select user_identity_source_id from user_identity_source where name = 'IDIR'), 'CHUCK', 'CHUCK', now());
 
   -- submission 1
-  insert into submission (source_transform_id, record_effective_date, eml_source) values (_source_transform_id, now()-interval '1 day', _eml_source) returning submission_id into _submission_id;
-  select count(1) into _count from submission;
-  assert _count = 1, 'FAIL submission(1)';
-  insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;
-  select count(1) into _count from submission_spatial_component;
-  assert _count = 1, 'FAIL submission_spatial_component(1)';
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
+  insert into submission (source_transform_id, uuid) values (_source_transform_id, 'cc688fda-5460-4057-b6cc-ce237c78e422') returning submission_id into _submission_id;
+	insert into submission_metadata (submission_id, eml_source) values (_submission_id, _eml_source);
+	insert into submission_observation (submission_id, darwin_core_source) values (_submission_id, '{}') returning submission_observation_id into _submission_observation_id;
+  insert into submission_spatial_component (submission_observation_id, spatial_component) values (_submission_observation_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;  
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Ingested'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   -- transpose comments on next three lines to test deletion of published surveys by system administrator
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Awaiting Curation'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Validated'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Published'), now()-interval '1 day') returning submission_status_id into _submission_status_id;
 	-- xrefs
 	insert into spatial_transform_submission (spatial_transform_id, submission_spatial_component_id) values (_spatial_transform_id, _submission_spatial_component_id);
 	insert into security_transform_submission (submission_spatial_component_id, security_transform_id) values (_submission_spatial_component_id, _security_transform_id);
-	insert into system_user_security_exception (security_transform_id, system_user_id, record_effective_date) values (_security_transform_id, (select system_user_id from system_user where user_identifier = 'CHUCK'), now());
+	insert into system_user_security_exception (persecution_or_harm_id, system_user_id) values (_persecution_or_harm_id, (select system_user_id from system_user where user_guid = 'CHUCK'));
+	insert into submission_job_queue (submission_job_queue_id, submission_id) values ((select nextval('submission_job_queue_seq')), _submission_id);
+	insert into artifact (artifact_id, submission_id, uuid, file_name, file_type) values ((select nextval('artifact_seq')), _submission_id, '34ae204d-a2fd-4fed-aa80-521d7e266f36', 'test.pdf', 'pdf');
+
+	select count(1) into _count from submission;
+  assert _count = 1, 'FAIL submission(1)';
+	select count(1) into _count from submission_metadata;
+  assert _count = 1, 'FAIL submission_metadata(1)';
+  select count(1) into _count from submission_spatial_component;
+  assert _count = 1, 'FAIL submission_spatial_component(1)';
+	select count(1) into _count from submission_job_queue;
+  assert _count = 1, 'FAIL submission_job_queue(1)';
+	select count(1) into _count from artifact;
+  assert _count = 1, 'FAIL artifact(1)';
 
   -- submission 2
-  insert into submission (source_transform_id, record_effective_date) values (_source_transform_id, now()) returning submission_id into _submission_id;
-  select count(1) into _count from submission;
-  assert _count = 2, 'FAIL submission(2)';
-  insert into submission_spatial_component (submission_id, spatial_component) values (_submission_id, '{}');
-  select count(1) into _count from submission_spatial_component;
-  assert _count = 2, 'FAIL submission_spatial_component(2)';
-  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Submitted'), now()) returning submission_status_id into _submission_status_id;
+  insert into submission (source_transform_id, uuid) values (_source_transform_id, 'c6625835-fce2-4aa4-b2a2-89c7f94824cd') returning submission_id into _submission_id;  
+	insert into submission_metadata (submission_id, eml_source) values (_submission_id, _eml_source);
+	insert into submission_observation (submission_id, darwin_core_source) values (_submission_id, '{}') returning submission_observation_id into _submission_observation_id;
+	insert into submission_spatial_component (submission_observation_id, spatial_component) values (_submission_observation_id, '{}') returning submission_spatial_component_id into _submission_spatial_component_id;
+  insert into submission_spatial_component (submission_observation_id, spatial_component) values (_submission_observation_id, '{}');  
+  insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Ingested'), now()) returning submission_status_id into _submission_status_id;
   insert into submission_status (submission_id, submission_status_type_id, event_timestamp) values (_submission_id, (select submission_status_type_id from submission_status_type where name = 'Rejected'), now()) returning submission_status_id into _submission_status_id;
-  insert into submission_message (submission_status_id, submission_message_type_id, event_timestamp, message) values (_submission_status_id, (select submission_message_type_id from submission_message_type where name = 'Missing Required Field'), now(), 'Some required field was not supplied.');
+  insert into submission_message (submission_status_id, submission_message_type_id, event_timestamp, message) values (_submission_status_id, (select submission_message_type_id from submission_message_type where name = 'Notice'), now(), 'Some required field was not supplied.');
+	insert into submission_job_queue (submission_job_queue_id, submission_id) values ((select nextval('submission_job_queue_seq')), _submission_id);
+	insert into artifact (artifact_id, submission_id, uuid, file_name, file_type) values ((select nextval('artifact_seq')), _submission_id, 'b3b3db37-cefb-4dbf-9af8-e4095bb00dba', 'test.pdf', 'pdf');
+
+	select count(1) into _count from submission;
+  assert _count = 2, 'FAIL submission(2)';
+	select count(1) into _count from submission_metadata;
+  assert _count = 2, 'FAIL submission_metadata(2)';
+	select count(1) into _count from submission_spatial_component;
+  assert _count = 3, 'FAIL submission_spatial_component(2)';
   select count(1) into _count from submission_status;
   assert _count = 5, 'FAIL submission_status';
   select count(1) into _count from submission_message;
   assert _count = 1, 'FAIL submission_message';
+	select count(1) into _count from submission_job_queue;
+  assert _count = 2, 'FAIL submission_job_queue(2)';
+	select count(1) into _count from artifact;
+  assert _count = 2, 'FAIL artifact(2)';
 
   raise notice 'smoketest_release(2): PASS';
 end
