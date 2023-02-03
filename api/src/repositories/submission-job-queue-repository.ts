@@ -14,13 +14,27 @@ export interface ISubmissionJobQueueModel {
   // no attempt count?
 }
 
+export interface IInsertSubmissionJobQueueRecord {
+  submission_job_queue_id: number;
+  submission_id: number;
+}
+
 export class SubmissionJobQueueRepository extends BaseRepository {
   // get next id
   // insert record
   // fetch record
   // update attempt count
 
-  async insertQueue(): Promise<{queue_id: number}> {
+  async insertQueue(queueId: number, submissionId: number): Promise<{queue_id: number}> {
+    const sqlStatement = SQL`
+      INSERT INTO (
+        submission_job_queue_id,
+        submission_id
+      ) VALUES (
+        ${queueId},
+        ${submissionId}
+      );
+    `;
     return {queue_id: 0};
   } 
 
@@ -34,7 +48,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     const response = await this.connection.sql<{id: number}>(sqlStatement);
 
     if (response.rowCount === 1) {
-      nextId = response.rows[0].id
+      nextId = response.rows[0].id + 1
     }
 
     return {next_id: nextId};
