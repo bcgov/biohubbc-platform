@@ -1,19 +1,18 @@
-import { RequestHandler } from "express";
-import { Operation } from "express-openapi";
-import { SOURCE_SYSTEM } from "../../../constants/database";
-import { getServiceAccountDBConnection } from "../../../database/db";
-import { HTTP400 } from "../../../errors/http-error";
-import { defaultErrorResponses } from "../../../openapi/schemas/http-responses";
-import { authorizeRequestHandler } from "../../../request-handlers/security/authorization";
-import { SubmissionJobQueueService } from "../../../services/submission-job-queue-service";
-import { scanFileForVirus } from "../../../utils/file-utils";
-import { getKeycloakSource } from "../../../utils/keycloak-utils";
-import { getLogger } from "../../../utils/logger";
+import { RequestHandler } from 'express';
+import { Operation } from 'express-openapi';
+import { SOURCE_SYSTEM } from '../../../constants/database';
+import { getServiceAccountDBConnection } from '../../../database/db';
+import { HTTP400 } from '../../../errors/http-error';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
+import { scanFileForVirus } from '../../../utils/file-utils';
+import { getKeycloakSource } from '../../../utils/keycloak-utils';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/queue');
 
 // TODO: does this need security?
-export const POST: Operation= [
+export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
@@ -23,38 +22,36 @@ export const POST: Operation= [
         }
       ]
     };
-  })
+  }),
+  queueForProcess()
 ];
 
 POST.apiDoc = {
   description: 'Submit DwCA to be queued and processed',
-  tags: ['dwc', 'dwca'],
+  tags: ['dwca'],
   security: [
-    {
-      Bearer: []
-    }
   ],
   requestBody: {
     content: {
       'multipart/form-data': {
-      schema: {
-        type: 'object',
-        required: ['media', 'dataset_uuid'],
-        properties: {
-          media: {
-            type: 'string',
-            format: 'binary',
-            description: 'A Darwin Core ARchive (DwCA) data package.'
-          },
-          dataset_uuid: {
-            type: 'string',
-            format: 'uuid',
-            description: 'A unique identifier for this Darwin Care Archive (DwCA) data package.'
+        schema: {
+          type: 'object',
+          required: ['media', 'dataset_uuid'],
+          properties: {
+            media: {
+              type: 'string',
+              format: 'binary',
+              description: 'A Darwin Core ARchive (DwCA) data package.'
+            },
+            dataset_uuid: {
+              type: 'string',
+              format: 'uuid',
+              description: 'A unique identifier for this Darwin Care Archive (DwCA) data package.'
+            }
           }
         }
       }
     }
-  }
   },
   responses: {
     200: {
@@ -65,22 +62,20 @@ POST.apiDoc = {
             type: 'object',
             required: ['queue_id'],
             properties: {
-              data_package_id: {
-                type: 'string',
-                format: 'number',
-                description: 'The unique identifier queue.'
+              queue_id: {
+                type: 'integer',
               }
             }
           }
         }
-    },
-    ...defaultErrorResponses
+      }
+    }
   }
-}
 };
 
 export function queueForProcess(): RequestHandler {
   return async (req, res) => {
+    console.log("New API running")
     // above apiDoc checks for this already
     const file: Express.Multer.File = req.files![0];
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
@@ -96,7 +91,7 @@ export function queueForProcess(): RequestHandler {
     }
 
     const id = req.body.dataset_uuid;
-    const connection = getServiceAccountDBConnection(sourceSystem)
+    const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
       await connection.open();
@@ -104,6 +99,7 @@ export function queueForProcess(): RequestHandler {
       const service = new SubmissionJobQueueService(connection);
       await service.intake(id, file);
       await connection.commit();
+      res.status(200).json({queue_id: 1});
     } catch (error) {
       defaultLog.error({ label: 'intakeDataset', message: 'error', error });
       await connection.rollback();
@@ -111,5 +107,5 @@ export function queueForProcess(): RequestHandler {
     } finally {
       connection.release();
     }
-  }
+  };
 }

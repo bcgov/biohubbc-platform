@@ -1,5 +1,5 @@
-import SQL from "sql-template-strings";
-import { BaseRepository } from "./base-repository";
+import SQL from 'sql-template-strings';
+import { BaseRepository } from './base-repository';
 
 export interface ISubmissionJobQueueModel {
   submission_job_queue_id: number;
@@ -20,12 +20,8 @@ export interface IInsertSubmissionJobQueueRecord {
 }
 
 export class SubmissionJobQueueRepository extends BaseRepository {
-  // get next id
-  // insert record
-  // fetch record
-  // update attempt count
 
-  async insertQueue(queueId: number, submissionId: number): Promise<{queue_id: number}> {
+  async insertJobQueueRecord(queueId: number, submissionId: number): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO (
         submission_job_queue_id,
@@ -35,30 +31,18 @@ export class SubmissionJobQueueRepository extends BaseRepository {
         ${submissionId}
       );
     `;
-    return {queue_id: 0};
-  } 
 
-  async getNextQueueId(): Promise<{next_id: number}> {
+    await this.connection.sql(sqlStatement);
+    return { queue_id: 0 };
+  }
+
+  async getNextQueueId(): Promise<{ queueId: number }> {
     const sqlStatement = SQL`
-      SELECT nextval(
-        pg_get_serial_sequence('submission_job_queue', 'submission_job_queue_id')
-      ) as id;
+      SELECT * FROM biohub.submission_job_queue_seq;
     `;
-    let nextId = 1;
-    const response = await this.connection.sql<{id: number}>(sqlStatement);
 
-    if (response.rowCount === 1) {
-      nextId = response.rows[0].id + 1
-    }
+    const response = await this.connection.sql<{ last_value: number, log_cnt: number, is_called: any }>(sqlStatement);
 
-    return {next_id: nextId};
-  }
-
-  async addAttempt(): Promise<{attempts: number}> {
-    return {attempts: 0};
-  }
-
-  async getSubmissionJob(queueId: number): Promise<ISubmissionJobQueueModel> {
-    return {} as ISubmissionJobQueueModel;
+    return { queueId: response.rows[0].last_value };
   }
 }
