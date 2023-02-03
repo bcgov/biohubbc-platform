@@ -25,11 +25,9 @@ export class ArtifactRepository extends BaseRepository {
 
     const sqlStatement = SQL`
       SELECT
-        COALESCE(MAX(artifact_id), 0) + 1
+        NEXTVAL('artifact_seq')
       AS
         artifact_id
-      FROM
-        artifact;
     `
 
     const response = await this.connection.sql<{ artifact_id: number }>(sqlStatement);
