@@ -8,11 +8,13 @@ import { IArtifactMetadata } from '../../repositories/artifact-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
 import { SubmissionService } from '../../services/submission-service';
-import { generateS3FileKey, scanFileForVirus, uploadFileToS3 } from '../../utils/file-utils';
+import { scanFileForVirus, uploadFileToS3 } from '../../utils/file-utils';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/artifact/intake');
+
+const S3_KEY_PREFIX = process.env.S3_KEY_PREFIX || 'platform';
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -48,18 +50,31 @@ POST.apiDoc = {
               format: 'binary',
               description: 'An artifact to be uploaded to BioHub'
             },
-            metadata: {
+            title: {
               type: 'array',
+              description: 'The metadata title',
               items: {
-                type: 'string',
-                description: 'JSON containing the metadata for each file'
+                type: 'string'
+              }
+            },
+            description: {
+              type: 'array',
+              description: 'The metadata description',
+              items: {
+                type: 'string'
+              }
+            },
+            foi_reason_description: {
+              type: 'array',
+              description: 'The metadata foi_reason_description',
+              items: {
+                type: 'string'
               }
             },
             data_package_id: {
               type: 'string',
               format: 'uuid',
-              description:
-                'The unique identifier for this artifact collection.'
+              description: 'The unique identifier for this artifact collection.'
             }
           }
         }
@@ -128,7 +143,7 @@ export function intakeArtifacts(): RequestHandler {
         throw new HTTP400('Failed to get source transform record for system user');
       }
 
-      const metadataRecords: string[] = req.body.metadata;
+      const metadataRecords: Record<string, any>[] = req.body.metadata;
       const { source_transform_id } = sourceTransformRecord;
 
       // Create a new submission for the artifact collection
@@ -137,31 +152,27 @@ export function intakeArtifacts(): RequestHandler {
         uuid: dataPackageId
       });
       
-      // Retrieve the ID that will be assigned to the artifact once it's inserted
-      const insertArtifactId = await artifactService.getNextArtifactId();
+      // Retrieve the series of IDs that will be assigned to the artifacts once they're inserted
+      const insertArtifactIds = await artifactService.getNextArtifactIds(files.length);
 
       const artifactPersistPromises = files.map(async (file: Express.Multer.File, fileIndex: number) => {
-        const artifactMetadata: IArtifactMetadata = JSON.parse(metadataRecords[fileIndex]);
-        const artifactId = insertArtifactId + fileIndex;
+        const artifactMetadata: IArtifactMetadata = metadataRecords[fileIndex];
+        const { uuid, artifact_id } = insertArtifactIds[fileIndex];
 
         // Generate the S3 key for the artifact, using the preemptive artifact ID + the package UUID
-        const s3Key = generateS3FileKey({
-          artifactId,
-          uuid: dataPackageId,
-          fileName: file.originalname
-        });
+        const s3Key = `${S3_KEY_PREFIX}/${dataPackageId}/artifacts/${uuid}`
 
         // Upload the artifact to S3
         const fileUploadResponse = await uploadFileToS3(file, s3Key, { filename: file.originalname });
 
         // If the file was successfully uploaded, we persist the artifact in the database
-        const artifactInsertResponse = await artifactService.insertArtifactMetadata({
+        const artifactInsertResponse = await artifactService.insertArtifactRecord({
           ...artifactMetadata,
-          artifact_id: artifactId,
+          artifact_id,
           submission_id,
-          uuid: dataPackageId,
+          uuid,
           file_name: file.originalname,
-          file_type: 'Miscellaneous' // TODO
+          file_type: 'Other'
         })
 
         return {

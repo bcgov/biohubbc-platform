@@ -11,7 +11,7 @@ export interface IArtifactMetadata {
   file_size?: number;
   foi_reason_description?: string;
 }
-export interface IGetArtifactMetadata extends IArtifactMetadata {
+export interface IArtifact extends IArtifactMetadata {
   artifact_id: number;
   submission_id: number;
   uuid: string;
@@ -20,29 +20,36 @@ export interface IGetArtifactMetadata extends IArtifactMetadata {
 }
 
 export class ArtifactRepository extends BaseRepository {
-  async getNextArtifactId(): Promise<number> {
-    defaultLog.debug({ label: 'getNextArtifactId' });
+  /**
+   * 
+   * @param count 
+   * @returns 
+   * @memberof ArtifactRepository
+   */
+  async getNextArtifactIds(count: number): Promise<{ uuid: string, artifact_id: number }[]> {
+    defaultLog.debug({ label: 'getNextArtifactIds' });
 
     const sqlStatement = SQL`
       SELECT
-        NEXTVAL('artifact_seq')
-      AS
-        artifact_id
+        NEXTVAL('artifact_seq') AS artifact_id,
+        UUID_GENERATE_V4() AS uuid
+      FROM
+        GENERATE_SERIES(1, ${count});
     `
 
-    const response = await this.connection.sql<{ artifact_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ uuid: string, artifact_id: number }>(sqlStatement);
 
-    const result = (response && response.rowCount && response.rows[0]?.artifact_id) || null;
+    const results = (response && response.rowCount && response.rows) || null;
 
-    if (!result) {
+    if (!results) {
       throw new ApiExecuteSQLError('Failed to get next artifact ID');
     }
 
-    return result;
+    return results;
   }
 
-  async insertArtifactMetadata(artifactMetadata: IGetArtifactMetadata): Promise<{ artifact_id: number }> {
-    defaultLog.debug({ label: 'insertArtifactMetadata', artifactMetadata });
+  async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
+    defaultLog.debug({ label: 'insertArtifactRecord', artifact });
 
     const sqlStatement = SQL`
       INSERT INTO
@@ -58,15 +65,15 @@ export class ArtifactRepository extends BaseRepository {
         file_size,
         foi_reason_description
       ) VALUES (
-        ${artifactMetadata?.artifact_id},
-        ${artifactMetadata?.submission_id},
-        ${artifactMetadata?.uuid},
-        ${artifactMetadata?.file_name},
-        ${artifactMetadata?.file_type},
-        ${artifactMetadata?.title},
-        ${artifactMetadata?.description},
-        ${artifactMetadata?.file_size},
-        ${artifactMetadata?.foi_reason_description}
+        ${artifact?.artifact_id},
+        ${artifact?.submission_id},
+        ${artifact?.uuid},
+        ${artifact?.file_name},
+        ${artifact?.file_type},
+        ${artifact?.title},
+        ${artifact?.description},
+        ${artifact?.file_size},
+        ${artifact?.foi_reason_description}
       )
       RETURNING
         artifact_id;

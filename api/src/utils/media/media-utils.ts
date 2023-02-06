@@ -1,6 +1,7 @@
 import AdmZip from 'adm-zip';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import mime from 'mime';
+import { ARTIFACT_TYPE } from '../../constants/artifacts';
 import { ArchiveFile, MediaFile } from './media-file';
 
 export type UnknownMedia = Express.Multer.File | GetObjectOutput;
@@ -114,3 +115,41 @@ export const isZipMimetype = (mimetype: string): boolean => {
     regex.test(mimetype)
   );
 };
+
+export const inferMediaType = (fileName: string) => {
+  const fileParts = fileName.split('.');
+  const extension = fileParts[fileParts.length - 1];
+  const mimeType = mime.getType(extension);
+
+  if (mimeType?.startsWith('audio')) {
+    return ARTIFACT_TYPE.AUDIO;
+  }
+
+  if (mimeType?.startsWith('image')) {
+    return ARTIFACT_TYPE.IMAGE;
+  }
+
+  if (mimeType?.startsWith('video')) {
+    return ARTIFACT_TYPE.VIDEO;
+  }
+
+  if (extension === 'zip') {
+    return ARTIFACT_TYPE.ARCHIVE;
+  }
+
+  if (extension === 'kml') {
+    return ARTIFACT_TYPE.SPATIAL;
+  }
+
+  if (['xls', 'xlsx', 'xlsm', 'xlsb', 'csv'].includes(extension)) {
+    return ARTIFACT_TYPE.SPREADSHEET
+  }
+
+  if (['doc', 'docx', 'pdf'].includes(extension)) {
+    return ARTIFACT_TYPE.REPORT
+  }
+
+  if (['txt', 'accdb', 'mdb', 'ods', 'json'].includes(extension)) {
+    return ARTIFACT_TYPE.DATA
+  }
+}

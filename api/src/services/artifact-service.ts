@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { ArtifactRepository, IGetArtifactMetadata } from '../repositories/artifact-repository';
+import { ArtifactRepository, IArtifact } from '../repositories/artifact-repository';
 import { DBService } from './db-service';
 // import { getLogger } from '../utils/logger';
 
@@ -19,11 +19,11 @@ export class ArtifactService extends DBService {
     this.artifactRepository = new ArtifactRepository(connection);
   }
 
-  async getNextArtifactId(): Promise<number> {
-    return this.artifactRepository.getNextArtifactId();
+  async getNextArtifactIds(count: number = 1): Promise<{ uuid: string, artifact_id: number }[]> {
+    return this.artifactRepository.getNextArtifactIds(count);
   }
 
-  async insertArtifactMetadata(artifactMetadata: IGetArtifactMetadata): Promise<{ artifact_id: number }> {
-    return this.artifactRepository.insertArtifactMetadata(artifactMetadata);
+  async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
+    return this.artifactRepository.insertArtifactRecord(artifact);
   }
 }

@@ -352,14 +352,11 @@ export class DarwinCoreService extends DBService {
       this.connection.systemUserId()
     );
 
+    dwcArchive;
+    // TODO fix
+
     const response = await this.submissionService.insertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
-      input_file_name: dwcArchive.rawFile.fileName,
-      input_key: '',
-      record_effective_date: new Date().toISOString(),
-      eml_source: '',
-      eml_json_source: '',
-      darwin_core_source: '{}',
       uuid: dataPackageId
     });
 
