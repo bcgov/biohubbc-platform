@@ -1,6 +1,10 @@
 import AdmZip from 'adm-zip';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
+import { XMLParser } from 'fast-xml-parser';
 import mime from 'mime';
+import { ApiGeneralError } from '../../errors/api-error';
+import { DWCArchive } from './dwc/dwc-archive-file';
+import { EMLFile } from './eml/eml-file';
 import { ArchiveFile, MediaFile } from './media-file';
 
 export type UnknownMedia = Express.Multer.File | GetObjectOutput;
@@ -114,3 +118,60 @@ export const isZipMimetype = (mimetype: string): boolean => {
     regex.test(mimetype)
   );
 };
+
+export const parseUnknownMediaToDwCAArchive = (unknownMedia: UnknownMedia): DWCArchive => {
+  const parsedMedia = parseUnknownMedia(unknownMedia);
+
+    if (!parsedMedia) {
+      throw new ApiGeneralError('Failed to parse submission', [
+        'DarwinCoreService->prepDWCArchive',
+        'unknown media file was empty or unable to be parsed'
+      ]);
+    }
+
+    if (!(parsedMedia instanceof ArchiveFile)) {
+      throw new ApiGeneralError('Failed to parse submission', [
+        'DarwinCoreService->prepDWCArchive',
+        'unknown media file was not a valid Archive file'
+      ]);
+    }
+
+    return new DWCArchive(parsedMedia);
+}
+
+export const parseEMLtoJSONSource = (eml: EMLFile): any => {
+
+      const options = {
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_',
+        parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
+          const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
+          if (tagsArray.includes(tagName)) return true;
+          return false;
+        }
+      };
+      const parser = new XMLParser(options);
+      const eml_json_source = parser.parse(eml.emlFile.buffer.toString() as string);
+      return eml_json_source
+}
+
+/**
+   * Returns normalized DwC Archive file data
+   *
+   * @param {DWCArchive} dwcArchiveFile
+   * @return {*}  {string}
+   * @memberof DarwinCoreService
+   */
+export const normalizeDWCA = (dwcArchiveFile: DWCArchive): string => {
+  const normalized = {};
+
+  Object.entries(dwcArchiveFile.worksheets).forEach(([key, value]) => {
+    if (value) {
+      normalized[key] = value.getRowObjects();
+    }
+  });
+
+  return JSON.stringify(normalized);
+}

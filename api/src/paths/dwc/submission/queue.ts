@@ -1,9 +1,9 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SOURCE_SYSTEM } from '../../../constants/database';
 import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+// import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
 import { scanFileForVirus } from '../../../utils/file-utils';
 import { getKeycloakSource } from '../../../utils/keycloak-utils';
@@ -13,16 +13,6 @@ const defaultLog = getLogger('paths/dwc/submission/queue');
 
 // TODO: does this need security?
 export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
-          discriminator: 'ServiceClient'
-        }
-      ]
-    };
-  }),
   queueForProcess()
 ];
 
@@ -69,7 +59,8 @@ POST.apiDoc = {
           }
         }
       }
-    }
+    },
+    ...defaultErrorResponses
   }
 };
 
@@ -78,8 +69,10 @@ export function queueForProcess(): RequestHandler {
     console.log("New API running")
     // above apiDoc checks for this already
     const file: Express.Multer.File = req.files![0];
+    console.log(Object.keys(req))
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
-
+    console.log(sourceSystem)
+    console.log(req.files);
     if (!(await scanFileForVirus(file))) {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
