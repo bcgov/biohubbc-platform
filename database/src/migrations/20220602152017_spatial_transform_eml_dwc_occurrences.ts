@@ -15,7 +15,7 @@ export async function up(knex: Knex): Promise<void> {
     SET SCHEMA '${DB_SCHEMA}';
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
 
-    INSERT into spatial_transform
+    INSERT into source_transform
       (name, description, record_effective_date, transform)
     VALUES (
       'DwC Occurrences', 'Extracts occurrences and properties from DwC JSON source.', now(),
