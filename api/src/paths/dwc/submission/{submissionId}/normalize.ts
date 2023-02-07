@@ -5,7 +5,6 @@ import { getServiceAccountDBConnection } from '../../../../database/db';
 import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { DarwinCoreService } from '../../../../services/dwc-service';
 import { getKeycloakSource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
@@ -51,10 +50,11 @@ POST.apiDoc = {
     ...defaultErrorResponses
   }
 };
+//TODO: END POINT might be depercated, review uses and delete if not needed
 
 export function normalizeSubmission(): RequestHandler {
   return async (req, res) => {
-    const submissionId = Number(req.params.submissionId);
+    // const submissionId = Number(req.params.submissionId);
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
@@ -69,11 +69,11 @@ export function normalizeSubmission(): RequestHandler {
     try {
       await connection.open();
 
-      const darwinCoreService = new DarwinCoreService(connection);
+      // const darwinCoreService = new DarwinCoreService(connection);
 
-      const dwcArchiveFile = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
+      // const dwcArchiveFile = await darwinCoreService.getSubmissionRecordAndConvertToDWCArchive(submissionId);
 
-      await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
+      // await darwinCoreService.normalizeSubmissionDWCA(submissionId, dwcArchiveFile);
 
       await connection.commit();
 

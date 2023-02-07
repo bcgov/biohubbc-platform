@@ -6,6 +6,7 @@ import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { DarwinCoreService } from '../../../../services/dwc-service';
+import { SubmissionService } from '../../../../services/submission-service';
 import { getKeycloakSource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
@@ -51,6 +52,8 @@ POST.apiDoc = {
     ...defaultErrorResponses
   }
 };
+//TODO: END POINT might be depercated, review uses and delete if not needed
+//CURRENTLY using to trigger intake job request
 
 export function ingestEmlSubmission(): RequestHandler {
   return async (req, res) => {
@@ -68,12 +71,15 @@ export function ingestEmlSubmission(): RequestHandler {
 
     try {
       await connection.open();
+      const submissionService = new SubmissionService(connection);
 
       const darwinCoreService = new DarwinCoreService(connection);
 
-      await darwinCoreService.ingestNewDwCAEML(submissionId);
-
-      await darwinCoreService.convertSubmissionEMLtoJSON(submissionId);
+      console.log('STARTING INTAKE JOB');
+      const intakeJob = await submissionService.getSubmissionJobQueue(submissionId);
+      console.log('intakeJob', intakeJob);
+      const response = await darwinCoreService.intakeJob(intakeJob);
+      console.log('response', response);
 
       await connection.commit();
 

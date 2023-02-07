@@ -1,5 +1,5 @@
-import AWS from 'aws-sdk';
-import { DeleteObjectOutput, GetObjectOutput, ManagedUpload, Metadata } from 'aws-sdk/clients/s3';
+import AWS, { AWSError, Request } from 'aws-sdk';
+import { CopyObjectOutput, DeleteObjectOutput, GetObjectOutput, ManagedUpload, Metadata } from 'aws-sdk/clients/s3';
 import clamd from 'clamdjs';
 import { S3_ROLE } from '../constants/roles';
 
@@ -39,6 +39,14 @@ export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput 
   }
 
   return S3.deleteObject({ Bucket: OBJECT_STORE_BUCKET_NAME, Key: key }).promise();
+}
+
+export async function moveFileInS3(oldKey: string, newKey: string): Promise<Request<CopyObjectOutput, AWSError>> {
+  return S3.copyObject({
+    Bucket: OBJECT_STORE_BUCKET_NAME,
+    CopySource: oldKey,
+    Key: newKey
+  });
 }
 
 /**
@@ -130,6 +138,8 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 export interface IS3FileKey {
   fileName: string;
   submissionId?: number;
+  uuid?: string;
+  jobQueueId?: number;
 }
 
 /**
@@ -145,6 +155,14 @@ export function generateS3FileKey(options: IS3FileKey): string {
   if (options.submissionId) {
     keyParts.push('submissions');
     keyParts.push(options.submissionId);
+  }
+
+  if (options.uuid) {
+    keyParts.push(options.uuid);
+    keyParts.push('DwCA');
+    if (options.jobQueueId) {
+      keyParts.push(options.jobQueueId);
+    }
   }
 
   keyParts.push(options.fileName);

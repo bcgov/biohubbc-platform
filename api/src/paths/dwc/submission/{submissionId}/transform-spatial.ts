@@ -52,6 +52,8 @@ POST.apiDoc = {
   }
 };
 
+//TODO: END POINT might be depercated, review uses and delete if not needed
+
 export function transformSpatialSubmission(): RequestHandler {
   return async (req, res) => {
     const submissionId = Number(req.params.submissionId);

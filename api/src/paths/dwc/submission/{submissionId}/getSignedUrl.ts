@@ -57,6 +57,8 @@ GET.apiDoc = {
   }
 };
 
+//TODO: END POINT might be depercated, review uses and delete if not needed
+
 export function getSubmissionSignedUrl(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
@@ -69,7 +71,7 @@ export function getSubmissionSignedUrl(): RequestHandler {
 
       const submission = await submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-      const s3Key = submission.input_key;
+      const s3Key = submission.uuid;
 
       if (!s3Key) {
         throw new HTTP400('Failed to find submission S3 key.');

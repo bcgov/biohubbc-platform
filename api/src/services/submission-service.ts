@@ -59,7 +59,10 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionMetadataEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
+  async updateSubmissionMetadataEMLSource(
+    submissionId: number,
+    file: EMLFile
+  ): Promise<{ submission_metadata_id: number }> {
     return this.submissionRepository.updateSubmissionMetadataEMLSource(submissionId, file);
   }
 
@@ -68,13 +71,13 @@ export class SubmissionService extends DBService {
    *
    * @param {number} submissionId
    * @param {ISubmissionRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionService
    */
   async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
     EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
-  ): Promise<{ submission_id: number }> {
+  ): Promise<{ submission_metadata_id: number }> {
     return this.submissionRepository.updateSubmissionMetadataEMLJSONSource(submissionId, EMLJSONSource);
   }
 
@@ -107,7 +110,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<{ submission_metadata_id: number }> {
+  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataRecordEndDate(submissionId);
   }
 
@@ -118,8 +121,16 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<{ submission_metadata_id: number }> {
+  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataRecordEffectiveDate(submissionId);
+  }
+
+  async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
+    return this.submissionRepository.updateSubmissionObservationRecordEndDate(submissionId);
+  }
+
+  async updateSubmissionObservationRecordEffectiveDate(submissionId: number): Promise<number> {
+    return this.submissionRepository.updateSubmissionObservationRecordEffectiveDate(submissionId);
   }
 
   /**
@@ -273,6 +284,8 @@ export class SubmissionService extends DBService {
   async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
     const s3File = await getFileFromS3(fileName);
 
+    console.log('s3File', s3File);
+
     if (!s3File) {
       throw new ApiGeneralError('Failed to get file from S3');
     }
@@ -360,6 +373,10 @@ export class SubmissionService extends DBService {
 
   async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
     return this.submissionRepository.getSubmissionJobQueue(submissionId);
+  }
+
+  async updateSubmissionJobQueueEndTime(submissionId: number) {
+    return this.submissionRepository.updateSubmissionJobQueueEndTime(submissionId);
   }
 
   async insertSubmissionMetadataRecord(
