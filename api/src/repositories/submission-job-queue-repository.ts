@@ -20,6 +20,14 @@ export interface IInsertSubmissionJobQueueRecord {
 }
 
 export class SubmissionJobQueueRepository extends BaseRepository {
+  /**
+   * Creates Job queue and returns the record Id
+   *
+   * @param {number} queueId
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ queue_id: number }>}
+   * @memberof SubmissionJobQueueRepository
+   */
   async insertJobQueueRecord(queueId: number, submissionId: number): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_job_queue (
@@ -35,6 +43,12 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     return { queue_id: 0 };
   }
 
+  /**
+   * Gets the next value from the `submission_job_queue_seq`
+   * 
+   * @return {*}  {Promise<{ queue_id: number }>}
+   * @memberof SubmissionJobQueueRepository
+   */
   async getNextQueueId(): Promise<{ queueId: number }> {
     const sqlStatement = SQL`
       SELECT nextval('submission_job_queue_seq');
@@ -44,6 +58,13 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     return { queueId: response.rows[0].nextval };
   }
 
+  /**
+   * Finds a transform source Id based for a particular user
+   *
+   * @param {number} userId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionJobQueueRepository
+   */
   async getSourceTransformIdForUserId(userId: number): Promise<number> {
     const sqlStatement = SQL`
       SELECT source_transform_id 

@@ -14,6 +14,14 @@ export class SubmissionJobQueueService extends DBService {
     this.repository = new SubmissionJobQueueRepository(connection);
   }
 
+  /**
+   * Intakes DwCA and preps it for processing. Adding files to S3, tracks submission status and creates a queue record
+   * 
+   * @param {string} dataUUID
+   * @param {Express.Multer.File} file
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionJobQueueService
+   */
   async intake(dataUUID: string, file: Express.Multer.File): Promise<number> {
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
@@ -43,6 +51,14 @@ export class SubmissionJobQueueService extends DBService {
     return nextJobId.queueId;
   }
 
+  /**
+   * Uploads the DwCA file to S3
+   * 
+   * @param {string} uuid
+   * @param {Express.Multer.File} file
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionJobQueueService
+   */
   async uploadDatasetToS3(uuid: string, queueId: number, file: Express.Multer.File): Promise<string> {
     const s3Key = generateDatasetS3FileKey({
       fileName: file.originalname,
@@ -53,10 +69,25 @@ export class SubmissionJobQueueService extends DBService {
     return s3Key;
   }
 
+  /**
+   * Creates a queue job for a submission
+   * 
+   * @param {number} queueId
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionJobQueueService
+   */
   async createQueueJob(queueId: number, submissionId: number): Promise<void> {
     await this.repository.insertJobQueueRecord(queueId, submissionId);
   }
 
+  /**
+   * Gets Transform Id for user Id
+   * 
+   * @param {number} userId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionJobQueueService
+   */
   async getSourceTransformIdForUserId(userId: number): Promise<number> {
     return await this.repository.getSourceTransformIdForUserId(userId);
   }
