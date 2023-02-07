@@ -23,32 +23,27 @@ export class SubmissionJobQueueService extends DBService {
   // return primary key
 
   async intake(dataUUID: string, file: Express.Multer.File): Promise<number> {
-    console.log("GOT HERE 1")
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
-    // get media from request...
 
-    console.log("GOT HERE 2")
     await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
     // const dwcArchive = parseUnknownMediaToDwCAArchive(file)
-
-    console.log("GOT HERE 3")
+    
     const submission = await submissionService.getSubmissionIdByUUID(dataUUID);
     let submissionId;
-    console.log("GOT HERE 3.5");
+
     if (!submission) {
-      console.log("GOT HERE 4")
-      const newId = await submissionService.insertSubmissionRecord(dataUUID, 1);
+      const currentUserId = this.connection.systemUserId();
+      const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
+      const newId = await submissionService.insertSubmissionRecord(dataUUID, sourceTransformId);
       submissionId = newId.submission_id;
     } else {
       submissionId = submission.submission_id
     }
 
-    console.log("GOT HERE 5")
     await this.createQueueJob(nextJobId.queueId, submissionId);
     await submissionService.insertSubmissionStatusAndMessage(submissionId, SUBMISSION_STATUS_TYPE.INGESTED, SUBMISSION_MESSAGE_TYPE.NOTICE, "Uploaded successfully.")
 
-    console.log(1);
     return nextJobId.queueId
   }
 
@@ -64,5 +59,9 @@ export class SubmissionJobQueueService extends DBService {
 
   async createQueueJob(queueId: number, submissionId: number): Promise<void> {
     await this.repository.insertJobQueueRecord(queueId, submissionId);
+  }
+
+  async getSourceTransformIdForUserId(userId: number): Promise<number> {
+    return await this.repository.getSourceTransformIdForUserId(userId);
   }
 }

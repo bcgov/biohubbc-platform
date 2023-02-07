@@ -23,7 +23,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
 
   async insertJobQueueRecord(queueId: number, submissionId: number): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
-      INSERT INTO (
+      INSERT INTO submission_job_queue (
         submission_job_queue_id,
         submission_id
       ) VALUES (
@@ -38,11 +38,22 @@ export class SubmissionJobQueueRepository extends BaseRepository {
 
   async getNextQueueId(): Promise<{ queueId: number }> {
     const sqlStatement = SQL`
-      SELECT * FROM biohub.submission_job_queue_seq;
+      SELECT nextval('submission_job_queue_seq');
     `;
 
-    const response = await this.connection.sql<{ last_value: number, log_cnt: number, is_called: any }>(sqlStatement);
+    const response = await this.connection.sql<{ nextval: number }>(sqlStatement);
+    return { queueId: response.rows[0].nextval };
+  }
 
-    return { queueId: response.rows[0].last_value };
+  async getSourceTransformIdForUserId(userId: number): Promise<number> {
+    const sqlStatement = SQL`
+      SELECT source_transform_id 
+      FROM source_transform 
+      WHERE system_user_id = ${userId};
+    `;
+
+    const response = await this.connection.sql<{ source_transform_id: number }>(sqlStatement);
+    // TODO should this throw an error if there is no transform for the user?
+    return response.rows[0].source_transform_id;
   }
 }

@@ -98,11 +98,10 @@ export function queueForProcess(): RequestHandler {
 
     try {
       await connection.open();
-
       const service = new SubmissionJobQueueService(connection);
-      await service.intake(id, file);
+      const queueId = await service.intake(id, file);
       await connection.commit();
-      res.status(200).json({queue_id: 1});
+      res.status(200).json({queue_id: queueId});
     } catch (error) {
       defaultLog.error({ label: 'intakeDataset', message: 'error', error });
       await connection.rollback();
