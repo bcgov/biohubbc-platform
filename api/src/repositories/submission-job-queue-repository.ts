@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { IProprietaryInformation } from '../services/submission-job-queue-service';
 import { BaseRepository } from './base-repository';
 
 export interface ISubmissionJobQueueModel {
@@ -29,19 +30,22 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    * @return {*}  {Promise<{ queue_id: number }>}
    * @memberof SubmissionJobQueueRepository
    */
-  async insertJobQueueRecord(queueId: number, submissionId: number): Promise<{ queue_id: number }> {
+  async insertJobQueueRecord(queueId: number, submissionId: number, proprietaryInformation: IProprietaryInformation): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_job_queue (
         submission_job_queue_id,
-        submission_id
+        submission_id,
+        security_request
       ) VALUES (
         ${queueId},
-        ${submissionId}
-      );
+        ${submissionId},
+        ${JSON.stringify(proprietaryInformation)}
+      )
+      RETURNING submission_job_queue_id;
     `;
 
-    await this.connection.sql(sqlStatement);
-    return { queue_id: 0 };
+    const response = await this.connection.sql<{submission_job_queue_id: number}>(sqlStatement);
+    return { queue_id: response.rows[0].submission_job_queue_id };
   }
 
   /**

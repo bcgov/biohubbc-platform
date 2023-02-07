@@ -5,6 +5,15 @@ import { generateDatasetS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
 
+export interface IProprietaryInformation {
+  first_nations_id: number,
+  proprietor_type_id: number,
+  survey_id: number,
+  rational: string,
+  proprietor_name: number,
+  disa_required?: boolean
+}
+
 export class SubmissionJobQueueService extends DBService {
   repository: SubmissionJobQueueRepository;
 
@@ -22,7 +31,7 @@ export class SubmissionJobQueueService extends DBService {
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
    */
-  async intake(dataUUID: string, file: Express.Multer.File): Promise<number> {
+  async intake(dataUUID: string, file: Express.Multer.File, proprietaryInformation: IProprietaryInformation): Promise<{queue_id: number}> {
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
 
@@ -40,7 +49,7 @@ export class SubmissionJobQueueService extends DBService {
       submissionId = submission.submission_id;
     }
 
-    await this.createQueueJob(nextJobId.queueId, submissionId);
+    const queueRecord = await this.createQueueJob(nextJobId.queueId, submissionId, proprietaryInformation);
     await submissionService.insertSubmissionStatusAndMessage(
       submissionId,
       SUBMISSION_STATUS_TYPE.INGESTED,
@@ -48,7 +57,7 @@ export class SubmissionJobQueueService extends DBService {
       'Uploaded successfully.'
     );
 
-    return nextJobId.queueId;
+    return queueRecord;
   }
 
   /**
@@ -77,8 +86,8 @@ export class SubmissionJobQueueService extends DBService {
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
    */
-  async createQueueJob(queueId: number, submissionId: number): Promise<void> {
-    await this.repository.insertJobQueueRecord(queueId, submissionId);
+  async createQueueJob(queueId: number, submissionId: number, proprietaryInformation: IProprietaryInformation): Promise<{queue_id: number}> {
+    return await this.repository.insertJobQueueRecord(queueId, submissionId, proprietaryInformation);
   }
 
   /**
