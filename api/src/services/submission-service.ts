@@ -40,12 +40,13 @@ export class SubmissionService extends DBService {
   /**
    * Insert a new submission record.
    *
-   * @param {IInsertSubmissionRecord} submissionData
+   * @param {string} uuid
+   * @param {number} source_transform_id
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecord(submissionData);
+  async insertSubmissionRecord(uuid: string, source_transform_id: number): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecord(uuid, source_transform_id);
   }
 
   /**
@@ -108,7 +109,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{submission_id: number}> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
   }
 

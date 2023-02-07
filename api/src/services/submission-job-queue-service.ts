@@ -1,8 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { SubmissionJobQueueRepository } from '../repositories/submission-job-queue-repository';
-import { IInsertSubmissionRecord, SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateDatasetS3FileKey, uploadFileToS3 } from '../utils/file-utils';
-import { normalizeDWCA, parseEMLtoJSONSource, parseUnknownMediaToDwCAArchive } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
 
@@ -24,36 +23,32 @@ export class SubmissionJobQueueService extends DBService {
   // return primary key
 
   async intake(dataUUID: string, file: Express.Multer.File): Promise<number> {
+    console.log("GOT HERE 1")
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
     // get media from request...
 
-    const key = await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
-    const dwcArchive = parseUnknownMediaToDwCAArchive(file)
+    console.log("GOT HERE 2")
+    await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
+    // const dwcArchive = parseUnknownMediaToDwCAArchive(file)
 
+    console.log("GOT HERE 3")
     const submission = await submissionService.getSubmissionIdByUUID(dataUUID);
-    let submissionId = submission.submission_id;
+    let submissionId;
+    console.log("GOT HERE 3.5");
     if (!submission) {
-      // create new submission
-      const newSubmission = {
-        source_transform_id: 1, 
-        uuid: dataUUID,
-        record_effective_date: new Date().toISOString(),
-        input_key: key,
-        input_file_name: file.originalname,
-        eml_source: dwcArchive.eml?.emlFile.buffer.toString(),
-        eml_json_source: dwcArchive.eml ? parseEMLtoJSONSource(dwcArchive.eml) : "",
-        darwin_core_source: normalizeDWCA(dwcArchive)
-      } as IInsertSubmissionRecord
-
-      const newId = await (await submissionService.insertSubmissionRecord(newSubmission));
+      console.log("GOT HERE 4")
+      const newId = await submissionService.insertSubmissionRecord(dataUUID, 1);
       submissionId = newId.submission_id;
+    } else {
+      submissionId = submission.submission_id
     }
 
+    console.log("GOT HERE 5")
     await this.createQueueJob(nextJobId.queueId, submissionId);
     await submissionService.insertSubmissionStatusAndMessage(submissionId, SUBMISSION_STATUS_TYPE.INGESTED, SUBMISSION_MESSAGE_TYPE.NOTICE, "Uploaded successfully.")
 
-    console.log(submissionId);
+    console.log(1);
     return nextJobId.queueId
   }
 

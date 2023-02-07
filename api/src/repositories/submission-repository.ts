@@ -174,43 +174,40 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {IInsertSubmissionRecord} submissionData
+   * @param {string} uuid
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(uuid: string, source_transform_id: number): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source_transform_id,
         uuid,
-        record_effective_date,
-        input_key,
-        input_file_name,
-        eml_source,
-        darwin_core_source
+        source_transform_id
       ) VALUES (
-        ${submissionData.source_transform_id},
-        ${submissionData.uuid},
-        ${submissionData.record_effective_date},
-        ${submissionData.input_key},
-        ${submissionData.input_file_name},
-        ${submissionData.eml_source},
-        ${submissionData.darwin_core_source}
+        ${uuid},
+        ${source_transform_id}
       )
       RETURNING
         submission_id;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission record', [
-        'SubmissionRepository->insertSubmissionRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
+    try {
+      
+      const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+        
+      if (response.rowCount !== 1) {
+        throw new ApiExecuteSQLError('Failed to insert submission record', [
+          'SubmissionRepository->insertSubmissionRecord',
+          'rowCount was null or undefined, expected rowCount = 1'
+        ]);
+      }
+  
+      return response.rows[0];
+    } catch (error) {
+      console.log("INSERT ERROR");
+      console.log(error)
+      throw "butts"
     }
-
-    return response.rows[0];
   }
 
   /**
@@ -351,20 +348,18 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{submission_id: number}> {
+    console.log(`UUID: ${uuid}`);
     const sqlStatement = SQL`
       SELECT
         submission_id
       FROM
         submission
       WHERE
-        uuid = ${uuid}
-      AND
-        record_end_date IS NULL;
+        uuid = ${uuid};
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
     return response.rows[0];
   }
 
