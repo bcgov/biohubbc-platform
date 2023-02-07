@@ -27,10 +27,15 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    *
    * @param {number} queueId
    * @param {number} submissionId
+   * @param {IProprietaryInformation} proprietaryInformation
    * @return {*}  {Promise<{ queue_id: number }>}
    * @memberof SubmissionJobQueueRepository
    */
-  async insertJobQueueRecord(queueId: number, submissionId: number, proprietaryInformation: IProprietaryInformation): Promise<{ queue_id: number }> {
+  async insertJobQueueRecord(
+    queueId: number,
+    submissionId: number,
+    proprietaryInformation?: IProprietaryInformation
+  ): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_job_queue (
         submission_job_queue_id,
@@ -39,18 +44,18 @@ export class SubmissionJobQueueRepository extends BaseRepository {
       ) VALUES (
         ${queueId},
         ${submissionId},
-        ${JSON.stringify(proprietaryInformation)}
+        ${JSON.stringify(proprietaryInformation ? proprietaryInformation : {})}
       )
       RETURNING submission_job_queue_id;
     `;
 
-    const response = await this.connection.sql<{submission_job_queue_id: number}>(sqlStatement);
+    const response = await this.connection.sql<{ submission_job_queue_id: number }>(sqlStatement);
     return { queue_id: response.rows[0].submission_job_queue_id };
   }
 
   /**
    * Gets the next value from the `submission_job_queue_seq`
-   * 
+   *
    * @return {*}  {Promise<{ queue_id: number }>}
    * @memberof SubmissionJobQueueRepository
    */
@@ -78,7 +83,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ source_transform_id: number }>(sqlStatement);
-    
+
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get source transform Id', [
         'SubmissionJobQueueRepository->getSourceTransformIdForUserId',

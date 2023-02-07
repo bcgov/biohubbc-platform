@@ -6,12 +6,12 @@ import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
 
 export interface IProprietaryInformation {
-  first_nations_id: number,
-  proprietor_type_id: number,
-  survey_id: number,
-  rational: string,
-  proprietor_name: number,
-  disa_required?: boolean
+  first_nations_id: number;
+  proprietor_type_id: number;
+  survey_id: number;
+  rational: string;
+  proprietor_name: number;
+  disa_required?: boolean;
 }
 
 export class SubmissionJobQueueService extends DBService {
@@ -25,13 +25,17 @@ export class SubmissionJobQueueService extends DBService {
 
   /**
    * Intakes DwCA and preps it for processing. Adding files to S3, tracks submission status and creates a queue record
-   * 
+   *
    * @param {string} dataUUID
    * @param {Express.Multer.File} file
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
    */
-  async intake(dataUUID: string, file: Express.Multer.File, proprietaryInformation: IProprietaryInformation): Promise<{queue_id: number}> {
+  async intake(
+    dataUUID: string,
+    file: Express.Multer.File,
+    proprietaryInformation?: IProprietaryInformation
+  ): Promise<{ queue_id: number }> {
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
 
@@ -62,7 +66,7 @@ export class SubmissionJobQueueService extends DBService {
 
   /**
    * Uploads the DwCA file to S3
-   * 
+   *
    * @param {string} uuid
    * @param {Express.Multer.File} file
    * @return {*}  {Promise<number>}
@@ -80,19 +84,24 @@ export class SubmissionJobQueueService extends DBService {
 
   /**
    * Creates a queue job for a submission
-   * 
+   *
    * @param {number} queueId
    * @param {number} submissionId
+   * @param {IProprietaryInformation} proprietaryInformation
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
    */
-  async createQueueJob(queueId: number, submissionId: number, proprietaryInformation: IProprietaryInformation): Promise<{queue_id: number}> {
+  async createQueueJob(
+    queueId: number,
+    submissionId: number,
+    proprietaryInformation?: IProprietaryInformation
+  ): Promise<{ queue_id: number }> {
     return await this.repository.insertJobQueueRecord(queueId, submissionId, proprietaryInformation);
   }
 
   /**
    * Gets Transform Id for user Id
-   * 
+   *
    * @param {number} userId
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
