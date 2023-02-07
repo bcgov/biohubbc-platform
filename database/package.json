@@ -22,6 +22,7 @@
     "format-fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
   },
   "dependencies": {
+    "@types/csv-parse": "^1.2.2",
     "knex": "~1.0.1",
     "pg": "~8.3.0",
     "typescript": "~4.1.6"
