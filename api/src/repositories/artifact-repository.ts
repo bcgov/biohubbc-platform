@@ -6,17 +6,18 @@ import { getLogger } from '../utils/logger';
 const defaultLog = getLogger('repositories/artifact-repository');
 
 export interface IArtifactMetadata {
+  file_name: string;
+  file_type: string;
   title?: string;
   description?: string;
   file_size?: number;
-  foi_reason_description?: string;
 }
 export interface IArtifact extends IArtifactMetadata {
   artifact_id: number;
   submission_id: number;
   uuid: string;
-  file_name: string;
-  file_type: string;
+  input_key: string;
+  foi_reason_description?: string;
 }
 
 export class ArtifactRepository extends BaseRepository {
@@ -26,18 +27,17 @@ export class ArtifactRepository extends BaseRepository {
    * @returns 
    * @memberof ArtifactRepository
    */
-  async getNextArtifactIds(count: number): Promise<{ uuid: string, artifact_id: number }[]> {
+  async getNextArtifactIds(count: number): Promise<number[]> {
     defaultLog.debug({ label: 'getNextArtifactIds' });
 
     const sqlStatement = SQL`
       SELECT
-        NEXTVAL('artifact_seq') AS artifact_id,
-        UUID_GENERATE_V4() AS uuid
+        NEXTVAL('artifact_seq') AS artifact_id
       FROM
         GENERATE_SERIES(1, ${count});
     `
 
-    const response = await this.connection.sql<{ uuid: string, artifact_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ artifact_id: number }>(sqlStatement);
 
     const results = (response && response.rowCount && response.rows) || null;
 
@@ -45,7 +45,7 @@ export class ArtifactRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to get next artifact ID');
     }
 
-    return results;
+    return results.map((row) => row.artifact_id);
   }
 
   async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
@@ -58,22 +58,22 @@ export class ArtifactRepository extends BaseRepository {
         artifact_id,
         submission_id,
         uuid,
+        input_key,
         file_name,
         file_type,
         title,
         description,
         file_size,
-        foi_reason_description
       ) VALUES (
-        ${artifact?.artifact_id},
-        ${artifact?.submission_id},
-        ${artifact?.uuid},
-        ${artifact?.file_name},
-        ${artifact?.file_type},
-        ${artifact?.title},
-        ${artifact?.description},
-        ${artifact?.file_size},
-        ${artifact?.foi_reason_description}
+        ${artifact.artifact_id},
+        ${artifact.submission_id},
+        ${artifact.uuid},
+        ${artifact.input_key}
+        ${artifact.file_name},
+        ${artifact.file_type},
+        ${artifact.title},
+        ${artifact.description},
+        ${artifact.file_size},
       )
       RETURNING
         artifact_id;

@@ -4,17 +4,14 @@ import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { IArtifactMetadata } from '../../repositories/artifact-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
-import { SubmissionService } from '../../services/submission-service';
-import { scanFileForVirus, uploadFileToS3 } from '../../utils/file-utils';
+import { scanFileForVirus } from '../../utils/file-utils';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
+import uuid from 'uuid'
 
 const defaultLog = getLogger('paths/artifact/intake');
-
-const S3_KEY_PREFIX = process.env.S3_KEY_PREFIX || 'platform';
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -50,31 +47,27 @@ POST.apiDoc = {
               format: 'binary',
               description: 'An artifact to be uploaded to BioHub'
             },
-            title: {
-              type: 'array',
-              description: 'The metadata title',
-              items: {
-                type: 'string'
-              }
-            },
-            description: {
-              type: 'array',
-              description: 'The metadata description',
-              items: {
-                type: 'string'
-              }
-            },
-            foi_reason_description: {
-              type: 'array',
-              description: 'The metadata foi_reason_description',
-              items: {
-                type: 'string'
-              }
-            },
             data_package_id: {
               type: 'string',
               format: 'uuid',
               description: 'The unique identifier for this artifact collection.'
+            },
+            metadata: {
+              type: 'object',
+              properties: {
+                title: {
+                  description: 'The metadata title',
+                  type: 'string'
+                },
+                description: {
+                  description: 'The metadata description',
+                  type: 'string'
+                },
+                foi_reason_description: {
+                  description: 'The metadata foi_reason_description',
+                  type: 'string'
+                }
+              }
             }
           }
         }
@@ -87,8 +80,7 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            
+            type: 'object'
           }
         }
       }
@@ -99,13 +91,14 @@ POST.apiDoc = {
 
 export function intakeArtifacts(): RequestHandler {
   return async (req, res) => {
-    if (!req?.files?.length) {
+    defaultLog.debug({ label: 'intakeArtifacts', metadata: req.body.metadata, media: req.body.media });
+    if (!req.files?.length) {
       throw new HTTP400('Missing required `media`');
     }
 
-    const files: Express.Multer.File[] = Object.values(req.files);
-    if (req.body.metadata?.length !== files.length) {
-      throw new HTTP400('File count and metadata record count do not agree');
+    if (req.files?.length !== 1) {
+      // no media objects included
+      throw new HTTP400('Too many files uploaded, expected 1');
     }
 
     const dataPackageId = req.body?.data_package_id;
@@ -113,9 +106,25 @@ export function intakeArtifacts(): RequestHandler {
       throw new HTTP400('Data package ID is required');
     }
 
+    const file: Express.Multer.File = Object.values(req.files)[0];
+    const metadata = req.body.metadata
+    if (!metadata) {
+      throw new HTTP400('Metadata is required');
+    }
+
+    const fileParts = file.originalname.split('.');
+    if (fileParts[fileParts.length - 1].toLocaleLowerCase() !== 'zip') {
+      throw new HTTP400('File must be a .zip archive');
+    }
+
+    const fileUuid = fileParts[0];
+    if (!uuid.validate(fileUuid)) {
+      throw new HTTP400('File name must reflect a valid UUID');
+    }
+
     // Scan all files for viruses
-    const virusScanResults = await Promise.all(files.map(async (file) => scanFileForVirus(file)));
-    if (virusScanResults.some((result: boolean) => !result)) {
+    const passesVirusCheck = await scanFileForVirus(file);
+    if (!passesVirusCheck) {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
@@ -131,59 +140,14 @@ export function intakeArtifacts(): RequestHandler {
     try {
       await connection.open();
 
-      const submissionService = new SubmissionService(connection);
       const artifactService = new ArtifactService(connection);
 
-      // Fetch the source transform record for this submission based on the source system user id
-      const sourceTransformRecord = await submissionService.getSourceTransformRecordBySystemUserId(
-        connection.systemUserId()
+      const response = await artifactService.uploadAndPersistArtifact(
+        dataPackageId,
+        metadata,
+        fileUuid,
+        file
       );
-
-      if (!sourceTransformRecord) {
-        throw new HTTP400('Failed to get source transform record for system user');
-      }
-
-      const metadataRecords: Record<string, any>[] = req.body.metadata;
-      const { source_transform_id } = sourceTransformRecord;
-
-      // Create a new submission for the artifact collection
-      const { submission_id } = await submissionService.getOrInsertSubmissionRecord({
-        source_transform_id: sourceTransformRecord.source_transform_id,
-        uuid: dataPackageId
-      });
-      
-      // Retrieve the series of IDs that will be assigned to the artifacts once they're inserted
-      const insertArtifactIds = await artifactService.getNextArtifactIds(files.length);
-
-      const artifactPersistPromises = files.map(async (file: Express.Multer.File, fileIndex: number) => {
-        const artifactMetadata: IArtifactMetadata = metadataRecords[fileIndex];
-        const { uuid, artifact_id } = insertArtifactIds[fileIndex];
-
-        // Generate the S3 key for the artifact, using the preemptive artifact ID + the package UUID
-        const s3Key = `${S3_KEY_PREFIX}/${dataPackageId}/artifacts/${uuid}`
-
-        // Upload the artifact to S3
-        const fileUploadResponse = await uploadFileToS3(file, s3Key, { filename: file.originalname });
-
-        // If the file was successfully uploaded, we persist the artifact in the database
-        const artifactInsertResponse = await artifactService.insertArtifactRecord({
-          ...artifactMetadata,
-          artifact_id,
-          submission_id,
-          uuid,
-          file_name: file.originalname,
-          file_type: 'Other'
-        })
-
-        return {
-          artifact_id: artifactInsertResponse.artifact_id,
-          s3Key: fileUploadResponse.Key,
-          source_transform_id,
-          submission_id
-        };
-      });
-
-      const response = await Promise.all(artifactPersistPromises);
 
       res.status(200).json({ artifacts: response });
 

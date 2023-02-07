@@ -1,9 +1,14 @@
 import { IDBConnection } from '../database/db';
-import { ArtifactRepository, IArtifact } from '../repositories/artifact-repository';
+import { ApiGeneralError } from '../errors/api-error';
+import { ArtifactRepository, IArtifact, IArtifactMetadata } from '../repositories/artifact-repository';
+import { uploadFileToS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
-// import { getLogger } from '../utils/logger';
+import { SubmissionService } from './submission-service';
+import { getLogger } from '../utils/logger';
 
-// const defaultLog = getLogger('services/artifact-service');
+const S3_KEY_PREFIX = process.env.S3_KEY_PREFIX || 'platform';
+
+const defaultLog = getLogger('services/artifact-service');
 
 /**
  *
@@ -12,18 +17,65 @@ import { DBService } from './db-service';
  */
 export class ArtifactService extends DBService {
   artifactRepository: ArtifactRepository;
+  submissionService: SubmissionService
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.artifactRepository = new ArtifactRepository(connection);
+    this.submissionService = new SubmissionService(connection);
   }
 
-  async getNextArtifactIds(count: number = 1): Promise<{ uuid: string, artifact_id: number }[]> {
+  async getNextArtifactIds(count: number = 1): Promise<number[]> {
     return this.artifactRepository.getNextArtifactIds(count);
   }
 
   async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
     return this.artifactRepository.insertArtifactRecord(artifact);
+  }
+
+  async uploadAndPersistArtifact(
+    dataPackageId: string,
+    metadata: IArtifactMetadata,
+    fileUuid: string,
+    file: Express.Multer.File
+  ): Promise<{ artifact_id: number }> {
+    defaultLog.debug({ label: 'uploadAndPersistArtifact' });
+
+    // Fetch the source transform record for this submission based on the source system user id
+    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
+      this.connection.systemUserId()
+    );
+
+    if (!sourceTransformRecord) {
+      throw new ApiGeneralError('Failed to get source transform record for system user');
+    }
+
+    // Create a new submission for the artifact collection
+    const { submission_id } = await this.submissionService.getOrInsertSubmissionRecord({
+      source_transform_id: sourceTransformRecord.source_transform_id,
+      uuid: dataPackageId
+    });
+    
+    // Retrieve the next artifact primary key assigned to this artifact once it is inserted
+    const artifact_id = await this.getNextArtifactIds()[0];      
+
+    // Generate the S3 key for the artifact, using the preemptive artifact ID + the package UUID
+    const s3Key = `${S3_KEY_PREFIX}/${dataPackageId}/artifacts/${artifact_id}/${file.originalname}`
+
+    // Upload the artifact to S3
+    await uploadFileToS3(file, s3Key, { filename: file.originalname });
+
+    // If the file was successfully uploaded, we persist the artifact in the database
+    const artifactInsertResponse = await this.insertArtifactRecord({
+      ...metadata,
+      artifact_id,
+      submission_id,
+      input_key: s3Key,
+      uuid: fileUuid
+    })
+
+    return { artifact_id: artifactInsertResponse.artifact_id };
+   
   }
 }

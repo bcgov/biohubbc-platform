@@ -3,6 +3,7 @@ export enum ARTIFACT_TYPE {
   AUDIO = 'Audio',
   DATA = 'Data',
   IMAGE = 'Image',
+  OTHER = 'Other',
   REPORT = 'Report',
   SPATIAL = 'Spatial',
   SPREADSHEET = 'Spreadsheet',
