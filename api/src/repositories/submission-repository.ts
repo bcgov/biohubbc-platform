@@ -348,7 +348,6 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
-    console.log(`UUID: ${uuid}`);
     const sqlStatement = SQL`
       SELECT
         submission_id
