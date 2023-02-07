@@ -1,9 +1,11 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import * as FileUtils from '../utils/file-utils';
 import { SubmissionJobQueueRepository } from '../repositories/submission-job-queue-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionJobQueueService } from './submission-job-queue-service';
+import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
@@ -42,4 +44,19 @@ describe.only('SubmissionJobQueueService', () => {
       expect(response).to.be.eql(1);
     });
   });
+
+  describe('uploadDatasetToS3', () => {
+    it('should create key and upload to S3', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SubmissionJobQueueService(mockDBConnection);
+      sinon.stub(FileUtils, 'uploadFileToS3');
+
+      const uuid = "uuid";
+      const queueId = 1;
+      const fileName = "file name.zip"
+      const key = await service.uploadDatasetToS3(uuid, queueId, {originalName: fileName} as unknown as Express.Multer.File);
+      
+      expect(key).to.be.eql('datasets/uuid/dwca/1/file name.zip');
+    });
+  })
 });
