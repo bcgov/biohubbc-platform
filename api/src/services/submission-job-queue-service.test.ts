@@ -45,6 +45,25 @@ describe.only('SubmissionJobQueueService', () => {
     });
   });
 
+  describe('intake', () => {
+    it('should return queue id and create new submission', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SubmissionJobQueueService(mockDBConnection);
+
+      const getQueue = sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({queueId: 1});
+      const getSourceTransform = sinon.stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId').resolves(1);
+      const getSubmissionId = sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({submission_id: 1});
+      const uploadToS3 = sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves("key");
+      const createQueue = sinon.stub()
+
+      const response = await service.intake("", {} as unknown as Express.Multer.File);
+
+      
+    });
+
+    it('should return queue id and find submission', async () => {});
+  });
+
   describe('uploadDatasetToS3', () => {
     it('should create key and upload to S3', async () => {
       const mockDBConnection = getMockDBConnection();
