@@ -20,7 +20,6 @@ export interface IInsertSubmissionJobQueueRecord {
 }
 
 export class SubmissionJobQueueRepository extends BaseRepository {
-
   async insertJobQueueRecord(queueId: number, submissionId: number): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_job_queue (

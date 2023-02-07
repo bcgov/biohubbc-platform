@@ -192,21 +192,20 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     try {
-      
       const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-        
+
       if (response.rowCount !== 1) {
         throw new ApiExecuteSQLError('Failed to insert submission record', [
           'SubmissionRepository->insertSubmissionRecord',
           'rowCount was null or undefined, expected rowCount = 1'
         ]);
       }
-  
+
       return response.rows[0];
     } catch (error) {
-      console.log("INSERT ERROR");
-      console.log(error)
-      throw "butts"
+      console.log('INSERT ERROR');
+      console.log(error);
+      throw 'butts';
     }
   }
 
@@ -348,7 +347,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{submission_id: number}> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
     console.log(`UUID: ${uuid}`);
     const sqlStatement = SQL`
       SELECT

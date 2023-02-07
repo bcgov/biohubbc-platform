@@ -582,7 +582,7 @@ export class DarwinCoreService extends DBService {
    */
   async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<void> {
     const normalized = normalizeDWCA(dwcArchiveFile);
-    
+
     await this.submissionService.updateSubmissionRecordDWCSource(submissionId, normalized);
   }
 

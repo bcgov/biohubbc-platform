@@ -14,21 +14,12 @@ export class SubmissionJobQueueService extends DBService {
     this.repository = new SubmissionJobQueueRepository(connection);
   }
 
-  // steps
-  // get next primary key:: is there a chance this could be an issue?
-  // get media from request, put into S3
-  // create submission record if does not exists for UUID
-  // create job queue record
-  // write DwCA receive record
-  // return primary key
-
   async intake(dataUUID: string, file: Express.Multer.File): Promise<number> {
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
 
     await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
-    // const dwcArchive = parseUnknownMediaToDwCAArchive(file)
-    
+
     const submission = await submissionService.getSubmissionIdByUUID(dataUUID);
     let submissionId;
 
@@ -38,13 +29,18 @@ export class SubmissionJobQueueService extends DBService {
       const newId = await submissionService.insertSubmissionRecord(dataUUID, sourceTransformId);
       submissionId = newId.submission_id;
     } else {
-      submissionId = submission.submission_id
+      submissionId = submission.submission_id;
     }
 
     await this.createQueueJob(nextJobId.queueId, submissionId);
-    await submissionService.insertSubmissionStatusAndMessage(submissionId, SUBMISSION_STATUS_TYPE.INGESTED, SUBMISSION_MESSAGE_TYPE.NOTICE, "Uploaded successfully.")
+    await submissionService.insertSubmissionStatusAndMessage(
+      submissionId,
+      SUBMISSION_STATUS_TYPE.INGESTED,
+      SUBMISSION_MESSAGE_TYPE.NOTICE,
+      'Uploaded successfully.'
+    );
 
-    return nextJobId.queueId
+    return nextJobId.queueId;
   }
 
   async uploadDatasetToS3(uuid: string, queueId: number, file: Express.Multer.File): Promise<string> {

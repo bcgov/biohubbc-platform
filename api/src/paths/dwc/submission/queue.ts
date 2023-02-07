@@ -66,7 +66,7 @@ POST.apiDoc = {
             required: ['queue_id'],
             properties: {
               queue_id: {
-                type: 'integer',
+                type: 'integer'
               }
             }
           }
@@ -101,7 +101,7 @@ export function queueForProcess(): RequestHandler {
       const service = new SubmissionJobQueueService(connection);
       const queueId = await service.intake(id, file);
       await connection.commit();
-      res.status(200).json({queue_id: queueId});
+      res.status(200).json({ queue_id: queueId });
     } catch (error) {
       defaultLog.error({ label: 'intakeDataset', message: 'error', error });
       await connection.rollback();

@@ -122,48 +122,47 @@ export const isZipMimetype = (mimetype: string): boolean => {
 export const parseUnknownMediaToDwCAArchive = (unknownMedia: UnknownMedia): DWCArchive => {
   const parsedMedia = parseUnknownMedia(unknownMedia);
 
-    if (!parsedMedia) {
-      throw new ApiGeneralError('Failed to parse submission', [
-        'DarwinCoreService->prepDWCArchive',
-        'unknown media file was empty or unable to be parsed'
-      ]);
-    }
+  if (!parsedMedia) {
+    throw new ApiGeneralError('Failed to parse submission', [
+      'DarwinCoreService->prepDWCArchive',
+      'unknown media file was empty or unable to be parsed'
+    ]);
+  }
 
-    if (!(parsedMedia instanceof ArchiveFile)) {
-      throw new ApiGeneralError('Failed to parse submission', [
-        'DarwinCoreService->prepDWCArchive',
-        'unknown media file was not a valid Archive file'
-      ]);
-    }
+  if (!(parsedMedia instanceof ArchiveFile)) {
+    throw new ApiGeneralError('Failed to parse submission', [
+      'DarwinCoreService->prepDWCArchive',
+      'unknown media file was not a valid Archive file'
+    ]);
+  }
 
-    return new DWCArchive(parsedMedia);
-}
+  return new DWCArchive(parsedMedia);
+};
 
 export const parseEMLtoJSONSource = (eml: EMLFile): any => {
-
-      const options = {
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_',
-        parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
-          const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
-          if (tagsArray.includes(tagName)) return true;
-          return false;
-        }
-      };
-      const parser = new XMLParser(options);
-      const eml_json_source = parser.parse(eml.emlFile.buffer.toString() as string);
-      return eml_json_source
-}
+  const options = {
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
+      const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
+      if (tagsArray.includes(tagName)) return true;
+      return false;
+    }
+  };
+  const parser = new XMLParser(options);
+  const eml_json_source = parser.parse(eml.emlFile.buffer.toString() as string);
+  return eml_json_source;
+};
 
 /**
-   * Returns normalized DwC Archive file data
-   *
-   * @param {DWCArchive} dwcArchiveFile
-   * @return {*}  {string}
-   * @memberof DarwinCoreService
-   */
+ * Returns normalized DwC Archive file data
+ *
+ * @param {DWCArchive} dwcArchiveFile
+ * @return {*}  {string}
+ * @memberof DarwinCoreService
+ */
 export const normalizeDWCA = (dwcArchiveFile: DWCArchive): string => {
   const normalized = {};
 
@@ -174,4 +173,4 @@ export const normalizeDWCA = (dwcArchiveFile: DWCArchive): string => {
   });
 
   return JSON.stringify(normalized);
-}
+};
