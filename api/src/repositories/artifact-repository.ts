@@ -8,23 +8,33 @@ const defaultLog = getLogger('repositories/artifact-repository');
 export interface IArtifactMetadata {
   file_name: string;
   file_type: string;
+  file_size: number;
   title?: string;
   description?: string;
-  file_size?: number;
 }
+
 export interface IArtifact extends IArtifactMetadata {
   artifact_id: number;
   submission_id: number;
   uuid: string;
   input_key: string;
   foi_reason_description?: string;
+  security_review_timestamp?: string;
 }
 
+/**
+ * A repository for maintaining submission artifacts.
+ * 
+ * @export
+ * @class ArtifactRepository
+ * @extends BaseRepository
+ */
 export class ArtifactRepository extends BaseRepository {
   /**
+   * Retrieves an array of of new primary keys for an artifact record.
    * 
-   * @param count 
-   * @returns 
+   * @param {number} [count=1] The number of artifact primary keys to generate (by default, only 1).
+   * @returns {*} {Promise<number[]>} The array of artifact primary keys
    * @memberof ArtifactRepository
    */
   async getNextArtifactIds(count: number): Promise<number[]> {
@@ -48,6 +58,13 @@ export class ArtifactRepository extends BaseRepository {
     return results.map((row) => row.artifact_id);
   }
 
+  /**
+   * Inserts a new artifact record
+   *
+   * @param artifact The artifact record to insert
+   * @returns {*} {Promise<{ artifact_id: number }>} The ID of the inserted artifact
+   * @memberof ArtifactRepository
+   */
   async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
     defaultLog.debug({ label: 'insertArtifactRecord', artifact });
 
@@ -58,22 +75,22 @@ export class ArtifactRepository extends BaseRepository {
         artifact_id,
         submission_id,
         uuid,
-        input_key,
+        key,
         file_name,
         file_type,
         title,
         description,
-        file_size,
+        file_size
       ) VALUES (
         ${artifact.artifact_id},
         ${artifact.submission_id},
         ${artifact.uuid},
-        ${artifact.input_key}
+        ${artifact.input_key},
         ${artifact.file_name},
         ${artifact.file_type},
         ${artifact.title},
         ${artifact.description},
-        ${artifact.file_size},
+        ${artifact.file_size}
       )
       RETURNING
         artifact_id;
