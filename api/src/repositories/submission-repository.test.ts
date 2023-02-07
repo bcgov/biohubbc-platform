@@ -9,7 +9,6 @@ import { EMLFile } from '../utils/media/eml/eml-file';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import {
-  IInsertSubmissionRecord,
   ISourceTransformModel,
   ISpatialComponentCount,
   SubmissionRepository,
@@ -88,16 +87,6 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    const mockParams = {
-      source_transform_id: 'test',
-      input_file_name: 'test',
-      input_key: 'test',
-      record_effective_date: 'test',
-      eml_source: 'test',
-      darwin_core_source: 'test',
-      uuid: 'test'
-    };
-
     it('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
@@ -108,7 +97,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecord(mockParams as unknown as IInsertSubmissionRecord);
+        await submissionRepository.insertSubmissionRecord("uuid", 1);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -124,9 +113,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionRecord(
-        mockParams as unknown as IInsertSubmissionRecord
-      );
+      const response = await submissionRepository.insertSubmissionRecord("uuid", 1);
 
       expect(response.submission_id).to.equal(1);
     });

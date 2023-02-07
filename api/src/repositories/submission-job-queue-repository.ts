@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
 export interface ISubmissionJobQueueModel {
@@ -73,7 +74,14 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ source_transform_id: number }>(sqlStatement);
-    // TODO should this throw an error if there is no transform for the user?
+    
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get source transform Id', [
+        'SubmissionJobQueueRepository->getSourceTransformIdForUserId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
     return response.rows[0].source_transform_id;
   }
 }
