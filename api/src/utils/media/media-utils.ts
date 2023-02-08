@@ -114,4 +114,3 @@ export const isZipMimetype = (mimetype: string): boolean => {
     regex.test(mimetype)
   );
 };
-

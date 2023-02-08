@@ -199,7 +199,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Insert a new submission record, returning the record having the matching UUID if it already exists.
-   * 
+   *
    * Because `ON CONFLICT ... DO NOTHING` fails to yield the submission_id, the query simply updates the
    * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
    * and infer that the query ran successfully.
@@ -242,10 +242,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordInputKey(
-    submissionId: number,
-    inputKey: string
-  ): Promise<{ submission_id: number }> {
+  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       UPDATE
         submission

@@ -15,7 +15,7 @@ import { POST } from './intake';
 
 chai.use(sinonChai);
 
-describe('intake', () => {
+describe.only('intake', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
@@ -117,7 +117,7 @@ describe('intake', () => {
           });
         });
 
-        describe.only('metadata', () => {
+        describe('metadata', () => {
           it('is undefined', async () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
@@ -168,14 +168,14 @@ describe('intake', () => {
                   }
                 }
               };
-  
+
               const response = requestValidator.validateRequest(request);
-  
+
               expect(response.status).to.equal(400);
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal('must be string');
             });
-  
+
             it('is undefined', async () => {
               const request = {
                 headers: { 'content-type': 'multipart/form-data' },
@@ -191,16 +191,16 @@ describe('intake', () => {
                   }
                 }
               };
-  
+
               const response = requestValidator.validateRequest(request);
-  
+
               expect(response.status).to.equal(400);
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal("must have required property 'file_name'");
               expect(response.errors[0].path).to.equal('metadata.file_name');
             });
           });
-  
+
           describe('file_type', () => {
             it('is invalid type', async () => {
               const request = {
@@ -217,14 +217,14 @@ describe('intake', () => {
                   }
                 }
               };
-  
+
               const response = requestValidator.validateRequest(request);
-  
+
               expect(response.status).to.equal(400);
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal('must be string');
             });
-  
+
             it('is undefined', async () => {
               const request = {
                 headers: { 'content-type': 'multipart/form-data' },
@@ -240,16 +240,16 @@ describe('intake', () => {
                   }
                 }
               };
-  
+
               const response = requestValidator.validateRequest(request);
-  
+
               expect(response.status).to.equal(400);
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal("must have required property 'file_type'");
               expect(response.errors[0].path).to.equal('metadata.file_type');
             });
           });
-  
+
           describe('file_size', () => {
             it('is invalid type', async () => {
               const request = {
@@ -266,14 +266,14 @@ describe('intake', () => {
                   }
                 }
               };
-  
+
               const response = requestValidator.validateRequest(request);
-  
+
               expect(response.status).to.equal(400);
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal('must be string');
             });
-  
+
             it('is undefined', async () => {
               const request = {
                 headers: { 'content-type': 'multipart/form-data' },
@@ -289,9 +289,9 @@ describe('intake', () => {
                   }
                 }
               };
-  
+
               const response = requestValidator.validateRequest(request);
-  
+
               expect(response.status).to.equal(400);
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal("must have required property 'file_size'");
@@ -398,7 +398,7 @@ describe('intake', () => {
 
       describe('should succeed when', () => {
         it('required values are valid', async () => {
-          const apiResponse = { artifact_id: 1};
+          const apiResponse = { artifact_id: 1 };
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response).to.equal(undefined);
@@ -407,7 +407,7 @@ describe('intake', () => {
     });
   });
 
-  describe.only('intakeArtifacts', () => {
+  describe('intakeArtifacts', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -426,7 +426,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -460,7 +460,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -491,7 +491,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(false);
 
@@ -524,7 +524,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: 'string'
         }
-      }
+      };
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -555,7 +555,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '-1'
         }
-      }
+      };
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -586,7 +586,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
@@ -620,7 +620,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
@@ -654,7 +654,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
@@ -691,7 +691,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
@@ -727,7 +727,7 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
@@ -754,7 +754,7 @@ describe('intake', () => {
 
       const mockFile = {
         originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
-      } as unknown as Express.Multer.File
+      } as unknown as Express.Multer.File;
 
       mockReq.files = [mockFile];
       mockReq.body = {
@@ -767,12 +767,13 @@ describe('intake', () => {
           file_type: 'Other',
           file_size: '1'
         }
-      }
+      };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const uploadStub = sinon.stub(ArtifactService.prototype, 'uploadAndPersistArtifact')
+      const uploadStub = sinon
+        .stub(ArtifactService.prototype, 'uploadAndPersistArtifact')
         .resolves({ artifact_id: 12 });
 
       const requestHandler = intake.intakeArtifacts();

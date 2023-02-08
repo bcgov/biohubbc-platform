@@ -55,9 +55,9 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-    async getOrInsertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
-      return this.submissionRepository.getOrInsertSubmissionRecord(submissionData);
-    }
+  async getOrInsertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+    return this.submissionRepository.getOrInsertSubmissionRecord(submissionData);
+  }
 
   /**
    * Update the `input_key` column of a submission record.
@@ -67,10 +67,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionRecordInputKey(
-    submissionId: number,
-    inputKey: string
-  ): Promise<{ submission_id: number }> {
+  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
   }
 

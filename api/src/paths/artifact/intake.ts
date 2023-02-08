@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { validate as validateUuid } from 'uuid';
 import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
@@ -9,7 +10,6 @@ import { ArtifactService } from '../../services/artifact-service';
 import { scanFileForVirus } from '../../utils/file-utils';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
-import { validate as validateUuid } from 'uuid'
 
 const defaultLog = getLogger('paths/artifact/intake');
 
@@ -123,7 +123,7 @@ export function intakeArtifacts(): RequestHandler {
     }
 
     const file: Express.Multer.File = Object.values(req.files)[0];
-    const metadata = req.body.metadata
+    const metadata = req.body.metadata;
     if (!metadata) {
       throw new HTTP400('Metadata is required');
     }

@@ -1,7 +1,7 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { BaseRepository } from './base-repository';
 import { getLogger } from '../utils/logger';
+import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/artifact-repository');
 
@@ -24,7 +24,7 @@ export interface IArtifact extends IArtifactMetadata {
 
 /**
  * A repository for maintaining submission artifacts.
- * 
+ *
  * @export
  * @class ArtifactRepository
  * @extends BaseRepository
@@ -32,7 +32,7 @@ export interface IArtifact extends IArtifactMetadata {
 export class ArtifactRepository extends BaseRepository {
   /**
    * Retrieves an array of of new primary keys for an artifact record.
-   * 
+   *
    * @param {number} [count=1] The number of artifact primary keys to generate (by default, only 1).
    * @returns {*} {Promise<number[]>} The array of artifact primary keys
    * @memberof ArtifactRepository
@@ -45,7 +45,7 @@ export class ArtifactRepository extends BaseRepository {
         NEXTVAL('artifact_seq') AS artifact_id
       FROM
         GENERATE_SERIES(1, ${count});
-    `
+    `;
 
     const response = await this.connection.sql<{ artifact_id: number }>(sqlStatement);
 
