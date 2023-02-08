@@ -345,7 +345,7 @@ export class DarwinCoreService extends DBService {
     file: Express.Multer.File,
     dataPackageId: string
   ): Promise<{ dataPackageId: string; submissionId: number }> {
-    const dwcArchive = this.prepDWCArchive(file);
+    this.prepDWCArchive(file);
 
     // Fetch the source transform record for this submission based on the source system user id
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
@@ -354,12 +354,6 @@ export class DarwinCoreService extends DBService {
 
     const response = await this.submissionService.insertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
-      input_file_name: dwcArchive.rawFile.fileName,
-      input_key: '',
-      record_effective_date: new Date().toISOString(),
-      eml_source: '',
-      eml_json_source: '',
-      darwin_core_source: '{}',
       uuid: dataPackageId
     });
 

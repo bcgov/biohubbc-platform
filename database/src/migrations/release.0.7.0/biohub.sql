@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Thursday, January 19, 2023 12:27:27
+-- Date Created : Monday, February 06, 2023 16:30:23
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -19,6 +19,7 @@ CREATE TABLE artifact(
     title                        varchar(300),
     description                  varchar(250),
     file_size                    integer,
+    key                          varchar(1000),
     security_review_timestamp    timestamptz(6),
     foi_reason_description       varchar(3000),
     create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
@@ -47,6 +48,8 @@ COMMENT ON COLUMN artifact.title IS 'The title of the artifact.'
 COMMENT ON COLUMN artifact.description IS 'The description of the record.'
 ;
 COMMENT ON COLUMN artifact.file_size IS 'The size of the artifact in bytes.'
+;
+COMMENT ON COLUMN artifact.key IS 'The identifying key to the file in the storage system.'
 ;
 COMMENT ON COLUMN artifact.security_review_timestamp IS 'The timestamp that the security review of the submission artifact was completed.'
 ;
