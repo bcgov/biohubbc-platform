@@ -75,7 +75,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     const response = await this.connection.sql<{ nextval: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to fetch nextval from sequence', [
+      throw new ApiExecuteSQLError('Failed to fetch nextval from submission sequence', [
         'SubmissionJobQueueRepository->getNextQueueId',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
