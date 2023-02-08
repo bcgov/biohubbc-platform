@@ -14,7 +14,7 @@ import * as queue from './queue';
 
 chai.use(sinonChai);
 
-describe.only('queue', () => {
+describe('queue', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(queue.POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
@@ -26,7 +26,7 @@ describe.only('queue', () => {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: undefined,
-                dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
                 security_request: {}
               }
             };
@@ -43,7 +43,7 @@ describe.only('queue', () => {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: null,
-                dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
                 security_request: {}
               }
             };
@@ -56,13 +56,13 @@ describe.only('queue', () => {
           });
         });
 
-        describe('dataset_uuid', () => {
+        describe('data_package_id', () => {
           it('is invalid type', async () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: 'file-binary',
-                dataset_uuid: 123,
+                data_package_id: 123,
                 security_request: {}
               }
             };
@@ -79,7 +79,7 @@ describe.only('queue', () => {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: 'file-binary',
-                dataset_uuid: 'abcdefg',
+                data_package_id: 'abcdefg',
                 security_request: {}
               }
             };
@@ -98,7 +98,7 @@ describe.only('queue', () => {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: 'file-binary',
-                dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
                 security_request: null
               }
             };
@@ -115,7 +115,7 @@ describe.only('queue', () => {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: 'file-binary',
-                dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
                 security_request: '{}'
               }
             };
@@ -135,7 +135,7 @@ describe.only('queue', () => {
             headers: { 'content-type': 'multipart/form-data' },
             body: {
               media: 'file-binary',
-              dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b'
+              data_package_id: '64f47e65-f306-410e-82fa-115f9916910b'
             }
           };
 
@@ -149,7 +149,7 @@ describe.only('queue', () => {
             headers: { 'content-type': 'multipart/form-data' },
             body: {
               media: 'file-binary',
-              dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+              data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
               security_request: {
                 first_nations_id: 1,
                 proprietor_type_id: 2,
@@ -170,7 +170,7 @@ describe.only('queue', () => {
             headers: { 'content-type': 'multipart/form-data' },
             body: {
               media: 'file-binary',
-              dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+              data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
               security_request: {
                 first_nations_id: 1,
                 proprietor_type_id: 2,
@@ -265,7 +265,7 @@ describe.only('queue', () => {
       mockReq.files = [];
       mockReq.body = {
         media: 'file-binary',
-        dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {}
       };
 
@@ -293,7 +293,7 @@ describe.only('queue', () => {
       ];
       mockReq.body = {
         media: 'file-binary',
-        dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {}
       };
 
@@ -318,7 +318,7 @@ describe.only('queue', () => {
       ];
       mockReq.body = {
         media: 'file-binary',
-        dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {}
       };
 
@@ -348,7 +348,7 @@ describe.only('queue', () => {
       ];
       mockReq.body = {
         media: 'file-binary',
-        dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {}
       };
 
@@ -378,7 +378,7 @@ describe.only('queue', () => {
       ];
       mockReq.body = {
         media: 'file-binary',
-        dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {}
       };
 
@@ -412,7 +412,7 @@ describe.only('queue', () => {
       mockReq.files = [mockFile];
       mockReq.body = {
         media: 'file-binary',
-        dataset_uuid: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {
           first_nations_id: 1,
           proprietor_type_id: 2,
