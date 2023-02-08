@@ -15,7 +15,7 @@ import { POST } from './intake';
 
 chai.use(sinonChai);
 
-describe.only('intake', () => {
+describe('intake', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);

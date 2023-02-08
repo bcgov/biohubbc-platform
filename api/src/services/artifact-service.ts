@@ -1,5 +1,4 @@
 import { IDBConnection } from '../database/db';
-import { ApiGeneralError } from '../errors/api-error';
 import { ArtifactRepository, IArtifact, IArtifactMetadata } from '../repositories/artifact-repository';
 import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -71,10 +70,6 @@ export class ArtifactService extends DBService {
       this.connection.systemUserId()
     );
 
-    if (!sourceTransformRecord) {
-      throw new ApiGeneralError('Failed to get source transform record for system user');
-    }
-
     // Create a new submission for the artifact collection
     const { submission_id } = await this.submissionService.getOrInsertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
@@ -95,14 +90,12 @@ export class ArtifactService extends DBService {
     await uploadFileToS3(file, s3Key, { filename: file.originalname });
 
     // If the file was successfully uploaded, we persist the artifact in the database
-    const artifactInsertResponse = await this.insertArtifactRecord({
+    return this.insertArtifactRecord({
       ...metadata,
       artifact_id,
       submission_id,
       input_key: s3Key,
       uuid: fileUuid
     });
-
-    return { artifact_id: artifactInsertResponse.artifact_id };
   }
 }

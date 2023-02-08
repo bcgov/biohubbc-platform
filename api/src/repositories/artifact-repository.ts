@@ -52,7 +52,7 @@ export class ArtifactRepository extends BaseRepository {
     const results = (response && response.rowCount && response.rows) || null;
 
     if (!results) {
-      throw new ApiExecuteSQLError('Failed to get next artifact ID');
+      throw new ApiExecuteSQLError('Failed to get next artifact IDs');
     }
 
     return results.map((row) => row.artifact_id);
@@ -101,7 +101,7 @@ export class ArtifactRepository extends BaseRepository {
     const result = (response && response.rowCount && response.rows[0]) || null;
 
     if (!result) {
-      throw new ApiExecuteSQLError('Failed to insert artifact metadata');
+      throw new ApiExecuteSQLError('Failed to insert artifact record');
     }
 
     return result;
