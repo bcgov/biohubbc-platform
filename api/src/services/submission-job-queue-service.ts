@@ -5,7 +5,7 @@ import { generateDatasetS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
 
-export interface IProprietaryInformation {
+export interface ISecurityRequest {
   first_nations_id: number;
   proprietor_type_id: number;
   survey_id: number;
@@ -34,7 +34,7 @@ export class SubmissionJobQueueService extends DBService {
   async intake(
     dataUUID: string,
     file: Express.Multer.File,
-    proprietaryInformation?: IProprietaryInformation
+    securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
     const submissionService = new SubmissionService(this.connection);
     const nextJobId = await this.repository.getNextQueueId();
@@ -53,7 +53,7 @@ export class SubmissionJobQueueService extends DBService {
       submissionId = submission.submission_id;
     }
 
-    const queueRecord = await this.createQueueJob(nextJobId.queueId, submissionId, proprietaryInformation);
+    const queueRecord = await this.createQueueJob(nextJobId.queueId, submissionId, securityRequest);
     await submissionService.insertSubmissionStatusAndMessage(
       submissionId,
       SUBMISSION_STATUS_TYPE.INGESTED,
@@ -94,9 +94,9 @@ export class SubmissionJobQueueService extends DBService {
   async createQueueJob(
     queueId: number,
     submissionId: number,
-    proprietaryInformation?: IProprietaryInformation
+    securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
-    return await this.repository.insertJobQueueRecord(queueId, submissionId, proprietaryInformation);
+    return await this.repository.insertJobQueueRecord(queueId, submissionId, securityRequest);
   }
 
   /**

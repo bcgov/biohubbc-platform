@@ -1,6 +1,6 @@
 import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { IProprietaryInformation } from '../services/submission-job-queue-service';
+import { ISecurityRequest } from '../services/submission-job-queue-service';
 import { BaseRepository } from './base-repository';
 
 export interface ISubmissionJobQueueModel {
@@ -34,7 +34,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
   async insertJobQueueRecord(
     queueId: number,
     submissionId: number,
-    proprietaryInformation?: IProprietaryInformation
+    securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_job_queue (
@@ -44,12 +44,20 @@ export class SubmissionJobQueueRepository extends BaseRepository {
       ) VALUES (
         ${queueId},
         ${submissionId},
-        ${JSON.stringify(proprietaryInformation ? proprietaryInformation : {})}
+        ${JSON.stringify(securityRequest ? securityRequest : {})}
       )
       RETURNING submission_job_queue_id;
     `;
 
     const response = await this.connection.sql<{ submission_job_queue_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert Queue Job', [
+        'SubmissionJobQueueRepository->insertJobQueueRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
     return { queue_id: response.rows[0].submission_job_queue_id };
   }
 
@@ -65,6 +73,14 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ nextval: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to fetch nextval from sequence', [
+        'SubmissionJobQueueRepository->getNextQueueId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+    
     return { queueId: response.rows[0].nextval };
   }
 

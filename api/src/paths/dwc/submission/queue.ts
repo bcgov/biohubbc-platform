@@ -51,8 +51,9 @@ POST.apiDoc = {
               format: 'uuid',
               description: 'A unique identifier for this Darwin Care Archive (DwCA) data package.'
             },
-            proprietary_information: {
-              type: 'string'
+            security_request: {
+              type: 'string',
+              description: 'A JSON object as a string containing information for a security request.'
             }
           }
         }
@@ -98,16 +99,16 @@ export function queueForProcess(): RequestHandler {
 
     const id = req.body.dataset_uuid;
     const connection = getServiceAccountDBConnection(sourceSystem);
-    const proprietaryInformation = JSON.parse(req.body.proprietary_information);
+    const securityRequest = req.body.security_request ? JSON.parse(req.body.security_request) : {}
 
     try {
       await connection.open();
       const service = new SubmissionJobQueueService(connection);
-      const queueRecord = await service.intake(id, file, proprietaryInformation);
+      const queueRecord = await service.intake(id, file, securityRequest);
       await connection.commit();
       res.status(200).json(queueRecord);
     } catch (error) {
-      defaultLog.error({ label: 'queue', message: 'error', error });
+      defaultLog.error({ label: 'queueForProcess', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
