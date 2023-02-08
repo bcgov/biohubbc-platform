@@ -99,7 +99,7 @@ export function queueForProcess(): RequestHandler {
 
     const id = req.body.dataset_uuid;
     const connection = getServiceAccountDBConnection(sourceSystem);
-    const securityRequest = req.body.security_request ? JSON.parse(req.body.security_request) : {}
+    const securityRequest = req.body.security_request ? JSON.parse(req.body.security_request) : {};
 
     try {
       await connection.open();

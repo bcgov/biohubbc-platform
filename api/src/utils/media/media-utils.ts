@@ -119,19 +119,25 @@ export const isZipMimetype = (mimetype: string): boolean => {
   );
 };
 
+/**
+ * Parses an unknown media type into a DWCArchive object or throws an error
+ *
+ * @param {UnknownMedia} unknownMedia
+ * @return {*}  {DWCArchive}
+ */
 export const parseUnknownMediaToDwCAArchive = (unknownMedia: UnknownMedia): DWCArchive => {
   const parsedMedia = parseUnknownMedia(unknownMedia);
 
   if (!parsedMedia) {
     throw new ApiGeneralError('Failed to parse submission', [
-      'DarwinCoreService->prepDWCArchive',
+      'Media Utils->parseUnknownMediaToDwCAArchive',
       'unknown media file was empty or unable to be parsed'
     ]);
   }
 
   if (!(parsedMedia instanceof ArchiveFile)) {
     throw new ApiGeneralError('Failed to parse submission', [
-      'DarwinCoreService->prepDWCArchive',
+      'Media Utils->parseUnknownMediaToDwCAArchive',
       'unknown media file was not a valid Archive file'
     ]);
   }
@@ -139,12 +145,17 @@ export const parseUnknownMediaToDwCAArchive = (unknownMedia: UnknownMedia): DWCA
   return new DWCArchive(parsedMedia);
 };
 
+/**
+ * Parses a given EML file into a JSON object
+ *
+ * @param {EMLFile} eml
+ * @return {*}  {any}
+ */
 export const parseEMLtoJSONSource = (eml: EMLFile): any => {
   const options = {
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
     parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
       const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
       if (tagsArray.includes(tagName)) return true;
@@ -161,7 +172,6 @@ export const parseEMLtoJSONSource = (eml: EMLFile): any => {
  *
  * @param {DWCArchive} dwcArchiveFile
  * @return {*}  {string}
- * @memberof DarwinCoreService
  */
 export const normalizeDWCA = (dwcArchiveFile: DWCArchive): string => {
   const normalized = {};

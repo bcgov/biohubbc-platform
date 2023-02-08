@@ -80,7 +80,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
-    
+
     return { queueId: response.rows[0].nextval };
   }
 

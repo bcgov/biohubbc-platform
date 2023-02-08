@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import { deleteFileFromS3, generateS3FileKey, getS3SignedURL } from './file-utils';
+import { deleteFileFromS3, generateDatasetS3FileKey, generateS3FileKey, getS3SignedURL } from './file-utils';
 
 describe('deleteFileFromS3', () => {
   it('returns null when no key specified', async () => {
@@ -29,5 +29,13 @@ describe('generateS3FileKey', () => {
     const result = generateS3FileKey({ submissionId: 1, fileName: 'extra/folders/testFileName' });
 
     expect(result).to.equal('platform/submissions/1/extra/folders/testFileName');
+  });
+
+  describe('generateDatasetS3FileKey', () => {
+    it('returns a dataset file path', async () => {
+      const result = generateDatasetS3FileKey({ fileName: 'fileName', uuid: 'uuid', queueId: 1 });
+
+      expect(result).to.equal('platform/datasets/uuid/dwca/1/fileName');
+    });
   });
 });
