@@ -41,21 +41,18 @@ export class SubmissionJobQueueService extends DBService {
 
     const key = await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
 
-    const submission = await submissionService.getSubmissionIdByUUID(dataUUID);
-    let submissionId;
+    let submission = await submissionService.getSubmissionIdByUUID(dataUUID);
 
     if (!submission) {
       const currentUserId = this.connection.systemUserId();
       const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
       const newId = await submissionService.insertSubmissionRecord(dataUUID, sourceTransformId, key);
-      submissionId = newId.submission_id;
-    } else {
-      submissionId = submission.submission_id;
+      submission = newId;
     }
 
-    const queueRecord = await this.createQueueJob(nextJobId.queueId, submissionId, securityRequest);
+    const queueRecord = await this.createQueueJob(nextJobId.queueId, submission.submission_id, securityRequest);
     await submissionService.insertSubmissionStatusAndMessage(
-      submissionId,
+      submission.submission_id,
       SUBMISSION_STATUS_TYPE.INGESTED,
       SUBMISSION_MESSAGE_TYPE.NOTICE,
       'Uploaded successfully.'
