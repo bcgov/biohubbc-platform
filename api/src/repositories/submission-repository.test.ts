@@ -628,6 +628,10 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('insertSubmissionRecord', () => {
+    // @TODO
+  });
+
   describe('listSubmissionRecords', () => {
     afterEach(() => {
       sinon.restore();

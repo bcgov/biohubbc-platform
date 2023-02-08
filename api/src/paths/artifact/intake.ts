@@ -129,8 +129,7 @@ export function intakeArtifacts(): RequestHandler {
     }
 
     const file_size = Number(metadata.file_size);
-    if (!(file_size >= 0)) {
-      // iff file size is NaN or < 0
+    if (isNaN(file_size) || file_size < 0) {
       throw new HTTP400('Metadata file_size must be a non-negative integer');
     }
 

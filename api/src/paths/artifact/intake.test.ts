@@ -506,6 +506,62 @@ describe('intake', () => {
       }
     });
 
+    it('throws an error when data_package_id is absent', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: undefined,
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: 'string'
+        }
+      };
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Data package ID is required');
+      }
+    });
+
+    it('throws an error when metadata is absent', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: undefined
+      };
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Metadata is required');
+      }
+    });
+
     it('throws an error when metadata file size is not a number', async () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

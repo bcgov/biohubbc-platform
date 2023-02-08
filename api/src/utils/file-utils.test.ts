@@ -30,4 +30,14 @@ describe('generateS3FileKey', () => {
 
     expect(result).to.equal('platform/submissions/1/extra/folders/testFileName');
   });
+
+  it('generates an artifact s3 key', () => {
+    const result = generateS3FileKey({
+      uuid: 'aaaa',
+      artifactId: 33,
+      fileName: 'bbbb.zip'
+    });
+
+    expect(result).to.equal('platform/aaaa/artifacts/33/bbbb.zip');
+  });
 });
