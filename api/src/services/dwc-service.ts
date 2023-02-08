@@ -81,7 +81,7 @@ export class DarwinCoreService extends DBService {
     await this.intakeJob_step5(intakeRecord.submission_id);
 
     //TODO: all jobs up to 5 data flow is in happy path. Review and harden functions + write tests
-    if (!dwcaFile.worksheets) {
+    if (dwcaFile.worksheets) {
       await this.intakeJob_step6(intakeRecord);
     }
 
@@ -287,7 +287,7 @@ export class DarwinCoreService extends DBService {
       };
 
       const response = await this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
-      console.log('response', response);
+      console.log('insertSubmissionObservationRecord', response);
 
       await this.spatialService.runSpatialTransforms(intakeRecord.submission_id);
 
@@ -378,33 +378,6 @@ export class DarwinCoreService extends DBService {
     }
 
     return this.prepDWCArchive(file);
-  }
-
-  /**
-   * Step 9 in processing a DWC archive file: run security transforms
-   *
-   * @param {number} submissionId
-   * @return {*}
-   * @memberof DarwinCoreService
-   */
-  async create_step9_runSecurityTransforms(submissionId: number) {
-    try {
-      await this.spatialService.runSecurityTransforms(submissionId);
-      await this.submissionService.insertSubmissionStatus(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
-      );
-    } catch (error: any) {
-      defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-      throw new ApiGeneralError('Run security transforms failed', error.message);
-    }
   }
 
   /**
@@ -523,7 +496,7 @@ export class DarwinCoreService extends DBService {
     // call to the ElasticSearch API to create a record with our transformed EML
     const response = await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
 
-    console.log('response', response); //TODO: remove this stuff
+    console.log('uploadToElasticSearch', response); //TODO: remove this stuff
   }
 
   /**

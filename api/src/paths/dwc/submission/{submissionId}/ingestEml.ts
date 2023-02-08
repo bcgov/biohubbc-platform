@@ -86,7 +86,9 @@ export function ingestEmlSubmission(): RequestHandler {
       res.status(200).send();
     } catch (error) {
       defaultLog.error({ label: 'secureSubmission', message: 'error', error });
-      await connection.rollback();
+      await connection.commit();
+
+      // await connection.rollback();
       throw error;
     } finally {
       connection.release();

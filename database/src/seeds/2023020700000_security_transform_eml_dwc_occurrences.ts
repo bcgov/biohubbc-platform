@@ -16,10 +16,10 @@ export async function seed(knex: Knex): Promise<void> {
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
     INSERT INTO
       security_transform
-      (name, description, record_effective_date, transform)
+      (persecution_or_harm_id, name, description,  transform)
     VALUES
-      ('DwC Occurrences', 'Assigns Persecution and Harm Rules', now(),
-      $transform$
+      (1, 'DwC Occurrences', 'Assigns Persecution and Harm Rules',
+      ($transform$
         WITH with_spatial_component AS
           (SELECT spatial_component,
           submission_spatial_component_id from submission_spatial_component where submission_id = ? and jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "Occurrence")'))
@@ -38,7 +38,7 @@ export async function seed(knex: Knex): Promise<void> {
                 END
             ) spatial_component
           FROM with_spatial_component wsc;
-        $transform$
-      WHERE name = 'DwC Occurrences';
+        $transform$)
+      );
   `);
 }

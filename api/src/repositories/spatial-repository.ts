@@ -274,21 +274,22 @@ export class SpatialRepository extends BaseRepository {
    * @memberof SpatialRepository
    */
   async insertSubmissionSpatialComponent(
-    submissionId: number,
+    submissionObservationId: number,
     transformedData: FeatureCollection
   ): Promise<{ submission_spatial_component_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
-        submission_id,
+        submission_observation_id,
         spatial_component,
         geography
       ) VALUES (
-        ${submissionId},
+        ${submissionObservationId},
         ${JSON.stringify(transformedData)}
     `;
 
     if (transformedData.features && transformedData.features.length > 0) {
       const geoCollection = generateGeometryCollectionSQL(transformedData.features);
+      console.log('geoCollection', geoCollection);
 
       sqlStatement.append(SQL`
         ,public.geography(
@@ -313,7 +314,11 @@ export class SpatialRepository extends BaseRepository {
         submission_spatial_component_id;
     `);
 
+    console.log('sqlStatement', String(sqlStatement.text));
+    console.log('sqlStatement', sqlStatement.values);
+
     const response = await this.connection.sql<{ submission_spatial_component_id: number }>(sqlStatement);
+    console.log('response', response);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission spatial component details', [
