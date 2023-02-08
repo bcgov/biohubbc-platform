@@ -90,6 +90,7 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
+            required: ['artifact_id'],
             properties: {
               artifact_id: {
                 type: 'integer',
@@ -134,7 +135,7 @@ export function intakeArtifacts(): RequestHandler {
     }
 
     const fileParts = file.originalname.split('.');
-    if (fileParts[fileParts.length - 1].toLocaleLowerCase() !== 'zip') {
+    if (fileParts.length < 2 || fileParts[fileParts.length - 1].toLocaleLowerCase() !== 'zip') {
       throw new HTTP400('File must be a .zip archive');
     }
 

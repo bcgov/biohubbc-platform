@@ -6,7 +6,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
-import { DarwinCoreService } from '../../services/dwc-service';
+import { ArtifactService } from '../../services/artifact-service';
 import * as fileUtils from '../../utils/file-utils';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
@@ -17,7 +17,7 @@ chai.use(sinonChai);
 
 describe('intake', () => {
   describe('openApiSchema', () => {
-    describe.only('request validation', () => {
+    describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
 
       describe('should throw an error when', () => {
@@ -33,7 +33,7 @@ describe('intake', () => {
                   description: 'Description',
                   file_name: 'Filename.txt',
                   file_type: 'Other',
-                  file_size: 1
+                  file_size: '1'
                 }
               }
             };
@@ -56,7 +56,7 @@ describe('intake', () => {
                   description: 'Description',
                   file_name: 'Filename.txt',
                   file_type: 'Other',
-                  file_size: 1
+                  file_size: '1'
                 }
               }
             };
@@ -74,14 +74,14 @@ describe('intake', () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
-                media: null,
+                media: 'file-binary',
                 data_package_id: 123,
                 metadata: {
                   title: 'Title',
                   description: 'Description',
                   file_name: 'Filename.txt',
                   file_type: 'Other',
-                  file_size: 1
+                  file_size: '1'
                 }
               }
             };
@@ -97,14 +97,14 @@ describe('intake', () => {
             const request = {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
-                media: null,
+                media: 'file-binary',
                 data_package_id: 'abcdefg',
                 metadata: {
                   title: 'Title',
                   description: 'Description',
                   file_name: 'Filename.txt',
                   file_type: 'Other',
-                  file_size: 1
+                  file_size: '1'
                 }
               }
             };
@@ -117,16 +117,187 @@ describe('intake', () => {
           });
         });
 
-        describe('file_name', () => {
-          //
-        });
+        describe.only('metadata', () => {
+          it('is undefined', async () => {
+            const request = {
+              headers: { 'content-type': 'multipart/form-data' },
+              body: {
+                media: 'file-binary',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                metadata: undefined
+              }
+            };
 
-        describe('file_type', () => {
-          //
-        });
+            const response = requestValidator.validateRequest(request);
 
-        describe('file_size', () => {
-          //
+            expect(response.status).to.equal(400);
+            expect(response.errors.length).to.equal(1);
+            expect(response.errors[0].message).to.equal("must have required property 'metadata'");
+          });
+
+          it('is null', async () => {
+            const request = {
+              headers: { 'content-type': 'multipart/form-data' },
+              body: {
+                media: 'file-binary',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                metadata: null
+              }
+            };
+
+            const response = requestValidator.validateRequest(request);
+
+            expect(response.status).to.equal(400);
+            expect(response.errors.length).to.equal(1);
+            expect(response.errors[0].message).to.equal('must be object');
+          });
+
+          describe('file_name', () => {
+            it('is invalid type', async () => {
+              const request = {
+                headers: { 'content-type': 'multipart/form-data' },
+                body: {
+                  media: 'file-binary',
+                  data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                  metadata: {
+                    title: 'Title',
+                    description: 'Description',
+                    file_name: 0,
+                    file_type: 'Other',
+                    file_size: '1'
+                  }
+                }
+              };
+  
+              const response = requestValidator.validateRequest(request);
+  
+              expect(response.status).to.equal(400);
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal('must be string');
+            });
+  
+            it('is undefined', async () => {
+              const request = {
+                headers: { 'content-type': 'multipart/form-data' },
+                body: {
+                  media: 'file-binary',
+                  data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                  metadata: {
+                    title: 'Title',
+                    description: 'Description',
+                    file_name: undefined,
+                    file_type: 'Other',
+                    file_size: '1'
+                  }
+                }
+              };
+  
+              const response = requestValidator.validateRequest(request);
+  
+              expect(response.status).to.equal(400);
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal("must have required property 'file_name'");
+              expect(response.errors[0].path).to.equal('metadata.file_name');
+            });
+          });
+  
+          describe('file_type', () => {
+            it('is invalid type', async () => {
+              const request = {
+                headers: { 'content-type': 'multipart/form-data' },
+                body: {
+                  media: 'file-binary',
+                  data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                  metadata: {
+                    title: 'Title',
+                    description: 'Description',
+                    file_name: 'Filename.txt',
+                    file_type: 0,
+                    file_size: '1'
+                  }
+                }
+              };
+  
+              const response = requestValidator.validateRequest(request);
+  
+              expect(response.status).to.equal(400);
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal('must be string');
+            });
+  
+            it('is undefined', async () => {
+              const request = {
+                headers: { 'content-type': 'multipart/form-data' },
+                body: {
+                  media: 'file-binary',
+                  data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                  metadata: {
+                    title: 'Title',
+                    description: 'Description',
+                    file_name: 'Filename.txt',
+                    file_type: undefined,
+                    file_size: '1'
+                  }
+                }
+              };
+  
+              const response = requestValidator.validateRequest(request);
+  
+              expect(response.status).to.equal(400);
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal("must have required property 'file_type'");
+              expect(response.errors[0].path).to.equal('metadata.file_type');
+            });
+          });
+  
+          describe('file_size', () => {
+            it('is invalid type', async () => {
+              const request = {
+                headers: { 'content-type': 'multipart/form-data' },
+                body: {
+                  media: 'file-binary',
+                  data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                  metadata: {
+                    title: 'Title',
+                    description: 'Description',
+                    file_name: 'Filename.txt',
+                    file_type: 'Other',
+                    file_size: 1000
+                  }
+                }
+              };
+  
+              const response = requestValidator.validateRequest(request);
+  
+              expect(response.status).to.equal(400);
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal('must be string');
+            });
+  
+            it('is undefined', async () => {
+              const request = {
+                headers: { 'content-type': 'multipart/form-data' },
+                body: {
+                  media: 'file-binary',
+                  data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                  metadata: {
+                    title: 'Title',
+                    description: 'Description',
+                    file_name: 'Filename.txt',
+                    file_type: 'Other',
+                    file_size: undefined
+                  }
+                }
+              };
+  
+              const response = requestValidator.validateRequest(request);
+  
+              expect(response.status).to.equal(400);
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal("must have required property 'file_size'");
+              expect(response.errors[0].path).to.equal('metadata.file_size');
+            });
+          });
         });
       });
 
@@ -135,12 +306,12 @@ describe('intake', () => {
           const request = {
             headers: { 'content-type': 'multipart/form-data' },
             body: {
-              media: 'file',
+              media: 'file-binary',
               data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
               metadata: {
                 file_name: 'Filename.txt',
                 file_type: 'Other',
-                file_size: 1
+                file_size: '1'
               }
             }
           };
@@ -154,14 +325,14 @@ describe('intake', () => {
           const request = {
             headers: { 'content-type': 'multipart/form-data' },
             body: {
-              media: 'file',
+              media: 'file-binary',
               data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
               metadata: {
                 title: 'Title',
                 description: 'Description',
                 file_name: 'Filename.txt',
                 file_type: 'Other',
-                file_size: 1
+                file_size: '1'
               }
             }
           };
@@ -182,6 +353,7 @@ describe('intake', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors.length).to.equal(1);
           expect(response.errors[0].message).to.equal('must be object');
         });
 
@@ -190,6 +362,7 @@ describe('intake', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors.length).to.equal(1);
           expect(response.errors[0].message).to.equal("must have required property 'artifact_id'");
         });
 
@@ -199,6 +372,7 @@ describe('intake', () => {
             const response = responseValidator.validateResponse(200, apiResponse);
 
             expect(response.message).to.equal('The response was not valid.');
+            expect(response.errors.length).to.equal(1);
             expect(response.errors[0].message).to.equal("must have required property 'artifact_id'");
           });
 
@@ -207,6 +381,16 @@ describe('intake', () => {
             const response = responseValidator.validateResponse(200, apiResponse);
 
             expect(response.message).to.equal('The response was not valid.');
+            expect(response.errors.length).to.equal(1);
+            expect(response.errors[0].message).to.equal('must be integer');
+          });
+
+          it('is wrong type', async () => {
+            const apiResponse = { artifact_id: '1' };
+            const response = responseValidator.validateResponse(200, apiResponse);
+
+            expect(response.message).to.equal('The response was not valid.');
+            expect(response.errors.length).to.equal(1);
             expect(response.errors[0].message).to.equal('must be integer');
           });
         });
@@ -223,7 +407,7 @@ describe('intake', () => {
     });
   });
 
-  describe('intakeArtifacts', () => {
+  describe.only('intakeArtifacts', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -233,9 +417,16 @@ describe('intake', () => {
 
       mockReq.files = [];
       mockReq.body = {
-        media: 'file',
-        data_package_id: '123-456-789'
-      };
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -248,14 +439,59 @@ describe('intake', () => {
       }
     });
 
+    it('throws an error when two or more files are submitted', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File,
+        {
+          originalname: 'bbb47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Too many files uploaded, expected 1');
+      }
+    });
+
     it('throws an error when media file is detected to be malicious', async () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
       mockReq.body = {
-        media: 'file',
-        data_package_id: '123-456-789'
-      };
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(false);
 
@@ -270,17 +506,192 @@ describe('intake', () => {
       }
     });
 
+    it('throws an error when metadata file size is not a number', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: 'string'
+        }
+      }
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Metadata file_size must be a non-negative integer');
+      }
+    });
+
+    it('throws an error when metadata file size is a negative number', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '-1'
+        }
+      }
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Metadata file_size must be a non-negative integer');
+      }
+    });
+
+    it('throws an error when zip file has no extension', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('File must be a .zip archive');
+      }
+    });
+
+    it('throws an error when file is not a zip', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'test.txt'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('File must be a .zip archive');
+      }
+    });
+
+    it('throws an error when file name does not reflect a valid uuid', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      mockReq.files = [
+        {
+          originalname: 'test.zip'
+        } as unknown as Express.Multer.File
+      ];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      const requestHandler = intake.intakeArtifacts();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('File name must reflect a valid UUID');
+      }
+    });
+
     it('throws an error when getKeycloakSource returns null', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.files = [{ originalname: 'file' } as unknown as Express.Multer.File];
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
       mockReq.body = {
-        media: 'file',
-        data_package_id: '123-456-789'
-      };
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
@@ -301,18 +712,27 @@ describe('intake', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
-      mockReq.files = [mockFile];
+      mockReq.files = [
+        {
+          originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+        } as unknown as Express.Multer.File
+      ];
       mockReq.body = {
-        media: 'file',
-        data_package_id: '123-456-789'
-      };
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      sinon.stub(DarwinCoreService.prototype, 'intake').throws(new Error('test error'));
+      sinon.stub(ArtifactService.prototype, 'uploadAndPersistArtifact').throws(new Error('test error'));
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -332,29 +752,48 @@ describe('intake', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      const mockFile = { originalname: 'file' } as unknown as Express.Multer.File;
-      const dataPackageId = '123-456-789';
+      const mockFile = {
+        originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+      } as unknown as Express.Multer.File
 
       mockReq.files = [mockFile];
       mockReq.body = {
-        media: 'test',
-        data_package_id: dataPackageId
-      };
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        metadata: {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: '1'
+        }
+      }
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const intakeStub = sinon.stub(DarwinCoreService.prototype, 'intake').resolves();
+      const uploadStub = sinon.stub(ArtifactService.prototype, 'uploadAndPersistArtifact')
+        .resolves({ artifact_id: 12 });
 
       const requestHandler = intake.intakeArtifacts();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(scanFileForVirusStub).to.have.been.calledOnceWith(mockFile);
-      expect(intakeStub).to.have.been.calledOnceWith(mockFile, dataPackageId);
+      expect(uploadStub).to.have.been.calledOnceWith(
+        '64f47e65-f306-410e-82fa-115f9916910b',
+        {
+          title: 'Title',
+          description: 'Description',
+          file_name: 'Filename.txt',
+          file_type: 'Other',
+          file_size: 1
+        },
+        'aaa47e65-f306-410e-82fa-115f9916910b',
+        mockFile
+      );
       expect(mockRes.statusValue).to.equal(200);
-      expect(mockRes.jsonValue).to.eql({ data_package_id: '123-456-789' });
+      expect(mockRes.jsonValue).to.eql({ artifact_id: 12 });
     });
   });
 });
