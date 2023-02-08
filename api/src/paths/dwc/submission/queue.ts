@@ -39,14 +39,14 @@ POST.apiDoc = {
       'multipart/form-data': {
         schema: {
           type: 'object',
-          required: ['media', 'dataset_uuid'],
+          required: ['media', 'data_package_id'],
           properties: {
             media: {
               type: 'string',
               format: 'binary',
               description: 'A Darwin Core ARchive (DwCA) data package.'
             },
-            dataset_uuid: {
+            data_package_id: {
               type: 'string',
               format: 'uuid',
               description: 'A unique identifier for this Darwin Care Archive (DwCA) data package.'
@@ -97,7 +97,7 @@ export function queueForProcess(): RequestHandler {
       ]);
     }
 
-    const id = req.body.dataset_uuid;
+    const id = req.body.data_package_id;
     const connection = getServiceAccountDBConnection(sourceSystem);
     const securityRequest = req.body.security_request ? JSON.parse(req.body.security_request) : {};
 
