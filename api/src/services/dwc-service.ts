@@ -345,12 +345,6 @@ export class DarwinCoreService extends DBService {
     file: Express.Multer.File,
     dataPackageId: string
   ): Promise<{ dataPackageId: string; submissionId: number }> {
-    // const dwcArchive = this.prepDWCArchive(file);
-
-    // Fetch the source transform record for this submission based on the source system user id
-    // const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
-    //   this.connection.systemUserId()
-    // );
 
     const response = await this.submissionService.insertSubmissionRecord(dataPackageId, 1, '');
 
