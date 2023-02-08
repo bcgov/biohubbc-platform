@@ -42,11 +42,16 @@ export class SubmissionService extends DBService {
    *
    * @param {string} uuid
    * @param {number} source_transform_id
+   * @param {string} key
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(uuid: string, source_transform_id: number): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecord(uuid, source_transform_id);
+  async insertSubmissionRecord(
+    uuid: string,
+    source_transform_id: number,
+    key: string
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecord(uuid, source_transform_id, key);
   }
 
   /**

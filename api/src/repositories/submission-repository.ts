@@ -175,17 +175,26 @@ export class SubmissionRepository extends BaseRepository {
    * Insert a new submission record.
    *
    * @param {string} uuid
+   * @param {number} source_transform_id
+   * @param {string} key
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(uuid: string, source_transform_id: number): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(
+    uuid: string,
+    source_transform_id: number,
+    key: string
+  ): Promise<{ submission_id: number }> {
+    console.log(`S3 Key: ${key}`);
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
-        source_transform_id
+        source_transform_id,
+        key
       ) VALUES (
         ${uuid},
-        ${source_transform_id}
+        ${source_transform_id},
+        ${key}
       )
       RETURNING
         submission_id;
@@ -205,7 +214,7 @@ export class SubmissionRepository extends BaseRepository {
     } catch (error) {
       console.log('INSERT ERROR');
       console.log(error);
-      throw 'butts';
+      throw '';
     }
   }
 

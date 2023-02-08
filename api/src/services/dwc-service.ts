@@ -352,7 +352,7 @@ export class DarwinCoreService extends DBService {
     //   this.connection.systemUserId()
     // );
 
-    const response = await this.submissionService.insertSubmissionRecord(dataPackageId, 1);
+    const response = await this.submissionService.insertSubmissionRecord(dataPackageId, 1, '');
 
     const submissionId = response.submission_id;
 

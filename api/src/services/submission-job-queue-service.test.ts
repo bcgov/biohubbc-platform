@@ -1,8 +1,8 @@
 import { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as FileUtils from '../utils/file-utils';
 import { SubmissionJobQueueRepository } from '../repositories/submission-job-queue-repository';
+import * as FileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionJobQueueService } from './submission-job-queue-service';
 import { SubmissionService } from './submission-service';
@@ -50,15 +50,17 @@ describe.only('SubmissionJobQueueService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SubmissionJobQueueService(mockDBConnection);
 
-      const getQueue = sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({queueId: 1});
-      const getSourceTransform = sinon.stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId').resolves(1);
-      const getSubmissionId = sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({submission_id: 1});
-      const uploadToS3 = sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves("key");
-      const createQueue = sinon.stub()
+      const getQueue = sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({ queueId: 1 });
+      const getSourceTransform = sinon
+        .stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId')
+        .resolves(1);
+      const getSubmissionId = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .resolves({ submission_id: 1 });
+      const uploadToS3 = sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
+      const createQueue = sinon.stub();
 
-      const response = await service.intake("", {} as unknown as Express.Multer.File);
-
-      
+      const response = await service.intake('', {} as unknown as Express.Multer.File);
     });
 
     it('should return queue id and find submission', async () => {});
@@ -70,12 +72,14 @@ describe.only('SubmissionJobQueueService', () => {
       const service = new SubmissionJobQueueService(mockDBConnection);
       sinon.stub(FileUtils, 'uploadFileToS3');
 
-      const uuid = "uuid";
+      const uuid = 'uuid';
       const queueId = 1;
-      const fileName = "file name.zip"
-      const key = await service.uploadDatasetToS3(uuid, queueId, {originalName: fileName} as unknown as Express.Multer.File);
-      
+      const fileName = 'file name.zip';
+      const key = await service.uploadDatasetToS3(uuid, queueId, {
+        originalName: fileName
+      } as unknown as Express.Multer.File);
+
       expect(key).to.be.eql('datasets/uuid/dwca/1/file name.zip');
     });
-  })
+  });
 });
