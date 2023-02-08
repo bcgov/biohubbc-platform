@@ -5,7 +5,6 @@ import { SubmissionJobQueueRepository } from '../repositories/submission-job-que
 import * as FileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionJobQueueService } from './submission-job-queue-service';
-import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 

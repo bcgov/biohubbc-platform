@@ -200,22 +200,16 @@ export class SubmissionRepository extends BaseRepository {
         submission_id;
     `;
 
-    try {
-      const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
-      if (response.rowCount !== 1) {
-        throw new ApiExecuteSQLError('Failed to insert submission record', [
-          'SubmissionRepository->insertSubmissionRecord',
-          'rowCount was null or undefined, expected rowCount = 1'
-        ]);
-      }
-
-      return response.rows[0];
-    } catch (error) {
-      console.log('INSERT ERROR');
-      console.log(error);
-      throw '';
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert submission record', [
+        'SubmissionRepository->insertSubmissionRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
     }
+
+    return response.rows[0];
   }
 
   /**

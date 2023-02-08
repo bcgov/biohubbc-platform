@@ -345,7 +345,6 @@ export class DarwinCoreService extends DBService {
     file: Express.Multer.File,
     dataPackageId: string
   ): Promise<{ dataPackageId: string; submissionId: number }> {
-
     const response = await this.submissionService.insertSubmissionRecord(dataPackageId, 1, '');
 
     const submissionId = response.submission_id;
