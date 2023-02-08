@@ -225,7 +225,7 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to insert submission record', [
+      throw new ApiExecuteSQLError('Failed to get or insert submission record', [
         'SubmissionRepository->getOrInsertSubmissionRecord',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
