@@ -52,8 +52,33 @@ POST.apiDoc = {
               description: 'A unique identifier for this Darwin Care Archive (DwCA) data package.'
             },
             security_request: {
-              type: 'string',
-              description: 'A JSON object as a string containing information for a security request.'
+              type: 'object',
+              description: 'An object containing information for a security request.',
+              properties: {
+                first_nations_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                proprietor_type_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                survey_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                rational: {
+                  type: 'string'
+                },
+                proprietor_name: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                disa_required: {
+                  type: 'boolean',
+                  nullable: true
+                }
+              }
             }
           }
         }
@@ -83,7 +108,15 @@ POST.apiDoc = {
 
 export function queueForProcess(): RequestHandler {
   return async (req, res) => {
-    // above apiDoc checks for this already
+    if (!req.files?.length) {
+      throw new HTTP400('Missing required `media`');
+    }
+
+    if (req.files?.length !== 1) {
+      // no media objects included
+      throw new HTTP400('Too many files uploaded, expected 1');
+    }
+
     const file: Express.Multer.File = req.files![0];
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
@@ -98,8 +131,8 @@ export function queueForProcess(): RequestHandler {
     }
 
     const id = req.body.dataset_uuid;
+    const securityRequest = req.body.security_request;
     const connection = getServiceAccountDBConnection(sourceSystem);
-    const securityRequest = req.body.security_request ? JSON.parse(req.body.security_request) : {};
 
     try {
       await connection.open();
