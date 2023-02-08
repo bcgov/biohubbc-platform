@@ -2,7 +2,6 @@ import AdmZip from 'adm-zip';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { XMLParser } from 'fast-xml-parser';
 import mime from 'mime';
-import { ApiGeneralError } from '../../errors/api-error';
 import { DWCArchive } from './dwc/dwc-archive-file';
 import { EMLFile } from './eml/eml-file';
 import { ArchiveFile, MediaFile } from './media-file';
@@ -117,32 +116,6 @@ export const isZipMimetype = (mimetype: string): boolean => {
   return [/application\/zip/, /application\/x-zip-compressed/, /application\/x-rar-compressed/].some((regex) =>
     regex.test(mimetype)
   );
-};
-
-/**
- * Parses an unknown media type into a DWCArchive object or throws an error
- *
- * @param {UnknownMedia} unknownMedia
- * @return {*}  {DWCArchive}
- */
-export const parseUnknownMediaToDwCAArchive = (unknownMedia: UnknownMedia): DWCArchive => {
-  const parsedMedia = parseUnknownMedia(unknownMedia);
-
-  if (!parsedMedia) {
-    throw new ApiGeneralError('Failed to parse submission', [
-      'Media Utils->parseUnknownMediaToDwCAArchive',
-      'unknown media file was empty or unable to be parsed'
-    ]);
-  }
-
-  if (!(parsedMedia instanceof ArchiveFile)) {
-    throw new ApiGeneralError('Failed to parse submission', [
-      'Media Utils->parseUnknownMediaToDwCAArchive',
-      'unknown media file was not a valid Archive file'
-    ]);
-  }
-
-  return new DWCArchive(parsedMedia);
 };
 
 /**
