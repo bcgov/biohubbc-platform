@@ -173,9 +173,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(
-    submissionData: IInsertSubmissionRecord
-  ): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
@@ -209,7 +207,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateS3KeyOnSubmission(submissionData: IInsertSubmissionRecord): Promise<{submission_id: number}> {
+  async updateS3KeyOnSubmission(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       UPDATE submission 
       SET key = ${submissionData.key} 
@@ -414,7 +412,7 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount > 0) {
       return response.rows[0];
     } else {
-      return null
+      return null;
     }
   }
 

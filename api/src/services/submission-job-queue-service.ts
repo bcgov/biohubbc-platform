@@ -46,12 +46,20 @@ export class SubmissionJobQueueService extends DBService {
 
     if (!submission) {
       // Create a submission if one does not exist
-      const newId = await submissionService.insertSubmissionRecord({uuid: dataUUID, source_transform_id: sourceTransformId, key});
+      const newId = await submissionService.insertSubmissionRecord({
+        uuid: dataUUID,
+        source_transform_id: sourceTransformId,
+        key
+      });
       submission = newId;
     } else {
       // update the submissions key column
       // this is done incase the artifact endpoint creates the submission first as it won't know the DwC path in S3
-      await submissionService.updateS3KeyOnSubmissionRecord({uuid: dataUUID, source_transform_id: sourceTransformId, key});
+      await submissionService.updateS3KeyOnSubmissionRecord({
+        uuid: dataUUID,
+        source_transform_id: sourceTransformId,
+        key
+      });
     }
 
     const queueRecord = await this.createQueueJob(nextJobId.queueId, submission.submission_id, securityRequest);

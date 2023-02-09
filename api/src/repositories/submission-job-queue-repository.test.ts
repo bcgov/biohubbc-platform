@@ -7,7 +7,7 @@ import { ApiGeneralError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionJobQueueRepository } from './submission-job-queue-repository';
 
-chai.use(sinonChai)
+chai.use(sinonChai);
 
 describe('SubmissionJobQueueRepository', () => {
   afterEach(() => {
@@ -18,11 +18,13 @@ describe('SubmissionJobQueueRepository', () => {
     it('should return inserted job queue ID', async () => {
       const queueId = 1;
 
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_job_queue_id: queueId }] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_job_queue_id: queueId }] } as any as Promise<
+        QueryResult<any>
+      >;
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse
       });
-      const repo = new SubmissionJobQueueRepository(mockDBConnection)
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
       const id = await repo.insertJobQueueRecord(queueId, 1);
       expect(id.queue_id).to.be.eql(queueId);
     });
@@ -35,7 +37,7 @@ describe('SubmissionJobQueueRepository', () => {
       const repo = new SubmissionJobQueueRepository(mockDBConnection);
 
       try {
-        await repo.insertJobQueueRecord(1, 1)
+        await repo.insertJobQueueRecord(1, 1);
         expect.fail();
       } catch (error) {
         expect((error as ApiGeneralError).message).to.equal('Failed to insert Queue Job');
@@ -43,33 +45,33 @@ describe('SubmissionJobQueueRepository', () => {
     });
   });
 
-describe('getNextQueueId', () => {
-  it('should return queue Id', async () => {
-    const mockQueryResponse = { rowCount: 1, rows: [{ nextval: 2 }] } as any as Promise<QueryResult<any>>;
+  describe('getNextQueueId', () => {
+    it('should return queue Id', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ nextval: 2 }] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse
       });
-      const repo = new SubmissionJobQueueRepository(mockDBConnection)
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
 
-      const id = await repo.getNextQueueId()
+      const id = await repo.getNextQueueId();
       expect(id.queueId).to.be.eql(2);
-  });
+    });
 
-  it('should throw error if sql fails', async () => {
-    const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+    it('should throw error if sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse
       });
-      const repo = new SubmissionJobQueueRepository(mockDBConnection)
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
 
       try {
-        await repo.getNextQueueId()
-        expect.fail()
+        await repo.getNextQueueId();
+        expect.fail();
       } catch (error) {
         expect((error as ApiGeneralError).message).to.equal('Failed to fetch nextval from submission sequence');
       }
+    });
   });
-});
 
   describe('getSourceTransformIdForUserId', () => {
     it('should return with transform id', async () => {
@@ -78,10 +80,10 @@ describe('getNextQueueId', () => {
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse
       });
-      const repo = new SubmissionJobQueueRepository(mockDBConnection)
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
 
       const transformId = await repo.getSourceTransformIdForUserId(1);
-      expect(transformId).to.be.eql(3)
+      expect(transformId).to.be.eql(3);
     });
 
     it('should throw an error when no transforms are found', async () => {
@@ -91,7 +93,7 @@ describe('getNextQueueId', () => {
         sql: () => mockQueryResponse
       });
 
-      const repo = new SubmissionJobQueueRepository(mockDBConnection)
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
 
       try {
         await repo.getSourceTransformIdForUserId(1);
@@ -99,6 +101,6 @@ describe('getNextQueueId', () => {
       } catch (error) {
         expect((error as ApiGeneralError).message).to.equal('Failed to get source transform Id');
       }
-    })
-  })
-}); 
+    });
+  });
+});

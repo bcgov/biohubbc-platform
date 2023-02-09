@@ -44,13 +44,10 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(
-    submissionData: IInsertSubmissionRecord
-  ): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     return this.submissionRepository.insertSubmissionRecord(submissionData);
   }
 
-  
   /**
    * Update key (S3 path) of a given submission record.
    *
@@ -58,9 +55,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateS3KeyOnSubmissionRecord(
-    submissionData: IInsertSubmissionRecord
-  ): Promise<{ submission_id: number }> {
+  async updateS3KeyOnSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateS3KeyOnSubmission(submissionData);
   }
 

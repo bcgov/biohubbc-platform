@@ -29,7 +29,7 @@ describe('SubmissionJobQueueService', () => {
         disa_required: false
       });
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({queue_id: 1});
+      expect(response).to.be.eql({ queue_id: 1 });
     });
   });
 
@@ -49,25 +49,21 @@ describe('SubmissionJobQueueService', () => {
     it('should return queue id and create new submission', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => {
-          return 1
+          return 1;
         }
       });
       const service = new SubmissionJobQueueService(mockDBConnection);
 
       sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({ queueId: 1 });
-      sinon
-        .stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId')
-        .resolves(3);
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
-        .resolves(null);
+      sinon.stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId').resolves(3);
+      sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves(null);
       sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
-      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({submission_id: 1});
-      sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({queue_id: 1});
+      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
+      sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({ queue_id: 1 });
       sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       const response = await service.intake('uuid', {} as unknown as Express.Multer.File);
-      
+
       expect(response.queue_id).to.be.eql(1);
       expect(insert).to.be.calledOnce;
     });
@@ -75,29 +71,27 @@ describe('SubmissionJobQueueService', () => {
     it('should return queue id and update submission', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => {
-          return 1
+          return 1;
         }
       });
       const service = new SubmissionJobQueueService(mockDBConnection);
 
       sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({ queueId: 1 });
-      sinon
-        .stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId')
-        .resolves(3);
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
-        .resolves({submission_id: 1});
+      sinon.stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId').resolves(3);
+      sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 1 });
       sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
-      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({submission_id: 1});
-      const update = sinon.stub(SubmissionService.prototype, 'updateS3KeyOnSubmissionRecord').resolves({submission_id: 1});
-      sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({queue_id: 1});
+      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
+      const update = sinon
+        .stub(SubmissionService.prototype, 'updateS3KeyOnSubmissionRecord')
+        .resolves({ submission_id: 1 });
+      sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({ queue_id: 1 });
       sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       const response = await service.intake('uuid', {} as unknown as Express.Multer.File);
-      
+
       expect(response.queue_id).to.be.eql(1);
       expect(insert).not.be.called;
-      expect(update).to.be.called
+      expect(update).to.be.called;
     });
   });
 

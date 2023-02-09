@@ -69,7 +69,7 @@ export class ArtifactService extends DBService {
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
       this.connection.systemUserId()
     );
-    
+
     // Retrieve the next artifact primary key assigned to this artifact once it is inserted
     const artifact_id = (await this.getNextArtifactIds())[0];
 
