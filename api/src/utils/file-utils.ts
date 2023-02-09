@@ -140,7 +140,6 @@ export interface IS3FileKey {
   uuid?: string;
   artifactId?: number;
   submissionId?: number;
-  uuid?: string;
   jobQueueId?: number;
 }
 
@@ -153,10 +152,6 @@ export interface IS3FileKey {
  */
 export function generateS3FileKey(options: IS3FileKey): string {
   const keyParts: (string | number)[] = [S3_KEY_PREFIX];
-
-  if (options.uuid) {
-    keyParts.push(options.uuid);
-  }
 
   if (options.artifactId) {
     keyParts.push('artifacts');

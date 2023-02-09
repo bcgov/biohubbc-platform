@@ -73,7 +73,7 @@ export function transformSpatialSubmission(): RequestHandler {
 
       const spatialService = new SpatialService(connection);
 
-      await spatialService.runSpatialTransforms(submissionId);
+      await spatialService.runSpatialTransforms(submissionId, submissionId); //TODO: fix this, used to remove error
 
       await connection.commit();
 

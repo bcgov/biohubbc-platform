@@ -70,18 +70,18 @@ export class DarwinCoreService extends DBService {
 
     console.log('submissionMetadataId', submissionMetadataId);
 
-    const dwcaFile = await this.intakeJob_step2(intakeRecord);
+    const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
 
     console.log('dwcaFile', dwcaFile);
 
-    await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile);
+    await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
     await this.intakeJob_step4(intakeRecord.submission_id);
 
     await this.intakeJob_step5(intakeRecord.submission_id);
 
     //TODO: all jobs up to 5 data flow is in happy path. Review and harden functions + write tests
-    if (dwcaFile.worksheets) {
+    if (!dwcaFile.worksheets) {
       await this.intakeJob_step6(intakeRecord);
     }
 
@@ -129,7 +129,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step2(intakeRecord: ISubmissionJobQueue): Promise<DWCArchive> {
+  async intakeJob_step2(intakeRecord: ISubmissionJobQueue, submissionMetadataId: number): Promise<DWCArchive> {
     try {
       const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(
         intakeRecord.submission_id
@@ -150,6 +150,7 @@ export class DarwinCoreService extends DBService {
       if (file.eml) {
         const response = await this.submissionService.updateSubmissionMetadataEMLSource(
           intakeRecord.submission_id,
+          submissionMetadataId,
           file.eml
         );
         console.log('response', response);
@@ -180,7 +181,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step3(submissionId: number, file: DWCArchive): Promise<any> {
+  async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<any> {
     try {
       if (file.eml) {
         const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
@@ -189,6 +190,7 @@ export class DarwinCoreService extends DBService {
 
         const response = await this.submissionService.updateSubmissionRecordEMLJSONSource(
           submissionId,
+          submissionMetadataId,
           JSON.stringify(jsonData)
         );
 
@@ -279,6 +281,7 @@ export class DarwinCoreService extends DBService {
   async intakeJob_step6(intakeRecord: ISubmissionJobQueue): Promise<any> {
     //TODO: FIx return type
     try {
+      //Step one: insert new observation record
       const submissionObservationData: ISubmissionObservationRecord = {
         submission_id: intakeRecord.submission_id,
         darwin_core_source: {},
@@ -286,10 +289,16 @@ export class DarwinCoreService extends DBService {
         foi_reason_description: null
       };
 
-      const response = await this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
-      console.log('insertSubmissionObservationRecord', response);
+      const submissionObservationId = await this.submissionService.insertSubmissionObservationRecord(
+        submissionObservationData
+      );
+      console.log('submissionObservationId', submissionObservationId);
 
-      await this.spatialService.runSpatialTransforms(intakeRecord.submission_id);
+      //run transform on observation data
+      await this.spatialService.runSpatialTransforms(
+        intakeRecord.submission_id,
+        submissionObservationId.submission_observation_id
+      );
 
       const response2 = await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,
@@ -354,6 +363,8 @@ export class DarwinCoreService extends DBService {
     });
 
     const newKey = generateS3FileKey({ uuid: submissionRecord.uuid, fileName: fileName });
+    console.log('oldKey', oldKey);
+    console.log('newKey', newKey);
 
     const response = await moveFileInS3(oldKey, newKey);
 
@@ -371,7 +382,10 @@ export class DarwinCoreService extends DBService {
   async getAndPrepFileFromS3(submissionJobQueueId: number, uuid: string, fileName: string) {
     const fileLocation = generateS3FileKey({ uuid: uuid, jobQueueId: submissionJobQueueId, fileName: fileName });
 
+    console.log('fileLocation', fileLocation);
+
     const file = await this.submissionService.getIntakeFileFromS3(fileLocation);
+    console.log('file', file);
 
     if (!file) {
       throw new ApiGeneralError('The source file is not available');

@@ -98,7 +98,7 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSpatialTransforms(submissionId: number): Promise<void> {
+  async runSpatialTransforms(submissionId: number, submissionObservationId: number): Promise<void> {
     const spatialTransformRecords = await this.getSpatialTransformRecords();
 
     console.log('spatialTransformRecords', spatialTransformRecords);
@@ -114,7 +114,7 @@ export class SpatialService extends DBService {
         console.log('dataPoint', dataPoint);
 
         const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
-          submissionId,
+          submissionObservationId,
           dataPoint.result_data
         );
 

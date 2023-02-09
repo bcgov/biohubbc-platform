@@ -84,9 +84,10 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionMetadataEMLSource(
     submissionId: number,
+    submissionMetadataId: number,
     file: EMLFile
   ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.updateSubmissionMetadataEMLSource(submissionId, file);
+    return this.submissionRepository.updateSubmissionMetadataEMLSource(submissionId, submissionMetadataId, file);
   }
 
   /**
@@ -99,9 +100,14 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
+    submissionMetadataId: number,
     EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
   ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.updateSubmissionMetadataEMLJSONSource(submissionId, EMLJSONSource);
+    return this.submissionRepository.updateSubmissionMetadataEMLJSONSource(
+      submissionId,
+      submissionMetadataId,
+      EMLJSONSource
+    );
   }
 
   /**

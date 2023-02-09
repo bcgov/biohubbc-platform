@@ -40,14 +40,14 @@ export interface ISubmissionRecordWithSpatial {
  * @interface ISubmissionModel
  */
 export interface ISubmissionModel {
-  submission_id: number;
+  submission_id?: number;
   source_transform_id: number;
   uuid: string;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
+  create_date?: string;
+  create_user?: number;
+  update_date?: string | null;
+  update_user?: number | null;
+  revision_count?: number;
 }
 
 export interface ISubmissionModelWithStatus extends ISubmissionModel {
@@ -298,10 +298,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update submission record key', [
         'SubmissionRepository->updateSubmissionRecordInputKey',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -318,6 +318,7 @@ export class SubmissionRepository extends BaseRepository {
    */
   async updateSubmissionMetadataEMLSource(
     submissionId: number,
+    submissionMetadataId: number,
     file: EMLFile
   ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
@@ -327,16 +328,21 @@ export class SubmissionRepository extends BaseRepository {
         eml_source = ${file.emlFile.buffer.toString()}
       WHERE
         submission_id = ${submissionId}
+        AND
+        submission_metadata_id =${submissionMetadataId}
       RETURNING
         submission_metadata_id;
     `;
+    console.log('sqlStatement', sqlStatement);
 
     const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    console.log('response', response);
+
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update submission Metadata source', [
         'SubmissionRepository->updateSubmissionMetadataEMLSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -353,6 +359,7 @@ export class SubmissionRepository extends BaseRepository {
    */
   async updateSubmissionMetadataEMLJSONSource(
     submissionId: number,
+    submissionMetadataId: number,
     EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
   ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
@@ -362,16 +369,22 @@ export class SubmissionRepository extends BaseRepository {
         eml_json_source = ${EMLJSONSource}
       WHERE
         submission_id = ${submissionId}
+      AND
+        submission_metadata_id =${submissionMetadataId}
       RETURNING
         submission_metadata_id;
     `;
 
+    console.log('sqlStatement', sqlStatement);
+
     const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    console.log('response', response);
+
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update submission Metadata eml json', [
         'SubmissionRepository->updateSubmissionMetadataEMLJSONSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -397,10 +410,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
         'SubmissionRepository->getSubmissionRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -569,10 +582,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.knex<ISourceTransformModel>(queryBuilder);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySystemUserId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -590,10 +603,10 @@ export class SubmissionRepository extends BaseRepository {
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
     const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
         'SubmissionRepository->getSubmissionMetadataJson',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -619,10 +632,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySourceTransformId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -786,10 +799,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
