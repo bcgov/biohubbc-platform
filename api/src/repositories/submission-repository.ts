@@ -185,7 +185,6 @@ export class SubmissionRepository extends BaseRepository {
     source_transform_id: number,
     key: string
   ): Promise<{ submission_id: number }> {
-    console.log(`S3 Key: ${key}`);
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
@@ -350,7 +349,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
     const sqlStatement = SQL`
       SELECT
         submission_id
@@ -361,7 +360,11 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-    return response.rows[0];
+    if (response.rowCount > 0) {
+      return response.rows[0];
+    } else {
+      return null
+    }
   }
 
   /**

@@ -5,10 +5,11 @@ import { SubmissionJobQueueRepository } from '../repositories/submission-job-que
 import * as FileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionJobQueueService } from './submission-job-queue-service';
+import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
-describe.skip('SubmissionJobQueueService', () => {
+describe('SubmissionJobQueueService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -44,26 +45,59 @@ describe.skip('SubmissionJobQueueService', () => {
     });
   });
 
-  // describe('intake', () => {
-  //   it('should return queue id and create new submission', async () => {
-  //     const mockDBConnection = getMockDBConnection();
-  //     const service = new SubmissionJobQueueService(mockDBConnection);
+  describe('intake', () => {
+    it('should return queue id and create new submission', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => {
+          return 1
+        }
+      });
+      const service = new SubmissionJobQueueService(mockDBConnection);
 
-  //     const getQueue = sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({ queueId: 1 });
-  //     const getSourceTransform = sinon
-  //       .stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId')
-  //       .resolves(1);
-  //     const getSubmissionId = sinon
-  //       .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
-  //       .resolves({ submission_id: 1 });
-  //     const uploadToS3 = sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
-  //     const createQueue = sinon.stub();
+      sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({ queueId: 1 });
+      sinon
+        .stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId')
+        .resolves(3);
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .resolves(null);
+      sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
+      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({submission_id: 1});
+      sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({queue_id: 1});
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
-  //     const response = await service.intake('', {} as unknown as Express.Multer.File);
-  //   });
+      const response = await service.intake('uuid', {} as unknown as Express.Multer.File);
+      
+      expect(response.queue_id).to.be.eql(1);
+      expect(insert).to.be.calledOnce;
+    });
 
-  //   it('should return queue id and find submission', async () => {});
-  // });
+    it('should return queue id and find submission', async () => {
+      const mockDBConnection = getMockDBConnection({
+        systemUserId: () => {
+          return 1
+        }
+      });
+      const service = new SubmissionJobQueueService(mockDBConnection);
+
+      sinon.stub(SubmissionJobQueueRepository.prototype, 'getNextQueueId').resolves({ queueId: 1 });
+      sinon
+        .stub(SubmissionJobQueueService.prototype, 'getSourceTransformIdForUserId')
+        .resolves(3);
+      sinon
+        .stub(SubmissionService.prototype, 'getSubmissionIdByUUID')
+        .resolves({submission_id: 1});
+      sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
+      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({submission_id: 1});
+      sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({queue_id: 1});
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      const response = await service.intake('uuid', {} as unknown as Express.Multer.File);
+      
+      expect(response.queue_id).to.be.eql(1);
+      expect(insert).not.be.called;
+    });
+  });
 
   describe('uploadDatasetToS3', () => {
     it('should create key and upload to S3', async () => {

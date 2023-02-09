@@ -297,7 +297,21 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.getSubmissionIdByUUID('test_uuid');
 
-      expect(response.submission_id).to.equal(1);
+      expect(response?.submission_id).to.equal(1);
+    });
+
+    it('should return null', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionIdByUUID('test_uuid');
+
+      expect(response).to.be.null;
     });
   });
 
