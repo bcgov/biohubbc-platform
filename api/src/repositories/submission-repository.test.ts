@@ -4,7 +4,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
-import { ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -625,6 +625,54 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.insertSubmissionMessage(1, SUBMISSION_MESSAGE_TYPE.ERROR, '');
 
       expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getOrInsertSubmissionRecord', () => {
+    it('should insert or retrieve a submission successfully', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            uuid: 'aaaa',
+            source_transform_id: 1,
+            submission_id: 20
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getOrInsertSubmissionRecord({
+        uuid: 'aaaa',
+        source_transform_id: 1
+      });
+
+      expect(response).to.eql({
+        uuid: 'aaaa',
+        source_transform_id: 1,
+        submission_id: 20
+      });
+    });
+
+    it('should throw an error', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: undefined } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getOrInsertSubmissionRecord({
+          uuid: 'bbbb',
+          source_transform_id: 3
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to get or insert submission record');
+      }
     });
   });
 

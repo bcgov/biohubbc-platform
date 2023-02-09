@@ -387,7 +387,12 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<{ dataPackageId: string; submissionId: number }>}
    * @memberof DarwinCoreService
    */
-  async ingestNewDwCADataPackage(dataPackageId: string): Promise<{ dataPackageId: string; submissionId: number }> {
+  async ingestNewDwCADataPackage(
+    file: Express.Multer.File,
+    dataPackageId: string
+  ): Promise<{ dataPackageId: string; submissionId: number }> {
+    this.prepDWCArchive(file);
+
     // Fetch the source transform record for this submission based on the source system user id
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
       this.connection.systemUserId()

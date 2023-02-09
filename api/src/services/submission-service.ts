@@ -52,6 +52,29 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Insert a new submission record, returning the record having the matching UUID if it already exists
+   *
+   * @param {ISubmissionModel} submissionData
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async getOrInsertSubmissionRecord(submissionData: ISubmissionModel): Promise<{ submission_id: number }> {
+    return this.submissionRepository.getOrInsertSubmissionRecord(submissionData);
+  }
+
+  /**
+   * Update the `input_key` column of a submission record.
+   *
+   * @param {number} submissionId
+   * @param {IInsertSubmissionRecord['input_key']} inputKey
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
+    return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
+  }
+
+  /**
    * Update the `eml_source` column of a submission record.
    *
    * @param {number} submissionId
