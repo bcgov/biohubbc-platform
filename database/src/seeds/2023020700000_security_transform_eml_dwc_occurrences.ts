@@ -22,7 +22,7 @@ export async function seed(knex: Knex): Promise<void> {
       ($transform$
         WITH with_spatial_component AS
           (SELECT spatial_component,
-          submission_spatial_component_id from submission_spatial_component where submission_id = ? and jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "Occurrence")'))
+          submission_spatial_component_id from submission_spatial_component where submission_observation_id = ? and jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "Occurrence")'))
           SELECT jsonb_build_object(
             'submission_spatial_component_id',
             wsc.submission_spatial_component_id,

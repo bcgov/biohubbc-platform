@@ -111,7 +111,8 @@ export class SpatialService extends DBService {
       console.log('transformed', transformed);
 
       const promises2 = transformed.map(async (dataPoint) => {
-        console.log('dataPoint', dataPoint);
+        console.log('submissionObservationId', submissionObservationId);
+        console.log('dataPoint.result_data', dataPoint.result_data);
 
         const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
           submissionObservationId,
@@ -131,22 +132,24 @@ export class SpatialService extends DBService {
       await Promise.all(promises2);
     });
 
+    console.log('COMPLETED', promises1);
+
     await Promise.all(promises1);
   }
 
   /**
    *Collect security transforms from db, run transformations on submission id, update the spatial component table
    *
-   * @param {number} submissionId
+   * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSecurityTransforms(submissionId: number): Promise<void> {
+  async runSecurityTransforms(submissionObservationId: number): Promise<void> {
     const spatialTransformRecords = await this.getSecurityTransformRecords();
 
     const promises1 = spatialTransformRecords.map(async (transformRecord) => {
       const transformed = await this.spatialRepository.runSecurityTransformOnSubmissionId(
-        submissionId,
+        submissionObservationId,
         transformRecord.transform
       );
 

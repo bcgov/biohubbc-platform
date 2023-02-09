@@ -1,5 +1,6 @@
-import AWS, { AWSError, Request } from 'aws-sdk';
+import AWS, { AWSError } from 'aws-sdk';
 import { CopyObjectOutput, DeleteObjectOutput, GetObjectOutput, ManagedUpload, Metadata } from 'aws-sdk/clients/s3';
+import { PromiseResult } from 'aws-sdk/lib/request';
 import clamd from 'clamdjs';
 import { S3_ROLE } from '../constants/roles';
 
@@ -41,12 +42,14 @@ export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput 
   return S3.deleteObject({ Bucket: OBJECT_STORE_BUCKET_NAME, Key: key }).promise();
 }
 
-export async function moveFileInS3(oldKey: string, newKey: string): Promise<Request<CopyObjectOutput, AWSError>> {
-  return S3.copyObject({
+export async function moveFileInS3(oldKey: string, newKey: string): Promise<PromiseResult<CopyObjectOutput, AWSError>> {
+  const copyparams = {
     Bucket: OBJECT_STORE_BUCKET_NAME,
-    CopySource: oldKey,
+    CopySource: encodeURI(`/${OBJECT_STORE_BUCKET_NAME}/${oldKey}`),
     Key: newKey
-  });
+  };
+
+  return S3.copyObject(copyparams).promise();
 }
 
 /**
@@ -136,7 +139,7 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 }
 
 export interface IS3FileKey {
-  fileName: string;
+  fileName?: string;
   uuid?: string;
   artifactId?: number;
   submissionId?: number;
@@ -171,7 +174,9 @@ export function generateS3FileKey(options: IS3FileKey): string {
     }
   }
 
-  keyParts.push(options.fileName);
+  if (options.fileName) {
+    keyParts.push(options.fileName);
+  }
 
   return keyParts.join('/');
 }

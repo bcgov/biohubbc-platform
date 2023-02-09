@@ -8,7 +8,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { generateS3FileKey, moveFileInS3 } from '../utils/file-utils';
+import { deleteFileFromS3, generateS3FileKey, moveFileInS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
@@ -81,7 +81,7 @@ export class DarwinCoreService extends DBService {
     await this.intakeJob_step5(intakeRecord.submission_id);
 
     //TODO: all jobs up to 5 data flow is in happy path. Review and harden functions + write tests
-    if (!dwcaFile.worksheets) {
+    if (dwcaFile.worksheets) {
       await this.intakeJob_step6(intakeRecord);
     }
 
@@ -257,7 +257,7 @@ export class DarwinCoreService extends DBService {
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
     } catch (error: any) {
-      defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step5', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -294,30 +294,13 @@ export class DarwinCoreService extends DBService {
       );
       console.log('submissionObservationId', submissionObservationId);
 
-      //run transform on observation data
-      await this.spatialService.runSpatialTransforms(
-        intakeRecord.submission_id,
-        submissionObservationId.submission_observation_id
-      );
-
-      const response2 = await this.submissionService.insertSubmissionStatus(
-        intakeRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
-      );
-      console.log('response2', response2);
-
-      await this.spatialService.runSecurityTransforms(intakeRecord.submission_id);
-
-      const response3 = await this.submissionService.insertSubmissionStatus(
-        intakeRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
-      );
-      console.log('response3', response3);
+      await this.runSpatialTransforms(intakeRecord, submissionObservationId.submission_observation_id);
+      await this.runSecurityTransforms(intakeRecord);
 
       await this.submissionService.updateSubmissionObservationRecordEndDate(intakeRecord.submission_id);
       await this.submissionService.updateSubmissionObservationRecordEffectiveDate(intakeRecord.submission_id);
     } catch (error: any) {
-      defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step6', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         intakeRecord.submission_id,
@@ -338,7 +321,7 @@ export class DarwinCoreService extends DBService {
 
       //TODO: SEND SCHEDULER JOB COMPLETE MESSAGE
     } catch (error: any) {
-      defaultLog.debug({ label: 'transformAndUploadMetaData', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         intakeRecord.submission_id,
@@ -348,6 +331,54 @@ export class DarwinCoreService extends DBService {
       );
 
       throw new ApiGeneralError('Transforming and uploading metadata', error.message);
+    }
+  }
+
+  async runSpatialTransforms(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
+    try {
+      //run transform on observation data
+      await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
+
+      const response2 = await this.submissionService.insertSubmissionStatus(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
+      );
+      console.log('response2', response2);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_runSpatialTransforms', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Transforming and uploading spaital transforms', error.message);
+    }
+  }
+
+  async runSecurityTransforms(intakeRecord: ISubmissionJobQueue): Promise<void> {
+    try {
+      //run transform on observation data
+      await this.spatialService.runSecurityTransforms(intakeRecord.submission_id);
+
+      const response = await this.submissionService.insertSubmissionStatus(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
+      );
+      console.log('response', response);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_runSpatialTransforms', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Transforming and uploading secure spaital transforms', error.message);
     }
   }
 
@@ -366,10 +397,20 @@ export class DarwinCoreService extends DBService {
     console.log('oldKey', oldKey);
     console.log('newKey', newKey);
 
-    const response = await moveFileInS3(oldKey, newKey);
+    const moveS3File = await moveFileInS3(oldKey, newKey);
 
-    console.log('response', response);
-    return response;
+    console.log('moveS3File', moveS3File);
+
+    const jobQueueFolderKey = generateS3FileKey({
+      uuid: submissionRecord.uuid,
+      jobQueueId: intakeRecord.submission_job_queue_id
+    });
+
+    //Delete Zip from job queue folder
+    await deleteFileFromS3(oldKey);
+
+    //Delete job queue folder
+    await deleteFileFromS3(`${jobQueueFolderKey}/`);
   }
 
   /**
