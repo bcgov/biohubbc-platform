@@ -47,11 +47,9 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async insertSubmissionRecord(
-    uuid: string,
-    source_transform_id: number,
-    key: string
+    submissionData: IInsertSubmissionRecord
   ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecord(uuid, source_transform_id, key);
+    return this.submissionRepository.insertSubmissionRecord(submissionData);
   }
 
   /**
