@@ -46,7 +46,7 @@ export class SubmissionJobQueueService extends DBService {
     if (!submission) {
       const currentUserId = this.connection.systemUserId();
       const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
-      const newId = await submissionService.insertSubmissionRecord(dataUUID, sourceTransformId, key);
+      const newId = await submissionService.insertSubmissionRecord({uuid: dataUUID, source_transform_id: sourceTransformId, key});
       submission = newId;
     }
 

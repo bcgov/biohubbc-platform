@@ -50,7 +50,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecord('', 1, '');
+      const response = await submissionService.insertSubmissionRecord({uuid:'', source_transform_id: 1, key: ''});
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });

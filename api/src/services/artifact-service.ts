@@ -69,13 +69,7 @@ export class ArtifactService extends DBService {
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
       this.connection.systemUserId()
     );
-
-    // Create a new submission for the artifact collection
-    const { submission_id } = await this.submissionService.getOrInsertSubmissionRecord({
-      source_transform_id: sourceTransformRecord.source_transform_id,
-      uuid: dataPackageId
-    });
-
+    
     // Retrieve the next artifact primary key assigned to this artifact once it is inserted
     const artifact_id = (await this.getNextArtifactIds())[0];
 
@@ -84,6 +78,13 @@ export class ArtifactService extends DBService {
       uuid: dataPackageId,
       artifactId: artifact_id,
       fileName: file.originalname
+    });
+
+    // Create a new submission for the artifact collection
+    const { submission_id } = await this.submissionService.getOrInsertSubmissionRecord({
+      source_transform_id: sourceTransformRecord.source_transform_id,
+      uuid: dataPackageId,
+      key: s3Key
     });
 
     // Upload the artifact to S3

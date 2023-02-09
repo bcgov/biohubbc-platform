@@ -97,7 +97,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecord('uuid', 1, 'key');
+        await submissionRepository.insertSubmissionRecord({uuid: "", source_transform_id: 1, key: ""});
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -113,7 +113,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionRecord('uuid', 1, 'key');
+      const response = await submissionRepository.insertSubmissionRecord({uuid: "uuid", source_transform_id: 1, key: "key"});
 
       expect(response.submission_id).to.equal(1);
     });
@@ -648,7 +648,8 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.getOrInsertSubmissionRecord({
         uuid: 'aaaa',
-        source_transform_id: 1
+        source_transform_id: 1,
+        key: ""
       });
 
       expect(response).to.eql({
@@ -668,7 +669,8 @@ describe('SubmissionRepository', () => {
       try {
         await submissionRepository.getOrInsertSubmissionRecord({
           uuid: 'bbbb',
-          source_transform_id: 3
+          source_transform_id: 3,
+          key: "key"
         });
         expect.fail();
       } catch (actualError) {
