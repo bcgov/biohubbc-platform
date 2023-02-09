@@ -129,6 +129,8 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 
 export interface IS3FileKey {
   fileName: string;
+  uuid?: string;
+  artifactId?: number;
   submissionId?: number;
 }
 
@@ -147,6 +149,15 @@ export interface IDatasetS3FileKey {
  */
 export function generateS3FileKey(options: IS3FileKey): string {
   const keyParts: (string | number)[] = [S3_KEY_PREFIX];
+
+  if (options.uuid) {
+    keyParts.push(options.uuid);
+  }
+
+  if (options.artifactId) {
+    keyParts.push('artifacts');
+    keyParts.push(options.artifactId);
+  }
 
   if (options.submissionId) {
     keyParts.push('submissions');

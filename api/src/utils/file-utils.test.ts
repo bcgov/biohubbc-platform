@@ -31,11 +31,21 @@ describe('generateS3FileKey', () => {
     expect(result).to.equal('platform/submissions/1/extra/folders/testFileName');
   });
 
-  describe('generateDatasetS3FileKey', () => {
-    it('returns a dataset file path', async () => {
-      const result = generateDatasetS3FileKey({ fileName: 'fileName', uuid: 'uuid', queueId: 1 });
-
-      expect(result).to.equal('platform/datasets/uuid/dwca/1/fileName');
+  it('generates an artifact s3 key', () => {
+    const result = generateS3FileKey({
+      uuid: 'aaaa',
+      artifactId: 33,
+      fileName: 'bbbb.zip'
     });
+
+    expect(result).to.equal('platform/aaaa/artifacts/33/bbbb.zip');
+  });
+});
+
+describe('generateDatasetS3FileKey', () => {
+  it('returns a dataset file path', async () => {
+    const result = generateDatasetS3FileKey({ fileName: 'fileName', uuid: 'uuid', queueId: 1 });
+
+    expect(result).to.equal('platform/datasets/uuid/dwca/1/fileName');
   });
 });

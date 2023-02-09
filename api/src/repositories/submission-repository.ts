@@ -19,12 +19,7 @@ export interface ISearchSubmissionCriteria {
 export interface IInsertSubmissionRecord {
   source_transform_id: number;
   uuid: string;
-  record_effective_date: string;
-  input_key: string;
-  input_file_name: string;
-  eml_source: string;
-  eml_json_source: string;
-  darwin_core_source: string;
+  key: string;
 }
 
 export interface ISubmissionRecordWithSpatial {
@@ -174,26 +169,20 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {string} uuid
-   * @param {number} source_transform_id
-   * @param {string} key
+   * @param {IInsertSubmissionRecord} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecord(
-    uuid: string,
-    source_transform_id: number,
-    key: string
+    submissionData: IInsertSubmissionRecord
   ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        uuid,
         source_transform_id,
-        key
+        uuid
       ) VALUES (
-        ${uuid},
-        ${source_transform_id},
-        ${key}
+        ${submissionData.source_transform_id},
+        ${submissionData.uuid}
       )
       RETURNING
         submission_id;
@@ -212,6 +201,43 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Insert a new submission record, returning the record having the matching UUID if it already exists.
+   *
+   * Because `ON CONFLICT ... DO NOTHING` fails to yield the submission_id, the query simply updates the
+   * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
+   * and infer that the query ran successfully.
+   *
+   * @param {IInsertSubmissionRecord} submissionData The submission record
+   * @return {*} {Promise<{ submission_id: number }>} The primary key of the submission
+   * @memberof SubmissionRepository
+   */
+  async getOrInsertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission (
+        source_transform_id,
+        uuid
+      ) VALUES (
+        ${submissionData.source_transform_id},
+        ${submissionData.uuid}
+      )
+      ON CONFLICT (uuid) DO UPDATE SET uuid = ${submissionData.uuid}
+      RETURNING
+        submission_id;
+    `;
+
+    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get or insert submission record', [
+        'SubmissionRepository->getOrInsertSubmissionRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
    * Update the `input_key` column of a submission record.
    *
    * @param {number} submissionId
@@ -219,10 +245,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordInputKey(
-    submissionId: number,
-    inputKey: IInsertSubmissionRecord['input_key']
-  ): Promise<{ submission_id: number }> {
+  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       UPDATE
         submission
@@ -288,7 +311,7 @@ export class SubmissionRepository extends BaseRepository {
    */
   async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
-    EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
+    EMLJSONSource: string
   ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       UPDATE

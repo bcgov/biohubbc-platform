@@ -55,6 +55,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Insert a new submission record, returning the record having the matching UUID if it already exists
+   *
+   * @param {IInsertSubmissionRecord} submissionData
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async getOrInsertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+    return this.submissionRepository.getOrInsertSubmissionRecord(submissionData);
+  }
+
+  /**
    * Update the `input_key` column of a submission record.
    *
    * @param {number} submissionId
@@ -62,10 +73,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionRecordInputKey(
-    submissionId: number,
-    inputKey: IInsertSubmissionRecord['input_key']
-  ): Promise<{ submission_id: number }> {
+  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
   }
 
@@ -91,7 +99,7 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
-    EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
+    EMLJSONSource: string
   ): Promise<{ submission_id: number }> {
     return this.submissionRepository.updateSubmissionRecordEMLJSONSource(submissionId, EMLJSONSource);
   }
