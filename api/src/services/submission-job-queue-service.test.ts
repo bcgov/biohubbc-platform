@@ -72,7 +72,7 @@ describe('SubmissionJobQueueService', () => {
       expect(insert).to.be.calledOnce;
     });
 
-    it('should return queue id and find submission', async () => {
+    it('should return queue id and update submission', async () => {
       const mockDBConnection = getMockDBConnection({
         systemUserId: () => {
           return 1
@@ -89,6 +89,7 @@ describe('SubmissionJobQueueService', () => {
         .resolves({submission_id: 1});
       sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
       const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({submission_id: 1});
+      const update = sinon.stub(SubmissionService.prototype, 'updateS3KeyOnSubmissionRecord').resolves({submission_id: 1});
       sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({queue_id: 1});
       sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
@@ -96,10 +97,11 @@ describe('SubmissionJobQueueService', () => {
       
       expect(response.queue_id).to.be.eql(1);
       expect(insert).not.be.called;
+      expect(update).to.be.called
     });
   });
 
-  describe.only('uploadDatasetToS3', () => {
+  describe('uploadDatasetToS3', () => {
     it('should create key and upload to S3', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SubmissionJobQueueService(mockDBConnection);
