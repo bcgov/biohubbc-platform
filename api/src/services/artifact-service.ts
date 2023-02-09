@@ -83,8 +83,7 @@ export class ArtifactService extends DBService {
     // Create a new submission for the artifact collection
     const { submission_id } = await this.submissionService.getOrInsertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
-      uuid: dataPackageId,
-      key: s3Key
+      uuid: dataPackageId
     });
 
     // Upload the artifact to S3

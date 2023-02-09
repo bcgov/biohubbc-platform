@@ -133,7 +133,8 @@ describe('ArtifactService', () => {
 
         expect(getOrInsertSubmissionRecordStub).to.be.calledWith({
           source_transform_id: 60,
-          uuid: mockDataPackageId
+          uuid: mockDataPackageId,
+          key: `platform/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
         });
         expect(getNextArtifactIdsStub).to.be.calledWith();
         expect(uploadStub).to.be.calledWith(

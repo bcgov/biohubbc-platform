@@ -40,9 +40,7 @@ export class SubmissionService extends DBService {
   /**
    * Insert a new submission record.
    *
-   * @param {string} uuid
-   * @param {number} source_transform_id
-   * @param {string} key
+   * @param {IInsertSubmissionRecord} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
@@ -50,6 +48,20 @@ export class SubmissionService extends DBService {
     submissionData: IInsertSubmissionRecord
   ): Promise<{ submission_id: number }> {
     return this.submissionRepository.insertSubmissionRecord(submissionData);
+  }
+
+  
+  /**
+   * Update key (S3 path) of a given submission record.
+   *
+   * @param {IInsertSubmissionRecord} submissionData
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async updateS3KeyOnSubmissionRecord(
+    submissionData: IInsertSubmissionRecord
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.updateS3KeyOnSubmission(submissionData);
   }
 
   /**

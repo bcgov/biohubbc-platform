@@ -40,14 +40,15 @@ export class SubmissionJobQueueService extends DBService {
     const nextJobId = await this.repository.getNextQueueId();
 
     const key = await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
-
+    const currentUserId = this.connection.systemUserId();
+    const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
     let submission = await submissionService.getSubmissionIdByUUID(dataUUID);
 
     if (!submission) {
-      const currentUserId = this.connection.systemUserId();
-      const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
       const newId = await submissionService.insertSubmissionRecord({uuid: dataUUID, source_transform_id: sourceTransformId, key});
       submission = newId;
+    } else {
+      await submissionService.updateS3KeyOnSubmissionRecord({uuid: dataUUID, source_transform_id: sourceTransformId, key});
     }
 
     const queueRecord = await this.createQueueJob(nextJobId.queueId, submission.submission_id, securityRequest);

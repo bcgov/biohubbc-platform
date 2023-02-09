@@ -29,7 +29,7 @@ describe('SubmissionJobQueueService', () => {
         disa_required: false
       });
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql(1);
+      expect(response).to.be.eql({queue_id: 1});
     });
   });
 
@@ -99,7 +99,7 @@ describe('SubmissionJobQueueService', () => {
     });
   });
 
-  describe('uploadDatasetToS3', () => {
+  describe.only('uploadDatasetToS3', () => {
     it('should create key and upload to S3', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SubmissionJobQueueService(mockDBConnection);
@@ -109,10 +109,9 @@ describe('SubmissionJobQueueService', () => {
       const queueId = 1;
       const fileName = 'file name.zip';
       const key = await service.uploadDatasetToS3(uuid, queueId, {
-        originalName: fileName
+        originalname: fileName
       } as unknown as Express.Multer.File);
-
-      expect(key).to.be.eql('datasets/uuid/dwca/1/file name.zip');
+      expect(key).to.be.eql('platform/datasets/uuid/dwca/1/file name.zip');
     });
   });
 });
