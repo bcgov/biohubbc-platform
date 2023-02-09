@@ -5,7 +5,7 @@ import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
+import { ISecurityRequest, SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
 import { scanFileForVirus } from '../../../utils/file-utils';
 import { getKeycloakSource } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
@@ -54,28 +54,25 @@ POST.apiDoc = {
             security_request: {
               type: 'object',
               description: 'An object containing information for a security request.',
+              required: ['first_nations_id', 'proprietor_type_id', 'survey_id', 'rational', 'proprietor_name'],
               properties: {
                 first_nations_id: {
-                  type: 'integer',
-                  minimum: 1
+                  type: 'string'
                 },
                 proprietor_type_id: {
-                  type: 'integer',
-                  minimum: 1
+                  type: 'string'
                 },
                 survey_id: {
-                  type: 'integer',
-                  minimum: 1
+                  type: 'string'
                 },
                 rational: {
                   type: 'string'
                 },
                 proprietor_name: {
-                  type: 'integer',
-                  minimum: 1
+                  type: 'string',
                 },
                 disa_required: {
-                  type: 'boolean',
+                  type: 'string',
                   nullable: true
                 }
               }
@@ -117,6 +114,45 @@ export function queueForProcess(): RequestHandler {
       throw new HTTP400('Too many files uploaded, expected 1');
     }
 
+    let securityRequest: ISecurityRequest | undefined;
+    if (req.body.security_request) {
+      const first_nations_id = Number(req.body.security_request.first_nations_id);
+      if (isNaN(first_nations_id) || first_nations_id < 0) {
+        throw new HTTP400('First nations id is a required field');
+      }
+
+      const proprietor_type_id = Number(req.body.security_request.proprietor_type_id);
+      if (isNaN(proprietor_type_id) || proprietor_type_id < 0) {
+        throw new HTTP400('Proprietor type id is a required field');
+      }
+
+      const survey_id = Number(req.body.security_request.survey_id);
+      if (isNaN(survey_id) || survey_id < 0) {
+        throw new HTTP400('Survey id is a required field');
+      }
+
+      const rational = req.body.security_request.rational;
+      if (rational) {
+        throw new HTTP400('Rational is a required field');
+      }
+
+      const proprietor_name = Number(req.body.security_request.proprietor_name);
+      if (isNaN(proprietor_name) || proprietor_name < 0) {
+        throw new HTTP400('Proprietor name is a required field');
+      }
+
+      const disa_required = !!req.body.security_request.disa_required
+
+      securityRequest = {
+        first_nations_id,
+        proprietor_type_id,
+        survey_id,
+        rational, 
+        proprietor_name,
+        disa_required
+      }
+    }
+
     const file: Express.Multer.File = req.files![0];
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
@@ -130,7 +166,6 @@ export function queueForProcess(): RequestHandler {
       ]);
     }
 
-    const securityRequest = req.body.security_request;
     const id = req.body.data_package_id;
     const connection = getServiceAccountDBConnection(sourceSystem);
 
