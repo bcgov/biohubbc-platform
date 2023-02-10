@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
-import { XMLParser } from 'fast-xml-parser';
+import { X2jOptionsOptional, XMLParser } from 'fast-xml-parser';
 import mime from 'mime';
 import { DWCArchive } from './dwc/dwc-archive-file';
 import { EMLFile } from './eml/eml-file';
@@ -124,15 +124,15 @@ export const isZipMimetype = (mimetype: string): boolean => {
  * @param {EMLFile} eml
  * @return {*}  {any}
  */
-export const parseEMLtoJSONSource = (eml: EMLFile): any => {
-  const options = {
+export const parseEMLtoJSONSource = (eml: EMLFile) => {
+  const options: X2jOptionsOptional = {
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
     parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
-    isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
+    isArray: (tagName: string) => {
       const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
-      if (tagsArray.includes(tagName)) return true;
-      return false;
+
+      return tagsArray.includes(tagName);
     }
   };
   const parser = new XMLParser(options);

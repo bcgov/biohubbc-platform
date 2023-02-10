@@ -153,7 +153,7 @@ export function queueForProcess(): RequestHandler {
       }
     }
 
-    const file: Express.Multer.File = req.files![0];
+    const file: Express.Multer.File = req.files[0];
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
     if (!(await scanFileForVirus(file))) {
