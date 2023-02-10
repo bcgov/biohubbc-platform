@@ -22,7 +22,7 @@
     "noFallthroughCasesInSwitch": true,
     "strict": true
   },
-  "include": ["src"],
+  "include": ["src", "src/queue/queue/.ts"],
   "ts-node": {
     "files": true
   }
