@@ -7,7 +7,7 @@ import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { ArchiveFile, IMediaState } from '../utils/media/media-file';
-import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { normalizeDWCA, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { ElasticSearchIndices } from './es-service';
 import { SpatialService } from './spatial-service';
@@ -584,28 +584,9 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async normalizeSubmissionDWCA(submissionId: number, dwcArchiveFile: DWCArchive): Promise<void> {
-    const normalized = this.normalizeDWCA(dwcArchiveFile);
+    const normalized = normalizeDWCA(dwcArchiveFile);
 
     await this.submissionService.updateSubmissionRecordDWCSource(submissionId, normalized);
-  }
-
-  /**
-   * Return normalized dwca file data
-   *
-   * @param {DWCArchive} dwcArchiveFile
-   * @return {*}  {string}
-   * @memberof DarwinCoreService
-   */
-  normalizeDWCA(dwcArchiveFile: DWCArchive): string {
-    const normalized = {};
-
-    Object.entries(dwcArchiveFile.worksheets).forEach(([key, value]) => {
-      if (value) {
-        normalized[key] = value.getRowObjects();
-      }
-    });
-
-    return JSON.stringify(normalized);
   }
 
   /**
