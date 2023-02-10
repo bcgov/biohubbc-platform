@@ -25,7 +25,7 @@ describe('SubmissionJobQueueRepository', () => {
         sql: () => mockQueryResponse
       });
       const repo = new SubmissionJobQueueRepository(mockDBConnection);
-      const id = await repo.insertJobQueueRecord(queueId, 1, "");
+      const id = await repo.insertJobQueueRecord(queueId, 1, '');
       expect(id.queue_id).to.be.eql(queueId);
     });
 
@@ -37,7 +37,7 @@ describe('SubmissionJobQueueRepository', () => {
       const repo = new SubmissionJobQueueRepository(mockDBConnection);
 
       try {
-        await repo.insertJobQueueRecord(1, 1, "");
+        await repo.insertJobQueueRecord(1, 1, '');
         expect.fail();
       } catch (error) {
         expect((error as ApiGeneralError).message).to.equal('Failed to insert Queue Job');

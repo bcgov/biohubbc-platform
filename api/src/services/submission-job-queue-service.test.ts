@@ -20,7 +20,7 @@ describe('SubmissionJobQueueService', () => {
       const service = new SubmissionJobQueueService(mockDBConnection);
       const repo = sinon.stub(SubmissionJobQueueRepository.prototype, 'insertJobQueueRecord').resolves({ queue_id: 1 });
 
-      const response = await service.createQueueJob(1, 1, "", {
+      const response = await service.createQueueJob(1, 1, '', {
         first_nations_id: 1,
         proprietor_type_id: 1,
         survey_id: 1,

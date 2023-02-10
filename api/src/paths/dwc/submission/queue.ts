@@ -69,7 +69,7 @@ POST.apiDoc = {
                   type: 'string'
                 },
                 proprietor_name: {
-                  type: 'string',
+                  type: 'string'
                 },
                 disa_required: {
                   type: 'string',
@@ -141,16 +141,16 @@ export function queueForProcess(): RequestHandler {
         throw new HTTP400('Proprietor name is a required field');
       }
 
-      const disa_required = !!req.body.security_request.disa_required
+      const disa_required = !!req.body.security_request.disa_required;
 
       securityRequest = {
         first_nations_id,
         proprietor_type_id,
         survey_id,
-        rational, 
+        rational,
         proprietor_name,
         disa_required
-      }
+      };
     }
 
     const file: Express.Multer.File = req.files[0];

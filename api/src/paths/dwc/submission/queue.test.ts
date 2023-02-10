@@ -42,7 +42,7 @@ describe('queue', () => {
               headers: { 'content-type': 'multipart/form-data' },
               body: {
                 media: null,
-                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+                data_package_id: '64f47e65-f306-410e-82fa-115f9916910b'
               }
             };
 
@@ -147,11 +147,11 @@ describe('queue', () => {
               media: 'file-binary',
               data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
               security_request: {
-                first_nations_id: "1",
-                proprietor_type_id: "2",
-                survey_id: "3",
+                first_nations_id: '1',
+                proprietor_type_id: '2',
+                survey_id: '3',
                 rational: 'string',
-                proprietor_name: "4"
+                proprietor_name: '4'
               }
             }
           };
@@ -168,12 +168,12 @@ describe('queue', () => {
               media: 'file-binary',
               data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
               security_request: {
-                first_nations_id: "1",
-                proprietor_type_id: "2",
-                survey_id: "3",
+                first_nations_id: '1',
+                proprietor_type_id: '2',
+                survey_id: '3',
                 rational: 'string',
-                proprietor_name: "4",
-                disa_required: "true"
+                proprietor_name: '4',
+                disa_required: 'true'
               }
             }
           };
@@ -372,7 +372,7 @@ describe('queue', () => {
       ];
       mockReq.body = {
         media: 'file-binary',
-        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b'
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
@@ -407,12 +407,12 @@ describe('queue', () => {
         media: 'file-binary',
         data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
         security_request: {
-          first_nations_id: "1",
-          proprietor_type_id: "2",
-          survey_id: "3",
-          rational: "string",
-          proprietor_name: "4",
-          disa_required: "true"
+          first_nations_id: '1',
+          proprietor_type_id: '2',
+          survey_id: '3',
+          rational: 'string',
+          proprietor_name: '4',
+          disa_required: 'true'
         }
       };
 

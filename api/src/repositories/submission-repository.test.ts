@@ -651,7 +651,7 @@ describe('SubmissionRepository', () => {
 
       const response = await submissionRepository.getOrInsertSubmissionRecord({
         uuid: 'aaaa',
-        source_transform_id: 1,
+        source_transform_id: 1
       });
 
       expect(response).to.eql({
