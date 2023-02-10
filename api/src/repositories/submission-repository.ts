@@ -19,7 +19,6 @@ export interface ISearchSubmissionCriteria {
 export interface IInsertSubmissionRecord {
   source_transform_id: number;
   uuid: string;
-  key?: string;
 }
 
 export interface ISubmissionRecordWithSpatial {
@@ -177,12 +176,10 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
-        uuid, 
-        key
+        uuid
       ) VALUES (
         ${submissionData.source_transform_id},
-        ${submissionData.uuid},
-        ${submissionData.key}
+        ${submissionData.uuid}
       )
       RETURNING
         submission_id;
@@ -193,32 +190,6 @@ export class SubmissionRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission record', [
         'SubmissionRepository->insertSubmissionRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Update key (S3 path) of a given submission record.
-   *
-   * @param {IInsertSubmissionRecord} submissionData
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateS3KeyOnSubmission(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
-    const sqlStatement = SQL`
-      UPDATE submission 
-      SET key = ${submissionData.key} 
-      WHERE uuid = ${submissionData.uuid} 
-      RETURNING submission_id;
-    `;
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record', [
-        'SubmissionRepository->updateS3KeyOnSubmission',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }

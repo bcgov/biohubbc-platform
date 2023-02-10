@@ -34,16 +34,19 @@ export class SubmissionJobQueueRepository extends BaseRepository {
   async insertJobQueueRecord(
     queueId: number,
     submissionId: number,
+    s3Key: string,
     securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_job_queue (
         submission_job_queue_id,
         submission_id,
+        key,
         security_request
       ) VALUES (
         ${queueId},
         ${submissionId},
+        ${s3Key},
         ${JSON.stringify(securityRequest ? securityRequest : {})}
       )
       RETURNING submission_job_queue_id;

@@ -5,15 +5,15 @@ const API_SCHEMA = process.env.DB_SCHEMA_DAPI_V1;
 
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
-    ALTER TABLE ${DB_SCHEMA}.submission ADD COLUMN key varchar(1000);
-    COMMENT ON COLUMN ${DB_SCHEMA}.submission.key IS 'The identifying key to the file in the storage system.';
+    ALTER TABLE ${DB_SCHEMA}.submission_job_queue ADD COLUMN key varchar(1000);
+    COMMENT ON COLUMN ${DB_SCHEMA}.submission_job_queue.key IS 'The identifying key to the file in the storage system.';
 
-    CREATE OR REPLACE VIEW ${API_SCHEMA}.submission as SELECT * FROM ${DB_SCHEMA}.submission;
+    CREATE OR REPLACE VIEW ${API_SCHEMA}.submission_job_queue as SELECT * FROM ${DB_SCHEMA}.submission_job_queue;
     `);
 }
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
-    ALTER TABLE submission DROP COLUMN key;
+    ALTER TABLE submission_job_queue DROP COLUMN key;
   `);
 }

@@ -354,8 +354,7 @@ export class DarwinCoreService extends DBService {
 
     const response = await this.submissionService.insertSubmissionRecord({
       source_transform_id: sourceTransformRecord.source_transform_id,
-      uuid: dataPackageId,
-      key: ''
+      uuid: dataPackageId
     });
 
     const submissionId = response.submission_id;

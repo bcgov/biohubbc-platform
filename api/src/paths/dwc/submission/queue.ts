@@ -132,7 +132,7 @@ export function queueForProcess(): RequestHandler {
       }
 
       const rational = req.body.security_request.rational;
-      if (rational) {
+      if (!rational) {
         throw new HTTP400('Rational is a required field');
       }
 

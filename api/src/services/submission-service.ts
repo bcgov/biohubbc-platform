@@ -49,17 +49,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Update key (S3 path) of a given submission record.
-   *
-   * @param {IInsertSubmissionRecord} submissionData
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateS3KeyOnSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
-    return this.submissionRepository.updateS3KeyOnSubmission(submissionData);
-  }
-
-  /**
    * Insert a new submission record, returning the record having the matching UUID if it already exists
    *
    * @param {IInsertSubmissionRecord} submissionData

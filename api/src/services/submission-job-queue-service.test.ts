@@ -20,7 +20,7 @@ describe('SubmissionJobQueueService', () => {
       const service = new SubmissionJobQueueService(mockDBConnection);
       const repo = sinon.stub(SubmissionJobQueueRepository.prototype, 'insertJobQueueRecord').resolves({ queue_id: 1 });
 
-      const response = await service.createQueueJob(1, 1, {
+      const response = await service.createQueueJob(1, 1, "", {
         first_nations_id: 1,
         proprietor_type_id: 1,
         survey_id: 1,
@@ -81,9 +81,6 @@ describe('SubmissionJobQueueService', () => {
       sinon.stub(SubmissionService.prototype, 'getSubmissionIdByUUID').resolves({ submission_id: 1 });
       sinon.stub(SubmissionJobQueueService.prototype, 'uploadDatasetToS3').resolves('key');
       const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
-      const update = sinon
-        .stub(SubmissionService.prototype, 'updateS3KeyOnSubmissionRecord')
-        .resolves({ submission_id: 1 });
       sinon.stub(SubmissionJobQueueService.prototype, 'createQueueJob').resolves({ queue_id: 1 });
       sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
@@ -91,7 +88,6 @@ describe('SubmissionJobQueueService', () => {
 
       expect(response.queue_id).to.be.eql(1);
       expect(insert).not.be.called;
-      expect(update).to.be.called;
     });
   });
 
