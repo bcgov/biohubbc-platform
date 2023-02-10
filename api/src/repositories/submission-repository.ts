@@ -278,7 +278,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Update the `input_key` column of a submission record.
-   *
+   * TODO: Might be deprecated, input key no longer in submission table
    * @param {number} submissionId
    * @param {IInsertSubmissionRecord['input_key']} inputKey
    * @return {*}  {Promise<{ submission_id: number }>}
@@ -312,8 +312,9 @@ export class SubmissionRepository extends BaseRepository {
    * Update the `eml_source` column of a submission record.
    *
    * @param {number} submissionId
+   * @param {number} submissionMetadataId
    * @param {EMLFile} file
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
   async updateSubmissionMetadataEMLSource(
@@ -333,11 +334,8 @@ export class SubmissionRepository extends BaseRepository {
       RETURNING
         submission_metadata_id;
     `;
-    console.log('sqlStatement', sqlStatement);
 
     const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
-
-    console.log('response', response);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update submission Metadata source', [
@@ -353,8 +351,9 @@ export class SubmissionRepository extends BaseRepository {
    * Update the `eml_json_source` column of a submission metadata.
    *
    * @param {number} submissionId
-   * @param {ISubmissionRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {number} submissionMetadataId
+   * @param {ISubmissionMetadataRecord['eml_json_source']} EMLJSONSource
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
   async updateSubmissionMetadataEMLJSONSource(
@@ -375,11 +374,7 @@ export class SubmissionRepository extends BaseRepository {
         submission_metadata_id;
     `;
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
-
-    console.log('response', response);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update submission Metadata eml json', [
@@ -422,7 +417,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Fetch a submission_id from uuid.
-   *
+   * TODO: Might be deprecated, investigate for removal
    * @param {number} uuid
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
@@ -446,7 +441,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Get submission eml json by dataset id.
-   *
+   * TODO: Might be deprecated, investigate for removal
    * @param {string} datasetId
    * @return {*}  {Promise<string>}
    * @memberof SubmissionRepository
@@ -809,6 +804,13 @@ export class SubmissionRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Fetch row of submission job queue by submission Id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionJobQueue>}
+   * @memberof SubmissionRepository
+   */
   async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
     const sqlStatement = SQL`
       SELECT
@@ -832,6 +834,13 @@ export class SubmissionRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Update end time for the most recently stated record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
   async updateSubmissionJobQueueEndTime(submissionId: number): Promise<number> {
     const sqlStatement = SQL`
       UPDATE
@@ -845,15 +854,18 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql(sqlStatement);
-
-    console.log('response', response);
 
     return response.rowCount;
   }
 
+  /**
+   * Insert a new metadata record
+   *
+   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
+   * @memberof SubmissionRepository
+   */
   async insertSubmissionMetadataRecord(
     submissonMetadata: ISubmissionMetadataRecord
   ): Promise<{ submission_metadata_id: number }> {
@@ -884,6 +896,13 @@ export class SubmissionRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  /**
+   * Insert a new Observation Record
+   *
+   * @param {ISubmissionObservationRecord} submissonObservation
+   * @return {*}  {Promise<{ submission_observation_id: number }>}
+   * @memberof SubmissionRepository
+   */
   async insertSubmissionObservationRecord(
     submissonObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
@@ -947,6 +966,13 @@ export class SubmissionRepository extends BaseRepository {
     return response.rowCount;
   }
 
+  /**
+   * Update start time stamp of submission metadata record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
   async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
     const sqlStatement = SQL`
       UPDATE
@@ -962,11 +988,7 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql(sqlStatement);
-
-    console.log('response', response);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission metadata record', [
@@ -978,6 +1000,13 @@ export class SubmissionRepository extends BaseRepository {
     return response.rowCount;
   }
 
+  /**
+   * Update end time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
   async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
     const sqlStatement = SQL`
       UPDATE
@@ -993,15 +1022,18 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql(sqlStatement);
-
-    console.log('response', response);
 
     return response.rowCount;
   }
 
+  /**
+   * Update start time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
   async updateSubmissionObservationRecordEffectiveDate(submissionId: number): Promise<number> {
     const sqlStatement = SQL`
       UPDATE
@@ -1017,11 +1049,7 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql(sqlStatement);
-
-    console.log('response', response);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission Observation record', [

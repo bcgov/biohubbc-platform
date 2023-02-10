@@ -42,6 +42,14 @@ export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput 
   return S3.deleteObject({ Bucket: OBJECT_STORE_BUCKET_NAME, Key: key }).promise();
 }
 
+/**
+ * Copy a file from S3, to a new location in S3
+ *
+ * @export
+ * @param {string} oldKey
+ * @param {string} newKey
+ * @return {*}  {Promise<PromiseResult<CopyObjectOutput, AWSError>>}
+ */
 export async function moveFileInS3(oldKey: string, newKey: string): Promise<PromiseResult<CopyObjectOutput, AWSError>> {
   const copyparams = {
     Bucket: OBJECT_STORE_BUCKET_NAME,

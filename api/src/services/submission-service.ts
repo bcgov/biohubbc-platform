@@ -154,10 +154,24 @@ export class SubmissionService extends DBService {
     return this.submissionRepository.updateSubmissionMetadataRecordEffectiveDate(submissionId);
   }
 
+  /**
+   * Update end time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionService
+   */
   async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
     return this.submissionRepository.updateSubmissionObservationRecordEndDate(submissionId);
   }
 
+  /**
+   * Update start time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionService
+   */
   async updateSubmissionObservationRecordEffectiveDate(submissionId: number): Promise<number> {
     return this.submissionRepository.updateSubmissionObservationRecordEffectiveDate(submissionId);
   }

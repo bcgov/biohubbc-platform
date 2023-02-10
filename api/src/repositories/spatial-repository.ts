@@ -247,7 +247,6 @@ export class SpatialRepository extends BaseRepository {
    */
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
-    console.log('runSpatialTransformOnSubmissionId', response);
 
     return response.rows;
   }
@@ -269,7 +268,7 @@ export class SpatialRepository extends BaseRepository {
   /**
    * Insert given transformed data into Spatial Component Table
    *
-   * @param {number} submissionId
+   * @param {number} submissionObservationId
    * @param {Feature[]} transformedData
    * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
    * @memberof SpatialRepository
@@ -290,7 +289,6 @@ export class SpatialRepository extends BaseRepository {
 
     if (transformedData.features && transformedData.features.length > 0) {
       const geoCollection = generateGeometryCollectionSQL(transformedData.features);
-      console.log('geoCollection', geoCollection);
 
       sqlStatement.append(SQL`
         ,public.geography(
@@ -315,11 +313,7 @@ export class SpatialRepository extends BaseRepository {
         submission_spatial_component_id;
     `);
 
-    console.log('sqlStatement', String(sqlStatement.text));
-    console.log('sqlStatement', sqlStatement.values);
-
     const response = await this.connection.sql<{ submission_spatial_component_id: number }>(sqlStatement);
-    console.log('response', response);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission spatial component details', [
