@@ -4,7 +4,6 @@ import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-re
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
-import { ApiGeneralError } from '../../../../errors/api-error';
 import { DarwinCoreService } from '../../../../services/dwc-service';
 import * as keycloakUtils from '../../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
@@ -135,8 +134,6 @@ describe('ingestEml', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').throws('error' as unknown as ApiGeneralError);
-
       try {
         const requestHandler = ingestEml.ingestEmlSubmission();
 
@@ -159,7 +156,6 @@ describe('ingestEml', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      sinon.stub(DarwinCoreService.prototype, 'ingestNewDwCAEML').resolves();
       sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
 
       const requestHandler = ingestEml.ingestEmlSubmission();

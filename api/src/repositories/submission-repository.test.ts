@@ -9,7 +9,7 @@ import { EMLFile } from '../utils/media/eml/eml-file';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import {
-  IInsertSubmissionRecord,
+  ISubmissionRecord,
   ISourceTransformModel,
   ISpatialComponentCount,
   SubmissionRepository,
@@ -108,7 +108,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecord(mockParams as unknown as IInsertSubmissionRecord);
+        await submissionRepository.insertSubmissionRecord(mockParams as unknown as ISubmissionRecord);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission record');
@@ -125,7 +125,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.insertSubmissionRecord(
-        mockParams as unknown as IInsertSubmissionRecord
+        mockParams as unknown as ISubmissionRecord
       );
 
       expect(response.submission_id).to.equal(1);
@@ -169,7 +169,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('updateSubmissionRecordEMLSource', () => {
+  describe('updateSubmissionMetadataEMLSource', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -184,7 +184,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.updateSubmissionRecordEMLSource(1, {
+        await submissionRepository.updateSubmissionMetadataEMLSource(1, 1, {
           emlFile: Buffer.from('')
         } as unknown as EMLFile);
 
@@ -203,15 +203,15 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.updateSubmissionRecordEMLSource(1, {
+      const response = await submissionRepository.updateSubmissionMetadataEMLSource(1, 1, {
         emlFile: Buffer.from('')
       } as unknown as EMLFile);
 
-      expect(response.submission_id).to.equal(1);
+      expect(response.submission_metadata_id).to.equal(1);
     });
   });
 
-  describe('updateSubmissionRecordEMLJSONSource', () => {
+  describe('updateSubmissionMetadataEMLJSONSource', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -225,7 +225,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
       try {
-        await submissionRepository.updateSubmissionRecordEMLJSONSource(1, 'string');
+        await submissionRepository.updateSubmissionMetadataEMLJSONSource(1, 1, 'string');
 
         expect.fail();
       } catch (actualError) {
@@ -242,9 +242,9 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.updateSubmissionRecordEMLJSONSource(1, 'string');
+      const response = await submissionRepository.updateSubmissionMetadataEMLJSONSource(1, 1, 'string');
 
-      expect(response.submission_id).to.equal(1);
+      expect(response.submission_metadata_id).to.equal(1);
     });
   });
 
@@ -379,43 +379,6 @@ describe('SubmissionRepository', () => {
 
       expect(response[0].spatial_type).to.equal('occurrence');
       expect(response[0].count).to.equal(10);
-    });
-  });
-
-  describe('setSubmissionEndDateById', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.setSubmissionEndDateById(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to update end date in submission record');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.setSubmissionEndDateById(1);
-
-      expect(response.submission_id).to.equal(1);
     });
   });
 
@@ -744,45 +707,6 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSourceTransformRecordBySubmissionId(1);
-
-      expect(response).to.eql(mockResponse);
-    });
-  });
-
-  describe('updateSubmissionRecordDWCSource', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when update sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.updateSubmissionRecordDWCSource(1, 'string');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal(
-          'Failed to update submission record darwin core source'
-        );
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        submission_id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.updateSubmissionRecordDWCSource(1, 'string');
 
       expect(response).to.eql(mockResponse);
     });
