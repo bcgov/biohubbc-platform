@@ -43,14 +43,19 @@ export class DarwinCoreService extends DBService {
 
   async intakeJob(intakeRecord: ISubmissionJobQueue): Promise<void> {
     const submissionMetadataId = await this.intakeJob_step1(intakeRecord.submission_id);
+    console.log('intake job 1: ', submissionMetadataId);
 
     const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
 
-    await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
+    console.log('intake job 2: ', dwcaFile);
 
+    await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
+    console.log('intake job 3: convert eml to json complete - complete');
     await this.intakeJob_step4(intakeRecord.submission_id);
+    console.log('intake job 4: set record effective dates and end dates- complete');
 
     await this.intakeJob_step5(intakeRecord.submission_id);
+    console.log('intake job 5: trasnform and upload metadata- complete');
 
     //TODO: all jobs up to 5 data flow is in happy path. Review and harden functions + write tests
     if (dwcaFile.worksheets) {
