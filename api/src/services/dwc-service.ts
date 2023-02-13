@@ -10,10 +10,10 @@ import {
 } from '../repositories/submission-repository';
 import { deleteFileFromS3, generateS3FileKey, moveFileInS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { DWCArchive, DWCWorksheets } from '../utils/media/dwc/dwc-archive-file';
+import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile } from '../utils/media/media-file';
-import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { normalizeDWCA, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { ElasticSearchIndices } from './es-service';
 import { SpatialService } from './spatial-service';
@@ -53,9 +53,7 @@ export class DarwinCoreService extends DBService {
     await this.intakeJob_step5(intakeRecord.submission_id);
 
     //TODO: all jobs up to 5 data flow is in happy path. Review and harden functions + write tests
-    if (dwcaFile.worksheets) {
-      await this.intakeJob_step6(intakeRecord, dwcaFile.worksheets);
-    }
+    await this.intakeJob_step6(intakeRecord, dwcaFile);
 
     await this.intakeJob_finishIntake(intakeRecord);
   }
@@ -235,25 +233,20 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step6(intakeRecord: ISubmissionJobQueue, dwcaWorksheets: DWCWorksheets): Promise<void> {
+  async intakeJob_step6(intakeRecord: ISubmissionJobQueue, dwcaWorksheets: DWCArchive): Promise<void> {
     try {
       console.log('dwcaWorksheets', dwcaWorksheets);
-      const submissionObservationData: ISubmissionObservationRecord = {
-        submission_id: intakeRecord.submission_id,
-        darwin_core_source: {},
-        submission_security_request: intakeRecord.security_request,
-        foi_reason_description: null
-      };
 
-      const submissionObservationId = await this.submissionService.insertSubmissionObservationRecord(
-        submissionObservationData
-      );
+      const jsonData = normalizeDWCA(dwcaWorksheets);
 
-      await this.runSpatialTransforms(intakeRecord, submissionObservationId.submission_observation_id);
-      await this.runSecurityTransforms(intakeRecord);
+      const submissionObservationId = await this.insertSubmissionObservationRecord(intakeRecord, jsonData);
+      console.log('submissionObservationId', submissionObservationId);
 
-      await this.submissionService.updateSubmissionObservationRecordEndDate(intakeRecord.submission_id);
-      await this.submissionService.updateSubmissionObservationRecordEffectiveDate(intakeRecord.submission_id);
+      await this.runTransformsOnObservations(intakeRecord, submissionObservationId.submission_observation_id);
+
+      console.log('submissionObservationId', submissionObservationId);
+
+      await this.updateSubmissionObservationEffectiveAndEndDate(intakeRecord);
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step6', message: 'error', error });
 
@@ -289,10 +282,87 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  async updateSubmissionObservationEffectiveAndEndDate(intakeRecord: ISubmissionJobQueue): Promise<void> {
+    try {
+      await this.submissionService.updateSubmissionObservationRecordEndDate(intakeRecord.submission_id);
+      await this.submissionService.updateSubmissionObservationRecordEffectiveDate(intakeRecord.submission_id);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'updateSubmissionObservationEffectiveAndEndDate', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_INGESTION,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Updating Submission Observation Record End and Effective Date', error.message);
+    }
+  }
+
+  async runTransformsOnObservations(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
+    try {
+      console.log('runTransformsOnObservations');
+      await this.runSpatialTransforms(intakeRecord, submissionObservationId);
+      console.log('FINISHED');
+
+      await this.runSecurityTransforms(intakeRecord);
+      console.log('FINISHED SECURITY');
+
+    } catch (error: any) {
+      defaultLog.debug({ label: 'runTransformsOnObservations', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Running Transforms on Observation Data', error.message);
+    }
+  }
+
+  async insertSubmissionObservationRecord(
+    intakeRecord: ISubmissionJobQueue,
+    dwcaJson: string
+  ): Promise<{
+    submission_observation_id: number;
+  }> {
+    try {
+      const submissionObservationData: ISubmissionObservationRecord = {
+        submission_id: intakeRecord.submission_id,
+        darwin_core_source: dwcaJson,
+        submission_security_request: intakeRecord.security_request,
+        foi_reason_description: null //TODO: Check null
+      };
+
+      console.log('submissionObservationData', submissionObservationData);
+
+      return this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'insertSubmissionObservationRecord', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        intakeRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Inserting Submission Observation Record', error.message);
+    }
+  }
+
   async runSpatialTransforms(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
+      console.log('START SPATIAL TRANSFORM');
+      console.log('intakeRecord', intakeRecord);
+      console.log('submissionObservationId', submissionObservationId);
+
       await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
+      console.log('FINISHED RUNING SPATIAL TRANSFORMS', submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,

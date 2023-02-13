@@ -10,6 +10,8 @@ export enum DWC_CLASS {
   MEASUREMENTORFACT = 'measurementorfact',
   RESOURCERELATIONSHIP = 'resourcerelationship',
   TAXON = 'taxon',
+  LOCATION = 'location',
+  RECORD = 'record',
   EML = 'eml'
 }
 
@@ -74,6 +76,18 @@ export class DWCArchive {
           break;
         case DWC_CLASS.TAXON:
           this.worksheets[DWC_CLASS.TAXON] = new CSVWorksheet(
+            rawFile.name,
+            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+          );
+          break;
+        case DWC_CLASS.LOCATION:
+          this.worksheets[DWC_CLASS.LOCATION] = new CSVWorksheet(
+            rawFile.name,
+            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+          );
+          break;
+        case DWC_CLASS.RECORD:
+          this.worksheets[DWC_CLASS.RECORD] = new CSVWorksheet(
             rawFile.name,
             xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
           );

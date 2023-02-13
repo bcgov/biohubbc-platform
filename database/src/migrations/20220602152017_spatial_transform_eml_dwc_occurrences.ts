@@ -22,17 +22,17 @@ export async function up(knex: Knex): Promise<void> {
       $transform$
       with submission as (select * from submission_observation where submission_observation_id = ?)
       , occurrences as (select submission_observation_id, occs
-      from submission_observation, jsonb_path_query(darwin_core_source, '$.occurrence') occs)
+      from submission, jsonb_path_query(darwin_core_source, '$.occurrence') occs)
       , occurrence as (select submission_observation_id, jsonb_array_elements(occs) occ
           from occurrences)
       , events as (select evns
-          from submission_observation, jsonb_path_query(darwin_core_source, '$.event') evns)
+          from submission, jsonb_path_query(darwin_core_source, '$.event') evns)
       , event as (select jsonb_array_elements(evns) evn
           from events)
       , locations as (select locs
-          from submission_observation, jsonb_path_query(darwin_core_source, '$.location') locs)
+          from submission, jsonb_path_query(darwin_core_source, '$.location') locs)
       , location as (select jsonb_array_elements(locs) loc
-          from locations)
+      	  from locations)
       , location_coord as (select st_x(pt) x, st_y(pt) y, loc  from location
       , ST_SetSRID(ST_MakePoint((loc->>'decimalLongitude')::float, (loc->>'decimalLatitude')::float), 4326) pt)
       , normal as (select distinct o.submission_observation_id, o.occ, ec.*, e.evn
@@ -45,11 +45,11 @@ export async function up(knex: Knex): Promise<void> {
         'type', 'FeatureCollection',
         'features', jsonb_build_array(
                       jsonb_build_object(
-                        'type', 'Feature'
+                        'type', 'Feature',
                         'geometry',jsonb_build_object(
                             'type', 'Point',
                             'coordinates', json_build_array(n.x, n.y)),
-                    'properties', jsonb_build_object(
+                    		'properties', jsonb_build_object(
                                     'type', 'Occurrence',
                                     'dwc', jsonb_build_object(
                                       'type', 'PhysicalObject',
@@ -67,9 +67,9 @@ export async function up(knex: Knex): Promise<void> {
                                       'verbatimSRS', n.loc->'verbatimSRS',
                                       'verbatimCoordinates', n.loc->'verbatimCoordinates')
                                   )
-                      )
-          )
-      )result_data
+                        )
+      		)
+      )
       from normal n;
       $transform$
     );

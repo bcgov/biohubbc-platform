@@ -925,7 +925,11 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
+    console.log('sqlStatement', sqlStatement);
+
     const response = await this.connection.sql<{ submission_observation_id: number }>(sqlStatement);
+
+    console.log('response', response);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to insert submission observation record', [
