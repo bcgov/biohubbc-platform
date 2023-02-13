@@ -254,7 +254,44 @@ describe.only('DarwinCoreService', () => {
     });
   });
 
-  describe('intakeJob_step4', () => {});
+  describe('intakeJob_step4', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEndDate').resolves()
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEffectiveDate').resolves()
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      await service.intakeJob_step4(1);
+      expect(insertStatus).to.not.be.called;
+    });
+
+    it('should throw `Update Submission` error', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return {rowCount: 0, rows:[]} as any as Promise<QueryResult<any>>;
+        }
+      });
+      const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEndDate').resolves()
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEffectiveDate').resolves()
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      try {
+        await service.intakeJob_step4(1);
+        expect.fail()
+      } catch (error) {
+        expect(insertStatus).to.be.calledOnce;
+        expect((error as ApiGeneralError).message).to.equal('Updating Submission Record End/Effective Date');
+      }
+    });
+  });
 
   describe('intakeJob_step5', () => {});
 
