@@ -1,11 +1,270 @@
-import chai from 'chai';
+import chai, { expect } from 'chai';
 import { describe } from 'mocha';
+import { QueryResult } from 'pg';
+import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { ApiGeneralError } from '../errors/api-error';
+import { CSVWorksheet } from '../utils/media/csv/csv-file';
+import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
+import { MediaFile } from '../utils/media/media-file';
+import { getMockDBConnection } from '../__mocks__/db';
+import { DarwinCoreService } from './dwc-service';
+import { SubmissionService } from './submission-service';
 
 
 chai.use(sinonChai);
 
-describe('DarwinCoreService', () => {
+describe.only('DarwinCoreService', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  describe('intakeJob', () => {});
+
+  describe('intakeJob_step1', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should insert metadata record', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return { rowCount: 1,  rows: [{submission_metadata_id: 1}] } as any as Promise<QueryResult<any>>;
+        }
+      })
+      const service = new DarwinCoreService(mockDBConnection);
+
+      const response = await service.intakeJob_step1(1);
+      expect(response).to.be.eql({submission_metadata_id: 1});
+    });
+
+    it('should fail with `Inserting new Metadata record` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionMetadataRecord').throws()
+      const errorInsert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      try {
+        await service.intakeJob_step1(1)
+      } catch (error) {
+        expect(errorInsert).to.be.calledOnce;
+        expect((error as ApiGeneralError).message).to.equal('Inserting new Metadata record');
+      }
+    });
+  });
+
+  describe.only('intakeJob_step2', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return DWCArchive', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const dwcArchive = {
+        eml: {
+          buffer: Buffer.from('test')
+        },
+        worksheets: {
+          test1: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet,
+          test2: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet
+        }
+      } as unknown as DWCArchive;
+
+      const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1, 
+        source_transform_id: 3, 
+        uuid: "uuid"
+      });
+      const metadata = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataEMLSource').resolves({submission_metadata_id: 1});
+
+      sinon.stub(DarwinCoreService.prototype, 'getAndPrepFileFromS3').resolves(dwcArchive);
+      const response = await service.intakeJob_step2({submission_job_queue_id: 1, submission_id: 1, job_start_timestamp: '', job_end_timestamp: ''}, 1);
+
+      expect(response).to.be.eql(dwcArchive);
+      expect(metadata).to.be.calledOnce;
+    });
+
+    it('should throw `File eml is empty` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const dwcArchive = {
+        eml: undefined,
+        worksheets: {
+          test1: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet,
+          test2: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet
+        }
+      } as unknown as DWCArchive;
+
+      const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1, 
+        source_transform_id: 3, 
+        uuid: "uuid"
+      });
+      const metadata = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataEMLSource').resolves({submission_metadata_id: 1});
+      sinon.stub(DarwinCoreService.prototype, 'getAndPrepFileFromS3').resolves(dwcArchive);
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      try {
+        await service.intakeJob_step2({submission_job_queue_id: 1, submission_id: 1, job_start_timestamp: '', job_end_timestamp: ''}, 1);
+
+      } catch(error) {
+        expect(insertStatus).to.be.calledOnce;
+        expect(metadata).not.to.be.called;
+        expect((error as ApiGeneralError).errors).to.equal('Accessing S3 File, file eml is empty');
+      }
+    });
+
+    it('should throw `Accessing S3 File` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const dwcArchive = {
+        eml: {
+          buffer: Buffer.from('test')
+        },
+        worksheets: {
+          test1: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet,
+          test2: {
+            getRowObjects: () => {
+              return [
+                { id: 1, name: 'test' },
+                { id: 2, name: 'test' }
+              ];
+            }
+          } as unknown as CSVWorksheet
+        }
+      } as unknown as DWCArchive;
+
+      const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').throws();
+      const metadata = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataEMLSource').resolves();
+      sinon.stub(DarwinCoreService.prototype, 'getAndPrepFileFromS3').resolves(dwcArchive);
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      try {
+        await service.intakeJob_step2({submission_job_queue_id: 1, submission_id: 1, job_start_timestamp: '', job_end_timestamp: ''}, 1);
+      } catch(error) {
+        expect(insertStatus).to.be.calledOnce;
+        expect(metadata).not.to.be.called;
+        expect((error as ApiGeneralError).message).to.equal('Accessing S3 File and Updating new Metadata record');
+        // checking for another error in the flow
+        expect((error as ApiGeneralError).errors).not.to.equal('Accessing S3 File, file eml is empty');
+      }
+    });
+  });
+
+  describe.only('intakeJob_step3', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mediaFileStub = sinon.createStubInstance(MediaFile);
+      const bufferStub = sinon.createStubInstance(Buffer);
+
+      bufferStub.toString.returns(
+        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
+      );
+
+      mediaFileStub.buffer = bufferStub as unknown as Buffer;
+
+      const mockDWCAFile = {
+        submission_id: 1,
+        eml: {
+          emlFile: mediaFileStub
+        },
+        worksheets: {}
+      } as unknown as DWCArchive;
+      const update = sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordEMLJSONSource').resolves();
+
+      await service.intakeJob_step3(1, mockDWCAFile, 1);
+      expect(update).to.be.calledOnce;
+    });
+
+    it('should throw `Converting EML to JSON` error', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return {rowCount: 0, rows:[]} as any as Promise<QueryResult<any>>;
+        }
+      });
+      const service = new DarwinCoreService(mockDBConnection);
+      const mediaFileStub = sinon.createStubInstance(MediaFile);
+      const bufferStub = sinon.createStubInstance(Buffer);
+      bufferStub.toString.returns(
+        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
+      );
+
+      mediaFileStub.buffer = bufferStub as unknown as Buffer;
+
+      const mockDWCAFile = {
+        submission_id: 1,
+        eml: {
+          emlFile: mediaFileStub
+        },
+        worksheets: {}
+      } as unknown as DWCArchive;
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      try {
+        await service.intakeJob_step3(1, mockDWCAFile, 1);
+        expect.fail();
+      } catch (error) {
+        expect(insertStatus).to.be.calledOnce;
+        expect((error as ApiGeneralError).message).to.equal('Converting EML to JSON and Storing data');
+      }
+    });
+  });
+
+  describe('intakeJob_step4', () => {});
+
+  describe('intakeJob_step5', () => {});
+
+  describe('intakeJob_step6', () => {});
+
+  describe('intakeJob_finishIntake', () => {});
+});
+
+
+// describe('DarwinCoreService', () => {
   // describe('prepDWCArchive', () => {
   //   afterEach(() => {
   //     sinon.restore();
@@ -198,21 +457,21 @@ describe('DarwinCoreService', () => {
   //     const mockDBConnection = getMockDBConnection();
   //     const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-  //     const mediaFileStub = sinon.createStubInstance(MediaFile);
-  //     const bufferStub = sinon.createStubInstance(Buffer);
+      // const mediaFileStub = sinon.createStubInstance(MediaFile);
+      // const bufferStub = sinon.createStubInstance(Buffer);
 
-  //     bufferStub.toString.returns(
-  //       '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
-  //     );
+      // bufferStub.toString.returns(
+      //   '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
+      // );
 
-  //     mediaFileStub.buffer = bufferStub as unknown as Buffer;
+      // mediaFileStub.buffer = bufferStub as unknown as Buffer;
 
-  //     const mockDWCAFile = {
-  //       submission_id: 1,
-  //       eml: {
-  //         emlFile: mediaFileStub
-  //       }
-  //     };
+      // const mockDWCAFile = {
+      //   submission_id: 1,
+      //   eml: {
+      //     emlFile: mediaFileStub
+      //   }
+      // };
 
   //     const getSubmissionRecordBySubmissionIdStub = sinon
   //       .stub(DarwinCoreService.prototype, 'getSubmissionRecordAndConvertToDWCArchive')
@@ -1140,4 +1399,4 @@ describe('DarwinCoreService', () => {
   //     expect(response).to.equal('dataPackageId eml');
   //   });
   // });
-});
+// });
