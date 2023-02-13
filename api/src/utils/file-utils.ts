@@ -221,25 +221,6 @@ export function generateDatasetS3FileKey(options: IDatasetS3FileKey): string {
 }
 
 /**
- * Helper function for generating S3 keys for DwCA datasets.
- *
- * @export
- * @param {IDatasetS3FileKey} options
- * @return {*}  {string}
- */
-export function generateDatasetS3FileKey(options: IDatasetS3FileKey): string {
-  const keyParts: (string | number)[] = [S3_KEY_PREFIX];
-
-  keyParts.push('datasets');
-  keyParts.push(options.uuid);
-  keyParts.push('dwca');
-  keyParts.push(options.queueId);
-  keyParts.push(options.fileName);
-
-  return keyParts.join('/');
-}
-
-/**
  * Scan a file for viruses.
  *
  * @export
