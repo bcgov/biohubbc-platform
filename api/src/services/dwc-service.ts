@@ -102,7 +102,6 @@ export class DarwinCoreService extends DBService {
         eml_source: '',
         eml_json_source: null
       };
-
       return this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
