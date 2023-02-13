@@ -24,6 +24,8 @@ const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${ver
 const staticUrlsAPI = config.staticUrlsAPI;
 const staticUrls = config.staticUrls;
 
+const queueDockerfilePath = './Dockerfile.queue';
+
 const processOptions = (options) => {
   const result = { ...options };
 
@@ -65,7 +67,8 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     branch: branch,
-    logLevel: (isStaticDeployment && 'info') || 'debug'
+    logLevel: (isStaticDeployment && 'info') || 'debug',
+    queueDockerfilePath: queueDockerfilePath
   },
   dev: {
     namespace: 'a0ec71-dev',
@@ -87,8 +90,11 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.dev,
     replicas: 1,
-    maxReplicas: 2,
-    logLevel: (isStaticDeployment && 'info') || 'debug'
+    maxReplicas: 1,
+    queueReplicas: 1,
+    queueMaxReplicas: 1,
+    logLevel: (isStaticDeployment && 'info') || 'debug',
+    queueDockerfilePath: queueDockerfilePath
   },
   test: {
     namespace: 'a0ec71-test',
@@ -109,9 +115,12 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
-    replicas: 3,
-    maxReplicas: 5,
-    logLevel: 'info'
+    replicas: 2,
+    maxReplicas: 2,
+    queueReplicas: 2,
+    queueMaxReplicas: 2,
+    logLevel: 'info',
+    queueDockerfilePath: queueDockerfilePathF
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -132,9 +141,12 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    replicas: 3,
-    maxReplicas: 6,
-    logLevel: 'info'
+    replicas: 2,
+    maxReplicas: 2,
+    queueReplicas: 2,
+    queueMaxReplicas: 2,
+    logLevel: 'info',
+    queueDockerfilePath: queueDockerfilePath
   }
 };
 
