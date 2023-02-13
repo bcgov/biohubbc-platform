@@ -120,7 +120,7 @@ const phases = {
     queueReplicas: 2,
     queueMaxReplicas: 2,
     logLevel: 'info',
-    queueDockerfilePath: queueDockerfilePathF
+    queueDockerfilePath: queueDockerfilePath
   },
   prod: {
     namespace: 'a0ec71-prod',

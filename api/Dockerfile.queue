@@ -30,7 +30,5 @@ COPY . ./
 # Application VOLUME
 VOLUME ${HOME}
 
-EXPOSE 6500
-
 # Application Entry point
 CMD ["npm", "run", "queue"]
