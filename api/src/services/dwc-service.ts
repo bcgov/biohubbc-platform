@@ -240,16 +240,11 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step6(intakeRecord: ISubmissionJobQueue, dwcaWorksheets: DWCArchive): Promise<void> {
     try {
-      console.log('dwcaWorksheets', dwcaWorksheets);
-
       const jsonData = normalizeDWCA(dwcaWorksheets);
 
       const submissionObservationId = await this.insertSubmissionObservationRecord(intakeRecord, jsonData);
-      console.log('submissionObservationId', submissionObservationId);
 
       await this.runTransformsOnObservations(intakeRecord, submissionObservationId.submission_observation_id);
-
-      console.log('submissionObservationId', submissionObservationId);
 
       await this.updateSubmissionObservationEffectiveAndEndDate(intakeRecord);
     } catch (error: any) {
@@ -307,13 +302,9 @@ export class DarwinCoreService extends DBService {
 
   async runTransformsOnObservations(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
     try {
-      console.log('runTransformsOnObservations');
       await this.runSpatialTransforms(intakeRecord, submissionObservationId);
-      console.log('FINISHED');
 
       await this.runSecurityTransforms(intakeRecord);
-      console.log('FINISHED SECURITY');
-
     } catch (error: any) {
       defaultLog.debug({ label: 'runTransformsOnObservations', message: 'error', error });
 
@@ -342,8 +333,6 @@ export class DarwinCoreService extends DBService {
         foi_reason_description: null //TODO: Check null
       };
 
-      console.log('submissionObservationData', submissionObservationData);
-
       return this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionObservationRecord', message: 'error', error });
@@ -362,12 +351,7 @@ export class DarwinCoreService extends DBService {
   async runSpatialTransforms(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
-      console.log('START SPATIAL TRANSFORM');
-      console.log('intakeRecord', intakeRecord);
-      console.log('submissionObservationId', submissionObservationId);
-
       await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
-      console.log('FINISHED RUNING SPATIAL TRANSFORMS', submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,

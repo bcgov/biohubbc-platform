@@ -110,6 +110,6 @@ with submission as (select * from submission_observation where submission_observ
                                   )
                         )
       		)
-      )
+      ) result_data
       from normal n;
 $transform$`;
