@@ -10,7 +10,7 @@ import { SubmissionService } from '../../../../services/submission-service';
 import { getKeycloakSource } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/submission/{submissionId}/ingestEml');
+const defaultLog = getLogger('paths/dwc/submission/{submissionId}/intake');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -23,7 +23,7 @@ export const POST: Operation = [
       ]
     };
   }),
-  ingestEmlSubmission()
+  intakeNewJobQueue()
 ];
 
 POST.apiDoc = {
@@ -55,7 +55,9 @@ POST.apiDoc = {
 //TODO: END POINT might be depercated, review uses and delete if not needed
 //CURRENTLY using to trigger intake job request
 
-export function ingestEmlSubmission(): RequestHandler {
+//TODO: DELETE MEEEEEE (END POINT) I WANT TO DIEEEEE
+
+export function intakeNewJobQueue(): RequestHandler {
   return async (req, res) => {
     const submissionId = Number(req.params.submissionId);
 
