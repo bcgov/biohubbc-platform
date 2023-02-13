@@ -114,6 +114,7 @@ export enum SUBMISSION_MESSAGE_TYPE {
 export interface ISubmissionJobQueue {
   submission_job_queue_id: number;
   submission_id: number;
+  key?: string;
   job_start_timestamp: string;
   job_end_timestamp: string;
   security_request?: string; //jsonb might need any
@@ -958,11 +959,7 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
-    console.log('sqlStatement', sqlStatement);
-
     const response = await this.connection.sql(sqlStatement);
-
-    console.log('response', response);
 
     return response.rowCount;
   }
