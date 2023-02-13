@@ -38,26 +38,24 @@ export class DarwinCoreService extends DBService {
     this.submissionService = new SubmissionService(this.connection);
   }
 
-  //TODO: https://apps.nrs.gov.bc.ca/int/confluence/display/TASHIS/BioHub+Job+Processing
-  // FOLLOWING this Data flow
-
+  /**
+   * Start intake job for job queue record
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async intakeJob(intakeRecord: ISubmissionJobQueue): Promise<void> {
     const submissionMetadataId = await this.intakeJob_step1(intakeRecord.submission_id);
-    console.log('intake job 1: ', submissionMetadataId);
 
     const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
 
-    console.log('intake job 2: ', dwcaFile);
-
     await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
-    console.log('intake job 3: convert eml to json complete - complete');
+
     await this.intakeJob_step4(intakeRecord.submission_id);
-    console.log('intake job 4: set record effective dates and end dates- complete');
 
     await this.intakeJob_step5(intakeRecord.submission_id);
-    console.log('intake job 5: trasnform and upload metadata- complete');
 
-    //TODO: all jobs up to 5 data flow is in happy path. Review and harden functions + write tests
     await this.intakeJob_step6(intakeRecord, dwcaFile);
 
     await this.intakeJob_finishIntake(intakeRecord);
@@ -82,7 +80,7 @@ export class DarwinCoreService extends DBService {
         eml_json_source: null
       };
 
-      return this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
+      return await this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
 
@@ -145,7 +143,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<any> {
+  async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<void> {
     try {
       if (file.eml) {
         const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
@@ -181,7 +179,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step4(submissionId: number): Promise<any> {
+  async intakeJob_step4(submissionId: number): Promise<void> {
     try {
       await this.submissionService.updateSubmissionMetadataRecordEndDate(submissionId);
       await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(submissionId);
@@ -261,6 +259,13 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Finish intake job, move S3 file to home folder, update status and queue end date
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async intakeJob_finishIntake(intakeRecord: ISubmissionJobQueue): Promise<void> {
     try {
       await this.updateS3FileLocation(intakeRecord);
@@ -282,6 +287,13 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Update Submission Record effective and end Date
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async updateSubmissionObservationEffectiveAndEndDate(intakeRecord: ISubmissionJobQueue): Promise<void> {
     try {
       await this.submissionService.updateSubmissionObservationRecordEndDate(intakeRecord.submission_id);
@@ -300,6 +312,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Run both spatial and Security Transform on Observation
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {number} submissionObservationId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async runTransformsOnObservations(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
     try {
       await this.runSpatialTransforms(intakeRecord, submissionObservationId);
@@ -319,6 +339,16 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Insert new Submission Observation Record
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {string} dwcaJson
+   * @return {*}  {Promise<{
+   *     submission_observation_id: number;
+   *   }>}
+   * @memberof DarwinCoreService
+   */
   async insertSubmissionObservationRecord(
     intakeRecord: ISubmissionJobQueue,
     dwcaJson: string
@@ -348,6 +378,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Run Spatial Transform on Submission Observation Record
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {number} submissionObservationId
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async runSpatialTransforms(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
@@ -371,6 +409,13 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Run Security Transform on Submission Observation Record
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @return {*}  {Promise<void>}
+   * @memberof DarwinCoreService
+   */
   async runSecurityTransforms(intakeRecord: ISubmissionJobQueue): Promise<void> {
     try {
       //run transform on observation data
@@ -394,6 +439,12 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Update and Move S3 file to new Home directory
+   *
+   * @param {ISubmissionJobQueue} intakeRecord
+   * @memberof DarwinCoreService
+   */
   async updateS3FileLocation(intakeRecord: ISubmissionJobQueue) {
     if (intakeRecord.key) {
       const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(

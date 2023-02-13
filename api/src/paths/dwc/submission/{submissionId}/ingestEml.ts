@@ -88,9 +88,7 @@ export function intakeNewJobQueue(): RequestHandler {
       res.status(200).send();
     } catch (error) {
       defaultLog.error({ label: 'INTAKE JOB ADDED', message: 'error', error });
-      await connection.commit();
-
-      // await connection.rollback();
+      await connection.rollback();
       throw error;
     } finally {
       connection.release();
