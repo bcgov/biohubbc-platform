@@ -75,7 +75,7 @@ with submission as (select * from submission_observation where submission_observ
       , location as (select jsonb_array_elements(locs) loc
       	  from locations)
       , location_coord as (select st_x(pt) x, st_y(pt) y, loc  from location
-      , ST_SetSRID(ST_MakePoint((loc->>'decimalLongitude')::float, (loc->>'decimalLatitude')::float), 4326) pt)
+      , ST_SetSRID(ST_MakePoint((nullif(loc->>'decimalLongitude', ''))::float, (nullif(loc->>'decimalLatitude', ''))::float), 4326) pt)
       , normal as (select distinct o.submission_observation_id, o.occ, ec.*, e.evn
       from occurrence o
       left outer join location_coord ec on
