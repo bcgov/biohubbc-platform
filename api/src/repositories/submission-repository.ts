@@ -369,21 +369,22 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
     const sqlStatement = SQL`
       SELECT
         submission_id
       FROM
         submission
       WHERE
-        uuid = ${uuid}
-      AND
-        record_end_date IS NULL;
+        uuid = ${uuid};
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    return response.rows[0];
+    if (response.rowCount > 0) {
+      return response.rows[0];
+    } else {
+      return null;
+    }
   }
 
   /**
