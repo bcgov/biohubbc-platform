@@ -128,7 +128,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
   }
 
@@ -327,8 +327,6 @@ export class SubmissionService extends DBService {
   async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
     const s3File = await getFileFromS3(fileName);
 
-    console.log('s3File', s3File);
-
     if (!s3File) {
       throw new ApiGeneralError('Failed to get file from S3');
     }
@@ -414,20 +412,48 @@ export class SubmissionService extends DBService {
     };
   }
 
+  /**
+   *  Fetch row of submission job queue by submission Id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionJobQueue>}
+   * @memberof SubmissionService
+   */
   async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
     return this.submissionRepository.getSubmissionJobQueue(submissionId);
   }
 
+  /**
+   * Update end time for the most recently stated record
+   *
+   * @param {number} submissionId
+   * @return {*}
+   * @memberof SubmissionService
+   */
   async updateSubmissionJobQueueEndTime(submissionId: number) {
     return this.submissionRepository.updateSubmissionJobQueueEndTime(submissionId);
   }
 
+  /**
+   * Insert a new metadata record
+   *
+   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
+   * @memberof SubmissionService
+   */
   async insertSubmissionMetadataRecord(
     submissonMetadata: ISubmissionMetadataRecord
   ): Promise<{ submission_metadata_id: number }> {
     return this.submissionRepository.insertSubmissionMetadataRecord(submissonMetadata);
   }
 
+  /**
+   * Insert a new Observation Record
+   *
+   * @param {ISubmissionObservationRecord} submissonObservation
+   * @return {*}  {Promise<{ submission_observation_id: number }>}
+   * @memberof SubmissionService
+   */
   async insertSubmissionObservationRecord(
     submissonObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {

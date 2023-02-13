@@ -68,11 +68,7 @@ export class DarwinCoreService extends DBService {
   async intakeJob(intakeRecord: ISubmissionJobQueue): Promise<void> {
     const submissionMetadataId = await this.intakeJob_step1(intakeRecord.submission_id);
 
-    console.log('submissionMetadataId', submissionMetadataId);
-
     const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
-
-    console.log('dwcaFile', dwcaFile);
 
     await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
@@ -135,25 +131,18 @@ export class DarwinCoreService extends DBService {
         intakeRecord.submission_id
       );
 
-      console.log('submissionRecord', submissionRecord);
-
-      const fileName = `${submissionRecord.uuid}.zip`;
-
       const file = await this.getAndPrepFileFromS3(
         intakeRecord.submission_job_queue_id,
         submissionRecord.uuid,
-        fileName
+        `${submissionRecord.uuid}.zip`
       );
 
-      console.log('file', file);
-
       if (file.eml) {
-        const response = await this.submissionService.updateSubmissionMetadataEMLSource(
+        await this.submissionService.updateSubmissionMetadataEMLSource(
           intakeRecord.submission_id,
           submissionMetadataId,
           file.eml
         );
-        console.log('response', response);
 
         return file;
       } else {
@@ -186,15 +175,11 @@ export class DarwinCoreService extends DBService {
       if (file.eml) {
         const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
 
-        console.log('jsonData', jsonData);
-
-        const response = await this.submissionService.updateSubmissionRecordEMLJSONSource(
+        await this.submissionService.updateSubmissionRecordEMLJSONSource(
           submissionId,
           submissionMetadataId,
           JSON.stringify(jsonData)
         );
-
-        console.log('response', response);
       }
     } catch (error: any) {
       defaultLog.debug({
@@ -278,10 +263,8 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step6(intakeRecord: ISubmissionJobQueue): Promise<any> {
-    //TODO: FIx return type
+  async intakeJob_step6(intakeRecord: ISubmissionJobQueue): Promise<void> {
     try {
-      //Step one: insert new observation record
       const submissionObservationData: ISubmissionObservationRecord = {
         submission_id: intakeRecord.submission_id,
         darwin_core_source: {},
@@ -292,7 +275,6 @@ export class DarwinCoreService extends DBService {
       const submissionObservationId = await this.submissionService.insertSubmissionObservationRecord(
         submissionObservationData
       );
-      console.log('submissionObservationId', submissionObservationId);
 
       await this.runSpatialTransforms(intakeRecord, submissionObservationId.submission_observation_id);
       await this.runSecurityTransforms(intakeRecord);
@@ -339,13 +321,12 @@ export class DarwinCoreService extends DBService {
       //run transform on observation data
       await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
 
-      const response2 = await this.submissionService.insertSubmissionStatus(
+      await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
       );
-      console.log('response2', response2);
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_runSpatialTransforms', message: 'error', error });
+      defaultLog.debug({ label: 'runSpatialTransforms', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         intakeRecord.submission_id,
@@ -363,13 +344,12 @@ export class DarwinCoreService extends DBService {
       //run transform on observation data
       await this.spatialService.runSecurityTransforms(intakeRecord.submission_id);
 
-      const response = await this.submissionService.insertSubmissionStatus(
+      await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
       );
-      console.log('response', response);
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_runSpatialTransforms', message: 'error', error });
+      defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         intakeRecord.submission_id,
@@ -394,12 +374,8 @@ export class DarwinCoreService extends DBService {
     });
 
     const newKey = generateS3FileKey({ uuid: submissionRecord.uuid, fileName: fileName });
-    console.log('oldKey', oldKey);
-    console.log('newKey', newKey);
 
-    const moveS3File = await moveFileInS3(oldKey, newKey);
-
-    console.log('moveS3File', moveS3File);
+    await moveFileInS3(oldKey, newKey);
 
     const jobQueueFolderKey = generateS3FileKey({
       uuid: submissionRecord.uuid,
@@ -423,10 +399,7 @@ export class DarwinCoreService extends DBService {
   async getAndPrepFileFromS3(submissionJobQueueId: number, uuid: string, fileName: string) {
     const fileLocation = generateS3FileKey({ uuid: uuid, jobQueueId: submissionJobQueueId, fileName: fileName });
 
-    console.log('fileLocation', fileLocation);
-
     const file = await this.submissionService.getIntakeFileFromS3(fileLocation);
-    console.log('file', file);
 
     if (!file) {
       throw new ApiGeneralError('The source file is not available');
@@ -526,8 +499,6 @@ export class DarwinCoreService extends DBService {
   async transformAndUploadMetaData(submissionId: number): Promise<void> {
     const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
 
-    console.log('submissionRecord', submissionRecord);
-
     if (!submissionRecord.source_transform_id) {
       throw new ApiGeneralError('The source_transform_id is not available');
     }
@@ -535,8 +506,6 @@ export class DarwinCoreService extends DBService {
     const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
       submissionRecord.source_transform_id
     );
-
-    console.log('sourceTransformRecord', sourceTransformRecord);
 
     if (!sourceTransformRecord.metadata_transform) {
       throw new ApiGeneralError('The source metadata transform is not available');
@@ -547,16 +516,12 @@ export class DarwinCoreService extends DBService {
       sourceTransformRecord.metadata_transform
     );
 
-    console.log('jsonMetadata', jsonMetadata);
-
     if (!jsonMetadata) {
       throw new ApiGeneralError('The source metadata json is not available');
     }
 
     // call to the ElasticSearch API to create a record with our transformed EML
-    const response = await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
-
-    console.log('uploadToElasticSearch', response); //TODO: remove this stuff
+    await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
   }
 
   /**
