@@ -155,6 +155,7 @@ export class DarwinCoreService extends DBService {
           JSON.stringify(jsonData)
         );
       }
+      // TODO: should this throw an error similar to step 2?
     } catch (error: any) {
       defaultLog.debug({
         label: 'convertSubmissionEMLtoJSON, updateSubmissionRecordEMLJSONSource',

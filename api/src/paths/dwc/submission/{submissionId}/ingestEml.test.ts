@@ -110,7 +110,7 @@ describe('ingestEml', () => {
 
       mockReq.params = { submissionId: '1' };
 
-      const requestHandler = ingestEml.ingestEmlSubmission();
+      const requestHandler = (ingestEml as any).ingestEmlSubmission();
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);
@@ -135,7 +135,7 @@ describe('ingestEml', () => {
       mockReq.params = { submissionId: '1' };
 
       try {
-        const requestHandler = ingestEml.ingestEmlSubmission();
+        const requestHandler = (ingestEml as any).ingestEmlSubmission();
 
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();
@@ -158,8 +158,8 @@ describe('ingestEml', () => {
 
       sinon.stub(DarwinCoreService.prototype, 'convertSubmissionEMLtoJSON').resolves();
 
-      const requestHandler = ingestEml.ingestEmlSubmission();
-
+      const requestHandler = (ingestEml as any).ingestEmlSubmission();
+      
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(mockRes.statusValue).to.equal(200);

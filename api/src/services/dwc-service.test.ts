@@ -453,7 +453,54 @@ describe.only('DarwinCoreService', () => {
     });
   });
 
-  describe('intakeJob_finishIntake', () => {});
+  describe.only('intakeJob_finishIntake', () => {
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: "",
+        job_end_timestamp: ""
+      } as ISubmissionJobQueue;
+
+      const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').resolves();
+      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves()
+      const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves()
+
+      await service.intakeJob_finishIntake(mockJobQueue)
+      
+      expect(update).to.be.calledOnce;
+      expect(insert).to.be.calledOnce;
+      expect(updateTime).to.be.calledOnce;
+    });
+
+    it('should throw `Transforming and uploading` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: "",
+        job_end_timestamp: ""
+      } as ISubmissionJobQueue;
+
+      const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
+      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves()
+      const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves()
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves()
+      
+      try {
+        await service.intakeJob_finishIntake(mockJobQueue)
+        expect.fail();
+      } catch (error) {
+        expect(insertStatus).to.be.calledOnce;  
+        expect(update).not.to.be.called;
+        expect(insert).not.to.be.called;
+        expect(updateTime).not.to.be.called;
+      }
+    });
+  });
 });
 
 
