@@ -160,6 +160,12 @@ export interface IDatasetS3FileKey {
   queueId: number;
 }
 
+export interface IDatasetS3FileKey {
+  fileName: string;
+  uuid: string;
+  queueId: number;
+}
+
 /**
  * Helper function for generating S3 keys.
  *
@@ -191,6 +197,25 @@ export function generateS3FileKey(options: IS3FileKey): string {
   if (options.fileName) {
     keyParts.push(options.fileName);
   }
+
+  return keyParts.join('/');
+}
+
+/**
+ * Helper function for generating S3 keys for DwCA datasets.
+ *
+ * @export
+ * @param {IDatasetS3FileKey} options
+ * @return {*}  {string}
+ */
+export function generateDatasetS3FileKey(options: IDatasetS3FileKey): string {
+  const keyParts: (string | number)[] = [S3_KEY_PREFIX];
+
+  keyParts.push('datasets');
+  keyParts.push(options.uuid);
+  keyParts.push('dwca');
+  keyParts.push(options.queueId);
+  keyParts.push(options.fileName);
 
   return keyParts.join('/');
 }
