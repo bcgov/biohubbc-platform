@@ -5,6 +5,7 @@ metadata:
   selfLink: ''
   name: biohub-platform-queue-dc
 parameters:
+  - name: NAME
     value: biohub-platform-queue
   - name: SUFFIX
     value: '-dev'

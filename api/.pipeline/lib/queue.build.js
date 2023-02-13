@@ -27,9 +27,10 @@ const queueBuild = (settings) => {
         NAME: name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
+        SOURCE_CONTEXT_DIR: 'api',
+        QUEUE_DOCKERFILE_PATH: phases[phase].queueDockerfilePath,
         SOURCE_REPOSITORY_URL: oc.git.http_url,
-        SOURCE_REPOSITORY_REF: phases[phase].branch || oc.git.ref,
-        QUEUE_DOCKERFILE_PATH: phases[phase].queueDockerfilePath
+        SOURCE_REPOSITORY_REF: phases[phase].branch || oc.git.ref
       }
     })
   );

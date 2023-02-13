@@ -28,7 +28,7 @@ const queueDeploy = async (settings) => {
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
-        HOST: phases[phase].host,
+        // HOST: phases[phase].host,
         CHANGE_ID: phases.build.changeId || changeId,
         NODE_ENV: phases[phase].env || 'dev',
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
@@ -43,6 +43,7 @@ const queueDeploy = async (settings) => {
         KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
         KEYCLOAK_ADMIN_HOST: phases[phase].sso.adminHost,
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
+        OBJECT_STORE_SECRETS: 'biohubbc-object-store',
         REPLICAS: phases[phase].queueReplicas || 1,
         REPLICA_MAX: phases[phase].queueMaxReplicas || 1,
         LOG_LEVEL: phases[phase].logLevel || 'info'
