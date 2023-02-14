@@ -453,6 +453,7 @@ describe.only('DarwinCoreService', () => {
     afterEach(() => {
       sinon.restore();
     });
+
     it('should run without issue', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
@@ -522,6 +523,9 @@ describe.only('DarwinCoreService', () => {
         worksheets: {}
       } as unknown as DWCArchive;
 
+      sinon
+        .stub(DarwinCoreService.prototype, 'insertSubmissionObservationRecord')
+        .resolves({ submission_observation_id: 1 });
       sinon.stub(DarwinCoreService.prototype, 'runTransformsOnObservations').resolves();
       sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEffectiveAndEndDate').throws();
       const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
@@ -865,7 +869,7 @@ describe.only('DarwinCoreService', () => {
       } as ISubmissionModel
 
       const submission = sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves(mockSubmission)
-      const moveS3 = sinon.stub(fileUtils, 'moveFileInS3').resolves();
+      const moveS3 = sinon.stub(fileUtils, 'copyFileInS3').resolves();
       const deleteS3 = sinon.stub(fileUtils, 'deleteFileFromS3').resolves();
 
       await service.updateS3FileLocation(mockJobQueue);
@@ -897,7 +901,7 @@ describe.only('DarwinCoreService', () => {
       } as ISubmissionModel
 
       const submission = sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves(mockSubmission)
-      const moveS3 = sinon.stub(fileUtils, 'moveFileInS3').resolves();
+      const moveS3 = sinon.stub(fileUtils, 'copyFileInS3').resolves();
       const deleteS3 = sinon.stub(fileUtils, 'deleteFileFromS3').resolves();
 
       await service.updateS3FileLocation(mockJobQueue);
@@ -922,7 +926,7 @@ describe.only('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueue;
 
-      const moveS3 = sinon.stub(fileUtils, 'moveFileInS3').resolves();
+      const moveS3 = sinon.stub(fileUtils, 'copyFileInS3').resolves();
       const deleteS3 = sinon.stub(fileUtils, 'deleteFileFromS3').resolves();
 
       try {
