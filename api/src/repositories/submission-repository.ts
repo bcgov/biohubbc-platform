@@ -278,38 +278,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update the `input_key` column of a submission record.
-   * TODO: Might be deprecated, input key no longer in submission table
-   * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['input_key']} inputKey
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission
-      SET
-        input_key = ${inputKey}
-      WHERE
-        submission_id = ${submissionId}
-      RETURNING
-        submission_id;
-    `;
-
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
-        'SubmissionRepository->updateSubmissionRecordInputKey',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * Update the `eml_source` column of a submission record.
    *
    * @param {number} submissionId
@@ -418,7 +386,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Fetch a submission_id from uuid.
-   * TODO: Might be deprecated, investigate for removal
+   *
    * @param {number} uuid
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
@@ -443,7 +411,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Get submission eml json by dataset id.
-   * TODO: Might be deprecated, investigate for removal
+   *
    * @param {string} datasetId
    * @return {*}  {Promise<string>}
    * @memberof SubmissionRepository

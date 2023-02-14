@@ -122,43 +122,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('updateSubmissionRecordInputKey', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.updateSubmissionRecordInputKey(1, 'test');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record key');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.updateSubmissionRecordInputKey(1, 'test');
-
-      expect(response.submission_id).to.equal(1);
-    });
-  });
-
   describe('updateSubmissionMetadataEMLSource', () => {
     afterEach(() => {
       sinon.restore();
@@ -342,51 +305,46 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('getSpatialComponentCountByDatasetIdAsAdmin', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return a query result', async () => {
+      const mockQueryResponse = { rowCount: 0, rows: [{ id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin('111-222-333');
+
+      expect(response).to.eql([{ id: 1 }]);
+    });
+  });
+
   describe('getSpatialComponentCountByDatasetId', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as ISpatialComponentCount[];
 
-      const mockDBConnection = getMockDBConnection();
-      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId').returns(mockResponse);
+      const mockQueryResponse = { rowCount: 0, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
-
-      expect(response[0].spatial_type).to.equal('occurrence');
-      expect(response[0].count).to.equal(10);
-    });
-
-    it('internal function should succeed with valid data', async () => {
-      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
-
-      const mockDBConnection = getMockDBConnection();
-      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId').returns(mockResponse);
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse,
+        systemUserId: () => 1
+      });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
 
-      expect(response[0].spatial_type).to.equal('occurrence');
-      expect(response[0].count).to.equal(10);
-    });
-
-    it('internal function should succeed with valid data as admin', async () => {
-      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as Promise<ISpatialComponentCount[]>;
-
-      const mockDBConnection = getMockDBConnection();
-      sinon.stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin').returns(mockResponse);
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin('111-222-333');
-
-      expect(response[0].spatial_type).to.equal('occurrence');
-      expect(response[0].count).to.equal(10);
+      expect(response).to.eql([mockResponse]);
     });
   });
 
@@ -717,6 +675,280 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.getSourceTransformRecordBySubmissionId(1);
 
       expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getSubmissionJobQueue', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionJobQueue(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to get submission job queue from submission id'
+        );
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionJobQueue(1);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('updateSubmissionJobQueueEndTime', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionJobQueueEndTime(1);
+
+      expect(response).to.eql(1);
+    });
+  });
+
+  describe('insertSubmissionMetadataRecord', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const submissionData = { submission_id: 1, eml_source: '', eml_json_source: '' };
+
+      try {
+        await submissionRepository.insertSubmissionMetadataRecord(submissionData);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission metadata record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const submissionData = { submission_id: 1, eml_source: '', eml_json_source: '' };
+
+      const response = await submissionRepository.insertSubmissionMetadataRecord(submissionData);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('insertSubmissionObservationRecord', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const submissionData = {
+        submission_id: 1,
+        darwin_core_source: '',
+        submission_security_request: '',
+        foi_reason_description: ''
+      };
+      try {
+        await submissionRepository.insertSubmissionObservationRecord(submissionData);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission observation record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const submissionData = {
+        submission_id: 1,
+        darwin_core_source: '',
+        submission_security_request: '',
+        foi_reason_description: ''
+      };
+
+      const response = await submissionRepository.insertSubmissionObservationRecord(submissionData);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('updateSubmissionMetadataRecordEndDate', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionMetadataRecordEndDate(1);
+
+      expect(response).to.eql(1);
+    });
+  });
+
+  describe('updateSubmissionMetadataRecordEffectiveDate', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.updateSubmissionMetadataRecordEffectiveDate(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to update record_effective_timestamp submission metadata record'
+        );
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionMetadataRecordEffectiveDate(1);
+
+      expect(response).to.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEndDate', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionObservationRecordEndDate(1);
+
+      expect(response).to.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEffectiveDate', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.updateSubmissionObservationRecordEffectiveDate(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to update record_effective_timestamp submission Observation record'
+        );
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateSubmissionObservationRecordEffectiveDate(1);
+
+      expect(response).to.eql(1);
     });
   });
 });

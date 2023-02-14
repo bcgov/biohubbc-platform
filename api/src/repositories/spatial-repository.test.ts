@@ -547,6 +547,7 @@ describe('SpatialRepository', () => {
 
       const mockSearchCriteria: ISpatialComponentsSearchCriteria = {
         type: ['Occurrence', 'Boundary'],
+        species: ['Moose'],
         datasetID: ['111-111-111', '222-222-222'],
         boundary: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[]] } }]
       };

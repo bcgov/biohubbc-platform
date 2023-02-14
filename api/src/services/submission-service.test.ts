@@ -58,22 +58,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('updateSubmissionRecordInputKey', () => {
-    it('should return submission_id on update', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordInputKey')
-        .resolves({ submission_id: 1 });
-
-      const response = await submissionService.updateSubmissionRecordInputKey(1, 'test');
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
-    });
-  });
-
   describe('updateSubmissionMetadataEMLSource', () => {
     it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
