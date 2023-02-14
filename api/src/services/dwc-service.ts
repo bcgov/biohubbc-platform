@@ -408,7 +408,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Transforming and uploading spaital transforms', error.message);
+      throw new ApiGeneralError('Transforming and uploading spatial transforms', error.message);
     }
   }
 
@@ -438,7 +438,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Transforming and uploading secure spaital transforms', error.message);
+      throw new ApiGeneralError('Transforming and uploading secure spatial transforms', error.message);
     }
   }
 
