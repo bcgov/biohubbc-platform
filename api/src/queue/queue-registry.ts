@@ -9,7 +9,7 @@ export const QueueJobRegistry = {
   registry: [
     {
       name: 'dwc_dataset_submission',
-      generator: getDummyQueueJob
+      generator: getTestJob('random', 10000)
     }
   ],
   findMatchingJob(name: string): QueueJob | undefined {
@@ -18,18 +18,31 @@ export const QueueJobRegistry = {
 };
 
 /**
- * TODO Temporary - delete and replace the above reference in the registry with the actual function handles dwc
- * submission intake.
+ * Returns a job queue generator function that auto resolves or rejects after a random timeout.
  *
- * @return {*}
+ * @param {('resolve' | 'reject' | 'random')} type controls the behaviour of the test function.
+ * - `resolve` will always resolve
+ * - `reject` will always reject
+ * - `random` will resolve when timeout is even, reject when timeout is odd.
+ * @param {number} maxTimeout maximum time before auto resolving or rejecting. If `type` is set to `random`, `timeout`
+ * will be used as the maximum timeout when generating random timeouts.
+ * @return {*}  {QueueJob}
  */
-function getDummyQueueJob(jobQueueRecord: ISubmissionJobQueueRecord) {
-  return new Promise((resolve, reject) => {
-    const timeout = Math.round(Math.random() * 10000);
-    if (timeout < 20000) {
-      setTimeout(() => resolve(`Resolved: ${jobQueueRecord.submission_job_queue_id}`), timeout);
-    } else {
-      setTimeout(() => reject(`!! Rejected: ${jobQueueRecord.submission_job_queue_id}`), timeout);
-    }
-  });
+function getTestJob(type: 'resolve' | 'reject' | 'random', maxTimeout: number): QueueJob {
+  return function testJob(jobQueueRecord: ISubmissionJobQueueRecord) {
+    return new Promise((resolve, reject) => {
+      const randomTimeout = Math.round(Math.random() * maxTimeout);
+      if (type === 'resolve') {
+        setTimeout(() => resolve(`Resolved: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
+      } else if (type === 'reject') {
+        setTimeout(() => reject(`Rejected: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
+      } else {
+        if (randomTimeout % 2 === 0) {
+          setTimeout(() => resolve(`Resolved: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
+        } else {
+          setTimeout(() => reject(`Rejected: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
+        }
+      }
+    });
+  };
 }

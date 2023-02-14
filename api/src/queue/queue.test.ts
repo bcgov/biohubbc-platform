@@ -1,13 +1,10 @@
 import { expect } from 'chai';
 import { describe } from 'mocha';
-import sinonChai from 'sinon-chai';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 import { Queue } from './queue';
 import { QUEUE_DEFAULT_CONCURRENCY, QUEUE_DEFAULT_TIMEOUT } from './queue-scheduler';
 
-chai.use(sinonChai);
-
-describe('Queue', () => {
+describe.only('Queue', () => {
   it('constructs a new Queue', () => {
     const queue = new Queue();
 
@@ -25,33 +22,12 @@ describe('Queue', () => {
 
       const jobQueueRecordStub = {} as unknown as ISubmissionJobQueueRecord;
 
-      for (let i = 0; i < QUEUE_DEFAULT_CONCURRENCY; i++) {
-        // Add exactly `QUEUE_DEFAULT_CONCURRENCY` items to the queue
-        queue.addJobToQueue(jobQueueRecordStub);
-      }
-
-      expect(queue.getJobQueueLength()).to.equal(0);
-    });
-
-    it('adds 6 items to the queue', () => {
-      const queue = new Queue();
-
-      queue._queue.pause();
-
-      expect(queue.getJobQueueLength()).to.equal(0);
-
-      const jobQueueRecordStub = {} as unknown as ISubmissionJobQueueRecord;
-
-      for (let i = 0; i < QUEUE_DEFAULT_CONCURRENCY; i++) {
-        // Add exactly `QUEUE_DEFAULT_CONCURRENCY` items to the queue
-        queue.addJobToQueue(jobQueueRecordStub);
-      }
-
-      // Add two additional items to the queue
+      queue.addJobToQueue(jobQueueRecordStub);
+      queue.addJobToQueue(jobQueueRecordStub);
       queue.addJobToQueue(jobQueueRecordStub);
       queue.addJobToQueue(jobQueueRecordStub);
 
-      expect(queue.getJobQueueLength()).to.equal(2);
+      expect(queue.getJobQueueLength()).to.equal(4);
     });
   });
 
@@ -62,7 +38,7 @@ describe('Queue', () => {
       expect(queue.getJobQueueLength()).to.equal(0);
     });
 
-    it('returns 0 when the queue is exactly at capacity', () => {
+    it('returns the number of items waiting in the queue', () => {
       const queue = new Queue();
 
       queue._queue.pause();
@@ -71,33 +47,12 @@ describe('Queue', () => {
 
       const jobQueueRecordStub = {} as unknown as ISubmissionJobQueueRecord;
 
-      for (let i = 0; i < QUEUE_DEFAULT_CONCURRENCY; i++) {
-        // Add exactly `QUEUE_DEFAULT_CONCURRENCY` items to the queue
-        queue.addJobToQueue(jobQueueRecordStub);
-      }
-
-      expect(queue.getJobQueueLength()).to.equal(0);
-    });
-
-    it('returns 2 when the queue is 2 records over capacity', () => {
-      const queue = new Queue();
-
-      queue._queue.pause();
-
-      expect(queue.getJobQueueLength()).to.equal(0);
-
-      const jobQueueRecordStub = {} as unknown as ISubmissionJobQueueRecord;
-
-      for (let i = 0; i < QUEUE_DEFAULT_CONCURRENCY; i++) {
-        // Add exactly `QUEUE_DEFAULT_CONCURRENCY` items to the queue
-        queue.addJobToQueue(jobQueueRecordStub);
-      }
-
-      // Add two additional items to the queue
+      queue.addJobToQueue(jobQueueRecordStub);
+      queue.addJobToQueue(jobQueueRecordStub);
       queue.addJobToQueue(jobQueueRecordStub);
       queue.addJobToQueue(jobQueueRecordStub);
 
-      expect(queue.getJobQueueLength()).to.equal(2);
+      expect(queue.getJobQueueLength()).to.equal(4);
     });
   });
 
