@@ -118,10 +118,13 @@ export class SubmissionJobQueueRepository extends BaseRepository {
   /**
    * Fetch the next available job queue record(s).
    *
-   * @param {number} [concurrency] The number of job queue processes that can run concurrently (integer > 0).
+   * @param {number} [concurrency] The number of job queue processes to select (based on how many can be processed
+   * concurrently) (integer > 0).
    * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
-   * (integer >= 1).
-   * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out.
+   * (integer >= 1). This currently leverages the revision_count column, so for an attempts of N, set to N*2.
+   * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out. In this
+   * case, a job that is not complete, has not reached the attempts limit, and is older than the specified timeout, will
+   * be up for re-selection for another attempt.
    * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
    * @memberof SubmissionJobQueueRepository
    */
@@ -158,49 +161,85 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     return response.rows;
   }
 
-  async startQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+  /**
+   * Set the start time of a queue record. Indicating the record has been picked up for processing.
+   *
+   * @param {number} jobQueueId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionJobQueueRepository
+   */
+  async startQueueRecord(jobQueueId: number): Promise<void> {
     const sqlStatement = SQL`
-          UPDATE
-            submission_job_queue
-          SET 
-            job_start_timestamp = now()
-          WHERE
-            submission_job_queue_id = ${jobQueueId};
-        `;
+      UPDATE
+        submission_job_queue
+      SET 
+        job_start_timestamp = now()
+      WHERE
+        submission_job_queue_id = ${jobQueueId};
+    `;
 
-    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement);
 
-    return response.rows[0];
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to start queue record', [
+        'SubmissionJobQueueRepository->startQueueRecord',
+        'rowCount !== 1, expected rowCount === 1'
+      ]);
+    }
   }
 
-  async resetJobQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+  /**
+   * Reset the start and end time of a queue records. Due to the job failing to complete successfully.
+   *
+   * @param {number} jobQueueId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionJobQueueRepository
+   */
+  async resetJobQueueRecord(jobQueueId: number): Promise<void> {
     const sqlStatement = SQL`
-          UPDATE
-            submission_job_queue
-          SET 
-            job_start_timestamp = null,
-            job_end_timestamp = null
-          WHERE
-            submission_job_queue_id = ${jobQueueId};
-        `;
+      UPDATE
+        submission_job_queue
+      SET 
+        job_start_timestamp = null,
+        job_end_timestamp = null
+      WHERE
+        submission_job_queue_id = ${jobQueueId};
+    `;
 
-    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement);
 
-    return response.rows[0];
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to reset queue record', [
+        'SubmissionJobQueueRepository->resetJobQueueRecord',
+        'rowCount !== 1, expected rowCount === 1'
+      ]);
+    }
   }
 
-  async endJobQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+  /**
+   * Set the end time of a queue records. Indicating the record has completed successfully.
+   *
+   * @param {number} jobQueueId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionJobQueueRepository
+   */
+  async endJobQueueRecord(jobQueueId: number): Promise<void> {
     const sqlStatement = SQL`
-          UPDATE
-            submission_job_queue
-          SET 
-            job_end_timestamp = now()
-          WHERE
-            submission_job_queue_id = ${jobQueueId};
-        `;
+      UPDATE
+        submission_job_queue
+      SET 
+        job_end_timestamp = now()
+      WHERE
+        submission_job_queue_id = ${jobQueueId};
+    `;
 
-    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement);
 
-    return response.rows[0];
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to end queue record', [
+        'SubmissionJobQueueRepository->endJobQueueRecord',
+        'rowCount !== 1, expected rowCount === 1'
+      ]);
+    }
   }
 }

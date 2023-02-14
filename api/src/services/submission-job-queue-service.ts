@@ -116,9 +116,13 @@ export class SubmissionJobQueueService extends DBService {
   /**
    * Fetch the next available job queue record(s).
    *
-   * @param {number} [concurrency] The number of job queue processes that can run concurrently (integer > 0).
-   * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully (integer >= 1).
-   * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out.
+   * @param {number} [concurrency] The number of job queue processes to select (based on how many can be processed
+   * concurrently) (integer > 0).
+   * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
+   * (integer >= 1). This currently leverages the revision_count column, so for an attempts of N, set to N*2.
+   * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out. In this
+   * case, a job that is not complete, has not reached the attempts limit, and is older than the specified timeout, will
+   * be up for re-selection for another attempt.
    * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
    * @memberof JobQueueService
    */
@@ -134,10 +138,10 @@ export class SubmissionJobQueueService extends DBService {
    * Update a job queue record, setting the start time to now.
    *
    * @param {number} jobQueueId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
+   * @return {*}  {Promise<void>}
    * @memberof SubmissionJobQueueService
    */
-  async startQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+  async startQueueRecord(jobQueueId: number): Promise<void> {
     return this.jobQueueRepository.startQueueRecord(jobQueueId);
   }
 
@@ -145,10 +149,10 @@ export class SubmissionJobQueueService extends DBService {
    * Update a job queue record, setting the end time to now.
    *
    * @param {number} jobQueueId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
+   * @return {*}  {Promise<void>}
    * @memberof SubmissionJobQueueService
    */
-  async endJobQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+  async endJobQueueRecord(jobQueueId: number): Promise<void> {
     return this.jobQueueRepository.endJobQueueRecord(jobQueueId);
   }
 
@@ -156,10 +160,10 @@ export class SubmissionJobQueueService extends DBService {
    * Update a job queue record, setting the start and end times to null.
    *
    * @param {number} jobQueueId
-   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
+   * @return {*}  {Promise<void>}
    * @memberof SubmissionJobQueueService
    */
-  async resetJobQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+  async resetJobQueueRecord(jobQueueId: number): Promise<void> {
     return this.jobQueueRepository.resetJobQueueRecord(jobQueueId);
   }
 }
