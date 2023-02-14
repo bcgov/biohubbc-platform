@@ -4,7 +4,7 @@ import { getLogger } from './utils/logger';
 
 const defaultLog = getLogger('queue');
 
-// Start api
+// Start queue
 try {
   initDBPool(defaultPoolConfig);
 

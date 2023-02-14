@@ -139,8 +139,6 @@ objects:
                 #   value: ${HOST}
                 # - name: QUEUE_PORT
                 #   value: ${QUEUE_PORT_DEFAULT}
-                - name: ENABLE_FILE_VIRUS_SCAN
-                  value: ${ENABLE_FILE_VIRUS_SCAN}
                 - name: DB_HOST
                   value: ${DB_SERVICE_NAME}
                 - name: DB_USER_API
