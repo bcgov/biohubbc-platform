@@ -139,7 +139,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
           .select(knex.raw('max(submission_job_queue_id) as submission_job_queue_id'), 'submission_id')
           .from('submission_job_queue')
           .groupBy('submission_id')
-          .orderBy('submission_job_queue_id');
+          .orderBy('submission_job_queue_id', 'ASC');
       })
       .select()
       .from({ sjq: 'submission_job_queue' })
@@ -150,8 +150,6 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     if (attempts) {
       queryBuilder.andWhere('sjq.attempt_count', '<', attempts);
     }
-
-    queryBuilder.orderBy('sjq.submission_job_queue_id', 'ASC');
 
     if (concurrency) {
       queryBuilder.limit(concurrency);
