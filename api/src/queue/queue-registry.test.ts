@@ -13,6 +13,6 @@ describe('QueueJobRegistry', () => {
   it('returns null if no matching job found', () => {
     const job = QueueJobRegistry.findMatchingJob('not_a_real_job');
 
-    expect(job).to.be.null;
+    expect(job).to.be.undefined;
   });
 });

@@ -4,7 +4,7 @@ import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-
 import { Queue } from './queue';
 import { QUEUE_DEFAULT_CONCURRENCY, QUEUE_DEFAULT_TIMEOUT } from './queue-scheduler';
 
-describe.only('Queue', () => {
+describe('Queue', () => {
   it('constructs a new Queue', () => {
     const queue = new Queue();
 
