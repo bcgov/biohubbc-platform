@@ -86,7 +86,9 @@ describe('ArtifactService', () => {
         .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
 
       // const getOrInsertSubmissionRecordStub =
-      sinon.stub(SubmissionService.prototype, 'getOrInsertSubmissionRecord').resolves({ submission_id: 100 });
+      sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionRecordWithPotentialConflict')
+        .resolves({ submission_id: 100 });
 
       // const getNextArtifactIdsStub =
       sinon.stub(ArtifactService.prototype, 'getNextArtifactIds').resolves([14]);
@@ -113,8 +115,8 @@ describe('ArtifactService', () => {
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
         .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
 
-      const getOrInsertSubmissionRecordStub = sinon
-        .stub(SubmissionService.prototype, 'getOrInsertSubmissionRecord')
+      const insertSubmissionRecordWithPotentialConflictStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 100 });
 
       const getNextArtifactIdsStub = sinon.stub(ArtifactService.prototype, 'getNextArtifactIds').resolves([14]);
@@ -131,7 +133,7 @@ describe('ArtifactService', () => {
       } catch (actualError) {
         expect(transformRecordStub).to.be.calledWith(20);
 
-        expect(getOrInsertSubmissionRecordStub).to.be.calledWith({
+        expect(insertSubmissionRecordWithPotentialConflictStub).to.be.calledWith({
           source_transform_id: 60,
           uuid: mockDataPackageId
         });

@@ -58,6 +58,25 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('insertSubmissionRecordWithPotentialConflict', () => {
+    it('should return submission_id on get or insert', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
+        .resolves({ submission_id: 1 });
+
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
+        uuid: '',
+        source_transform_id: 1
+      });
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
   describe('updateSubmissionMetadataEMLSource', () => {
     it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();

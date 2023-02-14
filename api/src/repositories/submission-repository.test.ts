@@ -557,7 +557,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getOrInsertSubmissionRecord', () => {
+  describe('insertSubmissionRecordWithPotentialConflict', () => {
     it('should insert or retrieve a submission successfully', async () => {
       const mockQueryResponse = {
         rowCount: 1,
@@ -574,7 +574,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getOrInsertSubmissionRecord({
+      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict({
         uuid: 'aaaa',
         source_transform_id: 1
       });
@@ -594,7 +594,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.getOrInsertSubmissionRecord({
+        await submissionRepository.insertSubmissionRecordWithPotentialConflict({
           uuid: 'bbbb',
           source_transform_id: 3
         });

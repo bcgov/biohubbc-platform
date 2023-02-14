@@ -251,7 +251,9 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*} {Promise<{ submission_id: number }>} The primary key of the submission
    * @memberof SubmissionRepository
    */
-  async getOrInsertSubmissionRecord(submissionData: ISubmissionModel): Promise<{ submission_id: number }> {
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
+  ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
@@ -269,7 +271,7 @@ export class SubmissionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get or insert submission record', [
-        'SubmissionRepository->getOrInsertSubmissionRecord',
+        'SubmissionRepository->insertSubmissionRecordWithPotentialConflict',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
