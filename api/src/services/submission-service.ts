@@ -58,8 +58,10 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getOrInsertSubmissionRecord(submissionData: ISubmissionModel): Promise<{ submission_id: number }> {
-    return this.submissionRepository.getOrInsertSubmissionRecord(submissionData);
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(submissionData);
   }
 
   /**
