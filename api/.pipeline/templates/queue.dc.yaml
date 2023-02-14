@@ -77,8 +77,8 @@ parameters:
     required: true
     value: '1'
 objects:
-  - apiVersion: image.openshift.io/v1
-    kind: ImageStream
+  - kind: ImageStream
+    apiVersion: image.openshift.io/v1
     metadata:
       annotations:
         description: Nodejs Runtime Image
@@ -90,8 +90,8 @@ objects:
     spec:
       lookupPolicy:
         local: false
-  - apiVersion: apps.openshift.io/v1
-    kind: DeploymentConfig
+  - kind: DeploymentConfig
+    apiVersion: apps.openshift.io/v1
     metadata:
       annotations:
         openshift.io/generated-by: OpenShiftWebConsole
@@ -126,85 +126,85 @@ objects:
             role: queue
         spec:
           containers:
-            env:
-              - name: DB_HOST
-                value: ${DB_SERVICE_NAME}
-              - name: DB_USER_API
-                valueFrom:
-                  secretKeyRef:
-                    key: database-user-api
-                    name: ${DB_SERVICE_NAME}
-              - name: DB_USER_API_PASS
-                valueFrom:
-                  secretKeyRef:
-                    key: database-user-api-password
-                    name: ${DB_SERVICE_NAME}
-              - name: DB_DATABASE
-                valueFrom:
-                  secretKeyRef:
-                    key: database-name
-                    name: ${DB_SERVICE_NAME}
-              - name: DB_PORT
-                value: '5432'
-              - name: KEYCLOAK_HOST
-                value: ${KEYCLOAK_HOST}
-              - name: KEYCLOAK_API_HOST
-                value: ${KEYCLOAK_API_HOST}
-              - name: KEYCLOAK_REALM
-                value: ${KEYCLOAK_REALM}
-              - name: KEYCLOAK_CLIENT_ID
-                value: ${KEYCLOAK_CLIENT_ID}
-              - name: KEYCLOAK_INTEGRATION_ID
-                value: ${KEYCLOAK_INTEGRATION_ID}
-              - name: KEYCLOAK_ADMIN_HOST
-                value: ${KEYCLOAK_ADMIN_HOST}
-              - name: KEYCLOAK_ADMIN_USERNAME
-                value: ${KEYCLOAK_ADMIN_USERNAME}
-              - name: KEYCLOAK_ADMIN_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: ${KEYCLOAK_SECRET}
-                    key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD}
-              - name: CHANGE_VERSION
-                value: ${CHANGE_ID}
-              - name: NODE_ENV
-                value: ${NODE_ENV}
-              - name: S3_KEY_PREFIX
-                value: ${S3_KEY_PREFIX}
-              - name: TZ
-                value: ${TZ}
-              - name: VERSION
-                value: ${VERSION}
-              - name: OBJECT_STORE_URL
-                valueFrom:
-                  secretKeyRef:
-                    key: object_store_url
-                    name: ${OBJECT_STORE_SECRETS}
-              - name: OBJECT_STORE_ACCESS_KEY_ID
-                valueFrom:
-                  secretKeyRef:
-                    key: object_store_access_key_id
-                    name: ${OBJECT_STORE_SECRETS}
-              - name: OBJECT_STORE_SECRET_KEY_ID
-                valueFrom:
-                  secretKeyRef:
-                    key: object_store_secret_key_id
-                    name: ${OBJECT_STORE_SECRETS}
-              - name: OBJECT_STORE_BUCKET_NAME
-                valueFrom:
-                  secretKeyRef:
-                    key: object_store_bucket_name
-                    name: ${OBJECT_STORE_SECRETS}
-              - name: LOG_LEVEL
-                value: ${LOG_LEVEL}
-            image: ' '
-            imagePullPolicy: Always
-            name: queue
-            terminationMessagePath: /dev/termination-log
-            terminationMessagePolicy: File
-            volumeMounts:
-              - mountPath: /opt/app-root/app
-                name: ${NAME}${SUFFIX}
+            - env:
+                - name: DB_HOST
+                  value: ${DB_SERVICE_NAME}
+                - name: DB_USER_API
+                  valueFrom:
+                    secretKeyRef:
+                      key: database-user-api
+                      name: ${DB_SERVICE_NAME}
+                - name: DB_USER_API_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      key: database-user-api-password
+                      name: ${DB_SERVICE_NAME}
+                - name: DB_DATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      key: database-name
+                      name: ${DB_SERVICE_NAME}
+                - name: DB_PORT
+                  value: '5432'
+                - name: KEYCLOAK_HOST
+                  value: ${KEYCLOAK_HOST}
+                - name: KEYCLOAK_API_HOST
+                  value: ${KEYCLOAK_API_HOST}
+                - name: KEYCLOAK_REALM
+                  value: ${KEYCLOAK_REALM}
+                - name: KEYCLOAK_CLIENT_ID
+                  value: ${KEYCLOAK_CLIENT_ID}
+                - name: KEYCLOAK_INTEGRATION_ID
+                  value: ${KEYCLOAK_INTEGRATION_ID}
+                - name: KEYCLOAK_ADMIN_HOST
+                  value: ${KEYCLOAK_ADMIN_HOST}
+                - name: KEYCLOAK_ADMIN_USERNAME
+                  value: ${KEYCLOAK_ADMIN_USERNAME}
+                - name: KEYCLOAK_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KEYCLOAK_SECRET}
+                      key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD}
+                - name: CHANGE_VERSION
+                  value: ${CHANGE_ID}
+                - name: NODE_ENV
+                  value: ${NODE_ENV}
+                - name: S3_KEY_PREFIX
+                  value: ${S3_KEY_PREFIX}
+                - name: TZ
+                  value: ${TZ}
+                - name: VERSION
+                  value: ${VERSION}
+                - name: OBJECT_STORE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      key: object_store_url
+                      name: ${OBJECT_STORE_SECRETS}
+                - name: OBJECT_STORE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      key: object_store_access_key_id
+                      name: ${OBJECT_STORE_SECRETS}
+                - name: OBJECT_STORE_SECRET_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      key: object_store_secret_key_id
+                      name: ${OBJECT_STORE_SECRETS}
+                - name: OBJECT_STORE_BUCKET_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      key: object_store_bucket_name
+                      name: ${OBJECT_STORE_SECRETS}
+                - name: LOG_LEVEL
+                  value: ${LOG_LEVEL}
+              image: ' '
+              imagePullPolicy: Always
+              name: queue
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              volumeMounts:
+                - mountPath: /opt/app-root/app
+                  name: ${NAME}${SUFFIX}
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           schedulerName: default-scheduler
@@ -231,20 +231,20 @@ objects:
       replicas: 0
       unavailableReplicas: 0
       updatedReplicas: 0
-  - apiVersion: v1
+  - kind: Secret
+    apiVersion: v1
     stringData:
       database-name: ''
       database-user-api-password: ''
       database-user-api: ''
-    kind: Secret
     metadata:
       annotations:
         as-copy-of: ${DB_SERVICE_NAME}
       creationTimestamp: null
       name: ${NAME}${SUFFIX}
     type: Opaque
-  - apiVersion: autoscaling/v1
-    kind: HorizontalPodAutoscaler
+  - kind: HorizontalPodAutoscaler
+    apiVersion: autoscaling/v1
     metadata:
       annotations: {}
       creationTimestamp: null
