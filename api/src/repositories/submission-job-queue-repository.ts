@@ -1,19 +1,21 @@
 import SQL from 'sql-template-strings';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { ISecurityRequest } from '../services/submission-job-queue-service';
 import { BaseRepository } from './base-repository';
 
-export interface ISubmissionJobQueueModel {
+export interface ISubmissionJobQueueRecord {
   submission_job_queue_id: number;
   submission_id: number;
   job_start_timestamp: string | null;
   job_end_timestamp: string | null;
-  security_request: string | null; // stored as JSON object
+  security_request: JSON | null;
+  key: string | null;
   create_date: string;
   create_user: number;
   update_date: string | null;
   update_user: number | null;
-  // no attempt count?
+  revision_count: number;
 }
 
 export interface IInsertSubmissionJobQueueRecord {
@@ -111,5 +113,95 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     }
 
     return response.rows[0].source_transform_id;
+  }
+
+  /**
+   * Fetch the next available job queue record(s).
+   *
+   * @param {number} [concurrency] The number of job queue processes that can run concurrently (integer > 0).
+   * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully (integer >= 1).
+   * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out.
+   * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
+   * @memberof SubmissionJobQueueRepository
+   */
+  async getNextUnprocessedJobQueueRecords(
+    concurrency?: number,
+    attempts?: number,
+    timeout?: number
+  ): Promise<ISubmissionJobQueueRecord[]> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select()
+      .from('submission_job_queue')
+      .where('job_end_timestamp', null)
+      .where((qb1) => {
+        qb1.orWhere('job_start_timestamp', null);
+        if (timeout) {
+          qb1.orWhere(knex.raw(`job_start_timestamp < NOW() - INTERVAL '${timeout} milliseconds'`));
+        }
+      });
+
+    if (attempts) {
+      queryBuilder.andWhere('revision_count', '<', attempts);
+    }
+
+    queryBuilder.orderBy('submission_job_queue_id', 'ASC');
+
+    if (concurrency) {
+      queryBuilder.limit(concurrency);
+    }
+
+    console.log(queryBuilder.toSQL().toNative());
+
+    const response = await this.connection.knex<ISubmissionJobQueueRecord>(queryBuilder);
+
+    return response.rows;
+  }
+
+  async startQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+    const sqlStatement = SQL`
+          UPDATE
+            submission_job_queue
+          SET 
+            job_start_timestamp = now()
+          WHERE
+            submission_job_queue_id = ${jobQueueId};
+        `;
+
+    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+
+    return response.rows[0];
+  }
+
+  async resetJobQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+    const sqlStatement = SQL`
+          UPDATE
+            submission_job_queue
+          SET 
+            job_start_timestamp = null,
+            job_end_timestamp = null
+          WHERE
+            submission_job_queue_id = ${jobQueueId};
+        `;
+
+    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+
+    return response.rows[0];
+  }
+
+  async endJobQueueRecord(jobQueueId: number): Promise<ISubmissionJobQueueRecord> {
+    const sqlStatement = SQL`
+          UPDATE
+            submission_job_queue
+          SET 
+            job_end_timestamp = now()
+          WHERE
+            submission_job_queue_id = ${jobQueueId};
+        `;
+
+    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+
+    return response.rows[0];
   }
 }

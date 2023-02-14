@@ -1,6 +1,6 @@
 import { getAPIUserDBConnection } from '../database/db';
-import { IJobQueueRecord } from '../repositories/job-queue-repositry';
-import { JobQueueService } from '../services/job-queue-service';
+import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
+import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
 import { SystemConstantService } from '../services/system-constant';
 import { getLogger } from '../utils/logger';
 import { Queue } from './queue';
@@ -126,7 +126,7 @@ export class QueueScheduler {
 
     await connection.open();
 
-    const jobQueueService = new JobQueueService(connection);
+    const jobQueueService = new SubmissionJobQueueService(connection);
 
     const nextJobQueueRecords = await jobQueueService.getNextUnprocessedJobQueueRecords(
       this._concurrency,
@@ -144,15 +144,15 @@ export class QueueScheduler {
   /**
    * Process a single queue record, kicking off its corresponding job.
    *
-   * @param {IJobQueueRecord} jobQueueRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @memberof QueueScheduler
    */
-  async _processJobQueueRecord(jobQueueRecord: IJobQueueRecord) {
+  async _processJobQueueRecord(jobQueueRecord: ISubmissionJobQueueRecord) {
     const connection = getAPIUserDBConnection();
 
     await connection.open();
 
-    const jobQueueService = new JobQueueService(connection);
+    const jobQueueService = new SubmissionJobQueueService(connection);
 
     // Initialize the job queue record by setting its start time.
     await jobQueueService.startQueueRecord(jobQueueRecord.submission_job_queue_id);

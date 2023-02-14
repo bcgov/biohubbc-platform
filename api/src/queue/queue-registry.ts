@@ -1,6 +1,6 @@
-import { IJobQueueRecord } from '../repositories/job-queue-repositry';
+import { ISubmissionJobQueueRecord } from '../repositories/job-queue-repositry';
 
-type QueueJob = (jobQueueRecord: IJobQueueRecord) => Promise<any>;
+type QueueJob = (jobQueueRecord: ISubmissionJobQueueRecord) => Promise<any>;
 
 /**
  * Translates a string to a queue-job compatible function.
@@ -23,7 +23,7 @@ export const QueueJobRegistry = {
  *
  * @return {*}
  */
-function getDummyQueueJob(jobQueueRecord: IJobQueueRecord) {
+function getDummyQueueJob(jobQueueRecord: ISubmissionJobQueueRecord) {
   return new Promise((resolve, reject) => {
     const timeout = Math.round(Math.random() * 10000);
     if (timeout < 20000) {

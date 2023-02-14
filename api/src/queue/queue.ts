@@ -1,5 +1,5 @@
 import fastq from 'fastq';
-import { IJobQueueRecord } from '../repositories/job-queue-repositry';
+import { ISubmissionJobQueueRecord } from '../repositories/job-queue-repositry';
 import { QueueJobRegistry } from './queue-registry';
 import { QUEUE_DEFAULT_CONCURRENCY, QUEUE_DEFAULT_TIMEOUT } from './queue-scheduler';
 
@@ -12,7 +12,7 @@ export class Queue {
     this._queue = fastq.promise(this, this._queueWorker, QUEUE_DEFAULT_CONCURRENCY);
   }
 
-  async _queueWorker(jobQueueRecord: IJobQueueRecord) {
+  async _queueWorker(jobQueueRecord: ISubmissionJobQueueRecord) {
     const job = QueueJobRegistry.findMatchingJob('dwc_dataset_submission');
 
     if (!job) {
@@ -22,7 +22,7 @@ export class Queue {
     return Promise.race([job(jobQueueRecord), this._getJobTimeout()]);
   }
 
-  async addJobToQueue(jobQueueRecord: IJobQueueRecord) {
+  async addJobToQueue(jobQueueRecord: ISubmissionJobQueueRecord) {
     return this._queue.push(jobQueueRecord);
   }
 
