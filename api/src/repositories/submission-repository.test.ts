@@ -185,7 +185,9 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_metadata_id: 1 }] } as any as Promise<
+        QueryResult<any>
+      >;
 
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse
@@ -224,7 +226,9 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = { rowCount: 1, rows: [{ submission_metadata_id: 1 }] } as any as Promise<
+        QueryResult<any>
+      >;
 
       const mockDBConnection = getMockDBConnection({
         sql: () => mockQueryResponse

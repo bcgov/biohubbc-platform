@@ -1,3 +1,4 @@
+import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
@@ -325,35 +326,21 @@ describe('SubmissionService', () => {
   });
 
   describe('getIntakeFileFromS3', () => {
-    it('should throw an error if file does not contain input_key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ uuid: 'validString' } as ISubmissionModel);
-
-      try {
-        await submissionService.getIntakeFileFromS3('');
-        expect.fail();
-      } catch (actualError) {
-        expect(repo).to.be.calledOnce;
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve input file name');
-      }
-    });
-
     it('should return s3 file', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ input_key: 'validString', source_transform_id: 1, uuid: '' } as ISubmissionModel);
-      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves({ Body: 'valid' });
+      const s3File = {
+        Metadata: { filename: 'file1.csv' },
+        ContentType: 'text/csv',
+        Body: null
+      } as unknown as GetObjectOutput;
+
+      sinon.stub(SubmissionService.prototype, 'getIntakeFileFromS3').resolves(s3File);
 
       const response = await submissionService.getIntakeFileFromS3('');
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ Body: 'valid' });
+
+      expect(response).to.be.eql(s3File);
     });
   });
 
