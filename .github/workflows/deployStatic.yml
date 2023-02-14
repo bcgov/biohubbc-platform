@@ -772,6 +772,14 @@ jobs:
           DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
           DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
 
+      # Clean the queue build/deployment artifacts
+      - name: Clean Queue Artifacts
+        working-directory: "./api/.pipeline/"
+        run: |
+          npm install --only=production
+          DEBUG=* npm run queue:clean -- --pr=$PR_NUMBER --env=build
+          DEBUG=* npm run queue:clean -- --pr=$PR_NUMBER --env=dev
+
       # Clean the app build/deployment artifacts
       - name: Clean APP Artifacts
         working-directory: "./app/.pipeline/"

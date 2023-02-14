@@ -25,7 +25,7 @@ const queueDeploy = async (settings) => {
   objects.push(
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/queue.dc.yaml`, {
       param: {
-        NAME: phases[phase].queueName,
+        NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
         CHANGE_ID: phases.build.changeId || changeId,
@@ -44,13 +44,13 @@ const queueDeploy = async (settings) => {
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
         OBJECT_STORE_SECRETS: 'biohubbc-object-store',
         LOG_LEVEL: phases[phase].logLevel || 'info',
-        REPLICAS: phases[phase].queueReplicas || 1,
-        REPLICA_MAX: phases[phase].queueMaxReplicas || 1
+        REPLICAS: phases[phase].replicas || 1,
+        REPLICA_MAX: phases[phase].maxReplicas || 1
       }
     })
   );
 
-  oc.applyRecommendedLabels(objects, phases[phase].queueName, phase, `${changeId}`, phases[phase].instance);
+  oc.applyRecommendedLabels(objects, phases[phase].name, phase, `${changeId}`, phases[phase].instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);
 
   oc.applyAndDeploy(objects, phases[phase].instance);

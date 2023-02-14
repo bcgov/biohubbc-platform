@@ -17,7 +17,7 @@ const queueBuild = (settings) => {
 
   const templatesLocalBaseUrl = oc.toFileUrl(path.resolve(__dirname, '../templates'));
 
-  const name = `${phases[phase].queueName}`;
+  const name = `${phases[phase].name}`;
 
   const objects = [];
 

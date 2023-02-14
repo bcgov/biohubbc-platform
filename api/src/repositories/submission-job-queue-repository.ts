@@ -152,8 +152,6 @@ export class SubmissionJobQueueRepository extends BaseRepository {
       queryBuilder.limit(concurrency);
     }
 
-    console.log(queryBuilder.toSQL().toNative());
-
     const response = await this.connection.knex<ISubmissionJobQueueRecord>(queryBuilder);
 
     return response.rows;
