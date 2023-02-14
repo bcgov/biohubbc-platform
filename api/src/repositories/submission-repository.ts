@@ -820,7 +820,7 @@ export class SubmissionRepository extends BaseRepository {
       FROM
         submission_job_queue
       WHERE
-        submission_id = ${submissionId}
+        submission_id = ${submissionId} ORDER BY CREATE_DATE DESC LIMIT 1
       ;
     `;
 

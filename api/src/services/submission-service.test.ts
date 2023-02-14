@@ -334,7 +334,7 @@ describe('SubmissionService', () => {
         .resolves({ uuid: 'validString' } as ISubmissionModel);
 
       try {
-        await submissionService.getIntakeFileFromS3("");
+        await submissionService.getIntakeFileFromS3('');
         expect.fail();
       } catch (actualError) {
         expect(repo).to.be.calledOnce;
@@ -348,10 +348,10 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ input_key: 'validString', source_transform_id: 1, uuid: "" } as ISubmissionModel);
+        .resolves({ input_key: 'validString', source_transform_id: 1, uuid: '' } as ISubmissionModel);
       sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves({ Body: 'valid' });
 
-      const response = await submissionService.getIntakeFileFromS3("");
+      const response = await submissionService.getIntakeFileFromS3('');
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ Body: 'valid' });
     });
