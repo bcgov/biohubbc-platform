@@ -10,6 +10,7 @@ import { UserObject } from '../models/user';
 import {
   ISearchSubmissionCriteria,
   ISourceTransformModel,
+  ISubmissionJobQueue,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -152,6 +153,66 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('updateSubmissionMetadataRecordEndDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionMetadataRecordEndDate').resolves(1);
+
+      const response = await submissionService.updateSubmissionMetadataRecordEndDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionMetadataRecordEffectiveDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataRecordEffectiveDate')
+        .resolves(1);
+
+      const response = await submissionService.updateSubmissionMetadataRecordEffectiveDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEndDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEndDate').resolves(1);
+
+      const response = await submissionService.updateSubmissionObservationRecordEndDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEffectiveDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEffectiveDate')
+        .resolves(1);
+
+      const response = await submissionService.updateSubmissionObservationRecordEffectiveDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
     });
   });
 
@@ -355,7 +416,7 @@ describe('SubmissionService', () => {
         Body: null
       } as unknown as GetObjectOutput;
 
-      sinon.stub(SubmissionService.prototype, 'getIntakeFileFromS3').resolves(s3File);
+      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves(s3File);
 
       const response = await submissionService.getIntakeFileFromS3('');
 
@@ -570,6 +631,36 @@ describe('SubmissionService', () => {
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.be.calledOnce;
       });
+    });
+  });
+
+  describe('getSubmissionJobQueue', () => {
+    it('should return a submission job queue record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
+        .resolves({ test: 'test' } as unknown as ISubmissionJobQueue);
+
+      const response = await submissionService.getSubmissionJobQueue(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ test: 'test' });
+    });
+  });
+
+  describe('updateSubmissionJobQueueEndTime', () => {
+    it('should return a submission id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionJobQueueEndTime').resolves(1);
+
+      const response = await submissionService.updateSubmissionJobQueueEndTime(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
     });
   });
 });
