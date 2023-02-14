@@ -119,7 +119,8 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    * Fetch the next available job queue record(s).
    *
    * @param {number} [concurrency] The number of job queue processes that can run concurrently (integer > 0).
-   * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully (integer >= 1).
+   * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
+   * (integer >= 1).
    * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out.
    * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
    * @memberof SubmissionJobQueueRepository

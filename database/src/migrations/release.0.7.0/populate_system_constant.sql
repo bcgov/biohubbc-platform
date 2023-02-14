@@ -11,5 +11,5 @@ insert into system_constant (constant_name, character_value, description) values
 insert into system_constant (constant_name, character_value, description) values ('JOB_QUEUE_ENABLED', 'true', 'Controls whether or not the job queue scheduler is enabled. Set to "true" to enable the job queue schdulerF, "false" to disable it.');
 insert into system_constant (constant_name, numeric_value,   description) values ('JOB_QUEUE_CONCURRENCY', 4, 'The number of job queue processes that can run concurrently (integer > 0).');
 insert into system_constant (constant_name, numeric_value,   description) values ('JOB_QUEUE_PERIOD', 5000, 'The frequency with which the job queue scheduler will check for new job queue records (milliseconds).');
-insert into system_constant (constant_name, numeric_value,   description) values ('JOB_QUEUE_ATTEMPTS', 3, 'The total number of times a job will be attempted until it finishes successfully (integer >= 1).');
-insert into system_constant (constant_name, numeric_value,   description) values ('JOB_QUEUE_TIMEOUT', 7000, 'The maximum duration a running job can take before it is considered timed out.');
+insert into system_constant (constant_name, numeric_value,   description) values ('JOB_QUEUE_ATTEMPTS', 2, 'The total number of times a job will be attempted until it finishes successfully (integer >= 1).');
+insert into system_constant (constant_name, numeric_value,   description) values ('JOB_QUEUE_TIMEOUT', 60000, 'The maximum duration a running job can take before it is considered timed out.');
