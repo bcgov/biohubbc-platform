@@ -180,7 +180,7 @@ describe('SubmissionRepository', () => {
 
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record source');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission Metadata source');
       }
     });
 
@@ -219,7 +219,7 @@ describe('SubmissionRepository', () => {
 
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission record eml json');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to update submission Metadata eml json');
       }
     });
 

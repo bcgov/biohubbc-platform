@@ -14,12 +14,60 @@ import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
-describe.only('DarwinCoreService', () => {
+describe('DarwinCoreService', () => {
   afterEach(() => {
     sinon.restore();
   });
 
-  describe('intakeJob', () => {});
+  describe('intakeJob', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+
+      const mediaFileStub = sinon.createStubInstance(MediaFile);
+      const bufferStub = sinon.createStubInstance(Buffer);
+      bufferStub.toString.returns(
+        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
+      );
+      mediaFileStub.buffer = bufferStub as unknown as Buffer;
+
+      const mockDWCAFile = {
+        submission_id: 1,
+        eml: {
+          emlFile: mediaFileStub
+        },
+        worksheets: {}
+      } as unknown as DWCArchive;
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueue;
+
+      const step1 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step1').resolves({ submission_metadata_id: 1 });
+      const step2 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step2').resolves(mockDWCAFile);
+      const step3 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step3').resolves();
+      const step4 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step4').resolves();
+      const step5 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step5').resolves();
+      const step6 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step6').resolves();
+      const finishIntake = sinon.stub(DarwinCoreService.prototype, 'intakeJob_finishIntake').resolves();
+
+      await service.intakeJob(mockJobQueue);
+
+      expect(step1).to.be.calledOnce;
+      expect(step2).to.be.calledOnce;
+      expect(step3).to.be.calledOnce;
+      expect(step4).to.be.calledOnce;
+      expect(step5).to.be.calledOnce;
+      expect(step6).to.be.calledOnce;
+      expect(finishIntake).to.be.calledOnce;
+    });
+  });
 
   describe('intakeJob_step1', () => {
     afterEach(() => {
@@ -483,7 +531,7 @@ describe.only('DarwinCoreService', () => {
     });
   });
 
-  describe.only('intakeJob_finishIntake', () => {
+  describe('intakeJob_finishIntake', () => {
     it('should run without issue', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
@@ -515,18 +563,18 @@ describe.only('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueue;
 
-      const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
-      const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+      const updateS3 = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
+      const insertSubmissionStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves();
-      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+      const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
         await service.intakeJob_finishIntake(mockJobQueue);
         expect.fail();
       } catch (error) {
-        expect(insertStatus).to.be.calledOnce;
-        expect(update).not.to.be.called;
-        expect(insert).not.to.be.called;
+        expect(updateS3).to.be.called;
+        expect(insertErrorStatus).to.be.called;
+        expect(insertSubmissionStatus).not.to.be.called;
         expect(updateTime).not.to.be.called;
       }
     });

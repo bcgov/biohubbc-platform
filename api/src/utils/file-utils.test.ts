@@ -38,7 +38,7 @@ describe('generateS3FileKey', () => {
       fileName: 'bbbb.zip'
     });
 
-    expect(result).to.equal('platform/aaaa/artifacts/33/bbbb.zip');
+    expect(result).to.equal('platform/artifacts/33/aaaa/DwCA/bbbb.zip');
   });
 });
 

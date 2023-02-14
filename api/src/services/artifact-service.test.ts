@@ -138,7 +138,7 @@ describe('ArtifactService', () => {
         expect(getNextArtifactIdsStub).to.be.calledWith();
         expect(uploadStub).to.be.calledWith(
           mockFile,
-          `platform/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
+          `platform/artifacts/${14}/${mockDataPackageId}/DwCA/${mockFile.originalname}`,
           { filename: mockFile.originalname }
         );
         expect(insertRecordStub).to.be.calledWith({
@@ -149,7 +149,7 @@ describe('ArtifactService', () => {
           file_size: 1,
           artifact_id: 14,
           submission_id: 100,
-          input_key: `platform/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
+          input_key: `platform/artifacts/${14}/${mockDataPackageId}/DwCA/${mockFile.originalname}`,
           uuid: mockFileUuid
         });
       }

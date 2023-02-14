@@ -85,7 +85,7 @@ describe('SubmissionService', () => {
       const response = await submissionService.updateSubmissionMetadataEMLSource(1, 1, { emlFile: {} } as EMLFile);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql({ submission_metadata_id: 1 });
     });
   });
 
@@ -101,7 +101,7 @@ describe('SubmissionService', () => {
       const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 1, 'test');
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql({ submission_metadata_id: 1 });
     });
   });
 
