@@ -104,23 +104,23 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step2(intakeRecord: ISubmissionJobQueue, submissionMetadataId: number): Promise<DWCArchive> {
     try {
-      if (intakeRecord.key) {
-        const file = await this.getAndPrepFileFromS3(intakeRecord.key);
-
-        if (file.eml) {
-          await this.submissionService.updateSubmissionMetadataEMLSource(
-            intakeRecord.submission_id,
-            submissionMetadataId,
-            file.eml
-          );
-
-          return file;
-        } else {
-          throw new ApiGeneralError('Accessing S3 File, file eml is empty');
-        }
-      } else {
+      if (!intakeRecord.key) {
         throw new ApiGeneralError('No S3 Key given');
       }
+
+      const file = await this.getAndPrepFileFromS3(intakeRecord.key);
+
+      if (!file.eml) {
+        throw new ApiGeneralError('Accessing S3 File, file eml is empty');
+      }
+
+      await this.submissionService.updateSubmissionMetadataEMLSource(
+        intakeRecord.submission_id,
+        submissionMetadataId,
+        file.eml
+      );
+
+      return file;
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
 
@@ -145,17 +145,17 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<void> {
     try {
-      if (file.eml) {
-        const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
-
-        await this.submissionService.updateSubmissionRecordEMLJSONSource(
-          submissionId,
-          submissionMetadataId,
-          JSON.stringify(jsonData)
-        );
-      } else {
-        throw new ApiGeneralError('Unable to convert EML to JSON');
+      if (!file.eml) {
+        throw new ApiGeneralError('file eml is empty');
       }
+
+      const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
+
+      await this.submissionService.updateSubmissionRecordEMLJSONSource(
+        submissionId,
+        submissionMetadataId,
+        JSON.stringify(jsonData)
+      );
     } catch (error: any) {
       defaultLog.debug({
         label: 'convertSubmissionEMLtoJSON, updateSubmissionRecordEMLJSONSource',
