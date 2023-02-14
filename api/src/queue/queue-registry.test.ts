@@ -5,11 +5,11 @@ import * as db from '../database/db';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
 import { getMockDBConnection } from '../__mocks__/db';
-import { jobQueueAttemptsWrapper, QueueJobRegistry } from './queue-registry';
+import { DWC_DATASET_SUBMISSION_JOB, jobQueueAttemptsWrapper, QueueJobRegistry } from './queue-registry';
 
 describe('QueueJobRegistry', () => {
   it('returns a known job function', () => {
-    const job = QueueJobRegistry.findMatchingJob('dwc_dataset_submission');
+    const job = QueueJobRegistry.findMatchingJob(DWC_DATASET_SUBMISSION_JOB);
 
     expect(job).not.to.be.undefined;
     expect(typeof job).to.equal('function');

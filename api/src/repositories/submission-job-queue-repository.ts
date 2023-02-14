@@ -132,16 +132,26 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
+      .with('latest_submission', (qb1) => {
+        // Given multiple queue records with the same submission id, only return the latest queue record id for that
+        // submission id.
+        qb1
+          .select(knex.raw('max(submission_job_queue_id) as submission_job_queue_id'), 'submission_id')
+          .from('submission_job_queue')
+          .groupBy('submission_id')
+          .orderBy('submission_job_queue_id');
+      })
       .select()
-      .from('submission_job_queue')
-      .where('job_start_timestamp', null)
-      .where('job_end_timestamp', null);
+      .from({ sjq: 'submission_job_queue' })
+      .rightJoin({ ls: 'latest_submission' }, 'sjq.submission_job_queue_id', 'ls.submission_job_queue_id')
+      .where('sjq.job_start_timestamp', null)
+      .where('sjq.job_end_timestamp', null);
 
     if (attempts) {
-      queryBuilder.andWhere('attempt_count', '<', attempts);
+      queryBuilder.andWhere('sjq.attempt_count', '<', attempts);
     }
 
-    queryBuilder.orderBy('submission_job_queue_id', 'ASC');
+    queryBuilder.orderBy('sjq.submission_job_queue_id', 'ASC');
 
     if (concurrency) {
       queryBuilder.limit(concurrency);
