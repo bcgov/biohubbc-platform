@@ -8,7 +8,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { deleteFileFromS3, generateS3FileKey, moveFileInS3 } from '../utils/file-utils';
+import { copyFileInS3, deleteFileFromS3, generateS3FileKey } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
@@ -361,8 +361,7 @@ export class DarwinCoreService extends DBService {
       const submissionObservationData: ISubmissionObservationRecord = {
         submission_id: intakeRecord.submission_id,
         darwin_core_source: dwcaJson,
-        submission_security_request: intakeRecord.security_request,
-        foi_reason_description: null //TODO: Check null
+        submission_security_request: intakeRecord.security_request
       };
 
       return await this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
@@ -457,7 +456,7 @@ export class DarwinCoreService extends DBService {
 
       const newKey = generateS3FileKey({ uuid: submissionRecord.uuid, fileName: fileName });
 
-      await moveFileInS3(intakeRecord.key, newKey);
+      await copyFileInS3(intakeRecord.key, newKey);
 
       const jobQueueFolderKey = generateS3FileKey({
         uuid: submissionRecord.uuid,
