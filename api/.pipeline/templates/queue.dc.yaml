@@ -200,6 +200,13 @@ objects:
               image: ' '
               imagePullPolicy: Always
               name: queue
+              resources:
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File
               volumeMounts:
