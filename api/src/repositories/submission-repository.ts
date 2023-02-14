@@ -129,7 +129,7 @@ export interface ISubmissionMetadataRecord {
   submission_metadata_id?: number;
   submission_id: number;
   eml_source: string;
-  eml_json_source: any | null; //TODO: Check type
+  eml_json_source?: any;
   record_effective_timestamp?: string | null;
   record_end_timestamp?: string | null;
   create_date?: string;
@@ -142,7 +142,7 @@ export interface ISubmissionMetadataRecord {
 export interface ISubmissionObservationRecord {
   submission_observation_id?: number;
   submission_id: number;
-  darwin_core_source: any; //TODO: confirm type
+  darwin_core_source: any;
   submission_security_request?: string | null;
   security_review_timestamp?: string | null;
   foi_reason_description?: string | null;

@@ -50,7 +50,7 @@ export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput 
  * @param {string} newKey
  * @return {*}  {Promise<PromiseResult<CopyObjectOutput, AWSError>>}
  */
-export async function moveFileInS3(oldKey: string, newKey: string): Promise<PromiseResult<CopyObjectOutput, AWSError>> {
+export async function copyFileInS3(oldKey: string, newKey: string): Promise<PromiseResult<CopyObjectOutput, AWSError>> {
   const copyparams = {
     Bucket: OBJECT_STORE_BUCKET_NAME,
     CopySource: encodeURI(`/${OBJECT_STORE_BUCKET_NAME}/${oldKey}`),
