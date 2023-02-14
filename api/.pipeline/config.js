@@ -9,6 +9,7 @@ const config = require('../../.config/config.json');
 
 const appName = config.module.app;
 const name = config.module.api;
+const queueName = config.module.queue;
 const dbName = config.module.db;
 
 const changeId = options.pr || `${Math.floor(Date.now() * 1000) / 60.0}`; // aka pull-request or branch
@@ -54,6 +55,7 @@ const phases = {
   build: {
     namespace: 'a0ec71-tools',
     name: `${name}`,
+    queueName: `${queueName}`,
     dbName: `${dbName}`,
     phase: 'build',
     changeId: changeId,
@@ -73,6 +75,7 @@ const phases = {
   dev: {
     namespace: 'a0ec71-dev',
     name: `${name}`,
+    queueName: `${queueName}`,
     dbName: `${dbName}`,
     phase: 'dev',
     changeId: deployChangeId,
@@ -99,6 +102,7 @@ const phases = {
   test: {
     namespace: 'a0ec71-test',
     name: `${name}`,
+    queueName: `${queueName}`,
     dbName: `${dbName}`,
     phase: 'test',
     changeId: deployChangeId,
@@ -125,6 +129,7 @@ const phases = {
   prod: {
     namespace: 'a0ec71-prod',
     name: `${name}`,
+    queueName: `${queueName}`,
     dbName: `${dbName}`,
     phase: 'prod',
     changeId: deployChangeId,

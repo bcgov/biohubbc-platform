@@ -15,6 +15,7 @@
   "module": {
     "db": "biohub-platform-db",
     "api": "biohub-platform-api",
+    "queue": "biohub-platform-queue",
     "app": "biohub-platform-app",
     "geoserver": "biohub-platform-geoserver"
   },

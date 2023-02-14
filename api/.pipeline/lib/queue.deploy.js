@@ -25,7 +25,7 @@ const queueDeploy = async (settings) => {
   objects.push(
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/queue.dc.yaml`, {
       param: {
-        NAME: phases[phase].name,
+        NAME: phases[phase].queueName,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
         CHANGE_ID: phases.build.changeId || changeId,
@@ -50,7 +50,7 @@ const queueDeploy = async (settings) => {
     })
   );
 
-  oc.applyRecommendedLabels(objects, phases[phase].name, phase, `${changeId}`, phases[phase].instance);
+  oc.applyRecommendedLabels(objects, phases[phase].queueName, phase, `${changeId}`, phases[phase].instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);
 
   oc.applyAndDeploy(objects, phases[phase].instance);
