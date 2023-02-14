@@ -153,8 +153,9 @@ export class DarwinCoreService extends DBService {
           submissionMetadataId,
           JSON.stringify(jsonData)
         );
+      } else {
+        throw new ApiGeneralError('Unable to convert EML to JSON');
       }
-      // TODO: should this throw an error similar to step 2?
     } catch (error: any) {
       defaultLog.debug({
         label: 'convertSubmissionEMLtoJSON, updateSubmissionRecordEMLJSONSource',
@@ -274,8 +275,6 @@ export class DarwinCoreService extends DBService {
       await this.submissionService.insertSubmissionStatus(intakeRecord.submission_id, SUBMISSION_STATUS_TYPE.INGESTED);
 
       await this.submissionService.updateSubmissionJobQueueEndTime(intakeRecord.submission_id);
-
-      //TODO: SEND SCHEDULER JOB COMPLETE MESSAGE
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
 
