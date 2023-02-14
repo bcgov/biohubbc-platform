@@ -1,4 +1,6 @@
+import { getAPIUserDBConnection } from '../database/db';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
+import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
 
 type QueueJob = (jobQueueRecord: ISubmissionJobQueueRecord) => Promise<any>;
 
@@ -9,13 +11,36 @@ export const QueueJobRegistry = {
   registry: [
     {
       name: 'dwc_dataset_submission',
-      generator: getTestJob('random', 10000)
+      generator: jobQueueAttemptsWrapper(getTestJob('random', 10000))
     }
   ],
   findMatchingJob(name: string): QueueJob | undefined {
     return this.registry.find((item) => item.name === name)?.generator;
   }
 };
+
+/**
+ * Wraps a queue job function. Will prefix the job execution with an update to the attempt count for the queue record.
+ *
+ * @param {QueueJob} job The job function to run, after incrementing the attempt count.
+ * @return {*}  {QueueJob}
+ */
+export function jobQueueAttemptsWrapper(queueJob: QueueJob): QueueJob {
+  return async function wrappedQueueJob(jobQueueRecord: ISubmissionJobQueueRecord) {
+    const connection = getAPIUserDBConnection();
+    await connection.open();
+
+    // Increment attempt count
+    const jobQueueService = new SubmissionJobQueueService(connection);
+    await jobQueueService.incrementAttemptCount(jobQueueRecord.submission_job_queue_id);
+
+    await connection.commit();
+    connection.release();
+
+    // Execute original job function
+    return queueJob(jobQueueRecord);
+  };
+}
 
 /**
  * Returns a job queue generator function that auto resolves or rejects after a random timeout.

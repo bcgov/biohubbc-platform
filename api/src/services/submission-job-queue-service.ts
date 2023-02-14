@@ -119,7 +119,7 @@ export class SubmissionJobQueueService extends DBService {
    * @param {number} [concurrency] The number of job queue processes to select (based on how many can be processed
    * concurrently) (integer > 0).
    * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
-   * (integer >= 1). This currently leverages the revision_count column, so for an attempts of N, set to N*2.
+   * (integer >= 1).
    * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out. In this
    * case, a job that is not complete, has not reached the attempts limit, and is older than the specified timeout, will
    * be up for re-selection for another attempt.
@@ -165,5 +165,16 @@ export class SubmissionJobQueueService extends DBService {
    */
   async resetJobQueueRecord(jobQueueId: number): Promise<void> {
     return this.jobQueueRepository.resetJobQueueRecord(jobQueueId);
+  }
+
+  /**
+   * Update a job queue record, incrementing the attempt count;
+   *
+   * @param {number} jobQueueId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionJobQueueService
+   */
+  async incrementAttemptCount(jobQueueId: number): Promise<void> {
+    return this.jobQueueRepository.incrementAttemptCount(jobQueueId);
   }
 }

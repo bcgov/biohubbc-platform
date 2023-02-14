@@ -68,13 +68,9 @@ export class QueueScheduler {
 
     // Update the constants tracked by this queue scheduler
     this._enabled = jobQueueEnabled?.character_value === 'true' || QUEUE_DEFAULT_ENABLED;
-    // Note: for a concurrency of N, set concurrency to N-1. This is a side effect of how the queue detects when it has
-    // reached capacity: the queue only detects that it is full when the N+1 record is added to the queue.
-    this._concurrency = (Number(jobQueueConcurrency?.numeric_value) || QUEUE_DEFAULT_CONCURRENCY) - 1;
+    this._concurrency = Number(jobQueueConcurrency?.numeric_value) || QUEUE_DEFAULT_CONCURRENCY;
     this._period = Number(jobQueuePeriod?.numeric_value) || QUEUE_DEFAULT_PERIOD;
-    // Note: for an attempts of N, set attempts to N*2. Attempts is currently leveraging the revision_count column,
-    // which will experience 2 updates per attempt (1 to set the start time, and 1 to reset the start time on failure).
-    this._attempts = (Number(jobQueueAttempts?.numeric_value) || QUEUE_DEFAULT_ATTEMPTS) * 2;
+    this._attempts = Number(jobQueueAttempts?.numeric_value) || QUEUE_DEFAULT_ATTEMPTS;
     this._timeout = Number(jobQueueTimeout?.numeric_value) || QUEUE_DEFAULT_TIMEOUT;
 
     // Update the internal concurrency tracked by the queue

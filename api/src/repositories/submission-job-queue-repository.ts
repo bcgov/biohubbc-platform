@@ -121,7 +121,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    * @param {number} [concurrency] The number of job queue processes to select (based on how many can be processed
    * concurrently) (integer > 0).
    * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
-   * (integer >= 1). This currently leverages the revision_count column, so for an attempts of N, set to N*2.
+   * (integer >= 1).
    * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out. In this
    * case, a job that is not complete, has not reached the attempts limit, and is older than the specified timeout, will
    * be up for re-selection for another attempt.
@@ -147,7 +147,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
       });
 
     if (attempts) {
-      queryBuilder.andWhere('revision_count', '<', attempts);
+      queryBuilder.andWhere('attempt_count', '<', attempts);
     }
 
     queryBuilder.orderBy('submission_job_queue_id', 'ASC');
@@ -238,6 +238,33 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to end queue record', [
         'SubmissionJobQueueRepository->endJobQueueRecord',
+        'rowCount !== 1, expected rowCount === 1'
+      ]);
+    }
+  }
+
+  /**
+   * Increment the attempt count of a queue record.
+   *
+   * @param {number} jobQueueId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionJobQueueRepository
+   */
+  async incrementAttemptCount(jobQueueId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_job_queue
+      SET 
+        attempt_count = attempt_count + 1
+      WHERE
+        submission_job_queue_id = ${jobQueueId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to increment queue record attempts', [
+        'SubmissionJobQueueRepository->incrementAttemptCount',
         'rowCount !== 1, expected rowCount === 1'
       ]);
     }
