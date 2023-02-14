@@ -12,9 +12,6 @@ parameters:
   - name: VERSION
     description: Version of the application
     value: '1.0.0'
-  # - name: HOST
-  #   description: Host name of the application
-  #   required: true
   - name: CHANGE_ID
     description: Change id of the project. This will help to pull image stream
     required: true
@@ -61,11 +58,6 @@ parameters:
   - name: KEYCLOAK_SECRET_ADMIN_PASSWORD
     description: The key of the admin password in the keycloak secret
     required: true
-  # - name: QUEUE_PORT_DEFAULT
-  #   value: '6500'
-  # - name: QUEUE_PORT_DEFAULT_NAME
-  #   description: Queue default port name
-  #   value: '6500-tcp'
   - name: OBJECT_STORE_SECRETS
     description: Secrets used to read and write to the S3 storage
     value: 'biohubbc-object-store'
@@ -134,119 +126,85 @@ objects:
             role: queue
         spec:
           containers:
-            - env:
-                # - name: API_HOST
-                #   value: ${HOST}
-                # - name: QUEUE_PORT
-                #   value: ${QUEUE_PORT_DEFAULT}
-                - name: DB_HOST
-                  value: ${DB_SERVICE_NAME}
-                - name: DB_USER_API
-                  valueFrom:
-                    secretKeyRef:
-                      key: database-user-api
-                      name: ${DB_SERVICE_NAME}
-                - name: DB_USER_API_PASS
-                  valueFrom:
-                    secretKeyRef:
-                      key: database-user-api-password
-                      name: ${DB_SERVICE_NAME}
-                - name: DB_DATABASE
-                  valueFrom:
-                    secretKeyRef:
-                      key: database-name
-                      name: ${DB_SERVICE_NAME}
-                - name: DB_PORT
-                  value: '5432'
-                - name: KEYCLOAK_HOST
-                  value: ${KEYCLOAK_HOST}
-                - name: KEYCLOAK_API_HOST
-                  value: ${KEYCLOAK_API_HOST}
-                - name: KEYCLOAK_REALM
-                  value: ${KEYCLOAK_REALM}
-                - name: KEYCLOAK_CLIENT_ID
-                  value: ${KEYCLOAK_CLIENT_ID}
-                - name: KEYCLOAK_INTEGRATION_ID
-                  value: ${KEYCLOAK_INTEGRATION_ID}
-                - name: KEYCLOAK_ADMIN_HOST
-                  value: ${KEYCLOAK_ADMIN_HOST}
-                - name: KEYCLOAK_ADMIN_USERNAME
-                  value: ${KEYCLOAK_ADMIN_USERNAME}
-                - name: KEYCLOAK_ADMIN_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${KEYCLOAK_SECRET}
-                      key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD}
-                - name: CHANGE_VERSION
-                  value: ${CHANGE_ID}
-                - name: NODE_ENV
-                  value: ${NODE_ENV}
-                - name: S3_KEY_PREFIX
-                  value: ${S3_KEY_PREFIX}
-                - name: TZ
-                  value: ${TZ}
-                - name: VERSION
-                  value: ${VERSION}
-                - name: OBJECT_STORE_URL
-                  valueFrom:
-                    secretKeyRef:
-                      key: object_store_url
-                      name: ${OBJECT_STORE_SECRETS}
-                - name: OBJECT_STORE_ACCESS_KEY_ID
-                  valueFrom:
-                    secretKeyRef:
-                      key: object_store_access_key_id
-                      name: ${OBJECT_STORE_SECRETS}
-                - name: OBJECT_STORE_SECRET_KEY_ID
-                  valueFrom:
-                    secretKeyRef:
-                      key: object_store_secret_key_id
-                      name: ${OBJECT_STORE_SECRETS}
-                - name: OBJECT_STORE_BUCKET_NAME
-                  valueFrom:
-                    secretKeyRef:
-                      key: object_store_bucket_name
-                      name: ${OBJECT_STORE_SECRETS}
-                - name: LOG_LEVEL
-                  value: ${LOG_LEVEL}
-              image: ' '
-              imagePullPolicy: Always
-              name: api
-              ports:
-                - containerPort: ${{QUEUE_PORT_DEFAULT}}
-                  protocol: TCP
-              resources:
-                limits:
-                  cpu: ${CPU_LIMIT}
-                  memory: ${MEMORY_LIMIT}
-                requests:
-                  cpu: ${CPU_REQUEST}
-                  memory: ${MEMORY_REQUEST}
-              readinessProbe:
-                httpGet:
-                  path: /api/version
-                  port: ${{QUEUE_PORT_DEFAULT}}
-                  scheme: HTTP
-                initialDelaySeconds: 10
-                periodSeconds: 15
-                timeoutSeconds: 10
-                successThreshold: 1
-                failureThreshold: 20
-              livenessProbe:
-                httpGet:
-                  path: /api/version
-                  port: ${{QUEUE_PORT_DEFAULT}}
-                  scheme: HTTP
-                initialDelaySeconds: 10
-                periodSeconds: 15
-                timeoutSeconds: 10
-                successThreshold: 1
-                failureThreshold: 20
-              terminationMessagePath: /dev/termination-log
-              terminationMessagePolicy: File
-              volumeMounts:
-                - mountPath: /opt/app-root/app
-                  name: ${NAME}${SUFFIX}
+            env:
+              - name: DB_HOST
+                value: ${DB_SERVICE_NAME}
+              - name: DB_USER_API
+                valueFrom:
+                  secretKeyRef:
+                    key: database-user-api
+                    name: ${DB_SERVICE_NAME}
+              - name: DB_USER_API_PASS
+                valueFrom:
+                  secretKeyRef:
+                    key: database-user-api-password
+                    name: ${DB_SERVICE_NAME}
+              - name: DB_DATABASE
+                valueFrom:
+                  secretKeyRef:
+                    key: database-name
+                    name: ${DB_SERVICE_NAME}
+              - name: DB_PORT
+                value: '5432'
+              - name: KEYCLOAK_HOST
+                value: ${KEYCLOAK_HOST}
+              - name: KEYCLOAK_API_HOST
+                value: ${KEYCLOAK_API_HOST}
+              - name: KEYCLOAK_REALM
+                value: ${KEYCLOAK_REALM}
+              - name: KEYCLOAK_CLIENT_ID
+                value: ${KEYCLOAK_CLIENT_ID}
+              - name: KEYCLOAK_INTEGRATION_ID
+                value: ${KEYCLOAK_INTEGRATION_ID}
+              - name: KEYCLOAK_ADMIN_HOST
+                value: ${KEYCLOAK_ADMIN_HOST}
+              - name: KEYCLOAK_ADMIN_USERNAME
+                value: ${KEYCLOAK_ADMIN_USERNAME}
+              - name: KEYCLOAK_ADMIN_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: ${KEYCLOAK_SECRET}
+                    key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD}
+              - name: CHANGE_VERSION
+                value: ${CHANGE_ID}
+              - name: NODE_ENV
+                value: ${NODE_ENV}
+              - name: S3_KEY_PREFIX
+                value: ${S3_KEY_PREFIX}
+              - name: TZ
+                value: ${TZ}
+              - name: VERSION
+                value: ${VERSION}
+              - name: OBJECT_STORE_URL
+                valueFrom:
+                  secretKeyRef:
+                    key: object_store_url
+                    name: ${OBJECT_STORE_SECRETS}
+              - name: OBJECT_STORE_ACCESS_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    key: object_store_access_key_id
+                    name: ${OBJECT_STORE_SECRETS}
+              - name: OBJECT_STORE_SECRET_KEY_ID
+                valueFrom:
+                  secretKeyRef:
+                    key: object_store_secret_key_id
+                    name: ${OBJECT_STORE_SECRETS}
+              - name: OBJECT_STORE_BUCKET_NAME
+                valueFrom:
+                  secretKeyRef:
+                    key: object_store_bucket_name
+                    name: ${OBJECT_STORE_SECRETS}
+              - name: LOG_LEVEL
+                value: ${LOG_LEVEL}
+            image: ' '
+            imagePullPolicy: Always
+            name: queue
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /opt/app-root/app
+                name: ${NAME}${SUFFIX}
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           schedulerName: default-scheduler
@@ -260,7 +218,7 @@ objects:
         - imageChangeParams:
             automatic: true
             containerNames:
-              - api
+              - queue
             from:
               kind: ImageStreamTag
               name: ${NAME}:${VERSION}
@@ -285,46 +243,6 @@ objects:
       creationTimestamp: null
       name: ${NAME}${SUFFIX}
     type: Opaque
-  # - apiVersion: v1
-  #   kind: Service
-  #   metadata:
-  #     annotations: null
-  #     creationTimestamp: null
-  #     labels: {}
-  #     name: ${NAME}${SUFFIX}
-  #   spec:
-  #     ports:
-  #       - name: ${NAME}-${QUEUE_PORT_DEFAULT_NAME}
-  #         port: ${{QUEUE_PORT_DEFAULT}}
-  #         protocol: TCP
-  #         targetPort: ${{QUEUE_PORT_DEFAULT}}
-  #     selector:
-  #       deploymentconfig: ${NAME}${SUFFIX}
-  #     sessionAffinity: None
-  #     type: ClusterIP
-  #   status:
-  #     loadBalancer: {}
-  # - apiVersion: route.openshift.io/v1
-  #   kind: Route
-  #   metadata:
-  #     annotations: {}
-  #     creationTimestamp: null
-  #     labels: {}
-  #     name: ${NAME}${SUFFIX}
-  #   spec:
-  #     host: ${HOST}
-  #     tls:
-  #       insecureEdgeTerminationPolicy: Redirect
-  #       termination: edge
-  #     port:
-  #       targetPort: ${NAME}-${QUEUE_PORT_DEFAULT_NAME}
-  #     to:
-  #       kind: Service
-  #       name: ${NAME}${SUFFIX}
-  #       weight: 100
-  #     wildcardPolicy: None
-  #   status:
-  #     ingress: null
   - apiVersion: autoscaling/v1
     kind: HorizontalPodAutoscaler
     metadata:

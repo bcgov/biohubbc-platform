@@ -1,5 +1,5 @@
 import fastq from 'fastq';
-import { ISubmissionJobQueueRecord } from '../repositories/job-queue-repositry';
+import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 import { QueueJobRegistry } from './queue-registry';
 import { QUEUE_DEFAULT_CONCURRENCY, QUEUE_DEFAULT_TIMEOUT } from './queue-scheduler';
 

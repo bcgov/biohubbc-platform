@@ -28,15 +28,14 @@ const queueDeploy = async (settings) => {
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
-        // HOST: phases[phase].host,
         CHANGE_ID: phases.build.changeId || changeId,
+        DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         NODE_ENV: phases[phase].env || 'dev',
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
         KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
         KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
         KEYCLOAK_SECRET_ADMIN_PASSWORD: phases[phase].sso.keycloakSecretAdminPassword,
-        DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         KEYCLOAK_HOST: phases[phase].sso.url,
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         KEYCLOAK_REALM: phases[phase].sso.realm,
@@ -44,9 +43,9 @@ const queueDeploy = async (settings) => {
         KEYCLOAK_ADMIN_HOST: phases[phase].sso.adminHost,
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
         OBJECT_STORE_SECRETS: 'biohubbc-object-store',
+        LOG_LEVEL: phases[phase].logLevel || 'info',
         REPLICAS: phases[phase].queueReplicas || 1,
-        REPLICA_MAX: phases[phase].queueMaxReplicas || 1,
-        LOG_LEVEL: phases[phase].logLevel || 'info'
+        REPLICA_MAX: phases[phase].queueMaxReplicas || 1
       }
     })
   );

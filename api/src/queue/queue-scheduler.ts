@@ -64,7 +64,7 @@ export class QueueScheduler {
     const jobQueueConcurrency = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_CONCURRENCY');
     const jobQueuePeriod = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_PERIOD');
     const jobQueueAttempts = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_ATTEMPTS');
-    // const jobQueueTimeout = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_TIMEOUT');
+    const jobQueueTimeout = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_TIMEOUT');
 
     // Update the constants tracked by this queue scheduler
     this._enabled = jobQueueEnabled?.character_value === 'true' || QUEUE_DEFAULT_ENABLED;
@@ -73,13 +73,10 @@ export class QueueScheduler {
     this._concurrency = (Number(jobQueueConcurrency?.numeric_value) || QUEUE_DEFAULT_CONCURRENCY) - 1;
     this._period = Number(jobQueuePeriod?.numeric_value) || QUEUE_DEFAULT_PERIOD;
     this._attempts = Number(jobQueueAttempts?.numeric_value) || QUEUE_DEFAULT_ATTEMPTS;
-    // this._timeout = Number(jobQueueTimeout?.numeric_value) || QUEUE_DEFAULT_TIMEOUT;
+    this._timeout = Number(jobQueueTimeout?.numeric_value) || QUEUE_DEFAULT_TIMEOUT;
 
     // Update the internal concurrency tracked by the queue
     this._queue.setJobQueueConcurrency(this._concurrency);
-
-    this._timeout = Math.round(this._timeout / 2);
-    this._queue.setJobTimeout(this._timeout);
 
     await connection.commit();
     connection.release();

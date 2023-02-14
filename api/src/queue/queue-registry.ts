@@ -1,4 +1,4 @@
-import { ISubmissionJobQueueRecord } from '../repositories/job-queue-repositry';
+import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 
 type QueueJob = (jobQueueRecord: ISubmissionJobQueueRecord) => Promise<any>;
 
