@@ -366,7 +366,7 @@ export class DarwinCoreService extends DBService {
         foi_reason_description: null //TODO: Check null
       };
 
-      return this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
+      return await this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionObservationRecord', message: 'error', error });
 
