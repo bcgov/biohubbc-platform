@@ -23,22 +23,6 @@ export interface ISystemConstant {
  */
 export class SystemConstantRepository extends BaseRepository {
   /**
-   * Fetch one system constant by name.
-   *
-   * @param {string} constantName
-   * @return {*}  {Promise<ISystemConstant>}
-   * @memberof SystemConstantRepository
-   */
-  async getSystemConstant(constantName: string): Promise<ISystemConstant> {
-    const knex = getKnex();
-    const queryBuilder = knex.queryBuilder().select().from('system_constant').where('constant_name', constantName);
-
-    const response = await this.connection.knex<ISystemConstant>(queryBuilder);
-
-    return response.rows[0];
-  }
-
-  /**
    * Fetch one or more system constants by name.
    *
    * @param {string[]} constantNames

@@ -1,7 +1,7 @@
 import { getAPIUserDBConnection } from '../database/db';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
-import { SystemConstantService } from '../services/system-constant';
+import { SystemConstantService } from '../services/system-constant-service';
 import { getLogger } from '../utils/logger';
 import { Queue } from './queue';
 
@@ -75,6 +75,8 @@ export class QueueScheduler {
 
     // Update the internal concurrency tracked by the queue
     this._queue.setJobQueueConcurrency(this._concurrency);
+    // Update the internal timeout tracked by the queue
+    this._queue.setJobTimeout(this._timeout);
 
     await connection.commit();
     connection.release();
@@ -125,8 +127,7 @@ export class QueueScheduler {
 
     const nextJobQueueRecords = await jobQueueService.getNextUnprocessedJobQueueRecords(
       this._concurrency,
-      this._attempts,
-      this._timeout
+      this._attempts
     );
 
     await connection.commit();

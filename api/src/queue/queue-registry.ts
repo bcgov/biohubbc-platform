@@ -4,13 +4,15 @@ import { SubmissionJobQueueService } from '../services/submission-job-queue-serv
 
 type QueueJob = (jobQueueRecord: ISubmissionJobQueueRecord) => Promise<any>;
 
+export const DWC_DATASET_SUBMISSION_JOB = 'dwc_dataset_submission_job';
+
 /**
  * Translates a string to a queue-job compatible function.
  */
 export const QueueJobRegistry = {
   registry: [
     {
-      name: 'dwc_dataset_submission',
+      name: DWC_DATASET_SUBMISSION_JOB,
       generator: jobQueueAttemptsWrapper(getTestJob('random', 10000))
     }
   ],

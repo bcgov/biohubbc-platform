@@ -122,29 +122,20 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    * concurrently) (integer > 0).
    * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
    * (integer >= 1).
-   * @param {number} [timeout] The maximum duration a running job can take before it is considered timed out. In this
-   * case, a job that is not complete, has not reached the attempts limit, and is older than the specified timeout, will
-   * be up for re-selection for another attempt.
    * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
    * @memberof SubmissionJobQueueRepository
    */
   async getNextUnprocessedJobQueueRecords(
     concurrency?: number,
-    attempts?: number,
-    timeout?: number
+    attempts?: number
   ): Promise<ISubmissionJobQueueRecord[]> {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
       .select()
       .from('submission_job_queue')
-      .where('job_end_timestamp', null)
-      .where((qb1) => {
-        qb1.orWhere('job_start_timestamp', null);
-        if (timeout) {
-          qb1.orWhere(knex.raw(`job_start_timestamp < NOW() - INTERVAL '${timeout} milliseconds'`));
-        }
-      });
+      .where('job_start_timestamp', null)
+      .where('job_end_timestamp', null);
 
     if (attempts) {
       queryBuilder.andWhere('attempt_count', '<', attempts);

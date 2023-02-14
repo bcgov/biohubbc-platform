@@ -136,9 +136,8 @@ describe('SubmissionJobQueueRepository', () => {
 
       const concurrency = 2;
       const attempts = 2;
-      const timeout = 5000;
 
-      const result = await repo.getNextUnprocessedJobQueueRecords(concurrency, attempts, timeout);
+      const result = await repo.getNextUnprocessedJobQueueRecords(concurrency, attempts);
 
       expect(result).to.be.eql([
         { submission_job_queue_id: 1 },

@@ -1,6 +1,6 @@
 import fastq from 'fastq';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
-import { QueueJobRegistry } from './queue-registry';
+import { DWC_DATASET_SUBMISSION_JOB, QueueJobRegistry } from './queue-registry';
 import { QUEUE_DEFAULT_CONCURRENCY, QUEUE_DEFAULT_TIMEOUT } from './queue-scheduler';
 
 export class Queue {
@@ -13,12 +13,14 @@ export class Queue {
   }
 
   async _queueWorker(jobQueueRecord: ISubmissionJobQueueRecord) {
-    const job = QueueJobRegistry.findMatchingJob('dwc_dataset_submission');
+    const job = QueueJobRegistry.findMatchingJob(DWC_DATASET_SUBMISSION_JOB);
 
     if (!job) {
       throw new Error('Failed to find matching queue job handler');
     }
 
+    // Race the job promise with a timeout promise. If the timeout promise resolves first, the job promise will be
+    // rejected (considered timed out).
     return Promise.race([job(jobQueueRecord), this._getJobTimeout()]);
   }
 
