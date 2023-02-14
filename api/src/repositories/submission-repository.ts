@@ -251,7 +251,9 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*} {Promise<{ submission_id: number }>} The primary key of the submission
    * @memberof SubmissionRepository
    */
-  async getOrInsertSubmissionRecord(submissionData: ISubmissionModel): Promise<{ submission_id: number }> {
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
+  ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
@@ -269,40 +271,8 @@ export class SubmissionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get or insert submission record', [
-        'SubmissionRepository->getOrInsertSubmissionRecord',
+        'SubmissionRepository->insertSubmissionRecordWithPotentialConflict',
         'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Update the `input_key` column of a submission record.
-   * TODO: Might be deprecated, input key no longer in submission table
-   * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['input_key']} inputKey
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission
-      SET
-        input_key = ${inputKey}
-      WHERE
-        submission_id = ${submissionId}
-      RETURNING
-        submission_id;
-    `;
-
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
-        'SubmissionRepository->updateSubmissionRecordInputKey',
-        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -418,7 +388,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Fetch a submission_id from uuid.
-   * TODO: Might be deprecated, investigate for removal
+   *
    * @param {number} uuid
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
@@ -443,7 +413,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Get submission eml json by dataset id.
-   * TODO: Might be deprecated, investigate for removal
+   *
    * @param {string} datasetId
    * @return {*}  {Promise<string>}
    * @memberof SubmissionRepository
