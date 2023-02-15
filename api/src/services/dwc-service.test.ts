@@ -16,7 +16,7 @@ import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
-describe.only('DarwinCoreService', () => {
+describe('DarwinCoreService', () => {
   afterEach(() => {
     sinon.restore();
   });
