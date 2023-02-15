@@ -1,31 +1,27 @@
 import AWS from 'aws-sdk';
+import { Metadata } from 'aws-sdk/clients/appstream';
 import { ManagedUpload } from 'aws-sdk/clients/s3';
 import { expect } from 'chai';
 import clamd from 'clamdjs';
-import sinon from 'sinon';
 import { describe } from 'mocha';
+import sinon from 'sinon';
 import * as fileUtils from './file-utils';
-import { Metadata } from 'aws-sdk/clients/appstream';
 
 const generateStubs = () => {
-  const _getObjectStoreUrlStub = sinon
-    .stub(fileUtils, '_getObjectStoreUrl')
-    .returns('object.store.url');
+  const _getObjectStoreUrlStub = sinon.stub(fileUtils, '_getObjectStoreUrl').returns('object.store.url');
 
   const _getObjectStoreBucketNameStub = sinon
     .stub(fileUtils, '_getObjectStoreBucketName')
     .returns('object-store-bucket-name');
 
-  const _getS3KeyPrefixStub = sinon
-    .stub(fileUtils, '_getS3KeyPrefix')
-    .returns('platform-test');
-  
+  const _getS3KeyPrefixStub = sinon.stub(fileUtils, '_getS3KeyPrefix').returns('platform-test');
+
   return {
     _getObjectStoreUrlStub,
     _getObjectStoreBucketNameStub,
     _getS3KeyPrefixStub
-  }
-}
+  };
+};
 
 describe.only('file-utils', () => {
   let sinonSandbox: sinon.SinonSandbox;
@@ -87,7 +83,7 @@ describe.only('file-utils', () => {
     it('constructs an S3 client', async () => {
       const { _getObjectStoreUrlStub } = generateStubs();
       const s3Stub = sinon.stub(AWS, 'S3').returns({});
-      
+
       fileUtils._getS3Client();
 
       expect(_getObjectStoreUrlStub).to.be.calledOnce;
@@ -99,7 +95,7 @@ describe.only('file-utils', () => {
         s3ForcePathStyle: true,
         region: 'ca-central-1'
       });
-    })
+    });
   });
 
   describe('_getObjectStoreUrl', () => {
@@ -190,20 +186,17 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const deleteObjectStub = sinonSandbox
-        .stub(mockS3Client, 'deleteObject')
-        .returns({
-          promise: () => Promise.resolve({
+      const deleteObjectStub = sinonSandbox.stub(mockS3Client, 'deleteObject').returns({
+        promise: () =>
+          Promise.resolve({
             DeleteMarker: true
           })
-        } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
 
       const result = await fileUtils.deleteFileFromS3('my-delete-key');
-      
+
       expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
       expect(deleteObjectStub).to.have.been.calledOnce;
       expect(deleteObjectStub).to.have.been.calledWith({
@@ -218,17 +211,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'deleteObject')
-        .returns({
-          promise: () => Promise.reject({
+      sinonSandbox.stub(mockS3Client, 'deleteObject').returns({
+        promise: () =>
+          Promise.reject({
             message: 'deleteObject test reject'
           })
-        } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
 
       try {
         await fileUtils.deleteFileFromS3('my-delete-key');
@@ -245,22 +235,19 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const copyObjectStub = sinonSandbox
-        .stub(mockS3Client, 'copyObject')
-        .returns({
-          promise: () => Promise.resolve({
+      const copyObjectStub = sinonSandbox.stub(mockS3Client, 'copyObject').returns({
+        promise: () =>
+          Promise.resolve({
             CopyObjectResult: {
               LastModified: new Date('1970-01-01')
             }
           })
-        } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
 
       const result = await fileUtils.moveFileInS3('old-key', 'new-key');
-      
+
       expect(_getObjectStoreBucketNameStub).to.have.callCount(2);
       expect(copyObjectStub).to.have.been.calledOnce;
       expect(copyObjectStub).to.have.been.calledWith({
@@ -280,17 +267,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'copyObject')
-        .returns({
-          promise: () => Promise.reject({
+      sinonSandbox.stub(mockS3Client, 'copyObject').returns({
+        promise: () =>
+          Promise.reject({
             message: 'copyObject test reject'
           })
-        } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
 
       try {
         await fileUtils.moveFileInS3('old-key', 'new-key');
@@ -313,27 +297,20 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const uploadStub = sinonSandbox
-        .stub(mockS3Client, 'upload')
-        .returns({
-          promise: () => Promise.resolve({
+      const uploadStub = sinonSandbox.stub(mockS3Client, 'upload').returns({
+        promise: () =>
+          Promise.resolve({
             Location: 'test-location',
             ETag: 'test-etag',
-            Bucket: 'test-bucket', 
+            Bucket: 'test-bucket',
             Key: 'test-key'
           })
-        } as ManagedUpload);
+      } as ManagedUpload);
 
-      const result = await fileUtils.uploadFileToS3(
-        mockFile,
-        'my-upload-key',
-        { test_name: 'test_value' }
-      );
-      
+      const result = await fileUtils.uploadFileToS3(mockFile, 'my-upload-key', { test_name: 'test_value' });
+
       expect(_getObjectStoreBucketNameStub).to.have.been.calledOnce;
       expect(uploadStub).to.have.been.calledOnce;
       expect(uploadStub).to.have.been.calledWith({
@@ -347,7 +324,7 @@ describe.only('file-utils', () => {
       expect(result).to.eql({
         Location: 'test-location',
         ETag: 'test-etag',
-        Bucket: 'test-bucket', 
+        Bucket: 'test-bucket',
         Key: 'test-key'
       });
     });
@@ -357,21 +334,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'upload')
-        .returns({
-          promise: () => Promise.reject(new Error('upload test reject'))
-        } as ManagedUpload);
+      sinonSandbox.stub(mockS3Client, 'upload').returns({
+        promise: () => Promise.reject(new Error('upload test reject'))
+      } as ManagedUpload);
 
       try {
-        await fileUtils.uploadFileToS3(
-          mockFile,
-          'my-upload-key'
-        );
+        await fileUtils.uploadFileToS3(mockFile, 'my-upload-key');
         expect.fail();
       } catch (actualError) {
         expect((actualError as Error).message).to.eql('upload test reject');
@@ -382,33 +352,64 @@ describe.only('file-utils', () => {
   describe('uploadBufferToS3', () => {
     const mockBuffer = Buffer.from('helloworld');
 
-    it('uploads a buffer', async () => {
+    it('uploads a buffer without metadata', async () => {
       sinonSandbox = sinon.createSandbox();
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const uploadStub = sinonSandbox
-        .stub(mockS3Client, 'upload')
-        .returns({
-          promise: () => Promise.resolve({
+      const uploadStub = sinonSandbox.stub(mockS3Client, 'upload').returns({
+        promise: () =>
+          Promise.resolve({
             Location: 'test-location',
             ETag: 'test-etag',
-            Bucket: 'test-bucket', 
+            Bucket: 'test-bucket',
             Key: 'test-key'
           })
-        } as ManagedUpload);
+      } as ManagedUpload);
 
-      const result = await fileUtils.uploadBufferToS3(
-        mockBuffer,
-        'test-mimetype',
-        'my-upload-key',
-        { test_name: 'test_value' }
-      );
-      
+      const result = await fileUtils.uploadBufferToS3(mockBuffer, 'test-mimetype', 'my-upload-key');
+
+      expect(_getObjectStoreBucketNameStub).to.have.been.calledOnce;
+      expect(uploadStub).to.have.been.calledOnce;
+      expect(uploadStub).to.have.been.calledWith({
+        Bucket: 'object-store-bucket-name',
+        Body: Buffer.from('helloworld'),
+        ContentType: 'test-mimetype',
+        Key: 'my-upload-key',
+        ACL: 'authenticated-read',
+        Metadata: {}
+      });
+      expect(result).to.eql({
+        Location: 'test-location',
+        ETag: 'test-etag',
+        Bucket: 'test-bucket',
+        Key: 'test-key'
+      });
+    });
+
+    it('uploads a buffer with metadata', async () => {
+      sinonSandbox = sinon.createSandbox();
+      const { _getObjectStoreBucketNameStub } = generateStubs();
+      const mockS3Client = new AWS.S3();
+
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
+
+      const uploadStub = sinonSandbox.stub(mockS3Client, 'upload').returns({
+        promise: () =>
+          Promise.resolve({
+            Location: 'test-location',
+            ETag: 'test-etag',
+            Bucket: 'test-bucket',
+            Key: 'test-key'
+          })
+      } as ManagedUpload);
+
+      const result = await fileUtils.uploadBufferToS3(mockBuffer, 'test-mimetype', 'my-upload-key', {
+        test_name: 'test_value'
+      });
+
       expect(_getObjectStoreBucketNameStub).to.have.been.calledOnce;
       expect(uploadStub).to.have.been.calledOnce;
       expect(uploadStub).to.have.been.calledWith({
@@ -422,7 +423,7 @@ describe.only('file-utils', () => {
       expect(result).to.eql({
         Location: 'test-location',
         ETag: 'test-etag',
-        Bucket: 'test-bucket', 
+        Bucket: 'test-bucket',
         Key: 'test-key'
       });
     });
@@ -432,23 +433,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'upload')
-        .returns({
-          promise: () => Promise.reject(new Error('upload buffer test reject'))
-        } as ManagedUpload);
+      sinonSandbox.stub(mockS3Client, 'upload').returns({
+        promise: () => Promise.reject(new Error('upload buffer test reject'))
+      } as ManagedUpload);
 
       try {
-        await fileUtils.uploadBufferToS3(
-          mockBuffer,
-          'test-mimetype',
-          'my-upload-key',
-          { test_name: 'test_value' }
-        );
+        await fileUtils.uploadBufferToS3(mockBuffer, 'test-mimetype', 'my-upload-key', { test_name: 'test_value' });
         expect.fail();
       } catch (actualError) {
         expect((actualError as Error).message).to.eql('upload buffer test reject');
@@ -462,20 +454,17 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const getObjectStub = sinonSandbox
-        .stub(mockS3Client, 'getObject')
-        .returns({
-          promise: () => Promise.resolve({
+      const getObjectStub = sinonSandbox.stub(mockS3Client, 'getObject').returns({
+        promise: () =>
+          Promise.resolve({
             Body: 'helloworld'
           })
-        } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
 
       const result = await fileUtils.getFileFromS3('my-get-key', 'my-version-id');
-      
+
       expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
       expect(getObjectStub).to.have.been.calledOnce;
       expect(getObjectStub).to.have.been.calledWith({
@@ -491,20 +480,17 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const getObjectStub = sinonSandbox
-        .stub(mockS3Client, 'getObject')
-        .returns({
-          promise: () => Promise.resolve({
+      const getObjectStub = sinonSandbox.stub(mockS3Client, 'getObject').returns({
+        promise: () =>
+          Promise.resolve({
             Body: 'helloworld'
           })
-        } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
 
       const result = await fileUtils.getFileFromS3('my-get-key');
-      
+
       expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
       expect(getObjectStub).to.have.been.calledOnce;
       expect(getObjectStub).to.have.been.calledWith({
@@ -520,17 +506,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'getObject')
-        .returns({
-          promise: () => Promise.reject({
+      sinonSandbox.stub(mockS3Client, 'getObject').returns({
+        promise: () =>
+          Promise.reject({
             message: 'getObject test reject'
           })
-        } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
 
       try {
         await fileUtils.getFileFromS3('my-get-key');
@@ -543,8 +526,7 @@ describe.only('file-utils', () => {
 
   describe('getS3SignedURL', () => {
     it('returns null when no key specified', async () => {
-      sinon.stub(fileUtils, '_getS3Client')
-        .returns(new AWS.S3());
+      sinon.stub(fileUtils, '_getS3Client').returns(new AWS.S3());
 
       const result = await fileUtils.getS3SignedURL(null as unknown as string);
 
@@ -552,8 +534,7 @@ describe.only('file-utils', () => {
     });
 
     it('returns null when s3Client is null', async () => {
-      sinon.stub(fileUtils, '_getS3Client')
-        .returns(null as unknown as AWS.S3);
+      sinon.stub(fileUtils, '_getS3Client').returns(null as unknown as AWS.S3);
 
       const result = await fileUtils.getS3SignedURL('my-test-key');
 
@@ -565,26 +546,19 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const getSignedUrlStub = sinonSandbox
-        .stub(mockS3Client, 'getSignedUrl')
-        .returns('test-signed-url');
+      const getSignedUrlStub = sinonSandbox.stub(mockS3Client, 'getSignedUrl').returns('test-signed-url');
 
       const result = await fileUtils.getS3SignedURL('my-test-key');
-      
+
       expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
       expect(getSignedUrlStub).to.have.been.calledOnce;
-      expect(getSignedUrlStub).to.have.been.calledWith(
-        'getObject',
-        {
-          Bucket: 'object-store-bucket-name',
-          Key: 'my-test-key',
-          Expires: 300000
-        }
-      );
+      expect(getSignedUrlStub).to.have.been.calledWith('getObject', {
+        Bucket: 'object-store-bucket-name',
+        Key: 'my-test-key',
+        Expires: 300000
+      });
       expect(result).to.eql('test-signed-url');
     });
 
@@ -593,12 +567,10 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
       const result = await fileUtils.getS3SignedURL('my-test-key');
- 
+
       expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
       expect(result).to.eql('https://s3.amazonaws.com/');
     });
@@ -610,23 +582,17 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const listObjectsStub = sinonSandbox
-        .stub(mockS3Client, 'listObjects')
-        .returns({
-          promise: () => Promise.resolve({
-            Contents: [
-              'file1',
-              'file2'
-            ]
+      const listObjectsStub = sinonSandbox.stub(mockS3Client, 'listObjects').returns({
+        promise: () =>
+          Promise.resolve({
+            Contents: ['file1', 'file2']
           } as AWS.S3.ListObjectsOutput)
-        } as AWS.Request<AWS.S3.ListObjectsOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.ListObjectsOutput, AWS.AWSError>);
 
       const result = await fileUtils.listFilesFromS3('my-test-path');
-      
+
       expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
       expect(listObjectsStub).to.have.been.calledOnce;
       expect(listObjectsStub).to.have.been.calledWith({
@@ -634,10 +600,7 @@ describe.only('file-utils', () => {
         Prefix: 'my-test-path'
       });
       expect(result).to.eql({
-          Contents: [
-            'file1',
-            'file2'
-          ]
+        Contents: ['file1', 'file2']
       });
     });
 
@@ -646,17 +609,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'listObjects')
-        .returns({
-          promise: () => Promise.reject({
+      sinonSandbox.stub(mockS3Client, 'listObjects').returns({
+        promise: () =>
+          Promise.reject({
             message: 'listObjects test reject'
           })
-        } as AWS.Request<AWS.S3.ListObjectsOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.ListObjectsOutput, AWS.AWSError>);
 
       try {
         await fileUtils.listFilesFromS3('my-testPath');
@@ -673,20 +633,17 @@ describe.only('file-utils', () => {
       const { _getObjectStoreBucketNameStub } = generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      const getObjectMetaStub = sinonSandbox
-        .stub(mockS3Client, 'headObject')
-        .returns({
-          promise: () => Promise.resolve({
+      const getObjectMetaStub = sinonSandbox.stub(mockS3Client, 'headObject').returns({
+        promise: () =>
+          Promise.resolve({
             Metadata: {
-              'test_key1': 'test_value1',
-              'test_key2': 'test_value2'            
+              test_key1: 'test_value1',
+              test_key2: 'test_value2'
             } as Metadata
           })
-        } as AWS.Request<AWS.S3.HeadObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.HeadObjectOutput, AWS.AWSError>);
 
       const result = await fileUtils.getObjectMeta('my-get-meta-key');
 
@@ -698,8 +655,8 @@ describe.only('file-utils', () => {
       });
       expect(result).to.eql({
         Metadata: {
-          'test_key1': 'test_value1',
-          'test_key2': 'test_value2'            
+          test_key1: 'test_value1',
+          test_key2: 'test_value2'
         }
       });
     });
@@ -709,17 +666,14 @@ describe.only('file-utils', () => {
       generateStubs();
       const mockS3Client = new AWS.S3();
 
-      sinonSandbox
-        .stub(AWS, 'S3')
-        .returns(mockS3Client);
+      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
 
-      sinonSandbox
-        .stub(mockS3Client, 'headObject')
-        .returns({
-          promise: () => Promise.reject({
+      sinonSandbox.stub(mockS3Client, 'headObject').returns({
+        promise: () =>
+          Promise.reject({
             message: 'headObject test reject'
           })
-        } as AWS.Request<AWS.S3.HeadObjectOutput, AWS.AWSError>);
+      } as AWS.Request<AWS.S3.HeadObjectOutput, AWS.AWSError>);
 
       try {
         await fileUtils.getObjectMeta('my-get-meta-key');
@@ -735,6 +689,12 @@ describe.only('file-utils', () => {
       const result = fileUtils.generateS3FileKey({ submissionId: 1, fileName: 'testFileName' });
 
       expect(result).to.equal('platform/submissions/1/testFileName');
+    });
+
+    it('returns a basic file path without filename', async () => {
+      const result = fileUtils.generateS3FileKey({ submissionId: 1 });
+
+      expect(result).to.equal('platform/submissions/1');
     });
 
     it('returns a long file path', async () => {
@@ -781,11 +741,10 @@ describe.only('file-utils', () => {
     } as unknown as Express.Multer.File;
 
     it('should return true if ClamAV scanner returns as null', async () => {
-      sinon.stub(fileUtils, '_getClamAvScanner')
-        .returns(null);
+      sinon.stub(fileUtils, '_getClamAvScanner').returns(null);
 
       const result = await fileUtils.scanFileForVirus(mockFile);
-      
+
       expect(result).to.equal(true);
     });
 
@@ -796,27 +755,16 @@ describe.only('file-utils', () => {
 
       sinonSandbox = sinon.createSandbox();
 
-      const mockClamAvScanner = clamd.createScanner(
-        process.env.CLAMAV_HOST,
-        Number(process.env.CLAMAV_PORT)
-      );
+      const mockClamAvScanner = clamd.createScanner(process.env.CLAMAV_HOST, Number(process.env.CLAMAV_PORT));
 
-      sinonSandbox
-        .stub(clamd, 'createScanner')
-        .returns(mockClamAvScanner);
+      sinonSandbox.stub(clamd, 'createScanner').returns(mockClamAvScanner);
 
-      const scanBufferStub = sinonSandbox
-        .stub(mockClamAvScanner, 'scanBuffer')
-        .resolves('virus FOUND');
+      const scanBufferStub = sinonSandbox.stub(mockClamAvScanner, 'scanBuffer').resolves('virus FOUND');
 
       const result = await fileUtils.scanFileForVirus(mockFile);
 
       expect(scanBufferStub).to.have.been.calledOnce;
-      expect(scanBufferStub).to.have.been.calledWith(
-        'test-buffer',
-        3000,
-        1048576
-      )
+      expect(scanBufferStub).to.have.been.calledWith('test-buffer', 3000, 1048576);
       expect(result).to.equal(false);
     });
 
@@ -827,14 +775,9 @@ describe.only('file-utils', () => {
 
       sinonSandbox = sinon.createSandbox();
 
-      const mockClamAvScanner = clamd.createScanner(
-        process.env.CLAMAV_HOST,
-        Number(process.env.CLAMAV_PORT)
-      );
+      const mockClamAvScanner = clamd.createScanner(process.env.CLAMAV_HOST, Number(process.env.CLAMAV_PORT));
 
-      sinonSandbox
-        .stub(clamd, 'createScanner')
-        .returns(mockClamAvScanner);
+      sinonSandbox.stub(clamd, 'createScanner').returns(mockClamAvScanner);
 
       const scanBufferStub = sinonSandbox
         .stub(mockClamAvScanner, 'scanBuffer')
@@ -843,11 +786,7 @@ describe.only('file-utils', () => {
       const result = await fileUtils.scanFileForVirus(mockFile);
 
       expect(scanBufferStub).to.have.been.calledOnce;
-      expect(scanBufferStub).to.have.been.calledWith(
-        'test-buffer',
-        3000,
-        1048576
-      )
+      expect(scanBufferStub).to.have.been.calledWith('test-buffer', 3000, 1048576);
       expect(result).to.equal(true);
     });
   });

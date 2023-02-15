@@ -1,5 +1,13 @@
 import AWS, { AWSError } from 'aws-sdk';
-import { CopyObjectOutput, DeleteObjectOutput, GetObjectOutput, HeadObjectOutput, ListObjectsOutput, ManagedUpload, Metadata } from 'aws-sdk/clients/s3';
+import {
+  CopyObjectOutput,
+  DeleteObjectOutput,
+  GetObjectOutput,
+  HeadObjectOutput,
+  ListObjectsOutput,
+  ManagedUpload,
+  Metadata
+} from 'aws-sdk/clients/s3';
 import { PromiseResult } from 'aws-sdk/lib/request';
 import clamd from 'clamdjs';
 import { S3_ROLE } from '../constants/roles';
@@ -111,9 +119,7 @@ export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput 
     return null;
   }
 
-  return s3Client
-    .deleteObject({ Bucket: _getObjectStoreBucketName(), Key: key })
-    .promise();
+  return s3Client.deleteObject({ Bucket: _getObjectStoreBucketName(), Key: key }).promise();
 }
 
 /**
@@ -133,9 +139,7 @@ export async function moveFileInS3(oldKey: string, newKey: string): Promise<Prom
     Key: newKey
   };
 
-  return s3Client
-    .copyObject(copyparams)
-    .promise();
+  return s3Client.copyObject(copyparams).promise();
 }
 
 /**
@@ -231,12 +235,11 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
     return null;
   }
 
-  return s3Client
-    .getSignedUrl('getObject', {
-      Bucket: _getObjectStoreBucketName(),
-      Key: key,
-      Expires: 300000 // 5 minutes
-    });
+  return s3Client.getSignedUrl('getObject', {
+    Bucket: _getObjectStoreBucketName(),
+    Key: key,
+    Expires: 300000 // 5 minutes
+  });
 }
 
 /**
@@ -250,9 +253,7 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 export const listFilesFromS3 = async (path: string): Promise<ListObjectsOutput> => {
   const s3Client = _getS3Client();
 
-  return s3Client
-    .listObjects({ Bucket: _getObjectStoreBucketName(), Prefix: path })
-    .promise();
+  return s3Client.listObjects({ Bucket: _getObjectStoreBucketName(), Prefix: path }).promise();
 };
 
 /**
@@ -265,9 +266,7 @@ export const listFilesFromS3 = async (path: string): Promise<ListObjectsOutput> 
 export async function getObjectMeta(key: string): Promise<HeadObjectOutput> {
   const s3Client = _getS3Client();
 
-  return s3Client
-    .headObject({ Bucket: _getObjectStoreBucketName(), Key: key })
-    .promise();
+  return s3Client.headObject({ Bucket: _getObjectStoreBucketName(), Key: key }).promise();
 }
 
 /**
