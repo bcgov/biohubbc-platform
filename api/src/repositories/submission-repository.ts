@@ -16,9 +16,15 @@ export interface ISearchSubmissionCriteria {
   spatial?: string;
 }
 
-export interface IInsertSubmissionRecord {
+export interface ISubmissionRecord {
+  submission_id?: number;
   source_transform_id: number;
   uuid: string;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
 }
 
 export interface ISubmissionRecordWithSpatial {
@@ -34,21 +40,14 @@ export interface ISubmissionRecordWithSpatial {
  * @interface ISubmissionModel
  */
 export interface ISubmissionModel {
-  submission_id: number;
+  submission_id?: number;
   source_transform_id: number;
   uuid: string;
-  record_effective_date: string;
-  record_end_date: string | null;
-  input_key: string | null;
-  input_file_name: string | null;
-  eml_source: string | null;
-  eml_json_source: string | null;
-  darwin_core_source: string | null;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
+  create_date?: string;
+  create_user?: number;
+  update_date?: string | null;
+  update_user?: number | null;
+  revision_count?: number;
 }
 
 export interface ISubmissionModelWithStatus extends ISubmissionModel {
@@ -112,6 +111,50 @@ export enum SUBMISSION_MESSAGE_TYPE {
   'DEBUG' = 'Debug'
 }
 
+export interface ISubmissionJobQueue {
+  submission_job_queue_id: number;
+  submission_id: number;
+  key?: string;
+  job_start_timestamp: string;
+  job_end_timestamp: string;
+  security_request?: string; //jsonb might need any
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
+export interface ISubmissionMetadataRecord {
+  submission_metadata_id?: number;
+  submission_id: number;
+  eml_source: string;
+  eml_json_source?: any;
+  record_effective_timestamp?: string | null;
+  record_end_timestamp?: string | null;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
+export interface ISubmissionObservationRecord {
+  submission_observation_id?: number;
+  submission_id: number;
+  darwin_core_source: any;
+  submission_security_request?: string | null;
+  security_review_timestamp?: string | null;
+  foi_reason_description?: string | null;
+  record_effective_timestamp?: string | null;
+  record_end_timestamp?: string | null;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
 /**
  * A repository class for accessing submission data.
  *
@@ -168,11 +211,11 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {IInsertSubmissionRecord} submissionData
+   * @param {ISubmissionRecord} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
@@ -204,11 +247,13 @@ export class SubmissionRepository extends BaseRepository {
    * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
    * and infer that the query ran successfully.
    *
-   * @param {IInsertSubmissionRecord} submissionData The submission record
+   * @param {ISubmissionModel} submissionData The submission record
    * @return {*} {Promise<{ submission_id: number }>} The primary key of the submission
    * @memberof SubmissionRepository
    */
-  async getOrInsertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
+  ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
@@ -226,39 +271,7 @@ export class SubmissionRepository extends BaseRepository {
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get or insert submission record', [
-        'SubmissionRepository->getOrInsertSubmissionRecord',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Update the `input_key` column of a submission record.
-   *
-   * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['input_key']} inputKey
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission
-      SET
-        input_key = ${inputKey}
-      WHERE
-        submission_id = ${submissionId}
-      RETURNING
-        submission_id;
-    `;
-
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
-        'SubmissionRepository->updateSubmissionRecordInputKey',
+        'SubmissionRepository->insertSubmissionRecordWithPotentialConflict',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -270,28 +283,35 @@ export class SubmissionRepository extends BaseRepository {
    * Update the `eml_source` column of a submission record.
    *
    * @param {number} submissionId
+   * @param {number} submissionMetadataId
    * @param {EMLFile} file
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
+  async updateSubmissionMetadataEMLSource(
+    submissionId: number,
+    submissionMetadataId: number,
+    file: EMLFile
+  ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
       UPDATE
-        submission
+        submission_metadata
       SET
-      eml_source = ${file.emlFile.buffer.toString()}
+        eml_source = ${file.emlFile.buffer.toString()}
       WHERE
         submission_id = ${submissionId}
+        AND
+        submission_metadata_id =${submissionMetadataId}
       RETURNING
-        submission_id;
+        submission_metadata_id;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record source', [
-        'SubmissionRepository->updateSubmissionRecordEMLSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update submission Metadata source', [
+        'SubmissionRepository->updateSubmissionMetadataEMLSource',
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -299,34 +319,38 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update the `eml_json_source` column of a submission record.
+   * Update the `eml_json_source` column of a submission metadata.
    *
    * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {number} submissionMetadataId
+   * @param {ISubmissionMetadataRecord['eml_json_source']} EMLJSONSource
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordEMLJSONSource(
+  async updateSubmissionMetadataEMLJSONSource(
     submissionId: number,
-    EMLJSONSource: string
-  ): Promise<{ submission_id: number }> {
+    submissionMetadataId: number,
+    EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
+  ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
       UPDATE
-        submission
+        submission_metadata
       SET
-      eml_json_source = ${EMLJSONSource}
+        eml_json_source = ${EMLJSONSource}
       WHERE
         submission_id = ${submissionId}
+      AND
+        submission_metadata_id =${submissionMetadataId}
       RETURNING
-        submission_id;
+        submission_metadata_id;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record eml json', [
-        'SubmissionRepository->updateSubmissionRecordEMLJSONSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update submission Metadata eml json', [
+        'SubmissionRepository->updateSubmissionMetadataEMLJSONSource',
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -352,10 +376,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
         'SubmissionRepository->getSubmissionRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -421,7 +445,7 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           features_array #> '{properties, type}' spatial_type,
           count(features_array #> '{properties, type}')::integer count
-        FROM 
+        FROM
           submission_spatial_component ssc,
           jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
           submission s
@@ -454,11 +478,11 @@ export class SubmissionRepository extends BaseRepository {
       .with(
         'with_filtered_spatial_component_with_security_transforms',
         knex.raw(`
-          SELECT 
+          SELECT
             array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms,
             ssc.spatial_component,
             ssc.secured_spatial_component
-          FROM 
+          FROM
             submission_spatial_component ssc,
             security_transform_submission sts,
             submission s
@@ -473,7 +497,7 @@ export class SubmissionRepository extends BaseRepository {
       .with(
         'combined_spatial_components',
         knex.raw(`
-          SELECT 
+          SELECT
           case
             when
               wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
@@ -489,7 +513,7 @@ export class SubmissionRepository extends BaseRepository {
       .with(
         'results',
         knex.raw(`
-          SELECT 
+          SELECT
             features_array #> '{properties, type}' spatial_type,
             count(features_array #> '{properties, type}')::integer count
           FROM
@@ -503,38 +527,6 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.knex<ISpatialComponentCount>(queryBuilder);
     return response.rows;
-  }
-  /**
-   * Update record_end_date of submission id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async setSubmissionEndDateById(submissionId: number): Promise<{ submission_id: number }> {
-    const sqlStatement = SQL`
-    UPDATE
-      submission
-    SET
-      record_end_date = now()
-    WHERE
-      submission_id = ${submissionId}
-    AND
-      record_end_date is null
-    RETURNING
-      submission_id;
-  `;
-
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update end date in submission record', [
-        'SubmissionRepository->setSubmissionEndDateById',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
   }
 
   /**
@@ -557,10 +549,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.knex<ISourceTransformModel>(queryBuilder);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySystemUserId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -578,10 +570,10 @@ export class SubmissionRepository extends BaseRepository {
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
     const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
         'SubmissionRepository->getSubmissionMetadataJson',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -607,10 +599,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySourceTransformId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -774,10 +766,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -785,37 +777,255 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update darwin_core_source field in submission table
+   * Fetch row of submission job queue by submission Id
    *
    * @param {number} submissionId
-   * @param {string} normalizedData
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<ISubmissionJobQueue>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordDWCSource(
-    submissionId: number,
-    normalizedData: string
-  ): Promise<{ submission_id: number }> {
+  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
     const sqlStatement = SQL`
-      UPDATE
-        submission
-      SET
-        darwin_core_source = ${normalizedData}
+      SELECT
+        *
+      FROM
+        submission_job_queue
       WHERE
-        submission_id = ${submissionId}
-      RETURNING
-        submission_id;
+        submission_id = ${submissionId} ORDER BY CREATE_DATE DESC LIMIT 1
+      ;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql<ISubmissionJobQueue>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record darwin core source', [
-        'SubmissionRepository->updateSubmissionRecordDWCSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
+        'SubmissionRepository->getSubmissionJobQueue',
+        'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Update end time for the most recently stated record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionJobQueueEndTime(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_job_queue
+      SET
+        job_end_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        job_end_timestamp IS NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount;
+  }
+
+  /**
+   * Insert a new metadata record
+   *
+   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionMetadataRecord(
+    submissonMetadata: ISubmissionMetadataRecord
+  ): Promise<{ submission_metadata_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_metadata (
+        submission_id,
+        eml_source,
+        eml_json_source
+      ) VALUES (
+        ${submissonMetadata.submission_id},
+        ${submissonMetadata.eml_source},
+        ${submissonMetadata.eml_json_source}
+      )
+      RETURNING
+        submission_metadata_id
+      ;
+    `;
+
+    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to insert submission metadata record', [
+        'SubmissionRepository->insertSubmissionMetadataRecord',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert a new Observation Record
+   *
+   * @param {ISubmissionObservationRecord} submissonObservation
+   * @return {*}  {Promise<{ submission_observation_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionObservationRecord(
+    submissonObservation: ISubmissionObservationRecord
+  ): Promise<{ submission_observation_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_observation (
+        submission_id,
+        darwin_core_source,
+        submission_security_request,
+        foi_reason_description
+      ) VALUES (
+        ${submissonObservation.submission_id},
+        ${submissonObservation.darwin_core_source},
+        ${submissonObservation.submission_security_request},
+        ${submissonObservation.foi_reason_description}
+      )
+      RETURNING
+        submission_observation_id
+      ;
+    `;
+
+    const response = await this.connection.sql<{ submission_observation_id: number }>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to insert submission observation record', [
+        'SubmissionRepository->insertSubmissionObservationRecord',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update record_end_timestamp of submission id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_metadata
+      SET
+        record_end_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        record_end_timestamp IS NULL
+      AND
+        record_effective_timestamp IS NOT NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount;
+  }
+
+  /**
+   * Update start time stamp of submission metadata record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_metadata
+      SET
+        record_effective_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        record_effective_timestamp IS NULL
+      AND
+        record_end_timestamp IS NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission metadata record', [
+        'SubmissionRepository->updateSubmissionMetadataRecordEffectiveDate',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rowCount;
+  }
+
+  /**
+   * Update end time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_observation
+      SET
+        record_end_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        record_end_timestamp IS NULL
+      AND
+        record_effective_timestamp IS NOT NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount;
+  }
+
+  /**
+   * Update start time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionObservationRecordEffectiveDate(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_observation
+      SET
+        record_effective_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        record_effective_timestamp IS NULL
+      AND
+        record_end_timestamp IS NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission Observation record', [
+        'SubmissionRepository->updateSubmissionObservationRecordEffectiveDate',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rowCount;
   }
 }

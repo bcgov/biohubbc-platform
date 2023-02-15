@@ -1,3 +1,4 @@
+import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
@@ -9,6 +10,7 @@ import { UserObject } from '../models/user';
 import {
   ISearchSubmissionCriteria,
   ISourceTransformModel,
+  ISubmissionJobQueue,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -57,35 +59,38 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('updateSubmissionRecordInputKey', () => {
-    it('should return submission_id on update', async () => {
+  describe('insertSubmissionRecordWithPotentialConflict', () => {
+    it('should return submission_id on get or insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordInputKey')
+        .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 1 });
 
-      const response = await submissionService.updateSubmissionRecordInputKey(1, 'test');
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
+        uuid: '',
+        source_transform_id: 1
+      });
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
     });
   });
 
-  describe('updateSubmissionRecordEMLSource', () => {
+  describe('updateSubmissionMetadataEMLSource', () => {
     it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordEMLSource')
-        .resolves({ submission_id: 1 });
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataEMLSource')
+        .resolves({ submission_metadata_id: 1 });
 
-      const response = await submissionService.updateSubmissionRecordEMLSource(1, { emlFile: {} } as EMLFile);
+      const response = await submissionService.updateSubmissionMetadataEMLSource(1, 1, { emlFile: {} } as EMLFile);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql({ submission_metadata_id: 1 });
     });
   });
 
@@ -95,13 +100,13 @@ describe('SubmissionService', () => {
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordEMLJSONSource')
-        .resolves({ submission_id: 1 });
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataEMLJSONSource')
+        .resolves({ submission_metadata_id: 1 });
 
-      const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 'test');
+      const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 1, 'test');
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql({ submission_metadata_id: 1 });
     });
   });
 
@@ -135,19 +140,63 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('setSubmissionEndDateById', () => {
+  describe('updateSubmissionMetadataRecordEndDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionMetadataRecordEndDate').resolves(1);
+
+      const response = await submissionService.updateSubmissionMetadataRecordEndDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionMetadataRecordEffectiveDate', () => {
     it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'setSubmissionEndDateById')
-        .resolves({ submission_id: 1 });
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataRecordEffectiveDate')
+        .resolves(1);
 
-      const response = await submissionService.setSubmissionEndDateById(1);
+      const response = await submissionService.updateSubmissionMetadataRecordEffectiveDate(1);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEndDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEndDate').resolves(1);
+
+      const response = await submissionService.updateSubmissionObservationRecordEndDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEffectiveDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEffectiveDate')
+        .resolves(1);
+
+      const response = await submissionService.updateSubmissionObservationRecordEffectiveDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
     });
   });
 
@@ -341,35 +390,21 @@ describe('SubmissionService', () => {
   });
 
   describe('getIntakeFileFromS3', () => {
-    it('should throw an error if file does not contain input_key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ uuid: 'validString' } as ISubmissionModel);
-
-      try {
-        await submissionService.getIntakeFileFromS3(1);
-        expect.fail();
-      } catch (actualError) {
-        expect(repo).to.be.calledOnce;
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve input file name');
-      }
-    });
-
     it('should return s3 file', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ input_key: 'validString' } as ISubmissionModel);
-      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves({ Body: 'valid' });
+      const s3File = {
+        Metadata: { filename: 'file1.csv' },
+        ContentType: 'text/csv',
+        Body: null
+      } as unknown as GetObjectOutput;
 
-      const response = await submissionService.getIntakeFileFromS3(1);
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ Body: 'valid' });
+      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves(s3File);
+
+      const response = await submissionService.getIntakeFileFromS3('');
+
+      expect(response).to.be.eql(s3File);
     });
   });
 
@@ -430,22 +465,6 @@ describe('SubmissionService', () => {
         submission_status_id: 2,
         submission_message_id: 1
       });
-    });
-  });
-
-  describe('updateSubmissionRecordDWCSource', () => {
-    it('should return submission id', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordDWCSource')
-        .resolves({ submission_id: 1 });
-
-      const response = await submissionService.updateSubmissionRecordDWCSource(1, 'string');
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
     });
   });
 
@@ -596,6 +615,36 @@ describe('SubmissionService', () => {
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.be.calledOnce;
       });
+    });
+  });
+
+  describe('getSubmissionJobQueue', () => {
+    it('should return a submission job queue record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
+        .resolves({ test: 'test' } as unknown as ISubmissionJobQueue);
+
+      const response = await submissionService.getSubmissionJobQueue(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ test: 'test' });
+    });
+  });
+
+  describe('updateSubmissionJobQueueEndTime', () => {
+    it('should return a submission id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionJobQueueEndTime').resolves(1);
+
+      const response = await submissionService.updateSubmissionJobQueueEndTime(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
     });
   });
 });
