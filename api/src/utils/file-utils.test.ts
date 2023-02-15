@@ -23,7 +23,7 @@ const generateStubs = () => {
   };
 };
 
-describe.only('file-utils', () => {
+describe('file-utils', () => {
   let sinonSandbox: sinon.SinonSandbox;
 
   beforeEach(() => {
