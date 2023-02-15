@@ -13,6 +13,7 @@ import { DarwinCoreService } from './dwc-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 import * as fileUtils from '../utils/file-utils';
+import { S3 } from 'aws-sdk';
 
 chai.use(sinonChai);
 
@@ -939,6 +940,39 @@ describe.only('DarwinCoreService', () => {
       }
     });
   });
+
+  describe.only('getAndPrepFileFromS3', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const dwc = sinon.createStubInstance(DWCArchive)
+      sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns(dwc);
+      const getFile = sinon.stub(SubmissionService.prototype, 'getIntakeFileFromS3').resolves('test' as any as S3.GetObjectOutput);
+      
+      const response = await service.getAndPrepFileFromS3("file-key");
+
+      expect(dwc).to.be.eql(response);
+      expect(getFile).to.be.calledOnce;
+    });
+
+    it('should throw `The source file is not available` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(SubmissionService.prototype, 'getIntakeFileFromS3').resolves(null as any as S3.GetObjectOutput);
+
+      try {
+        await service.getAndPrepFileFromS3("file-key");
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiGeneralError).message).to.equal('The source file is not available');
+      }
+    })
+  });
 });
 
 // describe('DarwinCoreService', () => {
@@ -975,21 +1009,21 @@ describe.only('DarwinCoreService', () => {
 //     }
 //   });
 
-//   it('should succeed', async () => {
-//     const mockDBConnection = getMockDBConnection();
-//     const darwinCoreService = new DarwinCoreService(mockDBConnection);
+  // it('should succeed', async () => {
+  //   const mockDBConnection = getMockDBConnection();
+  //   const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-//     const archiveStub = sinon.createStubInstance(ArchiveFile);
-//     const dwcStub = sinon.createStubInstance(DWCArchive);
+  //   const archiveStub = sinon.createStubInstance(ArchiveFile);
+  //   const dwcStub = sinon.createStubInstance(DWCArchive);
 
-//     sinon.stub(mediaUtils, 'parseUnknownMedia').returns(archiveStub);
-//     const dwcAStub = sinon.stub(dwcUtils, 'DWCArchive').returns(dwcStub);
+  //   sinon.stub(mediaUtils, 'parseUnknownMedia').returns(archiveStub);
+  //   const dwcAStub = sinon.stub(dwcUtils, 'DWCArchive').returns(dwcStub);
 
-//     const response = await darwinCoreService.prepDWCArchive('test' as unknown as UnknownMedia);
+  //   const response = await darwinCoreService.prepDWCArchive('test' as unknown as UnknownMedia);
 
-//     expect(response).to.equal(dwcStub);
-//     expect(dwcAStub).to.be.calledOnce;
-//   });
+  //   expect(response).to.equal(dwcStub);
+  //   expect(dwcAStub).to.be.calledOnce;
+  // });
 // });
 
 // describe.skip('ingestNewDwCADataPackage', () => {
@@ -1953,14 +1987,14 @@ describe.only('DarwinCoreService', () => {
 //     const mockDBConnection = getMockDBConnection();
 //     const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-//     const mockArchiveFile = {
-//       rawFile: {
-//         fileName: 'test'
-//       },
-//       eml: {
-//         buffer: Buffer.from('test')
-//       }
-//     };
+    // const mockArchiveFile = {
+    //   rawFile: {
+    //     fileName: 'test'
+    //   },
+    //   eml: {
+    //     buffer: Buffer.from('test')
+    //   }
+    // };
 
 //     const s3File = {
 //       Metadata: { filename: 'file1.txt' },
