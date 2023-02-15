@@ -1,3 +1,5 @@
+import { Client } from '@elastic/elasticsearch';
+import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
 import { S3 } from 'aws-sdk';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
@@ -15,11 +17,9 @@ import { ArchiveFile, MediaFile } from '../utils/media/media-file';
 import * as mediaUtils from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
+import { ElasticSearchIndices, ESService } from './es-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
-import { WriteResponseBase } from '@elastic/elasticsearch/lib/api/types';
-import { Client } from '@elastic/elasticsearch';
-import { ElasticSearchIndices, ESService } from './es-service';
 
 chai.use(sinonChai);
 
@@ -363,7 +363,7 @@ describe('DarwinCoreService', () => {
 
       try {
         await service.intakeJob_step3(1, mockDWCAFile, 1);
-        expect.fail()
+        expect.fail();
       } catch (error) {
         expect(update).to.not.be.called;
         expect(insertStatus).to.be.calledOnce;
@@ -1134,15 +1134,15 @@ describe('DarwinCoreService', () => {
     afterEach(() => {
       sinon.restore();
     });
-  
+
     it('throws an error if there is no source_transform_id in the submission record', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       sinon
         .stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId')
         .resolves({ id: 1 } as unknown as ISubmissionModel);
-  
+
       try {
         await darwinCoreService.transformAndUploadMetaData(1);
         expect.fail();
@@ -1150,21 +1150,21 @@ describe('DarwinCoreService', () => {
         expect((actualError as Error).message).to.equal('The source_transform_id is not available');
       }
     });
-  
+
     it('throws an error if there is no metadata_transform in the source transform record', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
         submission_id: 1,
         source_transform_id: 2,
         eml_source: 'some eml source'
       } as unknown as ISubmissionModel);
-  
+
       sinon
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
         .resolves({ source_transform_id: 2 } as unknown as ISourceTransformModel);
-  
+
       try {
         await darwinCoreService.transformAndUploadMetaData(1);
         expect.fail();
@@ -1172,23 +1172,23 @@ describe('DarwinCoreService', () => {
         expect((actualError as Error).message).to.equal('The source metadata transform is not available');
       }
     });
-  
+
     it('throws an error if the transformed metadata is null or empty', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
         submission_id: 1,
         source_transform_id: 2,
         eml_source: 'some eml source'
       } as unknown as ISubmissionModel);
-  
+
       sinon
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
         .resolves({ source_transform_id: 2, metadata_transform: 'some transform' } as unknown as ISourceTransformModel);
-  
+
       sinon.stub(SubmissionService.prototype, 'getSubmissionMetadataJson').resolves('');
-  
+
       try {
         await darwinCoreService.transformAndUploadMetaData(1);
         expect.fail();
@@ -1196,30 +1196,30 @@ describe('DarwinCoreService', () => {
         expect((actualError as Error).message).to.equal('The source metadata json is not available');
       }
     });
-  
+
     it('successfully inserts a record into elastic search', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
         submission_id: 1,
         source_transform_id: 2,
         eml_source: 'some eml source',
         uuid: 'uuid'
       } as unknown as ISubmissionModel);
-  
+
       sinon
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySourceTransformId')
         .resolves({ source_transform_id: 2, metadata_transform: 'some transform' } as unknown as ISourceTransformModel);
-  
+
       sinon.stub(SubmissionService.prototype, 'getSubmissionMetadataJson').resolves('transformed metadata');
-  
+
       const uploadToElasticSearchStub = sinon
         .stub(DarwinCoreService.prototype, 'uploadToElasticSearch')
         .resolves('success response' as unknown as WriteResponseBase);
-  
+
       await darwinCoreService.transformAndUploadMetaData(1);
-  
+
       expect(uploadToElasticSearchStub).to.be.calledOnceWith('uuid', 'transformed metadata');
     });
   });
@@ -1228,19 +1228,19 @@ describe('DarwinCoreService', () => {
     afterEach(() => {
       sinon.restore();
     });
-  
+
     it('succeeds with valid values', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       const indexStub = sinon.stub().returns('es response');
-  
+
       sinon.stub(DarwinCoreService.prototype, 'getEsClient').resolves({
         index: indexStub
       } as unknown as Client);
-  
+
       const response = await darwinCoreService.uploadToElasticSearch('dataPackageId', 'convertedEML');
-  
+
       expect(indexStub).to.be.calledOnceWith({
         id: 'dataPackageId',
         index: ElasticSearchIndices.EML,
@@ -1250,27 +1250,27 @@ describe('DarwinCoreService', () => {
     });
   });
 
-    describe('deleteEmlFromElasticSearchByDataPackageId', () => {
-      afterEach(() => {
-        sinon.restore();
-      });
-    
-      it('should succeed and delete old es file', async () => {
-        const mockDBConnection = getMockDBConnection();
-        const darwinCoreService = new DarwinCoreService(mockDBConnection);
-    
-        const esClientStub = sinon.createStubInstance(Client);
-    
-        esClientStub.delete.resolves('dataPackageId eml' as unknown as WriteResponseBase);
-    
-        const getEsClientStub = sinon
-          .stub(ESService.prototype, 'getEsClient')
-          .resolves(esClientStub as unknown as Client);
-    
-        const response = await darwinCoreService.deleteEmlFromElasticSearchByDataPackageId('dataPackageId');
-    
-        expect(getEsClientStub).to.be.calledOnce;
-        expect(response).to.equal('dataPackageId eml');
-      });
+  describe('deleteEmlFromElasticSearchByDataPackageId', () => {
+    afterEach(() => {
+      sinon.restore();
     });
+
+    it('should succeed and delete old es file', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
+
+      const esClientStub = sinon.createStubInstance(Client);
+
+      esClientStub.delete.resolves('dataPackageId eml' as unknown as WriteResponseBase);
+
+      const getEsClientStub = sinon
+        .stub(ESService.prototype, 'getEsClient')
+        .resolves(esClientStub as unknown as Client);
+
+      const response = await darwinCoreService.deleteEmlFromElasticSearchByDataPackageId('dataPackageId');
+
+      expect(getEsClientStub).to.be.calledOnce;
+      expect(response).to.equal('dataPackageId eml');
+    });
+  });
 });
