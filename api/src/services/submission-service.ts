@@ -58,20 +58,10 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getOrInsertSubmissionRecord(submissionData: ISubmissionModel): Promise<{ submission_id: number }> {
-    return this.submissionRepository.getOrInsertSubmissionRecord(submissionData);
-  }
-
-  /**
-   * Update the `input_key` column of a submission record.
-   *
-   * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['input_key']} inputKey
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionRecordInputKey(submissionId: number, inputKey: string): Promise<{ submission_id: number }> {
-    return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(submissionData);
   }
 
   /**

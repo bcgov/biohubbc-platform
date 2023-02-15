@@ -229,7 +229,7 @@ describe.only('file-utils', () => {
     });
   });
 
-  describe('moveFileInS3', () => {
+  describe('copyFileInS3', () => {
     it('copies a file', async () => {
       sinonSandbox = sinon.createSandbox();
       const { _getObjectStoreBucketNameStub } = generateStubs();
@@ -246,7 +246,7 @@ describe.only('file-utils', () => {
           })
       } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
 
-      const result = await fileUtils.moveFileInS3('old-key', 'new-key');
+      const result = await fileUtils.copyFileInS3('old-key', 'new-key');
 
       expect(_getObjectStoreBucketNameStub).to.have.callCount(2);
       expect(copyObjectStub).to.have.been.calledOnce;
@@ -277,7 +277,7 @@ describe.only('file-utils', () => {
       } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
 
       try {
-        await fileUtils.moveFileInS3('old-key', 'new-key');
+        await fileUtils.copyFileInS3('old-key', 'new-key');
         expect.fail();
       } catch (actualError) {
         expect((actualError as AWS.AWSError).message).to.equal('copyObject test reject');

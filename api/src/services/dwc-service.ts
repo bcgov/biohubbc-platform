@@ -8,7 +8,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { deleteFileFromS3, generateS3FileKey, moveFileInS3 } from '../utils/file-utils';
+import { copyFileInS3, deleteFileFromS3, generateS3FileKey } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
@@ -104,23 +104,23 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step2(intakeRecord: ISubmissionJobQueue, submissionMetadataId: number): Promise<DWCArchive> {
     try {
-      if (intakeRecord.key) {
-        const file = await this.getAndPrepFileFromS3(intakeRecord.key);
-
-        if (file.eml) {
-          await this.submissionService.updateSubmissionMetadataEMLSource(
-            intakeRecord.submission_id,
-            submissionMetadataId,
-            file.eml
-          );
-
-          return file;
-        } else {
-          throw new ApiGeneralError('Accessing S3 File, file eml is empty');
-        }
-      } else {
+      if (!intakeRecord.key) {
         throw new ApiGeneralError('No S3 Key given');
       }
+
+      const file = await this.getAndPrepFileFromS3(intakeRecord.key);
+
+      if (!file.eml) {
+        throw new ApiGeneralError('Accessing S3 File, file eml is empty');
+      }
+
+      await this.submissionService.updateSubmissionMetadataEMLSource(
+        intakeRecord.submission_id,
+        submissionMetadataId,
+        file.eml
+      );
+
+      return file;
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
 
@@ -145,16 +145,17 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<void> {
     try {
-      if (file.eml) {
-        const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
-
-        await this.submissionService.updateSubmissionRecordEMLJSONSource(
-          submissionId,
-          submissionMetadataId,
-          JSON.stringify(jsonData)
-        );
+      if (!file.eml) {
+        throw new ApiGeneralError('file eml is empty');
       }
-      // TODO: should this throw an error similar to step 2?
+
+      const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
+
+      await this.submissionService.updateSubmissionRecordEMLJSONSource(
+        submissionId,
+        submissionMetadataId,
+        JSON.stringify(jsonData)
+      );
     } catch (error: any) {
       defaultLog.debug({
         label: 'convertSubmissionEMLtoJSON, updateSubmissionRecordEMLJSONSource',
@@ -274,8 +275,6 @@ export class DarwinCoreService extends DBService {
       await this.submissionService.insertSubmissionStatus(intakeRecord.submission_id, SUBMISSION_STATUS_TYPE.INGESTED);
 
       await this.submissionService.updateSubmissionJobQueueEndTime(intakeRecord.submission_id);
-
-      //TODO: SEND SCHEDULER JOB COMPLETE MESSAGE
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
 
@@ -362,11 +361,10 @@ export class DarwinCoreService extends DBService {
       const submissionObservationData: ISubmissionObservationRecord = {
         submission_id: intakeRecord.submission_id,
         darwin_core_source: dwcaJson,
-        submission_security_request: intakeRecord.security_request,
-        foi_reason_description: null //TODO: Check null
+        submission_security_request: intakeRecord.security_request
       };
 
-      return this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
+      return await this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
     } catch (error: any) {
       defaultLog.debug({ label: 'insertSubmissionObservationRecord', message: 'error', error });
 
@@ -408,7 +406,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Transforming and uploading spaital transforms', error.message);
+      throw new ApiGeneralError('Transforming and uploading spatial transforms', error.message);
     }
   }
 
@@ -438,7 +436,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Transforming and uploading secure spaital transforms', error.message);
+      throw new ApiGeneralError('Transforming and uploading secure spatial transforms', error.message);
     }
   }
 
@@ -458,7 +456,7 @@ export class DarwinCoreService extends DBService {
 
       const newKey = generateS3FileKey({ uuid: submissionRecord.uuid, fileName: fileName });
 
-      await moveFileInS3(intakeRecord.key, newKey);
+      await copyFileInS3(intakeRecord.key, newKey);
 
       const jobQueueFolderKey = generateS3FileKey({
         uuid: submissionRecord.uuid,
