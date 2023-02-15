@@ -7,12 +7,12 @@ import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { ISourceTransformModel, ISubmissionJobQueue, ISubmissionModel } from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
-import * as mediaUtils from '../utils/media/media-utils'
-import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
 import { CSVWorksheet } from '../utils/media/csv/csv-file';
+import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile, MediaFile } from '../utils/media/media-file';
+import * as mediaUtils from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
 import { SpatialService } from './spatial-service';
@@ -1089,21 +1089,21 @@ describe('DarwinCoreService', () => {
       }
     });
 
-  it('should succeed', async () => {
-    const mockDBConnection = getMockDBConnection();
-    const darwinCoreService = new DarwinCoreService(mockDBConnection);
+    it('should succeed', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const darwinCoreService = new DarwinCoreService(mockDBConnection);
 
-    const archiveStub = sinon.createStubInstance(ArchiveFile);
-    const dwcStub = sinon.createStubInstance(DWCArchive);
+      const archiveStub = sinon.createStubInstance(ArchiveFile);
+      const dwcStub = sinon.createStubInstance(DWCArchive);
 
-    sinon.stub(mediaUtils, 'parseUnknownMedia').returns(archiveStub);
-    const dwcAStub = sinon.stub(dwcUtils, 'DWCArchive').returns(dwcStub);
+      sinon.stub(mediaUtils, 'parseUnknownMedia').returns(archiveStub);
+      const dwcAStub = sinon.stub(dwcUtils, 'DWCArchive').returns(dwcStub);
 
-    const response = await darwinCoreService.prepDWCArchive('test' as unknown as mediaUtils.UnknownMedia);
+      const response = await darwinCoreService.prepDWCArchive('test' as unknown as mediaUtils.UnknownMedia);
 
-    expect(response).to.equal(dwcStub);
-    expect(dwcAStub).to.be.calledOnce;
-  });
+      expect(response).to.equal(dwcStub);
+      expect(dwcAStub).to.be.calledOnce;
+    });
   });
 });
 
