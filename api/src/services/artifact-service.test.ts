@@ -86,7 +86,9 @@ describe('ArtifactService', () => {
         .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
 
       // const getOrInsertSubmissionRecordStub =
-      sinon.stub(SubmissionService.prototype, 'getOrInsertSubmissionRecord').resolves({ submission_id: 100 });
+      sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionRecordWithPotentialConflict')
+        .resolves({ submission_id: 100 });
 
       // const getNextArtifactIdsStub =
       sinon.stub(ArtifactService.prototype, 'getNextArtifactIds').resolves([14]);
@@ -113,8 +115,8 @@ describe('ArtifactService', () => {
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
         .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
 
-      const getOrInsertSubmissionRecordStub = sinon
-        .stub(SubmissionService.prototype, 'getOrInsertSubmissionRecord')
+      const insertSubmissionRecordWithPotentialConflictStub = sinon
+        .stub(SubmissionService.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 100 });
 
       const getNextArtifactIdsStub = sinon.stub(ArtifactService.prototype, 'getNextArtifactIds').resolves([14]);
@@ -131,14 +133,14 @@ describe('ArtifactService', () => {
       } catch (actualError) {
         expect(transformRecordStub).to.be.calledWith(20);
 
-        expect(getOrInsertSubmissionRecordStub).to.be.calledWith({
+        expect(insertSubmissionRecordWithPotentialConflictStub).to.be.calledWith({
           source_transform_id: 60,
           uuid: mockDataPackageId
         });
         expect(getNextArtifactIdsStub).to.be.calledWith();
         expect(uploadStub).to.be.calledWith(
           mockFile,
-          `platform/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
+          `platform/artifacts/${14}/${mockDataPackageId}/DwCA/${mockFile.originalname}`,
           { filename: mockFile.originalname }
         );
         expect(insertRecordStub).to.be.calledWith({
@@ -149,7 +151,7 @@ describe('ArtifactService', () => {
           file_size: 1,
           artifact_id: 14,
           submission_id: 100,
-          input_key: `platform/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
+          input_key: `platform/artifacts/${14}/${mockDataPackageId}/DwCA/${mockFile.originalname}`,
           uuid: mockFileUuid
         });
       }

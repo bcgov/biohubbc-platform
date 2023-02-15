@@ -15,7 +15,7 @@ export async function up(knex: Knex): Promise<void> {
     SET SCHEMA '${DB_SCHEMA}';
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
 
-    insert into spatial_transform (name, description, record_effective_date, transform) values ('EML Dataset Boundaries', 'Extracts EML dataset geographic coverage boundaries and properties.', now(), $transform$with submissions as (select eml_json_source from submission where submission_id = ?)
+    insert into spatial_transform (name, description, record_effective_date, transform) values ('EML Dataset Boundaries', 'Extracts EML dataset geographic coverage boundaries and properties.', now(), $transform$with submissions as (select eml_json_source from submission_metadata where submission_id = ? and record_end_timestamp is null)
     , project_coverage as (select c.cov_n, 'project' project_type, c.coverage from submissions, jsonb_path_query(eml_json_source, '$.**.project.studyAreaDescription.**.geographicCoverage') with ordinality c(coverage, cov_n))
     , related_project_coverages as (select c.cov_n, 'relatedProject' project_type, c.coverage from submissions, jsonb_path_query(eml_json_source, '$.**.relatedProject.studyAreaDescription.**.geographicCoverage') with ordinality c(coverage, cov_n))
     , descriptions as (select cov_n, project_type, coverage->'geographicDescription' description from project_coverage union select cov_n, project_type, coverage->'geographicDescription' description from related_project_coverages)

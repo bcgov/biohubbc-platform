@@ -5,7 +5,7 @@ const API_SCHEMA = process.env.DB_SCHEMA_DAPI_V1;
 
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
-    ALTER TABLE ${DB_SCHEMA}.submission_job_queue ADD COLUMN key varchar(1000);
+    ALTER TABLE ${DB_SCHEMA}.submission_job_queue ADD COLUMN key varchar(1000) NOT NULL;
     COMMENT ON COLUMN ${DB_SCHEMA}.submission_job_queue.key IS 'The identifying key to the file in the storage system.';
 
     CREATE OR REPLACE VIEW ${API_SCHEMA}.submission_job_queue as SELECT * FROM ${DB_SCHEMA}.submission_job_queue;

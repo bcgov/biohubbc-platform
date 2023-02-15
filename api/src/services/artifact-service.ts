@@ -81,7 +81,7 @@ export class ArtifactService extends DBService {
     });
 
     // Create a new submission for the artifact collection
-    const { submission_id } = await this.submissionService.getOrInsertSubmissionRecord({
+    const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict({
       source_transform_id: sourceTransformRecord.source_transform_id,
       uuid: dataPackageId
     });

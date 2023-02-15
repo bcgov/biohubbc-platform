@@ -98,7 +98,7 @@ export class SpatialService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSpatialTransforms(submissionId: number): Promise<void> {
+  async runSpatialTransforms(submissionId: number, submissionObservationId: number): Promise<void> {
     const spatialTransformRecords = await this.getSpatialTransformRecords();
 
     const promises1 = spatialTransformRecords.map(async (transformRecord) => {
@@ -109,7 +109,7 @@ export class SpatialService extends DBService {
 
       const promises2 = transformed.map(async (dataPoint) => {
         const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
-          submissionId,
+          submissionObservationId,
           dataPoint.result_data
         );
 
@@ -128,16 +128,16 @@ export class SpatialService extends DBService {
   /**
    *Collect security transforms from db, run transformations on submission id, update the spatial component table
    *
-   * @param {number} submissionId
+   * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSecurityTransforms(submissionId: number): Promise<void> {
+  async runSecurityTransforms(submissionObservationId: number): Promise<void> {
     const spatialTransformRecords = await this.getSecurityTransformRecords();
 
     const promises1 = spatialTransformRecords.map(async (transformRecord) => {
       const transformed = await this.spatialRepository.runSecurityTransformOnSubmissionId(
-        submissionId,
+        submissionObservationId,
         transformRecord.transform
       );
 

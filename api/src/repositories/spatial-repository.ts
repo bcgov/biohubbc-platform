@@ -268,22 +268,22 @@ export class SpatialRepository extends BaseRepository {
   /**
    * Insert given transformed data into Spatial Component Table
    *
-   * @param {number} submissionId
+   * @param {number} submissionObservationId
    * @param {Feature[]} transformedData
    * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
    * @memberof SpatialRepository
    */
   async insertSubmissionSpatialComponent(
-    submissionId: number,
+    submissionObservationId: number,
     transformedData: FeatureCollection
   ): Promise<{ submission_spatial_component_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
-        submission_id,
+        submission_observation_id,
         spatial_component,
         geography
       ) VALUES (
-        ${submissionId},
+        ${submissionObservationId},
         ${JSON.stringify(transformedData)}
     `;
 
