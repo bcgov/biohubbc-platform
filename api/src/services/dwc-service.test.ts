@@ -20,7 +20,7 @@ import { SubmissionService } from './submission-service';
 
 chai.use(sinonChai);
 
-describe.only('DarwinCoreService', () => {
+describe('DarwinCoreService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -1020,11 +1020,11 @@ describe.only('DarwinCoreService', () => {
     afterEach(() => {
       sinon.restore();
     });
-  
+
     it('should succeed', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       const mockArchiveFile = {
         rawFile: {
           fileName: 'test'
@@ -1033,7 +1033,7 @@ describe.only('DarwinCoreService', () => {
           buffer: Buffer.from('test')
         }
       };
-  
+
       const prepDWCArchiveStub = sinon
         .stub(DarwinCoreService.prototype, 'prepDWCArchive')
         .returns(mockArchiveFile as unknown as DWCArchive);
@@ -1043,12 +1043,12 @@ describe.only('DarwinCoreService', () => {
       const getSourceTransformRecordBySystemUserIdStub = sinon
         .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
         .resolves({ source_transform_id: 1 } as unknown as ISourceTransformModel);
-  
+
       const response = await darwinCoreService.ingestNewDwCADataPackage(
         { originalname: 'name' } as unknown as Express.Multer.File,
         'string'
       );
-  
+
       expect(response).to.eql({ dataPackageId: 'string', submissionId: 1 });
       expect(prepDWCArchiveStub).to.be.calledOnce;
       expect(insertSubmissionRecordStub).to.be.calledOnce;
@@ -1060,13 +1060,13 @@ describe.only('DarwinCoreService', () => {
     afterEach(() => {
       sinon.restore();
     });
-  
+
     it('should throw an error when media is invalid or empty', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       sinon.stub(mediaUtils, 'parseUnknownMedia').returns(null);
-  
+
       try {
         await darwinCoreService.prepDWCArchive('test' as unknown as mediaUtils.UnknownMedia);
         expect.fail();
@@ -1074,13 +1074,13 @@ describe.only('DarwinCoreService', () => {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to parse submission');
       }
     });
-  
+
     it('should throw an error when media is not a valid DwC Archive File', async () => {
       const mockDBConnection = getMockDBConnection();
       const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
       sinon.stub(mediaUtils, 'parseUnknownMedia').returns('test' as unknown as MediaFile);
-  
+
       try {
         await darwinCoreService.prepDWCArchive('test' as unknown as mediaUtils.UnknownMedia);
         expect.fail();
@@ -1088,19 +1088,19 @@ describe.only('DarwinCoreService', () => {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to parse submission');
       }
     });
-  
+
   it('should succeed', async () => {
     const mockDBConnection = getMockDBConnection();
     const darwinCoreService = new DarwinCoreService(mockDBConnection);
-  
+
     const archiveStub = sinon.createStubInstance(ArchiveFile);
     const dwcStub = sinon.createStubInstance(DWCArchive);
-  
+
     sinon.stub(mediaUtils, 'parseUnknownMedia').returns(archiveStub);
     const dwcAStub = sinon.stub(dwcUtils, 'DWCArchive').returns(dwcStub);
-  
+
     const response = await darwinCoreService.prepDWCArchive('test' as unknown as mediaUtils.UnknownMedia);
-  
+
     expect(response).to.equal(dwcStub);
     expect(dwcAStub).to.be.calledOnce;
   });
