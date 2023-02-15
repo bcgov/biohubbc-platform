@@ -260,4 +260,42 @@ describe('SubmissionJobQueueRepository', () => {
       }
     });
   });
+
+  describe('incrementAttemptCount', () => {
+    it('should run and return nothing', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ submission_job_queue_id: 1 }]
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
+
+      const jobQueueId = 1;
+
+      const result = await repo.incrementAttemptCount(jobQueueId);
+
+      expect(result).to.be.undefined;
+    });
+
+    it('should throw an error if rowCount is not 1', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const repo = new SubmissionJobQueueRepository(mockDBConnection);
+
+      const jobQueueId = 1;
+
+      try {
+        await repo.incrementAttemptCount(jobQueueId);
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to increment queue record attempts');
+      }
+    });
+  });
 });
