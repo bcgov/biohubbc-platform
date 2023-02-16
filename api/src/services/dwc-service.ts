@@ -322,7 +322,10 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runTransformsOnObservations(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
+  async runTransformsOnObservations(
+    intakeRecord: ISubmissionJobQueueRecord,
+    submissionObservationId: number
+  ): Promise<void> {
     try {
       await this.runSpatialTransforms(intakeRecord, submissionObservationId);
 
