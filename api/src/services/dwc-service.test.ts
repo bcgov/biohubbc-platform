@@ -596,13 +596,11 @@ describe('DarwinCoreService', () => {
 
       const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').resolves();
       const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-      const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves();
 
       await service.intakeJob_finishIntake(mockJobQueue);
 
       expect(update).to.be.calledOnce;
       expect(insert).to.be.calledOnce;
-      expect(updateTime).to.be.calledOnce;
     });
 
     it('should throw `Transforming and uploading` error', async () => {
@@ -617,7 +615,6 @@ describe('DarwinCoreService', () => {
 
       const updateS3 = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
       const insertSubmissionStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-      const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
@@ -627,7 +624,6 @@ describe('DarwinCoreService', () => {
         expect(updateS3).to.be.called;
         expect(insertErrorStatus).to.be.called;
         expect(insertSubmissionStatus).not.to.be.called;
-        expect(updateTime).not.to.be.called;
       }
     });
   });

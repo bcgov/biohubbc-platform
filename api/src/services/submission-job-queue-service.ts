@@ -120,14 +120,18 @@ export class SubmissionJobQueueService extends DBService {
    * concurrently) (integer > 0).
    * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
    * (integer >= 1).
+   * @param {number} [timeout] The maximum time a job can run before it is considered timed out. In this case, the
+   * timeout is used to fetch any records that had been started, but experienced an issue that caused them
+   * to fail and also not properly reset their start time. This scenario is expected to occur rarely if not never.
    * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
    * @memberof JobQueueService
    */
   async getNextUnprocessedJobQueueRecords(
     concurrency?: number,
-    attempts?: number
+    attempts?: number,
+    timeout?: number
   ): Promise<ISubmissionJobQueueRecord[]> {
-    return this.jobQueueRepository.getNextUnprocessedJobQueueRecords(concurrency, attempts);
+    return this.jobQueueRepository.getNextUnprocessedJobQueueRecords(concurrency, attempts, timeout);
   }
 
   /**

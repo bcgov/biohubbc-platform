@@ -717,28 +717,6 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('updateSubmissionJobQueueEndTime', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.updateSubmissionJobQueueEndTime(1);
-
-      expect(response).to.eql(1);
-    });
-  });
-
   describe('insertSubmissionMetadataRecord', () => {
     afterEach(() => {
       sinon.restore();

@@ -807,31 +807,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update end time for the most recently stated record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionJobQueueEndTime(submissionId: number): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_job_queue
-      SET
-        job_end_timestamp = now()
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        job_end_timestamp IS NULL
-      ;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    return response.rowCount;
-  }
-
-  /**
    * Insert a new metadata record
    *
    * @param {ISubmissionMetadataRecord} submissonMetadata

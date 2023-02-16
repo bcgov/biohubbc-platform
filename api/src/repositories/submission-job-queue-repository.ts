@@ -136,32 +136,48 @@ export class SubmissionJobQueueRepository extends BaseRepository {
     const knex = getKnex();
     const queryBuilder = knex
       .queryBuilder()
-      .with('latest_submission', (qb1) => {
+      .with('latest_submission', (qb) => {
         // Given multiple queue records with the same submission id, only return the latest queue record id for that
         // submission id.
-        qb1
-          .select(knex.raw('max(submission_job_queue_id) as submission_job_queue_id'), 'submission_id')
-          .from('submission_job_queue')
-          .groupBy('submission_id')
+        qb.select(knex.raw('max(submission_job_queue_id) as submission_job_queue_id'), 'sjq1.submission_id')
+          .from({ sjq1: 'submission_job_queue' })
+          .whereNotExists(
+            // Exclude all queue records based on submission id if for a given submission id there exists a record
+            // with a non null start timestamp. This indicates that the submission id is already being processed, and
+            // subsequent submissions under the same submission id should not be started due to the risk of
+            // concurrent jobs for the same submission id interfering with one another.
+            knex
+              .select('sub.submission_id')
+              .from({ sub: 'submission_job_queue' })
+              .where(knex.raw('sub.submission_id = sjq1.submission_id'))
+              .andWhere('sub.job_start_timestamp', 'is not', null)
+              .andWhere('sub.job_end_timestamp', null)
+              // Don't exclude records that are started, but not finished, but which are older than the timeout time.
+              // This is to handle a rare scenario where the node process exits after a record is started, but before
+              // the job is executed and therefore couldn't run its intended reject function to clean itself up.
+              .andWhere(knex.raw(`sub.job_start_timestamp > NOW() - INTERVAL '${timeout} milliseconds'`))
+              .groupBy('sub.submission_id')
+          )
+          .groupBy('sjq1.submission_id')
           .orderBy('submission_job_queue_id', 'ASC');
       })
       .select()
-      .from({ sjq: 'submission_job_queue' })
-      .rightJoin({ ls: 'latest_submission' }, 'sjq.submission_job_queue_id', 'ls.submission_job_queue_id')
-      .where('sjq.job_end_timestamp', null)
-      .andWhere((qb2) => {
-        qb2.orWhere('sjq.job_start_timestamp', null);
+      .from({ sjq2: 'submission_job_queue' })
+      .rightJoin({ ls: 'latest_submission' }, 'sjq2.submission_job_queue_id', 'ls.submission_job_queue_id')
+      .where('sjq2.job_end_timestamp', null)
+      .andWhere((qb) => {
+        qb.orWhere('sjq2.job_start_timestamp', null);
         if (timeout) {
-          // Fetch records that are started, but not finished, but which are older than the timeout time.
+          // Also fetch records that are started, but not finished, but which are older than the timeout time.
           // This is to handle a rare scenario where the node process exits after a record is started, but before the
           // job is executed and therefore couldn't run its intended reject function to clean itself up.
-          qb2.orWhere(knex.raw(`sjq.job_start_timestamp < NOW() - INTERVAL '${timeout} milliseconds'`));
+          qb.orWhere(knex.raw(`sjq2.job_start_timestamp < NOW() - INTERVAL '${timeout} milliseconds'`));
         }
       });
 
     if (attempts) {
       // Only fetch records that have been attempted fewer times than the specified maximum attempts limit.
-      queryBuilder.andWhere('sjq.attempt_count', '<', attempts);
+      queryBuilder.andWhere('sjq2.attempt_count', '<', attempts);
     }
 
     if (concurrency) {

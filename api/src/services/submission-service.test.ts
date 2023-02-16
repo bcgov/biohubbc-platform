@@ -633,18 +633,4 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql({ test: 'test' });
     });
   });
-
-  describe('updateSubmissionJobQueueEndTime', () => {
-    it('should return a submission id on update', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionJobQueueEndTime').resolves(1);
-
-      const response = await submissionService.updateSubmissionJobQueueEndTime(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql(1);
-    });
-  });
 });

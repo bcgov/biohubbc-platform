@@ -110,12 +110,10 @@ export class QueueScheduler {
       this._queue.setJobQueueConcurrency(this._concurrency);
       // Update the internal timeout tracked by the queue
       this._queue.setJobTimeout(this._timeout);
-
-      await connection.commit();
     } catch (error) {
       defaultLog.error({ label: '_updateJobQueueSettings', message: 'error', error });
-      connection.rollback();
     } finally {
+      await connection.commit();
       connection.release();
     }
 
@@ -173,7 +171,8 @@ export class QueueScheduler {
       // Fetch the next batch of unprocessed job queue records
       const nextJobQueueRecords = await jobQueueService.getNextUnprocessedJobQueueRecords(
         this._concurrency,
-        this._attempts
+        this._attempts,
+        this._timeout
       );
 
       await connection.commit();
@@ -207,7 +206,10 @@ export class QueueScheduler {
       await connection.commit();
     } catch (error) {
       defaultLog.error({ label: '_processJobQueueRecord', message: 'start error', error });
-      connection.rollback();
+      await connection.rollback();
+
+      // Failed to update start time, return early
+      return;
     } finally {
       connection.release();
     }

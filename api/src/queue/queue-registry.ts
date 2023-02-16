@@ -47,13 +47,11 @@ export function jobQueueAttemptsWrapper(queueJob: QueueJob): QueueJob {
       const jobQueueService = new SubmissionJobQueueService(connection);
       // Increment job queue record attempts count
       await jobQueueService.incrementAttemptCount(jobQueueRecord.submission_job_queue_id);
-
-      await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'wrappedQueueJob', message: 'error', error });
-      await connection.rollback();
       throw error;
     } finally {
+      await connection.commit();
       connection.release();
     }
 
@@ -77,13 +75,11 @@ export async function dwcDatasetSubmissionJob(jobQueueRecord: ISubmissionJobQueu
     const darwinCoreService = new DarwinCoreService(connection);
     // Run darwin core intake job
     await darwinCoreService.intakeJob(jobQueueRecord);
-
-    await connection.commit();
   } catch (error) {
     defaultLog.error({ label: 'dwcDatasetSubmissionJob', message: 'error', error });
-    await connection.rollback();
     throw error;
   } finally {
+    await connection.commit();
     connection.release();
   }
 }

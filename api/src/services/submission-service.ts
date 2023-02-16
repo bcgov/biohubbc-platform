@@ -414,17 +414,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Update end time for the most recently stated record
-   *
-   * @param {number} submissionId
-   * @return {*}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionJobQueueEndTime(submissionId: number) {
-    return this.submissionRepository.updateSubmissionJobQueueEndTime(submissionId);
-  }
-
-  /**
    * Insert a new metadata record
    *
    * @param {ISubmissionMetadataRecord} submissonMetadata

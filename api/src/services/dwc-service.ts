@@ -273,8 +273,6 @@ export class DarwinCoreService extends DBService {
       await this.updateS3FileLocation(intakeRecord);
 
       await this.submissionService.insertSubmissionStatus(intakeRecord.submission_id, SUBMISSION_STATUS_TYPE.INGESTED);
-
-      await this.submissionService.updateSubmissionJobQueueEndTime(intakeRecord.submission_id);
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
 
