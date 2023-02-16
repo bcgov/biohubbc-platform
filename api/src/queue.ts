@@ -8,7 +8,7 @@ const defaultLog = getLogger('queue');
 try {
   initDBPool(defaultPoolConfig);
 
-  new QueueScheduler();
+  new QueueScheduler().start();
 
   defaultLog.info({ label: 'queue', message: 'started queue' });
 } catch (error) {

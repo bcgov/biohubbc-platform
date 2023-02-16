@@ -10,7 +10,7 @@ import { UserObject } from '../models/user';
 import {
   ISearchSubmissionCriteria,
   ISourceTransformModel,
-  ISubmissionJobQueue,
+  ISubmissionJobQueueRecord,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -625,7 +625,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
-        .resolves({ test: 'test' } as unknown as ISubmissionJobQueue);
+        .resolves({ test: 'test' } as unknown as ISubmissionJobQueueRecord);
 
       const response = await submissionService.getSubmissionJobQueue(1);
 

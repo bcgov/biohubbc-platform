@@ -1,6 +1,10 @@
 import { getAPIUserDBConnection } from '../database/db';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
+import { DarwinCoreService } from '../services/dwc-service';
 import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
+import { getLogger } from '../utils/logger';
+
+const defaultLog = getLogger('queue/queue-registry');
 
 type QueueJob = (jobQueueRecord: ISubmissionJobQueueRecord) => Promise<any>;
 
@@ -13,9 +17,15 @@ export const QueueJobRegistry = {
   registry: [
     {
       name: DWC_DATASET_SUBMISSION_JOB,
-      generator: jobQueueAttemptsWrapper(getTestJob('random', 10000))
+      generator: jobQueueAttemptsWrapper(dwcDatasetSubmissionJob)
     }
   ],
+  /**
+   * Find a job in the registry.
+   *
+   * @param {string} name The name of the job in the registry.
+   * @return {*}  {(QueueJob | undefined)}
+   */
   findMatchingJob(name: string): QueueJob | undefined {
     return this.registry.find((item) => item.name === name)?.generator;
   }
@@ -30,14 +40,22 @@ export const QueueJobRegistry = {
 export function jobQueueAttemptsWrapper(queueJob: QueueJob): QueueJob {
   return async function wrappedQueueJob(jobQueueRecord: ISubmissionJobQueueRecord) {
     const connection = getAPIUserDBConnection();
-    await connection.open();
 
-    // Increment attempt count
-    const jobQueueService = new SubmissionJobQueueService(connection);
-    await jobQueueService.incrementAttemptCount(jobQueueRecord.submission_job_queue_id);
+    try {
+      await connection.open();
 
-    await connection.commit();
-    connection.release();
+      const jobQueueService = new SubmissionJobQueueService(connection);
+      // Increment job queue record attempts count
+      await jobQueueService.incrementAttemptCount(jobQueueRecord.submission_job_queue_id);
+
+      await connection.commit();
+    } catch (error) {
+      defaultLog.error({ label: 'wrappedQueueJob', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
     // Execute original job function
     return queueJob(jobQueueRecord);
@@ -45,31 +63,27 @@ export function jobQueueAttemptsWrapper(queueJob: QueueJob): QueueJob {
 }
 
 /**
- * Returns a job queue generator function that auto resolves or rejects after a random timeout.
+ * Function that runs the Darwin Core intake job.
  *
- * @param {('resolve' | 'reject' | 'random')} type controls the behaviour of the test function.
- * - `resolve` will always resolve
- * - `reject` will always reject
- * - `random` will resolve when timeout is even, reject when timeout is odd.
- * @param {number} maxTimeout maximum time before auto resolving or rejecting. If `type` is set to `random`, `timeout`
- * will be used as the maximum timeout when generating random timeouts.
- * @return {*}  {QueueJob}
+ * @export
+ * @param {ISubmissionJobQueueRecord} jobQueueRecord
  */
-function getTestJob(type: 'resolve' | 'reject' | 'random', maxTimeout: number): QueueJob {
-  return function testJob(jobQueueRecord: ISubmissionJobQueueRecord) {
-    return new Promise((resolve, reject) => {
-      const randomTimeout = Math.round(Math.random() * maxTimeout);
-      if (type === 'resolve') {
-        setTimeout(() => resolve(`Resolved: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
-      } else if (type === 'reject') {
-        setTimeout(() => reject(`Rejected: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
-      } else {
-        if (randomTimeout % 2 === 0) {
-          setTimeout(() => resolve(`Resolved: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
-        } else {
-          setTimeout(() => reject(`Rejected: ${jobQueueRecord.submission_job_queue_id}`), randomTimeout);
-        }
-      }
-    });
-  };
+export async function dwcDatasetSubmissionJob(jobQueueRecord: ISubmissionJobQueueRecord) {
+  const connection = getAPIUserDBConnection();
+
+  try {
+    await connection.open();
+
+    const darwinCoreService = new DarwinCoreService(connection);
+    // Run darwin core intake job
+    await darwinCoreService.intakeJob(jobQueueRecord);
+
+    await connection.commit();
+  } catch (error) {
+    defaultLog.error({ label: 'dwcDatasetSubmissionJob', message: 'error', error });
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }

@@ -14,21 +14,54 @@ export const QUEUE_DEFAULT_ATTEMPTS = 2;
 export const QUEUE_DEFAULT_TIMEOUT = 600000; // 10 minutes
 
 export class QueueScheduler {
+  /**
+   * Is the queue scheduler enabled, and processing jobs.
+   *
+   * @memberof QueueScheduler
+   */
   _enabled = QUEUE_DEFAULT_ENABLED;
+  /**
+   * How many jobs can be executed in parallel.
+   *
+   * @memberof QueueScheduler
+   */
   _concurrency = QUEUE_DEFAULT_CONCURRENCY;
+  /**
+   * How often the queue scheduler checks for new jobs.
+   *
+   * @memberof QueueScheduler
+   */
   _period = QUEUE_DEFAULT_PERIOD;
+  /**
+   * The maximum number of times a job will be attempted, if it fails to resolve successfully, before abandoning it.
+   *
+   * @memberof QueueScheduler
+   */
   _attempts = QUEUE_DEFAULT_ATTEMPTS;
+  /**
+   * The maximum time a job can run before it is considered timed out and automatically rejected.
+   *
+   * @memberof QueueScheduler
+   */
   _timeout = QUEUE_DEFAULT_TIMEOUT;
 
   _queue: Queue;
 
+  /**
+   * Creates an instance of QueueScheduler.
+   *
+   * @memberof QueueScheduler
+   */
   constructor() {
     this._queue = new Queue();
-
-    this._start();
   }
 
-  async _start() {
+  /**
+   * Start the scheduler process loop.
+   *
+   * @memberof QueueScheduler
+   */
+  async start() {
     // Check for updated queue settings
     await this._updateJobQueueSettings();
 
@@ -36,7 +69,7 @@ export class QueueScheduler {
     this._processJobQueueRecords();
 
     // Wait for a period of time before looping
-    setTimeout(() => this._start(), this._period);
+    setTimeout(() => this.start(), this._period);
   }
 
   /**
@@ -47,39 +80,44 @@ export class QueueScheduler {
    */
   async _updateJobQueueSettings(): Promise<void> {
     const connection = getAPIUserDBConnection();
-    await connection.open();
+    try {
+      await connection.open();
 
-    const systemConstantService = new SystemConstantService(connection);
+      const systemConstantService = new SystemConstantService(connection);
+      // Fetch all job queue constants
+      const jobQueueConstants = await systemConstantService.getSystemConstants([
+        'JOB_QUEUE_ENABLED',
+        'JOB_QUEUE_CONCURRENCY',
+        'JOB_QUEUE_PERIOD',
+        'JOB_QUEUE_ATTEMPTS',
+        'JOB_QUEUE_TIMEOUT'
+      ]);
 
-    // Fetch all job queue constants
-    const jobQueueConstants = await systemConstantService.getSystemConstants([
-      'JOB_QUEUE_ENABLED',
-      'JOB_QUEUE_CONCURRENCY',
-      'JOB_QUEUE_PERIOD',
-      'JOB_QUEUE_ATTEMPTS',
-      'JOB_QUEUE_TIMEOUT'
-    ]);
+      const jobQueueEnabled = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_ENABLED');
+      const jobQueueConcurrency = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_CONCURRENCY');
+      const jobQueuePeriod = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_PERIOD');
+      const jobQueueAttempts = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_ATTEMPTS');
+      const jobQueueTimeout = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_TIMEOUT');
 
-    const jobQueueEnabled = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_ENABLED');
-    const jobQueueConcurrency = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_CONCURRENCY');
-    const jobQueuePeriod = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_PERIOD');
-    const jobQueueAttempts = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_ATTEMPTS');
-    const jobQueueTimeout = jobQueueConstants.find((item) => item.constant_name === 'JOB_QUEUE_TIMEOUT');
+      // Update the constants tracked by this queue scheduler
+      this._enabled = jobQueueEnabled?.character_value === 'true' || QUEUE_DEFAULT_ENABLED;
+      this._concurrency = Number(jobQueueConcurrency?.numeric_value) || QUEUE_DEFAULT_CONCURRENCY;
+      this._period = Number(jobQueuePeriod?.numeric_value) || QUEUE_DEFAULT_PERIOD;
+      this._attempts = Number(jobQueueAttempts?.numeric_value) || QUEUE_DEFAULT_ATTEMPTS;
+      this._timeout = Number(jobQueueTimeout?.numeric_value) || QUEUE_DEFAULT_TIMEOUT;
 
-    // Update the constants tracked by this queue scheduler
-    this._enabled = jobQueueEnabled?.character_value === 'true' || QUEUE_DEFAULT_ENABLED;
-    this._concurrency = Number(jobQueueConcurrency?.numeric_value) || QUEUE_DEFAULT_CONCURRENCY;
-    this._period = Number(jobQueuePeriod?.numeric_value) || QUEUE_DEFAULT_PERIOD;
-    this._attempts = Number(jobQueueAttempts?.numeric_value) || QUEUE_DEFAULT_ATTEMPTS;
-    this._timeout = Number(jobQueueTimeout?.numeric_value) || QUEUE_DEFAULT_TIMEOUT;
+      // Update the internal concurrency tracked by the queue
+      this._queue.setJobQueueConcurrency(this._concurrency);
+      // Update the internal timeout tracked by the queue
+      this._queue.setJobTimeout(this._timeout);
 
-    // Update the internal concurrency tracked by the queue
-    this._queue.setJobQueueConcurrency(this._concurrency);
-    // Update the internal timeout tracked by the queue
-    this._queue.setJobTimeout(this._timeout);
-
-    await connection.commit();
-    connection.release();
+      await connection.commit();
+    } catch (error) {
+      defaultLog.error({ label: '_updateJobQueueSettings', message: 'error', error });
+      connection.rollback();
+    } finally {
+      connection.release();
+    }
 
     defaultLog.debug({
       label: 'updateJobQueueSettings',
@@ -108,7 +146,14 @@ export class QueueScheduler {
     }
   }
 
+  /**
+   * Whether or not the queue scheduler is ready to process additional jobs.
+   *
+   * @return {*}  {boolean} `true` if the queue scheduler can process additional jobs, `false` otherwise.
+   * @memberof QueueScheduler
+   */
   _readyToProcessAnotherRecord(): boolean {
+    // If the queue scheduler is enabled and if the queue has not reached maximum concurrency
     return this._enabled && this._queue.getJobQueueLength() === 0;
   }
 
@@ -121,20 +166,27 @@ export class QueueScheduler {
   async _getUnprocessedJobQueueRecords() {
     const connection = getAPIUserDBConnection();
 
-    await connection.open();
+    try {
+      await connection.open();
 
-    const jobQueueService = new SubmissionJobQueueService(connection);
+      const jobQueueService = new SubmissionJobQueueService(connection);
+      // Fetch the next batch of unprocessed job queue records
+      const nextJobQueueRecords = await jobQueueService.getNextUnprocessedJobQueueRecords(
+        this._concurrency,
+        this._attempts
+      );
 
-    const nextJobQueueRecords = await jobQueueService.getNextUnprocessedJobQueueRecords(
-      this._concurrency,
-      this._attempts
-    );
+      await connection.commit();
 
-    await connection.commit();
+      return nextJobQueueRecords;
+    } catch (error) {
+      defaultLog.error({ label: '_getUnprocessedJobQueueRecords', message: 'error', error });
+      await connection.rollback();
+    } finally {
+      connection.release();
+    }
 
-    connection.release();
-
-    return nextJobQueueRecords;
+    return [];
   }
 
   /**
@@ -145,56 +197,75 @@ export class QueueScheduler {
    */
   async _processJobQueueRecord(jobQueueRecord: ISubmissionJobQueueRecord) {
     const connection = getAPIUserDBConnection();
+    try {
+      await connection.open();
 
-    await connection.open();
+      const jobQueueService = new SubmissionJobQueueService(connection);
+      // Initialize the job queue record by setting its start time.
+      await jobQueueService.startQueueRecord(jobQueueRecord.submission_job_queue_id);
 
-    const jobQueueService = new SubmissionJobQueueService(connection);
-
-    // Initialize the job queue record by setting its start time.
-    await jobQueueService.startQueueRecord(jobQueueRecord.submission_job_queue_id);
-
-    await connection.commit();
+      await connection.commit();
+    } catch (error) {
+      defaultLog.error({ label: '_processJobQueueRecord', message: 'start error', error });
+      connection.rollback();
+    } finally {
+      connection.release();
+    }
 
     // On job success
-    const onResolve = async (resolve: unknown) => {
+    const onResolve = async function (resolve: unknown) {
+      const connection = getAPIUserDBConnection();
+
+      try {
+        await connection.open();
+
+        const jobQueueService = new SubmissionJobQueueService(connection);
+        // Mark a job queue record as complete by settings its end time.
+        jobQueueService.endJobQueueRecord(jobQueueRecord.submission_job_queue_id);
+
+        await connection.commit();
+      } catch (error) {
+        defaultLog.error({ label: '_processJobQueueRecord', message: 'onResolve error', error });
+        await connection.rollback();
+      } finally {
+        connection.release();
+      }
+
       defaultLog.debug({
-        label: 'processNextUnprocessedJobQueueRecord',
+        label: '_processJobQueueRecord',
         message: 'onResolve',
         submission_job_queue_id: jobQueueRecord.submission_job_queue_id,
         resolve: resolve
       });
-
-      // Mark a job queue record as complete by settings its end time.
-      jobQueueService.endJobQueueRecord(jobQueueRecord.submission_job_queue_id);
-      await connection.commit();
     };
 
     // On job failure
-    const onReject = async (error: unknown) => {
-      defaultLog.debug({
-        label: 'processNextUnprocessedJobQueueRecord',
+    const onReject = async function (error: unknown) {
+      const connection = getAPIUserDBConnection();
+
+      try {
+        await connection.open();
+
+        const jobQueueService = new SubmissionJobQueueService(connection);
+        // Mark a job queue record as unprocessed by resetting its start and end times to null.
+        jobQueueService.resetJobQueueRecord(jobQueueRecord.submission_job_queue_id);
+
+        await connection.commit();
+      } catch (error) {
+        defaultLog.error({ label: '_processJobQueueRecord', message: 'onReject error', error });
+        await connection.rollback();
+      } finally {
+        connection.release();
+      }
+
+      defaultLog.error({
+        label: '_processJobQueueRecord',
         message: 'onReject',
         submission_job_queue_id: jobQueueRecord.submission_job_queue_id,
-        error: error
+        error
       });
-
-      await connection.rollback();
-      // Mark a job queue record as unprocessed by resetting its start and end times to null.
-      jobQueueService.resetJobQueueRecord(jobQueueRecord.submission_job_queue_id);
-      await connection.commit();
     };
 
-    // On job complete (success or failure)
-    const onComplete = async () => {
-      defaultLog.debug({
-        label: 'processNextUnprocessedJobQueueRecord',
-        message: 'onComplete',
-        submission_job_queue_id: jobQueueRecord.submission_job_queue_id
-      });
-
-      connection.release();
-    };
-
-    this._queue.addJobToQueue(jobQueueRecord).then(onResolve).catch(onReject).finally(onComplete);
+    this._queue.addJobToQueue(jobQueueRecord).then(onResolve, onReject).catch(onReject);
   }
 }

@@ -9,7 +9,7 @@ export interface ISubmissionJobQueueRecord {
   submission_id: number;
   job_start_timestamp: string | null;
   job_end_timestamp: string | null;
-  security_request: JSON | null;
+  security_request: string | null;
   key: string | null;
   create_date: string;
   create_user: number;
@@ -122,12 +122,16 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    * concurrently) (integer > 0).
    * @param {number} [attempts] The total number of times a job will be attempted until it finishes successfully
    * (integer >= 1).
+   * @param {number} [timeout] The maximum time a job can run before it is considered timed out. In this case, the
+   * timeout is used to fetch any records that had been started, but experienced an issue that caused them
+   * to fail and also not properly reset their start time. This scenario is expected to occur rarely if not never.
    * @return {*}  {Promise<ISubmissionJobQueueRecord[]>}
    * @memberof SubmissionJobQueueRepository
    */
   async getNextUnprocessedJobQueueRecords(
     concurrency?: number,
-    attempts?: number
+    attempts?: number,
+    timeout?: number
   ): Promise<ISubmissionJobQueueRecord[]> {
     const knex = getKnex();
     const queryBuilder = knex
@@ -144,14 +148,24 @@ export class SubmissionJobQueueRepository extends BaseRepository {
       .select()
       .from({ sjq: 'submission_job_queue' })
       .rightJoin({ ls: 'latest_submission' }, 'sjq.submission_job_queue_id', 'ls.submission_job_queue_id')
-      .where('sjq.job_start_timestamp', null)
-      .where('sjq.job_end_timestamp', null);
+      .where('sjq.job_end_timestamp', null)
+      .andWhere((qb2) => {
+        qb2.orWhere('sjq.job_start_timestamp', null);
+        if (timeout) {
+          // Fetch records that are started, but not finished, but which are older than the timeout time.
+          // This is to handle a rare scenario where the node process exits after a record is started, but before the
+          // job is executed and therefore couldn't run its intended reject function to clean itself up.
+          qb2.orWhere(knex.raw(`sjq.job_start_timestamp < NOW() - INTERVAL '${timeout} milliseconds'`));
+        }
+      });
 
     if (attempts) {
+      // Only fetch records that have been attempted fewer times than the specified maximum attempts limit.
       queryBuilder.andWhere('sjq.attempt_count', '<', attempts);
     }
 
     if (concurrency) {
+      // Only return as many records as could be processed at one time in parallel
       queryBuilder.limit(concurrency);
     }
 
@@ -164,6 +178,7 @@ export class SubmissionJobQueueRepository extends BaseRepository {
    * Set the start time of a queue record. Indicating the record has been picked up for processing.
    *
    * @param {number} jobQueueId
+   *
    * @return {*}  {Promise<void>}
    * @memberof SubmissionJobQueueRepository
    */
