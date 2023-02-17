@@ -327,7 +327,7 @@ export class DarwinCoreService extends DBService {
     try {
       await this.runSpatialTransforms(intakeRecord, submissionObservationId);
 
-      await this.runSecurityTransforms(intakeRecord);
+      await this.runSecurityTransforms(intakeRecord, submissionObservationId);
     } catch (error: any) {
       defaultLog.debug({ label: 'runTransformsOnObservations', message: 'error', error });
 
@@ -415,13 +415,14 @@ export class DarwinCoreService extends DBService {
    * Run Security Transform on Submission Observation Record
    *
    * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runSecurityTransforms(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
+  async runSecurityTransforms(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
-      await this.spatialService.runSecurityTransforms(intakeRecord.submission_id);
+      await this.spatialService.runSecurityTransforms(submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,
