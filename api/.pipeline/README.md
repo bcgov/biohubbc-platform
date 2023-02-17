@@ -45,6 +45,9 @@
 - ### _./Dockerfile_
   Used to build the api image, as part of the execution of the OpenShift build config.
 
+- ### _./Dockerfile.queue_
+  Used to build the queue image, as part of the execution of the OpenShift build config.
+
 ## Important technologies/repos
 
 - ### _pipeline-cli_

@@ -22,8 +22,8 @@ export $(shell sed 's/=.*//' .env)
 env: | setup ## Copies the default ./env_config/env.docker to ./.env
 
 postgres: | close build-postgres run-postgres ## Performs all commands necessary to run the postgres project (db) in docker
-backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api) in docker
-web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, app, n8n) in docker
+backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api, queue) in docker
+web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, queue, app, n8n) in docker
 
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 db-migrate: | build-db-migrate run-db-migrate ## Performs all commands necessary to run the database migrations
@@ -77,38 +77,38 @@ run-postgres: ## Runs the postgres db containers
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend Commands
-## - Builds all of the BioHub backend projects (db, db_setup, api)
+## - Builds all of the BioHub backend projects (db, db_setup, api, queue)
 ## ------------------------------------------------------------------------------
 
 build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api
+	@docker-compose -f docker-compose.yml build db db_setup api queue
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api
+	@docker-compose -f docker-compose.yml up -d db db_setup api queue
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
-## - Builds all of the BioHub backend+web projects (db, db_setup, api, app, n8n, n8n_nginx, n8n_setup)
+## - Builds all of the BioHub backend+web projects (db, db_setup, api, queue, app, n8n, n8n_nginx, n8n_setup)
 ## ------------------------------------------------------------------------------
 
 build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api app
-  # @docker-compose -f docker-compose.yml build db db_setup api app n8n n8n_nginx n8n_setup
+	@docker-compose -f docker-compose.yml build db db_setup api queue app
+  # @docker-compose -f docker-compose.yml build db db_setup api queue app n8n n8n_nginx n8n_setup
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api app
+	@docker-compose -f docker-compose.yml up -d db db_setup api queue app
   ## Restart n8n as a workaround to resolve this known issue: https://github.com/n8n-io/n8n/issues/2155
   # @docker-compose -f docker-compose.yml up -d n8n n8n_nginx n8n_setup
   # @docker-compose restart n8n
@@ -135,6 +135,12 @@ api-container: ## Executes into the api container.
 	@echo "Shelling into api container"
 	@echo "==============================================="
 	@docker-compose exec api bash
+
+queue-container: ## Executes into the queue container.
+	@echo "==============================================="
+	@echo "Shelling into queue container"
+	@echo "==============================================="
+	@docker-compose exec queue bash
 
 n8n-container: ## Executes into the n8n container.
 	@echo "==============================================="
@@ -371,6 +377,12 @@ log-api: ## Runs `docker logs <container> -f` for the api container
 	@echo "Running docker logs for the api container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-api-$(DOCKER_NAMESPACE)-container -f $(args)
+
+log-queue: ## Runs `docker logs <container> -f` for the queue container
+	@echo "==============================================="
+	@echo "Running docker logs for the queue container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-queue-$(DOCKER_NAMESPACE)-container -f $(args)
 
 log-db: ## Runs `docker logs <container> -f` for the database container
 	@echo "==============================================="

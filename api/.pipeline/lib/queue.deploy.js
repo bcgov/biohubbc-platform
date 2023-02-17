@@ -4,12 +4,12 @@ const { OpenShiftClientX } = require('pipeline-cli');
 const path = require('path');
 
 /**
- * Run a pod to deploy the api image (must be already built, see api.build.js).
+ * Run a pod to deploy the queue image (must be already built, see queue.build.js).
  *
  * @param {*} settings
  * @returns
  */
-const apiDeploy = async (settings) => {
+const queueDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
@@ -23,23 +23,19 @@ const apiDeploy = async (settings) => {
   let objects = [];
 
   objects.push(
-    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/api.dc.yaml`, {
+    ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/queue.dc.yaml`, {
       param: {
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
-        HOST: phases[phase].host,
         CHANGE_ID: phases.build.changeId || changeId,
-        APP_HOST: phases[phase].appHost,
+        DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         NODE_ENV: phases[phase].env || 'dev',
-        ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
-        ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
         KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
         KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
         KEYCLOAK_SECRET_ADMIN_PASSWORD: phases[phase].sso.keycloakSecretAdminPassword,
-        DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         KEYCLOAK_HOST: phases[phase].sso.url,
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         KEYCLOAK_REALM: phases[phase].sso.realm,
@@ -47,9 +43,9 @@ const apiDeploy = async (settings) => {
         KEYCLOAK_ADMIN_HOST: phases[phase].sso.adminHost,
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
         OBJECT_STORE_SECRETS: 'biohubbc-object-store',
+        LOG_LEVEL: phases[phase].logLevel || 'info',
         REPLICAS: phases[phase].replicas || 1,
-        REPLICA_MAX: phases[phase].maxReplicas || 1,
-        LOG_LEVEL: phases[phase].logLevel || 'info'
+        REPLICA_MAX: phases[phase].maxReplicas || 1
       }
     })
   );
@@ -60,4 +56,4 @@ const apiDeploy = async (settings) => {
   oc.applyAndDeploy(objects, phases[phase].instance);
 };
 
-module.exports = { apiDeploy };
+module.exports = { queueDeploy };

@@ -7,22 +7,22 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
-const appName = config.module.app;
-const name = config.module.api;
+const name = config.module.queue;
 const dbName = config.module.db;
 
-const changeId = options.pr || `${Math.floor(Date.now() * 1000) / 60.0}`; // aka pull-request or branch
-const version = config.version || '1.0.0';
+const version = config.version;
+
+const changeId = options.pr;
 
 // A static deployment is when the deployment is updating dev, test, or prod (rather than a temporary PR)
+// See `--type=static` in the `deployStatic.yml` git workflow
 const isStaticDeployment = options.type === 'static';
 
 const deployChangeId = (isStaticDeployment && 'deploy') || changeId;
 const branch = (isStaticDeployment && options.branch) || null;
 const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${version}-${changeId}`;
 
-const staticUrlsAPI = config.staticUrlsAPI;
-const staticUrls = config.staticUrls;
+const queueDockerfilePath = './Dockerfile.queue';
 
 const processOptions = (options) => {
   const result = { ...options };
@@ -60,12 +60,11 @@ const phases = {
     version: `${version}-${changeId}`,
     tag: tag,
     env: 'build',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
-    elasticsearchEmlIndex: 'eml',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     branch: branch,
-    logLevel: (isStaticDeployment && 'info') || 'debug'
+    logLevel: (isStaticDeployment && 'info') || 'debug',
+    queueDockerfilePath: queueDockerfilePath
   },
   dev: {
     namespace: 'a0ec71-dev',
@@ -77,18 +76,15 @@ const phases = {
     instance: `${name}-dev-${deployChangeId}`,
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
-    host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
-    appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'dev',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
-    elasticsearchEmlIndex: 'eml',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.dev,
     replicas: 1,
     maxReplicas: 1,
-    logLevel: (isStaticDeployment && 'info') || 'debug'
+    logLevel: (isStaticDeployment && 'info') || 'debug',
+    queueDockerfilePath: queueDockerfilePath
   },
   test: {
     namespace: 'a0ec71-test',
@@ -100,18 +96,15 @@ const phases = {
     instance: `${name}-test`,
     version: `${version}`,
     tag: `test-${version}`,
-    host: staticUrlsAPI.test,
-    appHost: staticUrls.test,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'test',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
-    elasticsearchEmlIndex: 'eml',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
     replicas: 2,
     maxReplicas: 2,
-    logLevel: 'info'
+    logLevel: 'info',
+    queueDockerfilePath: queueDockerfilePath
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -123,18 +116,15 @@ const phases = {
     instance: `${name}-prod`,
     version: `${version}`,
     tag: `prod-${version}`,
-    host: staticUrlsAPI.prod,
-    appHost: staticUrls.prod,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'prod',
-    elasticsearchURL: 'http://es01:9200',
-    elasticsearchEmlIndex: 'eml',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
     replicas: 2,
     maxReplicas: 2,
-    logLevel: 'info'
+    logLevel: 'info',
+    queueDockerfilePath: queueDockerfilePath
   }
 };
 

@@ -10,7 +10,7 @@ import { UserObject } from '../models/user';
 import {
   ISearchSubmissionCriteria,
   ISourceTransformModel,
-  ISubmissionJobQueue,
+  ISubmissionJobQueueRecord,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -625,26 +625,12 @@ describe('SubmissionService', () => {
 
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
-        .resolves({ test: 'test' } as unknown as ISubmissionJobQueue);
+        .resolves({ test: 'test' } as unknown as ISubmissionJobQueueRecord);
 
       const response = await submissionService.getSubmissionJobQueue(1);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ test: 'test' });
-    });
-  });
-
-  describe('updateSubmissionJobQueueEndTime', () => {
-    it('should return a submission id on update', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionJobQueueEndTime').resolves(1);
-
-      const response = await submissionService.updateSubmissionJobQueueEndTime(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql(1);
     });
   });
 });

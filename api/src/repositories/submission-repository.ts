@@ -111,18 +111,18 @@ export enum SUBMISSION_MESSAGE_TYPE {
   'DEBUG' = 'Debug'
 }
 
-export interface ISubmissionJobQueue {
+export interface ISubmissionJobQueueRecord {
   submission_job_queue_id: number;
   submission_id: number;
-  key?: string;
-  job_start_timestamp: string;
-  job_end_timestamp: string;
-  security_request?: string; //jsonb might need any
-  create_date?: string;
-  create_user?: string;
-  update_date?: string;
-  update_user?: string;
-  revision_count?: string;
+  job_start_timestamp: string | null;
+  job_end_timestamp: string | null;
+  security_request: string | null; // JSON string
+  key: string | null;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
 }
 
 export interface ISubmissionMetadataRecord {
@@ -780,10 +780,10 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch row of submission job queue by submission Id
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionJobQueue>}
+   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
+  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
     const sqlStatement = SQL`
       SELECT
         *
@@ -794,7 +794,7 @@ export class SubmissionRepository extends BaseRepository {
       ;
     `;
 
-    const response = await this.connection.sql<ISubmissionJobQueue>(sqlStatement);
+    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
@@ -804,31 +804,6 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Update end time for the most recently stated record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionJobQueueEndTime(submissionId: number): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_job_queue
-      SET
-        job_end_timestamp = now()
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        job_end_timestamp IS NULL
-      ;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    return response.rowCount;
   }
 
   /**

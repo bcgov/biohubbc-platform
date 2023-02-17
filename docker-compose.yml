@@ -89,6 +89,39 @@ services:
       - db
       - db_setup
 
+  # Build the api_worker docker image
+  queue:
+    image: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-img
+    container_name: ${DOCKER_PROJECT_NAME}-queue-${DOCKER_NAMESPACE}-container
+    build:
+      context: ./api
+      dockerfile: ./.docker/queue/Dockerfile
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
+      - ELASTICSEARCH_EML_INDEX=${ELASTICSEARCH_EML_INDEX}
+      - S3_KEY_PREFIX=${S3_KEY_PREFIX}
+      - TZ=${API_TZ}
+      - DB_HOST=${DB_HOST}
+      - DB_USER_API=${DB_USER_API}
+      - DB_USER_API_PASS=${DB_USER_API_PASS}
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_SCHEMA=${DB_SCHEMA}
+      - OBJECT_STORE_URL=${OBJECT_STORE_URL}
+      - OBJECT_STORE_ACCESS_KEY_ID=${OBJECT_STORE_ACCESS_KEY_ID}
+      - OBJECT_STORE_SECRET_KEY_ID=${OBJECT_STORE_SECRET_KEY_ID}
+      - OBJECT_STORE_BUCKET_NAME=${OBJECT_STORE_BUCKET_NAME}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - ./api:/opt/app-root/src
+      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
+    networks:
+      - biohubbc-network
+    depends_on:
+      - db
+      - db_setup
+
   # Build the clamav docker image
   clamav:
     image: mkodockx/docker-clamav:latest

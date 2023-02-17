@@ -7,7 +7,11 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
-import { ISourceTransformModel, ISubmissionJobQueue, ISubmissionModel } from '../repositories/submission-repository';
+import {
+  ISourceTransformModel,
+  ISubmissionJobQueueRecord,
+  ISubmissionModel
+} from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
@@ -56,7 +60,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const step1 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step1').resolves({ submission_metadata_id: 1 });
       const step2 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step2').resolves(mockDWCAFile);
@@ -157,10 +161,10 @@ describe('DarwinCoreService', () => {
         {
           submission_job_queue_id: 1,
           submission_id: 1,
-          job_start_timestamp: '',
-          job_end_timestamp: '',
+          job_start_timestamp: null,
+          job_end_timestamp: null,
           key: 's3 path'
-        },
+        } as unknown as ISubmissionJobQueueRecord,
         1
       );
 
@@ -210,10 +214,10 @@ describe('DarwinCoreService', () => {
           {
             submission_job_queue_id: 1,
             submission_id: 1,
-            job_start_timestamp: '',
-            job_end_timestamp: '',
+            job_start_timestamp: null,
+            job_end_timestamp: null,
             key: 's3 key'
-          },
+          } as unknown as ISubmissionJobQueueRecord,
           1
         );
       } catch (error) {
@@ -262,7 +266,13 @@ describe('DarwinCoreService', () => {
 
       try {
         await service.intakeJob_step2(
-          { submission_job_queue_id: 1, submission_id: 1, job_start_timestamp: '', job_end_timestamp: '', key: '' },
+          {
+            submission_job_queue_id: 1,
+            submission_id: 1,
+            job_start_timestamp: null,
+            job_end_timestamp: null,
+            key: ''
+          } as unknown as ISubmissionJobQueueRecord,
           1
         );
       } catch (error) {
@@ -307,7 +317,12 @@ describe('DarwinCoreService', () => {
 
       try {
         await service.intakeJob_step2(
-          { submission_job_queue_id: 1, submission_id: 1, job_start_timestamp: '', job_end_timestamp: '' },
+          {
+            submission_job_queue_id: 1,
+            submission_id: 1,
+            job_start_timestamp: null,
+            job_end_timestamp: null
+          } as unknown as ISubmissionJobQueueRecord,
           1
         );
       } catch (error) {
@@ -491,7 +506,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const mediaFileStub = sinon.createStubInstance(MediaFile);
       const bufferStub = sinon.createStubInstance(Buffer);
@@ -534,7 +549,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const mediaFileStub = sinon.createStubInstance(MediaFile);
       const bufferStub = sinon.createStubInstance(Buffer);
@@ -577,17 +592,15 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').resolves();
       const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-      const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves();
 
       await service.intakeJob_finishIntake(mockJobQueue);
 
       expect(update).to.be.calledOnce;
       expect(insert).to.be.calledOnce;
-      expect(updateTime).to.be.calledOnce;
     });
 
     it('should throw `Transforming and uploading` error', async () => {
@@ -598,11 +611,10 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const updateS3 = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
       const insertSubmissionStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-      const updateTime = sinon.stub(SubmissionService.prototype, 'updateSubmissionJobQueueEndTime').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
@@ -612,7 +624,6 @@ describe('DarwinCoreService', () => {
         expect(updateS3).to.be.called;
         expect(insertErrorStatus).to.be.called;
         expect(insertSubmissionStatus).not.to.be.called;
-        expect(updateTime).not.to.be.called;
       }
     });
   });
@@ -627,7 +638,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEndDate').resolves();
       sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEffectiveDate').resolves();
@@ -646,7 +657,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEndDate').throws();
       sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEffectiveDate').resolves();
@@ -677,7 +688,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const transform = sinon.stub(DarwinCoreService.prototype, 'runSpatialTransforms').resolves();
       const security = sinon.stub(DarwinCoreService.prototype, 'runSecurityTransforms').resolves();
@@ -698,7 +709,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const transform = sinon.stub(DarwinCoreService.prototype, 'runSpatialTransforms').throws();
       const security = sinon.stub(DarwinCoreService.prototype, 'runSecurityTransforms').resolves();
@@ -729,7 +740,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
       const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
@@ -750,7 +761,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').throws();
       const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
@@ -781,13 +792,14 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
+      const submissionObservationId = 1;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSecurityTransforms').resolves();
       const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
-      await service.runSecurityTransforms(mockJobQueue);
+      await service.runSecurityTransforms(mockJobQueue, submissionObservationId);
 
       expect(transform).to.be.calledOnce;
       expect(status).to.be.calledOnce;
@@ -802,14 +814,15 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
+      const submissionObservationId = 1;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSecurityTransforms').throws();
       const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
-        await service.runSecurityTransforms(mockJobQueue);
+        await service.runSecurityTransforms(mockJobQueue, submissionObservationId);
         expect.fail();
       } catch (error) {
         expect(transform).to.be.calledOnce;
@@ -833,7 +846,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const insertObservation = sinon.stub(SubmissionService.prototype, 'insertSubmissionObservationRecord').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
@@ -852,7 +865,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const insertObservation = sinon.stub(SubmissionService.prototype, 'insertSubmissionObservationRecord').throws();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
@@ -882,7 +895,7 @@ describe('DarwinCoreService', () => {
         key: 'Key',
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const mockSubmission = {
         submission_id: 1,
@@ -916,7 +929,7 @@ describe('DarwinCoreService', () => {
         submission_id: 1,
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const mockSubmission = {
         submission_id: 1,
@@ -955,7 +968,7 @@ describe('DarwinCoreService', () => {
         key: 'Key',
         job_start_timestamp: '',
         job_end_timestamp: ''
-      } as ISubmissionJobQueue;
+      } as ISubmissionJobQueueRecord;
 
       const moveS3 = sinon.stub(fileUtils, 'copyFileInS3').resolves();
       const deleteS3 = sinon.stub(fileUtils, 'deleteFileFromS3').resolves();

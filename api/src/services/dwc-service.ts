@@ -2,7 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import {
-  ISubmissionJobQueue,
+  ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
   ISubmissionObservationRecord,
   SUBMISSION_MESSAGE_TYPE,
@@ -41,11 +41,11 @@ export class DarwinCoreService extends DBService {
   /**
    * Start intake job for job queue record
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intakeJob(intakeRecord: ISubmissionJobQueue): Promise<void> {
+  async intakeJob(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
     const submissionMetadataId = await this.intakeJob_step1(intakeRecord.submission_id);
 
     const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
@@ -102,7 +102,7 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step2(intakeRecord: ISubmissionJobQueue, submissionMetadataId: number): Promise<DWCArchive> {
+  async intakeJob_step2(intakeRecord: ISubmissionJobQueueRecord, submissionMetadataId: number): Promise<DWCArchive> {
     try {
       if (!intakeRecord.key) {
         throw new ApiGeneralError('No S3 Key given');
@@ -234,11 +234,11 @@ export class DarwinCoreService extends DBService {
    * Step 6: If csv worksheets are present, create submission oberservation record.
    * Then transform and update details
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step6(intakeRecord: ISubmissionJobQueue, dwcaWorksheets: DWCArchive): Promise<void> {
+  async intakeJob_step6(intakeRecord: ISubmissionJobQueueRecord, dwcaWorksheets: DWCArchive): Promise<void> {
     try {
       const jsonData = normalizeDWCA(dwcaWorksheets);
 
@@ -264,17 +264,15 @@ export class DarwinCoreService extends DBService {
   /**
    * Finish intake job, move S3 file to home folder, update status and queue end date
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_finishIntake(intakeRecord: ISubmissionJobQueue): Promise<void> {
+  async intakeJob_finishIntake(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
     try {
       await this.updateS3FileLocation(intakeRecord);
 
       await this.submissionService.insertSubmissionStatus(intakeRecord.submission_id, SUBMISSION_STATUS_TYPE.INGESTED);
-
-      await this.submissionService.updateSubmissionJobQueueEndTime(intakeRecord.submission_id);
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
 
@@ -292,11 +290,11 @@ export class DarwinCoreService extends DBService {
   /**
    * Update Submission Record effective and end Date
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async updateSubmissionObservationEffectiveAndEndDate(intakeRecord: ISubmissionJobQueue): Promise<void> {
+  async updateSubmissionObservationEffectiveAndEndDate(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
     try {
       await this.submissionService.updateSubmissionObservationRecordEndDate(intakeRecord.submission_id);
       await this.submissionService.updateSubmissionObservationRecordEffectiveDate(intakeRecord.submission_id);
@@ -317,16 +315,19 @@ export class DarwinCoreService extends DBService {
   /**
    * Run both spatial and Security Transform on Observation
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runTransformsOnObservations(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
+  async runTransformsOnObservations(
+    intakeRecord: ISubmissionJobQueueRecord,
+    submissionObservationId: number
+  ): Promise<void> {
     try {
       await this.runSpatialTransforms(intakeRecord, submissionObservationId);
 
-      await this.runSecurityTransforms(intakeRecord);
+      await this.runSecurityTransforms(intakeRecord, submissionObservationId);
     } catch (error: any) {
       defaultLog.debug({ label: 'runTransformsOnObservations', message: 'error', error });
 
@@ -344,7 +345,7 @@ export class DarwinCoreService extends DBService {
   /**
    * Insert new Submission Observation Record
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @param {string} dwcaJson
    * @return {*}  {Promise<{
    *     submission_observation_id: number;
@@ -352,7 +353,7 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async insertSubmissionObservationRecord(
-    intakeRecord: ISubmissionJobQueue,
+    intakeRecord: ISubmissionJobQueueRecord,
     dwcaJson: string
   ): Promise<{
     submission_observation_id: number;
@@ -382,12 +383,12 @@ export class DarwinCoreService extends DBService {
   /**
    * Run Spatial Transform on Submission Observation Record
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runSpatialTransforms(intakeRecord: ISubmissionJobQueue, submissionObservationId: number): Promise<void> {
+  async runSpatialTransforms(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
       await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
@@ -413,14 +414,15 @@ export class DarwinCoreService extends DBService {
   /**
    * Run Security Transform on Submission Observation Record
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runSecurityTransforms(intakeRecord: ISubmissionJobQueue): Promise<void> {
+  async runSecurityTransforms(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
-      await this.spatialService.runSecurityTransforms(intakeRecord.submission_id);
+      await this.spatialService.runSecurityTransforms(submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,
@@ -443,10 +445,10 @@ export class DarwinCoreService extends DBService {
   /**
    * Update and Move S3 file to new Home directory
    *
-   * @param {ISubmissionJobQueue} intakeRecord
+   * @param {ISubmissionJobQueueRecord} intakeRecord
    * @memberof DarwinCoreService
    */
-  async updateS3FileLocation(intakeRecord: ISubmissionJobQueue) {
+  async updateS3FileLocation(intakeRecord: ISubmissionJobQueueRecord) {
     if (intakeRecord.key) {
       const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(
         intakeRecord.submission_id

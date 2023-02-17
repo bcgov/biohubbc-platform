@@ -1,7 +1,10 @@
 import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SubmissionJobQueueRepository } from '../repositories/submission-job-queue-repository';
+import {
+  ISubmissionJobQueueRecord,
+  SubmissionJobQueueRepository
+} from '../repositories/submission-job-queue-repository';
 import * as FileUtils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionJobQueueService } from './submission-job-queue-service';
@@ -104,6 +107,72 @@ describe('SubmissionJobQueueService', () => {
         originalname: fileName
       } as unknown as Express.Multer.File);
       expect(key).to.be.eql('platform/datasets/uuid/dwca/1/file name.zip');
+    });
+  });
+
+  describe('getNextUnprocessedJobQueueRecords', () => {
+    it('should return an transform ID', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const repo = sinon
+        .stub(SubmissionJobQueueRepository.prototype, 'getNextUnprocessedJobQueueRecords')
+        .resolves([
+          { submission_job_queue_id: 1 },
+          { submission_job_queue_id: 2 },
+          { submission_job_queue_id: 3 }
+        ] as unknown as ISubmissionJobQueueRecord[]);
+
+      const service = new SubmissionJobQueueService(mockDBConnection);
+      const response = await service.getNextUnprocessedJobQueueRecords(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([
+        { submission_job_queue_id: 1 },
+        { submission_job_queue_id: 2 },
+        { submission_job_queue_id: 3 }
+      ]);
+    });
+  });
+
+  describe('startQueueRecord', () => {
+    it('should return an transform ID', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const repo = sinon.stub(SubmissionJobQueueRepository.prototype, 'startQueueRecord').resolves();
+
+      const service = new SubmissionJobQueueService(mockDBConnection);
+      const response = await service.startQueueRecord(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.undefined;
+    });
+  });
+
+  describe('endJobQueueRecord', () => {
+    it('should return an transform ID', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const repo = sinon.stub(SubmissionJobQueueRepository.prototype, 'endJobQueueRecord').resolves();
+
+      const service = new SubmissionJobQueueService(mockDBConnection);
+      const response = await service.endJobQueueRecord(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.undefined;
+    });
+  });
+
+  describe('resetJobQueueRecord', () => {
+    it('should return an transform ID', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const repo = sinon.stub(SubmissionJobQueueRepository.prototype, 'resetJobQueueRecord').resolves();
+
+      const service = new SubmissionJobQueueService(mockDBConnection);
+      const response = await service.resetJobQueueRecord(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.undefined;
     });
   });
 });

@@ -4,7 +4,7 @@ import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
   ISearchSubmissionCriteria,
   ISourceTransformModel,
-  ISubmissionJobQueue,
+  ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
   ISubmissionModel,
   ISubmissionModelWithStatus,
@@ -406,22 +406,11 @@ export class SubmissionService extends DBService {
    *  Fetch row of submission job queue by submission Id
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionJobQueue>}
+   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
    * @memberof SubmissionService
    */
-  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueue> {
+  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
     return this.submissionRepository.getSubmissionJobQueue(submissionId);
-  }
-
-  /**
-   * Update end time for the most recently stated record
-   *
-   * @param {number} submissionId
-   * @return {*}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionJobQueueEndTime(submissionId: number) {
-    return this.submissionRepository.updateSubmissionJobQueueEndTime(submissionId);
   }
 
   /**
