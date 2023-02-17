@@ -132,12 +132,12 @@ export function queueForProcess(): RequestHandler {
       }
 
       const rational = req.body.security_request.rational;
-      if (!rational && rational !== "") {
+      if (!rational && rational !== '') {
         throw new HTTP400('Rational is a required field');
       }
 
-      const proprietor_name = req.body.security_request.proprietor_name
-      if (!proprietor_name && proprietor_name !== "") {
+      const proprietor_name = req.body.security_request.proprietor_name;
+      if (!proprietor_name && proprietor_name !== '') {
         throw new HTTP400('Proprietor name is a required field');
       }
 
@@ -172,13 +172,12 @@ export function queueForProcess(): RequestHandler {
     try {
       await connection.open();
       const service = new SubmissionJobQueueService(connection);
-      console.log(securityRequest)
       const queueRecord = await service.intake(id, file, securityRequest);
       await connection.commit();
       res.status(200).json(queueRecord);
     } catch (error) {
       defaultLog.error({ label: 'queueForProcess', message: 'error', error });
-      await connection.rollback();  
+      await connection.rollback();
       throw error;
     } finally {
       connection.release();
