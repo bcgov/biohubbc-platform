@@ -411,7 +411,7 @@ describe('queue', () => {
           proprietor_type_id: '2',
           survey_id: '3',
           rational: 'string',
-          proprietor_name: '4',
+          proprietor_name: 'name',
           disa_required: 'true'
         }
       };
@@ -431,7 +431,7 @@ describe('queue', () => {
         proprietor_type_id: 2,
         survey_id: 3,
         rational: 'string',
-        proprietor_name: 4,
+        proprietor_name: "name",
         disa_required: true
       });
       expect(mockRes.statusValue).to.equal(200);
