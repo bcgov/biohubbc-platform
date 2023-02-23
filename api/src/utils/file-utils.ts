@@ -10,7 +10,6 @@ import {
 } from 'aws-sdk/clients/s3';
 import { PromiseResult } from 'aws-sdk/lib/request';
 import clamd from 'clamdjs';
-import { S3_ROLE } from '../constants/roles';
 
 export interface IS3FileKey {
   fileName?: string;
@@ -145,7 +144,6 @@ export async function copyFileInS3(oldKey: string, newKey: string): Promise<Prom
 /**
  * Upload a file to S3.
  *
- * Note: Assigns the `authenticated-read` permission.
  *
  * @export
  * @param {Express.Multer.File} file an object containing information about a single piece of media
@@ -166,7 +164,6 @@ export async function uploadFileToS3(
       Body: file.buffer,
       ContentType: file.mimetype,
       Key: key,
-      ACL: S3_ROLE.AUTH_READ,
       Metadata: metadata
     })
     .promise();
@@ -196,7 +193,6 @@ export async function uploadBufferToS3(
       Body: buffer,
       ContentType: mimetype,
       Key: key,
-      ACL: S3_ROLE.AUTH_READ,
       Metadata: metadata
     })
     .promise();
