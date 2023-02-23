@@ -46,10 +46,13 @@ const apiDeploy = async (settings) => {
         KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
         KEYCLOAK_ADMIN_HOST: phases[phase].sso.adminHost,
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
-        OBJECT_STORE_SECRETS: 'biohubbc-object-store',
-        REPLICAS: phases[phase].replicas || 1,
-        REPLICA_MAX: phases[phase].maxReplicas || 1,
-        LOG_LEVEL: phases[phase].logLevel || 'info'
+        LOG_LEVEL: phases[phase].logLevel || 'info',
+        CPU_REQUEST: phases[phase].cpuRequest,
+        CPU_LIMIT: phases[phase].cpuLimit,
+        MEMORY_REQUEST: phases[phase].memoryRequest,
+        MEMORY_LIMIT: phases[phase].memoryLimit,
+        REPLICAS: phases[phase].replicas,
+        REPLICAS_MAX: phases[phase].replicasMax
       }
     })
   );
@@ -57,7 +60,7 @@ const apiDeploy = async (settings) => {
   oc.applyRecommendedLabels(objects, phases[phase].name, phase, `${changeId}`, phases[phase].instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);
 
-  oc.applyAndDeploy(objects, phases[phase].instance);
+  await oc.applyAndDeploy(objects, phases[phase].instance);
 };
 
 module.exports = { apiDeploy };

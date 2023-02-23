@@ -57,7 +57,7 @@ parameters:
   - name: REACT_APP_KEYCLOAK_API_HOST
     description: api host
   - name: CPU_REQUEST
-    value: '10m'
+    value: '50m'
   - name: CPU_LIMIT
     value: '200m'
   - name: MEMORY_REQUEST
@@ -66,8 +66,7 @@ parameters:
     value: '200Mi'
   - name: REPLICAS
     value: '1'
-  - name: REPLICA_MAX
-    required: true
+  - name: REPLICAS_MAX
     value: '1'
 objects:
   - apiVersion: image.openshift.io/v1
@@ -94,7 +93,7 @@ objects:
         role: app
       name: ${NAME}${SUFFIX}
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -255,8 +254,8 @@ objects:
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
-      maxReplicas: '${{REPLICA_MAX}}'
-      minReplicas: '${{REPLICAS}}'
+      minReplicas: ${{REPLICAS}}
+      maxReplicas: ${{REPLICAS_MAX}}
       scaleTargetRef:
         apiVersion: v1
         kind: DeploymentConfig

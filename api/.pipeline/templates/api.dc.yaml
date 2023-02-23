@@ -1,9 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  resourceVersion: ''
-  selfLink: ''
   name: biohub-platform-api-dc
+  labels:
+    build: biohub-platform-api
 parameters:
   - name: ENABLE_FILE_VIRUS_SCAN
     value: 'true'
@@ -114,8 +114,7 @@ parameters:
     value: '2Gi'
   - name: REPLICAS
     value: '1'
-  - name: REPLICA_MAX
-    required: true
+  - name: REPLICAS_MAX
     value: '1'
 objects:
   - apiVersion: image.openshift.io/v1
@@ -142,7 +141,7 @@ objects:
         role: api
       name: ${NAME}${SUFFIX}
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -393,8 +392,8 @@ objects:
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
-      maxReplicas: '${{REPLICA_MAX}}'
-      minReplicas: '${{REPLICAS}}'
+      minReplicas: ${{REPLICAS}}
+      maxReplicas: ${{REPLICAS_MAX}}
       scaleTargetRef:
         apiVersion: v1
         kind: DeploymentConfig
