@@ -132,12 +132,12 @@ export function queueForProcess(): RequestHandler {
       }
 
       const rational = req.body.security_request.rational;
-      if (!rational) {
+      if (!rational && rational !== '') {
         throw new HTTP400('Rational is a required field');
       }
 
-      const proprietor_name = Number(req.body.security_request.proprietor_name);
-      if (isNaN(proprietor_name) || proprietor_name < 0) {
+      const proprietor_name = req.body.security_request.proprietor_name;
+      if (!proprietor_name && proprietor_name !== '') {
         throw new HTTP400('Proprietor name is a required field');
       }
 
