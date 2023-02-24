@@ -631,6 +631,7 @@ jobs:
   deployQueue:
     name: Deploy Queue Image
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: |
       always() &&
       (needs.deployDatabase.result == 'success' || needs.deployDatabase.result == 'skipped') &&
