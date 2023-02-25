@@ -44,7 +44,6 @@ const apiDeploy = async (settings) => {
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         KEYCLOAK_REALM: phases[phase].sso.realm,
         KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
-        KEYCLOAK_ADMIN_HOST: phases[phase].sso.adminHost,
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
         LOG_LEVEL: phases[phase].logLevel || 'info',
         CPU_REQUEST: phases[phase].cpuRequest,
