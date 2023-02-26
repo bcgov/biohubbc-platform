@@ -17,7 +17,7 @@ Since the metabase image has already been built, you can then deploy it in your 
 
 ``` sh
 export ADMIN_EMAIL=<ADMIN_EMAIL>
-export NAMESPACE=<YOURNAMESPACE> (the license plate like af2668)
+export NAMESPACE=<YOURNAMESPACE> (the license plate like a0ec71)
 export TARGET_NS=<TARGET> (The area where metabase will be installed like dev, test, prod, tools)
 
 
@@ -61,7 +61,7 @@ spec:
         - namespaceSelector:
             matchLabels:
               environment: tools
-              name: af2668
+              name: a0ec71
         - podSelector:
             matchLabels:
               app: metabase
@@ -73,4 +73,4 @@ spec:
 In the Database connection screen refer to your database server with the namespace suffixed.
 So in the example above our database server is called: 
 **biohubbc-db-postgresql-dev-deploy** and in metabase we refer to it as: 
-**biohubbc-db-postgresql-dev-deploy.af2668-dev**
+**biohubbc-db-postgresql-dev-deploy.a0ec71-dev**

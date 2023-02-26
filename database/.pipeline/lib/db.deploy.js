@@ -9,7 +9,7 @@ const path = require('path');
  * @param {*} settings
  * @returns
  */
-const dbDeploy = (settings) => {
+const dbDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
   const phase = options.env;
@@ -34,14 +34,20 @@ const dbDeploy = (settings) => {
         POSTGRESQL_DATABASE: 'biohubbc',
         TZ: phases[phase].tz,
         IMAGE_STREAM_NAMESPACE: phases.build.namespace,
-        VOLUME_CAPACITY: phases[phase].size
+        VOLUME_CAPACITY: phases[phase].volumeCapacity,
+        CPU_REQUEST: phases[phase].cpuRequest,
+        CPU_LIMIT: phases[phase].cpuLimit,
+        MEMORY_REQUEST: phases[phase].memoryRequest,
+        MEMORY_LIMIT: phases[phase].memoryLimit,
+        REPLICAS: phases[phase].replicas
       }
     })
   );
 
   oc.applyRecommendedLabels(objects, name, phase, changeId, instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);
-  oc.applyAndDeploy(objects, instance);
+
+  await oc.applyAndDeploy(objects, instance);
 };
 
 module.exports = { dbDeploy };

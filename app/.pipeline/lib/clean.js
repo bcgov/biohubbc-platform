@@ -15,7 +15,7 @@ const clean = (settings) => {
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases.build.namespace }, options));
 
   for (let phaseKey in phases) {
-    if (!phases.hasOwnProperty(phaseKey)) {
+    if (!Object.prototype.hasOwnProperty.call(phases, phaseKey)) {
       continue;
     }
 

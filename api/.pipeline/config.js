@@ -11,10 +11,12 @@ const appName = config.module.app;
 const name = config.module.api;
 const dbName = config.module.db;
 
-const changeId = options.pr || `${Math.floor(Date.now() * 1000) / 60.0}`; // aka pull-request or branch
-const version = config.version || '1.0.0';
+const version = config.version;
+
+const changeId = options.pr; // pull-request number or branch name
 
 // A static deployment is when the deployment is updating dev, test, or prod (rather than a temporary PR)
+// See `--type=static` in the `deployStatic.yml` git workflow
 const isStaticDeployment = options.type === 'static';
 
 const deployChangeId = (isStaticDeployment && 'deploy') || changeId;
@@ -65,7 +67,10 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     branch: branch,
-    logLevel: (isStaticDeployment && 'info') || 'debug'
+    cpuRequest: '100m',
+    cpuLimit: '1250m',
+    memoryRequest: '512Mi',
+    memoryLimit: '3Gi'
   },
   dev: {
     namespace: 'a0ec71-dev',
@@ -86,9 +91,13 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.dev,
-    replicas: 1,
-    maxReplicas: 1,
-    logLevel: (isStaticDeployment && 'info') || 'debug'
+    logLevel: 'debug',
+    cpuRequest: '100m',
+    cpuLimit: '500m',
+    memoryRequest: '512Mi',
+    memoryLimit: '2Gi',
+    replicas: (isStaticDeployment && '2') || '1',
+    replicasMax: (isStaticDeployment && '3') || '1'
   },
   test: {
     namespace: 'a0ec71-test',
@@ -109,9 +118,15 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
-    replicas: 2,
-    maxReplicas: 2,
-    logLevel: 'info'
+    replicas: 3,
+    maxReplicas: 5,
+    logLevel: 'info',
+    cpuRequest: '200m',
+    cpuLimit: '1000m',
+    memoryRequest: '512Mi',
+    memoryLimit: '3Gi',
+    replicas: '2',
+    replicasMax: '5'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -132,16 +147,16 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    replicas: 2,
-    maxReplicas: 2,
-    logLevel: 'info'
+    replicas: 3,
+    maxReplicas: 6,
+    logLevel: 'info',
+    cpuRequest: '200m',
+    cpuLimit: '1000m',
+    memoryRequest: '512Mi',
+    memoryLimit: '3Gi',
+    replicas: '2',
+    replicasMax: '5'
   }
 };
-
-// This callback forces the node process to exit as failure.
-process.on('unhandledRejection', (reason, promise) => {
-  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 module.exports = exports = { phases, options };
