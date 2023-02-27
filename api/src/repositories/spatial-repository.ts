@@ -387,14 +387,14 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
+            'ssc.submission_observation_id',
             'ssc.spatial_component',
             'ssc.geography'
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
           .groupBy('ssc.submission_spatial_component_id')
-          .groupBy('ssc.submission_id')
+          .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.geography');
 
@@ -419,7 +419,7 @@ export class SpatialRepository extends BaseRepository {
             knex.raw(
               `
                 submission_spatial_component_id,
-                submission_id,
+                submission_observation_id,
                 geography,
                 jsonb_build_object(
                   'submission_spatial_component_id',
@@ -487,7 +487,7 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
+            'ssc.submission_observation_id',
             'ssc.spatial_component',
             'ssc.secured_spatial_component',
             'ssc.geography'
@@ -501,7 +501,7 @@ export class SpatialRepository extends BaseRepository {
           )
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
-          .groupBy('ssc.submission_id')
+          .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.secured_spatial_component')
           .groupBy('ssc.geography');
@@ -710,7 +710,7 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
+            'ssc.submission_observation_id',
             'ssc.spatial_component',
             'ssc.secured_spatial_component'
           )
@@ -723,7 +723,7 @@ export class SpatialRepository extends BaseRepository {
           .whereIn('ssc.submission_spatial_component_id', submission_spatial_component_ids)
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
-          .groupBy('ssc.submission_id')
+          .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.secured_spatial_component');
       })
@@ -802,7 +802,7 @@ export class SpatialRepository extends BaseRepository {
    */
   async _buildSpatialSecurityExceptions(qb: Knex.QueryBuilder, system_user_id: number) {
     const knex = getKnex();
-    qb.select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+    qb.select(knex.raw('array_agg(suse.persecution_or_harm_id) as user_security_transform_exceptions'))
       .from('system_user_security_exception as suse')
       .where('suse.system_user_id', system_user_id);
   }
