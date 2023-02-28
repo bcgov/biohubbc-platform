@@ -1,9 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  resourceVersion: ''
-  selfLink: ''
   name: biohub-platform-api-dc
+  labels:
+    build: biohub-platform-api
 parameters:
   - name: ENABLE_FILE_VIRUS_SCAN
     value: 'true'
@@ -66,9 +66,6 @@ parameters:
   - name: KEYCLOAK_CLIENT_ID
     description: Client Id for application
     required: true
-  - name: KEYCLOAK_ADMIN_HOST
-    description: Keycloak admin host
-    required: true
   - name: KEYCLOAK_ADMIN_USERNAME
     description: keycloak host admin username
     required: true
@@ -114,8 +111,7 @@ parameters:
     value: '2Gi'
   - name: REPLICAS
     value: '1'
-  - name: REPLICA_MAX
-    required: true
+  - name: REPLICAS_MAX
     value: '1'
 objects:
   - apiVersion: image.openshift.io/v1
@@ -142,7 +138,7 @@ objects:
         role: api
       name: ${NAME}${SUFFIX}
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -209,8 +205,6 @@ objects:
                   value: ${KEYCLOAK_CLIENT_ID}
                 - name: KEYCLOAK_INTEGRATION_ID
                   value: ${KEYCLOAK_INTEGRATION_ID}
-                - name: KEYCLOAK_ADMIN_HOST
-                  value: ${KEYCLOAK_ADMIN_HOST}
                 - name: KEYCLOAK_ADMIN_USERNAME
                   value: ${KEYCLOAK_ADMIN_USERNAME}
                 - name: KEYCLOAK_ADMIN_PASSWORD
@@ -393,8 +387,8 @@ objects:
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
-      maxReplicas: '${{REPLICA_MAX}}'
-      minReplicas: '${{REPLICAS}}'
+      minReplicas: ${{REPLICAS}}
+      maxReplicas: ${{REPLICAS_MAX}}
       scaleTargetRef:
         apiVersion: v1
         kind: DeploymentConfig

@@ -687,6 +687,13 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Query builder to find spatial component from a given submission id, no security
+   *
+   * @param {number[]} submission_spatial_component_ids
+   * @return {*}  {Promise<ISpatialComponentFeaturePropertiesRow[]>}
+   * @memberof SpatialRepository
+   */
   async findSpatialMetadataBySubmissionSpatialComponentIds(
     submission_spatial_component_ids: number[]
   ): Promise<ISpatialComponentFeaturePropertiesRow[]> {

@@ -15,8 +15,6 @@
     "start-reload": "./node_modules/.bin/nodemon src/app.ts --exec ts-node",
     "queue": "ts-node src/queue",
     "queue-reload": "./node_modules/.bin/nodemon src/queue.ts --exec ts-node",
-    "migrate-latest": "knex migrate-latest",
-    "migrate-rollback": "knex migrate-rollback",
     "test": "mocha",
     "test-watch": "mocha --watch",
     "coverage": "nyc mocha",

@@ -64,7 +64,6 @@ describe('LogOutPage', () => {
         clientId: ''
       },
       SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      N8N_HOST: '',
       REACT_APP_NODE_ENV: 'local',
       MAX_UPLOAD_NUM_FILES: 10,
       MAX_UPLOAD_FILE_SIZE: 52428800
@@ -97,7 +96,6 @@ describe('LogOutPage', () => {
         clientId: ''
       },
       SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      N8N_HOST: '',
       REACT_APP_NODE_ENV: 'local',
       MAX_UPLOAD_NUM_FILES: 10,
       MAX_UPLOAD_FILE_SIZE: 52428800

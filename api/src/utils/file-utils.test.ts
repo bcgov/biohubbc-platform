@@ -318,7 +318,6 @@ describe('file-utils', () => {
         Body: Buffer.from('helloworld'),
         Key: 'my-upload-key',
         ContentType: 'test-mimetype',
-        ACL: 'authenticated-read',
         Metadata: { test_name: 'test_value' }
       });
       expect(result).to.eql({
@@ -378,7 +377,6 @@ describe('file-utils', () => {
         Body: Buffer.from('helloworld'),
         ContentType: 'test-mimetype',
         Key: 'my-upload-key',
-        ACL: 'authenticated-read',
         Metadata: {}
       });
       expect(result).to.eql({
@@ -417,7 +415,6 @@ describe('file-utils', () => {
         Body: Buffer.from('helloworld'),
         ContentType: 'test-mimetype',
         Key: 'my-upload-key',
-        ACL: 'authenticated-read',
         Metadata: { test_name: 'test_value' }
       });
       expect(result).to.eql({
