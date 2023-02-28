@@ -40,7 +40,7 @@ describe('parseSpatialDataByType', () => {
       {
         taxa_data: [
           {
-            associated_taxa: 'M-ALAM',
+            taxon_id: 'M-ALAM',
             vernacular_name: 'Moose',
             submission_spatial_component_id: 1
           }

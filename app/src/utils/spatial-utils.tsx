@@ -118,8 +118,8 @@ const occurrenceMarkerSetup = (
 ): IMarker | null => {
   const submission_ids: number[] = taxaData
     .filter((item: ITaxaData) => {
-      if (item.associated_taxa) {
-        return datasetVisibility[item.associated_taxa] === undefined ? true : datasetVisibility[item.associated_taxa];
+      if (item.taxon_id) {
+        return datasetVisibility[item.taxon_id] === undefined ? true : datasetVisibility[item.taxon_id];
       }
       return false;
     })
@@ -179,18 +179,17 @@ export const parseOccurrenceResults = (
   data.forEach((spatialData) => {
     spatialData.taxa_data.forEach((item) => {
       // need to check if it is an occurrence or not
-      if (isOccurrenceFeature(spatialData.spatial_data.features[0]) && item.associated_taxa) {
-        if (taxaMap[item.associated_taxa] === undefined) {
-          taxaMap[item.associated_taxa] = {
-            key: item.associated_taxa,
-            name: `${item.vernacular_name} (${item.associated_taxa})`,
+      if (isOccurrenceFeature(spatialData.spatial_data.features[0]) && item.taxon_id) {
+        if (taxaMap[item.taxon_id] === undefined) {
+          taxaMap[item.taxon_id] = {
+            key: item.taxon_id,
+            name: `${item.vernacular_name} (${item.taxon_id})`,
             count: 0,
-            visible:
-              datasetVisibility[item.associated_taxa] !== undefined ? datasetVisibility[item.associated_taxa] : true
+            visible: datasetVisibility[item.taxon_id] !== undefined ? datasetVisibility[item.taxon_id] : true
           };
         }
 
-        taxaMap[item.associated_taxa].count++;
+        taxaMap[item.taxon_id].count++;
       }
     });
   });

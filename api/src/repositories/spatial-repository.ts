@@ -61,7 +61,7 @@ export interface ISpatialComponentsSearchCriteria {
 export type EmptyObject = Record<string, never>;
 
 export interface ITaxaData {
-  associated_taxa?: string;
+  taxon_id?: string;
   vernacular_name?: string;
   submission_spatial_component_id: number;
 }
@@ -370,6 +370,7 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
+
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)
@@ -381,7 +382,7 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
             knex.raw(
-              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, taxonID}' as taxon_id"
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
@@ -424,8 +425,8 @@ export class SpatialRepository extends BaseRepository {
                 jsonb_build_object(
                   'submission_spatial_component_id',
                     wfsc.submission_spatial_component_id,
-                  'associated_taxa',
-                    wfsc.associated_taxa,
+                  'taxon_id',
+                    wfsc.taxon_id,
                   'vernacular_name',
                     wfsc.vernacular_name
                 ) taxa_data_object,
@@ -466,7 +467,6 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
-
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)
@@ -481,7 +481,7 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
             knex.raw(
-              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, taxonID}' as taxon_id"
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
@@ -572,7 +572,7 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Append where clause condition for spatial component associatedTaxa.
+   * Append where clause condition for spatial component taxonID.
    *
    * @param {string[]} species
    * @param {Knex.QueryBuilder} qb1
@@ -585,7 +585,7 @@ export class SpatialRepository extends BaseRepository {
         // Append OR clause for each item in species array
         qb2.or.where((qb3) => {
           qb3.whereRaw(
-            `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.associatedTaxa == "${singleSpecies}")')`
+            `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.taxonID == "${singleSpecies}")')`
           );
         });
       }
@@ -602,7 +602,12 @@ export class SpatialRepository extends BaseRepository {
   _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
     qb1.where((qb2) => {
       qb2.whereRaw(
-        `submission_id in (select submission_id from submission where uuid in (${"'" + datasetIDs.join("','") + "'"}))`
+        `submission_observation_id IN (
+            SELECT so.submission_observation_id
+            FROM submission_observation so
+            LEFT JOIN submission s
+            ON so.submission_id = s.submission_id
+            WHERE s.uuid in (${"'" + datasetIDs.join("','") + "'"}))`
       );
     });
   }
@@ -711,7 +716,7 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
             knex.raw(
-              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, taxonID}' as taxon_id"
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
@@ -776,8 +781,8 @@ export class SpatialRepository extends BaseRepository {
       jsonb_build_object(
         'submission_spatial_component_id',
           wfscwst.submission_spatial_component_id,
-        'associated_taxa',
-          wfscwst.associated_taxa,
+        'taxon_id',
+          wfscwst.taxon_id,
         'vernacular_name',
           wfscwst.vernacular_name
       ) taxa_data_object,
