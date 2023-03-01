@@ -7,7 +7,7 @@ import { SYSTEM_ROLE } from '../constants/roles';
 import { ApiError } from '../errors/api-error';
 import { Models } from '../models';
 import { UserObject } from '../models/user';
-import { IGetRoles, IGetUser, IInsertUser, UserRepository } from '../repositories/user-repository';
+import { SystemRoles, SystemUser, SystemUserExtended, UserRepository } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { UserService } from './user-service';
 
@@ -24,7 +24,7 @@ describe('UserService', () => {
 
       const mockResponseRow = [{ system_role_id: 1, name: 'admin' }];
       const mockUserRepository = sinon.stub(UserRepository.prototype, 'getRoles');
-      mockUserRepository.resolves(mockResponseRow as IGetRoles[]);
+      mockUserRepository.resolves(mockResponseRow as SystemRoles[]);
 
       const userService = new UserService(mockDBConnection);
 
@@ -45,7 +45,7 @@ describe('UserService', () => {
 
       const mockResponseRow = { system_user_id: 123 };
       const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserById');
-      mockUserRepository.resolves(mockResponseRow as unknown as IGetUser);
+      mockUserRepository.resolves(mockResponseRow as unknown as SystemUserExtended);
 
       const userService = new UserService(mockDBConnection);
 
@@ -79,7 +79,7 @@ describe('UserService', () => {
 
       const mockResponseRow = [{ system_user_id: 123 }];
       const mockUserRepository = sinon.stub(UserRepository.prototype, 'getUserByGuid');
-      mockUserRepository.resolves(mockResponseRow as unknown as IGetUser[]);
+      mockUserRepository.resolves(mockResponseRow as unknown as SystemUserExtended[]);
 
       const userService = new UserService(mockDBConnection);
 
@@ -136,7 +136,7 @@ describe('UserService', () => {
 
       const mockRowObj = { system_user_id: 123 };
       const mockUserRepository = sinon.stub(UserRepository.prototype, 'addSystemUser');
-      mockUserRepository.resolves(mockRowObj as unknown as IInsertUser);
+      mockUserRepository.resolves(mockRowObj as unknown as SystemUser);
 
       const userService = new UserService(mockDBConnection);
 
@@ -173,7 +173,7 @@ describe('UserService', () => {
 
       const mockResponseRows = [{ system_user_id: 123 }, { system_user_id: 456 }, { system_user_id: 789 }];
       const mockUserRepository = sinon.stub(UserRepository.prototype, 'listSystemUsers');
-      mockUserRepository.resolves(mockResponseRows as IGetUser[]);
+      mockUserRepository.resolves(mockResponseRows as SystemUserExtended[]);
 
       const userService = new UserService(mockDBConnection);
 

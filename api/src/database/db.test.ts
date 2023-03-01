@@ -406,7 +406,7 @@ describe('db', () => {
 
       expect(getDBConnectionStub).to.have.been.calledWith({
         preferred_username: `${DB_USERNAME}@database`,
-        identity_provider: 'database'
+        identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
       });
     });
   });

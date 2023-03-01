@@ -2,7 +2,7 @@ import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { Models } from '../models';
-import { IGetRoles, UserRepository } from '../repositories/user-repository';
+import { SystemRoles, UserRepository } from '../repositories/user-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 
@@ -19,10 +19,10 @@ export class UserService extends DBService {
   /**
    * Get all system roles in db
    *
-   * @return {*}  {Promise<IGetRoles[]>}
+   * @return {*}  {Promise<SystemRoles[]>}
    * @memberof UserService
    */
-  async getRoles(): Promise<IGetRoles[]> {
+  async getRoles(): Promise<SystemRoles[]> {
     return this.userRepository.getRoles();
   }
 
