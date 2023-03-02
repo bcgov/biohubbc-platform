@@ -3,9 +3,10 @@ import { describe } from 'mocha';
 import * as pg from 'pg';
 import Sinon, { SinonStub } from 'sinon';
 import SQL from 'sql-template-strings';
-import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
+import { getMockDBConnection } from '../__mocks__/db';
 import * as db from './db';
 import {
   DB_CLIENT,
@@ -396,18 +397,35 @@ describe('db', () => {
 
   describe('getAPIUserDBConnection', () => {
     it('calls getDBConnection for the biohub_api user', () => {
-      const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(
-        'stubbed DBConnection object' as unknown as IDBConnection
-      );
+      const mockDBConnection = getMockDBConnection();
+      const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
       getAPIUserDBConnection();
 
       const DB_USERNAME = process.env.DB_USER_API;
 
       expect(getDBConnectionStub).to.have.been.calledWith({
-        preferred_username: `${DB_USERNAME}@database`,
+        preferred_username: `${DB_USERNAME}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
         identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
       });
+
+      getDBConnectionStub.restore();
+    });
+  });
+
+  describe('getServiceAccountDBConnection', () => {
+    it('calls getDBConnection for a service account user', () => {
+      const mockDBConnection = getMockDBConnection();
+      const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      db.getServiceAccountDBConnection(SOURCE_SYSTEM['SIMS-SVC-4464']);
+
+      expect(getDBConnectionStub).to.have.been.calledWith({
+        preferred_username: `service-account-${SOURCE_SYSTEM['SIMS-SVC-4464']}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
+        identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
+      });
+
+      getDBConnectionStub.restore();
     });
   });
 
