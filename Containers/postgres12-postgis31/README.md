@@ -49,11 +49,3 @@ _NOTE_: This is meant for BC Gov Openshift (OCP4) Builds, as access to Redhat im
 ## License
 
 Code released under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0).
-
-## Image creation
-
-The image was created by pushing an existing image into the platform namespace use the OpenShift developer tools.
-
-```
-oc-push-image.sh -r image-registry.apps.silver.devops.gov.bc.ca -i image-registry.apps.silver.devops.gov.bc.ca/af2668-tools/postgis-postgres:12-31 -n a0ec71-tools
-```
