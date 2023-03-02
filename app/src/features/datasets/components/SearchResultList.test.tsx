@@ -47,7 +47,7 @@ describe('SearchResultList', () => {
 
   it('renders a component', () => {
     const { getByText } = render(<SearchResultComponent />);
-    expect(getByText('Found 1 records', { exact: false })).toBeVisible();
+    expect(getByText('Found 1 record', { exact: false })).toBeVisible();
   });
 
   it('backToSearch is called', () => {
