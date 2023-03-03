@@ -157,7 +157,7 @@ describe('SpatialService', () => {
         .stub(SpatialRepository.prototype, 'insertSpatialTransformSubmissionRecord')
         .resolves();
 
-      await spatialService.runSpatialTransforms(9, 9);
+      await spatialService.runSpatialTransforms(9);
 
       expect(getSpatialTransformRecordsStub).to.be.calledOnceWith();
       expect(runSpatialTransformOnSubmissionIdStub).to.be.calledWith(9, 'transform1').calledWith(9, 'transform2');

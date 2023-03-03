@@ -423,11 +423,15 @@ export class SubmissionRepository extends BaseRepository {
       SELECT
         eml_json_source
       FROM
+        submission_metadata
+      LEFT JOIN
         submission
+      ON
+        submission_metadata.submission_id = submission.submission_id
       WHERE
         submission.uuid = ${datasetId}
       AND
-        record_end_date IS NULL;
+        submission_metadata.record_end_timestamp IS NULL;
     `;
 
     return this.connection.sql<{ eml_json_source: string }>(sqlStatement);
