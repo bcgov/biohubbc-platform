@@ -677,6 +677,9 @@ export class SpatialRepository extends BaseRepository {
         qb1
           .select()
           .from('submission_spatial_component as ssc')
+          // Filter out submission_spatial_component records for end dated submission_observation records
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .where('so.record_end_timestamp', null)
           .whereIn('submission_spatial_component_id', submission_spatial_component_ids);
       })
       .select(
@@ -727,6 +730,9 @@ export class SpatialRepository extends BaseRepository {
             'ssc.secured_spatial_component'
           )
           .from('submission_spatial_component as ssc')
+          // Filter out submission_spatial_component records for end dated submission_observation records
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .where('so.record_end_timestamp', null)
           .leftJoin(
             'security_transform_submission as sts',
             'sts.submission_spatial_component_id',
