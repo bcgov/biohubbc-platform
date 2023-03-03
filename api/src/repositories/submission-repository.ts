@@ -448,10 +448,13 @@ export class SubmissionRepository extends BaseRepository {
         FROM
           submission_spatial_component ssc,
           jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
-          submission s
+          submission s,
+          submission_observation so
         WHERE s.uuid = ${datasetId}
-        AND ssc.submission_id = s.submission_id
-        AND s.record_end_date is null
+        AND so.submission_id = s.submission_id 
+        AND ssc.submission_observation_id = so.submission_observation_id
+        AND so.record_end_timestamp is null
+        AND so.security_review_timestamp is not null
         GROUP BY spatial_type;
       `;
     const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
