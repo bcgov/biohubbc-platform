@@ -10,7 +10,8 @@ import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
-  ISubmissionModel
+  ISubmissionModel,
+  SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet } from '../utils/media/csv/csv-file';
@@ -696,8 +697,8 @@ describe('DarwinCoreService', () => {
 
       await service.runTransformsOnObservations(mockJobQueue, 1);
 
-      expect(transform).to.be.calledOnce;
-      expect(security).to.be.calledOnce;
+      expect(transform).to.be.calledOnceWith(mockJobQueue, 1);
+      expect(security).to.be.calledOnceWith(mockJobQueue, 1);
       expect(insertErrorStatus).to.not.be.called;
     });
 
@@ -719,7 +720,7 @@ describe('DarwinCoreService', () => {
         await service.runTransformsOnObservations(mockJobQueue, 1);
         expect.fail();
       } catch (error) {
-        expect(transform).to.be.calledOnce;
+        expect(transform).to.be.calledOnceWith(mockJobQueue, 1);
         expect(security).to.not.be.called;
         expect(insertErrorStatus).to.be.calledOnce;
         expect((error as ApiGeneralError).message).to.equal('Running Transforms on Observation Data');
@@ -746,10 +747,13 @@ describe('DarwinCoreService', () => {
       const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
-      await service.runSpatialTransforms(mockJobQueue, 1);
+      await service.runSpatialTransforms(mockJobQueue, 2);
 
-      expect(transform).to.be.calledOnce;
-      expect(status).to.be.calledOnce;
+      expect(transform).to.be.calledOnceWith(2);
+      expect(status).to.be.calledOnceWith(
+        mockJobQueue.submission_id,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
+      );
       expect(insertErrorStatus).to.not.be.called;
     });
 

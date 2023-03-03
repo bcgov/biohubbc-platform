@@ -5,7 +5,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SpatialService } from '../../../services/spatial-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/eml/get');
+const defaultLog = getLogger('paths/dwc/spatial/metadata');
 
 export const GET: Operation = [getSpatialMetadataBySubmissionSpatialComponentIds()];
 
