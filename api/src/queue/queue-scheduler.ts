@@ -200,6 +200,8 @@ export class QueueScheduler {
       await connection.open();
 
       const jobQueueService = new SubmissionJobQueueService(connection);
+
+      console.log('jobQueueService:', jobQueueService);
       // Initialize the job queue record by setting its start time.
       await jobQueueService.startQueueRecord(jobQueueRecord.submission_job_queue_id);
 

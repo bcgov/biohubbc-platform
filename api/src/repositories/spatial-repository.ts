@@ -65,6 +65,7 @@ export interface ITaxaData {
   vernacular_name?: string;
   submission_spatial_component_id: number;
 }
+
 export interface ISubmissionSpatialSearchResponseRow {
   taxa_data: ITaxaData[];
   spatial_component: {
@@ -245,8 +246,13 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ITransformRow[]>}
    * @memberof SpatialRepository
    */
-  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
-    const response = await this.connection.query(transform, [submissionId]);
+  async runSpatialTransformOnSubmissionObservationId(
+    submissionObservationId: number,
+    transform: string
+  ): Promise<ITransformSpatialRow[]> {
+    console.log('submissionId: ', submissionObservationId);
+    console.log('transform: ', transform);
+    const response = await this.connection.query(transform, [submissionObservationId]);
 
     return response.rows;
   }
@@ -394,6 +400,8 @@ export class SpatialRepository extends BaseRepository {
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
+          //.leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          //.whereNull('so.record_end_timestamp')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
@@ -404,6 +412,7 @@ export class SpatialRepository extends BaseRepository {
         }
 
         if (criteria.species?.length) {
+          console.log('species selected: ', criteria.species);
           this._whereSpeciesIn(criteria.species, qb1);
         }
 
@@ -451,7 +460,15 @@ export class SpatialRepository extends BaseRepository {
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
 
+    console.log('**********As admin user*************');
+    console.log('**********criteria: ', criteria);
+
+    const qbString = queryBuilder.toSQL().toNative().sql;
+
+    console.log(qbString);
+
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
+    console.log('response to projects centroids: ', response);
 
     return response.rows;
   }
@@ -467,6 +484,12 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
+
+    // non-admin rules:
+    // see the secured spatial component if it is not null (and if you do not have an exception to all security rules applied to it),
+    // otherwise you see the non-secured spatial component
+    //
+
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)
@@ -494,11 +517,13 @@ export class SpatialRepository extends BaseRepository {
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
+          //.leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
           .leftJoin(
             'security_transform_submission as sts',
             'sts.submission_spatial_component_id',
             'ssc.submission_spatial_component_id'
           )
+          //.whereNull('so.record_end_timestamp')
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_observation_id')
@@ -525,7 +550,7 @@ export class SpatialRepository extends BaseRepository {
         qb7
           .select(
             'submission_spatial_component_id',
-            'submission_id',
+            'submission_observation_id',
             'geography',
             this._buildSelectForSecureNonSecureSpatialComponents()
           )
@@ -546,6 +571,12 @@ export class SpatialRepository extends BaseRepository {
       // The user is not allowed to see any aspect of these particular spatial components
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
+
+    console.log('**********As non admin user*************');
+
+    const qbString = queryBuilder.toSQL().toNative().sql;
+
+    console.log(qbString);
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -573,6 +604,7 @@ export class SpatialRepository extends BaseRepository {
 
   /**
    * Append where clause condition for spatial component taxonID.
+   * Append where clause condition for spatial component taxonID
    *
    * @param {string[]} species
    * @param {Knex.QueryBuilder} qb1
@@ -602,12 +634,9 @@ export class SpatialRepository extends BaseRepository {
   _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
     qb1.where((qb2) => {
       qb2.whereRaw(
-        `submission_observation_id IN (
-            SELECT so.submission_observation_id
-            FROM submission_observation so
-            LEFT JOIN submission s
-            ON so.submission_id = s.submission_id
-            WHERE s.uuid in (${"'" + datasetIDs.join("','") + "'"}))`
+        `submission_observation_id in (select submission_observation_id from submission_observation so left join submission s on so.submission_id = s.submission_id where s.uuid in (${
+          "'" + datasetIDs.join("','") + "'"
+        }))`
       );
     });
   }
@@ -796,7 +825,7 @@ export class SpatialRepository extends BaseRepository {
         'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component
-            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial component (non-secure, no exceptions required)
             case
               when
                 wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms

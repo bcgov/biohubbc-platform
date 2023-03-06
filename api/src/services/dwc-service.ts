@@ -48,17 +48,32 @@ export class DarwinCoreService extends DBService {
   async intakeJob(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
     const submissionMetadataId = await this.intakeJob_step1(intakeRecord.submission_id);
 
+    console.log('intake job 1 complete');
+
     const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
+
+    console.log('intake job 2 complete');
+
+    console.log('we have a dwcaFile');
 
     await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
+    console.log('intake job 3 complete');
+
     await this.intakeJob_step4(intakeRecord.submission_id);
+
+    console.log('intake job 4 complete');
 
     await this.intakeJob_step5(intakeRecord.submission_id);
 
+    console.log('intake job 5 complete');
+
     await this.intakeJob_step6(intakeRecord, dwcaFile);
 
+    console.log('intake job 6 complete');
+
     await this.intakeJob_finishIntake(intakeRecord);
+    console.log('intake jobs finished');
   }
 
   /**
@@ -212,8 +227,10 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intakeJob_step5(submissionId: number): Promise<void> {
+    console.log('inside intakeJob_step5');
     try {
       await this.transformAndUploadMetaData(submissionId);
+      console.log('await this.transformAndUploadMetaData(submissionId) complete');
 
       await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
     } catch (error: any) {

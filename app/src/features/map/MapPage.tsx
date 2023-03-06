@@ -64,6 +64,8 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
 
   const [parsedSearchResults, setParsedSearchResults] = useState<ISearchResult[]>([]);
 
+  console.log('parsedSearchResults: ', parsedSearchResults);
+
   useEffect(() => {
     if (!mapDataLoader.data) {
       return;

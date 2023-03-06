@@ -89,7 +89,7 @@ GET.apiDoc = {
                         type: 'number',
                         minimum: 1
                       },
-                      associated_taxa: {
+                      taxon_id: {
                         type: 'string',
                         nullable: true
                       },
@@ -128,6 +128,10 @@ GET.apiDoc = {
 
 export function searchSpatialComponents(): RequestHandler {
   return async (req, res) => {
+    //console.log('request.query.boundary is: ', req.query.boundary);
+
+    //console.log(typeof req.query.boundary);
+
     const boundaries: Feature[] = [];
     if (req.query.boundary?.length) {
       const boundariesArray: string[] = req.query.boundary as string[];
@@ -136,12 +140,16 @@ export function searchSpatialComponents(): RequestHandler {
       });
     }
 
+    console.log('boundaries- after: ', boundaries);
+
     const criteria = {
       type: (req.query.type as string[]) || [],
       species: (req.query.species as string[]) || [],
       datasetID: (req.query.datasetID as string[]) || [],
       boundary: boundaries
     };
+
+    console.log('criteria is: ', criteria);
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
@@ -152,25 +160,27 @@ export function searchSpatialComponents(): RequestHandler {
 
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
 
+      console.log('response searching for observations by species is: ', response);
+
+      const structuredResponse = response.map((row) => {
+        const { spatial_component, taxa_data } = row;
+        const { spatial_data, ...rest } = spatial_component;
+        return {
+          taxa_data,
+          ...rest,
+          spatial_data: {
+            ...spatial_data,
+            features: spatial_data.features.map((feature) => {
+              delete feature?.properties?.dwc;
+              return feature;
+            })
+          }
+        };
+      });
+
       await connection.commit();
 
-      res.status(200).json(
-        response.map((row) => {
-          const { spatial_component, taxa_data } = row;
-          const { spatial_data, ...rest } = spatial_component;
-          return {
-            taxa_data,
-            ...rest,
-            spatial_data: {
-              ...spatial_data,
-              features: spatial_data.features.map((feature) => {
-                delete feature?.properties?.dwc;
-                return feature;
-              })
-            }
-          };
-        })
-      );
+      res.status(200).json(structuredResponse);
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();
