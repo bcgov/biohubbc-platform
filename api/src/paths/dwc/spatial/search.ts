@@ -152,8 +152,6 @@ export function searchSpatialComponents(): RequestHandler {
 
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
 
-      console.log('response searching for observations by species is: ', response);
-
       const structuredResponse = response.map((row) => {
         const { spatial_component, taxa_data } = row;
         const { spatial_data, ...rest } = spatial_component;
