@@ -96,8 +96,8 @@ const phases = {
     cpuLimit: '500m',
     memoryRequest: '512Mi',
     memoryLimit: '2Gi',
-    replicas: (isStaticDeployment && '2') || '1',
-    replicasMax: (isStaticDeployment && '3') || '1'
+    replicas: '1',
+    replicasMax: (isStaticDeployment && '2') || '1'
   },
   test: {
     namespace: 'a0ec71-test',
