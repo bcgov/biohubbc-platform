@@ -45,14 +45,10 @@ export class SubmissionJobQueueService extends DBService {
     const key = await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
     let submission = await submissionService.getSubmissionIdByUUID(dataUUID);
 
-    console.log('submissionId is: ', submission);
-
     if (!submission) {
-      console.log('creating a new submission: ');
       // Create a submission if one does not exist
       const currentUserId = this.connection.systemUserId();
 
-      console.log('currentUserId:', currentUserId);
       const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
       submission = await submissionService.insertSubmissionRecord({
         uuid: dataUUID,
@@ -61,7 +57,7 @@ export class SubmissionJobQueueService extends DBService {
     }
 
     const queueRecord = await this.createQueueJob(nextJobId.queueId, submission.submission_id, key, securityRequest);
-    console.log('we have a queue recors at the service level');
+
     await submissionService.insertSubmissionStatusAndMessage(
       submission.submission_id,
       SUBMISSION_STATUS_TYPE.INGESTED,
