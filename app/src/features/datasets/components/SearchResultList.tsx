@@ -32,8 +32,6 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
   const [datasetVisibility, setDatasetVisibility] = useState<IDatasetVisibility>({});
   const { searchResults } = props;
 
-  console.log('searchResults: ', searchResults);
-
   useEffect(() => {
     const visibility = datasetVisibility;
     searchResults.forEach((item) => {

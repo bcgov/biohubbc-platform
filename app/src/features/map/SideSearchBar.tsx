@@ -71,8 +71,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
       });
     });
 
-    console.log('Feature Array: ', featureArray);
-
     const species_array: string[] = [];
     values.species_list.forEach((item) => {
       species_array.push(item.value.toString());
@@ -101,7 +99,6 @@ const SideSearchBar: React.FC<SideSearchBarProps> = (props) => {
   }, [props.mapDataLoader.isLoading, props.mapDataLoader.isReady]);
 
   const hasResults = props.searchResults.length > 0;
-  console.log('hasResults: ', hasResults);
 
   return (
     <>

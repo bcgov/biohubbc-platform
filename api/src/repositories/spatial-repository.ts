@@ -395,8 +395,8 @@ export class SpatialRepository extends BaseRepository {
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
-          //.leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
-          //.whereNull('so.record_end_timestamp')
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .whereNull('so.record_end_timestamp')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
@@ -407,7 +407,6 @@ export class SpatialRepository extends BaseRepository {
         }
 
         if (criteria.species?.length) {
-          console.log('species selected: ', criteria.species);
           this._whereSpeciesIn(criteria.species, qb1);
         }
 
@@ -455,15 +454,7 @@ export class SpatialRepository extends BaseRepository {
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
 
-    console.log('**********As admin user*************');
-    console.log('**********criteria: ', criteria);
-
-    const qbString = queryBuilder.toSQL().toNative().sql;
-
-    console.log(qbString);
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
-    console.log('response to projects centroids: ', response);
 
     return response.rows;
   }
@@ -566,12 +557,6 @@ export class SpatialRepository extends BaseRepository {
       // The user is not allowed to see any aspect of these particular spatial components
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
-
-    console.log('**********As non admin user*************');
-
-    const qbString = queryBuilder.toSQL().toNative().sql;
-
-    console.log(qbString);
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
@@ -844,9 +829,11 @@ export class SpatialRepository extends BaseRepository {
    */
   async _buildSpatialSecurityExceptions(qb: Knex.QueryBuilder, system_user_id: number) {
     const knex = getKnex();
-    qb.select(knex.raw('array_agg(suse.persecution_or_harm_id) as user_security_transform_exceptions'))
+    qb.select(knex.raw('array_remove(array_agg(st.security_transform_id), null) as user_security_transform_exceptions'))
       .from('system_user_security_exception as suse')
-      .where('suse.system_user_id', system_user_id);
+      .leftJoin('security_transform as st', 'st.persecution_or_harm_id', 'suse.persecution_or_harm_id')
+      .where('suse.system_user_id', system_user_id)
+      .and.whereRaw('(suse.end_date is null or now() < suse.end_date)');
   }
 
   /**

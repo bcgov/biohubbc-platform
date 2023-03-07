@@ -346,15 +346,9 @@ export class SubmissionService extends DBService {
     submission_status_id: number;
     submission_message_id: number;
   }> {
-    console.log('submissionId', submissionId);
-    console.log('submissionStatusType:', submissionStatusType);
-    console.log('submissionMessageType:', submissionMessageType);
-    console.log('submissionMessage', submissionMessage);
     const submission_status_id = (
       await this.submissionRepository.insertSubmissionStatus(submissionId, submissionStatusType)
     ).submission_status_id;
-
-    console.log('submission_status_id', submission_status_id);
 
     const submission_message_id = (
       await this.submissionRepository.insertSubmissionMessage(
@@ -363,8 +357,6 @@ export class SubmissionService extends DBService {
         submissionMessage
       )
     ).submission_message_id;
-
-    console.log('submission_message_id: ', submission_message_id);
 
     return {
       submission_status_id,

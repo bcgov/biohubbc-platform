@@ -420,19 +420,19 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<QueryResult<{ eml_json_source: string }>> {
     const sqlStatement = SQL`
-      SELECT
-        eml_json_source
-      FROM
-        submission_metadata sm
-      LEFT JOIN
-        submission s
-      ON
-        sm.submission_id = s.submission_id
-      WHERE
-        s.uuid = ${datasetId}
-      AND
-        sm.record_end_timestamp IS NULL;
-    `;
+    SELECT
+      eml_json_source
+    FROM
+      submission_metadata
+    LEFT JOIN
+      submission
+    ON
+      submission_metadata.submission_id = submission.submission_id
+    WHERE
+      submission.uuid = ${datasetId}
+    AND
+      submission_metadata.record_end_timestamp IS NULL;
+`;
 
     return this.connection.sql<{ eml_json_source: string }>(sqlStatement);
   }
