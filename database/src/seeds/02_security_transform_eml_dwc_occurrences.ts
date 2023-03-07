@@ -14,19 +14,19 @@ export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SCHEMA '${DB_SCHEMA}';
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
-    
+
     INSERT INTO security_transform (
       persecution_or_harm_id,
-      name, 
+      name,
       description,
       transform
     ) VALUES (
-      1, 
-      'DwC Occurrences', 
+      1,
+      'DwC Occurrences',
       'Assigns Persecution and Harm Rules',
       $transform$
         WITH submissionobservation AS (
-          select 
+          select
             submission_observation_id
           from
             submission_observation
@@ -36,14 +36,14 @@ export async function seed(knex: Knex): Promise<void> {
             record_end_timestamp is null
         ),
         with_spatial_component AS (
-          SELECT 
+          SELECT
             spatial_component,
-            submission_spatial_component_id 
-          FROM 
-            submission_spatial_component,
+            submission_spatial_component_id
+          FROM
+            submission_spatial_component ssc,
             submissionobservation
-          WHERE 
-            submission_observation_id = submissionobservation.submission_observation_id
+          WHERE
+            ssc.submission_observation_id = submissionobservation.submission_observation_id
           AND
             jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "Occurrence")')
         )
