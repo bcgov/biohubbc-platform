@@ -246,13 +246,8 @@ export class SpatialRepository extends BaseRepository {
    * @return {*}  {Promise<ITransformRow[]>}
    * @memberof SpatialRepository
    */
-  async runSpatialTransformOnSubmissionObservationId(
-    submissionObservationId: number,
-    transform: string
-  ): Promise<ITransformSpatialRow[]> {
-    console.log('submissionId: ', submissionObservationId);
-    console.log('transform: ', transform);
-    const response = await this.connection.query(transform, [submissionObservationId]);
+  async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
+    const response = await this.connection.query(transform, [submissionId]);
 
     return response.rows;
   }

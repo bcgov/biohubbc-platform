@@ -408,7 +408,7 @@ export class DarwinCoreService extends DBService {
   async runSpatialTransforms(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
     try {
       //run transform on observation data
-      await this.spatialService.runSpatialTransforms(submissionObservationId);
+      await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
         intakeRecord.submission_id,
