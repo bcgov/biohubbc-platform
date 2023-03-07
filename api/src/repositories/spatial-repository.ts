@@ -457,10 +457,6 @@ export class SpatialRepository extends BaseRepository {
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
 
-    // const qbString = queryBuilder.toSQL().toNative().sql;
-
-    // console.log(qbString);
-
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 
     return response.rows;
@@ -564,10 +560,6 @@ export class SpatialRepository extends BaseRepository {
       // The user is not allowed to see any aspect of these particular spatial components
       .whereRaw("spatial_component->'spatial_data' != '{}'")
       .groupBy('geography');
-
-    // const qbString = queryBuilder.toSQL().toNative().sql;
-
-    // console.log(qbString);
 
     const response = await this.connection.knex<ISubmissionSpatialSearchResponseRow>(queryBuilder);
 

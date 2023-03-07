@@ -128,10 +128,6 @@ GET.apiDoc = {
 
 export function searchSpatialComponents(): RequestHandler {
   return async (req, res) => {
-    //console.log('request.query.boundary is: ', req.query.boundary);
-
-    //console.log(typeof req.query.boundary);
-
     const boundaries: Feature[] = [];
     if (req.query.boundary?.length) {
       const boundariesArray: string[] = req.query.boundary as string[];
@@ -140,16 +136,12 @@ export function searchSpatialComponents(): RequestHandler {
       });
     }
 
-    console.log('boundaries- after: ', boundaries);
-
     const criteria = {
       type: (req.query.type as string[]) || [],
       species: (req.query.species as string[]) || [],
       datasetID: (req.query.datasetID as string[]) || [],
       boundary: boundaries
     };
-
-    console.log('criteria is: ', criteria);
 
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 

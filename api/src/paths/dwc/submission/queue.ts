@@ -173,7 +173,7 @@ export function queueForProcess(): RequestHandler {
       await connection.open();
       const service = new SubmissionJobQueueService(connection);
       const queueRecord = await service.intake(id, file, securityRequest);
-      console.log('we have a queueRecord: ', queueRecord);
+
       await connection.commit();
       res.status(200).json(queueRecord);
     } catch (error) {
