@@ -167,14 +167,15 @@ export class SubmissionRepository extends BaseRepository {
     const queryBuilder = getKnexQueryBuilder<any, { project_id: number }>()
       .select('submission.submission_id')
       .from('submission')
-      .leftJoin('occurrence', 'submission.submission_id', 'occurrence.submission_id');
-
+      .leftJoin('submission_observation as so', 'submission.submission_id', 'so.submission_id');
     if (criteria.keyword) {
+      // this will need to come from the darwin core area
       queryBuilder.and.where(function () {
+        // knex.raw(`jsonb_array_elements(os.darwin_core_source -> 'occurrence')`)
         this.or.whereILike('occurrence.taxonid', `%${criteria.keyword}%`);
         this.or.whereILike('occurrence.lifestage', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
         this.or.whereILike('occurrence.vernacularname', `%${criteria.keyword}%`);
+        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
         this.or.whereILike('occurrence.individualcount', `%${criteria.keyword}%`);
       });
     }
@@ -190,7 +191,6 @@ export class SubmissionRepository extends BaseRepository {
             public.ST_SetSRID(`;
 
       sqlStatement.append(geometryCollectionSQL);
-
       sqlStatement.append(`,
               4326
             )
@@ -420,8 +420,10 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<QueryResult<{ eml_json_source: string }>> {
     const sqlStatement = SQL`
-      SELECT sm.eml_json_source
-      FROM submission s, submission_metadata sm 
+      SELECT 
+        sm.eml_json_source
+      FROM 
+        submission s, submission_metadata sm 
       WHERE s.submission_id = sm.submission_id 
       AND sm.record_end_timestamp is null 
       AND s.uuid = ${datasetId};

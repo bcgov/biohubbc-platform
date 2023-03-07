@@ -81,7 +81,15 @@ export function searchSubmission(): RequestHandler {
     const searchCriteria: ISearchSubmissionCriteria = req.query || {};
 
     const connection = getDBConnection(req['keycloak_token']);
-
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
+    console.log("_____________________________")
     try {
       await connection.open();
 
