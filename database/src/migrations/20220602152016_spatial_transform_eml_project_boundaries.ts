@@ -36,13 +36,13 @@ export async function up(knex: Knex): Promise<void> {
             record_end_timestamp is null
         )
         , project_coverage as (
-          select 
-            c.cov_n, 
-            'project' project_type, 
-            c.coverage 
-          from 
-            submissionmetadata, 
-            jsonb_path_query(eml_json_source, '$.**.project.studyAreaDescription.**.geographicCoverage') with ordinality c(coverage, cov_n)
+            select 
+              c.cov_n, 
+              'project' project_type, 
+              c.coverage 
+            from 
+              submissionmetadata, 
+              jsonb_path_query(eml_json_source, '$.**.project.studyAreaDescription.**.geographicCoverage') with ordinality c(coverage, cov_n)
         )
         , related_project_coverages as (
             select 
@@ -59,7 +59,9 @@ export async function up(knex: Knex): Promise<void> {
               project_type, 
               coverage->'geographicDescription' description 
             from 
-              project_coverage union select cov_n, project_type, coverage->'geographicDescription' description from related_project_coverages
+              project_coverage union select cov_n, project_type, coverage->'geographicDescription' description
+            from
+              related_project_coverages
         )
         , coverages as (
             select 
@@ -95,14 +97,22 @@ export async function up(knex: Knex): Promise<void> {
               ll.project_type, 
               ll.poly_n, 
               ll.point_n, 
-              json_build_array(ll.long::float, ll.lat::float) point from latlongs ll
+              json_build_array(ll.long::float, ll.lat::float) point
+            from 
+              latlongs ll
         )
         , polys2 as (
             select 
               cov_n, 
               project_type, 
               poly_n, 
-              jsonb_agg(point order by point_n) poly from points group by cov_n, project_type, poly_n
+              jsonb_agg(point order by point_n) poly
+            from 
+              points
+            group by
+              cov_n, 
+              project_type, 
+              poly_n
         )
         , multipoly as (
             select 
@@ -118,9 +128,9 @@ export async function up(knex: Knex): Promise<void> {
         , features as (
             select 
               json_build_object(
-                'type','Feature',
+                'type', 'Feature',
                 'geometry', json_build_object(
-                  'type','Polygon',
+                  'type', 'Polygon',
                   'coordinates', f.mpoly
                 ), 
                 'properties', json_build_object(
@@ -145,7 +155,10 @@ export async function up(knex: Knex): Promise<void> {
               ) f
         )
         select 
-          json_build_object('type','FeatureCollection','features',jsonb_agg(feature)) result_data 
+          json_build_object(
+            'type', 'FeatureCollection', 
+            'features', jsonb_agg(feature)
+            ) result_data 
         from 
           features
       $transform$
