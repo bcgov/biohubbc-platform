@@ -2,7 +2,6 @@ import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
-  ISearchSubmissionCriteria,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -27,17 +26,6 @@ export class SubmissionService extends DBService {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
-  }
-
-  /**
-   * Search with keyword or spatial for submission IDs
-   *
-   * @param {ISearchSubmissionCriteria} submissionCriteria
-   * @return {*}  {Promise<{ submission_id: number }[]>}
-   * @memberof SubmissionService
-   */
-  async findSubmissionByCriteria(submissionCriteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
-    return this.submissionRepository.findSubmissionByCriteria(submissionCriteria);
   }
 
   /**

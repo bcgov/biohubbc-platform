@@ -3,7 +3,6 @@ import SQL from 'sql-template-strings';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
-import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface ISpatialComponentCount {
@@ -163,51 +162,6 @@ export interface ISubmissionObservationRecord {
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
-  async findSubmissionByCriteria(criteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
-    const queryBuilder = getKnexQueryBuilder<any, { project_id: number }>()
-      .select('submission.submission_id')
-      .from('submission')
-      .leftJoin('submission_observation as so', 'submission.submission_id', 'so.submission_id');
-    if (criteria.keyword) {
-      // this will need to come from the darwin core area
-      queryBuilder.and.where(function () {
-        // knex.raw(`jsonb_array_elements(os.darwin_core_source -> 'occurrence')`)
-        this.or.whereILike('occurrence.taxonid', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.lifestage', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.vernacularname', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.individualcount', `%${criteria.keyword}%`);
-      });
-    }
-
-    if (criteria.spatial) {
-      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(criteria.spatial));
-
-      const sqlStatement = SQL`
-      public.ST_INTERSECTS(
-        geography,
-        public.geography(
-          public.ST_Force2D(
-            public.ST_SetSRID(`;
-
-      sqlStatement.append(geometryCollectionSQL);
-      sqlStatement.append(`,
-              4326
-            )
-          )
-        )
-      )`);
-
-      queryBuilder.and.whereRaw(sqlStatement.sql, sqlStatement.values);
-    }
-
-    queryBuilder.groupBy('submission.submission_id');
-
-    const response = await this.connection.knex<{ submission_id: number }>(queryBuilder);
-
-    return response.rows;
-  }
-
   /**
    * Insert a new submission record.
    *
