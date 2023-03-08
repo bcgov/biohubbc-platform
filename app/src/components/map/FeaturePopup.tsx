@@ -51,7 +51,7 @@ export enum UNCOMMON_METADATA_PROPERTIES {
   'verbatimSRS' = 'Verbatim SRS',
   'occurrenceID' = 'Occurrence ID',
   'basisOfRecord' = 'Basis of Record',
-  'associatedTaxa' = 'Associated Taxa',
+  'taxonID' = 'Taxon ID',
   'verbatimCoordinates' = 'Verbatim Coordinates'
 }
 

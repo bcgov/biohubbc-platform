@@ -65,6 +65,7 @@ export interface ITaxaData {
   vernacular_name?: string;
   submission_spatial_component_id: number;
 }
+
 export interface ISubmissionSpatialSearchResponseRow {
   taxa_data: ITaxaData[];
   spatial_component: {
@@ -394,6 +395,8 @@ export class SpatialRepository extends BaseRepository {
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .whereNull('so.record_end_timestamp')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
@@ -467,6 +470,11 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
+
+    // non-admin rules:
+    // see the secured spatial component if it is not null (and if you do not have an exception to all security rules applied to it),
+    // otherwise you see the non-secured spatial component
+
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)
@@ -525,7 +533,7 @@ export class SpatialRepository extends BaseRepository {
         qb7
           .select(
             'submission_spatial_component_id',
-            'submission_id',
+            'submission_observation_id',
             'geography',
             this._buildSelectForSecureNonSecureSpatialComponents()
           )
@@ -573,6 +581,7 @@ export class SpatialRepository extends BaseRepository {
 
   /**
    * Append where clause condition for spatial component taxonID.
+   * Append where clause condition for spatial component taxonID
    *
    * @param {string[]} species
    * @param {Knex.QueryBuilder} qb1
@@ -602,12 +611,9 @@ export class SpatialRepository extends BaseRepository {
   _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
     qb1.where((qb2) => {
       qb2.whereRaw(
-        `submission_observation_id IN (
-            SELECT so.submission_observation_id
-            FROM submission_observation so
-            LEFT JOIN submission s
-            ON so.submission_id = s.submission_id
-            WHERE s.uuid in (${"'" + datasetIDs.join("','") + "'"}))`
+        `submission_observation_id in (
+          select submission_observation_id from submission_observation so
+          left join submission s on so.submission_id = s.submission_id where s.uuid in (${datasetIDs.join("','")}))`
       );
     });
   }
@@ -796,7 +802,7 @@ export class SpatialRepository extends BaseRepository {
         'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component
-            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial component (non-secure, no exceptions required)
             case
               when
                 wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
@@ -820,9 +826,11 @@ export class SpatialRepository extends BaseRepository {
    */
   async _buildSpatialSecurityExceptions(qb: Knex.QueryBuilder, system_user_id: number) {
     const knex = getKnex();
-    qb.select(knex.raw('array_agg(suse.persecution_or_harm_id) as user_security_transform_exceptions'))
+    qb.select(knex.raw('array_remove(array_agg(st.security_transform_id), null) as user_security_transform_exceptions'))
       .from('system_user_security_exception as suse')
-      .where('suse.system_user_id', system_user_id);
+      .leftJoin('security_transform as st', 'st.persecution_or_harm_id', 'suse.persecution_or_harm_id')
+      .where('suse.system_user_id', system_user_id)
+      .and.whereRaw('(suse.end_date is null or now() < suse.end_date)');
   }
 
   /**

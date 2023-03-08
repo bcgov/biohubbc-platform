@@ -10,7 +10,7 @@ export interface IGetSearchResultsResponse {
   id: string;
   name?: string;
   objectives?: string;
-  associatedtaxa?: string;
+  taxonID?: string;
   lifestage?: string;
   geometry: Feature[];
 }
