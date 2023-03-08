@@ -4,13 +4,248 @@ const DB_SCHEMA = process.env.DB_SCHEMA;
 const DB_SCHEMA_DAPI_V1 = process.env.DB_SCHEMA_DAPI_V1;
 
 /**
- * Add source_transform to parse EML json data into the json version expected elastic search.
+ * EML source Transform.
+ *
+ * Generates a JSON object containing key information from an EML file.
+ *
+ * Note: The intention of this transform is to only parse data that is relevant to supporting search. Fields that are
+ * not used in searching should not be included.
  *
  * @export
  * @param {Knex} knex
  * @return {*}  {Promise<void>}
  */
 export async function up(knex: Knex): Promise<void> {
+  const transformSQL = `
+    WITH submissionmetadata AS (
+      SELECT
+        *
+      FROM
+        submission_metadata
+      WHERE
+        submission_id = \\?
+        AND record_end_timestamp IS NULL
+    ),
+    eml AS (
+      SELECT
+        Jsonb_path_query(eml_json_source, '$."eml:eml"') eml
+      FROM
+        submissionmetadata
+    ),
+    datasets AS (
+      SELECT
+        Jsonb_path_query(eml, '$.**.dataset') dataset
+      FROM
+        eml
+    ),
+    projects AS (
+      SELECT
+        p.proj_n,
+        p.project
+      FROM
+        datasets,
+        Jsonb_path_query_first(dataset, '$.**.project') WITH ordinality p(project, proj_n)
+    ),
+    related_projects AS (
+      SELECT
+        p.proj_n,
+        p.project
+      FROM
+        datasets,
+        jsonb_path_query_first(dataset, '$.**.relatedProject[*]') WITH ordinality p(project, proj_n)
+    ),
+    projects_funding AS (
+      SELECT
+        p.proj_n,
+        pf.fund_n,
+        pf.funding
+      FROM
+        projects p,
+        jsonb_path_query_first(project, '$.funding.section') WITH ordinality pf(funding, fund_n)
+    ),
+    related_projects_funding AS (
+      SELECT
+        p.proj_n,
+        pf.fund_n,
+        pf.funding
+      FROM
+        related_projects p,
+        jsonb_path_query_first(project, '$.funding.section') WITH ordinality pf(funding, fund_n)
+    ),
+    projects_fundings AS (
+      SELECT
+        pf.proj_n,
+        pf.fund_n,
+        pfs.funds_n,
+        jsonb_build_object(
+          'agencyName',
+          pfs.projects_fundings -> 'para',
+          'fundingStartDate',
+          jsonb_path_query_first(
+            pfs.projects_fundings,
+            '$.section[*] \\? (@.title == "Funding Start Date").para'
+          ),
+          'fundingEndDate',
+          jsonb_path_query_first(
+            pfs.projects_fundings,
+            '$.section[*] \\? (@.title == "Funding End Date").para'
+          )
+        ) funding_object
+      FROM
+        projects_funding pf,
+        jsonb_array_elements(funding) WITH ordinality pfs(projects_fundings, funds_n)
+    ),
+    related_projects_fundings AS (
+      SELECT
+        pf.proj_n,
+        pf.fund_n,
+        pfs.funds_n,
+        jsonb_build_object(
+          'agencyName',
+          pfs.related_projects_fundings -> 'para',
+          'fundingStartDate',
+          jsonb_path_query_first(
+            pfs.related_projects_fundings,
+            '$.section[*] \\? (@.title == "Funding Start Date").para'
+          ),
+          'fundingEndDate',
+          jsonb_path_query_first(
+            pfs.related_projects_fundings,
+            '$.section[*] \\? (@.title == "Funding End Date").para'
+          )
+        ) funding_object
+      FROM
+        related_projects_funding pf,
+        jsonb_array_elements(funding) WITH ordinality pfs(related_projects_fundings, funds_n)
+    ),
+    projects_funding_arrs AS (
+      SELECT
+        proj_n,
+        jsonb_agg(funding_object) funding_arr
+      FROM
+        projects_fundings
+      GROUP BY
+        proj_n
+    ),
+    related_projects_funding_arrs AS (
+      SELECT
+        proj_n,
+        jsonb_agg(funding_object) funding_arr
+      FROM
+        related_projects_fundings
+      GROUP BY
+        proj_n
+    ),
+    project_objects AS (
+      SELECT
+        jsonb_build_object(
+          'projectId',
+          aps.project -> '@_id',
+          'projectTitle',
+          aps.project -> 'title',
+          'projectOrganizationName',
+          aps.project -> 'personnel' -> 'organizationName',
+          'projectAbstract',
+          jsonb_path_query_first(aps.project, '$.abstract.section'),
+          'taxonomicCoverage',
+          jsonb_path_query_first(
+            aps.project,
+            '$.studyAreaDescription.coverage.taxonomicCoverage'
+          ),
+          'fundingSource',
+          pfas.funding_arr
+        ) project_object
+      FROM
+        projects aps
+        LEFT JOIN projects_funding_arrs pfas ON pfas.proj_n = aps.proj_n
+    ),
+    related_project_objects AS (
+      SELECT
+        jsonb_build_object(
+          'projectId',
+          aps.project -> '@_id',
+          'projectTitle',
+          aps.project -> 'title',
+          'projectOrganizationName',
+          aps.project -> 'personnel' -> 'organizationName',
+          'projectAbstract',
+          jsonb_path_query_first(aps.project, '$.abstract.section'),
+          'taxonomicCoverage',
+          jsonb_path_query_first(
+            aps.project,
+            '$.studyAreaDescription.coverage.taxonomicCoverage'
+          ),
+          'fundingSource',
+          pfas.funding_arr
+        ) project_object
+      FROM
+        related_projects aps
+        LEFT JOIN related_projects_funding_arrs pfas ON pfas.proj_n = aps.proj_n
+    ),
+    project_objects_arr AS (
+      SELECT
+        jsonb_agg(project_object) project_objects_arr
+      FROM
+        project_objects
+    ),
+    related_project_objects_arr AS (
+      SELECT
+        jsonb_agg(project_object) project_objects_arr
+      FROM
+        related_project_objects
+    )
+    SELECT
+      jsonb_strip_nulls(
+        jsonb_build_object(
+          'datasetTitle',
+          d.dataset -> 'title',
+          'datasetId',
+          d.dataset -> '@_id',
+          'sourceSystem',
+          d.dataset -> '@_system',
+          'publishDate',
+          d.dataset -> 'pubDate',
+          'project',
+          poa.project_objects_arr,
+          'relatedProject',
+          rpoa.project_objects_arr,
+          'additionalMetadata',
+          jsonb_build_object(
+            'projectIUCNConservationActions',
+            jsonb_path_query_first(
+              e.eml,
+              '$.additionalMetadata[*].metadata.IUCNConservationActions.IUCNConservationAction'
+            ),
+            'projectStakeholderPartnerships',
+            jsonb_path_query_first(
+              e.eml,
+              '$.additionalMetadata[*].metadata.stakeholderPartnerships.stakeholderPartnership'
+            ),
+            'projectActivities',
+            jsonb_path_query_first(
+              e.eml,
+              '$.additionalMetadata[*].metadata.projectActivities.projectActivity'
+            ),
+            'projectFirstNations',
+            jsonb_path_query_first(
+              e.eml,
+              '$.additionalMetadata[*].metadata.firstNationPartnerships.firstNationPartnership'
+            ),
+            'projectSurveyProprietors',
+            jsonb_path_query_first(
+              e.eml,
+              '$.additionalMetadata[*].metadata.projectSurveyProprietors.projectSurveyProprietor'
+            )
+          )
+        )
+      ) result_data
+    FROM
+      eml e,
+      datasets d,
+      project_objects_arr poa,
+      related_project_objects_arr rpoa;
+  `;
+
   await knex.raw(`
     SET SCHEMA '${DB_SCHEMA}';
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
@@ -25,131 +260,19 @@ export async function up(knex: Knex): Promise<void> {
       '1.0', 
       'biohub_metadata', 
       $transform$ 
-        with submissionmetadata as (
-          select 
-            * 
-          from 
-            submission_metadata
-          where 
-            submission_id = ? 
-          and 
-            record_end_timestamp is null
-        )
-        , eml as (
-            select 
-              jsonb_path_query(eml_json_source, '$."eml:eml"') eml 
-            from 
-              submissionmetadata
-        )
-        , datasets as (
-            select 
-              jsonb_path_query(eml, '$.**.dataset') dataset 
-            from 
-              eml
-        )
-        , projects as (
-            select 
-              p.proj_n, 
-              'project' project_type, 
-              p.project 
-            from 
-              datasets, 
-              jsonb_path_query_first(dataset, '$.**.project') with ordinality p(project, proj_n)
-        )
-        , related_projects as (
-            select 
-              p.proj_n, 
-              'survey' project_type, 
-              p.project from datasets, 
-              jsonb_path_query_first(dataset, '$.**.relatedProject[*]') with ordinality p(project, proj_n)
-        )
-        , all_projects as (
-            select 
-              * 
-            from 
-              projects union select * from related_projects
-        )
-        , funding as (
-            select 
-              ap.proj_n, 
-              ap.project_type, 
-              f.fund_n, 
-              f.funding 
-            from 
-              all_projects ap, 
-              jsonb_path_query_first(project, '$.funding.section') with ordinality f(funding, fund_n)
-        )
-        , fundings as (
-            select 
-              f.proj_n, 
-              f.project_type, 
-              f.fund_n, 
-              fs.funds_n, 
-              jsonb_build_object(
-                'agencyName', fs.fundings->'para'
-                , 'fundingStartDate', jsonb_path_query_first(fs.fundings, '$.section[*] \\? (@.title == "Funding Start Date").para')
-                , 'fundingEndDate', jsonb_path_query_first(fs.fundings, '$.section[*] \\? (@.title == "Funding End Date").para')
-              ) funding_object 
-            from 
-              funding f, 
-              jsonb_array_elements(funding) with ordinality fs(fundings, funds_n)
-        )
-        , funding_arrs as (
-            select 
-              proj_n, 
-              project_type, 
-              jsonb_agg(funding_object) funding_arr 
-            from 
-              fundings 
-            group by 
-              project_type, proj_n
-        )
-        , project_objects as (
-            select 
-              jsonb_build_object(
-                'projectId', aps.project->'@_id'
-                , 'projectType', aps.project_type
-                , 'projectTitle', aps.project->'title'
-                , 'projectOrganizationName', aps.project->'personnel'->'organizationName'
-                , 'projectAbstract', jsonb_path_query_first(aps.project, '$.abstract.section')
-                , 'taxonomicCoverage', jsonb_path_query_first(aps.project, '$.studyAreaDescription.coverage.taxonomicCoverage')
-                , 'fundingSource', fas.funding_arr
-              ) project_object 
-            from 
-              all_projects aps
-            left join 
-              funding_arrs fas 
-            on fas.proj_n = aps.proj_n and fas.project_type = aps.project_type
-           	)
-            , project_arr as (
-              select 
-                jsonb_agg(project_object) project_array
-              from 
-                project_objects
-        )
-        select 
-          jsonb_strip_nulls(jsonb_build_object(
-            'datasetTitle', d.dataset->'title'
-            , 'datasetId', d.dataset->'@_id'
-            , 'sourceSystem', d.dataset->'@_system'
-            , 'publishDate', d.dataset->'pubDate'
-            , 'project', p.project_array
-            , 'projectIUCNConservationActions', jsonb_path_query_first(e.eml, '$.additionalMetadata[*].metadata.IUCNConservationActions.IUCNConservationAction')
-            , 'projectStakeholderPartnerships', jsonb_path_query_first(e.eml, '$.additionalMetadata[*].metadata.stakeholderPartnerships.stakeholderPartnership')
-            , 'projectActivities', jsonb_path_query_first(e.eml, '$.additionalMetadata[*].metadata.projectActivities.projectActivity')
-            , 'projectClimateChangeInitiatives', jsonb_path_query_first(e.eml, '$.additionalMetadata[*].metadata.projectClimateChangeInitiatives.projectClimateChangeInitiative')
-            , 'projectFirstNations', jsonb_path_query_first(e.eml, '$.additionalMetadata[*].metadata.firstNationPartnerships.firstNationPartnership')
-            , 'projectSurveyProprietors', jsonb_path_query_first(e.eml, '$.additionalMetadata[*].metadata.projectSurveyProprietors.projectSurveyProprietor')
-          )) result_data 
-        from 
-          eml e, 
-          datasets d, 
-          project_arr p;
+        ${transformSQL}
       $transform$
     );
   `);
 }
 
+/**
+ * Not used.
+ *
+ * @export
+ * @param {Knex} knex
+ * @return {*}  {Promise<void>}
+ */
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(``);
 }
