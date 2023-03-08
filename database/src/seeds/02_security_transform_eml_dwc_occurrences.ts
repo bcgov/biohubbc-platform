@@ -46,9 +46,9 @@ const checkTransformExists = () => `
  */
 const insertSecurityTransform = () => `
   INSERT into security_transform
-    (name, description, record_effective_date, transform)
+    (persecution_or_harm_id, name, description, transform)
   VALUES (
-    'DwC Occurrences', 'Assigns Persecution and Harm Rules', now(),${transformString}
+    1,'DwC Occurrences', 'Assigns Persecution and Harm Rules', ${transformString}
   );
 `;
 
