@@ -474,7 +474,6 @@ export class SpatialRepository extends BaseRepository {
     // non-admin rules:
     // see the secured spatial component if it is not null (and if you do not have an exception to all security rules applied to it),
     // otherwise you see the non-secured spatial component
-    //
 
     const queryBuilder = knex
       .queryBuilder()
@@ -503,13 +502,11 @@ export class SpatialRepository extends BaseRepository {
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
-          //.leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
           .leftJoin(
             'security_transform_submission as sts',
             'sts.submission_spatial_component_id',
             'ssc.submission_spatial_component_id'
           )
-          //.whereNull('so.record_end_timestamp')
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
           .groupBy('ssc.submission_observation_id')
@@ -614,9 +611,9 @@ export class SpatialRepository extends BaseRepository {
   _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
     qb1.where((qb2) => {
       qb2.whereRaw(
-        `submission_observation_id in (select submission_observation_id from submission_observation so left join submission s on so.submission_id = s.submission_id where s.uuid in (${
-          "'" + datasetIDs.join("','") + "'"
-        }))`
+        `submission_observation_id in (
+          select submission_observation_id from submission_observation so
+          left join submission s on so.submission_id = s.submission_id where s.uuid in (${datasetIDs.join("','")}))`
       );
     });
   }
