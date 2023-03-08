@@ -219,8 +219,8 @@ export class SpatialService extends DBService {
   /**
    * Query builder to find spatial component by given criteria
    *
-   * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @param {number[]} submissionSpatialComponentIds
+   * @return {*}  {Promise<GeoJsonProperties[]>}
    * @memberof SpatialService
    */
   async findSpatialMetadataBySubmissionSpatialComponentIds(
