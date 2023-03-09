@@ -1,11 +1,13 @@
 import knex, { Knex } from 'knex';
 import * as pg from 'pg';
 import { SQLStatement } from 'sql-template-strings';
+import { z } from 'zod';
 import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import * as UserQueries from '../queries/database/user-context-queries';
 import { getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
+import { asyncErrorWrapper, getZodQueryResult, syncErrorWrapper } from './db-utils';
 
 export const DB_CLIENT = 'pg';
 
@@ -123,20 +125,28 @@ export interface IDBConnection {
    * Performs a query against this connection, returning the results.
    *
    * @param {SQLStatement} sqlStatement SQL statement object
+   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
    * @return {*}  {(Promise<QueryResult<any>>)}
    * @throws If the connection is not open.
    * @memberof IDBConnection
    */
-  sql: <T extends pg.QueryResultRow = any>(sqlStatement: SQLStatement) => Promise<pg.QueryResult<T>>;
+  sql: <T extends pg.QueryResultRow = any>(
+    sqlStatement: SQLStatement,
+    zodSchema?: z.Schema<T, any, any>
+  ) => Promise<pg.QueryResult<T>>;
   /**
    * Performs a query against this connection, returning the results.
    *
    * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
+   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
    * @return {*}  {(Promise<QueryResult<any>>)}
    * @throws If the connection is not open.
    * @memberof IDBConnection
    */
-  knex: <T extends pg.QueryResultRow = any>(queryBuilder: Knex.QueryBuilder) => Promise<pg.QueryResult<T>>;
+  knex: <T extends pg.QueryResultRow = any>(
+    queryBuilder: Knex.QueryBuilder,
+    zodSchema?: z.Schema<T, any, any>
+  ) => Promise<pg.QueryResult<T>>;
   /**
    * Get the ID of the system user in context.
    *
@@ -282,24 +292,47 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    *
    * @template T
    * @param {SQLStatement} sqlStatement SQL statement object
+   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
    * @throws {Error} if the connection is not open
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
-  const _sql = async <T extends pg.QueryResultRow = any>(sqlStatement: SQLStatement): Promise<pg.QueryResult<T>> => {
-    return _query(sqlStatement.text, sqlStatement.values);
+  const _sql = async <T extends pg.QueryResultRow = any>(
+    sqlStatement: SQLStatement,
+    zodSchema?: z.Schema<T, any, any>
+  ): Promise<pg.QueryResult<T>> => {
+    const response = await _query(sqlStatement.text, sqlStatement.values);
+
+    if (zodSchema) {
+      // Validate the response against the zod schema
+      return getZodQueryResult(zodSchema).parseAsync(response);
+    }
+
+    return response;
   };
 
   /**
    * Performs a query against this connection, returning the results.
    *
+   * @template T
    * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
+   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
    * @throws {Error} if the connection is not open
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
-  const _knex = async (queryBuilder: Knex.QueryBuilder) => {
+  const _knex = async <T extends pg.QueryResultRow = any>(
+    queryBuilder: Knex.QueryBuilder,
+    zodSchema?: z.Schema<T, any, any>
+  ) => {
     const { sql, bindings } = queryBuilder.toSQL().toNative();
 
-    return _query(sql, bindings as any[]);
+    const response = await _query(sql, bindings as any[]);
+
+    if (zodSchema) {
+      // Validate the response against the zod schema
+      return getZodQueryResult(zodSchema).parseAsync(response);
+    }
+
+    return response;
   };
 
   /**
@@ -372,8 +405,8 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  */
 export const getAPIUserDBConnection = (): IDBConnection => {
   return getDBConnection({
-    preferred_username: `${DB_USERNAME}@database`,
-    identity_provider: 'database'
+    preferred_username: `${DB_USERNAME}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
+    identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
   });
 };
 
@@ -389,7 +422,7 @@ export const getAPIUserDBConnection = (): IDBConnection => {
 export const getServiceAccountDBConnection = (sourceSystem: SOURCE_SYSTEM): IDBConnection => {
   return getDBConnection({
     preferred_username: `service-account-${sourceSystem}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
-    identity_provider: 'system'
+    identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
   });
 };
 
@@ -419,54 +452,4 @@ export const getKnex = <TRecord extends Record<string, any> = any, TResult = Rec
   TResult
 > => {
   return knex<TRecord, TResult>({ client: DB_CLIENT });
-};
-
-/**
- * An asynchronous wrapper function that will catch any exceptions thrown by the wrapped function
- *
- * @param fn the function to be wrapped
- * @returns Promise<WrapperReturn> A Promise with the wrapped functions return value
- */
-const asyncErrorWrapper =
-  <WrapperArgs extends any[], WrapperReturn>(fn: (...args: WrapperArgs) => Promise<WrapperReturn>) =>
-  async (...args: WrapperArgs): Promise<WrapperReturn> => {
-    try {
-      return await fn(...args);
-    } catch (err) {
-      throw parseError(err);
-    }
-  };
-
-/**
- * A synchronous wrapper function that will catch any exceptions thrown by the wrapped function
- *
- * @param fn the function to be wrapped
- * @returns WrapperReturn The wrapped functions return value
- */
-const syncErrorWrapper =
-  <WrapperArgs extends any[], WrapperReturn>(fn: (...args: WrapperArgs) => WrapperReturn) =>
-  (...args: WrapperArgs): WrapperReturn => {
-    try {
-      return fn(...args);
-    } catch (err) {
-      throw parseError(err);
-    }
-  };
-
-/**
- * This function parses the passed in error and translates them into a human readable error
- *
- * @param error error to be parsed
- * @returns an error to throw
- */
-const parseError = (error: any) => {
-  switch (error.message) {
-    // error thrown by DB trigger based on revision_count
-    // will be thrown if two updates to the same record are made concurrently
-    case 'CONCURRENCY_EXCEPTION':
-      throw new ApiExecuteSQLError('Failed to update stale data', [error]);
-    default:
-      // Generic error thrown if not captured above
-      throw new ApiExecuteSQLError('Failed to execute SQL', [error]);
-  }
 };
