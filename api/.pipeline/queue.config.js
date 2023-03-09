@@ -89,7 +89,7 @@ const phases = {
     cpuRequest: '100m',
     cpuLimit: '500m',
     memoryRequest: '512Mi',
-    memoryLimit: '1.5Gi',
+    memoryLimit: '1Gi',
     replicas: '1',
     replicasMax: (isStaticDeployment && '2') || '1'
   },
