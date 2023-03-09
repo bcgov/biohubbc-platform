@@ -31,6 +31,8 @@ const queueDeploy = async (settings) => {
         CHANGE_ID: phases.build.changeId || changeId,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         NODE_ENV: phases[phase].env || 'dev',
+        ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
+        ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
         KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
@@ -43,8 +45,12 @@ const queueDeploy = async (settings) => {
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
         OBJECT_STORE_SECRETS: 'biohubbc-object-store',
         LOG_LEVEL: phases[phase].logLevel || 'info',
-        REPLICAS: phases[phase].replicas || 1,
-        REPLICA_MAX: phases[phase].maxReplicas || 1
+        CPU_REQUEST: phases[phase].cpuRequest,
+        CPU_LIMIT: phases[phase].cpuLimit,
+        MEMORY_REQUEST: phases[phase].memoryRequest,
+        MEMORY_LIMIT: phases[phase].memoryLimit,
+        REPLICAS: phases[phase].replicas,
+        REPLICAS_MAX: phases[phase].replicasMax
       }
     })
   );

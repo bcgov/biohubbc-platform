@@ -1,7 +1,5 @@
 'use strict';
 
-let process = require('process');
-
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -62,8 +60,6 @@ const phases = {
     version: `${version}-${changeId}`,
     tag: tag,
     env: 'build',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
-    elasticsearchEmlIndex: 'eml',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     branch: branch,
@@ -95,7 +91,7 @@ const phases = {
     cpuRequest: '100m',
     cpuLimit: '500m',
     memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
+    memoryLimit: '1.5Gi',
     replicas: '1',
     replicasMax: (isStaticDeployment && '2') || '1'
   },
@@ -118,15 +114,13 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
-    replicas: 3,
-    maxReplicas: 5,
     logLevel: 'info',
     cpuRequest: '200m',
     cpuLimit: '1000m',
     memoryRequest: '512Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '2Gi',
     replicas: '2',
-    replicasMax: '5'
+    replicasMax: '3'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -147,15 +141,13 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    replicas: 3,
-    maxReplicas: 6,
     logLevel: 'info',
     cpuRequest: '200m',
     cpuLimit: '1000m',
     memoryRequest: '512Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '2Gi',
     replicas: '2',
-    replicasMax: '5'
+    replicasMax: '3'
   }
 };
 

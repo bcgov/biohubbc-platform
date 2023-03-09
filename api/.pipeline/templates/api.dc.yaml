@@ -83,8 +83,6 @@ parameters:
   - name: OBJECT_STORE_SECRETS
     description: Secrets used to read and write to the S3 storage
     value: 'biohubbc-object-store'
-  - name: LOG_LEVEL
-    value: 'info'
   - name: GCNOTIFY_API_SECRET
     description: Secret for gcnotify api key
     value: 'gcnotify-api-key'
@@ -101,6 +99,8 @@ parameters:
     value: https://api.notification.canada.ca/v2/notifications/email
   - name: GCNOTIFY_SMS_URL
     value: https://api.notification.canada.ca/v2/notifications/sms
+  - name: LOG_LEVEL
+    value: 'info'
   - name: CPU_REQUEST
     value: '100m'
   - name: CPU_LIMIT
@@ -114,8 +114,8 @@ parameters:
   - name: REPLICAS_MAX
     value: '1'
 objects:
-  - apiVersion: image.openshift.io/v1
-    kind: ImageStream
+  - kind: ImageStream
+    apiVersion: image.openshift.io/v1
     metadata:
       annotations:
         description: Nodejs Runtime Image
@@ -127,8 +127,8 @@ objects:
     spec:
       lookupPolicy:
         local: false
-  - apiVersion: apps.openshift.io/v1
-    kind: DeploymentConfig
+  - kind: DeploymentConfig
+    apiVersion: apps.openshift.io/v1
     metadata:
       annotations:
         openshift.io/generated-by: OpenShiftWebConsole
@@ -327,20 +327,20 @@ objects:
       replicas: 0
       unavailableReplicas: 0
       updatedReplicas: 0
-  - apiVersion: v1
+  - kind: Secret
+    apiVersion: v1
     stringData:
       database-name: ''
       database-user-api-password: ''
       database-user-api: ''
-    kind: Secret
     metadata:
       annotations:
         as-copy-of: ${DB_SERVICE_NAME}
       creationTimestamp: null
       name: ${NAME}${SUFFIX}
     type: Opaque
-  - apiVersion: v1
-    kind: Service
+  - kind: Service
+    apiVersion: v1
     metadata:
       annotations: null
       creationTimestamp: null
@@ -358,8 +358,8 @@ objects:
       type: ClusterIP
     status:
       loadBalancer: {}
-  - apiVersion: route.openshift.io/v1
-    kind: Route
+  - kind: Route
+    apiVersion: route.openshift.io/v1
     metadata:
       annotations: {}
       creationTimestamp: null
@@ -379,8 +379,8 @@ objects:
       wildcardPolicy: None
     status:
       ingress: null
-  - apiVersion: autoscaling/v1
-    kind: HorizontalPodAutoscaler
+  - kind: HorizontalPodAutoscaler
+    apiVersion: autoscaling/v1
     metadata:
       annotations: {}
       creationTimestamp: null
