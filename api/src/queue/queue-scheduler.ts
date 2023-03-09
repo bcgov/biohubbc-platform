@@ -256,6 +256,7 @@ export class QueueScheduler {
         await connection.commit();
       } catch (error) {
         defaultLog.error({ label: '_processJobQueueRecord', message: 'onReject error', error });
+        console.log(error);
         await connection.rollback();
       } finally {
         connection.release();

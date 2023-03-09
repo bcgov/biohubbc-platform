@@ -1,3 +1,4 @@
+import stringifyObject from 'stringify-object';
 import winston from 'winston';
 import { ApiError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
@@ -41,9 +42,9 @@ export const isObjectWithkeys = (item: any): boolean => {
  * @param {any} item
  * @return {*}  {string}
  */
-export const prettyPrint = (item: any): string => {
-  return JSON.stringify(item, undefined, 2);
-};
+// export const prettyPrint = (item: any): string => {
+//   return JSON.stringify(item, undefined, 2);
+// };
 
 /**
  * Pretty stringify an item of unknown type.
@@ -57,11 +58,11 @@ export const prettyPrintUnknown = (item: any): string => {
   }
 
   if (item instanceof HTTPError) {
-    return `${item.status} ${item.stack}` + ((item.errors?.length && `\n${prettyPrintUnknown(item.errors)}`) || '');
+    return `${item.status} ${item.stack}` + ((item.errors?.length && `\n${stringifyObject(item.errors)}`) || '');
   }
 
   if (item instanceof ApiError) {
-    return `${item.stack}` + ((item.errors?.length && `\n${prettyPrintUnknown(item.errors)}`) || '');
+    return `${item.stack}` + ((item.errors?.length && `\n${stringifyObject(item.errors)}`) || '');
   }
 
   if (item instanceof Error) {
@@ -69,7 +70,9 @@ export const prettyPrintUnknown = (item: any): string => {
   }
 
   if (isObjectWithkeys(item)) {
-    return prettyPrint(item);
+    console.log('==================================');
+    console.log(item);
+    return stringifyObject(item);
   }
 
   if (isObject(item)) {

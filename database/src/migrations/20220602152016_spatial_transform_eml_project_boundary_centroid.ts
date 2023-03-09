@@ -23,7 +23,7 @@ export async function up(knex: Knex): Promise<void> {
       from
         submission_metadata
       where
-        submission_id = ?
+        submission_id = \\?
         and record_end_timestamp is null
     ),
     submissionuuid as (
