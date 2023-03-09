@@ -225,7 +225,7 @@ describe('example submission transformation schema', () => {
           { source: { columns: ['id'] }, target: 'id' },
           { source: { columns: ['occurrenceID'] }, target: 'occurrenceID' },
           { source: { columns: ['individualCount'] }, target: 'individualCount' },
-          { source: { columns: ['vernacularName'] }, target: 'associatedTaxa' },
+          { source: { columns: ['vernacularName'] }, target: 'taxonID' },
           { source: { columns: ['lifeStage'] }, target: 'lifeStage' },
           { source: { columns: ['sex'] }, target: 'sex' },
           { source: { value: 'Approved' }, target: 'Status' }
