@@ -742,14 +742,15 @@ describe('DarwinCoreService', () => {
         job_start_timestamp: '',
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
+      const submissionObservationId = 2;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
       const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
-      await service.runSpatialTransforms(mockJobQueue, 2);
+      await service.runSpatialTransforms(mockJobQueue, submissionObservationId);
 
-      expect(transform).to.be.calledOnceWith(2);
+      expect(transform).to.be.calledOnceWith(mockJobQueue.submission_id, submissionObservationId);
       expect(status).to.be.calledOnceWith(
         mockJobQueue.submission_id,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE

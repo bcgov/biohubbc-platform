@@ -204,7 +204,7 @@ describe('search', () => {
         it('returns invalid response (missing submission_spatial_component_id)', async () => {
           const apiResponse = [
             {
-              taxa_data: [{ associated_taxa: 'M-ALAM' }],
+              taxa_data: [{ taxon_id: 'M-ALAM' }],
               spatial_data: {
                 type: 'FeatureCollection',
                 properties: {},

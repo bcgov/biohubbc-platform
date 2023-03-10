@@ -74,6 +74,7 @@ export async function dwcDatasetSubmissionJob(jobQueueRecord: ISubmissionJobQueu
 
     const darwinCoreService = new DarwinCoreService(connection);
     // Run darwin core intake job
+
     await darwinCoreService.intakeJob(jobQueueRecord);
   } catch (error) {
     defaultLog.error({ label: 'dwcDatasetSubmissionJob', message: 'error', error });
