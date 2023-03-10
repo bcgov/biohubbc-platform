@@ -46,6 +46,7 @@ parameters:
   - name: ELASTICSEARCH_TAXONOMY_INDEX
     description: Platform Elasticsearch Taxonomy Index
     required: true
+    vale: 'taxonomy_3.0.0'
   - name: S3_KEY_PREFIX
     description: S3 key optional prefix
     required: false

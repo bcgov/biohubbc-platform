@@ -81,6 +81,7 @@ const phases = {
     env: 'dev',
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.dev,
@@ -107,6 +108,7 @@ const phases = {
     env: 'test',
     elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
     elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
@@ -133,6 +135,7 @@ const phases = {
     env: 'prod',
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
