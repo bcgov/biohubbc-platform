@@ -1,9 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  resourceVersion: ''
-  selfLink: ''
   name: biohub-platform-queue-dc
+  labels:
+    build: biohub-platform-queue-dc
 parameters:
   - name: NAME
     value: biohub-platform-queue
@@ -23,6 +23,18 @@ parameters:
     description: Application Environment type variable
     required: true
     value: 'dev'
+  - name: ELASTICSEARCH_URL
+    description: Platform Elasticsearch URL
+    required: true
+    value: 'http://es01:9200'
+  - name: ELASTICSEARCH_EML_INDEX
+    description: Platform Elasticsearch index for EML data
+    required: true
+    value: 'eml'
+  - name: ELASTICSEARCH_TAXONOMY_INDEX
+    description: Platform Elasticsearch Taxonomy Index
+    required: true
+    vale: 'taxonomy_3.0.0'
   - name: S3_KEY_PREFIX
     description: S3 key optional prefix
     required: false
@@ -70,8 +82,7 @@ parameters:
     value: '2Gi'
   - name: REPLICAS
     value: '1'
-  - name: REPLICA_MAX
-    required: true
+  - name: REPLICAS_MAX
     value: '1'
 objects:
   - kind: ImageStream
@@ -98,7 +109,7 @@ objects:
         role: queue
       name: ${NAME}${SUFFIX}
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -164,6 +175,12 @@ objects:
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
                   value: ${NODE_ENV}
+                - name: ELASTICSEARCH_URL
+                  value: ${ELASTICSEARCH_URL}
+                - name: ELASTICSEARCH_EML_INDEX
+                  value: ${ELASTICSEARCH_EML_INDEX}
+                - name: ELASTICSEARCH_TAXONOMY_INDEX
+                  value: ${ELASTICSEARCH_TAXONOMY_INDEX}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ
@@ -253,8 +270,8 @@ objects:
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
-      maxReplicas: '${{REPLICA_MAX}}'
-      minReplicas: '${{REPLICAS}}'
+      minReplicas: ${{REPLICAS}}
+      maxReplicas: ${{REPLICAS_MAX}}
       scaleTargetRef:
         apiVersion: v1
         kind: DeploymentConfig

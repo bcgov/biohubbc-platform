@@ -1,7 +1,5 @@
 'use strict';
 
-let process = require('process');
-
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -63,8 +61,11 @@ const phases = {
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     branch: branch,
-    logLevel: (isStaticDeployment && 'info') || 'debug',
-    queueDockerfilePath: queueDockerfilePath
+    queueDockerfilePath: queueDockerfilePath,
+    cpuRequest: '100m',
+    cpuLimit: '1250m',
+    memoryRequest: '512Mi',
+    memoryLimit: '3Gi'
   },
   dev: {
     namespace: 'a0ec71-dev',
@@ -78,13 +79,20 @@ const phases = {
     tag: `dev-${version}-${deployChangeId}`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'dev',
+    elasticsearchURL: 'http://es01:9200',
+    elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.dev,
-    replicas: 1,
-    maxReplicas: 1,
-    logLevel: (isStaticDeployment && 'info') || 'debug',
-    queueDockerfilePath: queueDockerfilePath
+    logLevel: 'debug',
+    queueDockerfilePath: queueDockerfilePath,
+    cpuRequest: '100m',
+    cpuLimit: '500m',
+    memoryRequest: '512Mi',
+    memoryLimit: '1.6Gi',
+    replicas: '1',
+    replicasMax: (isStaticDeployment && '2') || '1'
   },
   test: {
     namespace: 'a0ec71-test',
@@ -98,13 +106,20 @@ const phases = {
     tag: `test-${version}`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'test',
+    elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
+    elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
-    replicas: 2,
-    maxReplicas: 2,
     logLevel: 'info',
-    queueDockerfilePath: queueDockerfilePath
+    queueDockerfilePath: queueDockerfilePath,
+    cpuRequest: '200m',
+    cpuLimit: '1000m',
+    memoryRequest: '512Mi',
+    memoryLimit: '2Gi',
+    replicas: '2',
+    replicasMax: '3'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -118,20 +133,21 @@ const phases = {
     tag: `prod-${version}`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'prod',
+    elasticsearchURL: 'http://es01:9200',
+    elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    replicas: 2,
-    maxReplicas: 2,
     logLevel: 'info',
-    queueDockerfilePath: queueDockerfilePath
+    queueDockerfilePath: queueDockerfilePath,
+    cpuRequest: '200m',
+    cpuLimit: '1000m',
+    memoryRequest: '512Mi',
+    memoryLimit: '2Gi',
+    replicas: '2',
+    replicasMax: '3'
   }
 };
-
-// This callback forces the node process to exit as failure.
-process.on('unhandledRejection', (reason, promise) => {
-  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 module.exports = exports = { phases, options };
