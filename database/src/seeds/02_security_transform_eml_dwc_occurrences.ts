@@ -59,7 +59,7 @@ const transformString = `
       from
         submission_observation
       where
-        submission_id = \\?
+        submission_id = ?
         and record_end_timestamp is null
     ),
     with_spatial_component AS (
@@ -86,7 +86,7 @@ const transformString = `
             Lower(
               wsc.spatial_component -> 'features' -> 0 -> 'properties' -> 'dwc' ->> 'taxonID'
             )
-          ) :: jsonb < @ json_build_array(
+          ) :: jsonb <@ json_build_array(
             'mountain goat',
             'bighorn sheep',
             'thinhorn sheep',

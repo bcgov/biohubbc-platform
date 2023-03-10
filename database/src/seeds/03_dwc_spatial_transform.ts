@@ -57,7 +57,7 @@ const transformString = `
         from
             submission_observation
         where
-            submission_observation_id = \\?
+            submission_observation_id = ?
     ),
     occurrences as (
         select
