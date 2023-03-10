@@ -65,7 +65,7 @@ const phases = {
     cpuRequest: '100m',
     cpuLimit: '1000m',
     memoryRequest: '512Mi',
-    memoryLimit: '5Gi'
+    memoryLimit: '3Gi'
   },
   dev: {
     namespace: 'a0ec71-dev',

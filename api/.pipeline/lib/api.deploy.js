@@ -34,6 +34,7 @@ const apiDeploy = async (settings) => {
         NODE_ENV: phases[phase].env || 'dev',
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
+        ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
         KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,

@@ -63,7 +63,7 @@ GET.apiDoc = {
         'application/zip': {
           schema: {
             type: 'string',
-            description: 'Buffer of the arcived search results.'
+            description: 'Buffer of the archived search results.'
           }
         }
       }

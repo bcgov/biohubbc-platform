@@ -89,7 +89,7 @@ GET.apiDoc = {
                         type: 'number',
                         minimum: 1
                       },
-                      associated_taxa: {
+                      taxon_id: {
                         type: 'string',
                         nullable: true
                       },
@@ -152,25 +152,25 @@ export function searchSpatialComponents(): RequestHandler {
 
       const response = await spatialService.findSpatialComponentsByCriteria(criteria);
 
+      const structuredResponse = response.map((row) => {
+        const { spatial_component, taxa_data } = row;
+        const { spatial_data, ...rest } = spatial_component;
+        return {
+          taxa_data,
+          ...rest,
+          spatial_data: {
+            ...spatial_data,
+            features: spatial_data.features.map((feature) => {
+              delete feature?.properties?.dwc;
+              return feature;
+            })
+          }
+        };
+      });
+
       await connection.commit();
 
-      res.status(200).json(
-        response.map((row) => {
-          const { spatial_component, taxa_data } = row;
-          const { spatial_data, ...rest } = spatial_component;
-          return {
-            taxa_data,
-            ...rest,
-            spatial_data: {
-              ...spatial_data,
-              features: spatial_data.features.map((feature) => {
-                delete feature?.properties?.dwc;
-                return feature;
-              })
-            }
-          };
-        })
-      );
+      res.status(200).json(structuredResponse);
     } catch (error) {
       defaultLog.error({ label: 'searchSpatialComponents', message: 'error', error });
       await connection.rollback();

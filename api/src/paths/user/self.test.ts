@@ -7,7 +7,6 @@ import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { UserRepository } from '../../repositories/user-repository';
 import { UserService } from '../../services/user-service';
-// import { UserService } from '../../services/user-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as self from './self';
@@ -51,10 +50,17 @@ describe('getUser', () => {
     sinon.stub(UserRepository.prototype, 'getUserByGuid').resolves([
       {
         system_user_id: 1,
-        user_guid: 'aaaa',
+        user_identity_source_id: 1,
         user_identifier: 'identifier',
+        user_guid: 'aaaa',
         identity_source: 'idir',
+        record_effective_date: new Date(),
         record_end_date: null,
+        create_date: new Date(),
+        create_user: 1,
+        update_date: new Date(),
+        update_user: null,
+        revision_count: 0,
         role_ids: [1, 2],
         role_names: ['role 1', 'role 2']
       }
