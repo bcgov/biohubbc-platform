@@ -18,7 +18,6 @@ import {
 import { getFileFromS3 } from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
-import { UserService } from './user-service';
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -383,12 +382,9 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async findSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial | null> {
-    const userService = new UserService(this.connection);
     const [submissionEMLJSON, spatialComponentCounts] = await Promise.all([
       this.findSubmissionRecordEMLJSONByDatasetId(datasetId),
-      (await userService.isSystemUserAdmin())
-        ? this.submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin(datasetId)
-        : this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
+      this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
     ]);
 
     if (!submissionEMLJSON) {
