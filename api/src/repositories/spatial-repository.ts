@@ -611,9 +611,10 @@ export class SpatialRepository extends BaseRepository {
   _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
     qb1.where((qb2) => {
       qb2.whereRaw(
-        `submission_observation_id in (
+        `ssc.submission_observation_id in (
           select submission_observation_id from submission_observation so
-          left join submission s on so.submission_id = s.submission_id where s.uuid in (${datasetIDs.join("','")}))`
+          left join submission s on so.submission_id = s.submission_id
+          where s.uuid in (${"'" + datasetIDs.join("','") + "'"}))`
       );
     });
   }

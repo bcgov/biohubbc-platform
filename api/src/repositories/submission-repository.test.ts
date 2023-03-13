@@ -240,46 +240,26 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getSpatialComponentCountByDatasetIdAsAdmin', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should return a query result', async () => {
-      const mockQueryResponse = { rowCount: 0, rows: [{ id: 1 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin('111-222-333');
-
-      expect(response).to.eql([{ id: 1 }]);
-    });
-  });
-
   describe('getSpatialComponentCountByDatasetId', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as any as ISpatialComponentCount[];
+      const mockResponse = [{ spatial_type: 'occurrence', count: 10 }] as ISpatialComponentCount[];
 
-      const mockQueryResponse = { rowCount: 0, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: mockResponse
+      } as any as Promise<QueryResult<any>>;
 
-      const mockDBConnection = getMockDBConnection({
-        knex: () => mockQueryResponse,
-        systemUserId: () => 1
-      });
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSpatialComponentCountByDatasetId('111-222-333');
 
-      expect(response).to.eql([mockResponse]);
+      expect(response).to.eql(mockResponse);
     });
   });
 

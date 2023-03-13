@@ -1,7 +1,5 @@
 'use strict';
 
-let process = require('process');
-
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -62,8 +60,6 @@ const phases = {
     version: `${version}-${changeId}`,
     tag: tag,
     env: 'build',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
-    elasticsearchEmlIndex: 'eml',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     branch: branch,
@@ -86,8 +82,9 @@ const phases = {
     appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'dev',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
+    elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.dev,
@@ -95,7 +92,7 @@ const phases = {
     cpuRequest: '100m',
     cpuLimit: '500m',
     memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
+    memoryLimit: '1.6Gi',
     replicas: '1',
     replicasMax: (isStaticDeployment && '2') || '1'
   },
@@ -113,20 +110,19 @@ const phases = {
     appHost: staticUrls.test,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'test',
-    elasticsearchURL: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca',
+    elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
     elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.test,
-    replicas: 3,
-    maxReplicas: 5,
     logLevel: 'info',
     cpuRequest: '200m',
     cpuLimit: '1000m',
     memoryRequest: '512Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '2Gi',
     replicas: '2',
-    replicasMax: '5'
+    replicasMax: '3'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -144,18 +140,17 @@ const phases = {
     env: 'prod',
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
+    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'platform',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    replicas: 3,
-    maxReplicas: 6,
     logLevel: 'info',
     cpuRequest: '200m',
     cpuLimit: '1000m',
     memoryRequest: '512Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '2Gi',
     replicas: '2',
-    replicasMax: '5'
+    replicasMax: '3'
   }
 };
 
