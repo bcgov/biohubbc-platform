@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { describe } from 'mocha';
 import { getLogger, setLogLevel } from './logger';
 
-describe.only('logger', () => {
+describe('logger', () => {
   describe('getLogger', () => {
     it('returns a winston logger', () => {
       const logger = getLogger('myLogger');
