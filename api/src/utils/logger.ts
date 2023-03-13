@@ -78,6 +78,10 @@ export type WinstonLogLevel = typeof WinstonLogLevels[number];
  * @param {WinstonLogLevel} logLevel
  */
 export const setLogLevel = (logLevel: WinstonLogLevel) => {
+  // Update env var for future loggers
+  process.env.LOG_LEVEL = logLevel;
+
+  // Update existing loggers
   winston.loggers.loggers.forEach((logger) => {
     logger.transports[0].level = logLevel;
   });
