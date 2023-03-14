@@ -92,22 +92,16 @@ export async function seed(knex: Knex): Promise<void> {
 
   for (const systemUser of systemUsers) {
     // check if user is already in the system users table
-    const response = await knex.raw(`
-      ${getSystemUserSQL(systemUser.identifier)}
-    `);
+    const response = await knex.raw(getSystemUserSQL(systemUser.identifier));
 
     // if the fetch returns no rows, then the user is not in the system users table and should be added
     if (!response?.rows?.[0]) {
       // Add system user
-      await knex.raw(`
-        ${insertSystemUserSQL(systemUser.identifier, systemUser.type, systemUser.user_guid.toLowerCase())}
-      `);
+      await knex.raw(insertSystemUserSQL(systemUser.identifier, systemUser.type, systemUser.user_guid.toLowerCase()));
 
       if (systemUser.roleId) {
         // Add system role
-        await knex.raw(`
-        ${insertSystemUserRoleSQL(systemUser.identifier, systemUser.roleId)}
-        `);
+        await knex.raw(insertSystemUserRoleSQL(systemUser.identifier, systemUser.roleId));
       }
     }
   }

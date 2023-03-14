@@ -429,7 +429,7 @@ parameters:
     value: '200m'
   - name: MEMORY_REQUEST
     description: MEMORY REQUEST for dc
-    value: '750Mi'
+    value: '500Mi'
   - name: MEMORY_LIMIT
     description: MEMORY LIMIT for dc
-    value: '2Gi'
+    value: '1Gi'

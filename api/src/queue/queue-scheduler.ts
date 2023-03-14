@@ -117,7 +117,7 @@ export class QueueScheduler {
       connection.release();
     }
 
-    defaultLog.debug({
+    defaultLog.silly({
       label: 'updateJobQueueSettings',
       message: 'Current settings',
       enabled: this._enabled,
