@@ -2,7 +2,7 @@
 
 # BioHub Platform
 
-Platform Components for BioHub
+Platform Components for BioHub - updated
 
 # Pre-reqs
 
