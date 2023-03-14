@@ -3,10 +3,8 @@ import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import SQL from 'sql-template-strings';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
-import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import {
   ISourceTransformModel,
@@ -19,69 +17,6 @@ import {
 chai.use(sinonChai);
 
 describe('SubmissionRepository', () => {
-  describe('insertSubmissionRecord', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should return all submission_ids when no criteria is given', async () => {
-      const mockQueryResponse = { rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.findSubmissionByCriteria({});
-
-      expect(response).to.eql([{ submission_id: 1 }]);
-    });
-
-    it('should append knex query if keyword is given', async () => {
-      const mockQueryResponse = { rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async (query) => {
-          const sql = query.toSQL().sql;
-          expect(sql).includes('taxonid');
-          expect(sql).includes('lifestage');
-          expect(sql).includes('sex');
-          expect(sql).includes('vernacularname');
-          expect(sql).includes('individualcount');
-          return mockQueryResponse;
-        }
-      });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.findSubmissionByCriteria({ keyword: 'keyword' });
-
-      expect(response).to.eql([{ submission_id: 1 }]);
-    });
-
-    it('should append knex query if spatial is given', async () => {
-      const mockQueryResponse = { rows: [{ submission_id: 1 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        knex: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const generateGeoStub = sinon.stub(spatialUtils, 'generateGeometryCollectionSQL').returns(SQL`valid sql`);
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.findSubmissionByCriteria({ spatial: JSON.stringify('spatial') });
-
-      expect(response).to.eql([{ submission_id: 1 }]);
-      expect(generateGeoStub).to.be.calledWith('spatial');
-    });
-  });
-
   describe('insertSubmissionRecord', () => {
     afterEach(() => {
       sinon.restore();

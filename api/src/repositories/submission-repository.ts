@@ -3,7 +3,6 @@ import SQL from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
-import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
 export interface ISpatialComponentCount {
@@ -163,51 +162,6 @@ export interface ISubmissionObservationRecord {
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
-  async findSubmissionByCriteria(criteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
-    const queryBuilder = getKnexQueryBuilder<any, { project_id: number }>()
-      .select('submission.submission_id')
-      .from('submission')
-      .leftJoin('occurrence', 'submission.submission_id', 'occurrence.submission_id');
-
-    if (criteria.keyword) {
-      queryBuilder.and.where(function () {
-        this.or.whereILike('occurrence.taxonid', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.lifestage', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.vernacularname', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.individualcount', `%${criteria.keyword}%`);
-      });
-    }
-
-    if (criteria.spatial) {
-      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(criteria.spatial));
-
-      const sqlStatement = SQL`
-      public.ST_INTERSECTS(
-        geography,
-        public.geography(
-          public.ST_Force2D(
-            public.ST_SetSRID(`;
-
-      sqlStatement.append(geometryCollectionSQL);
-
-      sqlStatement.append(`,
-              4326
-            )
-          )
-        )
-      )`);
-
-      queryBuilder.and.whereRaw(sqlStatement.sql, sqlStatement.values);
-    }
-
-    queryBuilder.groupBy('submission.submission_id');
-
-    const response = await this.connection.knex<{ submission_id: number }>(queryBuilder);
-
-    return response.rows;
-  }
-
   /**
    * Insert a new submission record.
    *
@@ -420,19 +374,13 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<QueryResult<{ eml_json_source: string }>> {
     const sqlStatement = SQL`
-    SELECT
-      eml_json_source
-    FROM
-      submission_metadata
-    LEFT JOIN
-      submission
-    ON
-      submission_metadata.submission_id = submission.submission_id
-    WHERE
-      submission.uuid = ${datasetId}
-    AND
-      submission_metadata.record_end_timestamp IS NULL;
-`;
+      SELECT
+        sm.eml_json_source
+      FROM submission s, submission_metadata sm
+      WHERE s.submission_id = sm.submission_id
+      AND sm.record_end_timestamp IS NULL
+      AND s.uuid = ${datasetId};
+    `;
 
     return this.connection.sql<{ eml_json_source: string }>(sqlStatement);
   }
