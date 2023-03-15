@@ -57,7 +57,7 @@ const transformString = `
         from
             submission_observation
         where
-            submission_observation_id = ?
+            submission_id = ?
             and record_end_timestamp is null
     ),
     occurrences as (
