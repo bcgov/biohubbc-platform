@@ -501,6 +501,8 @@ export class SpatialRepository extends BaseRepository {
             'ssc.geography'
           )
           .from('submission_spatial_component as ssc')
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .whereNull('so.record_end_timestamp')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
           .leftJoin(
             'security_transform_submission as sts',

@@ -103,8 +103,8 @@ const transformString = `
     ),
     location_coord as (
         select
-            st_x(pt) x,
-            st_y(pt) y,
+            coalesce(st_x(pt), 0) x,
+            coalesce(st_y(pt), 0) y,
             loc
         from
             location,
