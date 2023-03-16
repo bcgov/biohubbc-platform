@@ -17,7 +17,7 @@ CREATE TABLE artifact(
     file_name                    varchar(300)      NOT NULL,
     file_type                    varchar(300)      NOT NULL,
     title                        varchar(300),
-    description                  varchar(250),
+    description                  varchar(3000),
     file_size                    integer,
     key                          varchar(1000),
     security_review_timestamp    timestamptz(6),

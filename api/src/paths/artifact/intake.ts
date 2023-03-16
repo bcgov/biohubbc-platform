@@ -58,19 +58,23 @@ POST.apiDoc = {
               properties: {
                 title: {
                   description: 'The title of the artifact.',
-                  type: 'string'
+                  type: 'string',
+                  maxLength: 300
                 },
                 description: {
                   description: 'The description of the record.',
-                  type: 'string'
+                  type: 'string',
+                  maxLength: 3000
                 },
                 file_name: {
                   description: 'The original name of the artifact.',
-                  type: 'string'
+                  type: 'string',
+                  maxLength: 300
                 },
                 file_type: {
                   description: 'The artifact type. Artifact type examples include video, audio and field data.',
-                  type: 'string'
+                  type: 'string',
+                  maxLength: 300
                 },
                 file_size: {
                   description: 'The size of the artifact, in bytes.',
