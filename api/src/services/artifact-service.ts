@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { ArtifactRepository, IArtifact, IArtifactMetadata } from '../repositories/artifact-repository';
-import { generateS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import { generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
@@ -74,8 +74,8 @@ export class ArtifactService extends DBService {
     const artifact_id = (await this.getNextArtifactIds())[0];
 
     // Generate the S3 key for the artifact, using the preemptive artifact ID + the package UUID
-    const s3Key = generateS3FileKey({
-      uuid: dataPackageId,
+    const s3Key = generateArtifactS3FileKey({
+      datasetUUID: dataPackageId,
       artifactId: artifact_id,
       fileName: file.originalname
     });

@@ -106,7 +106,7 @@ describe('SubmissionJobQueueService', () => {
       const key = await service.uploadDatasetToS3(uuid, queueId, {
         originalname: fileName
       } as unknown as Express.Multer.File);
-      expect(key).to.be.eql('platform/datasets/uuid/dwca/1/file name.zip');
+      expect(key).to.be.eql('biohub/queue/1/datasets/uuid/dwca/file name.zip');
     });
   });
 

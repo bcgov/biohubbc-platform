@@ -140,7 +140,7 @@ describe('ArtifactService', () => {
         expect(getNextArtifactIdsStub).to.be.calledWith();
         expect(uploadStub).to.be.calledWith(
           mockFile,
-          `platform/artifacts/${14}/${mockDataPackageId}/DwCA/${mockFile.originalname}`,
+          `biohub/datasets/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
           { filename: mockFile.originalname }
         );
         expect(insertRecordStub).to.be.calledWith({
@@ -151,7 +151,7 @@ describe('ArtifactService', () => {
           file_size: 1,
           artifact_id: 14,
           submission_id: 100,
-          input_key: `platform/artifacts/${14}/${mockDataPackageId}/DwCA/${mockFile.originalname}`,
+          input_key: `biohub/datasets/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
           uuid: mockFileUuid
         });
       }

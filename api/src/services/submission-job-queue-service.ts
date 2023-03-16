@@ -4,7 +4,7 @@ import {
   SubmissionJobQueueRepository
 } from '../repositories/submission-job-queue-repository';
 import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
-import { generateDatasetS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import { generateQueueS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
 
@@ -29,21 +29,22 @@ export class SubmissionJobQueueService extends DBService {
   /**
    * Intakes DwCA and preps it for processing. Adding files to S3, tracks submission status and creates a queue record
    *
-   * @param {string} dataUUID
+   * @param {string} datasetUUID
    * @param {Express.Multer.File} file
+   * @param {ISecurityRequest} [securityRequest]
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
    */
   async intake(
-    dataUUID: string,
+    datasetUUID: string,
     file: Express.Multer.File,
     securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
     const submissionService = new SubmissionService(this.connection);
-    const nextJobId = await this.jobQueueRepository.getNextQueueId();
+    const { queueId } = await this.jobQueueRepository.getNextQueueId();
 
-    const key = await this.uploadDatasetToS3(dataUUID, nextJobId.queueId, file);
-    let submission = await submissionService.getSubmissionIdByUUID(dataUUID);
+    const key = await this.uploadDatasetToS3(datasetUUID, queueId, file);
+    let submission = await submissionService.getSubmissionIdByUUID(datasetUUID);
 
     if (!submission) {
       // Create a submission if one does not exist
@@ -51,12 +52,12 @@ export class SubmissionJobQueueService extends DBService {
 
       const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
       submission = await submissionService.insertSubmissionRecord({
-        uuid: dataUUID,
+        uuid: datasetUUID,
         source_transform_id: sourceTransformId
       });
     }
 
-    const queueRecord = await this.createQueueJob(nextJobId.queueId, submission.submission_id, key, securityRequest);
+    const queueRecord = await this.createQueueJob(queueId, submission.submission_id, key, securityRequest);
 
     await submissionService.insertSubmissionStatusAndMessage(
       submission.submission_id,
@@ -71,16 +72,17 @@ export class SubmissionJobQueueService extends DBService {
   /**
    * Uploads the DwCA file to S3
    *
-   * @param {string} uuid
+   * @param {string} datasetUUID
+   * @param {number} queueId
    * @param {Express.Multer.File} file
    * @return {*}  {Promise<number>}
    * @memberof SubmissionJobQueueService
    */
-  async uploadDatasetToS3(uuid: string, queueId: number, file: Express.Multer.File): Promise<string> {
-    const s3Key = generateDatasetS3FileKey({
-      fileName: file.originalname,
-      uuid,
-      queueId
+  async uploadDatasetToS3(datasetUUID: string, queueId: number, file: Express.Multer.File): Promise<string> {
+    const s3Key = generateQueueS3FileKey({
+      queueId: queueId,
+      datasetUUID: datasetUUID,
+      fileName: file.originalname
     });
     await uploadFileToS3(file, s3Key, { fileName: file.originalname });
     return s3Key;

@@ -62,7 +62,8 @@ POST.apiDoc = {
                 },
                 description: {
                   description: 'The description of the record.',
-                  type: 'string'
+                  type: 'string',
+                  maxLength: 250
                 },
                 file_name: {
                   description: 'The original name of the artifact.',

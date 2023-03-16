@@ -50,7 +50,7 @@ parameters:
   - name: S3_KEY_PREFIX
     description: S3 key optional prefix
     required: false
-    value: 'platform'
+    value: 'biohub'
   - name: TZ
     description: Application timezone
     required: false
