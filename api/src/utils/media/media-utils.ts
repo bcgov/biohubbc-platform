@@ -2,7 +2,6 @@ import AdmZip from 'adm-zip';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { X2jOptionsOptional, XMLParser } from 'fast-xml-parser';
 import mime from 'mime';
-import { DWCArchive } from './dwc/dwc-archive-file';
 import { EMLFile } from './eml/eml-file';
 import { ArchiveFile, MediaFile } from './media-file';
 
@@ -141,22 +140,4 @@ export const parseEMLtoJSONSource = (eml: EMLFile) => {
   const parser = new XMLParser(options);
   const eml_json_source = parser.parse(eml.emlFile.buffer.toString() as string);
   return eml_json_source;
-};
-
-/**
- * Returns normalized DwC Archive file data
- *
- * @param {DWCArchive} dwcArchiveFile
- * @return {*}  {string}
- */
-export const normalizeDWCA = (dwcArchiveFile: DWCArchive): string => {
-  const normalized = {};
-
-  Object.entries(dwcArchiveFile.worksheets).forEach(([key, value]) => {
-    if (value) {
-      normalized[key] = value.getRowObjects();
-    }
-  });
-
-  return JSON.stringify(normalized);
 };

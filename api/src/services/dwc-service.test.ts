@@ -523,22 +523,21 @@ describe('DarwinCoreService', () => {
         eml: {
           emlFile: mediaFileStub
         },
-        worksheets: {}
+        worksheets: {},
+        normalize: () => 'normalized data'
       } as unknown as DWCArchive;
 
+      const update = sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEndTimestamp').resolves();
       const insert = sinon
         .stub(DarwinCoreService.prototype, 'insertSubmissionObservationRecord')
         .resolves({ submission_observation_id: 1 });
       const transform = sinon.stub(DarwinCoreService.prototype, 'runTransformsOnObservations').resolves();
-      const update = sinon
-        .stub(DarwinCoreService.prototype, 'updateSubmissionObservationEffectiveAndEndDate')
-        .resolves();
 
       await service.intakeJob_step6(mockJobQueue, mockDWCAFile);
 
+      expect(update).to.be.calledOnce;
       expect(insert).to.be.calledOnce;
       expect(transform).to.be.calledOnce;
-      expect(update).to.be.calledOnce;
     });
 
     it('should throw `Transforming and uploading` error', async () => {
@@ -571,7 +570,7 @@ describe('DarwinCoreService', () => {
         .stub(DarwinCoreService.prototype, 'insertSubmissionObservationRecord')
         .resolves({ submission_observation_id: 1 });
       sinon.stub(DarwinCoreService.prototype, 'runTransformsOnObservations').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEffectiveAndEndDate').throws();
+      sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEndTimestamp').throws();
       const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
@@ -629,7 +628,7 @@ describe('DarwinCoreService', () => {
     });
   });
 
-  describe('updateSubmissionObservationEffectiveAndEndDate', () => {
+  describe('updateSubmissionObservationEndTimestamp', () => {
     it('should run without issue', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
@@ -642,10 +641,9 @@ describe('DarwinCoreService', () => {
       } as ISubmissionJobQueueRecord;
 
       sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEndDate').resolves();
-      sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEffectiveDate').resolves();
       const submissionIssue = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
-      await service.updateSubmissionObservationEffectiveAndEndDate(mockJobQueue);
+      await service.updateSubmissionObservationEndTimestamp(mockJobQueue);
       expect(submissionIssue).to.not.be.called;
     });
 
@@ -661,11 +659,10 @@ describe('DarwinCoreService', () => {
       } as ISubmissionJobQueueRecord;
 
       sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEndDate').throws();
-      sinon.stub(SubmissionService.prototype, 'updateSubmissionObservationRecordEffectiveDate').resolves();
       const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
-        await service.updateSubmissionObservationEffectiveAndEndDate(mockJobQueue);
+        await service.updateSubmissionObservationEndTimestamp(mockJobQueue);
         expect.fail();
       } catch (error) {
         expect(insertStatus).to.be.calledOnce;
@@ -998,28 +995,29 @@ describe('DarwinCoreService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
       const dwc = sinon.createStubInstance(DWCArchive);
+
       sinon.stub(DarwinCoreService.prototype, 'prepDWCArchive').returns(dwc);
-      const getFile = sinon
-        .stub(SubmissionService.prototype, 'getIntakeFileFromS3')
-        .resolves('test' as any as S3.GetObjectOutput);
+
+      const getFileFromS3Stub = sinon.stub(fileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
 
       const response = await service.getAndPrepFileFromS3('file-key');
 
       expect(dwc).to.be.eql(response);
-      expect(getFile).to.be.calledOnce;
+      expect(getFileFromS3Stub).to.be.calledOnce;
     });
 
     it('should throw `The source file is not available` error', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
 
-      sinon.stub(SubmissionService.prototype, 'getIntakeFileFromS3').resolves(null as any as S3.GetObjectOutput);
+      const getFileFromS3Stub = sinon.stub(fileUtils, 'getFileFromS3').resolves(null as any as S3.GetObjectOutput);
 
       try {
         await service.getAndPrepFileFromS3('file-key');
         expect.fail();
       } catch (error) {
         expect((error as ApiGeneralError).message).to.equal('The source file is not available');
+        expect(getFileFromS3Stub).to.be.calledOnce;
       }
     });
   });

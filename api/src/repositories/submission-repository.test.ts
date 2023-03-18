@@ -805,43 +805,4 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql(1);
     });
   });
-
-  describe('updateSubmissionObservationRecordEffectiveDate', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      try {
-        await submissionRepository.updateSubmissionObservationRecordEffectiveDate(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal(
-          'Failed to update record_effective_timestamp submission Observation record'
-        );
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.updateSubmissionObservationRecordEffectiveDate(1);
-
-      expect(response).to.eql(1);
-    });
-  });
 });

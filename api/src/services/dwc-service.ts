@@ -8,12 +8,12 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { copyFileInS3, deleteFileFromS3, generateDatasetS3FileKey } from '../utils/file-utils';
+import { copyFileInS3, deleteFileFromS3, generateDatasetS3FileKey, getFileFromS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile } from '../utils/media/media-file';
-import { normalizeDWCA, parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
+import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { ElasticSearchIndices } from './es-service';
 import { SpatialService } from './spatial-service';
@@ -231,7 +231,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 6: If csv worksheets are present, create submission oberservation record.
+   * Step 6: If csv worksheets are present, create submission observation record.
    * Then transform and update details
    *
    * @param {ISubmissionJobQueueRecord} jobQueueRecord
@@ -240,13 +240,16 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step6(jobQueueRecord: ISubmissionJobQueueRecord, dwcaWorksheets: DWCArchive): Promise<void> {
     try {
-      const jsonData = normalizeDWCA(dwcaWorksheets);
+      const jsonData = dwcaWorksheets.normalize();
 
+      // Set the end timestamp for all existing submission observations
+      await this.updateSubmissionObservationEndTimestamp(jobQueueRecord);
+
+      // Insert new submission observation record
       const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, jsonData);
 
+      // Run spatial and security transforms on observation data
       await this.runTransformsOnObservations(jobQueueRecord, submissionObservationId.submission_observation_id);
-
-      await this.updateSubmissionObservationEffectiveAndEndDate(jobQueueRecord);
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step6', message: 'error', error });
 
@@ -291,18 +294,17 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Update Submission Record effective and end Date
+   * Update and set all matching submission record end timestamps.
    *
    * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async updateSubmissionObservationEffectiveAndEndDate(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+  async updateSubmissionObservationEndTimestamp(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
     try {
       await this.submissionService.updateSubmissionObservationRecordEndDate(jobQueueRecord.submission_id);
-      await this.submissionService.updateSubmissionObservationRecordEffectiveDate(jobQueueRecord.submission_id);
     } catch (error: any) {
-      defaultLog.debug({ label: 'updateSubmissionObservationEffectiveAndEndDate', message: 'error', error });
+      defaultLog.debug({ label: 'updateSubmissionObservationEndTimestamp', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         jobQueueRecord.submission_id,
@@ -482,18 +484,18 @@ export class DarwinCoreService extends DBService {
   /**
    * Access file from S3 and prep into DWCA File
    *
-   * @param {number} submissionJobQueueId
+   * @param {string} fileKey
    * @return {*}
    * @memberof DarwinCoreService
    */
   async getAndPrepFileFromS3(fileKey: string) {
-    const file = await this.submissionService.getIntakeFileFromS3(fileKey);
+    const s3File = await getFileFromS3(fileKey);
 
-    if (!file) {
+    if (!s3File) {
       throw new ApiGeneralError('The source file is not available');
     }
 
-    return this.prepDWCArchive(file);
+    return this.prepDWCArchive(s3File);
   }
 
   /**
