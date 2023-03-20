@@ -265,6 +265,7 @@ describe('CSVValidation', () => {
         fileName: 'fileName',
         fileErrors: [fileError1],
         headerErrors: [headerError1],
+        keyErrors: [],
         rowErrors: [rowError1],
         isValid: false
       });
