@@ -22,27 +22,6 @@ export class CSVWorkBook {
 
     this.worksheets = worksheets;
   }
-
-  /**
-   * Performs all of the given workbook validators on the workbook. Results of the validation
-   * are stored in the `csvValidation` property on each of the worksheets within the workbook. This
-   * method returns the corresponding validations in an object.
-   *
-   * @param {WorkBookValidator[]} validators A series of validators to be run on the workbook
-   * @return {*}  {WorkBookValidation} A key-value pair representing all CSV validations for each worksheet,
-   * where the keys are the names of the worksheets and the values are the corresponding CSV validations.
-   * @memberof CSVWorkBook
-   */
-  validate(validators: WorkBookValidator[]): WorkBookValidation {
-    validators.forEach((validator) => validator(this));
-
-    const validations: WorkBookValidation = {};
-    Object.entries(this.worksheets).forEach(([key, value]) => {
-      validations[key] = value.csvValidation;
-    });
-
-    return validations;
-  }
 }
 
 export class CSVWorksheet {
@@ -270,14 +249,6 @@ export interface IRowError {
 export interface ICsvState extends IMediaState {
   headerErrors: IHeaderError[];
   rowErrors: IRowError[];
-  keyErrors: IKeyError[];
-}
-
-export interface IKeyError {
-  errorCode: 'Missing Child Key from Parent';
-  message: string;
-  colNames: string[];
-  rows: number[];
 }
 
 /**
@@ -290,14 +261,12 @@ export interface IKeyError {
 export class CSVValidation extends MediaValidation {
   headerErrors: IHeaderError[];
   rowErrors: IRowError[];
-  keyErrors: IKeyError[];
 
   constructor(fileName: string) {
     super(fileName);
 
     this.headerErrors = [];
     this.rowErrors = [];
-    this.keyErrors = [];
   }
 
   addHeaderErrors(errors: IHeaderError[]) {
@@ -320,21 +289,12 @@ export class CSVValidation extends MediaValidation {
     }
   }
 
-  addKeyErrors(errors: IKeyError[]) {
-    this.keyErrors = this.keyErrors.concat(errors);
-
-    if (errors?.length) {
-      this.isValid = false;
-    }
-  }
-
   getState(): ICsvState {
     return {
       fileName: this.fileName,
       fileErrors: this.fileErrors,
       headerErrors: this.headerErrors,
       rowErrors: this.rowErrors,
-      keyErrors: this.keyErrors,
       isValid: this.isValid
     };
   }
