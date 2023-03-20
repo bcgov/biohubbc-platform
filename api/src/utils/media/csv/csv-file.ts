@@ -4,7 +4,6 @@ import { IMediaState, MediaValidation } from '../media-file';
 import { getCellValue, getWorksheetRange, replaceCellDates, trimCellWhitespace } from '../xlsx/xlsx-utils';
 
 export type CSVWorksheets = { [name: string]: CSVWorksheet };
-export type WorkBookValidators = { [name: string]: CSVValidation };
 
 export class CSVWorkBook {
   rawWorkbook: xlsx.WorkBook;
@@ -216,7 +215,6 @@ export class CSVWorksheet {
 }
 
 export type CSVValidator = (csvWorksheet: CSVWorksheet) => CSVWorksheet;
-export type WorkBookValidator = (csvWorkBook: CSVWorkBook) => CSVWorkBook;
 
 // ensure these error codes match the 'name' column in the table: submission_message_type
 
@@ -299,5 +297,3 @@ export class CSVValidation extends MediaValidation {
     };
   }
 }
-
-export type WorkBookValidation = { [name: string]: CSVValidation };
