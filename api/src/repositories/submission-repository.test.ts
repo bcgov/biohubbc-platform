@@ -533,7 +533,7 @@ describe('SubmissionRepository', () => {
         uuid: '2267501d-c6a9-43b5-b951-2324faff6397',
         record_effective_date: '2022-05-24T18:41:42.211Z',
         delete_timestamp: null,
-        input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
+        input_key: 'biohub/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
         input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
         eml_source: null,
         eml_json_source: null,

@@ -10,25 +10,21 @@ import {
 } from 'aws-sdk/clients/s3';
 import { PromiseResult } from 'aws-sdk/lib/request';
 import clamd from 'clamdjs';
-
-export interface IS3FileKey {
-  fileName?: string;
-  uuid?: string;
-  artifactId?: number;
-  submissionId?: number;
-  jobQueueId?: number;
+export interface IDatasetS3FileKey {
+  datasetUUID: string;
+  fileName: string;
 }
 
-export interface IDatasetS3FileKey {
+export interface IArtifactS3FileKey {
+  datasetUUID: string;
+  artifactId: number;
   fileName: string;
-  uuid: string;
-  queueId: number;
 }
 
-export interface IDatasetS3FileKey {
-  fileName: string;
-  uuid: string;
+export interface IQueueS3FileKey {
   queueId: number;
+  datasetUUID: string;
+  fileName: string;
 }
 
 /**
@@ -87,7 +83,7 @@ export const _getObjectStoreBucketName = (): string => {
  * @returns {*} {string} The S3 key prefix
  */
 export const _getS3KeyPrefix = (): string => {
-  return process.env.S3_KEY_PREFIX || 'platform';
+  return process.env.S3_KEY_PREFIX || 'biohub';
 };
 
 /**
@@ -266,57 +262,72 @@ export async function getObjectMeta(key: string): Promise<HeadObjectOutput> {
 }
 
 /**
- * Helper function for generating S3 keys.
+ * Generate an S3 key for a dataset artifact file.
+ *
+ * @example
+ * <s3_key_prefix>/datasets/<dataset_uuid>/artifacts/<artifact_id>/<file_name>
  *
  * @export
- * @param {IS3FileKey} options
- * @return {*}  {string}
+ * @param {IArtifactS3FileKey} options
+ * @return {*}
  */
-export function generateS3FileKey(options: IS3FileKey): string {
-  const keyParts: (string | number)[] = [_getS3KeyPrefix()];
+export function generateArtifactS3FileKey(options: IArtifactS3FileKey) {
+  const keyParts: (string | number)[] = [];
 
-  if (options.artifactId) {
-    keyParts.push('artifacts');
-    keyParts.push(options.artifactId);
-  }
+  keyParts.push(_getS3KeyPrefix());
+  keyParts.push('datasets');
+  keyParts.push(options.datasetUUID);
+  keyParts.push('artifacts');
+  keyParts.push(options.artifactId);
+  keyParts.push(options.fileName);
 
-  if (options.submissionId) {
-    keyParts.push('submissions');
-    keyParts.push(options.submissionId);
-  }
-
-  if (options.uuid) {
-    keyParts.push(options.uuid);
-    keyParts.push('DwCA');
-    if (options.jobQueueId) {
-      keyParts.push(options.jobQueueId);
-    }
-  }
-
-  if (options.fileName) {
-    keyParts.push(options.fileName);
-  }
-
-  return keyParts.join('/');
+  return keyParts.filter(Boolean).join('/');
 }
 
 /**
- * Helper function for generating S3 keys for DwCA datasets.
+ * Generate an S3 key for a submission job queue file.
+ *
+ * @example
+ * <s3_key_prefix>/queue/<queue_id>/datasets/<dataset_uuid>/dwca/<file_name>
+ *
+ * @export
+ * @param {IQueueS3FileKey} options
+ * @return {*}
+ */
+export function generateQueueS3FileKey(options: IQueueS3FileKey) {
+  const keyParts: (string | number)[] = [];
+
+  keyParts.push(_getS3KeyPrefix());
+  keyParts.push('queue');
+  keyParts.push(options.queueId);
+  keyParts.push('datasets');
+  keyParts.push(options.datasetUUID);
+  keyParts.push('dwca');
+  keyParts.push(options.fileName);
+
+  return keyParts.filter(Boolean).join('/');
+}
+
+/**
+ * Generate an S3 key for a dataset DwCA file.
+ *
+ * @example
+ * <s3_key_prefix>/datasets/<dataset_uuid>/dwca/<file_name>
  *
  * @export
  * @param {IDatasetS3FileKey} options
- * @return {*}  {string}
+ * @return {*}
  */
-export function generateDatasetS3FileKey(options: IDatasetS3FileKey): string {
-  const keyParts: (string | number)[] = [_getS3KeyPrefix()];
+export function generateDatasetS3FileKey(options: IDatasetS3FileKey) {
+  const keyParts: (string | number)[] = [];
 
+  keyParts.push(_getS3KeyPrefix());
   keyParts.push('datasets');
-  keyParts.push(options.uuid);
+  keyParts.push(options.datasetUUID);
   keyParts.push('dwca');
-  keyParts.push(options.queueId);
   keyParts.push(options.fileName);
 
-  return keyParts.join('/');
+  return keyParts.filter(Boolean).join('/');
 }
 
 /**

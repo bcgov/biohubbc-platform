@@ -922,7 +922,7 @@ describe('DarwinCoreService', () => {
       await service.updateS3FileLocation(mockJobQueue);
 
       expect(submission).to.be.calledOnce;
-      expect(deleteS3).to.be.calledTwice;
+      expect(deleteS3).to.be.calledOnce;
       expect(moveS3).to.be.calledOnce;
     });
 

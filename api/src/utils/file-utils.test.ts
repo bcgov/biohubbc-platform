@@ -142,7 +142,7 @@ describe('file-utils', () => {
       delete process.env.S3_KEY_PREFIX;
 
       const result = fileUtils._getS3KeyPrefix();
-      expect(result).to.equal('platform');
+      expect(result).to.equal('biohub');
     });
   });
 
@@ -681,52 +681,38 @@ describe('file-utils', () => {
     });
   });
 
-  describe('generateS3FileKey', () => {
-    it('returns a basic file path', async () => {
-      const result = fileUtils.generateS3FileKey({ submissionId: 1, fileName: 'testFileName' });
-
-      expect(result).to.equal('platform/submissions/1/testFileName');
-    });
-
-    it('returns a basic file path without filename', async () => {
-      const result = fileUtils.generateS3FileKey({ submissionId: 1 });
-
-      expect(result).to.equal('platform/submissions/1');
-    });
-
-    it('returns a long file path', async () => {
-      const result = fileUtils.generateS3FileKey({ submissionId: 1, fileName: 'extra/folders/testFileName' });
-
-      expect(result).to.equal('platform/submissions/1/extra/folders/testFileName');
-    });
-
-    it('generates an artifact s3 key', () => {
-      const result = fileUtils.generateS3FileKey({
-        uuid: 'aaaa',
-        artifactId: 33,
-        fileName: 'bbbb.zip'
+  describe('generateArtifactS3FileKey', () => {
+    it('returns an s3 key with a prefix', async () => {
+      const result = fileUtils.generateArtifactS3FileKey({
+        artifactId: 1,
+        datasetUUID: '123-456-789',
+        fileName: 'testFileName'
       });
 
-      expect(result).to.equal('platform/artifacts/33/aaaa/DwCA/bbbb.zip');
+      expect(result).to.equal('biohub/datasets/123-456-789/artifacts/1/testFileName');
     });
+  });
 
-    it('generates an job queue s3 key', () => {
-      const result = fileUtils.generateS3FileKey({
-        uuid: 'aaaa',
-        artifactId: 33,
-        jobQueueId: 12,
-        fileName: 'bbbb.zip'
+  describe('generateQueueS3FileKey', () => {
+    it('returns an s3 key with a prefix', async () => {
+      const result = fileUtils.generateQueueS3FileKey({
+        queueId: 1,
+        datasetUUID: '123-456-789',
+        fileName: 'testFileName'
       });
 
-      expect(result).to.equal('platform/artifacts/33/aaaa/DwCA/12/bbbb.zip');
+      expect(result).to.equal('biohub/queue/1/datasets/123-456-789/dwca/testFileName');
     });
   });
 
   describe('generateDatasetS3FileKey', () => {
-    it('returns a dataset file path', async () => {
-      const result = fileUtils.generateDatasetS3FileKey({ fileName: 'fileName', uuid: 'uuid', queueId: 1 });
+    it('returns an s3 key with a prefix', async () => {
+      const result = fileUtils.generateDatasetS3FileKey({
+        datasetUUID: '123-456-789',
+        fileName: 'testFileName'
+      });
 
-      expect(result).to.equal('platform/datasets/uuid/dwca/1/fileName');
+      expect(result).to.equal('biohub/datasets/123-456-789/dwca/testFileName');
     });
   });
 

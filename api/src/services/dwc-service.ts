@@ -8,7 +8,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { copyFileInS3, deleteFileFromS3, generateS3FileKey } from '../utils/file-utils';
+import { copyFileInS3, deleteFileFromS3, generateDatasetS3FileKey } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { EMLFile } from '../utils/media/eml/eml-file';
@@ -41,24 +41,24 @@ export class DarwinCoreService extends DBService {
   /**
    * Start intake job for job queue record
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intakeJob(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
-    const submissionMetadataId = await this.intakeJob_step1(intakeRecord.submission_id);
+  async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+    const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
 
-    const dwcaFile = await this.intakeJob_step2(intakeRecord, submissionMetadataId.submission_metadata_id);
+    const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
 
-    await this.intakeJob_step3(intakeRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
+    await this.intakeJob_step3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
-    await this.intakeJob_step4(intakeRecord.submission_id);
+    await this.intakeJob_step4(jobQueueRecord.submission_id);
 
-    await this.intakeJob_step5(intakeRecord.submission_id);
+    await this.intakeJob_step5(jobQueueRecord.submission_id);
 
-    await this.intakeJob_step6(intakeRecord, dwcaFile);
+    await this.intakeJob_step6(jobQueueRecord, dwcaFile);
 
-    await this.intakeJob_finishIntake(intakeRecord);
+    await this.intakeJob_finishIntake(jobQueueRecord);
   }
 
   /**
@@ -102,20 +102,20 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step2(intakeRecord: ISubmissionJobQueueRecord, submissionMetadataId: number): Promise<DWCArchive> {
+  async intakeJob_step2(jobQueueRecord: ISubmissionJobQueueRecord, submissionMetadataId: number): Promise<DWCArchive> {
     try {
-      if (!intakeRecord.key) {
+      if (!jobQueueRecord.key) {
         throw new ApiGeneralError('No S3 Key given');
       }
 
-      const file = await this.getAndPrepFileFromS3(intakeRecord.key);
+      const file = await this.getAndPrepFileFromS3(jobQueueRecord.key);
 
       if (!file.eml) {
         throw new ApiGeneralError('Accessing S3 File, file eml is empty');
       }
 
       await this.submissionService.updateSubmissionMetadataEMLSource(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         submissionMetadataId,
         file.eml
       );
@@ -125,7 +125,7 @@ export class DarwinCoreService extends DBService {
       defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -234,24 +234,24 @@ export class DarwinCoreService extends DBService {
    * Step 6: If csv worksheets are present, create submission oberservation record.
    * Then transform and update details
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step6(intakeRecord: ISubmissionJobQueueRecord, dwcaWorksheets: DWCArchive): Promise<void> {
+  async intakeJob_step6(jobQueueRecord: ISubmissionJobQueueRecord, dwcaWorksheets: DWCArchive): Promise<void> {
     try {
       const jsonData = normalizeDWCA(dwcaWorksheets);
 
-      const submissionObservationId = await this.insertSubmissionObservationRecord(intakeRecord, jsonData);
+      const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, jsonData);
 
-      await this.runTransformsOnObservations(intakeRecord, submissionObservationId.submission_observation_id);
+      await this.runTransformsOnObservations(jobQueueRecord, submissionObservationId.submission_observation_id);
 
-      await this.updateSubmissionObservationEffectiveAndEndDate(intakeRecord);
+      await this.updateSubmissionObservationEffectiveAndEndDate(jobQueueRecord);
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step6', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -264,20 +264,23 @@ export class DarwinCoreService extends DBService {
   /**
    * Finish intake job, move S3 file to home folder, update status and queue end date
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_finishIntake(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
+  async intakeJob_finishIntake(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
     try {
-      await this.updateS3FileLocation(intakeRecord);
+      await this.updateS3FileLocation(jobQueueRecord);
 
-      await this.submissionService.insertSubmissionStatus(intakeRecord.submission_id, SUBMISSION_STATUS_TYPE.INGESTED);
+      await this.submissionService.insertSubmissionStatus(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.INGESTED
+      );
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -290,19 +293,19 @@ export class DarwinCoreService extends DBService {
   /**
    * Update Submission Record effective and end Date
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async updateSubmissionObservationEffectiveAndEndDate(intakeRecord: ISubmissionJobQueueRecord): Promise<void> {
+  async updateSubmissionObservationEffectiveAndEndDate(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
     try {
-      await this.submissionService.updateSubmissionObservationRecordEndDate(intakeRecord.submission_id);
-      await this.submissionService.updateSubmissionObservationRecordEffectiveDate(intakeRecord.submission_id);
+      await this.submissionService.updateSubmissionObservationRecordEndDate(jobQueueRecord.submission_id);
+      await this.submissionService.updateSubmissionObservationRecordEffectiveDate(jobQueueRecord.submission_id);
     } catch (error: any) {
       defaultLog.debug({ label: 'updateSubmissionObservationEffectiveAndEndDate', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_INGESTION,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -315,24 +318,24 @@ export class DarwinCoreService extends DBService {
   /**
    * Run both spatial and Security Transform on Observation
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
   async runTransformsOnObservations(
-    intakeRecord: ISubmissionJobQueueRecord,
+    jobQueueRecord: ISubmissionJobQueueRecord,
     submissionObservationId: number
   ): Promise<void> {
     try {
-      await this.runSpatialTransforms(intakeRecord, submissionObservationId);
+      await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
 
-      await this.runSecurityTransforms(intakeRecord, submissionObservationId);
+      await this.runSecurityTransforms(jobQueueRecord, submissionObservationId);
     } catch (error: any) {
       defaultLog.debug({ label: 'runTransformsOnObservations', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -345,7 +348,7 @@ export class DarwinCoreService extends DBService {
   /**
    * Insert new Submission Observation Record
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @param {string} dwcaJson
    * @return {*}  {Promise<{
    *     submission_observation_id: number;
@@ -353,16 +356,16 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async insertSubmissionObservationRecord(
-    intakeRecord: ISubmissionJobQueueRecord,
+    jobQueueRecord: ISubmissionJobQueueRecord,
     dwcaJson: string
   ): Promise<{
     submission_observation_id: number;
   }> {
     try {
       const submissionObservationData: ISubmissionObservationRecord = {
-        submission_id: intakeRecord.submission_id,
+        submission_id: jobQueueRecord.submission_id,
         darwin_core_source: dwcaJson,
-        submission_security_request: intakeRecord.security_request
+        submission_security_request: jobQueueRecord.security_request
       };
 
       return await this.submissionService.insertSubmissionObservationRecord(submissionObservationData);
@@ -370,7 +373,7 @@ export class DarwinCoreService extends DBService {
       defaultLog.debug({ label: 'insertSubmissionObservationRecord', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_UPLOAD,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -383,25 +386,28 @@ export class DarwinCoreService extends DBService {
   /**
    * Run Spatial Transform on Submission Observation Record
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runSpatialTransforms(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
+  async runSpatialTransforms(
+    jobQueueRecord: ISubmissionJobQueueRecord,
+    submissionObservationId: number
+  ): Promise<void> {
     try {
       //run transform on observation data
-      await this.spatialService.runSpatialTransforms(intakeRecord.submission_id, submissionObservationId);
+      await this.spatialService.runSpatialTransforms(jobQueueRecord.submission_id, submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
       );
     } catch (error: any) {
       defaultLog.debug({ label: 'runSpatialTransforms', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -414,25 +420,28 @@ export class DarwinCoreService extends DBService {
   /**
    * Run Security Transform on Submission Observation Record
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runSecurityTransforms(intakeRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
+  async runSecurityTransforms(
+    jobQueueRecord: ISubmissionJobQueueRecord,
+    submissionObservationId: number
+  ): Promise<void> {
     try {
       //run transform on observation data
       await this.spatialService.runSecurityTransforms(submissionObservationId);
 
       await this.submissionService.insertSubmissionStatus(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
       );
     } catch (error: any) {
       defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        intakeRecord.submission_id,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -443,34 +452,31 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Update and Move S3 file to new Home directory
+   * Move S3 file to new home directory
    *
-   * @param {ISubmissionJobQueueRecord} intakeRecord
+   * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @memberof DarwinCoreService
    */
-  async updateS3FileLocation(intakeRecord: ISubmissionJobQueueRecord) {
-    if (intakeRecord.key) {
-      const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(
-        intakeRecord.submission_id
-      );
+  async updateS3FileLocation(jobQueueRecord: ISubmissionJobQueueRecord) {
+    const sourceS3Key = jobQueueRecord.key;
 
-      const fileName = `${submissionRecord.uuid}.zip`;
-
-      const newKey = generateS3FileKey({ uuid: submissionRecord.uuid, fileName: fileName });
-
-      await copyFileInS3(intakeRecord.key, newKey);
-
-      const jobQueueFolderKey = generateS3FileKey({
-        uuid: submissionRecord.uuid,
-        jobQueueId: intakeRecord.submission_job_queue_id
-      });
-
-      //Delete Zip from job queue folder
-      await deleteFileFromS3(intakeRecord.key);
-
-      //Delete job queue folder
-      await deleteFileFromS3(`${jobQueueFolderKey}/`);
+    if (!sourceS3Key) {
+      return;
     }
+
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(
+      jobQueueRecord.submission_id
+    );
+
+    const fileName = `${submissionRecord.uuid}.zip`;
+
+    const destinationS3Key = generateDatasetS3FileKey({ datasetUUID: submissionRecord.uuid, fileName: fileName });
+
+    // Copy object to new location
+    await copyFileInS3(sourceS3Key, destinationS3Key);
+
+    // Delete original object
+    await deleteFileFromS3(sourceS3Key);
   }
 
   /**
