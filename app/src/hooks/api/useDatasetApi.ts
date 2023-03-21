@@ -31,9 +31,22 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Fetch dataset attachments by datasetId.
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<any>}
+   */
+  const getDatasetAttachments = async (datasetId: string): Promise<any> => {
+    const { data } = await axios.get(`api/dwc/submission/${datasetId}/attachments`);
+
+    return data;
+  };
+
   return {
     listAllDatasets,
-    getDatasetEML
+    getDatasetEML,
+    getDatasetAttachments
   };
 };
 

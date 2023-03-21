@@ -106,4 +106,40 @@ export class ArtifactRepository extends BaseRepository {
 
     return result;
   }
+
+  /**
+   * Retrieves all artifacts belonging to the given dataset.
+   *
+   * @param {string} datasetId The ID of the dataset
+   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the dataset
+   * @memberof ArtifactRepository
+   */
+  async getArtifactsByDatasetId(datasetId: string): Promise<IArtifact[]> {
+    defaultLog.debug({ label: 'getArtifactsByDatasetId', datasetId });
+
+    const sqlStatement = SQL`
+    SELECT
+      *
+    FROM
+      artifact a
+    WHERE
+      a.submission_id
+    IN (
+      SELECT
+        sm.submission_id
+      FROM
+        submission s,
+        submission_metadata sm
+      WHERE
+        s.submission_id = sm.submission_id
+      AND
+        sm.record_end_timestamp IS NULL
+      AND
+        s.uuid = ${datasetId}
+    );`;
+
+    const response = await this.connection.sql<IArtifact>(sqlStatement);
+
+    return response.rows;
+  }
 }

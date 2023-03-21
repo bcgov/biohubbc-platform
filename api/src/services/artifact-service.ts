@@ -98,4 +98,15 @@ export class ArtifactService extends DBService {
       uuid: fileUuid
     });
   }
+
+  /**
+   * Retrieves all artifacts belonging to the given dataset.
+   *
+   * @param {string} datasetId The ID of the dataset
+   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the dataset
+   * @memberof ArtifactService
+   */
+  async getArtifactsByDatasetId(datasetId: string): Promise<IArtifact[]> {
+    return this.artifactRepository.getArtifactsByDatasetId(datasetId);
+  }
 }

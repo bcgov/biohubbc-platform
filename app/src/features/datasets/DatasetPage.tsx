@@ -243,6 +243,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const datasetId = urlParams['id'];
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
+
   const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialDataFile({
       boundary: [searchBoundary],
@@ -251,6 +252,12 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
       datasetID: datasetId
     })
   );
+
+  const attachmentsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetAttachments(datasetId));
+
+  console.log({ attachmentsDataLoader });
+
+  attachmentsDataLoader.load();
 
   useDataLoaderError(datasetDataLoader, () => {
     return {
