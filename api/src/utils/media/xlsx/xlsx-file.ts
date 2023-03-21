@@ -22,7 +22,10 @@ export class XLSXCSV {
 
     this.mediaValidation = new MediaValidation(this.rawFile.fileName);
 
-    this.workbook = new CSVWorkBook(xlsx.read(this.rawFile.buffer, { ...options }));
+    // See https://www.npmjs.com/package/xlsx#parsing-options for details on parsing options
+    const parsingOptions: xlsx.ParsingOptions = { cellDates: true, cellNF: true, cellHTML: false, ...options };
+
+    this.workbook = new CSVWorkBook(xlsx.read(this.rawFile.buffer, parsingOptions));
   }
 
   isMediaValid(validationSchemaParser: ValidationSchemaParser): IMediaState {

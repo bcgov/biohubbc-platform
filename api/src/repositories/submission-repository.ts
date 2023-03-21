@@ -742,12 +742,14 @@ export class SubmissionRepository extends BaseRepository {
         submission_id,
         darwin_core_source,
         submission_security_request,
-        foi_reason_description
+        foi_reason_description,
+        record_effective_timestamp
       ) VALUES (
         ${submissonObservation.submission_id},
         ${submissonObservation.darwin_core_source},
         ${submissonObservation.submission_security_request},
-        ${submissonObservation.foi_reason_description}
+        ${submissonObservation.foi_reason_description},
+        now()
       )
       RETURNING
         submission_observation_id
@@ -850,40 +852,6 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement);
-
-    return response.rowCount;
-  }
-
-  /**
-   * Update start time stamp for submission observation record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionObservationRecordEffectiveDate(submissionId: number): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_observation
-      SET
-        record_effective_timestamp = now()
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        record_effective_timestamp IS NULL
-      AND
-        record_end_timestamp IS NULL
-      ;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission Observation record', [
-        'SubmissionRepository->updateSubmissionObservationRecordEffectiveDate',
-        'rowCount was null or undefined, expected rowCount >= 0'
-      ]);
-    }
 
     return response.rowCount;
   }

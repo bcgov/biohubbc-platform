@@ -1,6 +1,5 @@
-import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
@@ -14,7 +13,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { getFileFromS3 } from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
@@ -140,17 +138,6 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
     return this.submissionRepository.updateSubmissionObservationRecordEndDate(submissionId);
-  }
-
-  /**
-   * Update start time stamp for submission observation record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionObservationRecordEffectiveDate(submissionId: number): Promise<number> {
-    return this.submissionRepository.updateSubmissionObservationRecordEffectiveDate(submissionId);
   }
 
   /**
@@ -281,34 +268,6 @@ export class SubmissionService extends DBService {
    */
   async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
     return this.submissionRepository.listSubmissionRecords();
-  }
-
-  /**
-   * Returns Intake file from S3
-   *
-   * @param {string} s3FileLocation
-   * @return {*}  {Promise<GetObjectOutput>}
-   * @memberof SubmissionService
-   */
-  async getIntakeFileFromS3(s3FileLocation: string): Promise<GetObjectOutput> {
-    return this.getFileFromS3(s3FileLocation);
-  }
-
-  /**
-   * Collect filename from S3
-   *
-   * @param {string} fileName
-   * @return {*}  {Promise<GetObjectOutput>}
-   * @memberof SubmissionService
-   */
-  async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
-    const s3File = await getFileFromS3(fileName);
-
-    if (!s3File) {
-      throw new ApiGeneralError('Failed to get file from S3');
-    }
-
-    return s3File;
   }
 
   /**

@@ -1,10 +1,9 @@
-import { GetObjectOutput } from 'aws-sdk/clients/s3';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { UserObject } from '../models/user';
 import {
   ISourceTransformModel,
@@ -14,7 +13,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import * as FileUtils from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
@@ -160,22 +158,6 @@ describe('SubmissionService', () => {
       const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEndDate').resolves(1);
 
       const response = await submissionService.updateSubmissionObservationRecordEndDate(1);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql(1);
-    });
-  });
-
-  describe('updateSubmissionObservationRecordEffectiveDate', () => {
-    it('should return submission_id on update', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEffectiveDate')
-        .resolves(1);
-
-      const response = await submissionService.updateSubmissionObservationRecordEffectiveDate(1);
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(1);
@@ -368,54 +350,6 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(mockResponse);
-    });
-  });
-
-  describe('getIntakeFileFromS3', () => {
-    it('should return s3 file', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const s3File = {
-        Metadata: { filename: 'file1.csv' },
-        ContentType: 'text/csv',
-        Body: null
-      } as unknown as GetObjectOutput;
-
-      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves(s3File);
-
-      const response = await submissionService.getIntakeFileFromS3('');
-
-      expect(response).to.be.eql(s3File);
-    });
-  });
-
-  describe('getFileFromS3', () => {
-    it('should throw an error if file could not be fetched from s3', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const s3Stub = sinon.stub(FileUtils, 'getFileFromS3').resolves();
-
-      try {
-        await submissionService.getFileFromS3('fileName');
-        expect.fail();
-      } catch (actualError) {
-        expect(s3Stub).to.be.calledOnce;
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get file from S3');
-      }
-    });
-
-    it('should return s3 file', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const s3Stub = sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
-
-      const response = await submissionService.getFileFromS3('fileName');
-
-      expect(s3Stub).to.be.calledOnce;
-      expect(response).to.be.eql({ Body: 'valid' });
     });
   });
 
