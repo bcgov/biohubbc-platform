@@ -59,6 +59,22 @@ describe('ArtifactService', () => {
     });
   });
 
+  describe('getArtifactsByDatasetId', () => {
+    it('should return an array of artifacts', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+
+      const getArtifactRecordsStub = sinon
+        .stub(ArtifactRepository.prototype, 'getArtifactsByDatasetId')
+        .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as IArtifact[]);
+
+      const response = await artifactService.getArtifactsByDatasetId('abcd');
+
+      expect(getArtifactRecordsStub).to.be.calledWith('abcd');
+      expect(response).to.be.eql([{ artifact_id: 1 }, { artifact_id: 2 }]);
+    });
+  });
+
   describe('uploadAndPersistArtifact', () => {
     afterEach(() => {
       sinon.restore();

@@ -34,9 +34,14 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-                type: 'object'
+            type: 'object',
+            properties: {
+              artifacts: {
+                type: 'array',
+                items: {
+                  type: 'object'
+                }
+              }
             }
           }
         }
@@ -53,9 +58,7 @@ GET.apiDoc = {
  */
 export function getArtifactsByDatasetId(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token']
-        ? getDBConnection(req['keycloak_token'])
-        : getAPIUserDBConnection();
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     const datasetId = String(req.params.datasetId);
 
@@ -68,7 +71,7 @@ export function getArtifactsByDatasetId(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(response);
+      res.status(200).json({ artifacts: response });
     } catch (error) {
       defaultLog.error({ label: 'getArtifactsByDatasetId', message: 'error', error });
       await connection.rollback();

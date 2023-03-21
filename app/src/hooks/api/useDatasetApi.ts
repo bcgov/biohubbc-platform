@@ -1,4 +1,5 @@
 import { AxiosInstance } from 'axios';
+import { IListArtifactsResponse } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -37,7 +38,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
    * @param {string} datasetId
    * @return {*}  {Promise<any>}
    */
-  const getDatasetAttachments = async (datasetId: string): Promise<any> => {
+  const getDatasetAttachments = async (datasetId: string): Promise<IListArtifactsResponse> => {
     const { data } = await axios.get(`api/dwc/submission/${datasetId}/attachments`);
 
     return data;

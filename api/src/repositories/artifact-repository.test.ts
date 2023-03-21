@@ -102,4 +102,24 @@ describe('ArtifactRepository', () => {
       expect(response.artifact_id).to.equal(1);
     });
   });
+
+  describe('getArtifactsByDatasetId', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ artifact_id: 1 }, { artifact_id: 2 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await submissionRepository.getArtifactsByDatasetId('abcd');
+
+      expect(response[0].artifact_id).to.equal(1);
+      expect(response[1].artifact_id).to.equal(2);
+    });
+  });
 });

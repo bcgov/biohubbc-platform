@@ -40,4 +40,18 @@ describe('useDatasetApi', () => {
 
     expect(actualResult).toEqual('response');
   });
+
+  it('getDatasetAttachments works as expected', async () => {
+    const response = {
+      artifacts: [{ artifact_id: 1 }, { artifact_id: 2 }]
+    };
+
+    mock.onGet('api/dwc/submission/a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf/attachments').reply(200, response);
+
+    const actualResult = await useDatasetApi(axios).getDatasetAttachments('a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf');
+
+    expect(actualResult).toEqual({
+      artifacts: [{ artifact_id: 1 }, { artifact_id: 2 }]
+    });
+  });
 });
