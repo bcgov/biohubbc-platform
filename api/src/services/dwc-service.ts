@@ -50,12 +50,17 @@ export class DarwinCoreService extends DBService {
 
     const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
 
+    // Step 3:  Convert EML to JSON and Save data
     await this.intakeJob_step3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
+    // Step 4: Update SubmissionId Records End Date and Effective Date
     await this.intakeJob_step4(jobQueueRecord.submission_id);
 
+    // Step 5: transform and upload metadata to ES
     await this.intakeJob_step5(jobQueueRecord.submission_id);
 
+    // Step 6: If csv worksheets are present, create submission observation record.
+    // Then transform and update details
     await this.intakeJob_step6(jobQueueRecord, dwcaFile);
 
     await this.intakeJob_finishIntake(jobQueueRecord);
@@ -175,7 +180,7 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 4: Update SubmissionId Records End Date and Effective Date
+   * Step 4: Update Submission metadata Records End Date and Effective Date
    *
    * @param {number} submissionId
    * @return {*}  {Promise<any>}
@@ -332,7 +337,7 @@ export class DarwinCoreService extends DBService {
     try {
       await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
 
-      await this.runSecurityTransforms(jobQueueRecord, submissionObservationId);
+      await this.runSecurityTransforms(jobQueueRecord);
     } catch (error: any) {
       defaultLog.debug({ label: 'runTransformsOnObservations', message: 'error', error });
 
@@ -423,17 +428,13 @@ export class DarwinCoreService extends DBService {
    * Run Security Transform on Submission Observation Record
    *
    * @param {ISubmissionJobQueueRecord} jobQueueRecord
-   * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async runSecurityTransforms(
-    jobQueueRecord: ISubmissionJobQueueRecord,
-    submissionObservationId: number
-  ): Promise<void> {
+  async runSecurityTransforms(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
     try {
       //run transform on observation data
-      await this.spatialService.runSecurityTransforms(submissionObservationId);
+      await this.spatialService.runSecurityTransforms(jobQueueRecord.submission_id);
 
       await this.submissionService.insertSubmissionStatus(
         jobQueueRecord.submission_id,
