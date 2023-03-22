@@ -7,7 +7,7 @@ import { HTTPError } from '../../../../errors/http-error';
 import { IArtifact } from '../../../../repositories/artifact-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import { getArtifactsByDatasetId } from './attachments';
+import { getArtifactsByDatasetId } from './artifacts';
 
 chai.use(sinonChai);
 
