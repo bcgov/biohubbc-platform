@@ -12,6 +12,9 @@ parameters:
   - name: VERSION
     description: Version of the application
     value: '1.0.0'
+  - name: HOST
+    description: Host name of the application
+    required: true
   - name: CHANGE_ID
     description: Change id of the project. This will help to pull image stream
     required: true
@@ -135,6 +138,8 @@ objects:
         spec:
           containers:
             - env:
+                - name: API_HOST
+                  value: ${HOST}
                 - name: DB_HOST
                   value: ${DB_SERVICE_NAME}
                 - name: DB_USER_API

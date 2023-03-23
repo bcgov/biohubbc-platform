@@ -20,6 +20,8 @@ const deployChangeId = (isStaticDeployment && 'deploy') || changeId;
 const branch = (isStaticDeployment && options.branch) || null;
 const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${version}-${changeId}`;
 
+const staticUrlsAPI = config.staticUrlsAPI;
+
 const queueDockerfilePath = './Dockerfile.queue';
 
 const processOptions = (options) => {
@@ -77,6 +79,7 @@ const phases = {
     instance: `${name}-dev-${deployChangeId}`,
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
+    host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'dev',
     elasticsearchURL: 'http://es01:9200',
@@ -104,6 +107,7 @@ const phases = {
     instance: `${name}-test`,
     version: `${version}`,
     tag: `test-${version}`,
+    host: staticUrlsAPI.test,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'test',
     elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
@@ -131,6 +135,7 @@ const phases = {
     instance: `${name}-prod`,
     version: `${version}`,
     tag: `prod-${version}`,
+    host: staticUrlsAPI.prod,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'prod',
     elasticsearchURL: 'http://es01:9200',
