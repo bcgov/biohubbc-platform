@@ -23,7 +23,7 @@ import useDataLoaderError from 'hooks/useDataLoaderError';
 import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
-import DatasetAttachments from './components/DatasetAttachments';
+import DatasetArtifacts from './components/DatasetArtifacts';
 import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -366,7 +366,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
       <Container maxWidth="xl">
         <Box py={5}>
           <Paper elevation={0}>
-            <DatasetAttachments datasetId={datasetId} />
+            <DatasetArtifacts datasetId={datasetId} />
           </Paper>
         </Box>
       </Container>
