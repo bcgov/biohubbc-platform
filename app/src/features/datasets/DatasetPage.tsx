@@ -364,14 +364,14 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
         </Container>
       </Paper>
       <Container maxWidth="xl">
-        <Box py={5}>
+        <Box pt={2}>
           <Paper elevation={0}>
             <DatasetArtifacts datasetId={datasetId} />
           </Paper>
         </Box>
       </Container>
       <Container maxWidth="xl">
-        <Box py={5}>
+        <Box py={2}>
           <Card data-testid="MapContainer">
             <Grid sx={{ justify: 'space-between', alignItems: 'center' }}>
               <Grid item>
