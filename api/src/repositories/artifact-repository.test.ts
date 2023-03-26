@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactRepository, Artifact } from './artifact-repository';
+import { Artifact, ArtifactRepository } from './artifact-repository';
 
 chai.use(sinonChai);
 

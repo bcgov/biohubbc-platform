@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { ArtifactRepository, Artifact, ArtifactMetadata } from '../repositories/artifact-repository';
+import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
 import { generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
