@@ -1,26 +1,31 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/artifact-repository');
 
-export interface IArtifactMetadata {
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  title?: string;
-  description?: string;
-}
+export const ArtifactMetadata = z.object({
+  file_name: z.string(),
+  file_type: z.string(),
+  file_size: z.number(),
+  title: z.string().nullable(),
+  description: z.string().nullable()
+});
 
-export interface IArtifact extends IArtifactMetadata {
-  artifact_id: number;
-  submission_id: number;
-  uuid: string;
-  input_key: string;
-  foi_reason_description?: string;
-  security_review_timestamp?: string;
-}
+export type ArtifactMetadata = z.infer<typeof ArtifactMetadata>;
+
+export const Artifact = ArtifactMetadata.extend({
+  artifact_id: z.number(),
+  submission_id: z.number(),
+  uuid: z.string().uuid(),
+  key: z.string(),
+  foi_reason_description: z.string().nullable().optional(),
+  security_review_timestamp: z.date().nullable().optional()
+});
+
+export type Artifact = z.infer<typeof Artifact>;
 
 /**
  * A repository for maintaining submission artifacts.
@@ -47,7 +52,7 @@ export class ArtifactRepository extends BaseRepository {
         GENERATE_SERIES(1, ${count});
     `;
 
-    const response = await this.connection.sql<{ artifact_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, Artifact.pick({ artifact_id: true }));
 
     const results = (response && response.rowCount && response.rows) || null;
 
@@ -65,7 +70,7 @@ export class ArtifactRepository extends BaseRepository {
    * @returns {*} {Promise<{ artifact_id: number }>} The ID of the inserted artifact
    * @memberof ArtifactRepository
    */
-  async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
+  async insertArtifactRecord(artifact: Artifact): Promise<{ artifact_id: number }> {
     defaultLog.debug({ label: 'insertArtifactRecord', artifact });
 
     const sqlStatement = SQL`
@@ -85,7 +90,7 @@ export class ArtifactRepository extends BaseRepository {
         ${artifact.artifact_id},
         ${artifact.submission_id},
         ${artifact.uuid},
-        ${artifact.input_key},
+        ${artifact.key},
         ${artifact.file_name},
         ${artifact.file_type},
         ${artifact.title},
@@ -96,7 +101,7 @@ export class ArtifactRepository extends BaseRepository {
         artifact_id;
     `;
 
-    const response = await this.connection.sql<{ artifact_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, Artifact.pick({ artifact_id: true }));
 
     const result = (response && response.rowCount && response.rows[0]) || null;
 
@@ -114,7 +119,7 @@ export class ArtifactRepository extends BaseRepository {
    * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the dataset
    * @memberof ArtifactRepository
    */
-  async getArtifactsByDatasetId(datasetId: string): Promise<IArtifact[]> {
+  async getArtifactsByDatasetId(datasetId: string): Promise<Artifact[]> {
     defaultLog.debug({ label: 'getArtifactsByDatasetId', datasetId });
 
     const sqlStatement = SQL`
@@ -138,7 +143,7 @@ export class ArtifactRepository extends BaseRepository {
         s.uuid = ${datasetId}
     );`;
 
-    const response = await this.connection.sql<IArtifact>(sqlStatement);
+    const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
 
     return response.rows;
   }

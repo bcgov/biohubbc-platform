@@ -33,13 +33,13 @@ const useDatasetApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch dataset attachments by datasetId.
+   * Fetch dataset artifacts by datasetId.
    *
    * @param {string} datasetId
    * @return {*}  {Promise<any>}
    */
-  const getDatasetAttachments = async (datasetId: string): Promise<IListArtifactsResponse> => {
-    const { data } = await axios.get(`api/dwc/submission/${datasetId}/attachments`);
+  const getDatasetArtifacts = async (datasetId: string): Promise<IListArtifactsResponse> => {
+    const { data } = await axios.get(`api/dwc/submission/${datasetId}/artifacts`);
 
     return data;
   };
@@ -47,7 +47,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
   return {
     listAllDatasets,
     getDatasetEML,
-    getDatasetAttachments
+    getDatasetArtifacts
   };
 };
 

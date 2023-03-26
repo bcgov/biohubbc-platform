@@ -158,7 +158,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const [showAlert, setShowAlert] = useState<boolean>(true);
 
   const biohubApi = useApi();
-  const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetAttachments(datasetId));
+  const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
 
   artifactsDataLoader.load();
 

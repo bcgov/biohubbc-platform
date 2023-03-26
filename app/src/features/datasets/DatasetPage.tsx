@@ -254,6 +254,10 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     })
   );
 
+  const attachmentsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
+
+  attachmentsDataLoader.load();
+
   useDataLoaderError(datasetDataLoader, () => {
     return {
       dialogTitle: 'Error Loading Dataset',

@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { HTTPError } from '../errors/http-error';
-import { ArtifactRepository, IArtifact, IArtifactMetadata } from '../repositories/artifact-repository';
+import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
 import { ISourceTransformModel } from '../repositories/submission-repository';
 import * as file_utils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -52,7 +52,7 @@ describe('ArtifactService', () => {
         .stub(ArtifactRepository.prototype, 'insertArtifactRecord')
         .resolves({ artifact_id: 1 });
 
-      const response = await artifactService.insertArtifactRecord({} as unknown as IArtifact);
+      const response = await artifactService.insertArtifactRecord({} as unknown as Artifact);
 
       expect(insertArtifactRecordStub).to.be.calledOnce;
       expect(response).to.be.eql({ artifact_id: 1 });
@@ -66,7 +66,7 @@ describe('ArtifactService', () => {
 
       const getArtifactRecordsStub = sinon
         .stub(ArtifactRepository.prototype, 'getArtifactsByDatasetId')
-        .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as IArtifact[]);
+        .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
 
       const response = await artifactService.getArtifactsByDatasetId('abcd');
 
@@ -81,7 +81,7 @@ describe('ArtifactService', () => {
     });
 
     const mockDataPackageId = '64f47e65-f306-410e-82fa-115f9916910b';
-    const mockArtifactMetadata: IArtifactMetadata = {
+    const mockArtifactMetadata: ArtifactMetadata = {
       title: 'Title',
       description: 'Description',
       file_name: 'Filename.txt',
@@ -167,7 +167,7 @@ describe('ArtifactService', () => {
           file_size: 1,
           artifact_id: 14,
           submission_id: 100,
-          input_key: `biohub/datasets/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
+          key: `biohub/datasets/${mockDataPackageId}/artifacts/${14}/${mockFile.originalname}`,
           uuid: mockFileUuid
         });
       }
