@@ -1,4 +1,6 @@
+import { grey } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
+import type {} from "@mui/x-data-grid/themeAugmentation";
 import 'styles.scss';
 
 const appTheme = createTheme({
@@ -96,6 +98,61 @@ const appTheme = createTheme({
             backgroundColor: theme.palette.grey[50]
           })
         })
+      }
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          '& th': {
+            letterSpacing: '0.02rem',
+            textTransform: 'uppercase'
+          },
+          '& tr:last-of-type td': {
+            borderBottom: 'none'
+          },
+          '& .MuiLink-root': {
+            fontFamily: 'inherit',
+            fontSize: 'inherit'
+          }
+        }
+      }
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.9rem'
+        },
+        head: {
+          fontSize: '0.875rem',
+          fontWeight: 700,
+          color: grey[600]
+        }
+      }
+    },
+    MuiDataGrid: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.9rem',
+          border: 0,
+          '& .MuiDataGrid-columnHeaders': {
+            fontSize: '0.875rem',
+            // @TODO this override is currently not working
+            fontWeight: 700,
+            color: grey[600]
+          },
+          '& .MuiDataGrid-columnHeader': {
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            letterSpacing: '0.02rem',
+          },
+          '& .MuiLink-root': {
+            fontFamily: 'inherit',
+            fontSize: 'inherit'
+          },
+          '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cellCheckbox:focus-within, & .MuiDataGrid-columnHeader:focus-within': {
+            outline: 'none'
+          }
+        }
       }
     }
   }

@@ -1,15 +1,14 @@
-import { mdiChevronDown, mdiDotsVertical, mdiInformationOutline, mdiLock, mdiTrashCanOutline, mdiTrayArrowDown } from "@mdi/js";
+import { mdiChevronDown, mdiDotsVertical, mdiInformationOutline, mdiLock, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from "@mdi/js";
 import Icon from "@mdi/react";
-import { Alert, Chip } from "@mui/material";
+import { Alert, Button, Chip } from "@mui/material";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem'
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
 import { DataGrid, GridColDef } from "@mui/x-data-grid"
+import { ActionToolbar } from "components/toolbar/ActionToolbars";
 import { DATE_FORMAT } from "constants/dateTimeFormats";
 import { useApi } from "hooks/useApi";
 import useDataLoader from "hooks/useDataLoader";
@@ -172,6 +171,7 @@ const columns: GridColDef[] = [
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
+  const [selected, setSelected] = useState<number[]>([]);
 
   const biohubApi = useApi();
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
@@ -180,20 +180,32 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
 
-  const rows = artifactsList.map((artifact) => ({ ...artifact, id: artifact.artifact_id }));
-
-
   const numPendingDocuments = artifactsList
     .filter((artifact) => artifact.security_review_timestamp === null)
     .length;
 
   return (
     <>
-      <Toolbar style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Typography variant="h4" component="h2">
-          Documents
-        </Typography>
-      </Toolbar>
+      <ActionToolbar label='Documents' labelProps={{ variant: 'h4' }}>
+        <Box display='flex' gap={1}>
+          <Button
+            title='Apply Security Rules'
+            variant='contained'
+            color='primary'
+            startIcon={<Icon path={mdiLockPlus} size={1} />}
+            onClick={() => console.log('Apply Security not implemented.')}
+            disabled={selected.length === 0}
+          >
+            Apply Security
+          </Button>
+          <IconButton
+            onClick={() => console.log('File download not implemented.')}
+            aria-label={`Download`}
+          >
+            <Icon path={mdiTrayArrowDown} color='primary' size={1} />
+          </IconButton>
+        </Box>
+      </ActionToolbar>
       <Divider></Divider>
       <Box px={1}>
         {numPendingDocuments > 0 && showAlert && (
@@ -207,8 +219,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
         )}
         <Box>
           <DataGrid
+            getRowId={(row) => row.artifact_id}
             autoHeight
-            rows={rows}
+            rows={artifactsList}
             columns={columns}
             pageSizeOptions={[5]}
             checkboxSelection
@@ -217,16 +230,6 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             disableColumnFilter
             disableColumnMenu
             sortingOrder={['asc', 'desc']}
-            sx={{
-              border: 0,
-              '& .MuiDataGrid-columnHeader': {
-                textTransform: 'uppercase',
-                fontWeight: 700
-              },
-              '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cellCheckbox:focus-within, & .MuiDataGrid-columnHeader:focus-within': {
-                outline: 'none'
-              },
-            }}
             initialState={{
               sorting: {
                 sortModel: [{ field: 'create_date', sort: 'desc' }]
@@ -237,6 +240,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
                 },
               },
             }}
+            onStateChange={(params) => setSelected(params.rowSelection)}
           />
         </Box>
       </Box>
