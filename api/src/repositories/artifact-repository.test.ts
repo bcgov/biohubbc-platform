@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactRepository, IArtifact } from './artifact-repository';
+import { ArtifactRepository, Artifact } from './artifact-repository';
 
 chai.use(sinonChai);
 
@@ -59,11 +59,11 @@ describe('ArtifactRepository', () => {
       sinon.restore();
     });
 
-    const mockArtifact: IArtifact = {
+    const mockArtifact: Artifact = {
       artifact_id: 1,
       submission_id: 2,
       uuid: 'abcd',
-      input_key: 'test-key',
+      key: 'test-key',
       file_name: 'file-name',
       file_type: 'file-type',
       title: 'Title',

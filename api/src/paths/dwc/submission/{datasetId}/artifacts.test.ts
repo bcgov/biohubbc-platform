@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
-import { IArtifact } from '../../../../repositories/artifact-repository';
+import { Artifact } from '../../../../repositories/artifact-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { getArtifactsByDatasetId } from './artifacts';
@@ -22,7 +22,7 @@ describe('getArtifactsByDatasetId', () => {
 
     const artifactServiceStub = sinon
       .stub(ArtifactService.prototype, 'getArtifactsByDatasetId')
-      .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as IArtifact[]);
+      .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
