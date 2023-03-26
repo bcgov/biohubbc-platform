@@ -1,9 +1,12 @@
-import { mdiChevronDown, mdiDotsVertical } from "@mdi/js";
+import { mdiChevronDown, mdiDotsVertical, mdiInformationOutline, mdiTrashCanOutline, mdiTrayArrowDown } from "@mdi/js";
 import Icon from "@mdi/react";
 import { Alert, Chip } from "@mui/material";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import IconButton from '@mui/material/IconButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem'
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import { DataGrid, GridColDef } from "@mui/x-data-grid"
@@ -15,6 +18,83 @@ import { getFormattedFileSize } from "utils/Utils";
 export interface IDatasetAttachmentsProps {
   datasetId: string;
 }
+
+const AttachmentItemMenuButton: React.FC<any> = (props) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event: any) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <Box my={-1}>
+        <Box>
+          <IconButton aria-label="Document actions" onClick={handleClick} data-testid="attachment-action-menu">
+            <Icon path={mdiDotsVertical} size={1} />
+          </IconButton>
+          <Menu
+            // getContentAnchorEl={null}
+            anchorOrigin={{
+              vertical: 'top',
+              horizontal: 'right'
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right'
+            }}
+            id="basic-menu"
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            MenuListProps={{
+              'aria-labelledby': 'basic-button'
+            }}>
+            <MenuItem
+              onClick={() => {
+                props.handleDownloadFileClick(props.attachment);
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-download">
+              <ListItemIcon>
+                <Icon path={mdiTrayArrowDown} size={0.875} />
+              </ListItemIcon>
+              Download Document
+            </MenuItem>
+            {props.attachment.fileType === 'REPORT' && (
+              <MenuItem
+                onClick={() => {
+                  props.handleViewDetailsClick(props.attachment);
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-details">
+                <ListItemIcon>
+                  <Icon path={mdiInformationOutline} size={0.8} />
+                </ListItemIcon>
+                View Document Details
+              </MenuItem>
+            )}
+            <MenuItem
+              onClick={() => {
+                props.handleDeleteFileClick(props.attachment);
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-delete">
+              <ListItemIcon>
+                <Icon path={mdiTrashCanOutline} size={0.8} />
+              </ListItemIcon>
+              Delete Document
+            </MenuItem>
+          </Menu>
+        </Box>
+      </Box>
+    </>
+  );
+};
 
 const columns: GridColDef[] = [
   {
@@ -61,9 +141,7 @@ const columns: GridColDef[] = [
     sortable: false,
     renderCell: (() => {
       return (
-        <IconButton>
-          <Icon path={mdiDotsVertical} size={1}/>
-        </IconButton>
+        <AttachmentItemMenuButton />
       );
     })
   },
@@ -88,7 +166,6 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const rows = artifactsList.map((artifact) => ({ ...artifact, id: artifact.artifact_id }));
 
-  console.log({ rows })
 
   const hasPendingDocuments = true // artifactsList.some((artifact) => artifact.status === 'PENDING_REVIEW');
 
