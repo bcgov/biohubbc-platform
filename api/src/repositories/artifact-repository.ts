@@ -22,8 +22,14 @@ export const Artifact = ArtifactMetadata.extend({
   uuid: z.string().uuid(),
   key: z.string(),
   foi_reason_description: z.string().nullable().optional(),
-  security_review_timestamp: z.date().nullable().optional()
+  security_review_timestamp: z.date().nullable().optional(),
+  create_date: z.date().optional()
 });
+
+export const ArtifactWithStatus = Artifact.extend({
+  submission_status: z.string(),
+  
+})
 
 export type Artifact = z.infer<typeof Artifact>;
 
@@ -47,7 +53,7 @@ export class ArtifactRepository extends BaseRepository {
 
     const sqlStatement = SQL`
       SELECT
-        NEXTVAL('artifact_seq') AS artifact_id
+        CAST(NEXTVAL('artifact_seq') AS INTEGER) AS artifact_id
       FROM
         GENERATE_SERIES(1, ${count});
     `;
@@ -124,7 +130,7 @@ export class ArtifactRepository extends BaseRepository {
 
     const sqlStatement = SQL`
     SELECT
-      *
+      a.*
     FROM
       artifact a
     WHERE

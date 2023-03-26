@@ -10,10 +10,11 @@ import MenuItem from '@mui/material/MenuItem'
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import { DataGrid, GridColDef } from "@mui/x-data-grid"
+import { DATE_FORMAT } from "constants/dateTimeFormats";
 import { useApi } from "hooks/useApi";
 import useDataLoader from "hooks/useDataLoader";
 import { useState } from "react";
-import { getFormattedFileSize } from "utils/Utils";
+import { getFormattedDate, getFormattedFileSize } from "utils/Utils";
 
 export interface IDatasetAttachmentsProps {
   datasetId: string;
@@ -56,7 +57,7 @@ const AttachmentItemMenuButton: React.FC<any> = (props) => {
             }}>
             <MenuItem
               onClick={() => {
-                props.handleDownloadFileClick(props.attachment);
+                // props.handleDownloadFileClick(props.attachment);
                 setAnchorEl(null);
               }}
               data-testid="attachment-action-menu-download">
@@ -65,10 +66,10 @@ const AttachmentItemMenuButton: React.FC<any> = (props) => {
               </ListItemIcon>
               Download Document
             </MenuItem>
-            {props.attachment.fileType === 'REPORT' && (
+            {props === 'REPORT' && (
               <MenuItem
                 onClick={() => {
-                  props.handleViewDetailsClick(props.attachment);
+                  // props.handleViewDetailsClick(props.attachment);
                   setAnchorEl(null);
                 }}
                 data-testid="attachment-action-menu-details">
@@ -109,15 +110,17 @@ const columns: GridColDef[] = [
     flex: 1
   },
   {
-    field: 'submitted',
+    field: 'create_date',
     headerName: 'Submitted',
+    valueGetter: ({ value }) => value && new Date(value),
+    valueFormatter: ({ value }) => getFormattedDate(DATE_FORMAT.ShortDateFormat, value),
     flex: 1
   },
   {
     field: 'file_size',
     headerName: 'Size',
     flex: 0,
-    renderCell: (params) => <>{getFormattedFileSize(params.row.file_size)}</>
+    valueFormatter: ({ value }) => getFormattedFileSize(value)
   },
   {
     field: 'status',
@@ -209,7 +212,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             }}
             initialState={{
               sorting: {
-                sortModel: [{ field: 'submitted', sort: 'desc' }]
+                sortModel: [{ field: 'create_date', sort: 'desc' }]
               },
               pagination: {
                 paginationModel: {
