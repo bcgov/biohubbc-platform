@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiDotsVertical, mdiInformationOutline, mdiTrashCanOutline, mdiTrayArrowDown } from "@mdi/js";
+import { mdiChevronDown, mdiDotsVertical, mdiInformationOutline, mdiLock, mdiTrashCanOutline, mdiTrayArrowDown } from "@mdi/js";
 import Icon from "@mdi/react";
 import { Alert, Chip } from "@mui/material";
 import Box from "@mui/material/Box";
@@ -127,13 +127,26 @@ const columns: GridColDef[] = [
     headerName: 'Status',
     flex: 1,
     renderCell: (params) => {
+      const { security_review_timestamp } = params.row
+      if (!security_review_timestamp) {
+        return (
+          <Chip
+            color='info'
+            sx={{ textTransform: 'uppercase' }}
+            label="Pending Review"
+            onDelete={() => {}}
+            deleteIcon={<Icon path={mdiChevronDown} size={1} />}
+          />
+        )
+      }
+
       return (
         <Chip
-          color='info'
+          color='warning'
           sx={{ textTransform: 'uppercase' }}
-          label="Pending Review"
+          label="Secured"
           onDelete={() => {}}
-          deleteIcon={<Icon path={mdiChevronDown} size={1} />}
+          deleteIcon={<Icon path={mdiLock} size={1} />}
         />
       )
     }
@@ -170,7 +183,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const rows = artifactsList.map((artifact) => ({ ...artifact, id: artifact.artifact_id }));
 
 
-  const hasPendingDocuments = true // artifactsList.some((artifact) => artifact.status === 'PENDING_REVIEW');
+  const numPendingDocuments = artifactsList
+    .filter((artifact) => artifact.security_review_timestamp === null)
+    .length;
 
   return (
     <>
@@ -181,10 +196,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       </Toolbar>
       <Divider></Divider>
       <Box px={1}>
-        {hasPendingDocuments && showAlert && (
+        {numPendingDocuments > 0 && showAlert && (
           <Box pt={2} pb={2}>
               <Alert onClose={() => setShowAlert(false)} severity='info'>
-                <strong>You have 5 project documents to review.</strong>
+                <strong>
+                  {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
+                </strong>
               </Alert>    
           </Box>  
         )}
