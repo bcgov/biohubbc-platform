@@ -163,7 +163,7 @@ export class DarwinCoreService extends DBService {
       }
 
       // Convert the EML data from XML to JSON
-      const emlJSON = await this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
+      const emlJSON = this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
 
       // Decorate the EML object, adding additional BioHub metadata to the original EML.
       const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
