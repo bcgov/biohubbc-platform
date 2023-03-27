@@ -265,3 +265,13 @@ export const makeCsvObjectUrl = (entries: Array<Record<string, any>>) => {
 
   return window.URL.createObjectURL(blob);
 };
+
+export const downloadFile = (url: string): void => {
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.addEventListener('click', () => {
+    anchor.remove();
+  });
+  
+  anchor.click();
+}

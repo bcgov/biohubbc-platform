@@ -52,7 +52,7 @@ export class ArtifactRepository extends BaseRepository {
 
     const sqlStatement = SQL`
       SELECT
-        CAST(NEXTVAL('artifact_seq') AS INTEGER) AS artifact_id
+        NEXTVAL('artifact_seq')::integer AS artifact_id
       FROM
         GENERATE_SERIES(1, ${count});
     `;

@@ -173,4 +173,20 @@ describe('ArtifactService', () => {
       }
     });
   });
+
+  describe('getArtifactById', () => {
+    it('should return a single artifact successfully', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+
+      const getArtifactRecordsStub = sinon
+        .stub(ArtifactRepository.prototype, 'getArtifactById')
+        .resolves({ artifact_id: 1 } as Artifact);
+
+      const response = await artifactService.getArtifactById(1);
+
+      expect(getArtifactRecordsStub).to.be.calledWith(1);
+      expect(response).to.be.eql({ artifact_id: 1 });
+    });
+  });
 });

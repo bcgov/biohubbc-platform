@@ -2,6 +2,7 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
 import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
+  downloadFile,
   ensureProtocol,
   getFeatureObjectFromLatLngBounds,
   getFormattedAmount,
@@ -383,5 +384,13 @@ describe('jsonStringifyObjectProperties', () => {
         bool: true
       })
     ).toEqual(output);
+  });
+});
+
+describe('downloadfile', () => {
+  it('should download a file', () => {
+    const url = 'http://example.com';
+    // TODO
+    downloadFile(url);
   });
 });

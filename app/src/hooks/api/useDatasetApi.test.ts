@@ -54,4 +54,13 @@ describe('useDatasetApi', () => {
       artifacts: [{ artifact_id: 1 }, { artifact_id: 2 }]
     });
   });
+
+  it('getArtifactSignedUrl works as expected', async () => {
+
+    mock.onGet(`api/artifact/${1}/getSignedUrl`).reply(200, 'http://example.com');
+
+    const actualResult = await useDatasetApi(axios).getArtifactSignedUrl(1);
+
+    expect(actualResult).toEqual('http://example.com');
+  });
 });
