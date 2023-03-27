@@ -193,7 +193,7 @@ export class EMLService extends DBService {
           resultType: 'all'
         });
 
-        paths.forEach(async (path: any) => {
+        paths.forEach((path: any) => {
           // Get value of target property
           const currentPropertyValue = path.value[patch.property];
 
