@@ -109,4 +109,8 @@ export class ArtifactService extends DBService {
   async getArtifactsByDatasetId(datasetId: string): Promise<Artifact[]> {
     return this.artifactRepository.getArtifactsByDatasetId(datasetId);
   }
+
+  async getArtifactById(artifactId: number): Promise<Artifact> {
+    return this.artifactRepository.getArtifactById(artifactId);
+  }
 }

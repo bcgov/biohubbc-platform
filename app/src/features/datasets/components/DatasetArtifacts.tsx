@@ -1,7 +1,6 @@
 import {
   mdiChevronDown,
   mdiDotsVertical,
-  mdiInformationOutline,
   mdiLock,
   mdiLockPlus,
   mdiTrashCanOutline,
@@ -27,165 +26,171 @@ export interface IDatasetAttachmentsProps {
   datasetId: string;
 }
 
-const AttachmentItemMenuButton: React.FC<any> = (props) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
-
-  const handleClick = (event: any) => {
-    setAnchorEl(event.currentTarget);
-  };
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  return (
-    <>
-      <Box my={-1}>
-        <Box>
-          <IconButton aria-label="Document actions" onClick={handleClick} data-testid="attachment-action-menu">
-            <Icon path={mdiDotsVertical} size={1} />
-          </IconButton>
-          <Menu
-            // getContentAnchorEl={null}
-            anchorOrigin={{
-              vertical: 'top',
-              horizontal: 'right'
-            }}
-            transformOrigin={{
-              vertical: 'top',
-              horizontal: 'right'
-            }}
-            id="basic-menu"
-            anchorEl={anchorEl}
-            open={open}
-            onClose={handleClose}
-            MenuListProps={{
-              'aria-labelledby': 'basic-button'
-            }}>
-            <MenuItem
-              onClick={() => {
-                // props.handleDownloadFileClick(props.attachment);
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-download">
-              <ListItemIcon>
-                <Icon path={mdiTrayArrowDown} size={0.875} />
-              </ListItemIcon>
-              Download Document
-            </MenuItem>
-            {props === 'REPORT' && (
-              <MenuItem
-                onClick={() => {
-                  // props.handleViewDetailsClick(props.attachment);
-                  setAnchorEl(null);
-                }}
-                data-testid="attachment-action-menu-details">
-                <ListItemIcon>
-                  <Icon path={mdiInformationOutline} size={0.8} />
-                </ListItemIcon>
-                View Document Details
-              </MenuItem>
-            )}
-            <MenuItem
-              onClick={() => {
-                props.handleDeleteFileClick(props.attachment);
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-delete">
-              <ListItemIcon>
-                <Icon path={mdiTrashCanOutline} size={0.8} />
-              </ListItemIcon>
-              Delete Document
-            </MenuItem>
-          </Menu>
-        </Box>
-      </Box>
-    </>
-  );
-};
-
-const columns: GridColDef[] = [
-  {
-    field: 'file_name',
-    headerName: 'Title',
-    flex: 2,
-    disableColumnMenu: true
-  },
-  {
-    field: 'file_type',
-    headerName: 'Type',
-    flex: 1
-  },
-  {
-    field: 'create_date',
-    headerName: 'Submitted',
-    valueGetter: ({ value }) => value && new Date(value),
-    valueFormatter: ({ value }) => getFormattedDate(DATE_FORMAT.ShortDateFormat, value),
-    flex: 1
-  },
-  {
-    field: 'file_size',
-    headerName: 'Size',
-    flex: 0,
-    valueFormatter: ({ value }) => getFormattedFileSize(value)
-  },
-  {
-    field: 'status',
-    headerName: 'Status',
-    flex: 1,
-    renderCell: (params) => {
-      const { security_review_timestamp } = params.row;
-      if (!security_review_timestamp) {
-        return (
-          <Chip
-            color="info"
-            sx={{ textTransform: 'uppercase' }}
-            label="Pending Review"
-            onDelete={() => {}}
-            deleteIcon={<Icon path={mdiChevronDown} size={1} />}
-          />
-        );
-      }
-
-      return (
-        <Chip
-          color="warning"
-          sx={{ textTransform: 'uppercase' }}
-          label="Secured"
-          onDelete={() => {}}
-          deleteIcon={<Icon path={mdiLock} size={1} />}
-        />
-      );
-    }
-  },
-  {
-    field: 'action',
-    headerName: 'Action',
-    sortable: false,
-    renderCell: () => {
-      return <AttachmentItemMenuButton />;
-    }
-  }
-];
-
 /**
- * Project attachments content for a project.
+ * Dataset attachments content for a dataset.
  *
  * @return {*}
  */
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
-  const [selected, setSelected] = useState<number[]>([]);
 
   const biohubApi = useApi();
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
-
   artifactsDataLoader.load();
 
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
-
   const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
+
+  const handleDownloadAttachment = (attachment: any) => {
+    biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id)
+      .then((signedUrl) => {
+        if (!signedUrl) {
+          return;
+        }
+
+        window.open(signedUrl);
+      })
+  }
+
+  const AttachmentItemMenuButton: React.FC<{ attachment: any }> = (props) => {
+    const [anchorEl, setAnchorEl] = useState(null);
+    const open = Boolean(anchorEl);
+  
+    const handleClick = (event: any) => {
+      setAnchorEl(event.currentTarget);
+    };
+    const handleClose = () => {
+      setAnchorEl(null);
+    };
+  
+    return (
+      <>
+        <Box my={-1}>
+          <Box>
+            <IconButton aria-label="Document actions" onClick={handleClick} data-testid="attachment-action-menu">
+              <Icon path={mdiDotsVertical} size={1} />
+            </IconButton>
+            <Menu
+              // getContentAnchorEl={null}
+              anchorOrigin={{
+                vertical: 'top',
+                horizontal: 'right'
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'right'
+              }}
+              id="basic-menu"
+              anchorEl={anchorEl}
+              open={open}
+              onClose={handleClose}
+              MenuListProps={{
+                'aria-labelledby': 'basic-button'
+              }}>
+              <MenuItem
+                onClick={() => {
+                  console.log('Apply security not implemented yet.')
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-apply-security">
+                <ListItemIcon>
+                  <Icon path={mdiLockPlus} size={0.8} />
+                </ListItemIcon>
+                Apply Security
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  handleDownloadAttachment(props.attachment);
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-download">
+                <ListItemIcon>
+                  <Icon path={mdiTrayArrowDown} size={0.875} />
+                </ListItemIcon>
+                Download Document
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  console.log('Delete artifact not implemented yet.')
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-delete">
+                <ListItemIcon>
+                  <Icon path={mdiTrashCanOutline} size={0.8} />
+                </ListItemIcon>
+                Delete Document
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Box>
+      </>
+    );
+  };
+
+  const columns: GridColDef[] = [
+    {
+      field: 'file_name',
+      headerName: 'Title',
+      flex: 2,
+      disableColumnMenu: true
+    },
+    {
+      field: 'file_type',
+      headerName: 'Type',
+      flex: 1
+    },
+    {
+      field: 'create_date',
+      headerName: 'Submitted',
+      valueGetter: ({ value }) => value && new Date(value),
+      valueFormatter: ({ value }) => getFormattedDate(DATE_FORMAT.ShortDateFormat, value),
+      flex: 1
+    },
+    {
+      field: 'file_size',
+      headerName: 'Size',
+      flex: 0,
+      valueFormatter: ({ value }) => getFormattedFileSize(value)
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      flex: 1,
+      renderCell: (params) => {
+        const { security_review_timestamp } = params.row;
+        if (!security_review_timestamp) {
+          return (
+            <Chip
+              color="info"
+              sx={{ textTransform: 'uppercase' }}
+              label="Pending Review"
+              onDelete={() => {}}
+              deleteIcon={<Icon path={mdiChevronDown} size={1} />}
+            />
+          );
+        }
+  
+        return (
+          <Chip
+            color="warning"
+            sx={{ textTransform: 'uppercase' }}
+            label="Secured"
+            onDelete={() => {}}
+            deleteIcon={<Icon path={mdiLock} size={1} />}
+          />
+        );
+      }
+    },
+    {
+      field: 'action',
+      headerName: 'Action',
+      sortable: false,
+      renderCell: (params) => {
+        return <AttachmentItemMenuButton attachment={params.row} />;
+      }
+    }
+  ];
 
   return (
     <>
@@ -197,7 +202,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => console.log('Apply Security not implemented.')}
-            disabled={selected.length === 0}>
+          >
             Apply Security
           </Button>
           <IconButton onClick={() => console.log('File download not implemented.')} aria-label={`Download`}>
@@ -239,7 +244,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
                 }
               }
             }}
-            onStateChange={(params) => setSelected(params.rowSelection)}
+            onStateChange={(params) => console.log('Selected: ', params.rowSelection)}
           />
         </Box>
       </Box>

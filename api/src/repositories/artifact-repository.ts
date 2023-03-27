@@ -152,4 +152,27 @@ export class ArtifactRepository extends BaseRepository {
 
     return response.rows;
   }
+
+  async getArtifactById(artifactId: number): Promise<Artifact> {
+    defaultLog.debug({ label: 'getArtifactById', artifactId });
+
+    const sqlStatement = SQL`
+      SELECT
+        a.*
+      FROM
+        artifact a
+      WHERE
+        a.artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
+
+    const result = (response && response.rowCount && response.rows[0]) || null;
+
+    if (!result) {
+      throw new ApiExecuteSQLError('Failed to retreive artifact record by ID');
+    }
+
+    return result;
+  }
 }

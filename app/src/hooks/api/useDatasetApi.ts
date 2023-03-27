@@ -44,10 +44,22 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Fetch the signed URL of an artifact by its artifact ID.
+   *
+   * @return {*}  {Promise<string>}
+   */
+  const getArtifactSignedUrl = async (artifactId: number): Promise<string> => {
+    const { data } = await axios.get<string>(`api/artifact/${artifactId}/getSignedUrl`);
+
+    return data;
+  };
+
   return {
     listAllDatasets,
     getDatasetEML,
-    getDatasetArtifacts
+    getDatasetArtifacts,
+    getArtifactSignedUrl
   };
 };
 
