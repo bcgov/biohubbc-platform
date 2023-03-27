@@ -84,7 +84,7 @@ const phases = {
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
-    s3KeyPrefix: 'biohub',
+    s3KeyPrefix: (isStaticDeployment && 'biohub') || `local/${deployChangeId}/biohub`,
     tz: config.timezone.api,
     sso: config.sso.dev,
     logLevel: 'debug',
