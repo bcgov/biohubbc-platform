@@ -19,12 +19,92 @@ import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 
 export interface IDatasetAttachmentsProps {
   datasetId: string;
 }
+
+interface IAttachmentItemMenuButtonProps {
+  artifact: IArtifact;
+  onDownload: (artifact: IArtifact) => void;
+}
+
+const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (props) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event: any) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <Box my={-1}>
+        <Box>
+          <IconButton aria-label="Document actions" onClick={handleClick} data-testid="attachment-action-menu">
+            <Icon path={mdiDotsVertical} size={1} />
+          </IconButton>
+          <Menu
+            anchorOrigin={{
+              vertical: 'top',
+              horizontal: 'right'
+            }}
+            transformOrigin={{
+              vertical: 'top',
+              horizontal: 'right'
+            }}
+            id="basic-menu"
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            MenuListProps={{
+              'aria-labelledby': 'basic-button'
+            }}>
+            <MenuItem
+              onClick={() => {
+                console.log('Apply security not implemented yet.')
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-apply-security">
+              <ListItemIcon>
+                <Icon path={mdiLockPlus} size={0.8} />
+              </ListItemIcon>
+              Apply Security
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                props.onDownload(props.artifact);
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-download">
+              <ListItemIcon>
+                <Icon path={mdiTrayArrowDown} size={0.875} />
+              </ListItemIcon>
+              Download Document
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                console.log('Delete artifact not implemented yet.')
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-delete">
+              <ListItemIcon>
+                <Icon path={mdiTrashCanOutline} size={0.8} />
+              </ListItemIcon>
+              Delete Document
+            </MenuItem>
+          </Menu>
+        </Box>
+      </Box>
+    </>
+  );
+};
 
 /**
  * Dataset attachments content for a dataset.
@@ -42,7 +122,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
   const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
 
-  const handleDownloadAttachment = (attachment: any) => {
+  const handleDownloadAttachment = (attachment: IArtifact) => {
     biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id)
       .then((signedUrl) => {
         if (!signedUrl) {
@@ -52,81 +132,6 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
         downloadFile(signedUrl);
       })
   }
-
-  const AttachmentItemMenuButton: React.FC<{ attachment: any }> = (props) => {
-    const [anchorEl, setAnchorEl] = useState(null);
-    const open = Boolean(anchorEl);
-  
-    const handleClick = (event: any) => {
-      setAnchorEl(event.currentTarget);
-    };
-    const handleClose = () => {
-      setAnchorEl(null);
-    };
-  
-    return (
-      <>
-        <Box my={-1}>
-          <Box>
-            <IconButton aria-label="Document actions" onClick={handleClick} data-testid="attachment-action-menu">
-              <Icon path={mdiDotsVertical} size={1} />
-            </IconButton>
-            <Menu
-              // getContentAnchorEl={null}
-              anchorOrigin={{
-                vertical: 'top',
-                horizontal: 'right'
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right'
-              }}
-              id="basic-menu"
-              anchorEl={anchorEl}
-              open={open}
-              onClose={handleClose}
-              MenuListProps={{
-                'aria-labelledby': 'basic-button'
-              }}>
-              <MenuItem
-                onClick={() => {
-                  console.log('Apply security not implemented yet.')
-                  setAnchorEl(null);
-                }}
-                data-testid="attachment-action-menu-apply-security">
-                <ListItemIcon>
-                  <Icon path={mdiLockPlus} size={0.8} />
-                </ListItemIcon>
-                Apply Security
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  handleDownloadAttachment(props.attachment);
-                  setAnchorEl(null);
-                }}
-                data-testid="attachment-action-menu-download">
-                <ListItemIcon>
-                  <Icon path={mdiTrayArrowDown} size={0.875} />
-                </ListItemIcon>
-                Download Document
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  console.log('Delete artifact not implemented yet.')
-                  setAnchorEl(null);
-                }}
-                data-testid="attachment-action-menu-delete">
-                <ListItemIcon>
-                  <Icon path={mdiTrashCanOutline} size={0.8} />
-                </ListItemIcon>
-                Delete Document
-              </MenuItem>
-            </Menu>
-          </Box>
-        </Box>
-      </>
-    );
-  };
 
   const columns: GridColDef[] = [
     {
@@ -187,7 +192,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       headerName: 'Action',
       sortable: false,
       renderCell: (params) => {
-        return <AttachmentItemMenuButton attachment={params.row} />;
+        return <AttachmentItemMenuButton
+          artifact={params.row}
+          onDownload={handleDownloadAttachment}
+        />;
       }
     }
   ];
