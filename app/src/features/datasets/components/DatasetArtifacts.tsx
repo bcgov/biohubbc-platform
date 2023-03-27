@@ -1,19 +1,27 @@
-import { mdiChevronDown, mdiDotsVertical, mdiInformationOutline, mdiLock, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from "@mdi/js";
-import Icon from "@mdi/react";
-import { Alert, Button, Chip } from "@mui/material";
-import Box from "@mui/material/Box";
-import Divider from "@mui/material/Divider";
+import {
+  mdiChevronDown,
+  mdiDotsVertical,
+  mdiInformationOutline,
+  mdiLock,
+  mdiLockPlus,
+  mdiTrashCanOutline,
+  mdiTrayArrowDown
+} from '@mdi/js';
+import Icon from '@mdi/react';
+import { Alert, Button, Chip } from '@mui/material';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem'
-import { DataGrid, GridColDef } from "@mui/x-data-grid"
-import { ActionToolbar } from "components/toolbar/ActionToolbars";
-import { DATE_FORMAT } from "constants/dateTimeFormats";
-import { useApi } from "hooks/useApi";
-import useDataLoader from "hooks/useDataLoader";
-import { useState } from "react";
-import { getFormattedDate, getFormattedFileSize } from "utils/Utils";
+import MenuItem from '@mui/material/MenuItem';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { ActionToolbar } from 'components/toolbar/ActionToolbars';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
+import { useState } from 'react';
+import { getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 
 export interface IDatasetAttachmentsProps {
   datasetId: string;
@@ -126,41 +134,38 @@ const columns: GridColDef[] = [
     headerName: 'Status',
     flex: 1,
     renderCell: (params) => {
-      const { security_review_timestamp } = params.row
+      const { security_review_timestamp } = params.row;
       if (!security_review_timestamp) {
         return (
           <Chip
-            color='info'
+            color="info"
             sx={{ textTransform: 'uppercase' }}
             label="Pending Review"
             onDelete={() => {}}
             deleteIcon={<Icon path={mdiChevronDown} size={1} />}
           />
-        )
+        );
       }
 
       return (
         <Chip
-          color='warning'
+          color="warning"
           sx={{ textTransform: 'uppercase' }}
           label="Secured"
           onDelete={() => {}}
           deleteIcon={<Icon path={mdiLock} size={1} />}
         />
-      )
+      );
     }
   },
   {
     field: 'action',
     headerName: 'Action',
     sortable: false,
-    renderCell: (() => {
-      return (
-        <AttachmentItemMenuButton />
-      );
-    })
-  },
-
+    renderCell: () => {
+      return <AttachmentItemMenuButton />;
+    }
+  }
 ];
 
 /**
@@ -180,29 +185,23 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
 
-  const numPendingDocuments = artifactsList
-    .filter((artifact) => artifact.security_review_timestamp === null)
-    .length;
+  const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
 
   return (
     <>
-      <ActionToolbar label='Documents' labelProps={{ variant: 'h4' }}>
-        <Box display='flex' gap={1}>
+      <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
+        <Box display="flex" gap={1}>
           <Button
-            title='Apply Security Rules'
-            variant='contained'
-            color='primary'
+            title="Apply Security Rules"
+            variant="contained"
+            color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => console.log('Apply Security not implemented.')}
-            disabled={selected.length === 0}
-          >
+            disabled={selected.length === 0}>
             Apply Security
           </Button>
-          <IconButton
-            onClick={() => console.log('File download not implemented.')}
-            aria-label={`Download`}
-          >
-            <Icon path={mdiTrayArrowDown} color='primary' size={1} />
+          <IconButton onClick={() => console.log('File download not implemented.')} aria-label={`Download`}>
+            <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
         </Box>
       </ActionToolbar>
@@ -210,12 +209,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       <Box px={1}>
         {numPendingDocuments > 0 && showAlert && (
           <Box pt={2} pb={2}>
-              <Alert onClose={() => setShowAlert(false)} severity='info'>
-                <strong>
-                  {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
-                </strong>
-              </Alert>    
-          </Box>  
+            <Alert onClose={() => setShowAlert(false)} severity="info">
+              <strong>
+                {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
+              </strong>
+            </Alert>
+          </Box>
         )}
         <Box>
           <DataGrid
@@ -236,9 +235,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
               },
               pagination: {
                 paginationModel: {
-                  pageSize: 5,
-                },
-              },
+                  pageSize: 5
+                }
+              }
             }}
             onStateChange={(params) => setSelected(params.rowSelection)}
           />

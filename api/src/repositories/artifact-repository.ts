@@ -27,9 +27,8 @@ export const Artifact = ArtifactMetadata.extend({
 });
 
 export const ArtifactWithStatus = Artifact.extend({
-  submission_status: z.string(),
-  
-})
+  submission_status: z.string()
+});
 
 export type Artifact = z.infer<typeof Artifact>;
 

@@ -1,6 +1,6 @@
 import { grey } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
-import type {} from "@mui/x-data-grid/themeAugmentation";
+import type {} from '@mui/x-data-grid/themeAugmentation';
 import 'styles.scss';
 
 const appTheme = createTheme({
@@ -143,15 +143,16 @@ const appTheme = createTheme({
           '& .MuiDataGrid-columnHeader': {
             textTransform: 'uppercase',
             fontWeight: 700,
-            letterSpacing: '0.02rem',
+            letterSpacing: '0.02rem'
           },
           '& .MuiLink-root': {
             fontFamily: 'inherit',
             fontSize: 'inherit'
           },
-          '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cellCheckbox:focus-within, & .MuiDataGrid-columnHeader:focus-within': {
-            outline: 'none'
-          }
+          '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cellCheckbox:focus-within, & .MuiDataGrid-columnHeader:focus-within':
+            {
+              outline: 'none'
+            }
         }
       }
     }
