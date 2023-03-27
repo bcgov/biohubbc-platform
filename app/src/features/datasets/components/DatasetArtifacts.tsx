@@ -1,11 +1,4 @@
-import {
-  mdiChevronDown,
-  mdiDotsVertical,
-  mdiLock,
-  mdiLockPlus,
-  mdiTrashCanOutline,
-  mdiTrayArrowDown
-} from '@mdi/js';
+import { mdiChevronDown, mdiDotsVertical, mdiLock, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Alert, Button, Chip } from '@mui/material';
 import Box from '@mui/material/Box';
@@ -68,7 +61,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             }}>
             <MenuItem
               onClick={() => {
-                console.log('Apply security not implemented yet.')
+                console.log('Apply security not implemented yet.');
                 setAnchorEl(null);
               }}
               data-testid="attachment-action-menu-apply-security">
@@ -90,7 +83,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             </MenuItem>
             <MenuItem
               onClick={() => {
-                console.log('Delete artifact not implemented yet.')
+                console.log('Delete artifact not implemented yet.');
                 setAnchorEl(null);
               }}
               data-testid="attachment-action-menu-delete">
@@ -114,6 +107,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
+  const [selected, setSelected] = useState<number[]>([]);
 
   const biohubApi = useApi();
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
@@ -122,16 +116,25 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
   const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
 
-  const handleDownloadAttachment = (attachment: IArtifact) => {
-    biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id)
-      .then((signedUrl) => {
-        if (!signedUrl) {
-          return;
-        }
+  const downloadSelected = async () => {
+    const promises = artifactsList
+      .filter((artifact: IArtifact) => selected.includes(artifact.artifact_id))
+      .map((artifact) => () => handleDownloadAttachment(artifact));
 
-        downloadFile(signedUrl);
-      })
-  }
+    for (const promise of promises) {
+      await promise();
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: IArtifact) => {
+    return biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id).then((signedUrl) => {
+      if (!signedUrl) {
+        return;
+      }
+
+      return downloadFile(signedUrl);
+    });
+  };
 
   const columns: GridColDef[] = [
     {
@@ -175,7 +178,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             />
           );
         }
-  
+
         return (
           <Chip
             color="warning"
@@ -192,10 +195,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       headerName: 'Action',
       sortable: false,
       renderCell: (params) => {
-        return <AttachmentItemMenuButton
-          artifact={params.row}
-          onDownload={handleDownloadAttachment}
-        />;
+        return <AttachmentItemMenuButton artifact={params.row} onDownload={handleDownloadAttachment} />;
       }
     }
   ];
@@ -210,10 +210,14 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => console.log('Apply Security not implemented.')}
-          >
+            disabled={selected.length === 0}>
             Apply Security
           </Button>
-          <IconButton onClick={() => console.log('File download not implemented.')} aria-label={`Download`}>
+          <IconButton
+            onClick={() => downloadSelected()}
+            title="Download Files"
+            aria-label={`Download selected files`}
+            disabled={selected.length === 0}>
             <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
         </Box>
@@ -252,7 +256,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
                 }
               }
             }}
-            onStateChange={(params) => console.log('Selected: ', params.rowSelection)}
+            onStateChange={(params) => setSelected(params.rowSelection)}
           />
         </Box>
       </Box>

@@ -56,7 +56,6 @@ describe('useDatasetApi', () => {
   });
 
   it('getArtifactSignedUrl works as expected', async () => {
-
     mock.onGet(`api/artifact/${1}/getSignedUrl`).reply(200, 'http://example.com');
 
     const actualResult = await useDatasetApi(axios).getArtifactSignedUrl(1);

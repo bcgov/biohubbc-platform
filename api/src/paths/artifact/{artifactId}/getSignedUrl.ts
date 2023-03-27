@@ -62,7 +62,7 @@ export function getArtifactSignedUrl(): RequestHandler {
 
       const response = await artifactService.getArtifactById(artifactId);
 
-      const signedUrl = await getS3SignedURL(response.key)
+      const signedUrl = await getS3SignedURL(response.key);
 
       await connection.commit();
 

@@ -387,10 +387,19 @@ describe('jsonStringifyObjectProperties', () => {
   });
 });
 
-describe('downloadfile', () => {
-  it('should download a file', () => {
-    const url = 'http://example.com';
-    // TODO
+describe('downloadFile', () => {
+  it('should create an anchor element with the provided URL and simulate a click', () => {
+    const url = 'https://example.com/file.pdf';
+    const anchor = document.createElement('a');
+    jest.spyOn(document, 'createElement').mockReturnValue(anchor);
+    jest.spyOn(anchor, 'click');
+    jest.spyOn(anchor, 'remove');
+
     downloadFile(url);
+
+    expect(document.createElement).toHaveBeenCalledWith('a');
+    expect(anchor.href).toEqual(url);
+    expect(anchor.click).toHaveBeenCalled();
+    expect(anchor.remove).toHaveBeenCalled();
   });
 });

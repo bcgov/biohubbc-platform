@@ -266,12 +266,15 @@ export const makeCsvObjectUrl = (entries: Array<Record<string, any>>) => {
   return window.URL.createObjectURL(blob);
 };
 
-export const downloadFile = (url: string): void => {
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.addEventListener('click', () => {
-    anchor.remove();
+export const downloadFile = async (url: string): Promise<void> => {
+  return new Promise((resolve) => {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.addEventListener('click', () => {
+      anchor.remove();
+      resolve();
+    });
+
+    anchor.click();
   });
-  
-  anchor.click();
-}
+};
