@@ -19,6 +19,7 @@ import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import useLinkDownload from 'hooks/useLinkDownload';
 import { useState } from 'react';
 import { getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 
@@ -39,6 +40,8 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();
 
+  const downloadFile = useLinkDownload();
+
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
   const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
 
@@ -49,7 +52,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           return;
         }
 
-        window.open(signedUrl);
+        downloadFile(signedUrl);
       })
   }
 
