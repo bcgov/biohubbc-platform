@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
-import { ArtifactRepository, IArtifact } from './artifact-repository';
+import { Artifact, ArtifactRepository } from './artifact-repository';
 
 chai.use(sinonChai);
 
@@ -59,11 +59,11 @@ describe('ArtifactRepository', () => {
       sinon.restore();
     });
 
-    const mockArtifact: IArtifact = {
+    const mockArtifact: Artifact = {
       artifact_id: 1,
       submission_id: 2,
       uuid: 'abcd',
-      input_key: 'test-key',
+      key: 'test-key',
       file_name: 'file-name',
       file_type: 'file-type',
       title: 'Title',
@@ -100,6 +100,26 @@ describe('ArtifactRepository', () => {
       const response = await submissionRepository.insertArtifactRecord(mockArtifact);
 
       expect(response.artifact_id).to.equal(1);
+    });
+  });
+
+  describe('getArtifactsByDatasetId', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ artifact_id: 1 }, { artifact_id: 2 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await submissionRepository.getArtifactsByDatasetId('abcd');
+
+      expect(response[0].artifact_id).to.equal(1);
+      expect(response[1].artifact_id).to.equal(2);
     });
   });
 });
