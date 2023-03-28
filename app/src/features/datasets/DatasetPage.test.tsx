@@ -23,7 +23,8 @@ jest.mock('../../hooks/useApi');
 
 const mockUseApi = {
   dataset: {
-    getDatasetEML: jest.fn()
+    getDatasetEML: jest.fn(),
+    getDatasetArtifacts: jest.fn()
   },
   search: {
     getSpatialData: jest.fn(),
@@ -48,6 +49,8 @@ describe('DatasetPage', () => {
     mockUseApi.search.getSpatialData.mockResolvedValue([]);
 
     mockUseApi.dataset.getDatasetEML.mockResolvedValue([]);
+
+    mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
     const { getByTestId } = renderContainer();
 
@@ -89,6 +92,8 @@ describe('DatasetPage', () => {
         }
       }
     });
+
+    mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
     const { getByTestId, getByText } = renderContainer();
 
