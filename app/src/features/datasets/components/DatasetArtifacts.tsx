@@ -10,11 +10,18 @@ import MenuItem from '@mui/material/MenuItem';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+
+const VALID_SYSTEM_ROLES: SYSTEM_ROLE[] = [
+  SYSTEM_ROLE.DATA_ADMINISTRATOR,
+  SYSTEM_ROLE.SYSTEM_ADMIN
+];
 
 export interface IDatasetAttachmentsProps {
   datasetId: string;
@@ -23,6 +30,8 @@ export interface IDatasetAttachmentsProps {
 interface IAttachmentItemMenuButtonProps {
   artifact: IArtifact;
   onDownload: (artifact: IArtifact) => void;
+  hasAdministrativePermissions: boolean;
+  isPendingReview: boolean;
 }
 
 const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (props) => {
@@ -58,19 +67,23 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             onClose={handleClose}
             MenuListProps={{
               'aria-labelledby': 'basic-button'
-            }}>
+            }}
+          >
+            {props.hasAdministrativePermissions && (
+              <MenuItem
+                onClick={() => {
+                  console.log('Apply security not implemented yet.');
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-apply-security">
+                <ListItemIcon>
+                  <Icon path={mdiLockPlus} size={0.8} />
+                </ListItemIcon>
+                Apply Security
+              </MenuItem>
+            )}
             <MenuItem
-              onClick={() => {
-                console.log('Apply security not implemented yet.');
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-apply-security">
-              <ListItemIcon>
-                <Icon path={mdiLockPlus} size={0.8} />
-              </ListItemIcon>
-              Apply Security
-            </MenuItem>
-            <MenuItem
+              disabled={!props.hasAdministrativePermissions && props.isPendingReview}
               onClick={() => {
                 props.onDownload(props.artifact);
                 setAnchorEl(null);
@@ -81,17 +94,19 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
               </ListItemIcon>
               Download Document
             </MenuItem>
-            <MenuItem
-              onClick={() => {
-                console.log('Delete artifact not implemented yet.');
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-delete">
-              <ListItemIcon>
-                <Icon path={mdiTrashCanOutline} size={0.8} />
-              </ListItemIcon>
-              Delete Document
-            </MenuItem>
+            {props.hasAdministrativePermissions && (
+              <MenuItem
+                onClick={() => {
+                  console.log('Delete artifact not implemented yet.');
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-delete">
+                <ListItemIcon>
+                  <Icon path={mdiTrashCanOutline} size={0.8} />
+                </ListItemIcon>
+                Delete Document
+              </MenuItem>
+            )}
           </Menu>
         </Box>
       </Box>
@@ -109,31 +124,23 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const [showAlert, setShowAlert] = useState<boolean>(true);
   const [selected, setSelected] = useState<number[]>([]);
 
+  const keycloakWrapper = useKeycloakWrapper();
   const biohubApi = useApi();
+
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();
 
   const artifactsList = artifactsDataLoader.data?.artifacts || [];
   const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
-
-  const downloadSelected = async () => {
-    const promises = artifactsList
-      .filter((artifact: IArtifact) => selected.includes(artifact.artifact_id))
-      .map((artifact) => () => handleDownloadAttachment(artifact));
-
-    for (const promise of promises) {
-      await promise();
-    }
-  };
+  const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
   const handleDownloadAttachment = async (attachment: IArtifact) => {
-    return biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id).then((signedUrl) => {
-      if (!signedUrl) {
-        return;
-      }
+    const signedUrl = await biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id);
+    if (!signedUrl) {
+      return;
+    }
 
-      return downloadFile(signedUrl);
-    });
+    await downloadFile(signedUrl);
   };
 
   const columns: GridColDef[] = [
@@ -195,7 +202,14 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       headerName: 'Action',
       sortable: false,
       renderCell: (params) => {
-        return <AttachmentItemMenuButton artifact={params.row} onDownload={handleDownloadAttachment} />;
+        return (
+          <AttachmentItemMenuButton
+            artifact={params.row}
+            onDownload={handleDownloadAttachment}
+            isPendingReview={!params.row.security_review_timestamp}
+            hasAdministrativePermissions={hasAdministrativePermissions}
+          />
+        );
       }
     }
   ];
@@ -214,10 +228,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             Apply Security
           </Button>
           <IconButton
-            onClick={() => downloadSelected()}
+            disabled
             title="Download Files"
             aria-label={`Download selected files`}
-            disabled={selected.length === 0}>
+          >
             <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
         </Box>

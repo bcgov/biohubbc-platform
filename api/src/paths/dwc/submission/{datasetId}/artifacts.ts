@@ -61,15 +61,7 @@ GET.apiDoc = {
                       minimum: 1
                     },
                     create_date: {
-                      oneOf: [
-                        {
-                          type: 'object'
-                        },
-                        {
-                          type: 'string',
-                          format: 'date-time'
-                        }
-                      ]
+                      oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                     },
                     description: {
                       type: 'string',
@@ -89,7 +81,7 @@ GET.apiDoc = {
                       type: 'string'
                     },
                     security_review_timestamp: {
-                      type: 'string',
+                      oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                       nullable: true
                     },
                     submission_id: {
