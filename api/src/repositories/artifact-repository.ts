@@ -129,7 +129,11 @@ export class ArtifactRepository extends BaseRepository {
 
     const sqlStatement = SQL`
     SELECT
+<<<<<<< HEAD
       a.*
+=======
+      *
+>>>>>>> dev
     FROM
       artifact a
     WHERE

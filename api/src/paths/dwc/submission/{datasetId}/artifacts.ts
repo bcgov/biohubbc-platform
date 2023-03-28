@@ -23,7 +23,8 @@ GET.apiDoc = {
       in: 'path',
       name: 'datasetId',
       schema: {
-        type: 'string'
+        type: 'string',
+        format: 'uuid'
       },
       required: true
     }
@@ -39,7 +40,57 @@ GET.apiDoc = {
               artifacts: {
                 type: 'array',
                 items: {
-                  type: 'object'
+                  type: 'object',
+                  properties: {
+                    artifact_id: {
+                      type: 'number',
+                      minimum: 1
+                    },
+                    create_date: {
+                      oneOf: [
+                        {
+                          type: 'object'
+                        },
+                        {
+                          type: 'string',
+                          format: 'date'
+                        }
+                      ]
+                    },
+                    description: {
+                      type: 'string',
+                      nullable: true
+                    },
+                    file_name: {
+                      type: 'string'
+                    },
+                    file_size: {
+                      type: 'number'
+                    },
+                    foi_reason_description: {
+                      type: 'string',
+                      nullable: true
+                    },
+                    key: {
+                      type: 'string'
+                    },
+                    security_review_timestamp: {
+                      type: 'string',
+                      nullable: true
+                    },
+                    submission_id: {
+                      type: 'number',
+                      minimum: 1
+                    },
+                    title: {
+                      type: 'string',
+                      nullable: true
+                    },
+                    uuid: {
+                      type: 'string',
+                      format: 'uuid'
+                    }
+                  }
                 }
               }
             }
