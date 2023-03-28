@@ -17,11 +17,11 @@ import * as fileUtils from '../utils/file-utils';
 import { CSVWorksheet } from '../utils/media/csv/csv-file';
 import * as dwcUtils from '../utils/media/dwc/dwc-archive-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
-import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile, MediaFile } from '../utils/media/media-file';
 import * as mediaUtils from '../utils/media/media-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { DarwinCoreService } from './dwc-service';
+import { EMLService } from './eml-service';
 import { ElasticSearchIndices, ESService } from './es-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
@@ -344,19 +344,33 @@ describe('DarwinCoreService', () => {
     it('should run without issue', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
+
+      sinon.stub(EMLService.prototype, 'decorateEML').resolves({
+        '?xml': {
+          '@_encoding': 'UTF-8',
+          '@_version': '1.0'
+        },
+        'eml:eml': {
+          '@_packageId': 'urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f'
+        }
+      });
+
       const mediaFileStub = sinon.createStubInstance(MediaFile);
       const bufferStub = sinon.createStubInstance(Buffer);
 
-      bufferStub.toString.returns(
-        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
-      );
+      const emlXMLString =
+        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>';
 
       mediaFileStub.buffer = bufferStub as unknown as Buffer;
 
       const mockDWCAFile = {
         submission_id: 1,
         eml: {
-          emlFile: mediaFileStub
+          emlFile: {
+            buffer: {
+              toString: () => emlXMLString
+            }
+          }
         },
         worksheets: {}
       } as unknown as DWCArchive;
@@ -1017,40 +1031,6 @@ describe('DarwinCoreService', () => {
         expect((error as ApiGeneralError).message).to.equal('The source file is not available');
         expect(getFileFromS3Stub).to.be.calledOnce;
       }
-    });
-  });
-
-  describe('convertSubmissionEMLtoJSON', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('transforms a submission record eml (xml) to json', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const darwinCoreService = new DarwinCoreService(mockDBConnection);
-
-      const mediaFileStub = sinon.createStubInstance(MediaFile);
-      const bufferStub = sinon.createStubInstance(Buffer);
-
-      bufferStub.toString.returns(
-        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
-      );
-
-      mediaFileStub.buffer = bufferStub as unknown as Buffer;
-
-      const mockDWCAFile = {
-        submission_id: 1,
-        eml: {
-          emlFile: mediaFileStub
-        }
-      };
-
-      const response = await darwinCoreService.convertSubmissionEMLtoJSON(mockDWCAFile.eml as EMLFile);
-
-      expect(response).to.eql({
-        '?xml': { '@_version': '1.0', '@_encoding': 'UTF-8' },
-        'eml:eml': { '@_packageId': 'urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f' }
-      });
     });
   });
 

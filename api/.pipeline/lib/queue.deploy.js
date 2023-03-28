@@ -28,6 +28,7 @@ const queueDeploy = async (settings) => {
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
+        HOST: phases[phase].host,
         CHANGE_ID: phases.build.changeId || changeId,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         NODE_ENV: phases[phase].env || 'dev',
