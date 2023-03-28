@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { ArtifactRepository, IArtifact, IArtifactMetadata } from '../repositories/artifact-repository';
+import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
 import { generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -42,7 +42,7 @@ export class ArtifactService extends DBService {
    * @returns {*} {Promise<{ artifact_id: number }>} The ID of the inserted artifact
    * @memberof ArtifactService
    */
-  async insertArtifactRecord(artifact: IArtifact): Promise<{ artifact_id: number }> {
+  async insertArtifactRecord(artifact: Artifact): Promise<{ artifact_id: number }> {
     return this.artifactRepository.insertArtifactRecord(artifact);
   }
 
@@ -59,7 +59,7 @@ export class ArtifactService extends DBService {
    */
   async uploadAndPersistArtifact(
     dataPackageId: string,
-    metadata: IArtifactMetadata,
+    metadata: ArtifactMetadata,
     fileUuid: string,
     file: Express.Multer.File
   ): Promise<{ artifact_id: number }> {
@@ -94,8 +94,19 @@ export class ArtifactService extends DBService {
       ...metadata,
       artifact_id,
       submission_id,
-      input_key: s3Key,
+      key: s3Key,
       uuid: fileUuid
     });
+  }
+
+  /**
+   * Retrieves all artifacts belonging to the given dataset.
+   *
+   * @param {string} datasetId The ID of the dataset
+   * @return {*}  {Promise<IArtifact[]>} All artifacts associated with the dataset
+   * @memberof ArtifactService
+   */
+  async getArtifactsByDatasetId(datasetId: string): Promise<Artifact[]> {
+    return this.artifactRepository.getArtifactsByDatasetId(datasetId);
   }
 }
