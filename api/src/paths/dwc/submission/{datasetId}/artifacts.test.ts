@@ -13,7 +13,7 @@ import { GET, getArtifactsByDatasetId } from './artifacts';
 
 chai.use(sinonChai);
 
-describe.only('getArtifactsByDatasetId', () => {
+describe('getArtifactsByDatasetId', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -63,25 +63,35 @@ describe.only('getArtifactsByDatasetId', () => {
       });
     });
 
-    describe.skip('response validation', () => {
+    describe('response validation', () => {
       const responseValidator = new OpenAPIResponseValidator(GET.apiDoc as unknown as OpenAPIResponseValidatorArgs);
       const mockResponse = {
         artifact_id: 1,
-        description: "aaa",
-        file_name: "Lecture 5 - Partial Fraction.pdf",
+        create_date: '1970-01-01T00:00:00.000Z',
+        description: 'aaa',
+        file_name: 'Lecture 5 - Partial Fraction.pdf',
         file_size: 2405262,
-        file_type: "Report",
+        file_type: 'Report',
         foi_reason_description: null,
-        key: "cupshall/platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip",
+        key: 'cupshall/platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip',
         security_review_timestamp: null,
         submission_id: 1,
-        title: "Report 2",
-        uuid: "374c4d6a-3a04-405b-af6d-b6497800a691",
-      }
+        title: 'Report 2',
+        uuid: '374c4d6a-3a04-405b-af6d-b6497800a691'
+      };
 
       describe('should throw an error when', () => {
         it('returns a null response', async () => {
           const apiResponse = null;
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors.length).to.equal(1);
+          expect(response.errors[0].message).to.equal('must be object');
+        });
+
+        it('returns a null array', async () => {
+          const apiResponse = { artifacts: null };
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
@@ -91,49 +101,96 @@ describe.only('getArtifactsByDatasetId', () => {
 
         describe('artifact', () => {
           it('returns a null response', async () => {
-            const apiResponse = [null];
+            const apiResponse = { artifacts: [null] };
             const response = responseValidator.validateResponse(200, apiResponse);
-  
+
             expect(response.message).to.equal('The response was not valid.');
             expect(response.errors.length).to.equal(1);
             expect(response.errors[0].message).to.equal('must be object');
           });
-  
+
           describe('artifact_id', () => {
             it('is undefined', async () => {
               const apiResponse = {
-                ...mockResponse,
-                artifact_id: undefined
+                artifacts: [
+                  {
+                    ...mockResponse,
+                    artifact_id: undefined
+                  }
+                ]
               };
               const response = responseValidator.validateResponse(200, apiResponse);
-  
+
               expect(response.message).to.equal('The response was not valid.');
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal("must have required property 'artifact_id'");
             });
-  
+
             it('is null', async () => {
               const apiResponse = {
-                ...mockResponse,
-                artifact_id: null
+                artifacts: [
+                  {
+                    ...mockResponse,
+                    artifact_id: null
+                  }
+                ]
               };
               const response = responseValidator.validateResponse(200, apiResponse);
-  
+
               expect(response.message).to.equal('The response was not valid.');
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal('must be integer');
             });
-  
+
             it('is wrong type', async () => {
               const apiResponse = {
-                ...mockResponse,
-                artifact_id: '1'
+                artifacts: [
+                  {
+                    ...mockResponse,
+                    artifact_id: '1'
+                  }
+                ]
               };
               const response = responseValidator.validateResponse(200, apiResponse);
-  
+
               expect(response.message).to.equal('The response was not valid.');
               expect(response.errors.length).to.equal(1);
               expect(response.errors[0].message).to.equal('must be integer');
+            });
+          });
+
+          describe('create_date', () => {
+            it('is undefined', async () => {
+              const apiResponse = {
+                artifacts: [
+                  {
+                    ...mockResponse,
+                    create_date: undefined
+                  }
+                ]
+              };
+              const response = responseValidator.validateResponse(200, apiResponse);
+
+              expect(response.message).to.equal('The response was not valid.');
+              expect(response.errors.length).to.equal(1);
+              expect(response.errors[0].message).to.equal("must have required property 'create_date'");
+            });
+
+            it('is null', async () => {
+              const apiResponse = {
+                artifacts: [
+                  {
+                    ...mockResponse,
+                    create_date: null
+                  }
+                ]
+              };
+              const response = responseValidator.validateResponse(200, apiResponse);
+
+              expect(response.message).to.equal('The response was not valid.');
+              expect(response.errors.length).to.equal(3);
+              expect(response.errors[0].message).to.equal('must be object');
+              expect(response.errors[1].message).to.equal('must be string');
             });
           });
         });
@@ -142,20 +199,25 @@ describe.only('getArtifactsByDatasetId', () => {
       describe('should succeed when', () => {
         it('required values are valid', async () => {
           const apiResponse = {
-            artifact_id: 1,
-            description: "Test description",
-            file_name: "Filename.docx",
-            file_size: 1024,
-            file_type: "Report",
-            foi_reason_description: null,
-            key: "platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip",
-            security_review_timestamp: null,
-            submission_id: 1,
-            title: "Test Report",
-            uuid: "374c4d6a-3a04-405b-af6d-b6497800a691",
+            artifacts: [
+              {
+                artifact_id: 1,
+                create_date: '1970-01-01T00:00:00.000Z',
+                description: 'Test description',
+                file_name: 'Filename.docx',
+                file_size: 1024,
+                file_type: 'Report',
+                foi_reason_description: null,
+                key: 'platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip',
+                security_review_timestamp: null,
+                submission_id: 1,
+                title: 'Test Report',
+                uuid: '374c4d6a-3a04-405b-af6d-b6497800a691'
+              }
+            ]
           };
-          const response = responseValidator.validateResponse(200, apiResponse);
 
+          const response = responseValidator.validateResponse(200, apiResponse);
           expect(response).to.equal(undefined);
         });
       });
