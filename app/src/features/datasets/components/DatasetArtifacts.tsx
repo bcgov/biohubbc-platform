@@ -18,10 +18,7 @@ import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 
-const VALID_SYSTEM_ROLES: SYSTEM_ROLE[] = [
-  SYSTEM_ROLE.DATA_ADMINISTRATOR,
-  SYSTEM_ROLE.SYSTEM_ADMIN
-];
+const VALID_SYSTEM_ROLES: SYSTEM_ROLE[] = [SYSTEM_ROLE.DATA_ADMINISTRATOR, SYSTEM_ROLE.SYSTEM_ADMIN];
 
 export interface IDatasetAttachmentsProps {
   datasetId: string;
@@ -67,8 +64,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             onClose={handleClose}
             MenuListProps={{
               'aria-labelledby': 'basic-button'
-            }}
-          >
+            }}>
             {props.hasAdministrativePermissions && (
               <MenuItem
                 onClick={() => {
@@ -180,7 +176,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
               color="info"
               sx={{ textTransform: 'uppercase' }}
               label="Pending Review"
-              onDelete={() => {}}
+              onDelete={hasAdministrativePermissions ? () => {} : undefined}
               deleteIcon={<Icon path={mdiChevronDown} size={1} />}
             />
           );
@@ -227,11 +223,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             disabled={selected.length === 0}>
             Apply Security
           </Button>
-          <IconButton
-            disabled
-            title="Download Files"
-            aria-label={`Download selected files`}
-          >
+          <IconButton disabled title="Download Files" aria-label={`Download selected files`}>
             <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
         </Box>
