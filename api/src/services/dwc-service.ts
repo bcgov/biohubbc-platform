@@ -1,4 +1,3 @@
-import { XMLParser } from 'fast-xml-parser';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import {
@@ -11,10 +10,10 @@ import {
 import { copyFileInS3, deleteFileFromS3, generateDatasetS3FileKey, getFileFromS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
-import { EMLFile } from '../utils/media/eml/eml-file';
 import { ArchiveFile } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
+import { EMLService } from './eml-service';
 import { ElasticSearchIndices } from './es-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
@@ -24,6 +23,7 @@ const defaultLog = getLogger('services/dwc-service');
 export class DarwinCoreService extends DBService {
   submissionService: SubmissionService;
   spatialService: SpatialService;
+  emlService: EMLService;
 
   /**
    * Creates an instance of DarwinCoreService.
@@ -36,6 +36,7 @@ export class DarwinCoreService extends DBService {
 
     this.spatialService = new SpatialService(this.connection);
     this.submissionService = new SubmissionService(this.connection);
+    this.emlService = new EMLService(this.connection);
   }
 
   /**
@@ -46,28 +47,31 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+    // Step 1: Insert submission metadata record
     const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
 
+    // Step 2: Set submission metadata eml source column
     const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
 
-    // Step 3:  Convert EML to JSON and Save data
+    // Step 2: Convert EML to JSON and set submission metadata eml json source column
     await this.intakeJob_step3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
-    // Step 4: Update SubmissionId Records End Date and Effective Date
+    // Step 4: Update submission metadata record end and effective dates
     await this.intakeJob_step4(jobQueueRecord.submission_id);
 
-    // Step 5: transform and upload metadata to ES
+    // Step 5: transform EML JSON and upload to Elastic Search
     await this.intakeJob_step5(jobQueueRecord.submission_id);
 
-    // Step 6: If csv worksheets are present, create submission observation record.
-    // Then transform and update details
+    // Step 6: Update existing submission observation end and effective dates, insert new submission observation record,
+    // run spatial + security transforms
     await this.intakeJob_step6(jobQueueRecord, dwcaFile);
 
     await this.intakeJob_finishIntake(jobQueueRecord);
   }
 
   /**
-   * Step 1: Create submission metadata record.
+   * Step 1
+   * - Insert submission metadata record
    *
    * @param {number} submissionId
    * @return {*}  {Promise<{
@@ -87,7 +91,7 @@ export class DarwinCoreService extends DBService {
 
       return await this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
     } catch (error: any) {
-      defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step1', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -101,7 +105,9 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 2: Import data from S3 to Submission Metadata EML
+   * Step 2
+   * - Download DwCA file form S3
+   * - Update submission metadata record - set EML source column
    *
    * @param {number} submissionJobQueueId
    * @return {*}  {Promise<any>}
@@ -127,7 +133,7 @@ export class DarwinCoreService extends DBService {
 
       return file;
     } catch (error: any) {
-      defaultLog.debug({ label: 'insertSubmissionMetadataRecord', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step2', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         jobQueueRecord.submission_id,
@@ -141,7 +147,9 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 3:  Convert EML to JSON and Save data
+   * Step 3
+   * - Convert EML to JSON
+   * - Update submission record, set EML JSON source column
    *
    * @param {number} submissionId
    * @param {DWCArchive} file
@@ -154,19 +162,19 @@ export class DarwinCoreService extends DBService {
         throw new ApiGeneralError('file eml is empty');
       }
 
-      const jsonData = await this.convertSubmissionEMLtoJSON(file.eml);
+      // Convert the EML data from XML to JSON
+      const emlJSON = this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
+
+      // Decorate the EML object, adding additional BioHub metadata to the original EML.
+      const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
 
       await this.submissionService.updateSubmissionRecordEMLJSONSource(
         submissionId,
         submissionMetadataId,
-        JSON.stringify(jsonData)
+        JSON.stringify(decoratedEMLJSON)
       );
     } catch (error: any) {
-      defaultLog.debug({
-        label: 'convertSubmissionEMLtoJSON, updateSubmissionRecordEMLJSONSource',
-        message: 'error',
-        error
-      });
+      defaultLog.debug({ label: 'intakeJob_step3', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -180,7 +188,9 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 4: Update Submission metadata Records End Date and Effective Date
+   * Step 4
+   * - Update submission metadata record end date
+   * - Update submission metadata record effective date
    *
    * @param {number} submissionId
    * @return {*}  {Promise<any>}
@@ -191,11 +201,7 @@ export class DarwinCoreService extends DBService {
       await this.submissionService.updateSubmissionMetadataRecordEndDate(submissionId);
       await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(submissionId);
     } catch (error: any) {
-      defaultLog.debug({
-        label: 'updateSubmissionMetadataRecordEndDate, updateSubmissionMetadataRecordEffectiveDate',
-        message: 'error',
-        error
-      });
+      defaultLog.debug({ label: 'intakeJob_step4', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -209,7 +215,8 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 5: transform and upload metadata to ES
+   * Step 5
+   * - Transform
    *
    * @param {number} submissionId
    * @param {string} dataPackageId
@@ -236,8 +243,10 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 6: If csv worksheets are present, create submission observation record.
-   * Then transform and update details
+   * Step 6
+   * - End date all existing submission observation records
+   * - Insert new submission observation record
+   * - Run observation transforms (spatial + security)
    *
    * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<any>}
@@ -270,7 +279,8 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Finish intake job, move S3 file to home folder, update status and queue end date
+   * Step 7
+   * - Move DwCA S3 file from temp location to final location
    *
    * @param {ISubmissionJobQueueRecord} jobQueueRecord
    * @return {*}  {Promise<void>}
@@ -552,31 +562,6 @@ export class DarwinCoreService extends DBService {
     }
 
     return new DWCArchive(parsedMedia);
-  }
-
-  /**
-   * Converts submission EML to JSON and persists with submission record.
-   *
-   * @param {EMLFile} file
-   * @return {*}  {*}
-   * @memberof DarwinCoreService
-   */
-  convertSubmissionEMLtoJSON(file: EMLFile): any {
-    const options = {
-      ignoreAttributes: false,
-      attributeNamePrefix: '@_',
-      parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      isArray: (tagName: string, _jPath: string, _isLeafNode: boolean, _isAttribute: boolean) => {
-        const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
-        if (tagsArray.includes(tagName)) return true;
-        return false;
-      }
-    };
-    const parser = new XMLParser(options);
-    const eml_json_source = parser.parse(file.emlFile.buffer.toString() as string);
-
-    return eml_json_source;
   }
 
   /**

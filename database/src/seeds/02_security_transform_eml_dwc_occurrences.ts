@@ -53,7 +53,7 @@ const updateSecurityTransform = () => `
 
 const transformString = `
   $transform$
-    WITH submissionobservation AS (
+    WITH w_submission_observation AS (
       select
         submission_observation_id
       from
@@ -62,15 +62,15 @@ const transformString = `
         submission_id = ?
         and record_end_timestamp is null
     ),
-    with_spatial_component AS (
+    w_spatial_component AS (
       SELECT
         spatial_component,
         submission_spatial_component_id
       FROM
         submission_spatial_component ssc,
-        submissionobservation
+        w_submission_observation
       WHERE
-        ssc.submission_observation_id = submissionobservation.submission_observation_id
+        ssc.submission_observation_id = w_submission_observation.submission_observation_id
         AND jsonb_path_exists(
           spatial_component,
           '$.features[*] \\? (@.properties.type == "Occurrence")'
@@ -104,6 +104,6 @@ const transformString = `
         END
       ) spatial_component
     FROM
-      with_spatial_component wsc;
+      w_spatial_component wsc;
   $transform$
 `;
