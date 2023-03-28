@@ -51,7 +51,7 @@ const updateSpatialTransform = () => `
 
 const transformString = `
   $transform$
-    with submission as (
+    with w_submission_observation as (
         select
             *
         from
@@ -60,54 +60,54 @@ const transformString = `
             submission_id = ?
             and record_end_timestamp is null
     ),
-    occurrences as (
+    w_occurrences as (
         select
             submission_observation_id,
             occs
         from
-            submission,
+            w_submission_observation,
             jsonb_path_query(darwin_core_source, '$.occurrence') occs
     ),
-    occurrence as (
+    w_occurrence as (
         select
             submission_observation_id,
             jsonb_array_elements(occs) occ
         from
-            occurrences
+            w_occurrences
     ),
-    events as (
+    w_events as (
         select
             evns
         from
-            submission,
+            w_submission_observation,
             jsonb_path_query(darwin_core_source, '$.event') evns
     ),
-    event as (
+    w_event as (
         select
             jsonb_array_elements(evns) evn
         from
-            events
+            w_events
     ),
-    locations as (
+    w_locations as (
         select
             locs
         from
-            submission,
+            w_submission_observation,
             jsonb_path_query(darwin_core_source, '$.location') locs
     ),
-    location as (
+    w_location as (
         select
             jsonb_array_elements(locs) loc
         from
-            locations
+            w_locations
     ),
-    location_coord as (
+    w_location_coord as (
         select
             coalesce(st_x(pt), 0) x,
             coalesce(st_y(pt), 0) y,
             loc
         from
-            location,
+            w_location,
             ST_SetSRID(
                 ST_MakePoint(
                     (nullif(loc ->> 'decimalLongitude', '')) :: float,
@@ -116,16 +116,16 @@ const transformString = `
                 4326
             ) pt
     ),
-    normal as (
+    w_normal as (
         select
             distinct o.submission_observation_id,
             o.occ,
             ec.*,
             e.evn
         from
-            occurrence o
-            left outer join location_coord ec on (ec.loc -> 'eventID' = o.occ -> 'eventID')
-            left outer join event e on (e.evn -> 'eventID' = o.occ -> 'eventID')
+            w_occurrence o
+            left outer join w_location_coord ec on (ec.loc -> 'eventID' = o.occ -> 'eventID')
+            left outer join w_event e on (e.evn -> 'eventID' = o.occ -> 'eventID')
     )
     select
         jsonb_build_object(
@@ -183,6 +183,6 @@ const transformString = `
             )
         ) result_data
     from
-        normal n;
+        w_normal n;
   $transform$
 `;

@@ -1,8 +1,6 @@
 import AdmZip from 'adm-zip';
 import { GetObjectOutput } from 'aws-sdk/clients/s3';
-import { X2jOptionsOptional, XMLParser } from 'fast-xml-parser';
 import mime from 'mime';
-import { EMLFile } from './eml/eml-file';
 import { ArchiveFile, MediaFile } from './media-file';
 
 export type UnknownMedia = Express.Multer.File | GetObjectOutput;
@@ -118,26 +116,4 @@ export const isZipMimetype = (mimetype: string): boolean => {
     /application\/x-rar-compressed/,
     /application\/octet-stream/
   ].some((regex) => regex.test(mimetype));
-};
-
-/**
- * Parses a given EML file into a JSON object
- *
- * @param {EMLFile} eml
- * @return {*}  {any}
- */
-export const parseEMLtoJSONSource = (eml: EMLFile) => {
-  const options: X2jOptionsOptional = {
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-    parseTagValue: false, //passes all through as strings. this avoids problems where text fields have numbers only but need to be interpreted as text.
-    isArray: (tagName: string) => {
-      const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage'];
-
-      return tagsArray.includes(tagName);
-    }
-  };
-  const parser = new XMLParser(options);
-  const eml_json_source = parser.parse(eml.emlFile.buffer.toString() as string);
-  return eml_json_source;
 };

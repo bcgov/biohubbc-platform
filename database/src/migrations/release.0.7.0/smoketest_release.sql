@@ -57,13 +57,11 @@ declare
 	<dataset id="cad7c99c-a1e7-442c-9239-1db953c83a87" system="https://biohub.gov.bc.ca">
 		<title>Coastal Caribou</title>
 		<creator>
-			<organizationName>Knowledge Management Branch, Ministry of Enivronment and Climate Change
-				Strategy, Government of British Columbia</organizationName>
+			<organizationName>Knowledge Management Branch, Ministry of Water, Land and Natural Resources, Government of British Columbia</organizationName>
 		</creator>
 		<metadataProvider>
-			<organizationName>Knowledge Management Branch, Ministry of Enivronment and Climate Change
-				Strategy, Government of British Columbia</organizationName>
-			<onlineUrl>https://www2.gov.bc.ca/gov/content/governments/organizational-structure/ministries-organizations/ministries/environment-climate-change</onlineUrl>
+			<organizationName>Knowledge Management Branch, Ministry of Water, Land and Natural Resources, Government of British Columbia</organizationName>
+			<onlineUrl>https://www2.gov.bc.ca/gov/content/governments/organizational-structure/ministries-organizations/ministries/water-land-and-resource-stewardship</onlineUrl>
 		</metadataProvider>
 		<pubDate>2021-08-05</pubDate>
 		<language>english</language>
