@@ -136,7 +136,6 @@ const appTheme = createTheme({
           border: 0,
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
-            // @TODO this override is currently not working
             fontWeight: 700,
             color: grey[600]
           },

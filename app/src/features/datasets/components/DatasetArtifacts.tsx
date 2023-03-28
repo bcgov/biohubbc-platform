@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiDotsVertical, mdiLock, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiDotsVertical, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Alert, Button, Chip } from '@mui/material';
 import Box from '@mui/material/Box';
@@ -176,19 +176,15 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
               color="info"
               sx={{ textTransform: 'uppercase' }}
               label="Pending Review"
-              onDelete={hasAdministrativePermissions ? () => {} : undefined}
-              deleteIcon={<Icon path={mdiChevronDown} size={1} />}
             />
           );
         }
 
         return (
           <Chip
-            color="warning"
+            color='success'
             sx={{ textTransform: 'uppercase' }}
-            label="Secured"
-            onDelete={() => {}}
-            deleteIcon={<Icon path={mdiLock} size={1} />}
+            label="Unsecured"
           />
         );
       }
