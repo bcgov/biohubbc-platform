@@ -36,26 +36,32 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
+            required: ['artifacts'],
             properties: {
               artifacts: {
                 type: 'array',
                 items: {
                   type: 'object',
+                  required: [
+                    'artifact_id',
+                    'create_date',
+                    'description',
+                    'file_name',
+                    'file_size',
+                    'foi_reason_description',
+                    'key',
+                    'security_review_timestamp',
+                    'submission_id',
+                    'title',
+                    'uuid'
+                  ],
                   properties: {
                     artifact_id: {
-                      type: 'number',
+                      type: 'integer',
                       minimum: 1
                     },
                     create_date: {
-                      oneOf: [
-                        {
-                          type: 'object'
-                        },
-                        {
-                          type: 'string',
-                          format: 'date'
-                        }
-                      ]
+                      oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }]
                     },
                     description: {
                       type: 'string',
@@ -65,7 +71,7 @@ GET.apiDoc = {
                       type: 'string'
                     },
                     file_size: {
-                      type: 'number'
+                      type: 'integer'
                     },
                     foi_reason_description: {
                       type: 'string',
@@ -75,11 +81,11 @@ GET.apiDoc = {
                       type: 'string'
                     },
                     security_review_timestamp: {
-                      type: 'string',
+                      oneOf: [{ type: 'object' }, { type: 'string', format: 'date-time' }],
                       nullable: true
                     },
                     submission_id: {
-                      type: 'number',
+                      type: 'integer',
                       minimum: 1
                     },
                     title: {

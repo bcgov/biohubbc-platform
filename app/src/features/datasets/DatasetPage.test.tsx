@@ -3,6 +3,7 @@ import { cleanup, render, waitFor } from '@testing-library/react';
 import { FeatureCollection } from 'geojson';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
+import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { Router } from 'react-router';
 import appTheme from 'themes/appTheme';
 import DatasetPage from './DatasetPage';
@@ -20,10 +21,16 @@ const renderContainer = () => {
 };
 
 jest.mock('../../hooks/useApi');
+jest.mock('../../hooks/useKeycloakWrapper');
+
+const mockUseKeycloakWrapper = {
+  hasSystemRole: (_roles: string[]) => true
+};
 
 const mockUseApi = {
   dataset: {
-    getDatasetEML: jest.fn()
+    getDatasetEML: jest.fn(),
+    getDatasetArtifacts: jest.fn()
   },
   search: {
     getSpatialData: jest.fn(),
@@ -32,10 +39,12 @@ const mockUseApi = {
 };
 
 const mockBiohubApi = useApi as jest.Mock;
+const mockKeycloakWrapper = useKeycloakWrapper as jest.Mock;
 
 describe('DatasetPage', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
+    mockKeycloakWrapper.mockImplementation(() => mockUseKeycloakWrapper);
   });
 
   afterEach(() => {
@@ -48,6 +57,8 @@ describe('DatasetPage', () => {
     mockUseApi.search.getSpatialData.mockResolvedValue([]);
 
     mockUseApi.dataset.getDatasetEML.mockResolvedValue([]);
+
+    mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
     const { getByTestId } = renderContainer();
 
@@ -89,6 +100,8 @@ describe('DatasetPage', () => {
         }
       }
     });
+
+    mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
     const { getByTestId, getByText } = renderContainer();
 

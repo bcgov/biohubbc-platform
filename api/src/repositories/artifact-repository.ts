@@ -22,7 +22,8 @@ export const Artifact = ArtifactMetadata.extend({
   uuid: z.string().uuid(),
   key: z.string(),
   foi_reason_description: z.string().nullable().optional(),
-  security_review_timestamp: z.date().nullable().optional()
+  security_review_timestamp: z.date().nullable().optional(),
+  create_date: z.date().optional()
 });
 
 export type Artifact = z.infer<typeof Artifact>;
@@ -124,7 +125,7 @@ export class ArtifactRepository extends BaseRepository {
 
     const sqlStatement = SQL`
     SELECT
-      *
+      a.*
     FROM
       artifact a
     WHERE
@@ -146,5 +147,28 @@ export class ArtifactRepository extends BaseRepository {
     const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
 
     return response.rows;
+  }
+
+  async getArtifactById(artifactId: number): Promise<Artifact> {
+    defaultLog.debug({ label: 'getArtifactById', artifactId });
+
+    const sqlStatement = SQL`
+      SELECT
+        a.*
+      FROM
+        artifact a
+      WHERE
+        a.artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
+
+    const result = (response && response.rowCount && response.rows[0]) || null;
+
+    if (!result) {
+      throw new ApiExecuteSQLError('Failed to retreive artifact record by ID');
+    }
+
+    return result;
   }
 }

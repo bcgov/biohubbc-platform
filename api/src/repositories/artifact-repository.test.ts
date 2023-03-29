@@ -122,4 +122,42 @@ describe('ArtifactRepository', () => {
       expect(response[1].artifact_id).to.equal(2);
     });
   });
+
+  describe('getArtifactById', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ artifact_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await submissionRepository.getArtifactById(1);
+
+      expect(response).to.eql({ artifact_id: 1 });
+    });
+
+    it('throw an error if query fails', async () => {
+      const mockQueryResponse = { rows: undefined, rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+
+      try {
+        await artifactRepository.getArtifactById(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to retreive artifact record by ID');
+      }
+    });
+  });
 });

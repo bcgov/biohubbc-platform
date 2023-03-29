@@ -25,6 +25,7 @@
     "npm": ">= 6.0.0"
   },
   "dependencies": {
+    "@babel/core": "^7.0.0",
     "@bcgov/bc-sans": "~1.0.1",
     "@emotion/react": "^11.10.0",
     "@emotion/styled": "^11.10.0",
@@ -34,6 +35,8 @@
     "@mui/lab": "^5.0.0-alpha.97",
     "@mui/material": "^5.10.0",
     "@mui/styles": "^5.9.3",
+    "@mui/system": "^5.11.15",
+    "@mui/x-data-grid": "^6.0.2",
     "@react-keycloak/web": "^3.4.0",
     "@react-leaflet/core": "~1.0.2",
     "@testing-library/react-hooks": "^8.0.1",
@@ -49,6 +52,7 @@
     "express": "~4.17.1",
     "formik": "~2.2.6",
     "handlebars": "^4.7.7",
+    "jest-watch-typeahead": "^2.2.2",
     "jszip": "^3.10.1",
     "keycloak-js": "^20.0.2",
     "leaflet": "^1.8.0",

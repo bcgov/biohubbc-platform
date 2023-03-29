@@ -23,6 +23,7 @@ import useDataLoaderError from 'hooks/useDataLoaderError';
 import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
+import DatasetArtifacts from './components/DatasetArtifacts';
 import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -253,10 +254,6 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     })
   );
 
-  const attachmentsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
-
-  attachmentsDataLoader.load();
-
   useDataLoaderError(datasetDataLoader, () => {
     return {
       dialogTitle: 'Error Loading Dataset',
@@ -367,7 +364,14 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
         </Container>
       </Paper>
       <Container maxWidth="xl">
-        <Box py={5}>
+        <Box pt={2}>
+          <Paper elevation={0}>
+            <DatasetArtifacts datasetId={datasetId} />
+          </Paper>
+        </Box>
+      </Container>
+      <Container maxWidth="xl">
+        <Box py={2}>
           <Card data-testid="MapContainer">
             <Grid sx={{ justify: 'space-between', alignItems: 'center' }}>
               <Grid item>
