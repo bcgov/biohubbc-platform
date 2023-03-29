@@ -139,7 +139,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     await downloadFile(signedUrl);
   };
 
-  const columns: GridColDef[] = [
+  const columns: GridColDef<IArtifact>[] = [
     {
       field: 'file_name',
       headerName: 'Title',
