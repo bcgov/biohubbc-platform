@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { HTTP403 } from '../../../errors/http-error';
+import { HTTP401 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { ArtifactService } from '../../../services/artifact-service';
 import { UserService } from '../../../services/user-service';
@@ -26,7 +26,8 @@ GET.apiDoc = {
       in: 'path',
       name: 'artifactId',
       schema: {
-        type: 'string'
+        type: 'integer',
+        minimum: 1
       },
       required: true
     }
@@ -67,7 +68,7 @@ export function getArtifactSignedUrl(): RequestHandler {
       const response = await artifactService.getArtifactById(artifactId);
 
       if (!response.security_review_timestamp && !isSystemUserAdmin) {
-        throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
+        throw new HTTP401('Documents that are pending review can only be downloaded by administrators.');
       }
 
       const signedUrl = await getS3SignedURL(response.key);
