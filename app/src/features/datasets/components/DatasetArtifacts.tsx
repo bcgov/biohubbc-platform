@@ -171,22 +171,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       renderCell: (params) => {
         const { security_review_timestamp } = params.row;
         if (!security_review_timestamp) {
-          return (
-            <Chip
-              color="info"
-              sx={{ textTransform: 'uppercase' }}
-              label="Pending Review"
-            />
-          );
+          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
         }
 
-        return (
-          <Chip
-            color='success'
-            sx={{ textTransform: 'uppercase' }}
-            label="Unsecured"
-          />
-        );
+        return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Unsecured" />;
       }
     },
     {

@@ -26,10 +26,6 @@ export const Artifact = ArtifactMetadata.extend({
   create_date: z.date().optional()
 });
 
-export const ArtifactWithStatus = Artifact.extend({
-  submission_status: z.string()
-});
-
 export type Artifact = z.infer<typeof Artifact>;
 
 /**
