@@ -34,9 +34,14 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'array',
-            items: {
-                // @TODO
+            type: 'object',
+            properties: {
+              datasets: {
+                type: 'array',
+                items: {
+                    // @TODO
+                }
+              }
             }
           }
         }
@@ -62,13 +67,11 @@ export function getRelatedDatasetsByDatasetId(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.getSubmissionRecordEMLJSONByDatasetId(datasetId);
-
-      // @TODO
+      const datasets = await submissionService.findRelatedDatasetsByDatasetId(datasetId);
 
       await connection.commit();
 
-      res.status(200).json(result);
+      res.status(200).json({ datasets });
     } catch (error) {
       defaultLog.error({ label: 'getRelatedDatasetsByDatasetId', message: 'error', error });
       await connection.rollback();

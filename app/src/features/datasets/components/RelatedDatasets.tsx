@@ -1,6 +1,6 @@
 import { mdiLockPlus, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, Button, Chip } from '@mui/material';
+import { Button, Chip } from '@mui/material';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
@@ -9,7 +9,7 @@ import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IRelatedDataset } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 
@@ -25,18 +25,16 @@ export interface IRelatedDatasetsProps {
  */
 const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
   const { datasetId } = props;
-  const [showAlert, setShowAlert] = useState<boolean>(true);
   const [selected, setSelected] = useState<number[]>([]);
 
   const biohubApi = useApi();
 
-  const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
-  artifactsDataLoader.load();
+  const relatedDatasetsDataLoader = useDataLoader(() => biohubApi.dataset.getRelatedDatasets(datasetId));
+  relatedDatasetsDataLoader.load();
 
-  const artifactsList = artifactsDataLoader.data?.artifacts || [];
-  const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
+  const relatedDatasetsList = relatedDatasetsDataLoader.data?.datasets || [];
 
-  const columns: GridColDef<IArtifact>[] = [
+  const columns: GridColDef<IRelatedDataset>[] = [
     {
       field: 'file_name',
       headerName: 'Title',
@@ -88,7 +86,7 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
 
   return (
     <>
-      <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
+      <ActionToolbar label="Related Datasets" labelProps={{ variant: 'h4' }}>
         <Box display="flex" gap={1}>
           <Button
             title="Apply Security Rules"
@@ -106,20 +104,11 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
       </ActionToolbar>
       <Divider></Divider>
       <Box px={1}>
-        {numPendingDocuments > 0 && showAlert && (
-          <Box pt={2} pb={2}>
-            <Alert onClose={() => setShowAlert(false)} severity="info">
-              <strong>
-                {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
-              </strong>
-            </Alert>
-          </Box>
-        )}
         <Box>
           <DataGrid
             getRowId={(row) => row.artifact_id}
             autoHeight
-            rows={artifactsList}
+            rows={relatedDatasetsList}
             columns={columns}
             pageSizeOptions={[5]}
             checkboxSelection

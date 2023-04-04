@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
@@ -15,6 +16,19 @@ import {
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
+
+
+export const RelatedDataset = z.object({
+  dataset_id: z.string(),
+  title: z.string(),
+  source: z.string(),
+  focal_species: z.number(),
+  occurrence_count: z.number(),
+  start_date: z.date(),
+  end_date: z.date()
+});
+
+export type RelatedDataset = z.infer<typeof RelatedDataset>;
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -380,5 +394,18 @@ export class SubmissionService extends DBService {
     submissonObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
     return this.submissionRepository.insertSubmissionObservationRecord(submissonObservation);
+  }
+
+  /**
+   * Retrieves an array of datasets related to the given dataset.
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<RelatedDataset[]>}
+   * @memberof SubmissionService
+   */
+  async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
+    await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
+
+    return [];
   }
 }

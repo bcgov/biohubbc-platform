@@ -62,4 +62,9 @@ describe('useDatasetApi', () => {
 
     expect(actualResult).toEqual('http://example.com');
   });
+
+  // @TODO
+  it('getRelatedDatasets works as expected', async () => {
+    //
+  })
 });

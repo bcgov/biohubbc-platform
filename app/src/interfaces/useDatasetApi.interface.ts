@@ -20,3 +20,11 @@ export interface IArtifact {
 export interface IListArtifactsResponse {
   artifacts: IArtifact[];
 }
+
+
+// @TODO
+export type IRelatedDataset = Record<string, any>;
+
+export interface IListRelatedDatasetsResponse {
+  datasets: IRelatedDataset[];
+}
