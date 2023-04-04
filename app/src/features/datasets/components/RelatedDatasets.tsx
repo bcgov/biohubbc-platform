@@ -1,17 +1,16 @@
 import { mdiLockPlus, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, Chip } from '@mui/material';
+import { Button, Link } from '@mui/material';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams, GridTreeNodeWithRender } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
-import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { IRelatedDataset } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
-import { getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+// import { Link as RouterLink } from 'react-router-dom'
 
 export interface IRelatedDatasetsProps {
   datasetId: string;
@@ -36,50 +35,14 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
 
   const columns: GridColDef<IRelatedDataset>[] = [
     {
-      field: 'file_name',
+      field: 'title',
       headerName: 'Title',
-      flex: 2,
-      disableColumnMenu: true
-    },
-    {
-      field: 'file_type',
-      headerName: 'Type',
-      flex: 1
-    },
-    {
-      field: 'create_date',
-      headerName: 'Submitted',
-      valueGetter: ({ value }) => value && new Date(value),
-      valueFormatter: ({ value }) => getFormattedDate(DATE_FORMAT.ShortDateFormat, value),
-      flex: 1
-    },
-    {
-      field: 'file_size',
-      headerName: 'Size',
-      flex: 0,
-      valueFormatter: ({ value }) => getFormattedFileSize(value)
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
       flex: 1,
-      renderCell: (params) => {
-        const { security_review_timestamp } = params.row;
-        if (!security_review_timestamp) {
-          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
-        }
-
-        return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Unsecured" />;
-      }
-    },
-    {
-      field: 'action',
-      headerName: 'Action',
-      sortable: false,
-      renderCell: (params) => {
+      disableColumnMenu: true,
+      renderCell: (params: GridRenderCellParams<IRelatedDataset, any, any, GridTreeNodeWithRender>) => {
         return (
-          null
-        );
+          <Link href={params.row.url}>{params.row.title}</Link>
+        )
       }
     }
   ];
@@ -106,7 +69,7 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
       <Box px={1}>
         <Box>
           <DataGrid
-            getRowId={(row) => row.artifact_id}
+            getRowId={(row) => row.datasetId}
             autoHeight
             rows={relatedDatasetsList}
             columns={columns}

@@ -17,15 +17,10 @@ import {
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
-
 export const RelatedDataset = z.object({
   dataset_id: z.string(),
   title: z.string(),
-  source: z.string(),
-  focal_species: z.number(),
-  occurrence_count: z.number(),
-  start_date: z.date(),
-  end_date: z.date()
+  url: z.string()
 });
 
 export type RelatedDataset = z.infer<typeof RelatedDataset>;
@@ -404,8 +399,14 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
-    await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
+    const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
-    return [];
+    return emlJson?.['eml:eml']?.dataset?.project?.relatedProject?.map((relatedProject: any) => {
+      return {
+        datasetId: relatedProject['@_id'],
+        title: 'Related Project',
+        url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
+      };
+    });
   }
 }

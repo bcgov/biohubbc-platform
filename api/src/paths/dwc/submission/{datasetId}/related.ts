@@ -39,7 +39,20 @@ GET.apiDoc = {
               datasets: {
                 type: 'array',
                 items: {
-                    // @TODO
+                  type: 'object',
+                  required: ['datasetId', 'title', 'url'],
+                  properties: {
+                    datasetId: {
+                      type: 'string',
+                      format: 'uuid'
+                    },
+                    title: {
+                      type: 'string'
+                    },
+                    url: {
+                      type: 'string'
+                    }
+                  }
                 }
               }
             }
