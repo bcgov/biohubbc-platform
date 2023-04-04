@@ -52,64 +52,11 @@ const simsHandlebarsTemplate = `
       </div>
     {{/if}}
 
-    {{#if eml:eml.dataset.pubDate}}
-      <div>
-        <div class="meta-container">
-          <div class="meta-title-container">
-            Published
-          </div>
-          <div class="meta-body-container">
-            {{eml:eml.dataset.pubDate}}
-          </div>
-        </div>
-      </div>
-    {{/if}}
-
-    {{#if eml:eml.dataset.creator}}
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Creator
-        </div>
-        <div class="meta-body-container">
-          <div>
-            {{#if eml:eml.dataset.creator.organizationName}}
-              <div>
-                {{eml:eml.dataset.creator.organizationName}}
-              </div>
-            {{/if}}
-
-            {{#if eml:eml.dataset.creator.electronicMailAddress}}
-              <div>
-                <a href="mailto: {{eml:eml.dataset.creator.electronicMailAddress}}">
-                  {{eml:eml.dataset.creator.electronicMailAddress}}
-                </a>
-              </div>
-            {{/if}}
-          </div>
-        </div>
-      </div>
-    {{/if}}
-
-    {{#if eml:eml.dataset.metadataProvider}}
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Provider
-        </div>
-        <div class="meta-body-container">
-          <div>
-            <a href="mailto: {{eml:eml.dataset.metadataProvider.onlineUrl}}">
-              {{eml:eml.dataset.metadataProvider.organizationName}}
-            </a>
-          </div>
-        </div>
-      </div>
-    {{/if}}
-
     {{#each eml:eml.dataset.project.abstract.section as | section |}}
       {{#ifCond section.title '===' "Objectives"}}
         <div class="meta-container">
           <div class="meta-title-container">
-            Objectives
+            Objectives:
           </div>
           <div class="meta-body-container">
             {{section.para}}
@@ -118,41 +65,83 @@ const simsHandlebarsTemplate = `
       {{/ifCond}}
     {{/each}}
 
-    {{#if eml:eml.dataset.contact}}
-      <div class="meta-container">
-        <div class="meta-title-container">
-          <div class="meta-title">
-          Contacts
-          </div>
-        </div>
-        <div class="meta-body-container">
 
-          <div>
-            {{#if eml:eml.dataset.contact.individualName.givenName}}
-              {{eml:eml.dataset.contact.individualName.givenName}}
-            {{/if}}
-            {{#if eml:eml.dataset.contact.individualName.surName}}
-              {{eml:eml.dataset.contact.individualName.surName}}
-            {{/if}}
+    {{#if eml:eml.dataset.contact.individualName.givenName}}
+      <div>
+        <div class="meta-container">
+          <div class="meta-title-container">
+            Lead:
           </div>
-
-          <div>
-            {{#if eml:eml.dataset.contact.organizationName}}
-              {{eml:eml.dataset.contact.organizationName}}
-            {{/if}}
+          <div class="meta-body-container">
+            <div>
+              {{#if eml:eml.dataset.contact.individualName.givenName}}
+                {{eml:eml.dataset.contact.individualName.givenName}}
+              {{/if}}
+              {{#if eml:eml.dataset.contact.individualName.surName}}
+                {{eml:eml.dataset.contact.individualName.surName}}
+              {{/if}}
+            </div>
           </div>
-
-          <div>
-            {{#if eml:eml.dataset.creator.electronicMailAddress}}
-              <a href="mailto:eml:eml.dataset.creator.electronicMailAddress}">
-                {{eml:eml.dataset.creator.electronicMailAddress}}
-              </a>
-            {{/if}}
-          </div>
-
         </div>
       </div>
     {{/if}}
+
+
+    {{#if eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates}}
+      <div>
+        <div class="meta-container">
+          <div class="meta-title-container">
+            Timeline:
+          </div>
+          <div class="meta-body-container">
+            {{eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate}} to {{eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate}}
+          </div>
+        </div>
+      </div>
+    {{/if}}
+
+
+    {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
+      <div>
+        <div class="meta-container">
+          <div class="meta-title-container">
+            Study Area:
+          </div>
+          <div class="meta-body-container">
+            {{eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
+          </div>
+        </div>
+      </div>
+    {{/if}}
+
+
+    {{#each eml:eml.dataset.project.abstract.section as | section |}}
+      {{#ifCond section.title '===' "Intended Outcomes"}}
+        <div class="meta-container">
+          <div class="meta-title-container">
+            Intended Outcomes:
+          </div>
+          <div class="meta-body-container">
+            {{section.para}}
+          </div>
+        </div>
+      {{/ifCond}}
+    {{/each}}
+
+
+
+    {{#each eml:eml.dataset.project.designDescription.description.section as | section |}}
+      {{#ifCond section.title '===' "Field Method"}}
+        <div class="meta-container">
+          <div class="meta-title-container">
+            Field Method:
+          </div>
+          <div class="meta-body-container">
+            {{section.para}}
+          </div>
+        </div>
+      {{/ifCond}}
+    {{/each}}
 
     <div class="meta-container">
       {{#each eml:eml.additionalMetadata as | amd |}}
