@@ -1,36 +1,46 @@
 .hbr-container {
+  font-family: Noto Sans;
 
-  .dataset-title {
-    font-family: Noto Sans;
-    font-size: 32px;
-    color: #000000;
-    text-decoration: none solid rgb(0, 0, 0);
-  }
-
-  h1 {
-    font-size: '2.25rem';
-    font-weight: 700;
-  }
-
-  h2 {
-    font-size: '1.875rem';
-    font-weight: 700;
-  }
-
-  .meta-container {
+  .hbr-header {
     display: flex;
-    flex-wrap: nowrap;
-    & + .meta-container {
-      margin-top: 1rem;
+    flex-direction: column;
+
+    .hbr-header-title-primary {
+      font-size: 32px;
+      color: #000000;
+      text-decoration: none solid rgb(0, 0, 0);
     }
 
-    .meta-title-container {
-      flex: 0 0 150px;
-    }
-
-    .meta-body-container {
-      flex: 1 1 auto;
-      max-width: 92ch;
+    .hbr-header-title-secondary {
+      font-size: 20px;
+      color: #000000;
+      text-decoration: none solid rgb(0, 0, 0);
     }
   }
+
+  .details-container {
+    .details-container-title {
+      border-radius: 6px;
+      background-color: #ffffff;
+      background-size: cover;
+    }
+    
+    .meta-container {
+      display: flex;
+      & + .meta-container {
+        margin-top: 1rem;
+      }
+  
+      .meta-title-container {
+        flex: 1;
+      }
+  
+      .meta-body-container {
+        flex: 2;
+        max-width: 92ch;
+      }
+    }
+  }
+
+
 }
