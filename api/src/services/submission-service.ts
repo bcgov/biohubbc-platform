@@ -404,7 +404,7 @@ export class SubmissionService extends DBService {
     return emlJson?.['eml:eml']?.dataset?.project?.relatedProject?.map((relatedProject: any) => {
       return {
         datasetId: relatedProject['@_id'],
-        title: 'Related Project',
+        title: relatedProject['title'],
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });

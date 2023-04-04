@@ -1,7 +1,9 @@
 import { mdiDotsVertical, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, Button, Chip } from '@mui/material';
+import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -79,7 +81,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
               </MenuItem>
             )}
             <MenuItem
-              disabled={!props.hasAdministrativePermissions && props.isPendingReview}
+              disabled={!props.hasAdministrativePermissions}
               onClick={() => {
                 props.onDownload(props.artifact);
                 setAnchorEl(null);
@@ -118,7 +120,6 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
-  const [selected, setSelected] = useState<number[]>([]);
 
   const keycloakWrapper = useKeycloakWrapper();
   const biohubApi = useApi();
@@ -170,11 +171,11 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       flex: 1,
       renderCell: (params) => {
         const { security_review_timestamp } = params.row;
-        if (!security_review_timestamp) {
+        if (!security_review_timestamp && hasAdministrativePermissions) {
           return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
         }
 
-        return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Unsecured" />;
+        return <Chip color="warning" sx={{ textTransform: 'uppercase' }} label="Secured" />;
       }
     },
     {
@@ -198,6 +199,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     <>
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
         <Box display="flex" gap={1}>
+        {/*
           <Button
             title="Apply Security Rules"
             variant="contained"
@@ -210,11 +212,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <IconButton disabled title="Download Files" aria-label={`Download selected files`}>
             <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
+        */}
         </Box>
       </ActionToolbar>
       <Divider></Divider>
-      <Box px={1}>
-        {numPendingDocuments > 0 && showAlert && (
+      <Box px={2}>
+        {hasAdministrativePermissions && numPendingDocuments > 0 && showAlert && (
           <Box pt={2} pb={2}>
             <Alert onClose={() => setShowAlert(false)} severity="info">
               <strong>
@@ -246,7 +249,24 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
                 }
               }
             }}
-            onStateChange={(params) => setSelected(params.rowSelection)}
+            slots={{
+              noRowsOverlay: () => (
+                <Box sx={{
+                  p: 2,
+                  display: 'flex',
+                  flexFlow: 'column',
+                  alignItems: 'center',
+                  top: '50%',
+                  position: 'relative',
+                  transform: 'translateY(-50%)'
+                }}>
+                  <Typography component="strong" color="textSecondary" variant="body2">
+                    No Artifacts
+                  </Typography>
+                </Box>
+              )
+            }}
+            // onStateChange={(params) => setSelected(params.rowSelection)}
           />
         </Box>
       </Box>

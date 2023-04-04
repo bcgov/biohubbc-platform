@@ -1,16 +1,11 @@
-import { mdiLockPlus, mdiTrayArrowDown } from '@mdi/js';
-import Icon from '@mdi/react';
-import { Button, Link } from '@mui/material';
+import { Link, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
 import { DataGrid, GridColDef, GridRenderCellParams, GridTreeNodeWithRender } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { IRelatedDataset } from 'interfaces/useDatasetApi.interface';
-import { useState } from 'react';
-// import { Link as RouterLink } from 'react-router-dom'
 
 export interface IRelatedDatasetsProps {
   datasetId: string;
@@ -24,14 +19,13 @@ export interface IRelatedDatasetsProps {
  */
 const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
   const { datasetId } = props;
-  const [selected, setSelected] = useState<number[]>([]);
 
   const biohubApi = useApi();
 
   const relatedDatasetsDataLoader = useDataLoader(() => biohubApi.dataset.getRelatedDatasets(datasetId));
   relatedDatasetsDataLoader.load();
 
-  const relatedDatasetsList = relatedDatasetsDataLoader.data?.datasets || [];
+  const relatedDatasetsList: IRelatedDataset[] = relatedDatasetsDataLoader.data?.datasets || [];
 
   const columns: GridColDef<IRelatedDataset>[] = [
     {
@@ -49,32 +43,34 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
 
   return (
     <>
-      <ActionToolbar label="Related Datasets" labelProps={{ variant: 'h4' }}>
-        <Box display="flex" gap={1}>
-          <Button
-            title="Apply Security Rules"
-            variant="contained"
-            color="primary"
-            startIcon={<Icon path={mdiLockPlus} size={1} />}
-            onClick={() => console.log('Apply Security not implemented.')}
-            disabled={selected.length === 0}>
-            Apply Security
-          </Button>
-          <IconButton disabled title="Download Files" aria-label={`Download selected files`}>
-            <Icon path={mdiTrayArrowDown} color="primary" size={1} />
-          </IconButton>
-        </Box>
-      </ActionToolbar>
+      <ActionToolbar label="Related Datasets" labelProps={{ variant: 'h4' }} />
       <Divider></Divider>
-      <Box px={1}>
+      <Box px={2}>
         <Box>
           <DataGrid
             getRowId={(row) => row.datasetId}
             autoHeight
+            disableVirtualization
             rows={relatedDatasetsList}
+            slots={{
+              noRowsOverlay: () => (
+                <Box sx={{
+                  p: 2,
+                  display: 'flex',
+                  flexFlow: 'column',
+                  alignItems: 'center',
+                  top: '50%',
+                  position: 'relative',
+                  transform: 'translateY(-50%)'
+                }}>
+                  <Typography component="strong" color="textSecondary" variant="body2">
+                    No Related Datasets
+                  </Typography>
+                </Box>
+              )
+            }}
             columns={columns}
             pageSizeOptions={[5]}
-            checkboxSelection
             disableRowSelectionOnClick
             disableColumnSelector
             disableColumnFilter
@@ -90,7 +86,6 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
                 }
               }
             }}
-            onStateChange={(params) => setSelected(params.rowSelection)}
           />
         </Box>
       </Box>
