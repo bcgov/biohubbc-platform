@@ -30,7 +30,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
     paddingTop: theme.spacing(5),
     paddingBottom: theme.spacing(5),
-    background: '#ffffff',
+    background: '#f7f8fa',
     '& h1': {
       marginTop: '-4px'
     }
@@ -66,7 +66,7 @@ const simsHandlebarsTemplate = `
       <div class="details-container-title">
         Details
       </div>
-      <dl>
+      <dl class="details-container-metadata">
         {{#each eml:eml.dataset.project.abstract.section as | section |}}
           {{#ifCond section.title '===' "Objectives"}}
             <div>
@@ -75,6 +75,7 @@ const simsHandlebarsTemplate = `
               </dt>
               <dd>
                 {{section.para}}
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque nec urna ac risus congue pharetra. Morbi posuere id mi vitae varius. Nullam a porta elit. Sed ultrices lobortis tortor. Fusce suscipit fermentum lectus, vel euismod justo faucibus et. Donec porttitor ex eget cursus pretium. Sed imperdiet porttitor mauris eget malesuada. Fusce ac ultricies eros. Nam elementum posuere dictum. Proin ornare ipsum sed massa dictum, et tempus risus scelerisque. Nulla facilisi. In commodo congue ipsum, a rhoncus erat ultricies in. Phasellus ex eros, faucibus sed justo et, sagittis tempus lorem.
               </dd>
             </div>
           {{/ifCond}}
