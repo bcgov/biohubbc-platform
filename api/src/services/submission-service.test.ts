@@ -505,4 +505,29 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql({ test: 'test' });
     });
   });
+
+  describe('getRelatedDatasetsByDatasetId', () => {
+    it('should return a valid array of related datasets on success', async () => {
+      const mockEmlString = JSON.stringify({
+        'eml:eml': {
+          //
+        }
+      });
+    
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+        .resolves(mockEmlString);
+  
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+  
+      // @TODO
+    });
+  
+    it('should return an empty array if no EML JSON could be found', async () => {
+      // @TODO
+    });
+  
+    it('should return an empty array if JSON Path fails to return any results', async () => {
+      // @TODO
+    });
+  })
 });
