@@ -1,6 +1,5 @@
 import { mdiDotsVertical, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
-import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -9,6 +8,7 @@ import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
@@ -199,7 +199,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     <>
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
         <Box display="flex" gap={1}>
-        {/*
+          {/*
           <Button
             title="Apply Security Rules"
             variant="contained"
@@ -251,15 +251,16 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             }}
             slots={{
               noRowsOverlay: () => (
-                <Box sx={{
-                  p: 2,
-                  display: 'flex',
-                  flexFlow: 'column',
-                  alignItems: 'center',
-                  top: '50%',
-                  position: 'relative',
-                  transform: 'translateY(-50%)'
-                }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    display: 'flex',
+                    flexFlow: 'column',
+                    alignItems: 'center',
+                    top: '50%',
+                    position: 'relative',
+                    transform: 'translateY(-50%)'
+                  }}>
                   <Typography component="strong" color="textSecondary" variant="body2">
                     No Artifacts
                   </Typography>

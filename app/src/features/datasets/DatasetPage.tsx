@@ -24,8 +24,8 @@ import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 import DatasetArtifacts from './components/DatasetArtifacts';
-import RenderWithHandlebars from './components/RenderWithHandlebars';
 import RelatedDatasets from './components/RelatedDatasets';
+import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {

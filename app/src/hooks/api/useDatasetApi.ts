@@ -65,7 +65,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
     const { data } = await axios.get<IListRelatedDatasetsResponse>(`api/dwc/submission/${datasetId}/related`);
 
     return data;
-  }
+  };
 
   return {
     listAllDatasets,

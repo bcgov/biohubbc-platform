@@ -11,7 +11,6 @@ export interface IRelatedDatasetsProps {
   datasetId: string;
 }
 
-
 /**
  * Dataset attachments content for a dataset.
  *
@@ -34,9 +33,7 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
       flex: 1,
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<IRelatedDataset, any, any, GridTreeNodeWithRender>) => {
-        return (
-          <Link href={params.row.url}>{params.row.title}</Link>
-        )
+        return <Link href={params.row.url}>{params.row.title}</Link>;
       }
     }
   ];
@@ -54,15 +51,16 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
             rows={relatedDatasetsList}
             slots={{
               noRowsOverlay: () => (
-                <Box sx={{
-                  p: 2,
-                  display: 'flex',
-                  flexFlow: 'column',
-                  alignItems: 'center',
-                  top: '50%',
-                  position: 'relative',
-                  transform: 'translateY(-50%)'
-                }}>
+                <Box
+                  sx={{
+                    p: 2,
+                    display: 'flex',
+                    flexFlow: 'column',
+                    alignItems: 'center',
+                    top: '50%',
+                    position: 'relative',
+                    transform: 'translateY(-50%)'
+                  }}>
                   <Typography component="strong" color="textSecondary" variant="body2">
                     No Related Datasets
                   </Typography>

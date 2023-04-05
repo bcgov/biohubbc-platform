@@ -1,3 +1,4 @@
+import { JSONPath } from 'jsonpath-plus';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -401,7 +402,21 @@ export class SubmissionService extends DBService {
   async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
     const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
-    return emlJson?.['eml:eml']?.dataset?.project?.relatedProject?.map((relatedProject: any) => {
+    if (!emlJson) {
+      return [];
+    }
+
+    const result = JSONPath({
+      path: '$..eml:eml..relatedProject',
+      json: emlJson,
+      resultType: 'all'
+    });
+
+    if (!result.length) {
+      return [];
+    }
+
+    return result[0].value.map((relatedProject: any) => {
       return {
         datasetId: relatedProject['@_id'],
         title: relatedProject['title'],
