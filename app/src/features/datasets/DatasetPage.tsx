@@ -54,7 +54,7 @@ const simsHandlebarsTemplate = `
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#with (lookup amd.metadata "types") as | projectType | ~}}
             {{#ifCond amd.describes '===' @root.eml:eml.dataset.[@_id]}}
-              <div class="hbr-header-title-secondary">Species Inventory {{projectType.type}}</div>
+              <div class="hbr-header-title-secondary">Species Inventory {{#capFirst projectType.type}}{{/capFirst}}</div>
             {{/ifCond}}
           {{/with}}
         {{/each}}
@@ -66,8 +66,6 @@ const simsHandlebarsTemplate = `
       <div class="details-container-title">
         Details
       </div>
-      
-
       <dl>
         {{#each eml:eml.dataset.project.abstract.section as | section |}}
           {{#ifCond section.title '===' "Objectives"}}

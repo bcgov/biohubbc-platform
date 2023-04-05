@@ -34,6 +34,16 @@ export const useHandlebars = () => {
     });
   };
 
+
+  const capitalizeFirst = () => {
+    Handlebars.registerHelper('capFirst', (text) => {
+      if (typeof text === 'string') {
+        text = text.toLowerCase()
+        text = text.charAt(0).toUpperCase() + text.slice(1);
+      }
+      return text;
+    });
+  };
   /**
    * This function converts a rawTemplate to a template
    *
@@ -42,6 +52,7 @@ export const useHandlebars = () => {
    */
   const compileFromRawTemplate = (template: TemplateSpecification): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
+    capitalizeFirst();
     return Handlebars.compile(template);
   };
 
