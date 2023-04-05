@@ -1,10 +1,11 @@
 .hbr-container {
   font-family: Noto Sans;
-
+  background-color: #f7f8fa;
   .hbr-header {
     display: flex;
     flex-direction: column;
     padding-bottom: 16px;
+    background-color: #ffffff;
 
     .hbr-header-title-primary {
       font-size: 32px;
@@ -50,3 +51,6 @@
     }
   }
 }
+
+
+
