@@ -1,10 +1,10 @@
 .hbr-container {
   font-family: Noto Sans;
-  background-color: #f7f8fa;
   .hbr-header {
     display: flex;
     flex-direction: column;
     padding-bottom: 16px;
+    margin-bottom: 16px;
     background-color: #ffffff;
 
     .hbr-header-title-primary {
@@ -22,35 +22,33 @@
   }
 
   .details-container {
+    border-radius: 6px;
+    background-color: #ffffff;
     .details-container-title {
-      border-radius: 6px;
       background-color: #ffffff;
       background-size: cover;
       font-size: 20px;
       font-weight: bold;
       padding: 18px 25px;
+      border-bottom: solid #dadada;
+      border-radius: 6px 6px 0 0;
     }
-    
-    .details-container-meta {
-      padding: 0px 25px;
-      .meta-container {
+
+    .details-container-metadata {
+      padding: 25px;
+      div {
         display: flex;
-        & + .meta-container {
-          margin-top: 1rem;
+        padding: 10px 0px;
+
+        dt {
+          color: #787f81;
+          flex:1;
+          max-width: 200px;
         }
-    
-        .meta-title-container {
-          flex: 1;
-        }
-    
-        .meta-body-container {
-          flex: 2;
-          max-width: 92ch;
+        dd {
+          flex:1;
         }
       }
     }
   }
 }
-
-
-
