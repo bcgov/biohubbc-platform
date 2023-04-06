@@ -37,8 +37,7 @@ export const useHandlebars = () => {
   const capitalizeFirst = () => {
     Handlebars.registerHelper('capFirst', (text) => {
       if (typeof text === 'string') {
-        text = text.toLowerCase();
-        text = text.charAt(0).toUpperCase() + text.slice(1);
+        return `${text.charAt(0).toUpperCase()}${text.slice(1).toLowerCase()}`;
       }
       return text;
     });
