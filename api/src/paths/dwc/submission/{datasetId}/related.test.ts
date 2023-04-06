@@ -6,11 +6,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
-import { Artifact } from '../../../../repositories/artifact-repository';
-import { ArtifactService } from '../../../../services/artifact-service';
+import { RelatedDataset, SubmissionService } from '../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { GET, getRelatedDatasetsByDatasetId } from './related';
-import { SubmissionService } from '../../../../services/submission-service';
 
 chai.use(sinonChai);
 
@@ -272,23 +270,39 @@ describe('getRelatedDatasetsByDatasetId', () => {
           expect(response).to.equal(undefined);
         });
       });
-      
     });
   });
 
-  it('should return an empty array if no related projects could be found', async () => {
-    // @TODO
-  });
+  it('should return a valid array of related datasets on success', async () => {
+    const dbConnectionObj = getMockDBConnection();
+    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-  it('should return an empty array if JSON Path fails to return any results', async () => {
-    // @TODO
+    const submissionServiceStub = sinon
+      .stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId')
+      .resolves([{ datasetId: 'aaa' }, { datasetId: 'bbb' }] as RelatedDataset[]);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq.params = {
+      datasetId: 'abcd'
+    };
+
+    const requestHandler = getRelatedDatasetsByDatasetId();
+
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.statusValue).to.equal(200);
+    expect(submissionServiceStub).to.be.calledWith('abcd');
+    expect(mockRes.jsonValue).to.eql({
+      datasets: [{ datasetId: 'aaa' }, { datasetId: 'bbb' }]
+    });
   });
 
   it('catches and re-throws an error', async () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-    sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').rejects(new Error('a test error'));
+    sinon.stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId').rejects(new Error('a test error'));
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -297,7 +311,7 @@ describe('getRelatedDatasetsByDatasetId', () => {
     };
 
     try {
-      const requestHandler = getArtifactsByDatasetId();
+      const requestHandler = getRelatedDatasetsByDatasetId();
 
       await requestHandler(mockReq, mockRes, mockNext);
       expect.fail();

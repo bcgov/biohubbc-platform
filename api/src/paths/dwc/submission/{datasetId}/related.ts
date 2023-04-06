@@ -23,7 +23,8 @@ GET.apiDoc = {
       in: 'path',
       name: 'datasetId',
       schema: {
-        type: 'string'
+        type: 'string',
+        format: 'uuid'
       },
       required: true
     }

@@ -11,6 +11,23 @@ export interface IRelatedDatasetsProps {
   datasetId: string;
 }
 
+const NoDatasetRowsOverlay = () => (
+  <Box
+    sx={{
+      p: 2,
+      display: 'flex',
+      flexFlow: 'column',
+      alignItems: 'center',
+      top: '50%',
+      position: 'relative',
+      transform: 'translateY(-50%)'
+    }}>
+    <Typography component="strong" color="textSecondary" variant="body2">
+      No Related Datasets
+    </Typography>
+  </Box>
+);
+
 /**
  * Dataset attachments content for a dataset.
  *
@@ -50,22 +67,7 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
             disableVirtualization
             rows={relatedDatasetsList}
             slots={{
-              noRowsOverlay: () => (
-                <Box
-                  sx={{
-                    p: 2,
-                    display: 'flex',
-                    flexFlow: 'column',
-                    alignItems: 'center',
-                    top: '50%',
-                    position: 'relative',
-                    transform: 'translateY(-50%)'
-                  }}>
-                  <Typography component="strong" color="textSecondary" variant="body2">
-                    No Related Datasets
-                  </Typography>
-                </Box>
-              )
+              noRowsOverlay: NoDatasetRowsOverlay
             }}
             columns={columns}
             pageSizeOptions={[5]}

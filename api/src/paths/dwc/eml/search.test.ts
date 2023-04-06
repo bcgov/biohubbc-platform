@@ -162,8 +162,8 @@ describe('search', () => {
         .stub(SubmissionService.prototype, 'findSubmissionRecordsWithSpatialCount')
         .onCall(0)
         .resolves([
-          { id: 'test_uuid1', source: 'valid_json_string_1', observation_count: 14 },
-          { id: 'test_uuid2', source: 'valid_json_string_2', observation_count: 23 }
+          { id: 'test_uuid1', source: {}, observation_count: 14 },
+          { id: 'test_uuid2', source: {}, observation_count: 23 }
         ]);
 
       const keywordSearchEmlStub = sinon.stub(ESService.prototype, 'keywordSearchEml').resolves([
@@ -177,8 +177,8 @@ describe('search', () => {
 
       expect(keywordSearchEmlStub).to.have.been.calledOnceWith('search-term');
       expect(mockRes.jsonValue).eql([
-        { id: 'test_uuid1', source: 'valid_json_string_1', observation_count: 14 },
-        { id: 'test_uuid2', source: 'valid_json_string_2', observation_count: 23 }
+        { id: 'test_uuid1', source: {}, observation_count: 14 },
+        { id: 'test_uuid2', source: {}, observation_count: 23 }
       ]);
     });
   });

@@ -19,7 +19,7 @@ import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
 export const RelatedDataset = z.object({
-  dataset_id: z.string(),
+  datasetId: z.string(),
   title: z.string(),
   url: z.string()
 });
@@ -188,10 +188,10 @@ export class SubmissionService extends DBService {
    * Get json representation of eml source from submission by datasetId.
    *
    * @param {string} datasetId
-   * @return {string}
+   * @return {Promise<Record<string, unknown>>}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string> {
+  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown>> {
     const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (response.rowCount !== 1) {
@@ -209,10 +209,10 @@ export class SubmissionService extends DBService {
    * any existing records.
    *
    * @param {string} datasetId
-   * @return {string | null}
+   * @return {Record<string, unknown> | null}
    * @memberof SubmissionService
    */
-  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string | null> {
+  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown> | null> {
     const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (response.rowCount !== 1) {

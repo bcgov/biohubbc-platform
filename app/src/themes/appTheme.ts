@@ -154,6 +154,26 @@ const appTheme = createTheme({
             }
         }
       }
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
+        },
+        colorPrimary: {
+          color: '#003366',
+          backgroundColor: '#DCEBFB',
+          textTransform: 'uppercase',
+          fontSize: '12px',
+          '&.colorSuccess': {
+            color: '#2D4821',
+            backgroundColor: '#DFF0D8'
+          }
+        },
+        colorSecondary: {
+          backgroundColor: 'red'
+        }
+      }
     }
   }
 });

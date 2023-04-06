@@ -33,6 +33,23 @@ interface IAttachmentItemMenuButtonProps {
   isPendingReview: boolean;
 }
 
+const NoArtifactRowsOverlay = () => (
+  <Box
+    sx={{
+      p: 2,
+      display: 'flex',
+      flexFlow: 'column',
+      alignItems: 'center',
+      top: '50%',
+      position: 'relative',
+      transform: 'translateY(-50%)'
+    }}>
+    <Typography component="strong" color="textSecondary" variant="body2">
+      No Artifacts
+    </Typography>
+  </Box>
+);
+
 const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (props) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -250,22 +267,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
               }
             }}
             slots={{
-              noRowsOverlay: () => (
-                <Box
-                  sx={{
-                    p: 2,
-                    display: 'flex',
-                    flexFlow: 'column',
-                    alignItems: 'center',
-                    top: '50%',
-                    position: 'relative',
-                    transform: 'translateY(-50%)'
-                  }}>
-                  <Typography component="strong" color="textSecondary" variant="body2">
-                    No Artifacts
-                  </Typography>
-                </Box>
-              )
+              noRowsOverlay: NoArtifactRowsOverlay
             }}
             // onStateChange={(params) => setSelected(params.rowSelection)}
           />
