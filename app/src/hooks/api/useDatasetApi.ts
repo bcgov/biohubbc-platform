@@ -56,7 +56,6 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  
   /**
    * Fetch the signed handlebar template for a given dataset ID.
    *
@@ -66,7 +65,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
   const getHandlebarsTemplate = async (datasetId: string): Promise<string> => {
     // const { data } = await axios.get<string>(`api/dwc/submission/${datasetId}/template`);
     return simsHandlebarsTemplate;
-  }
+  };
 
   return {
     listAllDatasets,

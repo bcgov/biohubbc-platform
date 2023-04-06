@@ -1,5 +1,4 @@
 .hbr-container {
-  font-family: Noto Sans;
   .hbr-header {
     display: flex;
     flex-direction: column;
@@ -43,11 +42,11 @@
 
         dt {
           color: #787f81;
-          flex:1;
+          flex: 1;
           max-width: 200px;
         }
         dd {
-          flex:1;
+          flex: 1;
         }
       }
     }
