@@ -30,7 +30,8 @@ const mockUseKeycloakWrapper = {
 const mockUseApi = {
   dataset: {
     getDatasetEML: jest.fn(),
-    getDatasetArtifacts: jest.fn()
+    getDatasetArtifacts: jest.fn(),
+    getHandlebarsTemplate: jest.fn()
   },
   search: {
     getSpatialData: jest.fn(),
@@ -59,6 +60,8 @@ describe('DatasetPage', () => {
     mockUseApi.dataset.getDatasetEML.mockResolvedValue([]);
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
+
+    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('');
 
     const { getByTestId } = renderContainer();
 
@@ -100,6 +103,8 @@ describe('DatasetPage', () => {
         }
       }
     });
+
+    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('{{eml:eml.dataset.contact.organizationName}}');
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 

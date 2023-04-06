@@ -63,7 +63,6 @@ const useDatasetApi = (axios: AxiosInstance) => {
    * @return {*}  {Promise<string>}
    */
   const getHandlebarsTemplate = async (datasetId: string): Promise<string> => {
-    // const { data } = await axios.get<string>(`api/dwc/submission/${datasetId}/template`);
     return simsHandlebarsTemplate;
   };
 
