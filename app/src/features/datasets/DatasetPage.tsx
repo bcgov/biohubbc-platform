@@ -28,7 +28,6 @@ import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
-    paddingTop: theme.spacing(5),
     paddingBottom: theme.spacing(5),
     background: '#f7f8fa',
     '& h1': {
@@ -349,13 +348,11 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   if (!datasetDataLoader.data) {
     return <CircularProgress className="pageProgress" size={40} />;
   }
-  console.log(datasetDataLoader.data);
+
   return (
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
-        <Container maxWidth="xl">
-          <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={simsHandlebarsTemplate} />
-        </Container>
+        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={simsHandlebarsTemplate} />
       </Paper>
       <Container maxWidth="xl">
         <Box pt={2}>

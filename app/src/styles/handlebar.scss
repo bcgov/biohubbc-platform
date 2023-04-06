@@ -3,7 +3,7 @@
   .hbr-header {
     display: flex;
     flex-direction: column;
-    padding-bottom: 16px;
+    padding: 24px;
     margin-bottom: 16px;
     background-color: #ffffff;
 
@@ -24,6 +24,7 @@
   .details-container {
     border-radius: 6px;
     background-color: #ffffff;
+    margin: 0 24px;
     .details-container-title {
       background-color: #ffffff;
       background-size: cover;
