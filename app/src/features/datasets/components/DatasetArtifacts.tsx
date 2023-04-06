@@ -269,7 +269,6 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             slots={{
               noRowsOverlay: NoArtifactRowsOverlay
             }}
-            // onStateChange={(params) => setSelected(params.rowSelection)}
           />
         </Box>
       </Box>
