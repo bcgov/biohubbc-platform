@@ -67,7 +67,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
   }
 
   /**
-    * Fetch a list of datasets related to the given dataset
+   * Fetch a list of datasets related to the given dataset
    *
    * @param {string} datasetId
    * @return {*}  {Promise<IRelatedDataset>}
