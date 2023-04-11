@@ -5,6 +5,7 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
+const appName = config.module.app;
 const name = config.module.queue;
 const dbName = config.module.db;
 
@@ -21,6 +22,7 @@ const branch = (isStaticDeployment && options.branch) || null;
 const tag = (branch && `build-${version}-${changeId}-${branch}`) || `build-${version}-${changeId}`;
 
 const staticUrlsAPI = config.staticUrlsAPI;
+const staticUrls = config.staticUrls;
 
 const queueDockerfilePath = './Dockerfile.queue';
 
@@ -60,7 +62,6 @@ const phases = {
     version: `${version}-${changeId}`,
     tag: tag,
     env: 'build',
-    s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     branch: branch,
     queueDockerfilePath: queueDockerfilePath,
@@ -80,6 +81,7 @@ const phases = {
     version: `${deployChangeId}-${changeId}`,
     tag: `dev-${version}-${deployChangeId}`,
     host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
+    appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'dev',
     elasticsearchURL: 'http://es01:9200',
@@ -108,6 +110,7 @@ const phases = {
     version: `${version}`,
     tag: `test-${version}`,
     host: staticUrlsAPI.test,
+    appHost: staticUrls.test,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'test',
     elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
@@ -136,6 +139,7 @@ const phases = {
     version: `${version}`,
     tag: `prod-${version}`,
     host: staticUrlsAPI.prod,
+    appHost: staticUrls.prod,
     adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'prod',
     elasticsearchURL: 'http://es01:9200',

@@ -20,3 +20,13 @@ export interface IArtifact {
 export interface IListArtifactsResponse {
   artifacts: IArtifact[];
 }
+
+export interface IRelatedDataset {
+  datasetId: string;
+  title: string;
+  url: string;
+}
+
+export interface IListRelatedDatasetsResponse {
+  datasets: IRelatedDataset[];
+}

@@ -5,7 +5,7 @@ import { defaultErrorResponses } from '../../../../openapi/schemas/http-response
 import { ArtifactService } from '../../../../services/artifact-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/eml/get');
+const defaultLog = getLogger('paths/dwc/submission/{datasetId}/artifacts');
 
 export const GET: Operation = [getArtifactsByDatasetId()];
 

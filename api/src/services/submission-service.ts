@@ -1,3 +1,5 @@
+import { JSONPath } from 'jsonpath-plus';
+import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
@@ -15,6 +17,14 @@ import {
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
+
+export const RelatedDataset = z.object({
+  datasetId: z.string(),
+  title: z.string(),
+  url: z.string()
+});
+
+export type RelatedDataset = z.infer<typeof RelatedDataset>;
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -178,10 +188,10 @@ export class SubmissionService extends DBService {
    * Get json representation of eml source from submission by datasetId.
    *
    * @param {string} datasetId
-   * @return {string}
+   * @return {Promise<Record<string, unknown>>}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string> {
+  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown>> {
     const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (response.rowCount !== 1) {
@@ -199,10 +209,10 @@ export class SubmissionService extends DBService {
    * any existing records.
    *
    * @param {string} datasetId
-   * @return {string | null}
+   * @return {Record<string, unknown> | null}
    * @memberof SubmissionService
    */
-  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string | null> {
+  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown> | null> {
     const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (response.rowCount !== 1) {
@@ -380,5 +390,38 @@ export class SubmissionService extends DBService {
     submissonObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
     return this.submissionRepository.insertSubmissionObservationRecord(submissonObservation);
+  }
+
+  /**
+   * Retrieves an array of datasets related to the given dataset.
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<RelatedDataset[]>}
+   * @memberof SubmissionService
+   */
+  async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
+    const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
+
+    if (!emlJson) {
+      return [];
+    }
+
+    const result = JSONPath({
+      path: '$..eml:eml..relatedProject',
+      json: emlJson,
+      resultType: 'all'
+    });
+
+    if (!result.length) {
+      return [];
+    }
+
+    return result[0].value.map((relatedProject: any) => {
+      return {
+        datasetId: relatedProject['@_id'],
+        title: relatedProject['title'],
+        url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
+      };
+    });
   }
 }
