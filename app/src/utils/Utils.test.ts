@@ -30,6 +30,11 @@ describe('ensureProtocol', () => {
     expect(urlWithProtocol).toEqual(url);
   });
 
+  it('does nothing if string begins with `localhost:`', async () => {
+    const urlWithProtocol = ensureProtocol('localhost:6200/test');
+    expect(urlWithProtocol).toEqual('localhost:6200/test');
+  });
+
   it('adds `https://` when no protocol param is provided', async () => {
     const url = 'someurl.com';
     const urlWithProtocol = ensureProtocol(url);
