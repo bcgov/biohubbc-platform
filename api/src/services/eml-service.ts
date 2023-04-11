@@ -76,11 +76,7 @@ export class EMLService extends DBService {
    * @memberof EMLService
    */
   getSystemURL(): string {
-    if (process.env.NODE_ENV === 'local') {
-      return `http://${process.env.API_HOST}:${process.env.API_PORT}`;
-    }
-
-    return process.env.API_HOST || '';
+    return process.env.APP_HOST || '';
   }
 
   /**
