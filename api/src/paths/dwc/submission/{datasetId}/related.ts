@@ -66,7 +66,7 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves dataset metadata from the submission table.
+ * Retrieves related datasets within elastic search
  *
  * @returns {RequestHandler}
  */
