@@ -18,10 +18,9 @@ import {
 } from './Utils';
 
 describe('ensureProtocol', () => {
-  it('does nothing if string already has `http://`', async () => {
-    const url = 'http://someurl.com';
-    const urlWithProtocol = ensureProtocol(url);
-    expect(urlWithProtocol).toEqual(url);
+  it('upgrades the URL if string begins with `http://`', async () => {
+    const urlWithProtocol = ensureProtocol('http://someurl.com');
+    expect(urlWithProtocol).toEqual('https://someurl.com');
   });
 
   it('does nothing if string already has `https://`', async () => {
@@ -30,9 +29,14 @@ describe('ensureProtocol', () => {
     expect(urlWithProtocol).toEqual(url);
   });
 
-  it('does nothing if string begins with `localhost:`', async () => {
-    const urlWithProtocol = ensureProtocol('localhost:6200/test');
-    expect(urlWithProtocol).toEqual('localhost:6200/test');
+  it('adds http if string begins with `localhost`', async () => {
+    const urlWithProtocol = ensureProtocol('localhost:1234/test');
+    expect(urlWithProtocol).toEqual('http://localhost:1234/test');
+  });
+
+  it('does nothing if string begins with `http://localhost`', async () => {
+    const urlWithProtocol = ensureProtocol('http://localhost:1234/test');
+    expect(urlWithProtocol).toEqual('http://localhost:1234/test');
   });
 
   it('adds `https://` when no protocol param is provided', async () => {
