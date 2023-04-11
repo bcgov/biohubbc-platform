@@ -20,9 +20,7 @@ describe('get', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon
-        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
-        .resolves(`{id: 'a valid json string}`);
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId').resolves({});
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

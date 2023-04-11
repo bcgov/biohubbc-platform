@@ -28,7 +28,7 @@ export interface ISubmissionRecord {
 
 export interface ISubmissionRecordWithSpatial {
   id: string;
-  source: string;
+  source: Record<string, unknown>;
   observation_count: number;
 }
 
@@ -369,10 +369,12 @@ export class SubmissionRepository extends BaseRepository {
    * Get submission eml json by dataset id.
    *
    * @param {string} datasetId
-   * @return {*}  {Promise<string>}
+   * @return {*}  {Promise<QueryResult<{ eml_json_source: Record<string, unknown> }>>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<QueryResult<{ eml_json_source: string }>> {
+  async getSubmissionRecordEMLJSONByDatasetId(
+    datasetId: string
+  ): Promise<QueryResult<{ eml_json_source: Record<string, unknown> }>> {
     const sqlStatement = SQL`
       SELECT
         sm.eml_json_source
@@ -382,7 +384,7 @@ export class SubmissionRepository extends BaseRepository {
       AND s.uuid = ${datasetId};
     `;
 
-    return this.connection.sql<{ eml_json_source: string }>(sqlStatement);
+    return this.connection.sql<{ eml_json_source: Record<string, unknown> }>(sqlStatement);
   }
 
   /**

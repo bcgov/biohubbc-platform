@@ -135,56 +135,28 @@ describe('EMLService', () => {
   });
 
   describe('getSystemURL', () => {
-    it('returns url string when NODE_ENV=local', () => {
-      process.env.NODE_ENV = 'local';
-      process.env.API_HOST = 'localhost';
-      process.env.API_PORT = '1234';
+    it('returns the system url', () => {
+      process.env.APP_HOST = 'http://localhost:7200';
 
       const mockDBConnection = getMockDBConnection();
       const emlService = new EMLService(mockDBConnection);
 
       const response = emlService.getSystemURL();
 
-      expect(response).to.eql('http://localhost:1234');
-    });
-
-    it('returns url string when NODE_ENV!=local', () => {
-      process.env.NODE_ENV = 'dev';
-      process.env.API_HOST = 'www.host.com';
-
-      const mockDBConnection = getMockDBConnection();
-      const emlService = new EMLService(mockDBConnection);
-
-      const response = emlService.getSystemURL();
-
-      expect(response).to.eql('www.host.com');
+      expect(response).to.eql('http://localhost:7200');
     });
   });
 
   describe('getDatasetSystemURL', () => {
-    it('returns url string when NODE_ENV=local', () => {
-      process.env.NODE_ENV = 'local';
-      process.env.API_HOST = 'localhost';
-      process.env.API_PORT = '1234';
+    it('returns the dataset system url', () => {
+      process.env.APP_HOST = 'https://www.biohub.ca';
 
       const mockDBConnection = getMockDBConnection();
       const emlService = new EMLService(mockDBConnection);
 
       const response = emlService.getDatasetSystemURL();
 
-      expect(response).to.eql('http://localhost:1234/datasets');
-    });
-
-    it('returns url string when NODE_ENV!=local', () => {
-      process.env.NODE_ENV = 'dev';
-      process.env.API_HOST = 'www.host.com';
-
-      const mockDBConnection = getMockDBConnection();
-      const emlService = new EMLService(mockDBConnection);
-
-      const response = emlService.getDatasetSystemURL();
-
-      expect(response).to.eql('www.host.com/datasets');
+      expect(response).to.eql('https://www.biohub.ca/datasets');
     });
   });
 
@@ -242,7 +214,7 @@ describe('EMLService', () => {
 
     it('decorates the eml', async () => {
       process.env.NODE_ENV = 'dev';
-      process.env.API_HOST = 'www.host.com';
+      process.env.APP_HOST = 'www.host.com';
       process.env.ELASTICSEARCH_URL = 'www.elastic.com';
       process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_index';
 

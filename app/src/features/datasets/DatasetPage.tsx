@@ -24,6 +24,7 @@ import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 import DatasetArtifacts from './components/DatasetArtifacts';
+import RelatedDatasets from './components/RelatedDatasets';
 import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -175,6 +176,13 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
         <Box pt={2}>
           <Paper elevation={0}>
             <DatasetArtifacts datasetId={datasetId} />
+          </Paper>
+        </Box>
+      </Container>
+      <Container maxWidth="xl">
+        <Box pt={2}>
+          <Paper elevation={0}>
+            <RelatedDatasets datasetId={datasetId} />
           </Paper>
         </Box>
       </Container>

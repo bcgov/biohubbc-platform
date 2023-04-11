@@ -23,7 +23,7 @@ parameters:
     required: true
   - name: APP_HOST
     description: APP host for application frontend
-    value: ''
+    required: true
   - name: CHANGE_ID
     description: Change id of the project. This will help to pull image stream
     required: true

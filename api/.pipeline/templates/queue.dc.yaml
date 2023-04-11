@@ -15,6 +15,9 @@ parameters:
   - name: HOST
     description: Host name of the application
     required: true
+  - name: APP_HOST
+    description: APP host for application frontend
+    required: true
   - name: CHANGE_ID
     description: Change id of the project. This will help to pull image stream
     required: true
@@ -140,6 +143,8 @@ objects:
             - env:
                 - name: API_HOST
                   value: ${HOST}
+                - name: APP_HOST
+                  value: ${APP_HOST}
                 - name: DB_HOST
                   value: ${DB_SERVICE_NAME}
                 - name: DB_USER_API

@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import * as JSONPathPlus from 'jsonpath-plus';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
@@ -392,9 +393,9 @@ describe('SubmissionService', () => {
       const findSubmissionRecordWithSpatialCountStub = sinon
         .stub(SubmissionService.prototype, 'findSubmissionRecordWithSpatialCount')
         .onCall(0)
-        .resolves({ id: '111-111-111', source: 'source string 1', observation_count: 0 })
+        .resolves({ id: '111-111-111', source: {}, observation_count: 0 })
         .onCall(1)
-        .resolves({ id: '222-222-222', source: 'source string 2', observation_count: 200 })
+        .resolves({ id: '222-222-222', source: {}, observation_count: 200 })
         .onCall(2)
         .resolves(null);
 
@@ -406,8 +407,8 @@ describe('SubmissionService', () => {
 
       expect(findSubmissionRecordWithSpatialCountStub).to.be.calledThrice;
       expect(response).to.be.eql([
-        { id: '111-111-111', source: 'source string 1', observation_count: 0 },
-        { id: '222-222-222', source: 'source string 2', observation_count: 200 },
+        { id: '111-111-111', source: {}, observation_count: 0 },
+        { id: '222-222-222', source: {}, observation_count: 200 },
         null
       ]);
     });
@@ -427,7 +428,7 @@ describe('SubmissionService', () => {
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
-          .resolves('source string 1');
+          .resolves({});
 
         const getSpatialComponentCountByDatasetIdStub = sinon
           .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
@@ -437,7 +438,7 @@ describe('SubmissionService', () => {
 
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
-        expect(response).to.be.eql({ id: '111-111-111', source: 'source string 1', observation_count: 0 });
+        expect(response).to.be.eql({ id: '111-111-111', source: {}, observation_count: 0 });
       });
     });
 
@@ -450,8 +451,8 @@ describe('SubmissionService', () => {
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
-          .resolves('source string 1')
-          .resolves('source string 2');
+          .resolves({})
+          .resolves({});
 
         const getSpatialComponentCountByDatasetIdStub = sinon
           .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
@@ -462,7 +463,7 @@ describe('SubmissionService', () => {
 
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
-        expect(response).to.be.eql({ id: '222-222-222', source: 'source string 2', observation_count: 200 });
+        expect(response).to.be.eql({ id: '222-222-222', source: {}, observation_count: 200 });
       });
     });
 
@@ -503,6 +504,82 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ test: 'test' });
+    });
+  });
+
+  describe('findRelatedDatasetsByDatasetId', () => {
+    it('should return a valid array of related datasets on success', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const mockEmlJson = {
+        'eml:eml': {
+          dataset: {
+            project: {
+              relatedProject: [
+                {
+                  '@_id': 'abcde',
+                  title: 'Test-Title',
+                  '@_system': 'http://example.com/datasets'
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      const emlStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+        .resolves(mockEmlJson);
+
+      const response = await submissionService.findRelatedDatasetsByDatasetId('test-dataset-id');
+
+      expect(response).to.eql([
+        {
+          datasetId: 'abcde',
+          title: 'Test-Title',
+          url: 'http://example.com/datasets/abcde'
+        }
+      ]);
+
+      expect(emlStub).to.be.calledOnce;
+      expect(emlStub).to.be.calledWith('test-dataset-id');
+    });
+
+    it('should return an empty array if no EML JSON could be found', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const emlStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+        .resolves(null as unknown as Record<string, unknown>);
+
+      const response = await submissionService.findRelatedDatasetsByDatasetId('test-dataset-id');
+
+      expect(response).to.eql([]);
+      expect(emlStub).to.be.calledOnce;
+      expect(emlStub).to.be.calledWith('test-dataset-id');
+    });
+
+    it('should return an empty array if JSON Path fails to return any results', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const emlStub = sinon.stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId').resolves({});
+
+      const jsonPathStub = sinon.stub(JSONPathPlus, 'JSONPath').returns([]);
+
+      const response = await submissionService.findRelatedDatasetsByDatasetId('test-dataset-id');
+
+      expect(response).to.eql([]);
+      expect(emlStub).to.be.calledOnce;
+      expect(emlStub).to.be.calledWith('test-dataset-id');
+      expect(jsonPathStub).to.be.calledOnce;
+      expect(jsonPathStub).to.be.calledWith({
+        path: '$..eml:eml..relatedProject',
+        json: {},
+        resultType: 'all'
+      });
     });
   });
 });

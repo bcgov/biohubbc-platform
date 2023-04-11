@@ -116,6 +116,7 @@ services:
       - OBJECT_STORE_SECRET_KEY_ID=${OBJECT_STORE_SECRET_KEY_ID}
       - OBJECT_STORE_BUCKET_NAME=${OBJECT_STORE_BUCKET_NAME}
       - LOG_LEVEL=${LOG_LEVEL}
+      - APP_HOST=${APP_HOST}
     volumes:
       - ./api:/opt/app-root/src
       - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
