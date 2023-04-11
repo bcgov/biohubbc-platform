@@ -7,7 +7,7 @@ import DatasetPage from './DatasetPage';
  *
  * @return {*}
  */
-const datasetsRouter: React.FC<React.PropsWithChildren> = () => {
+const DatasetsRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
       <Redirect exact from="/datasets/:id" to="/datasets/:id/details" />
@@ -24,4 +24,4 @@ const datasetsRouter: React.FC<React.PropsWithChildren> = () => {
   );
 };
 
-export default datasetsRouter;
+export default DatasetsRouter;
