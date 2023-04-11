@@ -5,6 +5,7 @@ let options = require('pipeline-cli').Util.parseArguments();
 // The root config for common values
 const config = require('../../.config/config.json');
 
+const appName = config.module.app;
 const name = config.module.queue;
 const dbName = config.module.db;
 
@@ -61,7 +62,6 @@ const phases = {
     version: `${version}-${changeId}`,
     tag: tag,
     env: 'build',
-    s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     branch: branch,
     queueDockerfilePath: queueDockerfilePath,
