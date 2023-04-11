@@ -6,7 +6,7 @@ import moment from 'moment';
 
 /**
  * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
- * begins with `localhost:`, othe prtocol is ignored.
+ * begins with `localhost`, the `http` protocol is used.
  *
  * @param {string} url
  * @param {('http://' | 'https://')} [protocol='https://'] The protocol to add, if necessary. Defaults to `https://`.
