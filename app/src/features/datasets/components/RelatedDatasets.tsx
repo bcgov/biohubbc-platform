@@ -6,6 +6,7 @@ import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { IRelatedDataset } from 'interfaces/useDatasetApi.interface';
+import { ensureProtocol } from 'utils/Utils';
 
 export interface IRelatedDatasetsProps {
   datasetId: string;
@@ -50,7 +51,7 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
       flex: 1,
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<IRelatedDataset, any, any, GridTreeNodeWithRender>) => {
-        return <Link href={params.row.url}>{params.row.title}</Link>;
+        return <Link href={ensureProtocol(params.row.url)}>{params.row.title}</Link>;
       }
     }
   ];
