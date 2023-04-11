@@ -64,7 +64,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
    */
   const getHandlebarsTemplate = async (datasetId: string): Promise<string> => {
     return simsHandlebarsTemplate;
-  }
+  };
 
   /**
    * Fetch a list of datasets related to the given dataset
@@ -84,7 +84,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
     getDatasetArtifacts,
     getArtifactSignedUrl,
     getHandlebarsTemplate,
-    getRelatedDatasets,
+    getRelatedDatasets
   };
 };
 
