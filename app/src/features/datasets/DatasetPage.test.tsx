@@ -61,7 +61,7 @@ describe('DatasetPage', () => {
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
-    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('');
+    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('not empty');
 
     const { getByTestId } = renderContainer();
 
