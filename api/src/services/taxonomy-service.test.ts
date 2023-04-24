@@ -36,7 +36,7 @@ describe('TaxonomyService', () => {
     });
 
     it('should query elasticsearch and return []', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_2.0.0';
+      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
 
       const taxonomyService = new TaxonomyService();
 
@@ -49,7 +49,7 @@ describe('TaxonomyService', () => {
     });
 
     it('should query elasticsearch and return taxonomy', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_2.0.0';
+      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
 
       const taxonomyService = new TaxonomyService();
 
@@ -62,7 +62,9 @@ describe('TaxonomyService', () => {
         tty_kingdom: 'kingdom',
         tty_name: 'name',
         english_name: 'animal',
-        note: null
+        note: null,
+        parent_id: 1,
+        parent_hierarchy: []
       };
 
       const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves({
@@ -104,7 +106,7 @@ describe('TaxonomyService', () => {
     });
 
     it('should query elasticsearch and return []', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_2.0.0';
+      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
 
       const taxonomyService = new TaxonomyService();
 
@@ -117,7 +119,7 @@ describe('TaxonomyService', () => {
     });
 
     it('should query elasticsearch and return sanitized data', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_2.0.0';
+      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
 
       const taxonomyService = new TaxonomyService();
 
@@ -130,7 +132,9 @@ describe('TaxonomyService', () => {
         tty_kingdom: 'kingdom',
         tty_name: 'name',
         english_name: 'animal',
-        note: null
+        note: null,
+        parent_id: 1,
+        parent_hierarchy: []
       };
 
       const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves({
@@ -163,7 +167,7 @@ describe('TaxonomyService', () => {
 
   describe('searchSpecies', async () => {
     it('should query elasticsearch', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_2.0.0';
+      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
 
       const taxonomyService = new TaxonomyService();
 
@@ -176,7 +180,9 @@ describe('TaxonomyService', () => {
         tty_kingdom: 'kingdom',
         tty_name: 'name',
         english_name: 'animal',
-        note: null
+        note: null,
+        parent_id: 1,
+        parent_hierarchy: []
       };
 
       const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves({

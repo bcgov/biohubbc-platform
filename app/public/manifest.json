@@ -1,6 +1,6 @@
 {
-  "short_name": "Ionic App",
-  "name": "My Ionic App",
+  "short_name": "BioHub Data Aggregator System",
+  "name": "BioHub Data Aggregator System",
   "icons": [
     {
       "src": "assets/icon/favicon.ico",

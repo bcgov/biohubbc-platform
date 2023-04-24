@@ -79,6 +79,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     });
 
     if (!verifiedToken) {
+      defaultLog.warn({ label: 'authenticate', message: 'verified token was null' });
       throw new HTTP401('Access Denied');
     }
 

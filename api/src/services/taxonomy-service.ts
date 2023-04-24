@@ -21,6 +21,8 @@ export interface ITaxonomySource {
   english_name: string;
   note: string | null;
   end_date: string | null;
+  parent_id: number | null;
+  parent_hierarchy: { id: number; level: string }[];
 }
 
 /**
@@ -31,6 +33,14 @@ export interface ITaxonomySource {
  * @extends {ESService}
  */
 export class TaxonomyService extends ESService {
+  /**
+   * Performs a query in Elasticsearch based on the given search criteria
+   *
+   * @param {SearchRequest} searchRequest
+   * @return {*}  {(Promise<SearchResponse<ITaxonomySource, Record<string, AggregationsAggregate>> | undefined>)}
+   * Promise resolving the search results from Elasticsearch
+   * @memberof TaxonomyService
+   */
   async elasticSearch(
     searchRequest: SearchRequest
   ): Promise<SearchResponse<ITaxonomySource, Record<string, AggregationsAggregate>> | undefined> {
@@ -45,9 +55,18 @@ export class TaxonomyService extends ESService {
       defaultLog.debug({ label: 'elasticSearch', message: 'error', error });
     }
   }
-
-  _sanitizeSpeciesData(data: SearchHit<any>[]) {
-    return data.map((item) => {
+  /**
+   * Sanitizes species data retrieved from Elasticsearch.
+   *
+   * @param {SearchHit<ITaxonomySource>[]} data The data response from ElasticSearch
+   * @return {*}  {({ id: string; code: string | undefined; label: string }[])} An ID, code, and label tuple for each
+   * taxonomic code
+   * @memberof TaxonomyService
+   */
+  _sanitizeSpeciesData = (
+    data: SearchHit<ITaxonomySource>[]
+  ): { id: string; code: string | undefined; label: string }[] => {
+    return data.map((item: SearchHit<ITaxonomySource>) => {
       const { _id: id, _source } = item;
 
       const label = [
@@ -63,9 +82,9 @@ export class TaxonomyService extends ESService {
         .filter(Boolean)
         .join(': ');
 
-      return { id, code: _source.code, label: label };
+      return { id, code: _source?.code, label: label };
     });
-  }
+  };
 
   /**
    * Searches the taxonomy Elasticsearch index by taxonomic code IDs
@@ -109,7 +128,18 @@ export class TaxonomyService extends ESService {
     return response ? this._sanitizeSpeciesData(response.hits.hits) : [];
   }
 
-  async searchSpecies(term: string) {
+  /**
+   * Maps a taxonomic search term to an Elasticsearch query, then performs the query and sanitizes the response.
+   * The query also includes a boolean match to only include records whose `end_date` field is either
+   * undefined/null or is a date that hasn't occurred yet. This filtering is not done on similar ES queries,
+   * since we must still be able to search by a given taxonomic code ID, even if is one that is expired.
+   *
+   * @param {string} term The search term string
+   * @return {*}  {(Promise<{ id: string; code: string | undefined; label: string }[]>)} Promise resolving an ID, code,
+   * and label tuple for each taxonomic code
+   * @memberof TaxonomyService
+   */
+  async searchSpecies(term: string): Promise<{ id: string; code: string | undefined; label: string }[]> {
     const searchConfig: object[] = [];
 
     const splitTerms = term.split(' ');
