@@ -75,7 +75,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     // Verify token using public signing key
     const verifiedToken = verify(tokenString, signingKey, {
       issuer: KEYCLOAK_ISSUER,
-      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464']
+      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464'] // TODO this sims service name should not be hardcoded here
     });
 
     if (!verifiedToken) {

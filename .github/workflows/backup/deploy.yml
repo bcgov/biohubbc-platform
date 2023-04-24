@@ -28,7 +28,7 @@ jobs:
     steps:
       # Checkout the PR branch
       - name: Checkout Target Branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Wait for API response
         uses: nev7n/wait_for_response@v1.0.1
@@ -83,13 +83,13 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 14
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: cache-repo
         env:
           cache-name: cache-repo
@@ -102,7 +102,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -132,13 +132,13 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 14
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: cache-repo
         env:
           cache-name: cache-repo
@@ -151,7 +151,7 @@ jobs:
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.

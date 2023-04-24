@@ -14,7 +14,7 @@ const AccessDenied = () => {
 
   const { keycloakWrapper } = useContext(AuthStateContext);
 
-  if (!keycloakWrapper?.keycloak?.authenticated) {
+  if (!keycloakWrapper?.keycloak.authenticated) {
     // User is not logged in
     return <Redirect to={{ pathname: '/' }} />;
   }

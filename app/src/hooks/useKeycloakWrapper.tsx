@@ -47,10 +47,10 @@ export interface IKeycloakWrapper {
   /**
    * Original raw keycloak object.
    *
-   * @type {(Keycloak | undefined)}
+   * @type {(Keycloak)}
    * @memberof IKeycloakWrapper
    */
-  keycloak: Keycloak | undefined;
+  keycloak: Keycloak;
   /**
    * Returns `true` if the user's information has been loaded, false otherwise.
    *
@@ -130,7 +130,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     keycloakUserDataLoader.load();
   }
 
-  if (keycloak?.authenticated) {
+  if (keycloak.authenticated) {
     // keycloak user is authenticated, load system user info
     userDataLoader.load();
   }

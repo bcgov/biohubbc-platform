@@ -1,11 +1,39 @@
-import { SearchHit, SearchRequest } from '@elastic/elasticsearch/lib/api/types';
+import {
+  AggregationsAggregate,
+  QueryDslBoolQuery,
+  SearchHit,
+  SearchRequest,
+  SearchResponse
+} from '@elastic/elasticsearch/lib/api/types';
 import { getLogger } from '../utils/logger';
 import { ElasticSearchIndices, ESService } from './es-service';
 
 const defaultLog = getLogger('services/taxonomy-service');
 
+export interface ITaxonomySource {
+  unit_name1: string;
+  unit_name2: string;
+  unit_name3: string;
+  taxon_authority: string;
+  code: string;
+  tty_kingdom: string;
+  tty_name: string;
+  english_name: string;
+  note: string | null;
+  end_date: string | null;
+}
+
+/**
+ * Service for retrieving and processing taxonomic data from Elasticsearch.
+ *
+ * @export
+ * @class TaxonomyService
+ * @extends {ESService}
+ */
 export class TaxonomyService extends ESService {
-  private async elasticSearch(searchRequest: SearchRequest) {
+  async elasticSearch(
+    searchRequest: SearchRequest
+  ): Promise<SearchResponse<ITaxonomySource, Record<string, AggregationsAggregate>> | undefined> {
     try {
       const esClient = await this.getEsClient();
 
@@ -18,12 +46,16 @@ export class TaxonomyService extends ESService {
     }
   }
 
-  private sanitizeSpeciesData = (data: SearchHit<any>[]) => {
+  _sanitizeSpeciesData(data: SearchHit<any>[]) {
     return data.map((item) => {
+      const { _id: id, _source } = item;
+
       const label = [
+        _source?.code,
         [
-          [item._source.unit_name1, item._source.unit_name2, item._source.unit_name3].filter(Boolean).join(' '),
-          item._source.english_name
+          [_source?.tty_kingdom, _source?.tty_name].filter(Boolean).join(' '),
+          [_source?.unit_name1, _source?.unit_name2, _source?.unit_name3].filter(Boolean).join(' '),
+          _source?.english_name
         ]
           .filter(Boolean)
           .join(', ')
@@ -31,23 +63,18 @@ export class TaxonomyService extends ESService {
         .filter(Boolean)
         .join(': ');
 
-      return { id: item._id, code: item._source.code, label: label };
+      return { id, code: _source.code, label: label };
     });
-  };
-
-  async getTaxonomyFromIds(ids: number[]) {
-    const response = await this.elasticSearch({
-      query: {
-        terms: {
-          _id: ids
-        }
-      }
-    });
-
-    return (response && response.hits.hits.map((item) => item._source)) || [];
   }
 
-  async getSpeciesFromIds(ids: string[]) {
+  /**
+   * Searches the taxonomy Elasticsearch index by taxonomic code IDs
+   *
+   * @param {string[] | number[]} ids The array of taxonomic code IDs
+   * @return {Promise<SearchHit<ITaxonomySource>[]>} The response from Elasticsearch
+   * @memberof TaxonomyService
+   */
+  async getTaxonomyFromIds(ids: string[] | number[]): Promise<SearchHit<ITaxonomySource>[]> {
     const response = await this.elasticSearch({
       query: {
         terms: {
@@ -56,7 +83,30 @@ export class TaxonomyService extends ESService {
       }
     });
 
-    return response ? this.sanitizeSpeciesData(response.hits.hits) : [];
+    if (!response) {
+      return [];
+    }
+
+    return response.hits.hits;
+  }
+
+  /**
+   * Searches the taxonomy Elasticsearch index by taxonomic code IDs and santizes the response
+   *
+   * @param {string[] | number[]} ids The array of taxonomic code IDs
+   * @returns {Promise<{ id: string, label: string}[]>} Promise resolving an ID and label pair for each taxonomic code
+   * @memberof TaxonomyService
+   */
+  async getSpeciesFromIds(ids: string[] | number[]): Promise<{ id: string; label: string }[]> {
+    const response = await this.elasticSearch({
+      query: {
+        terms: {
+          _id: ids
+        }
+      }
+    });
+
+    return response ? this._sanitizeSpeciesData(response.hits.hits) : [];
   }
 
   async searchSpecies(term: string) {
@@ -88,11 +138,40 @@ export class TaxonomyService extends ESService {
     const response = await this.elasticSearch({
       query: {
         bool: {
-          should: searchConfig
-        }
+          must: [
+            {
+              bool: {
+                should: searchConfig
+              }
+            },
+            {
+              bool: {
+                minimum_should_match: 1,
+                should: [
+                  {
+                    bool: {
+                      must_not: {
+                        exists: {
+                          field: 'end_date'
+                        }
+                      }
+                    }
+                  },
+                  {
+                    range: {
+                      end_date: {
+                        gt: 'now'
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        } as QueryDslBoolQuery
       }
     });
 
-    return response ? this.sanitizeSpeciesData(response.hits.hits) : [];
+    return response ? this._sanitizeSpeciesData(response.hits.hits) : [];
   }
 }

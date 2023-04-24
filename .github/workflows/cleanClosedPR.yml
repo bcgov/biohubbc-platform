@@ -12,7 +12,7 @@ on:
 
 jobs:
   clean:
-    name: Clean Deployment Artifacts for API and App in Dev and Tools environment
+    name: Clean Deployment Artifacts for API, App, and DB in Dev and Tools environment
     runs-on: ubuntu-latest
     # Don't run if the PR was merged
     if: ${{ github.event.pull_request.merged != true }}

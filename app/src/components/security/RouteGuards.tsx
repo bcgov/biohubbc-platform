@@ -50,7 +50,7 @@ const CheckForAuthLoginParam: React.FC<React.PropsWithChildren> = ({ children })
 
   const location = useLocation();
 
-  if (!keycloakWrapper?.keycloak?.authenticated) {
+  if (!keycloakWrapper?.keycloak.authenticated) {
     const urlParams = qs.parse(location.search, { ignoreQueryPrefix: true });
     const authLoginUrlParam = urlParams.authLogin;
     // check for urlParam to force login
@@ -60,7 +60,7 @@ const CheckForAuthLoginParam: React.FC<React.PropsWithChildren> = ({ children })
       const redirectUri = `${window.location.origin}${location.pathname}?${redirectUrlParams}`;
 
       // trigger login
-      keycloakWrapper?.keycloak?.login({ redirectUri: redirectUri });
+      keycloakWrapper?.keycloak.login({ redirectUri: redirectUri });
     }
 
     return <Redirect to="/" />;

@@ -114,7 +114,7 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
     }
   };
 
-  if (!keycloakWrapper?.keycloak?.authenticated) {
+  if (!keycloakWrapper?.keycloak.authenticated) {
     // User is not logged in
     return <Redirect to={{ pathname: '/' }} />;
   }
@@ -132,7 +132,10 @@ export const AccessRequestPage: React.FC<React.PropsWithChildren> = () => {
   let initialValues: any;
   let validationSchema: any;
   let requestForm: any;
-  if (keycloakWrapper?.getIdentitySource() === SYSTEM_IDENTITY_SOURCE.BCEID_BASIC) {
+  if (
+    keycloakWrapper?.getIdentitySource() === SYSTEM_IDENTITY_SOURCE.BCEID_BASIC ||
+    keycloakWrapper?.getIdentitySource() === SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS
+  ) {
     initialValues = BCeIDRequestFormInitialValues;
     validationSchema = BCeIDRequestFormYupSchema;
     requestForm = <BCeIDRequestForm />;
