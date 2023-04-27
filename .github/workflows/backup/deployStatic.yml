@@ -15,8 +15,6 @@ jobs:
     name: Cycle SchemaSpy to refresh after database update in dev
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false && github.base_ref == 'dev' }}
-    env:
-      BUILD_ID: ${{ github.event.number }}
     needs:
       - checkEnv
       - deployDatabaseSetup
