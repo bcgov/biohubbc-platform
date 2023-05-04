@@ -46,7 +46,7 @@ describe('Header', () => {
 
     expect(getByTestId('menu_log_out')).toBeVisible();
 
-    expect(getByText('BCeID / testuser')).toBeVisible();
+    expect(getByText('BCeID / testusername')).toBeVisible();
   });
 
   describe('Log Out', () => {

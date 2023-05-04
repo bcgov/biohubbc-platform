@@ -50,11 +50,11 @@ export const SystemAdminAuthState: IAuthState = {
     hasLoadedAllUserInfo: true,
     systemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
     hasSystemRole: () => true,
-    getUserIdentifier: () => 'admin-username',
+    getUserIdentifier: () => 'testusername',
     getIdentitySource: () => 'idir',
-    username: 'admin-username',
-    displayName: 'admin-displayname',
-    email: 'admin@email.com',
+    username: 'testusername',
+    displayName: 'testdisplayname',
+    email: 'test@email.com',
     systemUserId: 1,
     refresh: () => {
       // do nothing

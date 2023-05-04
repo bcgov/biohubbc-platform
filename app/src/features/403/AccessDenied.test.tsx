@@ -5,8 +5,6 @@ import { getMockAuthState, SystemUserAuthState, UnauthenticatedUserAuthState } f
 import { render } from 'test-helpers/test-utils';
 import AccessDenied from './AccessDenied';
 
-const history = createMemoryHistory();
-
 describe('AccessDenied', () => {
   it('redirects to `/` when user is not authenticated', () => {
     const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
@@ -28,8 +26,8 @@ describe('AccessDenied', () => {
 
   it('renders a spinner when user is authenticated and `hasLoadedAllUserInfo` is false', () => {
     const authState = getMockAuthState({
-      base: UnauthenticatedUserAuthState,
-      overrides: { keycloakWrapper: { hasLoadedAllUserInfo: true } }
+      base: SystemUserAuthState,
+      overrides: { keycloakWrapper: { hasLoadedAllUserInfo: false } }
     });
 
     const history = createMemoryHistory();
@@ -52,6 +50,10 @@ describe('AccessDenied', () => {
   });
 
   it('renders correctly when the user is authenticated', () => {
+    const history = createMemoryHistory();
+
+    history.push('/forbidden');
+
     const authState = getMockAuthState({ base: SystemUserAuthState });
 
     const { getByText } = render(
@@ -61,6 +63,9 @@ describe('AccessDenied', () => {
         </Router>
       </AuthStateContext.Provider>
     );
+
+    // does not change location
+    expect(history.location.pathname).toEqual('/forbidden');
 
     expect(getByText('You do not have permission to access this page.')).toBeVisible();
   });
