@@ -95,8 +95,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: () => {
-        deActivateSystemUser(row);
+      onYes: async () => {
+        await deActivateSystemUser(row);
         dialogContext.setYesNoDialog({ open: false });
       }
     });
@@ -158,8 +158,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
         dialogContext.setYesNoDialog({ open: false });
       },
       open: true,
-      onYes: () => {
-        changeSystemUserRole(row, newRoleId, newRoleName);
+      onYes: async () => {
+        await changeSystemUserRole(row, newRoleId, newRoleName);
         dialogContext.setYesNoDialog({ open: false });
       }
     });
@@ -375,8 +375,8 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
           validationSchema: AddSystemUsersFormYupSchema
         }}
         onCancel={() => setOpenAddUserDialog(false)}
-        onSave={(values) => {
-          handleAddSystemUsersSave(values);
+        onSave={async (values) => {
+          await handleAddSystemUsersSave(values);
           setOpenAddUserDialog(false);
         }}
       />

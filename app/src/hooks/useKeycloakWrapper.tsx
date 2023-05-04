@@ -195,7 +195,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
-    if (!validSystemRoles || !validSystemRoles.length) {
+    if (!validSystemRoles?.length) {
       return true;
     }
 
