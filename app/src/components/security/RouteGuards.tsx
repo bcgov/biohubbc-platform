@@ -89,7 +89,7 @@ const WaitForKeycloakToLoadUserInfo: React.FC<React.PropsWithChildren> = ({ chil
 };
 
 /**
- * Checks if the user is a registered user or has a pending access request.
+ * Checks if the user is a registered user.
  *
  * Redirects the user as appropriate, or renders the `children`.
  *
@@ -103,21 +103,9 @@ const CheckIfAuthenticatedUser: React.FC<React.PropsWithChildren> = ({ children 
 
   if (!keycloakWrapper?.systemUserId) {
     // User is not a registered system user
-    if (keycloakWrapper?.hasAccessRequest) {
-      // The user has a pending access request, restrict them to the request-submitted or logout pages
-      if (location.pathname !== '/request-submitted' && location.pathname !== '/logout') {
-        return <Redirect to="/request-submitted" />;
-      }
-    } else {
-      // The user does not have a pending access request, restrict them to the access-request, request-submitted or logout pages
-      if (
-        location.pathname !== '/access-request' &&
-        location.pathname !== '/request-submitted' &&
-        location.pathname !== '/logout'
-      ) {
-        // User attempted to go to restricted page
-        return <Redirect to="/forbidden" />;
-      }
+    if (location.pathname !== '/logout') {
+      // User attempted to go to restricted page
+      return <Redirect to="/forbidden" />;
     }
   }
 

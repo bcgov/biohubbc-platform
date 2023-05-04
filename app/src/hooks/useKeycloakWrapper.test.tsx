@@ -21,6 +21,7 @@ const getMockTestWrapper = (userInfo?: any) => {
 
   const keycloak: Keycloak = {
     authenticated: true,
+    token: 'a token',
     init: () => Promise.resolve(true) as KeycloakPromise<any, any>,
     createLoginUrl: () => 'string',
     createLogoutUrl: () => 'string',

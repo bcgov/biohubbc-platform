@@ -72,13 +72,6 @@ export interface IKeycloakWrapper {
    */
   hasSystemRole: (validSystemRoles?: string[]) => boolean;
   /**
-   * True if the user has at least 1 pending access request.
-   *
-   * @type {boolean}
-   * @memberof IKeycloakWrapper
-   */
-  hasAccessRequest: boolean;
-  /**
    * Get out the username portion of the preferred_username from the token.
    *
    * @memberof IKeycloakWrapper
@@ -96,8 +89,6 @@ export interface IKeycloakWrapper {
   systemUserId: number;
   /**
    * Force this keycloak wrapper to refresh its data.
-   *
-   * Note: currently this only refreshes the `hasAccessRequest` property.
    *
    * @memberof IKeycloakWrapper
    */
@@ -117,7 +108,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const keycloakUserDataLoader = useDataLoader(async () => {
     return (
-      (keycloak &&
+      (keycloak.token &&
         (keycloak.loadUserInfo() as unknown as IIDIRUserInfo | IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)) ||
       undefined
     );
@@ -241,7 +232,6 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     hasLoadedAllUserInfo: !!userDataLoader.data,
     systemRoles: getSystemRoles(),
     hasSystemRole,
-    hasAccessRequest: false,
     getUserIdentifier,
     getIdentitySource,
     username: username(),

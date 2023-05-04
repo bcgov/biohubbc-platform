@@ -19,9 +19,6 @@ jest.mock('../../../hooks/useApi');
 const mockBiohubApi = useApi as jest.Mock;
 
 const mockUseApi = {
-  admin: {
-    getAccessRequests: jest.fn()
-  },
   user: {
     getUsersList: jest.fn()
   }
@@ -37,7 +34,6 @@ describe('ManageUsersPage', () => {
   });
 
   it('renders the main page content correctly', async () => {
-    mockUseApi.admin.getAccessRequests.mockReturnValue([]);
     mockUseApi.user.getUsersList.mockReturnValue([]);
 
     const { getByText } = renderContainer();
@@ -48,7 +44,6 @@ describe('ManageUsersPage', () => {
   });
 
   it('renders the access requests and active users component', async () => {
-    mockUseApi.admin.getAccessRequests.mockReturnValue([]);
     mockUseApi.user.getUsersList.mockReturnValue([]);
 
     const { getByText } = renderContainer();

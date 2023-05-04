@@ -327,16 +327,6 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                             buttonTitle="Actions"
                             buttonIcon={<Icon path={mdiDotsVertical} size={1} />}
                             menuItems={[
-                              //TODO: disabled view details button, page and router does not exist
-                              // {
-                              //   menuIcon: <Icon path={mdiInformationOutline} size={0.875} />,
-                              //   menuLabel: 'View Users Details',
-                              //   menuOnClick: () =>
-                              //     history.push({
-                              //       pathname: `/admin/users/${row.id}`,
-                              //       state: row
-                              //     })
-                              // },
                               {
                                 menuIcon: <Icon path={mdiTrashCanOutline} size={0.875} />,
                                 menuLabel: 'Remove user',
