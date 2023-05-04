@@ -187,11 +187,11 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   }, [keycloakUserDataLoader.data, userDataLoader.data]);
 
   const systemUserId = (): number => {
-    return userDataLoader.data?.id || 0;
+    return userDataLoader.data?.id ?? 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return userDataLoader.data?.role_names || [];
+    return userDataLoader.data?.role_names ?? [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
