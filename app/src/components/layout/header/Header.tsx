@@ -135,6 +135,11 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   <Link to="/" id="menu_home">
                     Home
                   </Link>
+                  <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                    <Link to="/admin/dashboard" id="menu_admin_dashboard">
+                      Dashboard
+                    </Link>
+                  </SystemRoleGuard>
                   <Link to="/search" id="menu_search">
                     Find Datasets
                   </Link>

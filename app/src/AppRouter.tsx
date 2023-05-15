@@ -6,6 +6,7 @@ import NotFoundPage from 'features/404/NotFoundPage';
 import AccessRequestPage from 'features/access/AccessRequestPage';
 import RequestSubmitted from 'features/access/RequestSubmitted';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
+import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import LogOutPage from 'features/logout/LogOutPage';
@@ -63,7 +64,11 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
         </AuthenticatedRouteGuard>
       </AppRoute>
 
-      <Redirect exact from="/admin" to="/admin/users" />
+      <Redirect exact from="/admin" to="/admin/dashboard" />
+
+      <AppRoute exact path="/admin/dashboard" title={getTitle('Dashboard')} layout={BaseLayout}>
+        <AdminDashboardRouter />
+      </AppRoute>
 
       <AppRoute path="/admin/users" title={getTitle('Users')} layout={BaseLayout}>
         <AuthenticatedRouteGuard>
