@@ -30,3 +30,10 @@ export interface IRelatedDataset {
 export interface IListRelatedDatasetsResponse {
   datasets: IRelatedDataset[];
 }
+
+export interface IDatasetForReview {
+  id: string; // UUID
+  count: number;
+  name: string;
+  last_updated: string;
+}
