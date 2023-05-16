@@ -28,12 +28,12 @@ const useDatasetApi = (axios: AxiosInstance) => {
   /**
    * Fetch all unsecure datasets for review.
    *
-   * @returns {*} {Promize<any[]>}
+   * @returns {*} {Promise<IDatasetForReview[]>}
    */
   const listAllDatasetsForReview = async (): Promise<IDatasetForReview[]> => {
-    await axios.get(`api/administrative/review/list`);
+    const { data } = await axios.get(`api/administrative/review/list`);
 
-    return [];
+    return data;
   };
 
   /**
