@@ -16,14 +16,14 @@ const DashboardPage = () => {
   const datasetList = unsecuredDatasetDataLoader.data || [];
   const columns: GridColDef<IDatasetForReview>[] = [
     {
-      field: 'count',
+      field: 'artifacts_to_review',
       headerName: 'FILES TO REVIEW',
       flex: 1,
       disableColumnMenu: true
     },
     {
-      field: 'name',
-      headerName: 'PROJECT',
+      field: 'dataset_name',
+      headerName: 'DATASET',
       flex: 2,
       disableColumnMenu: true
     },
@@ -84,7 +84,7 @@ const DashboardPage = () => {
           )}
           {datasetList.length > 0 && (
             <DataGrid
-              getRowId={(row) => row.id}
+              getRowId={(row) => row.dataset_id}
               autoHeight
               rows={datasetList}
               columns={columns}

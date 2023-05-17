@@ -32,8 +32,8 @@ export interface IListRelatedDatasetsResponse {
 }
 
 export interface IDatasetForReview {
-  id: string; // UUID
-  count: number;
-  name: string;
+  dataset_id: string; // UUID
+  artifacts_to_review: number;
+  dataset_name: string;
   last_updated: string;
 }

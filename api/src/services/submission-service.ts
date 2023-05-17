@@ -13,7 +13,8 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SUBMISSION_STATUS_TYPE,
+  DatasetsToReview
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -423,5 +424,13 @@ export class SubmissionService extends DBService {
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });
+  }
+
+  /**
+   * 
+   * @returns 
+   */
+  async getDatasetsForReview(): Promise<DatasetsToReview[]> {
+    return this.submissionRepository.getDatasetsForReview()
   }
 }

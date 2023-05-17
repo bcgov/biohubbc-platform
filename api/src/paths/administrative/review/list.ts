@@ -5,6 +5,7 @@ import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { getLogger } from '../../../utils/logger';
+import { SubmissionService } from '../../../services/submission-service';
 
 const defaultLog = getLogger('paths/administrative/review/list');
 
@@ -41,15 +42,15 @@ GET.apiDoc = {
             items: {
               type: 'object',
               properties: {
-                id: {
+                dataset_id: {
                   type: 'string',
                   description: 'UUID for a specific dataset'
                 },
-                count: {
-                  type: 'number',
+                artifacts_to_review: {
+                  type: 'integer',
                   description: 'A count of the total files to review'
                 },
-                name: {
+                dataset_name: {
                   type: 'string',
                   description: 'Name of the project to review'
                 },
@@ -79,30 +80,12 @@ export function getDatasetsForReview(): RequestHandler {
     try {
       await connection.open();
 
-      // const service = new SpatialService(connection);
-
       await connection.commit();
+      
+      const service = new SubmissionService(connection);
+      const response = await service.getDatasetsForReview()
 
-      return res.status(200).json([
-        {
-          id: 'UUID-1',
-          count: 2,
-          name: 'A cool project',
-          last_updated: '2023-05-15'
-        },
-        {
-          id: 'UUID-2',
-          count: 25,
-          name: 'Counting Moose',
-          last_updated: '2023-05-15'
-        },
-        {
-          id: 'UUID-3',
-          count: 10,
-          name: 'Counting more moose',
-          last_updated: '2023-05-15'
-        }
-      ]);
+      return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'getDatasetsForReview', message: 'error', error });
       throw error;

@@ -1,9 +1,19 @@
 import { QueryResult } from 'pg';
+import { z } from 'zod';
 import SQL from 'sql-template-strings';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+
+export const DatasetsToReview = z.object({
+  artifacts_to_review: z.number(),
+  dataset_id: z.string(),
+  dataset_name: z.string(),
+  last_updated: z.string()
+});
+
+export type DatasetsToReview = z.infer<typeof DatasetsToReview>;
 
 export interface ISpatialComponentCount {
   spatial_type: string;
@@ -856,5 +866,36 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     return response.rowCount;
+  }
+
+  /**
+   * 
+   */
+  async getDatasetsForReview(): Promise<DatasetsToReview[]> {
+    // sub query to avoid having eml_json_source in the group by
+    const sql = SQL`
+    SELECT 
+      sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name,
+      fc.artifacts_to_review, 
+      fc.dataset_id,
+      fc.last_updated
+    FROM submission_metadata sm, (
+      SELECT 
+        s.uuid as dataset_id,
+        COUNT(a.artifact_id)::int as artifacts_to_review, 
+        a.submission_id,
+        MAX(a.create_date)::date as last_updated
+      FROM artifact a, submission s 
+      WHERE a.submission_id = s.submission_id    
+      AND security_review_timestamp is null
+      GROUP BY a.submission_id , s.submission_id, s.uuid
+    ) as fc
+    WHERE sm.submission_id = fc.submission_id
+    AND sm.record_end_timestamp is null;
+    `;
+
+    const response = await this.connection.sql<DatasetsToReview>(sql, DatasetsToReview);
+
+    return response.rows;
   }
 }
