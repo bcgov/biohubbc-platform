@@ -869,7 +869,10 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Fetches a count of artifacts that require security review for each dataset
    * 
+   * @returns {*} {Promise<DatasetsToReview[]>}
+   * @memberof SubmissionRepository
    */
   async getDatasetsForReview(): Promise<DatasetsToReview[]> {
     // sub query to avoid having eml_json_source in the group by

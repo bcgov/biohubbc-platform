@@ -67,7 +67,11 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
       <Redirect exact from="/admin" to="/admin/dashboard" />
 
       <AppRoute exact path="/admin/dashboard" title={getTitle('Dashboard')} layout={BaseLayout}>
-        <AdminDashboardRouter />
+        <AuthenticatedRouteGuard>
+          <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+            <AdminDashboardRouter />
+          </SystemRoleGuard>
+        </AuthenticatedRouteGuard>
       </AppRoute>
 
       <AppRoute path="/admin/users" title={getTitle('Users')} layout={BaseLayout}>

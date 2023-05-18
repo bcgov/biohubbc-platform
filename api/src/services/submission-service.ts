@@ -427,8 +427,10 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Fetches a count of artifacts that require security review for each dataset
    * 
-   * @returns 
+   * @returns {*} {Promise<DatasetsToReview[]>}
+   * @memberof SubmissionService
    */
   async getDatasetsForReview(): Promise<DatasetsToReview[]> {
     return this.submissionRepository.getDatasetsForReview()
