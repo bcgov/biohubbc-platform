@@ -1,12 +1,13 @@
+import { Link, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams, GridTreeNodeWithRender } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { IDatasetForReview } from 'interfaces/useDatasetApi.interface';
+import { ensureProtocol } from 'utils/Utils';
 
 const DashboardPage = () => {
   const biohubApi = useApi();
@@ -25,7 +26,14 @@ const DashboardPage = () => {
       field: 'dataset_name',
       headerName: 'DATASET',
       flex: 2,
-      disableColumnMenu: true
+      disableColumnMenu: true,
+      renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
+        return (
+          <Link href={`${ensureProtocol(window.location.host)}/datasets/${params.row.dataset_id}/details`}>
+            {params.row.dataset_name}
+          </Link>
+        );
+      }
     },
     {
       field: 'last_updated',
