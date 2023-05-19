@@ -195,19 +195,16 @@ export async function up(knex: Knex): Promise<void> {
         related_project_objects
     ),
     project_type AS (
-      select * from (
-        select s.uuid, sm.submission_id, data_array -> 'metadata' -> 'types' ->> 'type' as dataset_type
-        from
-          submission s, 
-          submission_metadata sm,
-          json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as data_array
-        where s.submission_id = sm.submission_id 
-        and sm.record_end_timestamp is null
-        and uuid(data_array ->> 'describes') = s.uuid
-        order by s.uuid
-      ) as submission_type
-      where submission_type.dataset_type is not null
-      and submission_type.uuid = d.dataset ->> '@_id';
+      SELECT 
+        data_array -> 'metadata' -> 'types' ->> 'type' as project_type
+      FROM
+        submission s,
+        submission_metadata sm,
+        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as data_array
+      WHERE s.submission_id = sm.submission_id 
+      AND sm.record_end_timestamp is null
+      AND (data_array ->> 'describes') = aps.project -> '@_id'
+      AND s.uuid = aps.project -> '@_id'
     )
     SELECT
       jsonb_strip_nulls(
@@ -226,8 +223,8 @@ export async function up(knex: Knex): Promise<void> {
           rpoa.project_objects_arr,
           'submitterSystem',
           'sims',
-          'primaryKeywords',
-          '',
+          'primary_keywords',
+          jsonb_agg(pt.project_type),
           'additionalMetadata',
           jsonb_build_object(
             'projectIUCNConservationActions',
@@ -262,14 +259,15 @@ export async function up(knex: Knex): Promise<void> {
       eml e,
       datasets d,
       project_objects_arr poa,
-      related_project_objects_arr rpoa;
+      related_project_objects_arr rpoa
+      project_type pt;
   `;
   await knex.raw(`
     SET SCHEMA '${DB_SCHEMA}';
     SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
 
     update source_transform
-    set version='1.1', metadata_transform=$transform$${transformSQL}$transform$
+    set metadata_transform=$transform$${transformSQL}$transform$
     where system_user_id = (select system_user_id from system_user where user_identifier = 'service-account-SIMS-SVC-4464');
   `);
 }

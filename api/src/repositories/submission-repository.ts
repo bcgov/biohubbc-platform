@@ -464,16 +464,16 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
-    const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
-        'SubmissionRepository->getSubmissionMetadataJson',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
-
-    return response.rows[0].result_data;
+      const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
+      
+      if (!response.rowCount) {
+        throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
+          'SubmissionRepository->getSubmissionMetadataJson',
+          'rowCount was null or undefined, expected rowCount != 0'
+        ]);
+      }
+  
+      return response.rows[0].result_data;
   }
 
   /**
@@ -900,5 +900,29 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<DatasetsToReview>(sql, DatasetsToReview);
 
     return response.rows;
+  }
+
+  /**
+   * 
+   * @param submissionId 
+   * @param submitterSystem 
+   * @param datasetSearch  
+   * @returns {*} {Promise<DatasetsToReview[]>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, submitterSystem: string, datasetSearch: any): Promise<number> {
+    const sql = SQL`
+    UPDATE 
+      submission_metadata 
+    SET 
+      dataset_search_criteria=${datasetSearch}, 
+      submitter_system= ${submitterSystem} 
+    WHERE submission_id = ${submissionId}
+    AND record_end_timestamp IS NOT NULL;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    return response.rowCount;
   }
 }

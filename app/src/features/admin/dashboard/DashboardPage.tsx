@@ -24,7 +24,7 @@ const DashboardPage = () => {
     },
     {
       field: 'dataset_name',
-      headerName: 'DATASET',
+      headerName: 'TITLE',
       flex: 2,
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
