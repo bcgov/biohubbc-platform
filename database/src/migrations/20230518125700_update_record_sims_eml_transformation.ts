@@ -259,7 +259,7 @@ export async function up(knex: Knex): Promise<void> {
       eml e,
       datasets d,
       project_objects_arr poa,
-      related_project_objects_arr rpoa
+      related_project_objects_arr rpoa,
       project_type pt;
   `;
   await knex.raw(`
