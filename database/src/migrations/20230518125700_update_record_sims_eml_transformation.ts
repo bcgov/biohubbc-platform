@@ -195,16 +195,17 @@ export async function up(knex: Knex): Promise<void> {
         related_project_objects
     ),
     project_type AS (
-      SELECT 
-        data_array -> 'metadata' -> 'types' ->> 'type' as project_type
+      SELECT
+        jsonb_path_query_array(jsonb_agg(data_array -> 'metadata' -> 'types' ->> 'type'), '$[*] \\? (@ != null)') as project_types
       FROM
         submission s,
         submission_metadata sm,
-        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as data_array
-      WHERE s.submission_id = sm.submission_id 
-      AND sm.record_end_timestamp is null
-      AND (data_array ->> 'describes') = aps.project -> '@_id'
-      AND s.uuid = aps.project -> '@_id'
+        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as data_array,
+        submissionmetadata smd
+      WHERE smd.submission_id = s.submission_id 
+        AND s.submission_id = sm.submission_id 
+        AND sm.record_end_timestamp is null
+        AND (data_array ->> 'describes') = s.uuid::text
     )
     SELECT
       jsonb_strip_nulls(
@@ -223,8 +224,8 @@ export async function up(knex: Knex): Promise<void> {
           rpoa.project_objects_arr,
           'submitterSystem',
           'sims',
-          'primary_keywords',
-          jsonb_agg(pt.project_type),
+          'primaryKeywords',
+          pt.project_types,
           'additionalMetadata',
           jsonb_build_object(
             'projectIUCNConservationActions',
