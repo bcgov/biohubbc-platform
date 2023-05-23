@@ -47,25 +47,29 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+    console.log(`___INTAKE JOB___`)
+    console.log(`___INTAKE JOB___`)
+    console.log(`___INTAKE JOB___`)
+    console.log(`___INTAKE JOB___`)
     // Step 1: Insert submission metadata record
     const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
-
+    console.log(1)
     // Step 2: Set submission metadata eml source column
     const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
-
+    console.log(2)
     // Step 2: Convert EML to JSON and set submission metadata eml json source column
     await this.intakeJob_step3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
-
+    console.log(3)
     // Step 4: Update submission metadata record end and effective dates
     await this.intakeJob_step4(jobQueueRecord.submission_id);
-
+    console.log(4)
     // Step 5: transform EML JSON and upload to Elastic Search
     await this.intakeJob_step5(jobQueueRecord.submission_id);
-
+    console.log(5)
     // Step 6: Update existing submission observation end and effective dates, insert new submission observation record,
     // run spatial + security transforms
     await this.intakeJob_step6(jobQueueRecord, dwcaFile);
-
+    console.log(6)
     await this.intakeJob_finishIntake(jobQueueRecord);
   }
 
@@ -598,6 +602,7 @@ export class DarwinCoreService extends DBService {
 
     // call to the ElasticSearch API to create a record with our transformed EML
     await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
+    await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, 'sims', jsonMetadata)
   }
 
   /**

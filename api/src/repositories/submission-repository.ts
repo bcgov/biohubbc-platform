@@ -472,7 +472,7 @@ export class SubmissionRepository extends BaseRepository {
           'rowCount was null or undefined, expected rowCount != 0'
         ]);
       }
-  
+
       return response.rows[0].result_data;
   }
 
@@ -904,10 +904,10 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * 
-   * @param submissionId 
-   * @param submitterSystem 
-   * @param datasetSearch  
-   * @returns {*} {Promise<DatasetsToReview[]>}
+   * @param submissionId the submission to update
+   * @param submitterSystem The name of the system that is submitted data e.g. 'sims'
+   * @param datasetSearch 
+   * @returns {*} {Promise<number>} the number of rows updated
    * @memberof SubmissionRepository
    */
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, submitterSystem: string, datasetSearch: any): Promise<number> {
@@ -918,7 +918,7 @@ export class SubmissionRepository extends BaseRepository {
       dataset_search_criteria=${datasetSearch}, 
       submitter_system= ${submitterSystem} 
     WHERE submission_id = ${submissionId}
-    AND record_end_timestamp IS NOT NULL;
+    AND record_end_timestamp IS NULL;
     `;
 
     const response = await this.connection.sql(sql);
