@@ -56,7 +56,11 @@ GET.apiDoc = {
                 },
                 last_updated: {
                   type: 'string',
-                  description: 'Last date a file was updated '
+                  description: 'Last date a file was updated'
+                },
+                dataset_type: {
+                  type: 'string',
+                  description: 'Describes the type of dataset'
                 }
               }
             }
@@ -83,7 +87,7 @@ export function getDatasetsForReview(): RequestHandler {
       await connection.commit();
       
       const service = new SubmissionService(connection);
-      const response = await service.getDatasetsForReview()
+      const response = await service.getDatasetsForReview(['PROJECT'])
 
       return res.status(200).json(response);
     } catch (error) {

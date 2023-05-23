@@ -10,7 +10,9 @@ export const DatasetsToReview = z.object({
   artifacts_to_review: z.number(),
   dataset_id: z.string(),
   dataset_name: z.string(),
-  last_updated: z.string()
+  last_updated: z.string(),
+  related_projects: z.string({}).array().transform(value => value ?? []),
+  dataset_type: z.string()
 });
 
 export type DatasetsToReview = z.infer<typeof DatasetsToReview>;
@@ -877,24 +879,43 @@ export class SubmissionRepository extends BaseRepository {
   async getDatasetsForReview(): Promise<DatasetsToReview[]> {
     // sub query to avoid having eml_json_source in the group by
     const sql = SQL`
-    SELECT 
+    SELECT
       sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name,
-      fc.artifacts_to_review, 
+      fc.artifacts_to_review,
       fc.dataset_id,
-      fc.last_updated
+      fc.last_updated,
+      project_metadata.*
     FROM submission_metadata sm, (
-      SELECT 
+      SELECT
         s.uuid as dataset_id,
-        COUNT(a.artifact_id)::int as artifacts_to_review, 
+        COUNT(a.artifact_id)::int as artifacts_to_review,
         a.submission_id,
         MAX(a.create_date)::date as last_updated
-      FROM artifact a, submission s 
-      WHERE a.submission_id = s.submission_id    
+      FROM artifact a, submission s
+      WHERE a.submission_id = s.submission_id
       AND security_review_timestamp is null
       GROUP BY a.submission_id , s.submission_id, s.uuid
-    ) as fc
+    ) as fc,
+    (
+      SELECT 
+        s.uuid, 
+        sm.submission_id , 
+        json_extract_path_text(additional_metadata, 'metadata', 'types', 'type') as dataset_type ,
+        json_agg(json_extract_path_text(related_projects, '@_id')) as related_projects
+      FROM 
+        submission s, 
+        submission_metadata sm, 
+        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as additional_metadata,
+        json_array_elements(sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject') as related_projects
+      WHERE s.submission_id = sm.submission_id 
+      AND sm.record_end_timestamp IS NULL
+      AND additional_metadata->>'describes' = s.uuid::text
+      AND json_extract_path_text(additional_metadata, 'metadata', 'types', 'type') IS NOT NULL
+      GROUP BY s.uuid, sm.submission_id, dataset_type
+    ) as project_metadata
     WHERE sm.submission_id = fc.submission_id
-    AND sm.record_end_timestamp is null;
+    AND sm.record_end_timestamp IS NULL
+    AND project_metadata.uuid = fc.dataset_id;
     `;
 
     const response = await this.connection.sql<DatasetsToReview>(sql, DatasetsToReview);

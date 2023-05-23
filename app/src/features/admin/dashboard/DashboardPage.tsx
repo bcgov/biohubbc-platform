@@ -1,5 +1,6 @@
 import { Link, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
@@ -33,6 +34,18 @@ const DashboardPage = () => {
             {params.row.dataset_name}
           </Link>
         );
+      }
+    },
+    {
+      field: 'dataset_type',
+      headerName: 'TYPE',
+      flex: 1,
+      disableColumnMenu: true,
+      renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
+        if (params.row.dataset_type.toUpperCase() === 'PROJECT') {
+          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="INVENTORY PROJECT" />;
+        }
+        return <></>;
       }
     },
     {

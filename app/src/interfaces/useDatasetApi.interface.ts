@@ -36,4 +36,5 @@ export interface IDatasetForReview {
   artifacts_to_review: number;
   dataset_name: string;
   last_updated: string;
+  dataset_type: string;
 }
