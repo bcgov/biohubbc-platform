@@ -4,8 +4,8 @@ import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { getLogger } from '../../../utils/logger';
 import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/review/list');
 
@@ -85,9 +85,9 @@ export function getDatasetsForReview(): RequestHandler {
       await connection.open();
 
       await connection.commit();
-      
+
       const service = new SubmissionService(connection);
-      const response = await service.getDatasetsForReview(['PROJECT'])
+      const response = await service.getDatasetsForReview(['PROJECT']);
 
       return res.status(200).json(response);
     } catch (error) {

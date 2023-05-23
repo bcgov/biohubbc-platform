@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
+  DatasetsToReview,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -13,8 +14,7 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE,
-  DatasetsToReview
+  SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -428,8 +428,8 @@ export class SubmissionService extends DBService {
 
   /**
    * Fetches a count of artifacts that require security review for 'PROJECT' datasets
-   * This function will 'roll' all artifact counts for a single parent project. 
-   * 
+   * This function will 'roll' all artifact counts for a single parent project.
+   *
    * @param {string} keys An array of tags to refine the dataset
    * @returns {*} {Promise<DatasetsToReview[]>}
    * @memberof SubmissionService
@@ -439,30 +439,38 @@ export class SubmissionService extends DBService {
 
     // collect file counts into dictionary
     const file_count = {};
-    data.forEach(item => file_count[item.dataset_id] = item.artifacts_to_review);
+    data.forEach((item) => (file_count[item.dataset_id] = item.artifacts_to_review));
 
     // combine artifact counts for all related projects
-    data.map(item => {
-      item.related_projects.forEach(id => {
-        item.artifacts_to_review += file_count[id]
-      })
+    data.map((item) => {
+      item.related_projects.forEach((id) => {
+        item.artifacts_to_review += file_count[id];
+      });
 
       return item;
     });
-    
+
     // only return '' to the front end to so it appears that all artifacts are 'rolled' into single parent project
     // this filter should eventually but it was difficult to 'roll' these counts up under a parent dataset
-    return data.filter(item => keys.includes(item.dataset_type.toUpperCase()));
+    return data.filter((item) => keys.includes(item.dataset_type.toUpperCase()));
   }
   /**
-   * 
-   * @param submissionId 
-   * @param submitterSystem 
-   * @param datasetSearch 
-   * @returns 
+   *
+   * @param submissionId
+   * @param submitterSystem
+   * @param datasetSearch
+   * @returns
    * @memberof SubmissionService
    */
-  async updateSubmissionMetadataWithSearchKeys(submissionId: number, submitterSystem: string, datasetSearch: any): Promise<number> {
-    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, submitterSystem, datasetSearch);
+  async updateSubmissionMetadataWithSearchKeys(
+    submissionId: number,
+    submitterSystem: string,
+    datasetSearch: any
+  ): Promise<number> {
+    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(
+      submissionId,
+      submitterSystem,
+      datasetSearch
+    );
   }
 }

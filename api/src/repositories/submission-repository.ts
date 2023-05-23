@@ -1,6 +1,6 @@
 import { QueryResult } from 'pg';
-import { z } from 'zod';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
@@ -11,7 +11,12 @@ export const DatasetsToReview = z.object({
   dataset_id: z.string(),
   dataset_name: z.string(),
   last_updated: z.string(),
-  related_projects: z.string({}).array().transform(value => value ?? []),
+  related_projects: z
+    .array(z.string())
+    .nullable()
+    .optional()
+    .transform((item) => item || [])
+    .default([]),
   dataset_type: z.string()
 });
 
@@ -466,16 +471,16 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
-      const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
-      
-      if (!response.rowCount) {
-        throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
-          'SubmissionRepository->getSubmissionMetadataJson',
-          'rowCount was null or undefined, expected rowCount != 0'
-        ]);
-      }
+    const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
 
-      return response.rows[0].result_data;
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
+        'SubmissionRepository->getSubmissionMetadataJson',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows[0].result_data;
   }
 
   /**
@@ -872,7 +877,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Fetches a count of artifacts that require security review for each dataset
-   * 
+   *
    * @returns {*} {Promise<DatasetsToReview[]>}
    * @memberof SubmissionRepository
    */
@@ -901,15 +906,15 @@ export class SubmissionRepository extends BaseRepository {
     ) as fc,
     (
       SELECT 
-        s.uuid, 
-        sm.submission_id , 
-        json_extract_path_text(additional_metadata, 'metadata', 'types', 'type') as dataset_type ,
-        json_agg(json_extract_path_text(related_projects, '@_id')) as related_projects
-      FROM 
+        s.uuid,
+        sm.submission_id, 
+        json_extract_path_text(additional_metadata, 'metadata', 'types', 'type') as dataset_type,
+  		  COALESCE(json_agg(json_extract_path_text(related_projects, '@_id')) filter (where json_extract_path_text(related_projects, '@_id') IS NOT NULL), null) as related_projects
+    FROM 
         submission s, 
         submission_metadata sm, 
-        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as additional_metadata,
-        json_array_elements(sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject') as related_projects
+        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as additional_metadata
+        LEFT JOIN LATERAL json_array_elements(sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject') as related_projects ON true
       WHERE s.submission_id = sm.submission_id 
       AND sm.record_end_timestamp IS NULL
       AND additional_metadata->>'describes' = s.uuid::text
@@ -921,20 +926,24 @@ export class SubmissionRepository extends BaseRepository {
     AND project_metadata.uuid = fc.dataset_id;
     `;
 
-    const response = await this.connection.sql<DatasetsToReview>(sql, DatasetsToReview);
+    const response = await this.connection.sql(sql, DatasetsToReview);
 
     return response.rows;
   }
 
   /**
-   * 
+   *
    * @param submissionId the submission to update
    * @param submitterSystem The name of the system that is submitted data e.g. 'sims'
-   * @param datasetSearch 
+   * @param datasetSearch
    * @returns {*} {Promise<number>} the number of rows updated
    * @memberof SubmissionRepository
    */
-  async updateSubmissionMetadataWithSearchKeys(submissionId: number, submitterSystem: string, datasetSearch: any): Promise<number> {
+  async updateSubmissionMetadataWithSearchKeys(
+    submissionId: number,
+    submitterSystem: string,
+    datasetSearch: any
+  ): Promise<number> {
     const sql = SQL`
     UPDATE 
       submission_metadata 
