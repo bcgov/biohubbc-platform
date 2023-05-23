@@ -877,7 +877,10 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getDatasetsForReview(): Promise<DatasetsToReview[]> {
-    // sub query to avoid having eml_json_source in the group by
+    // 3 queries to collect the datasets for the admin dashboard
+    // The first sub-query is getting a count of un reviewed (`security_review_timestamp is null`) artifacts for all datasets
+    // the second sub-query is parsing the eml json object for dataset type and related projects for all active projects (record_end_timestamp IS NULL)
+    // The top level SELECT is combining the data collected in the sub-queries to create an list that will feed the admin dashboard
     const sql = SQL`
     SELECT
       sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name,
