@@ -1,4 +1,4 @@
-import { Link, Typography } from '@mui/material';
+import { CircularProgress, Link, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Container from '@mui/material/Container';
@@ -15,7 +15,7 @@ const DashboardPage = () => {
   const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.listAllDatasetsForReview());
   unsecuredDatasetDataLoader.load();
 
-  const datasetList = unsecuredDatasetDataLoader.data || [];
+  const datasetList: IDatasetForReview[] = unsecuredDatasetDataLoader.data || [];
   const columns: GridColDef<IDatasetForReview>[] = [
     {
       field: 'artifacts_to_review',
@@ -86,7 +86,8 @@ const DashboardPage = () => {
       </Paper>
       <Container maxWidth="xl">
         <Box>
-          {datasetList.length == 0 && (
+          {unsecuredDatasetDataLoader.isLoading && <CircularProgress className="pageProgress" size={40} />}
+          {datasetList.length == 0 && !unsecuredDatasetDataLoader.isLoading && (
             <Box
               sx={{
                 p: 2,
@@ -103,7 +104,7 @@ const DashboardPage = () => {
               </Typography>
             </Box>
           )}
-          {datasetList.length > 0 && (
+          {datasetList.length > 0 && !unsecuredDatasetDataLoader.isLoading && (
             <DataGrid
               getRowId={(row) => row.dataset_id}
               autoHeight
