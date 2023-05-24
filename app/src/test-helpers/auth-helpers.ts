@@ -18,7 +18,8 @@ const SystemUserAuthState: IAuthState = {
     systemUserId: 1,
     refresh: () => {
       // do nothing
-    }
+    },
+    getLoginUrl: () => 'test/login'
   }
 };
 
