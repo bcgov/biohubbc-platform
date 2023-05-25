@@ -952,7 +952,7 @@ export class SubmissionRepository extends BaseRepository {
 
   /**
    * Gets a count of all artifacts for a given submission UUID.
-   * 
+   *
    * @param uuid UUID of the submission to look for
    * @returns {*} Promise<DatasetArtifactCount | undefined>
    */

@@ -822,10 +822,10 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.updateSubmissionMetadataWithSearchKeys(1, "", {});
+      const response = await submissionRepository.updateSubmissionMetadataWithSearchKeys(1, '', {});
 
       expect(response).to.eql(1);
-    })
+    });
   });
 
   describe('getArtifactForReviewCountForSubmissionUUID', () => {
@@ -835,10 +835,10 @@ describe('SubmissionRepository', () => {
 
     it('should succeed with valid data', async () => {
       const mockResponse = {
-        dataset_id: "UUID",
+        dataset_id: 'UUID',
         submission_id: 1,
         artifacts_to_review: 1,
-        last_updated: "2023-05-25",
+        last_updated: '2023-05-25'
       };
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
@@ -847,10 +847,10 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getArtifactForReviewCountForSubmissionUUID("");
+      const response = await submissionRepository.getArtifactForReviewCountForSubmissionUUID('');
 
       expect(response).to.eql(mockResponse);
-    })
+    });
   });
 
   describe('getDatasetsForReview', () => {
@@ -859,14 +859,16 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse = [{
-        dataset_id: "UUID",
-        submission_id: 1,
-        submitter_system: "sims",
-        dataset_name: "Project Name",
-        keywords: [],
-        related_projects: [],
-      }];
+      const mockResponse = [
+        {
+          dataset_id: 'UUID',
+          submission_id: 1,
+          submitter_system: 'sims',
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: []
+        }
+      ];
 
       const mockQueryResponse = { rowCount: 1, rows: mockResponse } as any as Promise<QueryResult<any>>;
 
@@ -874,9 +876,9 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getDatasetsForReview([""]);
+      const response = await submissionRepository.getDatasetsForReview(['']);
 
       expect(response).to.eql(mockResponse);
-    })
+    });
   });
 });
