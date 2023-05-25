@@ -67,7 +67,6 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
     return prep;
   };
 
-  console.log(`Dataset list: ${datasetList.length} Is Loading: ${!unsecuredDatasetDataLoader.isLoading}`);
   return (
     <>
       {unsecuredDatasetDataLoader.isLoading && <CircularProgress className="pageProgress" size={40} />}
