@@ -21,6 +21,7 @@ import SecurityReasonSelector, {
   SecurityReasonsYupSchema
 } from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
+
 export interface IApplySecurityDialog {
   selectedArtifacts: IArtifact[];
   open: boolean;

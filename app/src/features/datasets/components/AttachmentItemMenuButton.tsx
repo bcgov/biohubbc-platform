@@ -1,4 +1,4 @@
-import { mdiDotsVertical, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiDotsVertical, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -57,6 +57,19 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             MenuListProps={{
               'aria-labelledby': 'basic-button'
             }}>
+            {props.hasAdministrativePermissions && (
+              <MenuItem
+                onClick={() => {
+                  console.log('Apply security not implemented yet.');
+                  setAnchorEl(null);
+                }}
+                data-testid="attachment-action-menu-apply-security">
+                <ListItemIcon>
+                  <Icon path={mdiLockPlus} size={0.8} />
+                </ListItemIcon>
+                Apply Security
+              </MenuItem>
+            )}
             <MenuItem
               disabled={checkPermissions()}
               onClick={() => {
