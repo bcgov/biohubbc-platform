@@ -41,7 +41,12 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
         return params.row.keywords.map((item) => (
-          <Chip color="info" sx={{ textTransform: 'uppercase' }} label={prepKeyword(item)} />
+          <Chip
+            color="primary"
+            style={{ backgroundColor: '#d9eaf7', color: 'black', fontSize: '10px' }}
+            sx={{ textTransform: 'uppercase' }}
+            label={prepKeyword(item)}
+          />
         ));
       }
     },

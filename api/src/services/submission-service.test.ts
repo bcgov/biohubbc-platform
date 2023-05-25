@@ -583,7 +583,7 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe.only('getDatasetsForReview', () => {
+  describe('getDatasetsForReview', () => {
     it('should return a rolled up dataset for review', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
@@ -624,7 +624,6 @@ describe('SubmissionService', () => {
         });
 
       const response = await submissionService.getDatasetsForReview(['']);
-      console.log(response);
 
       expect(stubDataset).to.be.calledOnce;
       expect(stubArtifactCount).to.be.calledWith('RP_UUID_1');
