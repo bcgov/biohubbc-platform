@@ -58,7 +58,7 @@ export const parseSpatialDataByType = (
         if (visible) {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
-            key: feature.id || feature.properties.id,
+            key: feature.id,
             popup: <FeaturePopup submissionSpatialComponentIds={ids} />
           });
         }
@@ -75,7 +75,7 @@ export const parseSpatialDataByType = (
         if (visible) {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
-            key: feature.id || feature.properties.id,
+            key: feature.id || feature.properties.datasetID,
             popup: <DatasetPopup submissionSpatialComponentIds={ids} />
           });
         }
