@@ -950,26 +950,12 @@ export class SubmissionRepository extends BaseRepository {
     return response.rows;
   }
 
-  async getArtifactsForReviewCountForSubmissionUUID(uuids: string[]): Promise<DatasetArtifactCount[]> {
-    const knex = getKnex();
-    const queryBuilder = knex
-      .queryBuilder()
-      .select(
-        's.uuid as dataset_id',
-        's.submission_id',
-        knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
-        knex.raw(`MAX(a.create_date)::date as last_updated`)
-      )
-      .from('submission as s')
-      .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
-      .whereNull('a.security_review_timestamp')
-      .whereIn('s.uuid', uuids)
-      .groupBy(['s.submission_id', 's.uuid']);
-    const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
-
-    return response.rows;
-  }
-
+  /**
+   * Gets a count of all artifacts for a given submission UUID.
+   * 
+   * @param uuid UUID of the submission to look for
+   * @returns {*} Promise<DatasetArtifactCount | undefined>
+   */
   async getArtifactForReviewCountForSubmissionUUID(uuid: string): Promise<DatasetArtifactCount | undefined> {
     const knex = getKnex();
     const queryBuilder = knex
