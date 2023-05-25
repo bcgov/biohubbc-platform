@@ -96,6 +96,7 @@ const appTheme = createTheme({
         root: {
           color: '#1A5A96',
           textDecoration: 'none',
+          cursor: 'pointer',
           textDecorationColor: '#1A5A96',
           ':hover': {
             textDecoration: 'underline'
