@@ -958,4 +958,45 @@ export class SubmissionRepository extends BaseRepository {
 
     return response.rowCount;
   }
+
+  async getDatasetsForReview_new(keywordFilter: string[]): Promise<any[]> {
+    const sql = SQL`
+      SELECT 
+        s.uuid as dataset_id, 
+        sm.submission_id, 
+        sm.dataset_search_criteria::json->>'primaryKeywords' as keywords, 
+        sm.submitter_system,
+        sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects
+      FROM 
+        submission s, 
+        submission_metadata sm
+      WHERE s.submission_id = sm.submission_id
+      AND sm.record_end_timestamp IS NULL
+      AND (sm.dataset_search_criteria->'primaryKeywords')::jsonb \?| array[${keywordFilter.join(",")}];
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    return response.rows;
+  }
+
+  async getArtifactsForReviewForSubmissionUUID(uuids: string[]): Promise<any[]> {
+    const sql = SQL`
+      SELECT
+        s.uuid as dataset_id,
+        COUNT(a.artifact_id)::int as artifacts_to_review,
+        s.submission_id ,
+        MAX(a.create_date)::date as last_updated
+      FROM artifact a, submission s
+      WHERE s.submission_id = a.submission_id
+      AND a.security_review_timestamp is null
+      AND s.uuid::text in (${uuids.join(",")})
+      GROUP BY s.submission_id, dataset_id;
+    `;
+
+    console.log(sql)
+    const response = await this.connection.sql(sql);
+
+    return response.rows;
+  }
 }
