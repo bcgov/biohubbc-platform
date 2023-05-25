@@ -42,6 +42,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
         return params.row.keywords.map((item) => (
           <Chip
+            key={params.row.dataset_id}
             color="primary"
             style={{ backgroundColor: '#d9eaf7', color: 'black', fontSize: '10px' }}
             sx={{ textTransform: 'uppercase' }}
@@ -66,6 +67,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
     return prep;
   };
 
+  console.log(`Dataset list: ${datasetList.length} Is Loading: ${!unsecuredDatasetDataLoader.isLoading}`);
   return (
     <>
       {unsecuredDatasetDataLoader.isLoading && <CircularProgress className="pageProgress" size={40} />}
@@ -81,13 +83,19 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
             border: '1pt solid #dadada',
             borderRadius: '4px'
           }}>
-          <Typography component="strong" color="textSecondary" variant="body1" fontWeight={'bold'}>
+          <Typography
+            data-testid="no-security-reviews"
+            component="strong"
+            color="textSecondary"
+            variant="body1"
+            fontWeight={'bold'}>
             No Pending Security Reviews
           </Typography>
         </Box>
       )}
       {datasetList.length > 0 && !unsecuredDatasetDataLoader.isLoading && (
         <DataGrid
+          data-testid="security-reviews-data-grid"
           getRowId={(row) => row.dataset_id}
           autoHeight
           rows={datasetList}
