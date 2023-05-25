@@ -39,7 +39,7 @@ const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (pro
 
   const layerControls: ReactElement[] = [];
 
-  props.layers.forEach((layer, index) => {
+  props.layers.forEach((layer) => {
     if (!layer.features?.length) {
       return;
     }
