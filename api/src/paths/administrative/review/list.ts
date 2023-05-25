@@ -62,7 +62,7 @@ GET.apiDoc = {
                   type: 'array',
                   items: {
                     type: 'string',
-                    description: "Keyword used for filtering datasets"
+                    description: 'Keyword used for filtering datasets'
                   }
                 }
               }

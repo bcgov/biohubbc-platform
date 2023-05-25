@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
+  IDatasetsForReview,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -13,8 +14,7 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE,
-  IDatasetsForReview
+  SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -426,34 +426,38 @@ export class SubmissionService extends DBService {
     });
   }
 
-
   /**
-   * 
-   * @param keys 
-   * @returns 
+   * Gets datasets that have artifacts that require a security review.
+   * This will roll up any related projects to provide a "total" count of artifacts to review
+   *
+   * @param keys A list of keys to filter the data based on search criteria defined by the transform process
+   * @returns {*}  {Promise<IDatasetsForReview[]>}
+   * @memberof SubmissionService
    */
   async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
     const data = await this.submissionRepository.getDatasetsForReview(keys);
-    const datasetsForReview: IDatasetsForReview[] = []
+    const datasetsForReview: IDatasetsForReview[] = [];
 
     for await (const item of data) {
       let rollUpCount = 0;
       if (item.related_projects) {
         for await (const rp of item.related_projects) {
-          const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id'])
-          rollUpCount += (rpCount?.artifacts_to_review ?? 0)
+          const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
+          rollUpCount += rpCount?.artifacts_to_review ?? 0;
         }
       }
-      
-      const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(item.dataset_id);
+
+      const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(
+        item.dataset_id
+      );
       if (parentArtifactCount) {
         datasetsForReview.push({
           dataset_id: parentArtifactCount.dataset_id,
           artifacts_to_review: rollUpCount + parentArtifactCount.artifacts_to_review,
           dataset_name: item.dataset_name,
           last_updated: parentArtifactCount.last_updated,
-          keywords: item.keywords,
-        })
+          keywords: item.keywords
+        });
       }
     }
     return datasetsForReview;

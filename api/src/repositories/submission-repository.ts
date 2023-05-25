@@ -919,22 +919,32 @@ export class SubmissionRepository extends BaseRepository {
     return response.rowCount;
   }
 
+  /**
+   * Gets datasets that have artifacts that require a security review.
+   *
+   * @param keywordFilter A list of keys to filter the data based on search criteria defined by the transform process
+   * @returns {*}  {Promise<IDatasetsForReview[]>}
+   */
   async getDatasetsForReview(keywordFilter: string[]): Promise<DatasetMetadata[]> {
     const knex = getKnex();
-    const queryBuilder = knex.queryBuilder()
-    .select(
-      's.uuid as dataset_id',
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        's.uuid as dataset_id',
         'sm.submission_id',
         'sm.submitter_system',
         knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name`),
         knex.raw(`sm.dataset_search_criteria::json->'primaryKeywords' as keywords`),
         knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects`)
-    )
-    .from('submission as s')
-    .leftJoin('submission_metadata as sm', 'sm.submission_id', 's.submission_id')
-    .whereNull('sm.record_end_timestamp')
-    .whereRaw(`(sm.dataset_search_criteria->'primaryKeywords')::jsonb \\?| array[${"'" + keywordFilter.join("','") + "'"}]`)
-    
+      )
+      .from('submission as s')
+      .leftJoin('submission_metadata as sm', 'sm.submission_id', 's.submission_id')
+      .whereNull('sm.record_end_timestamp')
+      // the ?| operator does a containment check meaning it will check if any elements in the left side array exist in the right side array
+      .whereRaw(
+        `(sm.dataset_search_criteria->'primaryKeywords')::jsonb \\?| array[${"'" + keywordFilter.join("','") + "'"}]`
+      );
+
     const response = await this.connection.knex(queryBuilder, DatasetMetadata);
 
     return response.rows;
@@ -942,18 +952,19 @@ export class SubmissionRepository extends BaseRepository {
 
   async getArtifactsForReviewCountForSubmissionUUID(uuids: string[]): Promise<DatasetArtifactCount[]> {
     const knex = getKnex();
-    const queryBuilder = knex.queryBuilder()
-    .select(
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
         's.uuid as dataset_id',
         's.submission_id',
         knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
         knex.raw(`MAX(a.create_date)::date as last_updated`)
-    )
-    .from('submission as s')
-    .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
-    .whereNull('a.security_review_timestamp')
-    .whereIn('s.uuid', uuids)
-    .groupBy(['s.submission_id', 's.uuid']);
+      )
+      .from('submission as s')
+      .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
+      .whereNull('a.security_review_timestamp')
+      .whereIn('s.uuid', uuids)
+      .groupBy(['s.submission_id', 's.uuid']);
     const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows;
@@ -961,18 +972,19 @@ export class SubmissionRepository extends BaseRepository {
 
   async getArtifactForReviewCountForSubmissionUUID(uuid: string): Promise<DatasetArtifactCount | undefined> {
     const knex = getKnex();
-    const queryBuilder = knex.queryBuilder()
-    .select(
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
         's.uuid as dataset_id',
         's.submission_id',
         knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
         knex.raw(`MAX(a.create_date)::date as last_updated`)
-    )
-    .from('submission as s')
-    .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
-    .whereNull('a.security_review_timestamp')
-    .where('s.uuid', uuid)
-    .groupBy(['s.submission_id', 's.uuid']);
+      )
+      .from('submission as s')
+      .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
+      .whereNull('a.security_review_timestamp')
+      .where('s.uuid', uuid)
+      .groupBy(['s.submission_id', 's.uuid']);
     const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows[0];
