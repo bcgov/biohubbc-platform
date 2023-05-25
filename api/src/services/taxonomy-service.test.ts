@@ -159,7 +159,7 @@ describe('TaxonomyService', () => {
 
       expect(elasticSearchStub).to.be.calledOnce;
       expect(sanitizeSpeciesDataStub).to.be.calledOnce;
-      expect(response).to.eql([{ id: '1', code: 'D', label: 'D: kingdom name, A B C, animal' }]);
+      expect(response).to.eql([{ id: '1', code: 'D', label: 'animal, A B C' }]);
     });
   });
 
