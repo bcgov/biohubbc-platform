@@ -1,26 +1,42 @@
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
-import { getKnexQueryBuilder } from '../database/db';
+import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
 
-export const DatasetsToReview = z.object({
-  artifacts_to_review: z.number(),
+export interface IDatasetsForReview {
+  dataset_id: string; // UUID
+  artifacts_to_review: number;
+  dataset_name: string;
+  last_updated: string;
+  keywords: string[];
+}
+
+export const DatasetMetadata = z.object({
   dataset_id: z.string(),
+  submission_id: z.number(),
+  submitter_system: z.string(),
   dataset_name: z.string(),
-  last_updated: z.string(),
+  keywords: z.array(z.string()),
   related_projects: z
-    .array(z.string())
+    .array(z.any())
     .nullable()
     .optional()
     .transform((item) => item || [])
-    .default([]),
-  dataset_type: z.string()
 });
 
-export type DatasetsToReview = z.infer<typeof DatasetsToReview>;
+export type DatasetMetadata = z.infer<typeof DatasetMetadata>;
+
+export const DatasetArtifactCount = z.object({
+  dataset_id: z.string(),
+  submission_id: z.number(),
+  artifacts_to_review: z.number(),
+  last_updated: z.string()
+});
+
+export type DatasetArtifactCount = z.infer<typeof DatasetArtifactCount>;
 
 export interface ISpatialComponentCount {
   spatial_type: string;
@@ -876,62 +892,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Fetches a count of artifacts that require security review for each dataset
-   *
-   * @returns {*} {Promise<DatasetsToReview[]>}
-   * @memberof SubmissionRepository
-   */
-  async getDatasetsForReview(): Promise<DatasetsToReview[]> {
-    // 3 queries to collect the datasets for the admin dashboard
-    // The first sub-query is getting a count of un reviewed (`security_review_timestamp is null`) artifacts for all datasets
-    // the second sub-query is parsing the eml json object for dataset type and related projects for all active projects (record_end_timestamp IS NULL)
-    // The top level SELECT is combining the data collected in the sub-queries to create an list that will feed the admin dashboard
-    const sql = SQL`
-    SELECT
-      sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name,
-      fc.artifacts_to_review,
-      fc.dataset_id,
-      fc.last_updated,
-      project_metadata.*
-    FROM submission_metadata sm, (
-      SELECT
-        s.uuid as dataset_id,
-        COUNT(a.artifact_id)::int as artifacts_to_review,
-        a.submission_id,
-        MAX(a.create_date)::date as last_updated
-      FROM artifact a, submission s
-      WHERE a.submission_id = s.submission_id
-      AND security_review_timestamp is null
-      GROUP BY a.submission_id , s.submission_id, s.uuid
-    ) as fc,
-    (
-      SELECT 
-        s.uuid,
-        sm.submission_id, 
-        json_extract_path_text(additional_metadata, 'metadata', 'types', 'type') as dataset_type,
-  		  COALESCE(json_agg(json_extract_path_text(related_projects, '@_id')) filter (where json_extract_path_text(related_projects, '@_id') IS NOT NULL), null) as related_projects
-    FROM 
-        submission s, 
-        submission_metadata sm, 
-        json_array_elements(sm.eml_json_source::json->'eml:eml'->'additionalMetadata') as additional_metadata
-        LEFT JOIN LATERAL json_array_elements(sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject') as related_projects ON true
-      WHERE s.submission_id = sm.submission_id 
-      AND sm.record_end_timestamp IS NULL
-      AND additional_metadata->>'describes' = s.uuid::text
-      AND json_extract_path_text(additional_metadata, 'metadata', 'types', 'type') IS NOT NULL
-      GROUP BY s.uuid, sm.submission_id, dataset_type
-    ) as project_metadata
-    WHERE sm.submission_id = fc.submission_id
-    AND sm.record_end_timestamp IS NULL
-    AND project_metadata.uuid = fc.dataset_id;
-    `;
-
-    const response = await this.connection.sql(sql, DatasetsToReview);
-
-    return response.rows;
-  }
-
-  /**
    *
    * @param submissionId the submission to update
    * @param submitterSystem The name of the system that is submitted data e.g. 'sims'
@@ -959,44 +919,62 @@ export class SubmissionRepository extends BaseRepository {
     return response.rowCount;
   }
 
-  async getDatasetsForReview_new(keywordFilter: string[]): Promise<any[]> {
-    const sql = SQL`
-      SELECT 
-        s.uuid as dataset_id, 
-        sm.submission_id, 
-        sm.dataset_search_criteria::json->>'primaryKeywords' as keywords, 
-        sm.submitter_system,
-        sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects
-      FROM 
-        submission s, 
-        submission_metadata sm
-      WHERE s.submission_id = sm.submission_id
-      AND sm.record_end_timestamp IS NULL
-      AND (sm.dataset_search_criteria->'primaryKeywords')::jsonb \?| array[${keywordFilter.join(",")}];
-    `;
-
-    const response = await this.connection.sql(sql);
+  async getDatasetsForReview(keywordFilter: string[]): Promise<DatasetMetadata[]> {
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder()
+    .select(
+      's.uuid as dataset_id',
+        'sm.submission_id',
+        'sm.submitter_system',
+        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name`),
+        knex.raw(`sm.dataset_search_criteria::json->'primaryKeywords' as keywords`),
+        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects`)
+    )
+    .from('submission as s')
+    .leftJoin('submission_metadata as sm', 'sm.submission_id', 's.submission_id')
+    .whereNull('sm.record_end_timestamp')
+    .whereRaw(`(sm.dataset_search_criteria->'primaryKeywords')::jsonb \\?| array[${"'" + keywordFilter.join("','") + "'"}]`)
+    
+    const response = await this.connection.knex(queryBuilder, DatasetMetadata);
 
     return response.rows;
   }
 
-  async getArtifactsForReviewForSubmissionUUID(uuids: string[]): Promise<any[]> {
-    const sql = SQL`
-      SELECT
-        s.uuid as dataset_id,
-        COUNT(a.artifact_id)::int as artifacts_to_review,
-        s.submission_id ,
-        MAX(a.create_date)::date as last_updated
-      FROM artifact a, submission s
-      WHERE s.submission_id = a.submission_id
-      AND a.security_review_timestamp is null
-      AND s.uuid::text in (${uuids.join(",")})
-      GROUP BY s.submission_id, dataset_id;
-    `;
-
-    console.log(sql)
-    const response = await this.connection.sql(sql);
+  async getArtifactsForReviewCountForSubmissionUUID(uuids: string[]): Promise<DatasetArtifactCount[]> {
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder()
+    .select(
+        's.uuid as dataset_id',
+        's.submission_id',
+        knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
+        knex.raw(`MAX(a.create_date)::date as last_updated`)
+    )
+    .from('submission as s')
+    .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
+    .whereNull('a.security_review_timestamp')
+    .whereIn('s.uuid', uuids)
+    .groupBy(['s.submission_id', 's.uuid']);
+    const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows;
+  }
+
+  async getArtifactForReviewCountForSubmissionUUID(uuid: string): Promise<DatasetArtifactCount | undefined> {
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder()
+    .select(
+        's.uuid as dataset_id',
+        's.submission_id',
+        knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
+        knex.raw(`MAX(a.create_date)::date as last_updated`)
+    )
+    .from('submission as s')
+    .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
+    .whereNull('a.security_review_timestamp')
+    .where('s.uuid', uuid)
+    .groupBy(['s.submission_id', 's.uuid']);
+    const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
+
+    return response.rows[0];
   }
 }

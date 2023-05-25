@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
-  DatasetsToReview,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -14,7 +13,8 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SUBMISSION_STATUS_TYPE,
+  IDatasetsForReview
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -426,33 +426,37 @@ export class SubmissionService extends DBService {
     });
   }
 
+
   /**
-   * Fetches a count of artifacts that require security review for 'PROJECT' datasets
-   * This function will 'roll' all artifact counts for a single parent project.
-   *
-   * @param {string} keys An array of tags to refine the dataset
-   * @returns {*} {Promise<DatasetsToReview[]>}
-   * @memberof SubmissionService
+   * 
+   * @param keys 
+   * @returns 
    */
-  async getDatasetsForReview(keys: string[]): Promise<DatasetsToReview[]> {
-    const data = await this.submissionRepository.getDatasetsForReview();
+  async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
+    const data = await this.submissionRepository.getDatasetsForReview(keys);
+    const datasetsForReview: IDatasetsForReview[] = []
 
-    // collect file counts into dictionary
-    const file_count = {};
-    data.forEach((item) => (file_count[item.dataset_id] = item.artifacts_to_review));
-
-    // combine artifact counts for all related projects
-    data.map((item) => {
-      item.related_projects.forEach((id) => {
-        item.artifacts_to_review += file_count[id];
-      });
-
-      return item;
-    });
-
-    // only return '' to the front end to so it appears that all artifacts are 'rolled' into single parent project
-    // this filter should eventually but it was difficult to 'roll' these counts up under a parent dataset
-    return data.filter((item) => keys.includes(item.dataset_type.toUpperCase()));
+    for await (const item of data) {
+      let rollUpCount = 0;
+      if (item.related_projects) {
+        for await (const rp of item.related_projects) {
+          const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id'])
+          rollUpCount += (rpCount?.artifacts_to_review ?? 0)
+        }
+      }
+      
+      const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(item.dataset_id);
+      if (parentArtifactCount) {
+        datasetsForReview.push({
+          dataset_id: parentArtifactCount.dataset_id,
+          artifacts_to_review: rollUpCount + parentArtifactCount.artifacts_to_review,
+          dataset_name: item.dataset_name,
+          last_updated: parentArtifactCount.last_updated,
+          keywords: item.keywords,
+        })
+      }
+    }
+    return datasetsForReview;
   }
   /**
    *

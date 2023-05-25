@@ -40,10 +40,9 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       flex: 1,
       disableColumnMenu: true,
       renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
-        if (params.row.dataset_type.toUpperCase() === 'PROJECT') {
-          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="INVENTORY PROJECT" />;
-        }
-        return <></>;
+        return params.row.keywords.map((item) => (
+          <Chip color="info" sx={{ textTransform: 'uppercase' }} label={prepKeyword(item)} />
+        ));
       }
     },
     {
@@ -53,6 +52,14 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       disableColumnMenu: true
     }
   ];
+
+  const prepKeyword = (keyword: string): string => {
+    let prep = keyword.toUpperCase();
+    if (prep === 'PROJECT') {
+      prep = 'INVENTORY PROJECT';
+    }
+    return prep;
+  };
 
   return (
     <>

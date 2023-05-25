@@ -58,9 +58,12 @@ GET.apiDoc = {
                   type: 'string',
                   description: 'Last date a file was updated'
                 },
-                dataset_type: {
-                  type: 'string',
-                  description: 'Describes the type of dataset'
+                keywords: {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    description: "Keyword used for filtering datasets"
+                  }
                 }
               }
             }
