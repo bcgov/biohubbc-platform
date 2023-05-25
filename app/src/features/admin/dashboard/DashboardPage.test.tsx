@@ -70,7 +70,7 @@ describe('DashboardPage', () => {
 
     await waitFor(
       async () => {
-        expect(await findByText('INVENTORY PROJECT')).toBeInTheDocument;
+        expect(await findByText('INVENTORY PROJECT')).toBeInTheDocument();
       },
       { container }
     );

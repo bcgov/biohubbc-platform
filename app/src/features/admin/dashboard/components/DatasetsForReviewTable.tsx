@@ -71,7 +71,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
   return (
     <>
       {unsecuredDatasetDataLoader.isLoading && <CircularProgress className="pageProgress" size={40} />}
-      {datasetList.length == 0 && !unsecuredDatasetDataLoader.isLoading && (
+      {datasetList.length === 0 && !unsecuredDatasetDataLoader.isLoading && (
         <Box
           sx={{
             p: 2,

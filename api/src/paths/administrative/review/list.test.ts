@@ -3,9 +3,9 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
+import { SubmissionService } from '../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as list from './list';
-import { SubmissionService } from '../../../services/submission-service';
 
 chai.use(sinonChai);
 
@@ -25,11 +25,9 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const mock = sinon
-      .stub(SubmissionService.prototype, 'getDatasetsForReview')
-      .resolves();
+    const mock = sinon.stub(SubmissionService.prototype, 'getDatasetsForReview').resolves();
 
-    const requestHandler = list.getDatasetsForReview()
+    const requestHandler = list.getDatasetsForReview();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
