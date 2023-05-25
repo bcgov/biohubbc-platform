@@ -13,7 +13,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
   const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.listAllDatasetsForReview());
   unsecuredDatasetDataLoader.load();
 
-  const datasetList: IDatasetForReview[] = unsecuredDatasetDataLoader.data || [];
+  const datasetList: IDatasetForReview[] = unsecuredDatasetDataLoader.data ?? [];
   const columns: GridColDef<IDatasetForReview>[] = [
     {
       field: 'artifacts_to_review',

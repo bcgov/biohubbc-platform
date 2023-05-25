@@ -352,7 +352,7 @@ export class SubmissionService extends DBService {
     return {
       id: datasetId,
       source: submissionEMLJSON,
-      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
+      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count ?? 0
     };
   }
 

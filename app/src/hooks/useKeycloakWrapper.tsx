@@ -204,11 +204,11 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   }, [keycloakUserDataLoader.data, userDataLoader.data]);
 
   const systemUserId = (): number => {
-    return userDataLoader.data?.id || 0;
+    return userDataLoader.data?.id ?? 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return userDataLoader.data?.role_names || [];
+    return userDataLoader.data?.role_names ?? [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
@@ -245,7 +245,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   const getLoginUrl = (redirectUri = '/admin/dashboard'): string => {
-    return keycloak?.createLoginUrl({ redirectUri: buildUrl(window.location.origin, redirectUri) }) || '/login';
+    return keycloak?.createLoginUrl({ redirectUri: buildUrl(window.location.origin, redirectUri) }) ?? '/login';
   };
 
   return {

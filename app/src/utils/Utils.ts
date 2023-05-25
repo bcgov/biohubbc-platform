@@ -48,7 +48,7 @@ export const getFormattedDateRangeString = (
 ): string => {
   const startDateFormatted = getFormattedDate(dateFormat, startDate);
 
-  const endDateFormatted = getFormattedDate(dateFormat, endDate || '');
+  const endDateFormatted = getFormattedDate(dateFormat, endDate ?? '');
 
   if (!startDateFormatted || (endDate && !endDateFormatted)) {
     return '';
