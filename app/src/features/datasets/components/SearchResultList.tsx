@@ -42,11 +42,11 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
   }, [searchResults, datasetVisibility]);
 
   const toggleVisibility = (key: string) => {
-    const udpated = datasetVisibility;
+    const updated = datasetVisibility;
     const value = datasetVisibility[key];
-    udpated[key] = !udpated[key];
+    updated[key] = !updated[key];
     setDatasetVisibility({ ...datasetVisibility, [key]: !value });
-    props.onToggleDataVisibility(udpated);
+    props.onToggleDataVisibility(updated);
   };
 
   return (

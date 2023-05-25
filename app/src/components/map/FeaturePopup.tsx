@@ -35,6 +35,8 @@ export type BoundaryCentroidFeature = Feature & { properties: BoundaryCentroidFe
 
 export type BoundaryCentroidFeatureProperties = {
   type: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID;
+  datasetID: string;
+  datasetTitle: string;
 };
 
 export enum COMMON_METADATA_PROPERTIES {
@@ -216,7 +218,10 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
               size="small"
               variant="text"
               startIcon={<Icon path={mdiChevronLeft} size={1} />}
-              onClick={() => handlePrev()}
+              onClick={(event) => {
+                event.stopPropagation();
+                handlePrev();
+              }}
               sx={{
                 fontWeight: 700,
                 color: 'text.secondary',
@@ -230,7 +235,10 @@ const FeaturePopup: React.FC<React.PropsWithChildren<{ submissionSpatialComponen
               size="small"
               variant="text"
               endIcon={<Icon path={mdiChevronRight} size={1} />}
-              onClick={() => handleNext()}
+              onClick={(event) => {
+                event.stopPropagation();
+                handleNext();
+              }}
               sx={{
                 fontWeight: 700,
                 color: 'text.secondary',
