@@ -34,7 +34,7 @@ const SelectedDocumentsDataset: React.FC<IRelatedDatasetsProps> = (props) => {
 
   return (
     <>
-      <Paper elevation={2}>
+      <Paper elevation={3}>
         <ActionToolbar label={`Selected Documents (${selectedArtifacts.length})`} labelProps={{ variant: 'h4' }} />
         <Divider></Divider>
         <Box px={2}>

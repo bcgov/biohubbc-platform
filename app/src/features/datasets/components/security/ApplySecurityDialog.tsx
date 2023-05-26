@@ -37,7 +37,15 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
         maxWidth="xl"
         open={open}
         aria-labelledby="component-dialog-title"
-        aria-describedby="component-dialog-description">
+        aria-describedby="component-dialog-description"
+        sx={{
+          '& .MuiDialog-container': {
+            '& .MuiPaper-root': {
+              width: '100%',
+              maxWidth: '1500px' // Set your width here
+            }
+          }
+        }}>
         <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
