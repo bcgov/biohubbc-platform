@@ -21,7 +21,7 @@ export const Artifact = ArtifactMetadata.extend({
   submission_id: z.number(),
   uuid: z.string().uuid(),
   key: z.string(),
-  foi_reason_description: z.string().nullable().optional(),
+  foi_reason: z.boolean().optional(),
   security_review_timestamp: z.date().nullable().optional(),
   create_date: z.date().optional()
 });

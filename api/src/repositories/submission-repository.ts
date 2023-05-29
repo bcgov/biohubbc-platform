@@ -144,7 +144,7 @@ export interface ISubmissionObservationRecord {
   darwin_core_source: any;
   submission_security_request?: string | null;
   security_review_timestamp?: string | null;
-  foi_reason_description?: string | null;
+  foi_reason?: boolean;
   record_effective_timestamp?: string | null;
   record_end_timestamp?: string | null;
   create_date?: string;
@@ -744,13 +744,13 @@ export class SubmissionRepository extends BaseRepository {
         submission_id,
         darwin_core_source,
         submission_security_request,
-        foi_reason_description,
+        foi_reason,
         record_effective_timestamp
       ) VALUES (
         ${submissonObservation.submission_id},
         ${submissonObservation.darwin_core_source},
         ${submissonObservation.submission_security_request},
-        ${submissonObservation.foi_reason_description},
+        ${submissonObservation.foi_reason},
         now()
       )
       RETURNING

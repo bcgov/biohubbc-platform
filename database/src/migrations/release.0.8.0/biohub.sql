@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Monday, February 06, 2023 16:30:23
+-- Date Created : Friday, May 26, 2023 15:30:47
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -11,22 +11,25 @@
 --
 
 CREATE TABLE artifact(
-    artifact_id                  integer           NOT NULL,
-    submission_id                integer           NOT NULL,
-    uuid                         uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    file_name                    varchar(300)      NOT NULL,
-    file_type                    varchar(300)      NOT NULL,
-    title                        varchar(300),
-    description                  varchar(3000),
-    file_size                    integer,
-    key                          varchar(1000),
-    security_review_timestamp    timestamptz(6),
-    foi_reason_description       varchar(3000),
-    create_date                  timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                  integer           NOT NULL,
-    update_date                  timestamptz(6),
-    update_user                  integer,
-    revision_count               integer           DEFAULT 0 NOT NULL,
+    artifact_id                    integer           NOT NULL,
+    submission_id                  integer           NOT NULL,
+    uuid                           uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    file_name                      varchar(300)      NOT NULL,
+    file_type                      varchar(300)      NOT NULL,
+    title                          varchar(300),
+    description                    varchar(3000),
+    file_size                      integer,
+    key                            varchar(1000),
+    security_review_timestamp      timestamptz(6),
+    foi_reason                     boolean,
+    security_reason_name           varchar(300),
+    security_reason_description    varchar(3000),
+    security_reason_end_date       timestamptz(6),
+    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                    integer           NOT NULL,
+    update_date                    timestamptz(6),
+    update_user                    integer,
+    revision_count                 integer           DEFAULT 0 NOT NULL,
     CONSTRAINT artifact_pk PRIMARY KEY (artifact_id)
 )
 ;
@@ -53,7 +56,13 @@ COMMENT ON COLUMN artifact.key IS 'The identifying key to the file in the storag
 ;
 COMMENT ON COLUMN artifact.security_review_timestamp IS 'The timestamp that the security review of the submission artifact was completed.'
 ;
-COMMENT ON COLUMN artifact.foi_reason_description IS 'The description of the Freedom of Information reason for securing of the artifact.'
+COMMENT ON COLUMN artifact.foi_reason IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.'
+;
+COMMENT ON COLUMN artifact.security_reason_name IS 'The name of the custom security reason.'
+;
+COMMENT ON COLUMN artifact.security_reason_description IS 'A reason description that is secures this data and is specific to this artifact or dataset.'
+;
+COMMENT ON COLUMN artifact.security_reason_end_date IS 'Custom security reason end date.'
 ;
 COMMENT ON COLUMN artifact.create_date IS 'The datetime the record was created.'
 ;
@@ -75,10 +84,10 @@ COMMENT ON TABLE artifact IS 'A listing of historical data submission artifacts.
 
 CREATE TABLE artifact_government_interest(
     artifact_government_interest_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    artifact_id                        integer           NOT NULL,
     wldtaxonomic_units_id              integer           NOT NULL,
     data_type                          varchar(300),
     description                        varchar(3000),
-    artifact_id                        integer           NOT NULL,
     create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                        integer           NOT NULL,
     update_date                        timestamptz(6),
@@ -92,13 +101,13 @@ CREATE TABLE artifact_government_interest(
 
 COMMENT ON COLUMN artifact_government_interest.artifact_government_interest_id IS 'System generated surrogate primary key identifier.'
 ;
+COMMENT ON COLUMN artifact_government_interest.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
+;
 COMMENT ON COLUMN artifact_government_interest.wldtaxonomic_units_id IS 'A foreign reference to the taxonomic unit id.'
 ;
 COMMENT ON COLUMN artifact_government_interest.data_type IS 'A description of the type of data that is secured.'
 ;
 COMMENT ON COLUMN artifact_government_interest.description IS 'The description of the record.'
-;
-COMMENT ON COLUMN artifact_government_interest.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
 ;
 COMMENT ON COLUMN artifact_government_interest.create_date IS 'The datetime the record was created.'
 ;
@@ -158,13 +167,13 @@ COMMENT ON TABLE artifact_persecution IS 'An intersection table defining associa
 
 CREATE TABLE artifact_proprietary(
     artifact_proprietary_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    artifact_id                integer           NOT NULL,
     proprietary_type_id        integer           NOT NULL,
     first_nations_id           integer,
     proprietor                 varchar(30),
     description                varchar(3000),
     start_date                 timestamptz(6),
     end_date                   timestamptz(6),
-    artifact_id                integer           NOT NULL,
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
     update_date                timestamptz(6),
@@ -178,6 +187,8 @@ CREATE TABLE artifact_proprietary(
 
 COMMENT ON COLUMN artifact_proprietary.artifact_proprietary_id IS 'System generated surrogate primary key identifier.'
 ;
+COMMENT ON COLUMN artifact_proprietary.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
+;
 COMMENT ON COLUMN artifact_proprietary.proprietary_type_id IS 'System generated surrogate primary key identifier.'
 ;
 COMMENT ON COLUMN artifact_proprietary.first_nations_id IS 'A foreign reference to the first nations id.'
@@ -189,8 +200,6 @@ COMMENT ON COLUMN artifact_proprietary.description IS 'The description of the re
 COMMENT ON COLUMN artifact_proprietary.start_date IS 'The record start date.'
 ;
 COMMENT ON COLUMN artifact_proprietary.end_date IS 'The record end date.'
-;
-COMMENT ON COLUMN artifact_proprietary.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.'
 ;
 COMMENT ON COLUMN artifact_proprietary.create_date IS 'The datetime the record was created.'
 ;
@@ -693,6 +702,8 @@ CREATE TABLE submission_job_queue(
     job_start_timestamp        timestamptz(6),
     job_end_timestamp          timestamptz(6),
     security_request           jsonb,
+    key                        varchar(1000)     NOT NULL,
+    attempt_count              integer           DEFAULT 0 NOT NULL,
     create_date                timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                integer           NOT NULL,
     update_date                timestamptz(6),
@@ -714,6 +725,10 @@ COMMENT ON COLUMN submission_job_queue.job_start_timestamp IS 'The timestamp of 
 COMMENT ON COLUMN submission_job_queue.job_end_timestamp IS 'The timestamp of the job process completion.'
 ;
 COMMENT ON COLUMN submission_job_queue.security_request IS 'A document supplied by the submitter outlining a security request for submission observations.'
+;
+COMMENT ON COLUMN submission_job_queue.key IS 'The identifying key to the file in the storage system.'
+;
+COMMENT ON COLUMN submission_job_queue.attempt_count IS 'The number of times this job queue record has been attempted.'
 ;
 COMMENT ON COLUMN submission_job_queue.create_date IS 'The datetime the record was created.'
 ;
@@ -872,6 +887,7 @@ CREATE TABLE submission_metadata(
     submission_id                 integer           NOT NULL,
     eml_source                    text              NOT NULL,
     eml_json_source               jsonb,
+    dataset_search_criteria       jsonb,
     record_effective_timestamp    timestamptz(6),
     record_end_timestamp          timestamptz(6),
     create_date                   timestamptz(6)    DEFAULT now() NOT NULL,
@@ -892,6 +908,8 @@ COMMENT ON COLUMN submission_metadata.submission_id IS 'System generated surroga
 COMMENT ON COLUMN submission_metadata.eml_source IS 'The Ecological Metadata Language source as extracted from the submission.'
 ;
 COMMENT ON COLUMN submission_metadata.eml_json_source IS 'The JSON representation of the Ecological Metadata Language source for the submission.'
+;
+COMMENT ON COLUMN submission_metadata.dataset_search_criteria IS 'Describes the object the system sends to elastic search'
 ;
 COMMENT ON COLUMN submission_metadata.record_effective_timestamp IS 'Record level effective timestamp.'
 ;
@@ -920,7 +938,10 @@ CREATE TABLE submission_observation(
     darwin_core_source             jsonb             NOT NULL,
     submission_security_request    jsonb,
     security_review_timestamp      timestamptz(6),
-    foi_reason_description         varchar(3000),
+    foi_reason                     boolean,
+    security_reason_name           varchar(300),
+    security_reason_description    varchar(3000),
+    security_reason_end_date       timestamptz(6),
     record_effective_timestamp     timestamptz(6),
     record_end_timestamp           timestamptz(6),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
@@ -944,7 +965,13 @@ COMMENT ON COLUMN submission_observation.submission_security_request IS 'A JSON 
 ;
 COMMENT ON COLUMN submission_observation.security_review_timestamp IS 'The timestamp of the associated event.'
 ;
-COMMENT ON COLUMN submission_observation.foi_reason_description IS 'The description of the Freedom of Information reason for securing of the artifact.'
+COMMENT ON COLUMN submission_observation.foi_reason IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.'
+;
+COMMENT ON COLUMN submission_observation.security_reason_name IS 'The name of the custom security reason.'
+;
+COMMENT ON COLUMN submission_observation.security_reason_description IS 'A reason description that is secures this data and is specific to this artifact or dataset.'
+;
+COMMENT ON COLUMN submission_observation.security_reason_end_date IS 'Custom security reason end date.'
 ;
 COMMENT ON COLUMN submission_observation.record_effective_timestamp IS 'Record level effective timestamp.'
 ;
@@ -968,19 +995,19 @@ COMMENT ON TABLE submission_observation IS 'A listing of historical data submiss
 --
 
 CREATE TABLE submission_spatial_component(
-    submission_spatial_component_id    integer                     GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    submission_observation_id          integer                     NOT NULL,
-    spatial_component                  jsonb                       NOT NULL,
-    geometry                           geometry(geometry, 3005),
-    geography                          geography(geometry),
+    submission_spatial_component_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_observation_id          integer           NOT NULL,
+    spatial_component                  jsonb             NOT NULL,
+    geometry                           point,
+    geography                          point,
     secured_spatial_component          jsonb,
-    secured_geometry                   geometry(geometry, 3005),
-    secured_geography                  geography(geometry),
-    create_date                        timestamptz(6)              DEFAULT now() NOT NULL,
-    create_user                        integer                     NOT NULL,
+    secured_geometry                   point,
+    secured_geography                  point,
+    create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                        integer           NOT NULL,
     update_date                        timestamptz(6),
     update_user                        integer,
-    revision_count                     integer                     DEFAULT 0 NOT NULL,
+    revision_count                     integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_spatial_component_pk PRIMARY KEY (submission_spatial_component_id)
 )
 ;
