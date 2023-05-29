@@ -39,6 +39,12 @@ export interface SecurityReasonProps {
   icon: string;
 }
 
+export interface SecurityReasonProps {
+  securityReason: ISecurityReason;
+  onClickSecurityReason: (securityReason: ISecurityReason) => void;
+  icon: string;
+}
+
 export interface SecurityReasonCategoryProps {
   categoryName: string;
   securityReasons: ISecurityReason[];
