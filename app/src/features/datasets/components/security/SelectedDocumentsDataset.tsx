@@ -16,13 +16,12 @@ export interface IRelatedDatasetsProps {
  */
 const SelectedDocumentsDataset: React.FC<IRelatedDatasetsProps> = (props) => {
   const { selectedArtifacts } = props;
-  console.log('selectedArtifacts', selectedArtifacts);
 
   const columns: GridColDef<IArtifact>[] = [
     {
       field: 'file_type',
       headerName: 'Type',
-      flex: 1
+      flex: 0.5
     },
     {
       field: 'file_name',
@@ -33,29 +32,27 @@ const SelectedDocumentsDataset: React.FC<IRelatedDatasetsProps> = (props) => {
   ];
 
   return (
-    <>
-      <Paper elevation={3}>
-        <ActionToolbar label={`Selected Documents (${selectedArtifacts.length})`} labelProps={{ variant: 'h4' }} />
-        <Divider></Divider>
-        <Box px={2}>
-          <Box>
-            <DataGrid
-              getRowId={(row) => row.artifact_id}
-              autoHeight
-              disableVirtualization
-              rows={selectedArtifacts}
-              columns={columns}
-              disableRowSelectionOnClick
-              disableColumnSelector
-              disableColumnFilter
-              disableColumnMenu
-              disableDensitySelector
-              hideFooter
-            />
-          </Box>
+    <Paper elevation={2} sx={{ my: 2 }}>
+      <ActionToolbar label={`Selected Documents (${selectedArtifacts.length})`} labelProps={{ variant: 'h4' }} />
+      <Divider></Divider>
+      <Box px={2}>
+        <Box>
+          <DataGrid
+            getRowId={(row) => row.artifact_id}
+            autoHeight
+            disableVirtualization
+            rows={selectedArtifacts}
+            columns={columns}
+            disableRowSelectionOnClick
+            disableColumnSelector
+            disableColumnFilter
+            disableColumnMenu
+            disableDensitySelector
+            hideFooter
+          />
         </Box>
-      </Paper>
-    </>
+      </Box>
+    </Paper>
   );
 };
 

@@ -145,7 +145,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => setOpenApplySecurity(true)}
-            disabled={false}>
+            disabled={selectedArtifacts.length > 0 ? false : true}>
             Apply Security
           </Button>
           <IconButton disabled title="Download Files" aria-label={`Download selected files`}>

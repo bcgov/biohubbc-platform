@@ -1,32 +1,25 @@
-import { mdiPlus } from '@mdi/js';
+import { mdiArrowDown, mdiMinus, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
-import { IconButton, Paper, Typography } from '@mui/material';
+import { Collapse, IconButton, Paper, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-// const useStyles = makeStyles((theme: Theme) => ({
-//   datasetTitleContainer: {
-//     paddingBottom: theme.spacing(5),
-//     background: '#f7f8fa',
-//     '& h1': {
-//       marginTop: '-4px'
-//     }
-//   },
-//   datasetMapContainer: {
-//     width: '100%',
-//     aspectRatio: '1 / 0.5',
-//     borderRadius: '6px',
-//     paddingBottom: '16px'
-//   }
-// }));
+import { FieldArray } from 'formik';
+import { useState } from 'react';
 
-export interface SecurityReasonProps {
+export interface ISecurityReason {
   name: string;
   description?: string;
   category?: string;
 }
 
+export interface SecurityReasonProps {
+  securityReason: ISecurityReason;
+  onClickSecurityReason: (securityReason: ISecurityReason) => void;
+  icon: string;
+}
+
 export interface SecurityReasonCategoryProps {
   categoryName: string;
-  securityReasons: SecurityReasonProps[];
+  securityReasons: ISecurityReason[];
 }
 /**
  * Security Reason Selector for security application.
@@ -35,49 +28,68 @@ export interface SecurityReasonCategoryProps {
  */
 const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) => {
   const { categoryName, securityReasons } = props;
-  console.log('securityReasons', securityReasons);
+
+  const [open, setOpen] = useState(false);
 
   const sortedSecurityReasons = securityReasons.sort((a, b) => {
     return a.name.localeCompare(b.name);
   });
 
   return (
-    <>
-      <Box m={4}>
-        <Typography variant="h3">{categoryName}</Typography>
+    <Paper elevation={3} sx={{ p: 1 }}>
+      <Box m={4} sx={{ display: 'flex' }}>
+        <Box sx={{ width: '100%' }}>
+          <Typography variant="h3">{categoryName}</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignContent: 'center' }}>
+          <IconButton onClick={() => setOpen(!open)} color="primary" aria-label="dropdown arrow" component="label">
+            <Icon path={mdiArrowDown} size={1} />
+          </IconButton>
+        </Box>
       </Box>
-      {sortedSecurityReasons.map((securityReason) => {
-        return (
-          <Box py={1} px={2}>
-            <SecurityReason
-              key={securityReason.name}
-              name={securityReason.name}
-              description={securityReason.description}
-              category={categoryName}
-            />
-          </Box>
-        );
-      })}
-    </>
+
+      <Collapse in={open} timeout="auto" unmountOnExit>
+        <FieldArray
+          name="securityReasons"
+          render={(arrayHelpers) => (
+            <>
+              {sortedSecurityReasons.map((securityReason) => {
+                return (
+                  <Box key={securityReason.name} py={1} px={2}>
+                    <SecurityReason
+                      securityReason={securityReason}
+                      onClickSecurityReason={() => arrayHelpers.push(securityReason)}
+                      icon={'add'}
+                    />
+                  </Box>
+                );
+              })}
+            </>
+          )}
+        />
+      </Collapse>
+    </Paper>
   );
 };
 
-const SecurityReason: React.FC<SecurityReasonProps> = (props) => {
-  const { name, description, category } = props;
+export const SecurityReason: React.FC<SecurityReasonProps> = (props) => {
+  const { securityReason, onClickSecurityReason, icon } = props;
 
   return (
-    <Paper elevation={2} variant="outlined">
+    <Paper elevation={0} variant="outlined">
       <Box m={4} sx={{ display: 'flex' }}>
-        <Box sx={{ width: '100%' }}>
-          <Typography variant="h5">{name}</Typography>
-          <Typography variant="body1">{description}</Typography>
+        <Box>
+          <Typography variant="h5">{securityReason.name}</Typography>
+          <Typography sx={{ overflow: 'hidden' }} variant="body1">
+            {securityReason.description}
+          </Typography>
           <Typography pt={1} variant="body2">
-            {category}
+            {securityReason.category}
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', alignContent: 'center' }}>
-          <IconButton color="primary" aria-label="upload picture" component="label">
-            <Icon path={mdiPlus} size={1} />
+        <Box sx={{ display: 'flex', alignContent: 'center', flex: '0 0 auto' }}>
+          <IconButton onClick={() => onClickSecurityReason(securityReason)} color="primary" aria-label="add security">
+            <Icon path={icon === 'add' ? mdiPlus : mdiMinus} size={1} />
           </IconButton>
         </Box>
       </Box>

@@ -1,4 +1,4 @@
-import Box from '@mui/material/Box';
+import { Box, Divider } from '@mui/material';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -7,9 +7,13 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { Formik, FormikProps } from 'formik';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
-import React from 'react';
-import SecurityReasonSelector from './SecurityReasonSelector';
+import React, { useRef, useState } from 'react';
+import SecurityReasonSelector, {
+  SecurityReasonsInitialValues,
+  SecurityReasonsYupSchema
+} from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
 
 export interface IApplySecurityDialog {
@@ -25,10 +29,11 @@ export interface IApplySecurityDialog {
  */
 const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const { selectedArtifacts, open, onClose } = props;
-  console.log('selectedArtifacts', selectedArtifacts);
 
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
+
+  const [formikRef] = useState(useRef<FormikProps<any>>(null));
 
   return (
     <>
@@ -38,42 +43,48 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
         open={open}
         aria-labelledby="component-dialog-title"
         aria-describedby="component-dialog-description"
-        sx={{
-          '& .MuiDialog-container': {
-            '& .MuiPaper-root': {
-              width: '100%',
-              maxWidth: '1500px' // Set your width here
-            }
+        PaperProps={{
+          sx: {
+            width: '100%',
+            height: '100%',
+            p: 2
           }
         }}>
-        <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            <strong>Search for the security reasons and apply them to the selected doument(s). </strong>
-          </DialogContentText>
+        <Formik
+          innerRef={formikRef}
+          initialValues={SecurityReasonsInitialValues}
+          validationSchema={SecurityReasonsYupSchema}
+          validateOnBlur={true}
+          validateOnChange={false}
+          onSubmit={(values) => {
+            console.log('values', values);
+          }}>
+          {(formikProps) => (
+            <>
+              <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
+              <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <Box sx={{ mb: 2 }}>
+                  <DialogContentText id="alert-dialog-description">
+                    Search for the security reasons and apply them to the selected doument(s).
+                  </DialogContentText>
 
-          <Box mt={2}>
-            <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
-          </Box>
+                  <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
+                </Box>
 
-          <Box mt={2}>
-            <SecurityReasonSelector />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              console.log('submit');
-            }}
-            color="primary"
-            variant="contained"
-            autoFocus>
-            Submit
-          </Button>
-          <Button onClick={onClose} color="primary" variant="outlined" autoFocus>
-            Cancel
-          </Button>
-        </DialogActions>
+                <SecurityReasonSelector selectedArtifacts={selectedArtifacts} />
+              </DialogContent>
+              <Divider />
+              <DialogActions>
+                <Button onClick={formikProps.submitForm} color="primary" variant="contained" autoFocus>
+                  Submit
+                </Button>
+                <Button onClick={onClose} color="primary" variant="outlined" autoFocus>
+                  Cancel
+                </Button>
+              </DialogActions>
+            </>
+          )}
+        </Formik>
       </Dialog>
     </>
   );

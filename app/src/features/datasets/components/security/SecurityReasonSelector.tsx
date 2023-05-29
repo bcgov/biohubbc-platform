@@ -1,69 +1,96 @@
-import { Grid, Paper } from '@mui/material';
+import { Paper } from '@mui/material';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
+import { FieldArray, useFormikContext } from 'formik';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import SecurityReasonCategory, { SecurityReasonProps } from './SecurityReasonCategory';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import yup from 'utils/YupSchema';
+import SecurityReasonCategory, { ISecurityReason, SecurityReason } from './SecurityReasonCategory';
 
-// const useStyles = makeStyles((theme: Theme) => ({
-//   datasetTitleContainer: {
-//     paddingBottom: theme.spacing(5),
-//     background: '#f7f8fa',
-//     '& h1': {
-//       marginTop: '-4px'
-//     }
-//   },
-//   datasetMapContainer: {
-//     width: '100%',
-//     aspectRatio: '1 / 0.5',
-//     borderRadius: '6px',
-//     paddingBottom: '16px'
-//   }
-// }));
+export interface SecurityReasonSelectorProps {
+  selectedArtifacts: IArtifact[];
+}
+export interface ISelectSecurityReasonForm {
+  securityReasons: ISecurityReason[];
+}
 
-// export interface SecurityReasonSelectorProps {
-//   name: string;
-// }
+export const SecurityReasonsInitialValues: ISelectSecurityReasonForm = {
+  securityReasons: []
+};
+
+export const SecurityReasonsYupSchema = yup.object().shape({
+  securityReasons: yup
+    .array()
+    .min(1, 'A minimum of 1 security reason is required')
+    .of(
+      yup.object().shape({
+        name: yup.string(),
+        description: yup.string()
+      })
+    )
+});
 
 /**
  * Security Reason Selector for security application.
  *
  * @return {*}
  */
-const SecurityReasonSelector: React.FC = () => {
+const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) => {
   const biohubApi = useApi();
-
   const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
   persecutionHarmDataLoader.load();
 
-  const persecutionHarm = persecutionHarmDataLoader.data;
-  // const [securityReasons, setSecurityReasons] = useState<IArtifact[]>([]);
-  // const [appliedSecurityReasons, setAppliedSecurityReasons] = useState<IArtifact[]>([]);
+  const { values } = useFormikContext<ISelectSecurityReasonForm>();
 
-  if (!persecutionHarm) {
+  if (!persecutionHarmDataLoader.data) {
     return <></>; //TODO: Loader Spinner
   }
 
   return (
-    <Paper elevation={5}>
-      <Grid container spacing={0} direction={'row'}>
-        <Grid item xs={6}>
-          <ActionToolbar label={`Security Reasons`} labelProps={{ variant: 'h4' }} />
-          <Divider></Divider>
+    <Paper elevation={3} sx={{ height: '100%', width: '100%', display: 'flex', overflow: 'hidden' }}>
+      <Box sx={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
+        <ActionToolbar label={`Security Reasons`} labelProps={{ variant: 'h4' }} />
+        <Divider></Divider>
+        <Box sx={{ p: 2, height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
           <SecurityReasonCategory
             categoryName={'Persecution or Harm'}
-            securityReasons={persecutionHarm as unknown as SecurityReasonProps[]}
+            securityReasons={persecutionHarmDataLoader.data as unknown as ISecurityReason[]}
           />
-        </Grid>
-        <Divider orientation="vertical" flexItem></Divider>
-        <Grid item xs={5}>
-          <Box flexGrow={1}>
-            <ActionToolbar label={`Applied Security Reasons ()`} labelProps={{ variant: 'h4' }} />
-            <Divider></Divider>
-          </Box>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
+
+      <Divider orientation="vertical" flexItem />
+
+      <Box sx={{ width: '50%' }}>
+        <ActionToolbar
+          label={`Applied Security Reasons (${values.securityReasons.length})`}
+          labelProps={{ variant: 'h4' }}
+        />
+        <Divider></Divider>
+        <Box sx={{ p: 2, height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
+          <FieldArray
+            name="securityReasons"
+            render={(arrayHelpers) => (
+              <>
+                {values.securityReasons.map((securityReason, index) => {
+                  return (
+                    <Box key={securityReason.name} py={1} px={2}>
+                      <SecurityReason
+                        key={index}
+                        securityReason={securityReason}
+                        onClickSecurityReason={() => arrayHelpers.remove(index)}
+                        icon="minus"
+                      />
+                    </Box>
+                  );
+                })}
+              </>
+            )}
+          />
+        </Box>
+      </Box>
     </Paper>
   );
 };
