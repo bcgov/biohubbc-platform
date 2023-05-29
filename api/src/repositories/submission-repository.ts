@@ -897,10 +897,7 @@ export class SubmissionRepository extends BaseRepository {
    * @returns {*} {Promise<number>} the number of rows updated
    * @memberof SubmissionRepository
    */
-  async updateSubmissionMetadataWithSearchKeys(
-    submissionId: number,
-    datasetSearch: any
-  ): Promise<number> {
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     const sql = SQL`
     UPDATE 
       submission_metadata 

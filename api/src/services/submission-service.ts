@@ -470,13 +470,7 @@ export class SubmissionService extends DBService {
    * @returns
    * @memberof SubmissionService
    */
-  async updateSubmissionMetadataWithSearchKeys(
-    submissionId: number,
-    datasetSearch: any
-  ): Promise<number> {
-    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(
-      submissionId,
-      datasetSearch
-    );
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
+    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
   }
 }
