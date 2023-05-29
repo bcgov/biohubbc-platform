@@ -1,4 +1,5 @@
 import { JSONPath } from 'jsonpath-plus';
+import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -440,10 +441,15 @@ export class SubmissionService extends DBService {
 
     for await (const item of data) {
       let rollUpCount = 0;
+      const dates: string[] = [];
+
       if (item.related_projects) {
         for await (const rp of item.related_projects) {
           const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
-          rollUpCount += rpCount?.artifacts_to_review ?? 0;
+          if (rpCount) {
+            rollUpCount += rpCount.artifacts_to_review;
+            dates.push(rpCount?.last_updated);
+          }
         }
       }
 
@@ -451,17 +457,31 @@ export class SubmissionService extends DBService {
         item.dataset_id
       );
       if (parentArtifactCount) {
+        dates.push(parentArtifactCount.last_updated);
+
         datasetsForReview.push({
           dataset_id: parentArtifactCount.dataset_id,
           artifacts_to_review: rollUpCount + parentArtifactCount.artifacts_to_review,
           dataset_name: item.dataset_name,
-          last_updated: parentArtifactCount.last_updated,
+          last_updated: this.mostRecentDate(dates),
           keywords: item.keywords
         });
       }
     }
     return datasetsForReview;
   }
+
+  /**
+   * Compares and finds the most recent date given a list of date strings. Todays date is returned if no data is present in the list
+   *
+   * @param dates a list of date strings
+   * @returns {*} {string} the most recent date found
+   */
+  mostRecentDate(dates: string[]): string {
+    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
+    return dates[0] ?? moment();
+  }
+
   /**
    *
    * @param submissionId
