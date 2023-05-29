@@ -592,7 +592,6 @@ describe('SubmissionService', () => {
         {
           dataset_id: 'UUID',
           submission_id: 1,
-          submitter_system: 'sims',
           dataset_name: 'Project Name',
           keywords: [],
           related_projects: []
@@ -600,7 +599,6 @@ describe('SubmissionService', () => {
         {
           dataset_id: 'UUID',
           submission_id: 2,
-          submitter_system: 'sims',
           dataset_name: 'Project Name',
           keywords: [],
           related_projects: [{ ['@_id']: 'RP_UUID_1' }, { ['@_id']: 'RP_UUID_2' }]
@@ -608,7 +606,6 @@ describe('SubmissionService', () => {
         {
           dataset_id: 'UUID',
           submission_id: 3,
-          submitter_system: 'sims',
           dataset_name: 'Project Name',
           keywords: [],
           related_projects: [{ ['@_id']: 'RP_UUID_3' }]
@@ -662,7 +659,7 @@ describe('SubmissionService', () => {
 
       const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionMetadataWithSearchKeys').resolves(1);
 
-      const response = await submissionService.updateSubmissionMetadataWithSearchKeys(1, 'sims', {});
+      const response = await submissionService.updateSubmissionMetadataWithSearchKeys(1, {});
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(1);

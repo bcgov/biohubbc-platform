@@ -472,12 +472,10 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionMetadataWithSearchKeys(
     submissionId: number,
-    submitterSystem: string,
     datasetSearch: any
   ): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(
       submissionId,
-      submitterSystem,
       datasetSearch
     );
   }

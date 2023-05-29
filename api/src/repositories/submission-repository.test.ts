@@ -822,7 +822,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.updateSubmissionMetadataWithSearchKeys(1, '', {});
+      const response = await submissionRepository.updateSubmissionMetadataWithSearchKeys(1, '');
 
       expect(response).to.eql(1);
     });

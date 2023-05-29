@@ -598,7 +598,9 @@ export class DarwinCoreService extends DBService {
 
     // call to the ElasticSearch API to create a record with our transformed EML
     await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
-    await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, 'sims', jsonMetadata);
+
+    // update submission metadata with a copy of the elastic search object
+    await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, jsonMetadata);
   }
 
   /**

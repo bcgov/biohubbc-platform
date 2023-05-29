@@ -17,7 +17,6 @@ export interface IDatasetsForReview {
 export const DatasetMetadata = z.object({
   dataset_id: z.string(),
   submission_id: z.number(),
-  submitter_system: z.string(),
   dataset_name: z.string(),
   keywords: z.array(z.string()),
   related_projects: z
@@ -894,22 +893,19 @@ export class SubmissionRepository extends BaseRepository {
   /**
    *
    * @param submissionId the submission to update
-   * @param submitterSystem The name of the system that is submitted data e.g. 'sims'
    * @param datasetSearch
    * @returns {*} {Promise<number>} the number of rows updated
    * @memberof SubmissionRepository
    */
   async updateSubmissionMetadataWithSearchKeys(
     submissionId: number,
-    submitterSystem: string,
     datasetSearch: any
   ): Promise<number> {
     const sql = SQL`
     UPDATE 
       submission_metadata 
     SET 
-      dataset_search_criteria=${datasetSearch}, 
-      submitter_system= ${submitterSystem} 
+      dataset_search_criteria=${datasetSearch}
     WHERE submission_id = ${submissionId}
     AND record_end_timestamp IS NULL;
     `;
@@ -932,7 +928,6 @@ export class SubmissionRepository extends BaseRepository {
       .select(
         's.uuid as dataset_id',
         'sm.submission_id',
-        'sm.submitter_system',
         knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name`),
         knex.raw(`sm.dataset_search_criteria::json->'primaryKeywords' as keywords`),
         knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects`)
