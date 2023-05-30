@@ -32,7 +32,7 @@ export const DatasetArtifactCount = z.object({
   dataset_id: z.string(),
   submission_id: z.number(),
   artifacts_to_review: z.number(),
-  last_updated: z.string()
+  last_updated: z.string().nullable()
 });
 
 export type DatasetArtifactCount = z.infer<typeof DatasetArtifactCount>;

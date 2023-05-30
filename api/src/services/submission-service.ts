@@ -448,7 +448,7 @@ export class SubmissionService extends DBService {
           const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
           if (rpCount) {
             rollUpCount += rpCount.artifacts_to_review;
-            dates.push(rpCount?.last_updated);
+            dates.push(rpCount.last_updated ?? "");
           }
         }
       }
@@ -457,7 +457,7 @@ export class SubmissionService extends DBService {
         item.dataset_id
       );
       if (parentArtifactCount) {
-        dates.push(parentArtifactCount.last_updated);
+        dates.push(parentArtifactCount.last_updated ?? "");
 
         datasetsForReview.push({
           dataset_id: parentArtifactCount.dataset_id,
