@@ -68,7 +68,7 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
 
       <AppRoute exact path="/admin/dashboard" title={getTitle('Dashboard')} layout={BaseLayout}>
         <AuthenticatedRouteGuard>
-          <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+          <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
             <AdminDashboardRouter />
           </SystemRoleGuard>
         </AuthenticatedRouteGuard>
@@ -76,7 +76,7 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
 
       <AppRoute path="/admin/users" title={getTitle('Users')} layout={BaseLayout}>
         <AuthenticatedRouteGuard>
-          <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+          <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}>
             <AdminUsersRouter />
           </SystemRoleGuard>
         </AuthenticatedRouteGuard>
