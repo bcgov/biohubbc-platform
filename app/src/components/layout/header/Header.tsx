@@ -116,7 +116,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   <span>
                     <strong>BioHub</strong>
                     <BetaLabel />
-                    {/* <EnvironmentLabel /> */}
                   </span>
                 </Link>
                 <Box
@@ -174,24 +173,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
             </Box>
           </Toolbar>
         </Box>
-        {/* <Box className={classes.mainNav}>
-          <Toolbar variant="dense" className={classes.mainNavToolbar} role="navigation" aria-label="Main Navigation">
-            <Link to="/" id="menu_home">
-              Home
-            </Link>
-            <Link to="/search" id="menu_search">
-              Find Datasets
-            </Link>
-            <Link to="/map" id="menu_map">
-              Map Search
-            </Link>
-            <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-              <Link to="/admin/users" id="menu_admin_users">
-                Manage Users
-              </Link>
-            </SystemRoleGuard>
-          </Toolbar>
-        </Box> */}
       </AppBar>
 
       <Dialog open={openSupportDialog}>
