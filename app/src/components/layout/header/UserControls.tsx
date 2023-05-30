@@ -7,7 +7,7 @@ import Link from '@mui/material/Link';
 import { makeStyles } from '@mui/styles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   userInfo: {
@@ -62,10 +62,11 @@ export const LoggedInUserControls = () => {
 
 export const NotLoggedInUserControls = () => {
   const { keycloakWrapper } = useContext(AuthStateContext);
+  const loginUrl = useMemo(() => keycloakWrapper?.getLoginUrl(), [keycloakWrapper]);
 
   return (
     <Button
-      onClick={() => keycloakWrapper?.getLoginUrl()}
+      href={loginUrl}
       size="large"
       type="submit"
       variant="contained"

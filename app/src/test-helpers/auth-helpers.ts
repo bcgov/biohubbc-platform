@@ -16,6 +16,7 @@ export const UnauthenticatedUserAuthState: IAuthState = {
     displayName: 'testdisplayname',
     email: 'test@email.com',
     systemUserId: 1,
+    getLoginUrl: () => 'fake/login/url',
     refresh: () => {
       // do nothing
     }
@@ -36,6 +37,7 @@ export const SystemUserAuthState: IAuthState = {
     displayName: 'testdisplayname',
     email: 'test@email.com',
     systemUserId: 1,
+    getLoginUrl: () => 'fake/login/url',
     refresh: () => {
       // do nothing
     }
