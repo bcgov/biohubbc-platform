@@ -2,7 +2,7 @@
 -- ER/Studio Data Architect SQL Code Generation
 -- Project :      BioHub.DM1
 --
--- Date Created : Friday, May 26, 2023 15:30:47
+-- Date Created : Monday, May 29, 2023 20:18:39
 -- Target DBMS : PostgreSQL 10.x-12.x
 --
 
@@ -995,19 +995,19 @@ COMMENT ON TABLE submission_observation IS 'A listing of historical data submiss
 --
 
 CREATE TABLE submission_spatial_component(
-    submission_spatial_component_id    integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    submission_observation_id          integer           NOT NULL,
-    spatial_component                  jsonb             NOT NULL,
-    geometry                           point,
-    geography                          point,
+    submission_spatial_component_id    integer                     GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    submission_observation_id          integer                     NOT NULL,
+    spatial_component                  jsonb                       NOT NULL,
+    geometry                           geometry(geometry, 3005),
+    geography                          geography(geometry),
     secured_spatial_component          jsonb,
-    secured_geometry                   point,
-    secured_geography                  point,
-    create_date                        timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                        integer           NOT NULL,
+    secured_geometry                   geometry(geometry, 3005),
+    secured_geography                  geography(geometry),
+    create_date                        timestamptz(6)              DEFAULT now() NOT NULL,
+    create_user                        integer                     NOT NULL,
     update_date                        timestamptz(6),
     update_user                        integer,
-    revision_count                     integer           DEFAULT 0 NOT NULL,
+    revision_count                     integer                     DEFAULT 0 NOT NULL,
     CONSTRAINT submission_spatial_component_pk PRIMARY KEY (submission_spatial_component_id)
 )
 ;
