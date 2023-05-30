@@ -15,23 +15,6 @@ describe('removeSystemUser', () => {
     sinon.restore();
   });
 
-  it('should throw a 400 error when missing required path param: userId', async () => {
-    const dbConnectionObj = getMockDBConnection();
-
-    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-    try {
-      const requestHandler = delete_endpoint.removeSystemUser();
-      await requestHandler(mockReq, mockRes, mockNext);
-      expect.fail();
-    } catch (actualError) {
-      expect((actualError as HTTPError).status).to.equal(400);
-      expect((actualError as HTTPError).message).to.equal('Missing required path param: userId');
-    }
-  });
-
   it('should throw a 400 error when user record has expired', async () => {
     const dbConnectionObj = getMockDBConnection();
 

@@ -1,7 +1,7 @@
 kind: Template
 apiVersion: template.openshift.io/v1
 metadata:
-  name: biohub-platform-api
+  name: biohub-platform-api-bc
   labels:
     build: biohub-platform-api
 parameters:
@@ -78,8 +78,8 @@ objects:
     spec:
       lookupPolicy:
         local: false
-  - apiVersion: v1
-    kind: BuildConfig
+  - kind: BuildConfig
+    apiVersion: v1
     metadata:
       name: '${NAME}${SUFFIX}'
       creationTimestamp:

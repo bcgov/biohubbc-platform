@@ -14,7 +14,7 @@ const AccessDenied = () => {
 
   const { keycloakWrapper } = useContext(AuthStateContext);
 
-  if (!keycloakWrapper?.keycloak?.authenticated) {
+  if (!keycloakWrapper?.keycloak.authenticated) {
     // User is not logged in
     return <Redirect to={{ pathname: '/' }} />;
   }
@@ -24,33 +24,22 @@ const AccessDenied = () => {
     return <CircularProgress className="pageProgress" />;
   }
 
-  if (keycloakWrapper.hasAccessRequest) {
-    // User already has a pending access request
-    return <Redirect to={{ pathname: '/request-submitted' }} />;
-  }
-
-  const userHasARole = !!keycloakWrapper?.systemRoles?.length;
-
   return (
     <Container>
       <Box pt={6} textAlign="center">
         <Icon path={mdiAlertCircleOutline} size={2} color="#ff5252" />
         <h1>Access Denied</h1>
-        <Typography>
-          {`You do not have permission to access this ${(userHasARole && 'page') || 'application'}.`}
-        </Typography>
+        <Typography>{`You do not have permission to access this page.`}</Typography>
         <Box pt={4}>
-          {!userHasARole && (
-            <Button
-              onClick={() => history.push('/access-request')}
-              type="submit"
-              size="large"
-              variant="contained"
-              color="primary"
-              data-testid="request_access">
-              Request Access
-            </Button>
-          )}
+          <Button
+            onClick={() => history.push('/')}
+            type="submit"
+            size="large"
+            variant="contained"
+            color="primary"
+            data-testid="access-denied-return-home-button">
+            Return Home
+          </Button>
         </Box>
       </Box>
     </Container>

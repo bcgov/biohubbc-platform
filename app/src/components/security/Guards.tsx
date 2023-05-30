@@ -1,5 +1,6 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
+import { isFunction } from 'lodash-es';
 import { isValidElement, ReactElement, useContext } from 'react';
 import { isAuthenticated } from 'utils/authUtils';
 
@@ -34,9 +35,9 @@ export const NoRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: S
   if (props.fallback) {
     if (isValidElement(props.fallback)) {
       return <>{props.fallback}</>;
+    } else if (isFunction(props.fallback)) {
+      return props.fallback();
     }
-
-    return props.fallback();
   }
 
   return <></>;
@@ -64,9 +65,9 @@ export const SystemRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRole
   if (props.fallback) {
     if (isValidElement(props.fallback)) {
       return <>{props.fallback}</>;
+    } else if (isFunction(props.fallback)) {
+      return props.fallback();
     }
-
-    return props.fallback();
   }
 
   return <></>;
@@ -90,9 +91,9 @@ export const AuthGuard: React.FC<React.PropsWithChildren<IGuardProps>> = (props)
   if (props.fallback) {
     if (isValidElement(props.fallback)) {
       return <>{props.fallback}</>;
+    } else if (isFunction(props.fallback)) {
+      return props.fallback();
     }
-
-    return props.fallback();
   }
 
   return <></>;
@@ -116,9 +117,9 @@ export const UnAuthGuard: React.FC<React.PropsWithChildren<IGuardProps>> = (prop
   if (props.fallback) {
     if (isValidElement(props.fallback)) {
       return <>{props.fallback}</>;
+    } else if (isFunction(props.fallback)) {
+      return props.fallback();
     }
-
-    return props.fallback();
   }
 
   return <></>;

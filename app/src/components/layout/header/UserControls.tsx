@@ -65,7 +65,7 @@ export const NotLoggedInUserControls = () => {
 
   return (
     <Button
-      onClick={() => keycloakWrapper?.keycloak?.login()}
+      onClick={() => keycloakWrapper?.keycloak.login()}
       size="large"
       type="submit"
       variant="contained"

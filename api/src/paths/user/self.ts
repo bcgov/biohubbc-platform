@@ -27,11 +27,12 @@ GET.apiDoc = {
           schema: {
             title: 'User Response Object',
             type: 'object',
-            required: ['id', 'user_identifier', 'role_ids', 'role_names'],
+            required: ['id', 'user_identifier', 'user_guid', 'record_end_date', 'role_ids', 'role_names'],
             properties: {
               id: {
                 description: 'user id',
-                type: 'number'
+                type: 'integer',
+                minimum: 1
               },
               user_identifier: {
                 description: 'The unique user identifier',
@@ -39,7 +40,8 @@ GET.apiDoc = {
               },
               user_guid: {
                 type: 'string',
-                description: 'The GUID for the user.'
+                description: 'The GUID for the user.',
+                nullable: true
               },
               record_end_date: {
                 oneOf: [{ type: 'object' }, { type: 'string', format: 'date' }],
@@ -50,7 +52,8 @@ GET.apiDoc = {
                 description: 'list of role ids for the user',
                 type: 'array',
                 items: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 }
               },
               role_names: {

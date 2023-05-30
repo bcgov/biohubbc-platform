@@ -47,10 +47,10 @@ export interface IKeycloakWrapper {
   /**
    * Original raw keycloak object.
    *
-   * @type {(Keycloak | undefined)}
+   * @type {(Keycloak)}
    * @memberof IKeycloakWrapper
    */
-  keycloak: Keycloak | undefined;
+  keycloak: Keycloak;
   /**
    * Returns `true` if the user's information has been loaded, false otherwise.
    *
@@ -72,13 +72,6 @@ export interface IKeycloakWrapper {
    */
   hasSystemRole: (validSystemRoles?: string[]) => boolean;
   /**
-   * True if the user has at least 1 pending access request.
-   *
-   * @type {boolean}
-   * @memberof IKeycloakWrapper
-   */
-  hasAccessRequest: boolean;
-  /**
    * Get out the username portion of the preferred_username from the token.
    *
    * @memberof IKeycloakWrapper
@@ -96,8 +89,6 @@ export interface IKeycloakWrapper {
   systemUserId: number;
   /**
    * Force this keycloak wrapper to refresh its data.
-   *
-   * Note: currently this only refreshes the `hasAccessRequest` property.
    *
    * @memberof IKeycloakWrapper
    */
@@ -117,7 +108,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const keycloakUserDataLoader = useDataLoader(async () => {
     return (
-      (keycloak &&
+      (keycloak.token &&
         (keycloak.loadUserInfo() as unknown as IIDIRUserInfo | IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)) ||
       undefined
     );
@@ -130,7 +121,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     keycloakUserDataLoader.load();
   }
 
-  if (keycloak?.authenticated) {
+  if (keycloak.authenticated) {
     // keycloak user is authenticated, load system user info
     userDataLoader.load();
   }
@@ -196,15 +187,15 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   }, [keycloakUserDataLoader.data, userDataLoader.data]);
 
   const systemUserId = (): number => {
-    return userDataLoader.data?.id || 0;
+    return userDataLoader.data?.id ?? 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return userDataLoader.data?.role_names || [];
+    return userDataLoader.data?.role_names ?? [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
-    if (!validSystemRoles || !validSystemRoles.length) {
+    if (!validSystemRoles?.length) {
       return true;
     }
 
@@ -241,7 +232,6 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     hasLoadedAllUserInfo: !!userDataLoader.data,
     systemRoles: getSystemRoles(),
     hasSystemRole,
-    hasAccessRequest: false,
     getUserIdentifier,
     getIdentitySource,
     username: username(),
