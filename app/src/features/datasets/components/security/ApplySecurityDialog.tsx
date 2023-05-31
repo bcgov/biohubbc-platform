@@ -1,4 +1,4 @@
-import { mdiInformationOutline, mdiLock } from '@mdi/js';
+import { mdiAlphaX, mdiInformationOutline, mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Divider, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
@@ -67,6 +67,21 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
 
   return (
     <>
+      <Dialog
+        maxWidth="sm"
+        open={applySecurityCompleted}
+        aria-labelledby="component-dialog-title"
+        aria-describedby="component-dialog-description">
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'row', justifyContent: 'start' }}>
+          <DialogContentText id="alert-dialog-description" sx={{ py: 2 }}>
+            {applySecurityText}
+          </DialogContentText>
+          <IconButton onClick={() => setApplySecurityCompleted(false)} color="primary" aria-label="close">
+            <Icon path={mdiAlphaX} size={1.5} />
+          </IconButton>
+        </Box>
+      </Dialog>
+
       <Dialog
         fullScreen={fullScreen}
         maxWidth="xl"

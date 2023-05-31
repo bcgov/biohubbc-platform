@@ -90,7 +90,6 @@ const SecurityReasonSelector: React.FC = () => {
             render={(arrayHelpers) => (
               <>
                 {values.securityReasons.map((securityReason, index) => {
-                  console.log('values.securityReasons', values.securityReasons);
                   return (
                     <Box key={securityReason.name} py={1} px={2}>
                       <SecurityReason
