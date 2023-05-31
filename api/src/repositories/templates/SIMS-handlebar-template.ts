@@ -21,12 +21,15 @@ export const simsHandlebarsTemplate = `
       <div class="details-container-title">
         Details
       </div>
+      
       <dl class="details-container-metadata">
+
+        <!-- PROJECT OBJECTIVES -->
         {{#each eml:eml.dataset.project.abstract.section as | section |}}
           {{#ifCond section.title '===' "Objectives"}}
             <div>
               <dt>
-                Objectives:
+                Project Objectives:
               </dt>
               <dd>
                 {{section.para}}
@@ -64,9 +67,20 @@ export const simsHandlebarsTemplate = `
         {{/if}}
 
         <!-- PROJECT TYPE -->
-        {{#if}}
-          // find me in the additional metadata
-        {{/if}}
+        {{#each eml:eml.additionalMetadata as | amd |}}
+        {{#each amd.metadata as | metadata |}}
+            {{#ifCond @key '===' "projectTypes"}}
+            <div>
+              <dt>
+                Project Type
+              </dt>
+              <dd>
+                {{metadata.projectType}}
+              </dd>
+            </div>
+            {{/ifCond}}
+          {{/each}}
+        {{/each}}
 
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
           <div>
