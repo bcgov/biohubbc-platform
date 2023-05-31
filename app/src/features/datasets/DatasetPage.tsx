@@ -98,7 +98,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     return {
       dialogTitle: 'Error Exporting Data',
       dialogText:
-        'An error has occurred while attempting to archive and download occurance data, please try again. If the error persists, please contact your system administrator.'
+        'An error has occurred while attempting to archive and download occurrence data, please try again. If the error persists, please contact your system administrator.'
     };
   });
 

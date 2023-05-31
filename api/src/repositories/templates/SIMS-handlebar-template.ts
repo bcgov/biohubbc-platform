@@ -51,6 +51,7 @@ export const simsHandlebarsTemplate = `
           </div>
         {{/if}}
 
+        <!-- TIMELINE -->
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates}}
           <div>
             <dt>
@@ -62,6 +63,10 @@ export const simsHandlebarsTemplate = `
           </div>
         {{/if}}
 
+        <!-- PROJECT TYPE -->
+        {{#if}}
+          // find me in the additional metadata
+        {{/if}}
 
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
           <div>
