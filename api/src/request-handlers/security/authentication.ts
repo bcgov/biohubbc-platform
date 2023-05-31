@@ -52,7 +52,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     }
 
     // Get token header kid (key id)
-    const kid = decodedToken.header && decodedToken.header.kid;
+    const kid = decodedToken.header.kid;
 
     if (!kid) {
       defaultLog.warn({ label: 'authenticate', message: 'decoded token header kid was null' });
@@ -75,10 +75,11 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     // Verify token using public signing key
     const verifiedToken = verify(tokenString, signingKey, {
       issuer: KEYCLOAK_ISSUER,
-      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464']
+      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464'] // TODO this sims service name should not be hardcoded here
     });
 
     if (!verifiedToken) {
+      defaultLog.warn({ label: 'authenticate', message: 'verified token was null' });
       throw new HTTP401('Access Denied');
     }
 

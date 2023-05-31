@@ -15,8 +15,6 @@ jobs:
     name: Cycle SchemaSpy to refresh after database update in dev
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true && github.event.pull_request.draft == false && github.base_ref == 'dev' }}
-    env:
-      BUILD_ID: ${{ github.event.number }}
     needs:
       - checkEnv
       - deployDatabaseSetup
@@ -54,7 +52,7 @@ jobs:
     steps:
       # Checkout the PR branch
       - name: Checkout Target Branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Wait for API response
         uses: nev7n/wait_for_response@v1.0.1

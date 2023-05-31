@@ -1,7 +1,5 @@
 import { Theme } from '@mui/material';
 import { makeStyles } from '@mui/styles';
-import { ConfigContext } from 'contexts/configContext';
-import { useContext } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   appPhaseTag: {
@@ -18,24 +16,6 @@ export const BetaLabel: React.FC<React.PropsWithChildren> = () => {
   return (
     <sup className={classes.appPhaseTag} aria-label="This application is currently in beta phase of development">
       Beta
-    </sup>
-  );
-};
-
-export const EnvironmentLabel = () => {
-  const classes = useStyles();
-
-  const config = useContext(ConfigContext);
-
-  if (config?.REACT_APP_NODE_ENV === 'prod') {
-    return <></>;
-  }
-
-  return (
-    <sup
-      className={classes.appPhaseTag}
-      aria-label={`This application is currently being run in the ${config?.REACT_APP_NODE_ENV} environment`}>
-      & {config?.REACT_APP_NODE_ENV}
     </sup>
   );
 };
