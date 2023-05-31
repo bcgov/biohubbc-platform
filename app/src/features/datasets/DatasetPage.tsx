@@ -53,7 +53,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const datasetId = urlParams['id'];
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
-  const templateDataLoader = useDataLoader(() => biohubApi.dataset.getHandlebarsTemplate(datasetId));
+  const templateDataLoader = useDataLoader(() => biohubApi.dataset.getHandleBarsTemplateByDatasetId(datasetId));
 
   const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialDataFile({

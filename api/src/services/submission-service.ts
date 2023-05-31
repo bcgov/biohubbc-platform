@@ -424,4 +424,14 @@ export class SubmissionService extends DBService {
       };
     });
   }
+
+  /**
+   * 
+   * @param datasetId 
+   * @returns 
+   */
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<string> {
+
+    return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
+  }
 }

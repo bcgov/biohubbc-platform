@@ -4,6 +4,7 @@ import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+import { simsHandlebarsTemplate } from './templates/SIMS-handlebar-template';
 
 export interface ISpatialComponentCount {
   spatial_type: string;
@@ -856,5 +857,14 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     return response.rowCount;
+  }
+
+  /**
+   * 
+   * @param datasetId 
+   * @returns 
+   */
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<string> {
+    return simsHandlebarsTemplate;
   }
 }
