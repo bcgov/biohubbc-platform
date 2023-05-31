@@ -1,4 +1,4 @@
-import { Paper } from '@mui/material';
+import { Button, Paper } from '@mui/material';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
@@ -21,15 +21,12 @@ export const SecurityReasonsInitialValues: ISelectSecurityReasonForm = {
 };
 
 export const SecurityReasonsYupSchema = yup.object().shape({
-  securityReasons: yup
-    .array()
-    .min(1, 'A minimum of 1 security reason is required')
-    .of(
-      yup.object().shape({
-        name: yup.string(),
-        description: yup.string()
-      })
-    )
+  securityReasons: yup.array().of(
+    yup.object().shape({
+      name: yup.string(),
+      description: yup.string()
+    })
+  )
 });
 
 /**
@@ -42,11 +39,7 @@ const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) =>
   const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
   persecutionHarmDataLoader.load();
 
-  const { values } = useFormikContext<ISelectSecurityReasonForm>();
-
-  if (!persecutionHarmDataLoader.data) {
-    return <></>; //TODO: Loader Spinner
-  }
+  const { values, setFieldValue } = useFormikContext<ISelectSecurityReasonForm>();
 
   return (
     <Paper elevation={3} sx={{ height: '100%', width: '100%', display: 'flex', overflow: 'hidden' }}>
@@ -54,20 +47,37 @@ const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) =>
         <ActionToolbar label={`Security Reasons`} labelProps={{ variant: 'h4' }} />
         <Divider></Divider>
         <Box sx={{ p: 2, height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
-          <SecurityReasonCategory
-            categoryName={'Persecution or Harm'}
-            securityReasons={persecutionHarmDataLoader.data as unknown as ISecurityReason[]}
-          />
+          {persecutionHarmDataLoader.data && (
+            <SecurityReasonCategory
+              categoryName={'Persecution or Harm'}
+              securityReasons={persecutionHarmDataLoader.data as unknown as ISecurityReason[]}
+            />
+          )}
         </Box>
       </Box>
 
       <Divider orientation="vertical" flexItem />
 
-      <Box sx={{ width: '50%' }}>
-        <ActionToolbar
-          label={`Applied Security Reasons (${values.securityReasons.length})`}
-          labelProps={{ variant: 'h4' }}
-        />
+      <Box sx={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex' }}>
+          <Box sx={{ width: '100%' }}>
+            <ActionToolbar
+              label={`Applied Security Reasons (${values.securityReasons.length})`}
+              labelProps={{ variant: 'h4' }}
+            />
+          </Box>
+          {values.securityReasons.length > 1 && (
+            <Button
+              sx={{ width: '20%', display: 'flex', justifyContent: 'center', alignContent: 'center' }}
+              variant="text"
+              color="primary"
+              onClick={() => {
+                setFieldValue('securityReasons', SecurityReasonsInitialValues.securityReasons);
+              }}>
+              Remove All
+            </Button>
+          )}
+        </Box>
         <Divider></Divider>
         <Box sx={{ p: 2, height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
           <FieldArray
@@ -75,6 +85,7 @@ const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) =>
             render={(arrayHelpers) => (
               <>
                 {values.securityReasons.map((securityReason, index) => {
+                  console.log('values.securityReasons', values.securityReasons);
                   return (
                     <Box key={securityReason.name} py={1} px={2}>
                       <SecurityReason

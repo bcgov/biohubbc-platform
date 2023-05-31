@@ -1,3 +1,5 @@
+import { mdiInformationOutline, mdiLock } from '@mdi/js';
+import Icon from '@mdi/react';
 import { Box, Divider } from '@mui/material';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -7,6 +9,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
+import YesNoDialog from 'components/dialog/YesNoDialog';
 import { Formik, FormikProps } from 'formik';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import React, { useRef, useState } from 'react';
@@ -15,7 +18,6 @@ import SecurityReasonSelector, {
   SecurityReasonsYupSchema
 } from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
-
 export interface IApplySecurityDialog {
   selectedArtifacts: IArtifact[];
   open: boolean;
@@ -32,6 +34,8 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
 
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
+
+  const [yesNoDialogOpen, setYesNoDialogOpen] = useState(false);
 
   const [formikRef] = useState(useRef<FormikProps<any>>(null));
 
@@ -58,9 +62,39 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           validateOnChange={false}
           onSubmit={(values) => {
             console.log('values', values);
+            onClose();
           }}>
           {(formikProps) => (
             <>
+              <YesNoDialog
+                open={yesNoDialogOpen}
+                onClose={() => setYesNoDialogOpen(false)}
+                onYes={async () => {
+                  await formikProps.submitForm();
+                  setYesNoDialogOpen(false);
+                }}
+                onNo={() => setYesNoDialogOpen(false)}
+                dialogTitle=""
+                dialogText=""
+                dialogContent={
+                  <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', alignContent: 'center' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'row', justifyContent: 'center' }}>
+                      <Icon path={mdiInformationOutline} size={5} color={'#a12622'} />
+                    </Box>
+                    <DialogTitle id="component-dialog-title" align={'center'}>
+                      Warning
+                    </DialogTitle>
+                    <DialogContentText id="alert-dialog-description" align={'center'} sx={{ py: 2 }}>
+                      You are going to make this document available to the public. This document can be downloaded.
+                      Also, if there is any security reasons, they will be removed.
+                    </DialogContentText>
+                    <DialogContentText id="alert-dialog-description" align={'center'}>
+                      <strong>Are you sure you would like to proceed?</strong>
+                    </DialogContentText>
+                  </Box>
+                }
+              />
+
               <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <Box sx={{ mb: 2 }}>
@@ -75,8 +109,26 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
               </DialogContent>
               <Divider />
               <DialogActions>
-                <Button onClick={formikProps.submitForm} color="primary" variant="contained" autoFocus>
-                  Submit
+                <Button
+                  title="Apply Security Rules"
+                  variant="contained"
+                  color="primary"
+                  disabled={formikProps.values.securityReasons.length === 0}
+                  startIcon={<Icon path={mdiLock} size={1} />}
+                  onClick={formikProps.submitForm}>
+                  Apply Security
+                </Button>
+
+                <Button
+                  title="No Security Required"
+                  variant="contained"
+                  color="primary"
+                  startIcon={<Icon path={mdiLock} size={1} />}
+                  onClick={() => {
+                    formikProps.setFieldValue('securityReasons', SecurityReasonsInitialValues.securityReasons);
+                    setYesNoDialogOpen(true);
+                  }}>
+                  No Security Required
                 </Button>
                 <Button onClick={onClose} color="primary" variant="outlined" autoFocus>
                   Cancel
