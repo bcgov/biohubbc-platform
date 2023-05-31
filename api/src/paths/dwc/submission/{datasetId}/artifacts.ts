@@ -74,7 +74,8 @@ GET.apiDoc = {
                       type: 'integer'
                     },
                     foi_reason: {
-                      type: 'boolean'
+                      type: 'boolean',
+                      nullable: true
                     },
                     key: {
                       type: 'string'

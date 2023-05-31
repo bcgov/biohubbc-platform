@@ -436,7 +436,7 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
-    const data = await this.submissionRepository.getDatasetsForReview(keys);
+    const data = await this.submissionRepository.getDatasetsForReview([]);
     const datasetsForReview: IDatasetsForReview[] = [];
 
     for await (const item of data) {
@@ -457,15 +457,19 @@ export class SubmissionService extends DBService {
         item.dataset_id
       );
       if (parentArtifactCount) {
-        dates.push(parentArtifactCount.last_updated ?? '');
+        const finalCount = rollUpCount + parentArtifactCount.artifacts_to_review;
 
-        datasetsForReview.push({
-          dataset_id: parentArtifactCount.dataset_id,
-          artifacts_to_review: rollUpCount + parentArtifactCount.artifacts_to_review,
-          dataset_name: item.dataset_name,
-          last_updated: this.mostRecentDate(dates),
-          keywords: item.keywords
-        });
+        // only push projects with artifacts to review
+        if (finalCount > 0) {
+          dates.push(parentArtifactCount.last_updated ?? '');
+          datasetsForReview.push({
+            dataset_id: parentArtifactCount.dataset_id,
+            artifacts_to_review: finalCount,
+            dataset_name: item.dataset_name,
+            last_updated: this.mostRecentDate(dates),
+            keywords: item.keywords
+          });
+        }
       }
     }
     return datasetsForReview;
