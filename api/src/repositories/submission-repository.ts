@@ -176,7 +176,7 @@ export interface ISubmissionObservationRecord {
   darwin_core_source: any;
   submission_security_request?: string | null;
   security_review_timestamp?: string | null;
-  foi_reason?: boolean;
+  foi_reason?: boolean | null;
   record_effective_timestamp?: string | null;
   record_end_timestamp?: string | null;
   create_date?: string;
