@@ -78,7 +78,6 @@ export function getPersecutionAndHarmRules(): RequestHandler {
 
       const securityService = new SecurityService(connection);
       const response = await securityService.getPersecutionAndHarmRules();
-      console.log('response', response);
 
       res.status(200).json(response);
     } catch (error) {

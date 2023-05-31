@@ -1,6 +1,6 @@
-import { mdiInformationOutline, mdiLock } from '@mdi/js';
+import { mdiAlphaX, mdiInformationOutline, mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Box, Divider } from '@mui/material';
+import { Box, Divider, IconButton } from '@mui/material';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -11,8 +11,10 @@ import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 import { Formik, FormikProps } from 'formik';
+import { useApi } from 'hooks/useApi';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import React, { useRef, useState } from 'react';
+import { ISecurityReason } from './SecurityReasonCategory';
 import SecurityReasonSelector, {
   SecurityReasonsInitialValues,
   SecurityReasonsYupSchema
@@ -30,6 +32,7 @@ export interface IApplySecurityDialog {
  * @return {*}
  */
 const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
+  const biohubApi = useApi();
   const { selectedArtifacts, open, onClose } = props;
 
   const theme = useTheme();
@@ -37,10 +40,33 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
 
   const [yesNoDialogOpen, setYesNoDialogOpen] = useState(false);
 
+  const [applySecurityCompleted, setApplySecurityCompleted] = useState(false);
+  const [applySecurityText, setApplySecurityText] = useState('');
+
   const [formikRef] = useState(useRef<FormikProps<any>>(null));
+
+  const handleSubmit = async (securityReasons: ISecurityReason[]) => {
+    const response = await biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, securityReasons);
+    console.log('response', response);
+  };
 
   return (
     <>
+      <Dialog
+        maxWidth="sm"
+        open={applySecurityCompleted}
+        aria-labelledby="component-dialog-title"
+        aria-describedby="component-dialog-description">
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'row', justifyContent: 'start' }}>
+          <DialogContentText id="alert-dialog-description" sx={{ py: 2 }}>
+            {applySecurityText}
+          </DialogContentText>
+          <IconButton onClick={() => setApplySecurityCompleted(false)} color="primary" aria-label="close">
+            <Icon path={mdiAlphaX} size={1.5} />
+          </IconButton>
+        </Box>
+      </Dialog>
+
       <Dialog
         fullScreen={fullScreen}
         maxWidth="xl"
@@ -60,8 +86,10 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           validationSchema={SecurityReasonsYupSchema}
           validateOnBlur={true}
           validateOnChange={false}
-          onSubmit={(values) => {
-            console.log('values', values);
+          onSubmit={(values: { securityReasons: ISecurityReason[] }) => {
+            handleSubmit(values.securityReasons);
+            setApplySecurityText('You successfully applied security reasons to the file (s).');
+            setApplySecurityCompleted(true);
             onClose();
           }}>
           {(formikProps) => (
@@ -71,6 +99,8 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onClose={() => setYesNoDialogOpen(false)}
                 onYes={async () => {
                   await formikProps.submitForm();
+                  setApplySecurityText('You successfully unsecued the file (s).');
+                  setApplySecurityCompleted(true);
                   setYesNoDialogOpen(false);
                 }}
                 onNo={() => setYesNoDialogOpen(false)}
@@ -105,7 +135,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                   <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
                 </Box>
 
-                <SecurityReasonSelector selectedArtifacts={selectedArtifacts} />
+                <SecurityReasonSelector />
               </DialogContent>
               <Divider />
               <DialogActions>

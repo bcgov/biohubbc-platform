@@ -1,5 +1,6 @@
 import { IDBConnection } from '../database/db';
-import { PersecutionAndHarmSecurity, SecurityRepository } from '../repositories/security-repository';
+import { Artifact } from '../repositories/artifact-repository';
+import { PersecutionAndHarmSecurity, SecurityReason, SecurityRepository } from '../repositories/security-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 
@@ -20,9 +21,55 @@ export class SecurityService extends DBService {
     this.securityRepository = new SecurityRepository(connection);
   }
 
+  /**
+   * Get persecution and harm rules.
+   *
+   * @return {*}  {Promise<PersecutionAndHarmSecurity[]>}
+   * @memberof SecurityService
+   */
   async getPersecutionAndHarmRules(): Promise<PersecutionAndHarmSecurity[]> {
     defaultLog.debug({ label: 'getPersecutionAndHarmRules' });
 
     return this.securityRepository.getPersecutionAndHarmRules();
+  }
+
+  /**
+   * Apply security rules to an artifact.
+   *
+   * @param {SecurityReason[]} securityReasons
+   * @param {Artifact[]} selectedArtifacts
+   * @return {*}  {(Promise<({ artifact_persecution_id: number } | undefined)[]>)}
+   * @memberof SecurityService
+   */
+  async applySecurityRulesToArtifacts(
+    securityReasons: SecurityReason[],
+    selectedArtifacts: Artifact[]
+  ): Promise<({ artifact_persecution_id: number } | undefined)[]> {
+    defaultLog.debug({ label: 'applySecurityRulesToArtifacts' });
+
+    const promise1 = selectedArtifacts.map(async (artifact) => {
+      for (const securityReason of securityReasons) {
+        return this.securityRepository.applySecurityRulesToArtifact(artifact.artifact_id, securityReason.id);
+      }
+    });
+
+    return await Promise.all(promise1);
+  }
+
+  /**
+   * Apply security rules to an artifact.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityService
+   */
+  async removeAllSecurityRulesFromArtifact(selectedArtifacts: Artifact[]): Promise<void> {
+    defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
+
+    const promise1 = selectedArtifacts.map(async (artifact) => {
+      return this.securityRepository.removeAllSecurityRulesFromArtifact(artifact.artifact_id);
+    });
+
+    await Promise.all(promise1);
   }
 }

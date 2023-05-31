@@ -3,12 +3,34 @@ import Icon from '@mdi/react';
 import { Collapse, Divider, IconButton, Paper, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import { FieldArray } from 'formik';
+import { IPersecutionHarmRule } from 'interfaces/useSecurityApi.interface';
 import { useState } from 'react';
 
 export interface ISecurityReason {
   name: string;
-  description?: string;
-  category?: string;
+  id: number;
+  type_id: number;
+  wldtaxonomic_units_id: number;
+  description: string | null;
+  category: string;
+}
+
+export class SecurityReasonClass implements ISecurityReason {
+  name: string;
+  id: number;
+  type_id: number;
+  wldtaxonomic_units_id: number;
+  description: string | null;
+  category: string;
+
+  constructor(props: IPersecutionHarmRule, category: string) {
+    this.name = props.name;
+    this.description = props.description;
+    this.category = category;
+    this.id = props.persecution_or_harm_id;
+    this.type_id = props.persecution_or_harm_type_id;
+    this.wldtaxonomic_units_id = props.wldtaxonomic_units_id;
+  }
 }
 
 export interface SecurityReasonProps {

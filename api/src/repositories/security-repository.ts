@@ -16,6 +16,13 @@ export const PersecutionAndHarmSecurity = z.object({
 
 export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecurity>;
 
+export const SecurityReason = z.object({
+  id: z.number(),
+  type_id: z.number()
+});
+
+export type SecurityReason = z.infer<typeof SecurityReason>;
+
 /**
  * A repository for maintaining security on artifacts.
  *
@@ -24,6 +31,12 @@ export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecuri
  * @extends BaseRepository
  */
 export class SecurityRepository extends BaseRepository {
+  /**
+   * Get persecution and harm rules.
+   *
+   * @return {*}  {Promise<PersecutionAndHarmSecurity[]>}
+   * @memberof SecurityRepository
+   */
   async getPersecutionAndHarmRules(): Promise<PersecutionAndHarmSecurity[]> {
     defaultLog.debug({ label: 'getPersecutionAndHarmRules' });
 
@@ -47,5 +60,66 @@ export class SecurityRepository extends BaseRepository {
     }
 
     return results;
+  }
+
+  /**
+   * Apply security rules to an artifact.
+   *
+   * @param {number} artifactId
+   * @param {number} securityId
+   * @return {*}  {Promise<{ artifact_persecution_id: number }>}
+   * @memberof SecurityRepository
+   */
+  async applySecurityRulesToArtifact(
+    artifactId: number,
+    securityId: number
+  ): Promise<{ artifact_persecution_id: number }> {
+    defaultLog.debug({ label: 'applySecurityRulesToArtifact' });
+
+    //TODO: add a check to see if the rule already exists
+    const sqlStatement = SQL`
+      INSERT INTO artifact_persecution (
+        artifact_id,
+        persecution_or_harm_id
+      ) VALUES (
+        ${artifactId},
+        ${securityId}
+      )
+      RETURNING artifact_persecution_id;
+    `;
+
+    const response = await this.connection.sql<{ artifact_persecution_id: number }>(sqlStatement);
+
+    const results = (response.rowCount && response.rows[0]) || null;
+
+    if (!results) {
+      throw new ApiExecuteSQLError('Failed to apply security rules to artifact');
+    }
+
+    return results;
+  }
+
+  /**
+   * Remove a security rule from an artifact.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityRepository
+   */
+  async removeAllSecurityRulesFromArtifact(artifactId: number): Promise<void> {
+    defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
+
+    const sqlStatement = SQL`
+      DELETE FROM
+        artifact_persecution
+      WHERE
+        artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to remove all security rules from artifact');
+    }
   }
 }

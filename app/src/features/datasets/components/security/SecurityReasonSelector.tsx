@@ -5,13 +5,9 @@ import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { FieldArray, useFormikContext } from 'formik';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import yup from 'utils/YupSchema';
-import SecurityReasonCategory, { ISecurityReason, SecurityReason } from './SecurityReasonCategory';
+import SecurityReasonCategory, { ISecurityReason, SecurityReason, SecurityReasonClass } from './SecurityReasonCategory';
 
-export interface SecurityReasonSelectorProps {
-  selectedArtifacts: IArtifact[];
-}
 export interface ISelectSecurityReasonForm {
   securityReasons: ISecurityReason[];
 }
@@ -34,12 +30,19 @@ export const SecurityReasonsYupSchema = yup.object().shape({
  *
  * @return {*}
  */
-const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) => {
+const SecurityReasonSelector: React.FC = () => {
   const biohubApi = useApi();
+  const { values, setFieldValue } = useFormikContext<ISelectSecurityReasonForm>();
   const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
   persecutionHarmDataLoader.load();
 
-  const { values, setFieldValue } = useFormikContext<ISelectSecurityReasonForm>();
+  if (!persecutionHarmDataLoader.data) {
+    return <></>;
+  }
+
+  const persecutionHarmRules = persecutionHarmDataLoader.data.map((rule) => {
+    return new SecurityReasonClass(rule, 'Persecution or Harm');
+  });
 
   return (
     <Paper elevation={3} sx={{ height: '100%', width: '100%', display: 'flex', overflow: 'hidden' }}>
@@ -50,7 +53,9 @@ const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) =>
           {persecutionHarmDataLoader.data && (
             <SecurityReasonCategory
               categoryName={'Persecution or Harm'}
-              securityReasons={persecutionHarmDataLoader.data as unknown as ISecurityReason[]}
+              securityReasons={persecutionHarmRules.filter((value: ISecurityReason) => {
+                return !values.securityReasons.some((reason) => reason.name === value.name);
+              })}
             />
           )}
         </Box>
@@ -85,7 +90,6 @@ const SecurityReasonSelector: React.FC<SecurityReasonSelectorProps> = (props) =>
             render={(arrayHelpers) => (
               <>
                 {values.securityReasons.map((securityReason, index) => {
-                  console.log('values.securityReasons', values.securityReasons);
                   return (
                     <Box key={securityReason.name} py={1} px={2}>
                       <SecurityReason

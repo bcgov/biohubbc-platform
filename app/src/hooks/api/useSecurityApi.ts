@@ -1,4 +1,6 @@
 import { AxiosInstance } from 'axios';
+import { ISecurityReason } from 'features/datasets/components/security/SecurityReasonCategory';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { IListPersecutionHarmResponse } from 'interfaces/useSecurityApi.interface';
 
 /**
@@ -19,8 +21,21 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const applySecurityReasonsToArtifacts = async (
+    selectedArtifacts: IArtifact[],
+    securityReasons: ISecurityReason[]
+  ): Promise<any> => {
+    const { data } = await axios.post('/api/security/persecution-harm/apply', {
+      selectedArtifacts: selectedArtifacts,
+      securityReasons: securityReasons
+    });
+
+    return data;
+  };
+
   return {
-    listPersecutionHarmRules
+    listPersecutionHarmRules,
+    applySecurityReasonsToArtifacts
   };
 };
 
