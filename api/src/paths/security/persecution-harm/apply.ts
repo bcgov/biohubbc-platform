@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { forEach } from 'lodash';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
@@ -107,14 +108,24 @@ export function applySecurityRulesToArtifacts(): RequestHandler {
 
       const securityService = new SecurityService(connection);
 
-      if (securityReasons.length === 0) {
-        await securityService.removeAllSecurityRulesFromArtifact(selectedArtifacts);
-        res.status(200).json([]);
-      } else {
-        const response = await securityService.applySecurityRulesToArtifacts(securityReasons, selectedArtifacts);
+      await securityService.removeAllSecurityRulesFromArtifact(selectedArtifacts);
 
-        res.status(200).json(response);
+      const response: { artifact_persecution_id: number }[] = [];
+
+      if (securityReasons.length > 0) {
+        const artifactPersecutionIds = await securityService.applySecurityRulesToArtifacts(
+          securityReasons,
+          selectedArtifacts
+        );
+
+        forEach(artifactPersecutionIds, (artifactPersecution) => {
+          forEach(artifactPersecution, (persecutionId) => {
+            response.push(persecutionId);
+          });
+        });
       }
+
+      res.status(200).json(response);
       await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'applySecurityRulesToArtifacts', message: 'error', error });

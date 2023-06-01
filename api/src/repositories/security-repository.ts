@@ -76,7 +76,6 @@ export class SecurityRepository extends BaseRepository {
   ): Promise<{ artifact_persecution_id: number }> {
     defaultLog.debug({ label: 'applySecurityRulesToArtifact' });
 
-    //TODO: add a check to see if the rule already exists
     const sqlStatement = SQL`
       INSERT INTO artifact_persecution (
         artifact_id,
@@ -118,7 +117,7 @@ export class SecurityRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement);
 
-    if (!response.rowCount) {
+    if (!response) {
       throw new ApiExecuteSQLError('Failed to remove all security rules from artifact');
     }
   }

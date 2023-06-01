@@ -44,16 +44,17 @@ export class SecurityService extends DBService {
   async applySecurityRulesToArtifacts(
     securityReasons: SecurityReason[],
     selectedArtifacts: Artifact[]
-  ): Promise<({ artifact_persecution_id: number } | undefined)[]> {
+  ): Promise<{ artifact_persecution_id: number }[][]> {
     defaultLog.debug({ label: 'applySecurityRulesToArtifacts' });
 
     const promise1 = selectedArtifacts.map(async (artifact) => {
-      for (const securityReason of securityReasons) {
+      const promise2 = securityReasons.map(async (securityReason) => {
         return this.securityRepository.applySecurityRulesToArtifact(artifact.artifact_id, securityReason.id);
-      }
+      });
+      return Promise.all(promise2);
     });
 
-    return await Promise.all(promise1);
+    return Promise.all(promise1);
   }
 
   /**
