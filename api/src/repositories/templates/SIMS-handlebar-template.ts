@@ -99,6 +99,22 @@ export const simsHandlebarsTemplate = `
           {{/each}}
         {{/each}}
 
+        <!-- PROJECT COORDINATOR -->
+        {{#if eml:eml.dataset.contact}}
+          <div>
+            <dt>
+              Project Coordinator
+            </dt>
+            <dd>
+              <ul class="hbr-project-coordinator">
+                <li>{{eml:eml.dataset.contact.individualName.givenName}} {{eml:eml.dataset.contact.individualName.surName}}</li>
+                <li>{{eml:eml.dataset.contact.organizationName}}</li>
+                <li><a href="mailto:{{eml:eml.dataset.contact.electronicMailAddress}}">{{eml:eml.dataset.contact.electronicMailAddress}}</a></li>
+              </ul>
+            </dd>
+          </div>
+        {{/if}}
+
         <!-- FUNDING SOURCES -->
         {{#if eml:eml.dataset.project.funding.section}}
           <div>
@@ -136,7 +152,7 @@ export const simsHandlebarsTemplate = `
                   Activities
                 </dt>
                 <dd>
-                  <ul>
+                  <ul style="padding: 0;">
                     {{#each metadata.IUCNConservationAction as | actions |}}
                       <li>
                         {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
@@ -148,17 +164,6 @@ export const simsHandlebarsTemplate = `
             {{/ifCond}}
           {{/each}}
         {{/each}}
-
-        {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
-          <div>
-            <dt>
-              Study Area:
-            </dt>
-            <dd>
-              {{eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
-            </dd>
-          </div>
-        {{/if}}
 
         {{#each eml:eml.dataset.project.abstract.section as | section |}}
           {{#ifCond section.title '===' "Intended Outcomes"}}
