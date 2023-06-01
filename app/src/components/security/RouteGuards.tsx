@@ -19,18 +19,7 @@ export const AuthenticatedRouteGuard: React.FC<React.PropsWithChildren<RouteProp
     <CheckForAuthLoginParam>
       <WaitForKeycloakToLoadUserInfo>
         <CheckIfAuthenticatedUser>
-          <Route
-            {...rest}
-            render={(props) => {
-              return (
-                <>
-                  {React.Children.map(children, (child: any) => {
-                    return React.cloneElement(child, props);
-                  })}
-                </>
-              );
-            }}
-          />
+          <Route {...rest}>{children}</Route>
         </CheckIfAuthenticatedUser>
       </WaitForKeycloakToLoadUserInfo>
     </CheckForAuthLoginParam>

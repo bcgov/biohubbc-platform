@@ -1,6 +1,7 @@
 import { useKeycloak } from '@react-keycloak/web';
 import Keycloak from 'keycloak-js';
 import { useCallback } from 'react';
+import { buildUrl } from 'utils/Utils';
 import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
 
@@ -93,6 +94,13 @@ export interface IKeycloakWrapper {
    * @memberof IKeycloakWrapper
    */
   refresh: () => void;
+  /**
+   * Generates the URL to sign in using Keycloak.
+   *
+   * @param {string} [redirectUri] Optionally URL to redirect the user to after logging in
+   * @memberof IKeycloakWrapper
+   */
+  getLoginUrl: (redirectUri?: string) => string;
 }
 
 /**
@@ -227,6 +235,10 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     userDataLoader.refresh();
   };
 
+  const getLoginUrl = (redirectUri = '/admin/dashboard'): string => {
+    return keycloak?.createLoginUrl({ redirectUri: buildUrl(window.location.origin, redirectUri) }) ?? '/login';
+  };
+
   return {
     keycloak,
     hasLoadedAllUserInfo: !!userDataLoader.data,
@@ -238,7 +250,8 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     email: email(),
     displayName: displayName(),
     systemUserId: systemUserId(),
-    refresh
+    refresh,
+    getLoginUrl
   };
 }
 

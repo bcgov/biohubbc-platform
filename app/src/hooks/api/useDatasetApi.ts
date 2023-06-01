@@ -1,6 +1,10 @@
 import { AxiosInstance } from 'axios';
 import { simsHandlebarsTemplate } from 'hooks/templates/SIMS-handlebar-template';
-import { IListArtifactsResponse, IListRelatedDatasetsResponse } from 'interfaces/useDatasetApi.interface';
+import {
+  IDatasetForReview,
+  IListArtifactsResponse,
+  IListRelatedDatasetsResponse
+} from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -17,6 +21,17 @@ const useDatasetApi = (axios: AxiosInstance) => {
    */
   const listAllDatasets = async (): Promise<IKeywordSearchResponse[]> => {
     const { data } = await axios.get(`api/dwc/eml/search`);
+
+    return data;
+  };
+
+  /**
+   * Fetch all unsecure datasets for review.
+   *
+   * @returns {*} {Promise<IDatasetForReview[]>}
+   */
+  const listAllDatasetsForReview = async (): Promise<IDatasetForReview[]> => {
+    const { data } = await axios.get(`api/administrative/review/list`);
 
     return data;
   };
@@ -80,6 +95,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
 
   return {
     listAllDatasets,
+    listAllDatasetsForReview,
     getDatasetEML,
     getDatasetArtifacts,
     getArtifactSignedUrl,

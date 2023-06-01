@@ -1,8 +1,10 @@
 import { JSONPath } from 'jsonpath-plus';
+import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
+  IDatasetsForReview,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -351,7 +353,7 @@ export class SubmissionService extends DBService {
     return {
       id: datasetId,
       source: submissionEMLJSON,
-      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
+      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count ?? 0
     };
   }
 
@@ -423,5 +425,76 @@ export class SubmissionService extends DBService {
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });
+  }
+
+  /**
+   * Gets datasets that have artifacts that require a security review.
+   * This will roll up any related projects to provide a "total" count of artifacts to review
+   *
+   * @param keys A list of keys to filter the data based on search criteria defined by the transform process
+   * @returns {*}  {Promise<IDatasetsForReview[]>}
+   * @memberof SubmissionService
+   */
+  async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
+    const data = await this.submissionRepository.getDatasetsForReview([]);
+    const datasetsForReview: IDatasetsForReview[] = [];
+
+    for await (const item of data) {
+      let rollUpCount = 0;
+      const dates: string[] = [];
+
+      if (item.related_projects) {
+        for await (const rp of item.related_projects) {
+          const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
+          if (rpCount) {
+            rollUpCount += rpCount.artifacts_to_review;
+            dates.push(rpCount.last_updated ?? '');
+          }
+        }
+      }
+
+      const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(
+        item.dataset_id
+      );
+      if (parentArtifactCount) {
+        const finalCount = rollUpCount + parentArtifactCount.artifacts_to_review;
+
+        // only push projects with artifacts to review
+        if (finalCount > 0) {
+          dates.push(parentArtifactCount.last_updated ?? '');
+          datasetsForReview.push({
+            dataset_id: parentArtifactCount.dataset_id,
+            artifacts_to_review: finalCount,
+            dataset_name: item.dataset_name,
+            last_updated: this.mostRecentDate(dates),
+            keywords: item.keywords
+          });
+        }
+      }
+    }
+    return datasetsForReview;
+  }
+
+  /**
+   * Compares and finds the most recent date given a list of date strings. Todays date is returned if no data is present in the list
+   *
+   * @param dates a list of date strings
+   * @returns {*} {string} the most recent date found
+   */
+  mostRecentDate(dates: string[]): string {
+    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
+    return dates[0] ?? moment();
+  }
+
+  /**
+   *
+   * @param submissionId
+   * @param submitterSystem
+   * @param datasetSearch
+   * @returns
+   * @memberof SubmissionService
+   */
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
+    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
   }
 }
