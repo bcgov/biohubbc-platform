@@ -82,6 +82,24 @@ export const simsHandlebarsTemplate = `
           {{/each}}
         {{/each}}
 
+        <!-- ACTIVITIES -->
+        {{#each eml:eml.additionalMetadata as | amd |}}
+          {{#each amd.metadata as | metadata |}}
+            {{#ifCond @key '===' "projectActivities"}}
+            <div>
+              <dt>
+                Activities
+              </dt>
+              <dd>
+                {{#each metadata.projectActivity as | activities |}}
+                  {{activities.name}}{{#unless @last}}, {{/unless}}
+                {{/each}}
+              </dd>
+            </div>
+            {{/ifCond}}
+          {{/each}}
+        {{/each}}
+
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
           <div>
             <dt>
