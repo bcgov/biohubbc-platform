@@ -113,6 +113,42 @@ export const simsHandlebarsTemplate = `
           </div>
         {{/if}}
 
+        <!-- PARTNERS -->
+        {{#if eml:eml.dataset.project.funding.section}}
+          <div>
+            <dt>
+              Partners
+            </dt>
+            <dd>
+              {{#each eml:eml.dataset.project.funding.section as | funding |}}
+                {{funding.para}}{{#unless @last}}, {{/unless}}
+              {{/each}}
+            </dd>
+          </div>
+        {{/if}}
+
+        <!-- CONSERVATION ACTIONS -->
+        {{#each eml:eml.additionalMetadata as | amd |}}
+          {{#each amd.metadata as | metadata |}}
+            {{#ifCond @key '===' "IUCNConservationActions"}}
+            <div>
+              <dt>
+                Activities
+              </dt>
+              <dd>
+                <ul>
+                  {{#each metadata.IUCNConservationAction as | actions |}}
+                    <li>
+                      {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                    </li>
+                  {{/each}}
+                </ul>
+              </dd>
+            </div>
+            {{/ifCond}}
+          {{/each}}
+        {{/each}}
+
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
           <div>
             <dt>
