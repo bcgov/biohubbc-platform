@@ -1,7 +1,7 @@
 export const simsHandlebarsTemplate = `
   <div class="hbr-container">
 
-  <!-- HEADER -->
+    <!-- HEADER -->
     {{#if eml:eml.dataset.title}}
       <div class="hbr-header">
         <div class="hbr-header-title-primary"> {{eml:eml.dataset.title}}</div>
@@ -60,7 +60,7 @@ export const simsHandlebarsTemplate = `
               Timeline:
             </dt>
             <dd>
-              {{eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate}} to {{eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate}}
+              {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate}}{{/formatDate}} - {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate}}{{/formatDate}}
             </dd>
           </div>
         {{/if}}

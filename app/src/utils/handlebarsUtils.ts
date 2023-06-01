@@ -1,4 +1,5 @@
 import Handlebars, { HelperOptions } from 'handlebars';
+import moment from 'moment';
 
 export const useHandlebars = () => {
   /**
@@ -42,6 +43,13 @@ export const useHandlebars = () => {
       return text;
     });
   };
+
+  const formatDateHelper = () => {
+    Handlebars.registerHelper('formatDate', (dateString)=> {
+      return moment(dateString, 'YYYY-MM-DD').format("MMM YYYY").toString()
+    })
+  }
+
   /**
    * This function converts a rawTemplate to a template
    *
@@ -51,6 +59,7 @@ export const useHandlebars = () => {
   const compileFromRawTemplate = (template: TemplateSpecification): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
     capitalizeFirst();
+    formatDateHelper();
     return Handlebars.compile(template);
   };
 
