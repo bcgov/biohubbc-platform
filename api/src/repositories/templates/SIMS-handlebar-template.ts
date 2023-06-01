@@ -5,7 +5,6 @@ export const simsHandlebarsTemplate = `
     {{#if eml:eml.dataset.title}}
       <div class="hbr-header">
         <div class="hbr-header-title-primary"> {{eml:eml.dataset.title}}</div>
-
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#with (lookup amd.metadata "types") as | projectType | ~}}
             {{#ifCond amd.describes '===' @root.eml:eml.dataset.[@_id]}}
@@ -100,6 +99,20 @@ export const simsHandlebarsTemplate = `
           {{/each}}
         {{/each}}
 
+        <!-- FUNDING SOURCES -->
+        {{#if eml:eml.dataset.project.funding.section}}
+          <div>
+            <dt>
+              Funding Sources
+            </dt>
+            <dd>
+              {{#each eml:eml.dataset.project.funding.section as | funding |}}
+                {{funding.para}}{{#unless @last}}, {{/unless}}
+              {{/each}}
+            </dd>
+          </div>
+        {{/if}}
+
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.geographicCoverage.geographicDescription}}
           <div>
             <dt>
@@ -141,7 +154,7 @@ export const simsHandlebarsTemplate = `
 
     <!-- DOCUMENTS -->
     <div class="meta-container">
-      {{#each eml:eml.additionalMetadata as | amd |}}
+    {{#each eml:eml.additionalMetadata as | amd |}}
         {{#with (lookup amd.metadata "projectAttachments") as | attachments | ~}}
 
           <div class="meta-title-container">
@@ -179,7 +192,7 @@ export const simsHandlebarsTemplate = `
 
 
     <div class="meta-container">
-      {{#each eml:eml.additionalMetadata as | amd |}}
+    {{#each eml:eml.additionalMetadata as | amd |}}
 
         {{#with (lookup amd.metadata "projectReportAttachments") as | attachments | ~}}
           <div class="meta-title-container">
