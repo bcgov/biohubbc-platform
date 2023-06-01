@@ -79,7 +79,6 @@ const phases = {
     tag: `dev-${version}-${deployChangeId}`,
     host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
-    adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'dev',
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
@@ -107,7 +106,6 @@ const phases = {
     tag: `test-${version}`,
     host: staticUrlsAPI.test,
     appHost: staticUrls.test,
-    adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'test',
     elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
     elasticsearchEmlIndex: 'eml',
@@ -135,7 +133,6 @@ const phases = {
     tag: `prod-${version}`,
     host: staticUrlsAPI.prod,
     appHost: staticUrls.prod,
-    adminHost: 'https://loginproxy.gov.bc.ca/auth',
     env: 'prod',
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',

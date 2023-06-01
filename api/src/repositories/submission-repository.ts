@@ -1,9 +1,41 @@
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
-import { getKnexQueryBuilder } from '../database/db';
+import { z } from 'zod';
+import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+
+export interface IDatasetsForReview {
+  dataset_id: string; // UUID
+  artifacts_to_review: number;
+  dataset_name: string;
+  last_updated: string;
+  keywords: string[];
+}
+
+export const DatasetMetadata = z.object({
+  dataset_id: z.string(),
+  submission_id: z.number(),
+  dataset_name: z.string(),
+  keywords: z.array(z.string()),
+  related_projects: z
+    .array(z.any())
+    .nullable()
+    .optional()
+    .transform((item) => item || [])
+});
+
+export type DatasetMetadata = z.infer<typeof DatasetMetadata>;
+
+export const DatasetArtifactCount = z.object({
+  dataset_id: z.string(),
+  submission_id: z.number(),
+  artifacts_to_review: z.number(),
+  last_updated: z.string().nullable()
+});
+
+export type DatasetArtifactCount = z.infer<typeof DatasetArtifactCount>;
 
 export interface ISpatialComponentCount {
   spatial_type: string;
@@ -144,7 +176,7 @@ export interface ISubmissionObservationRecord {
   darwin_core_source: any;
   submission_security_request?: string | null;
   security_review_timestamp?: string | null;
-  foi_reason_description?: string | null;
+  foi_reason?: boolean | null;
   record_effective_timestamp?: string | null;
   record_end_timestamp?: string | null;
   create_date?: string;
@@ -744,13 +776,13 @@ export class SubmissionRepository extends BaseRepository {
         submission_id,
         darwin_core_source,
         submission_security_request,
-        foi_reason_description,
+        foi_reason,
         record_effective_timestamp
       ) VALUES (
         ${submissonObservation.submission_id},
         ${submissonObservation.darwin_core_source},
         ${submissonObservation.submission_security_request},
-        ${submissonObservation.foi_reason_description},
+        ${submissonObservation.foi_reason},
         now()
       )
       RETURNING
@@ -856,5 +888,83 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql(sqlStatement);
 
     return response.rowCount;
+  }
+
+  /**
+   *
+   * @param submissionId the submission to update
+   * @param datasetSearch
+   * @returns {*} {Promise<number>} the number of rows updated
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
+    const sql = SQL`
+    UPDATE 
+      submission_metadata 
+    SET 
+      dataset_search_criteria=${datasetSearch}
+    WHERE submission_id = ${submissionId}
+    AND record_end_timestamp IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    return response.rowCount;
+  }
+
+  /**
+   * Gets datasets that have artifacts that require a security review.
+   *
+   * @param keywordFilter A list of keys to filter the data based on search criteria defined by the transform process
+   * @returns {*}  {Promise<IDatasetsForReview[]>}
+   */
+  async getDatasetsForReview(keywordFilter: string[]): Promise<DatasetMetadata[]> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        's.uuid as dataset_id',
+        'sm.submission_id',
+        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name`),
+        knex.raw(`sm.dataset_search_criteria::json->'primaryKeywords' as keywords`),
+        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects`)
+      )
+      .from('submission as s')
+      .leftJoin('submission_metadata as sm', 'sm.submission_id', 's.submission_id')
+      .whereNull('sm.record_end_timestamp')
+      // the ?| operator does a containment check meaning it will check if any elements in the left side array exist in the right side array
+      .whereRaw(
+        `(sm.dataset_search_criteria->'primaryKeywords')::jsonb \\?| array[${"'" + keywordFilter.join("','") + "'"}]`
+      );
+
+    const response = await this.connection.knex(queryBuilder, DatasetMetadata);
+
+    return response.rows;
+  }
+
+  /**
+   * Gets a count of all artifacts for a given submission UUID.
+   *
+   * @param uuid UUID of the submission to look for
+   * @returns {*} Promise<DatasetArtifactCount | undefined>
+   */
+  async getArtifactForReviewCountForSubmissionUUID(uuid: string): Promise<DatasetArtifactCount | undefined> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        's.uuid as dataset_id',
+        's.submission_id',
+        knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
+        knex.raw(`MAX(a.create_date)::date as last_updated`)
+      )
+      .from('submission as s')
+      .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
+      .whereNull('a.security_review_timestamp')
+      .where('s.uuid', uuid)
+      .groupBy(['s.submission_id', 's.uuid']);
+    const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
+
+    return response.rows[0];
   }
 }

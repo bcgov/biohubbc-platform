@@ -48,7 +48,7 @@ GET.apiDoc = {
                     'description',
                     'file_name',
                     'file_size',
-                    'foi_reason_description',
+                    'foi_reason',
                     'key',
                     'security_review_timestamp',
                     'submission_id',
@@ -73,8 +73,8 @@ GET.apiDoc = {
                     file_size: {
                       type: 'integer'
                     },
-                    foi_reason_description: {
-                      type: 'string',
+                    foi_reason: {
+                      type: 'boolean',
                       nullable: true
                     },
                     key: {

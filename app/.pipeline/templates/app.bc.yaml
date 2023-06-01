@@ -1,10 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  creationTimestamp: null
+  name: biohub-platform-app-bc
   labels:
     build: biohub-platform-app
-  name: biohub-platform-app
 parameters:
   - name: NAME
     displayName: Name

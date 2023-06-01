@@ -1,6 +1,7 @@
 import { useKeycloak } from '@react-keycloak/web';
 import Keycloak from 'keycloak-js';
 import { useCallback } from 'react';
+import { buildUrl } from 'utils/Utils';
 import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
 
@@ -47,10 +48,10 @@ export interface IKeycloakWrapper {
   /**
    * Original raw keycloak object.
    *
-   * @type {(Keycloak | undefined)}
+   * @type {(Keycloak)}
    * @memberof IKeycloakWrapper
    */
-  keycloak: Keycloak | undefined;
+  keycloak: Keycloak;
   /**
    * Returns `true` if the user's information has been loaded, false otherwise.
    *
@@ -72,13 +73,6 @@ export interface IKeycloakWrapper {
    */
   hasSystemRole: (validSystemRoles?: string[]) => boolean;
   /**
-   * True if the user has at least 1 pending access request.
-   *
-   * @type {boolean}
-   * @memberof IKeycloakWrapper
-   */
-  hasAccessRequest: boolean;
-  /**
    * Get out the username portion of the preferred_username from the token.
    *
    * @memberof IKeycloakWrapper
@@ -97,11 +91,16 @@ export interface IKeycloakWrapper {
   /**
    * Force this keycloak wrapper to refresh its data.
    *
-   * Note: currently this only refreshes the `hasAccessRequest` property.
-   *
    * @memberof IKeycloakWrapper
    */
   refresh: () => void;
+  /**
+   * Generates the URL to sign in using Keycloak.
+   *
+   * @param {string} [redirectUri] Optionally URL to redirect the user to after logging in
+   * @memberof IKeycloakWrapper
+   */
+  getLoginUrl: (redirectUri?: string) => string;
 }
 
 /**
@@ -117,7 +116,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
 
   const keycloakUserDataLoader = useDataLoader(async () => {
     return (
-      (keycloak &&
+      (keycloak.token &&
         (keycloak.loadUserInfo() as unknown as IIDIRUserInfo | IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)) ||
       undefined
     );
@@ -130,7 +129,7 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     keycloakUserDataLoader.load();
   }
 
-  if (keycloak?.authenticated) {
+  if (keycloak.authenticated) {
     // keycloak user is authenticated, load system user info
     userDataLoader.load();
   }
@@ -196,15 +195,15 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   }, [keycloakUserDataLoader.data, userDataLoader.data]);
 
   const systemUserId = (): number => {
-    return userDataLoader.data?.id || 0;
+    return userDataLoader.data?.id ?? 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return userDataLoader.data?.role_names || [];
+    return userDataLoader.data?.role_names ?? [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
-    if (!validSystemRoles || !validSystemRoles.length) {
+    if (!validSystemRoles?.length) {
       return true;
     }
 
@@ -236,19 +235,23 @@ function useKeycloakWrapper(): IKeycloakWrapper {
     userDataLoader.refresh();
   };
 
+  const getLoginUrl = (redirectUri = '/admin/dashboard'): string => {
+    return keycloak?.createLoginUrl({ redirectUri: buildUrl(window.location.origin, redirectUri) }) ?? '/login';
+  };
+
   return {
     keycloak,
     hasLoadedAllUserInfo: !!userDataLoader.data,
     systemRoles: getSystemRoles(),
     hasSystemRole,
-    hasAccessRequest: false,
     getUserIdentifier,
     getIdentitySource,
     username: username(),
     email: email(),
     displayName: displayName(),
     systemUserId: systemUserId(),
-    refresh
+    refresh,
+    getLoginUrl
   };
 }
 

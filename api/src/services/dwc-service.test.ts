@@ -1207,6 +1207,7 @@ describe('DarwinCoreService', () => {
         .resolves({ source_transform_id: 2, metadata_transform: 'some transform' } as unknown as ISourceTransformModel);
 
       sinon.stub(SubmissionService.prototype, 'getSubmissionMetadataJson').resolves('transformed metadata');
+      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataWithSearchKeys').resolves(1);
 
       const uploadToElasticSearchStub = sinon
         .stub(DarwinCoreService.prototype, 'uploadToElasticSearch')
