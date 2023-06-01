@@ -131,20 +131,20 @@ export const simsHandlebarsTemplate = `
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#each amd.metadata as | metadata |}}
             {{#ifCond @key '===' "IUCNConservationActions"}}
-            <div>
-              <dt>
-                Activities
-              </dt>
-              <dd>
-                <ul>
-                  {{#each metadata.IUCNConservationAction as | actions |}}
-                    <li>
-                      {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
-                    </li>
-                  {{/each}}
-                </ul>
-              </dd>
-            </div>
+              <div>
+                <dt>
+                  Activities
+                </dt>
+                <dd>
+                  <ul>
+                    {{#each metadata.IUCNConservationAction as | actions |}}
+                      <li>
+                        {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                      </li>
+                    {{/each}}
+                  </ul>
+                </dd>
+              </div>
             {{/ifCond}}
           {{/each}}
         {{/each}}
