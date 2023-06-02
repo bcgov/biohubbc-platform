@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { forEach } from 'lodash';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';

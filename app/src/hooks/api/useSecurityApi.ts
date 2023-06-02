@@ -1,6 +1,4 @@
 import { AxiosInstance } from 'axios';
-import { ISecurityReason } from 'features/datasets/components/security/SecurityReasonCategory';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { IListPersecutionHarmResponse } from 'interfaces/useSecurityApi.interface';
 
 /**
