@@ -95,7 +95,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       )}
       {datasetList.length > 0 && !unsecuredDatasetDataLoader.isLoading && (
         <DataGrid
-          sx={{ borderTop: '1pt solid #dadada' }}
+          sx={{ borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
           data-testid="security-reviews-data-grid"
           getRowId={(row) => row.dataset_id}
           autoHeight
@@ -105,7 +105,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
           disableRowSelectionOnClick
           disableColumnSelector
           disableColumnMenu
-          hideFooterPagination
+          hideFooter
           sortingOrder={['asc', 'desc']}
           initialState={{
             sorting: { sortModel: [{ field: 'last_updated', sort: 'desc' }] },
