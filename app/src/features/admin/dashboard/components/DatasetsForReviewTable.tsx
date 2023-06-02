@@ -74,6 +74,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
         <Box
           sx={{
             p: 2,
+            m: 1,
             display: 'flex',
             flexFlow: 'column',
             alignItems: 'center',
@@ -94,6 +95,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       )}
       {datasetList.length > 0 && !unsecuredDatasetDataLoader.isLoading && (
         <DataGrid
+          sx={{ borderTop: '1pt solid #dadada' }}
           data-testid="security-reviews-data-grid"
           getRowId={(row) => row.dataset_id}
           autoHeight
