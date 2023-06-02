@@ -31,13 +31,16 @@ GET.apiDoc = {
               ],
               properties: {
                 persecution_or_harm_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 },
                 persecution_or_harm_type_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 },
                 wldtaxonomic_units_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 },
                 name: {
                   type: 'string'

@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { forEach } from 'lodash';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
@@ -24,33 +23,20 @@ POST.apiDoc = {
         schema: {
           title: 'Security Reason and Artifacts Arrays',
           type: 'object',
-          required: ['selectedArtifacts', 'securityReasons'],
+          required: ['artifactIds', 'securityReasonIds'],
           properties: {
-            selectedArtifacts: {
+            artifactIds: {
               type: 'array',
               items: {
-                type: 'object',
-                required: ['artifact_id'],
-                properties: {
-                  artifact_id: {
-                    type: 'number'
-                  }
-                }
+                type: 'integer',
+                minimum: 1
               }
             },
-            securityReasons: {
+            securityReasonIds: {
               type: 'array',
               items: {
-                type: 'object',
-                required: ['id', 'type_id'],
-                properties: {
-                  id: {
-                    type: 'number'
-                  },
-                  type_id: {
-                    type: 'number'
-                  }
-                }
+                type: 'integer',
+                minimum: 1
               }
             }
           }
@@ -71,7 +57,8 @@ POST.apiDoc = {
               required: ['artifact_persecution_id'],
               properties: {
                 artifact_persecution_id: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 }
               }
             }
@@ -101,28 +88,19 @@ export function applySecurityRulesToArtifacts(): RequestHandler {
     defaultLog.debug({ label: 'applySecurityRulesToArtifacts', message: 'request body', req_body: req.body });
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
-    const { selectedArtifacts, securityReasons } = req.body;
+    const { artifactIds, securityReasonIds } = req.body;
 
     try {
       await connection.open();
 
       const securityService = new SecurityService(connection);
 
-      await securityService.removeAllSecurityRulesFromArtifact(selectedArtifacts);
+      await securityService.removeAllSecurityRulesFromArtifact(artifactIds);
 
-      const response: { artifact_persecution_id: number }[] = [];
+      let response: { artifact_persecution_id: number }[] = [];
 
-      if (securityReasons.length > 0) {
-        const artifactPersecutionIds = await securityService.applySecurityRulesToArtifacts(
-          securityReasons,
-          selectedArtifacts
-        );
-
-        forEach(artifactPersecutionIds, (artifactPersecution) => {
-          forEach(artifactPersecution, (persecutionId) => {
-            response.push(persecutionId);
-          });
-        });
+      if (securityReasonIds.length > 0) {
+        response = await securityService.applySecurityRulesToArtifacts(securityReasonIds, artifactIds);
       }
 
       res.status(200).json(response);

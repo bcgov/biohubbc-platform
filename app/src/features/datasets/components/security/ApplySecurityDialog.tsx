@@ -46,8 +46,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const [formikRef] = useState(useRef<FormikProps<any>>(null));
 
   const handleSubmit = async (securityReasons: ISecurityReason[]) => {
-    const response = await biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, securityReasons);
-    console.log('response', response);
+    await biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, securityReasons);
   };
 
   return (
@@ -88,7 +87,9 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           validateOnChange={false}
           onSubmit={(values: { securityReasons: ISecurityReason[] }) => {
             handleSubmit(values.securityReasons);
-            setApplySecurityText('You successfully applied security reasons to the file (s).');
+            setApplySecurityText(
+              `You successfully applied security reasons to the file${selectedArtifacts.length > 1 && 's'}.`
+            );
             setApplySecurityCompleted(true);
             onClose();
           }}>
@@ -99,7 +100,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onClose={() => setYesNoDialogOpen(false)}
                 onYes={async () => {
                   await formikProps.submitForm();
-                  setApplySecurityText('You successfully unsecued the file (s).');
+                  setApplySecurityText(`You successfully  unsecured the file${selectedArtifacts.length > 1 && 's'}.`);
                   setApplySecurityCompleted(true);
                   setYesNoDialogOpen(false);
                 }}
@@ -116,7 +117,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                     </DialogTitle>
                     <DialogContentText id="alert-dialog-description" align={'center'} sx={{ py: 2 }}>
                       You are going to make this document available to the public. This document can be downloaded.
-                      Also, if there is any security reasons, they will be removed.
+                      Also, if there are any security reasons, they will be removed.
                     </DialogContentText>
                     <DialogContentText id="alert-dialog-description" align={'center'}>
                       <strong>Are you sure you would like to proceed?</strong>
@@ -129,7 +130,8 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <Box sx={{ mb: 2 }}>
                   <DialogContentText id="alert-dialog-description">
-                    Search for the security reasons and apply them to the selected doument(s).
+                    Search for the security reasons and apply them to the selected document
+                    {selectedArtifacts.length > 1 && 's'}.
                   </DialogContentText>
 
                   <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />

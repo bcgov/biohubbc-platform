@@ -1,6 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { Artifact } from '../repositories/artifact-repository';
-import { PersecutionAndHarmSecurity, SecurityReason, SecurityRepository } from '../repositories/security-repository';
+import { PersecutionAndHarmSecurity, SecurityRepository } from '../repositories/security-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 
@@ -34,7 +33,7 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Apply security rules to an artifact.
+   * Apply security rules to all selected artifacts.
    *
    * @param {SecurityReason[]} securityReasons
    * @param {Artifact[]} selectedArtifacts
@@ -42,35 +41,35 @@ export class SecurityService extends DBService {
    * @memberof SecurityService
    */
   async applySecurityRulesToArtifacts(
-    securityReasons: SecurityReason[],
-    selectedArtifacts: Artifact[]
-  ): Promise<{ artifact_persecution_id: number }[][]> {
+    artifactIds: number[],
+    securityReasonIds: number[]
+  ): Promise<{ artifact_persecution_id: number }[]> {
     defaultLog.debug({ label: 'applySecurityRulesToArtifacts' });
 
-    const promise1 = selectedArtifacts.map(async (artifact) => {
-      const promise2 = securityReasons.map(async (securityReason) => {
-        return this.securityRepository.applySecurityRulesToArtifact(artifact.artifact_id, securityReason.id);
-      });
-      return Promise.all(promise2);
-    });
+    const promises: Promise<{ artifact_persecution_id: number }>[] = artifactIds.reduce(
+      (acc: Promise<{ artifact_persecution_id: number }>[], artifactId: number) => {
+        securityReasonIds.forEach((securityReasonId: number) => {
+          acc.push(this.securityRepository.applySecurityRulesToArtifact(artifactId, securityReasonId));
+        });
 
-    return Promise.all(promise1);
+        return acc;
+      },
+      []
+    );
+
+    return Promise.all(promises);
   }
 
   /**
-   * Apply security rules to an artifact.
+   * Remove all security rules from an artifact.
    *
    * @param {number} artifactId
    * @return {*}  {Promise<void>}
    * @memberof SecurityService
    */
-  async removeAllSecurityRulesFromArtifact(selectedArtifacts: Artifact[]): Promise<void> {
+  async removeAllSecurityRulesFromArtifact(artifactIds: number[]): Promise<void> {
     defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
 
-    const promise1 = selectedArtifacts.map(async (artifact) => {
-      return this.securityRepository.removeAllSecurityRulesFromArtifact(artifact.artifact_id);
-    });
-
-    await Promise.all(promise1);
+    await Promise.all(artifactIds.map(this.securityRepository.removeAllSecurityRulesFromArtifact));
   }
 }

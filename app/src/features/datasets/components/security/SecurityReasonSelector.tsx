@@ -93,7 +93,7 @@ const SecurityReasonSelector: React.FC = () => {
                   return (
                     <Box key={securityReason.name} py={1} px={2}>
                       <SecurityReason
-                        key={index}
+                        key={securityReason.id}
                         securityReason={securityReason}
                         onClickSecurityReason={() => arrayHelpers.remove(index)}
                         icon="minus"
