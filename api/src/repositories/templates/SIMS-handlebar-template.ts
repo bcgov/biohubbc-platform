@@ -1,4 +1,6 @@
-export const simsHandlebarsTemplate = `
+export const simsHandlebarsTemplate_HEADER = ``
+
+export const simsHandlebarsTemplate_DETAILS = `
   <div class="hbr-container">
 
     <!-- HEADER -->
@@ -18,7 +20,7 @@ export const simsHandlebarsTemplate = `
     <!-- DETAILS -->
     <div class="details-container">
       <div class="details-container-title">
-        Details
+        Project Details
       </div>
       
       <dl class="details-container-metadata">

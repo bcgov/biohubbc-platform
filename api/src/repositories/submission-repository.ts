@@ -4,8 +4,12 @@ import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
-import { simsHandlebarsTemplate } from './templates/SIMS-handlebar-template';
+import { simsHandlebarsTemplate, simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
+export interface IDetailsPage {
+  header: string
+  details: string
+}
 export interface ISpatialComponentCount {
   spatial_type: string;
   count: number;
@@ -860,11 +864,16 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Finds an object of handlebars templates for a given datasetId to power the project details page 
    * 
-   * @param datasetId 
-   * @returns 
+   * @param datasetId a dataset UUID for determining the handlebars template to fetch
+   * @returns {*} {Promise<IDetailsPage>} an object containing a string of handlebars templates
+   * @memberof SubmissionRepository
    */
-  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<string> {
-    return simsHandlebarsTemplate;
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IDetailsPage> {
+    return {
+      header: simsHandlebarsTemplate_HEADER,
+      details: simsHandlebarsTemplate_DETAILS
+    };
   }
 }

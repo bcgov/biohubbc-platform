@@ -67,14 +67,14 @@ export const useHandlebars = () => {
    * This function converts a precompiled template
    * see Readme/handlebars.md for more information
    *
-   * @param {TemplateSpecification} preCompiledtemplate
+   * @param {TemplateSpecification} preCompiledTemplate
    * @return {*}  {HandlebarsTemplateDelegate}
    */
-  const compileFromPrecompiledTemplate = (preCompiledtemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
+  const compileFromPrecompiledTemplate = (preCompiledTemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
     // This is a workaround to using Handlebars.template(preCompiledTemplate)
     // in order to avoid an unknown object exception
 
-    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledtemplate})`;
+    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledTemplate})`;
     // eslint-disable-next-line no-eval
     const handlebarsFunction = eval(encodedHandlebarsFunction);
 
