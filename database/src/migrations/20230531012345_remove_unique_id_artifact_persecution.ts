@@ -15,7 +15,7 @@ export async function up(knex: Knex): Promise<void> {
 
     set search_path=biohub;
     DROP INDEX if exists artifact_persecution_uk1;
-    CREATE INDEX artifact_persecution_uk1 ON artifact_persecution(persecution_or_harm_id);
+    CREATE unique INDEX artifact_persecution_uk1 ON artifact_persecution(persecution_or_harm_id, artifact_id);
 
     set search_path=biohub_dapi_v1;
     CREATE OR REPLACE VIEW artifact_persecution as SELECT * FROM biohub.artifact_persecution;
