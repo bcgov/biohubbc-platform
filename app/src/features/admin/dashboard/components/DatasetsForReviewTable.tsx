@@ -73,12 +73,11 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       {datasetList.length === 0 && !unsecuredDatasetDataLoader.isLoading && (
         <Box
           sx={{
-            p: 2,
+            p: 3,
             m: 1,
             display: 'flex',
             flexFlow: 'column',
             alignItems: 'center',
-            top: '50%',
             position: 'relative',
             border: '1pt solid #dadada',
             borderRadius: '4px'

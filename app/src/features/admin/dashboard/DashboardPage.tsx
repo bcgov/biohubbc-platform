@@ -25,7 +25,7 @@ const DashboardPage = () => {
         <Typography
           variant="h3"
           sx={{
-            p: 2,
+            p: 3,
             borderBottom: '1pt solid #dadada',
             mb: 1
           }}>
