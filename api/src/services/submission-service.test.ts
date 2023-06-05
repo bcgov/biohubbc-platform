@@ -582,4 +582,87 @@ describe('SubmissionService', () => {
       });
     });
   });
+
+  describe('getDatasetsForReview', () => {
+    it('should return a rolled up dataset for review', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const stubDataset = sinon.stub(SubmissionRepository.prototype, 'getDatasetsForReview').resolves([
+        {
+          dataset_id: 'UUID',
+          submission_id: 1,
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: []
+        },
+        {
+          dataset_id: 'UUID',
+          submission_id: 2,
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: [{ ['@_id']: 'RP_UUID_1' }, { ['@_id']: 'RP_UUID_2' }]
+        },
+        {
+          dataset_id: 'UUID',
+          submission_id: 3,
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: [{ ['@_id']: 'RP_UUID_3' }]
+        }
+      ]);
+      const stubArtifactCount = sinon
+        .stub(SubmissionRepository.prototype, 'getArtifactForReviewCountForSubmissionUUID')
+        .resolves({
+          dataset_id: '',
+          submission_id: 1,
+          artifacts_to_review: 1,
+          last_updated: ''
+        });
+
+      const response = await submissionService.getDatasetsForReview(['']);
+
+      expect(stubDataset).to.be.calledOnce;
+      expect(stubArtifactCount).to.be.calledWith('RP_UUID_1');
+      expect(stubArtifactCount).to.be.calledWith('RP_UUID_2');
+      expect(stubArtifactCount).to.be.calledWith('RP_UUID_3');
+      expect(response).to.be.eql([
+        {
+          dataset_id: '',
+          artifacts_to_review: 1,
+          dataset_name: 'Project Name',
+          last_updated: '',
+          keywords: []
+        },
+        {
+          dataset_id: '',
+          artifacts_to_review: 3,
+          dataset_name: 'Project Name',
+          last_updated: '',
+          keywords: []
+        },
+        {
+          dataset_id: '',
+          artifacts_to_review: 2,
+          dataset_name: 'Project Name',
+          last_updated: '',
+          keywords: []
+        }
+      ]);
+    });
+  });
+
+  describe('updateSubmissionMetadataWithSearchKeys', () => {
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionMetadataWithSearchKeys').resolves(1);
+
+      const response = await submissionService.updateSubmissionMetadataWithSearchKeys(1, {});
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
 });

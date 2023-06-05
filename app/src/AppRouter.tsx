@@ -4,6 +4,7 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
+import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import LogOutPage from 'features/logout/LogOutPage';
@@ -49,11 +50,23 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
         <AccessDenied />
       </AppRoute>
 
-      <Redirect exact from="/admin" to="/admin/users" />
+      <Redirect exact from="/admin" to="/admin/dashboard" />
+
+      <AppRoute exact path="/admin/dashboard" title={getTitle('Dashboard')} layout={BaseLayout}>
+        <AuthenticatedRouteGuard>
+          <SystemRoleGuard
+            validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+            fallback={<Redirect to="/forbidden" />}>
+            <AdminDashboardRouter />
+          </SystemRoleGuard>
+        </AuthenticatedRouteGuard>
+      </AppRoute>
 
       <AppRoute path="/admin/users" title={getTitle('Users')} layout={BaseLayout}>
         <AuthenticatedRouteGuard>
-          <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]} fallback={<Redirect to="/forbidden" />}>
+          <SystemRoleGuard
+            validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+            fallback={<Redirect to="/forbidden" />}>
             <AdminUsersRouter />
           </SystemRoleGuard>
         </AuthenticatedRouteGuard>

@@ -6,7 +6,7 @@ export interface IArtifact {
   file_name: string;
   file_size: number;
   file_type: string;
-  foi_reason: boolean;
+  foi_reason: boolean | null;
   key: string;
   revision_count: number;
   security_review_timestamp: string | null;
@@ -32,3 +32,10 @@ export interface IListRelatedDatasetsResponse {
 }
 
 export interface IHandlebarsTemplates {header: string, details: string}
+export interface IDatasetForReview {
+  dataset_id: string; // UUID
+  artifacts_to_review: number;
+  dataset_name: string;
+  last_updated: string;
+  keywords: string[];
+}

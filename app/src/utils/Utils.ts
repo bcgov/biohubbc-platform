@@ -48,7 +48,7 @@ export const getFormattedDateRangeString = (
 ): string => {
   const startDateFormatted = getFormattedDate(dateFormat, startDate);
 
-  const endDateFormatted = getFormattedDate(dateFormat, endDate || '');
+  const endDateFormatted = getFormattedDate(dateFormat, endDate ?? '');
 
   if (!startDateFormatted || (endDate && !endDateFormatted)) {
     return '';
@@ -293,4 +293,20 @@ export const downloadFile = async (url: string): Promise<void> => {
 
     anchor.click();
   });
+};
+
+/**
+ * Builds a URL from multiple (possibly null or undefined) url parts, stripping any
+ * double slashes from the resulting URL.
+ *
+ * @param {(string | undefined)[]} urlParts The parts of the URL
+ * @returns The built URL
+ */
+export const buildUrl = (...urlParts: (string | undefined)[]): string => {
+  return urlParts
+    .filter((urlPart): urlPart is string => Boolean(urlPart))
+    .map((urlPart) => String(urlPart).trim()) // Trim leading and trailing whitespace
+    .filter(Boolean)
+    .join('/')
+    .replace(/([^:]\/)\/+/g, '$1'); // Trim double slashes
 };
