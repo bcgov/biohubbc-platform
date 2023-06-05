@@ -100,7 +100,7 @@ export function applySecurityRulesToArtifacts(): RequestHandler {
       let response: { artifact_persecution_id: number }[] = [];
 
       if (securityReasonIds.length > 0) {
-        response = await securityService.applySecurityRulesToArtifacts(securityReasonIds, artifactIds);
+        response = await securityService.applySecurityRulesToArtifacts(artifactIds, securityReasonIds);
       }
 
       res.status(200).json(response);

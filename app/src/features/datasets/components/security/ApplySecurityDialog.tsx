@@ -85,8 +85,8 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           validationSchema={SecurityReasonsYupSchema}
           validateOnBlur={true}
           validateOnChange={false}
-          onSubmit={(values: { securityReasons: ISecurityReason[] }) => {
-            handleSubmit(values.securityReasons);
+          onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
+            await handleSubmit(values.securityReasons);
             setApplySecurityText(
               `You successfully applied security reasons to the file${selectedArtifacts.length > 1 && 's'}.`
             );
