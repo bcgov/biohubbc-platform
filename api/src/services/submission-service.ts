@@ -436,7 +436,7 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
-    const data = await this.submissionRepository.getDatasetsForReview([]);
+    const data = await this.submissionRepository.getDatasetsForReview(keys);
     const datasetsForReview: IDatasetsForReview[] = [];
 
     for await (const item of data) {

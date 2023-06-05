@@ -1,44 +1,43 @@
 import { Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-import Container from '@mui/material/Container';
-import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import DatasetsForReviewTable from './components/DatasetsForReviewTable';
 
 const DashboardPage = () => {
   return (
-    <Box>
+    <Box sx={{ backgroundColor: '#dadada', height: '100%' }}>
       <Paper
         square
         elevation={0}
         sx={{
-          py: 7
+          py: 4,
+          px: 3
         }}>
-        <Container maxWidth="xl">
-          <Typography
-            variant="h1"
-            sx={{
-              mt: -2,
-              mb: 4
-            }}>
-            Dashboard
-          </Typography>
-          <Typography
-            variant="h3"
-            sx={{
-              mt: 6,
-              mb: 4
-            }}>
-            Pending Security Reviews
-          </Typography>
-          <Divider />
-        </Container>
+        <Typography variant="h1">Dashboard</Typography>
       </Paper>
-      <Container maxWidth="xl">
-        <Box>
+      <Paper
+        square
+        elevation={0}
+        sx={{
+          m: 3,
+          borderRadius: 2
+        }}>
+        <Typography
+          variant="h3"
+          sx={{
+            p: 3,
+            borderBottom: '1pt solid #dadada',
+            mb: 1
+          }}>
+          Pending Security Reviews
+        </Typography>
+        <Box
+          sx={{
+            p: 2
+          }}>
           <DatasetsForReviewTable />
         </Box>
-      </Container>
+      </Paper>
     </Box>
   );
 };
