@@ -70,6 +70,10 @@ export class SecurityService extends DBService {
   async removeAllSecurityRulesFromArtifact(artifactIds: number[]): Promise<void> {
     defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
 
-    await Promise.all(artifactIds.map(this.securityRepository.removeAllSecurityRulesFromArtifact));
+    await Promise.all(
+      artifactIds.map(
+        async (artifactId) => await this.securityRepository.removeAllSecurityRulesFromArtifact(artifactId)
+      )
+    );
   }
 }
