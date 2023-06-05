@@ -1,24 +1,25 @@
-.hbr-container {
-  .hbr-header {
-    display: flex;
-    flex-direction: column;
-    padding: 24px;
-    margin-bottom: 16px;
-    background-color: #ffffff;
+.hbr-header {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  margin-bottom: 16px;
+  background-color: #ffffff;
 
-    .hbr-header-title-primary {
-      font-size: 32px;
-      color: #000000;
-      font-weight: bold;
-      text-decoration: none solid rgb(0, 0, 0);
-    }
-
-    .hbr-header-title-secondary {
-      font-size: 16px;
-      color: #787f81;
-      text-decoration: none solid rgb(0, 0, 0);
-    }
+  .hbr-header-title-primary {
+    font-size: 32px;
+    color: #000000;
+    font-weight: bold;
+    text-decoration: none solid rgb(0, 0, 0);
   }
+
+  .hbr-header-title-secondary {
+    font-size: 16px;
+    color: #787f81;
+    text-decoration: none solid rgb(0, 0, 0);
+  }
+}
+
+.hbr-container {
 
   .hbr-project-coordinator {
     list-style-type: none;

@@ -1,22 +1,21 @@
-export const simsHandlebarsTemplate_HEADER = ``
+export const simsHandlebarsTemplate_HEADER = `
+  <!-- HEADER -->
+  {{#if eml:eml.dataset.title}}
+    <div class="hbr-header">
+      <div class="hbr-header-title-primary"> {{eml:eml.dataset.title}}</div>
+      {{#each eml:eml.additionalMetadata as | amd |}}
+        {{#with (lookup amd.metadata "types") as | projectType | ~}}
+          {{#ifCond amd.describes '===' @root.eml:eml.dataset.[@_id]}}
+            <div class="hbr-header-title-secondary">Species Inventory {{#capFirst projectType.type}}{{/capFirst}}</div>
+          {{/ifCond}}
+        {{/with}}
+      {{/each}}
+    </div>
+  {{/if}}
+`
 
 export const simsHandlebarsTemplate_DETAILS = `
   <div class="hbr-container">
-
-    <!-- HEADER -->
-    {{#if eml:eml.dataset.title}}
-      <div class="hbr-header">
-        <div class="hbr-header-title-primary"> {{eml:eml.dataset.title}}</div>
-        {{#each eml:eml.additionalMetadata as | amd |}}
-          {{#with (lookup amd.metadata "types") as | projectType | ~}}
-            {{#ifCond amd.describes '===' @root.eml:eml.dataset.[@_id]}}
-              <div class="hbr-header-title-secondary">Species Inventory {{#capFirst projectType.type}}{{/capFirst}}</div>
-            {{/ifCond}}
-          {{/with}}
-        {{/each}}
-      </div>
-    {{/if}}
-
     <!-- DETAILS -->
     <div class="details-container">
       <div class="details-container-title">

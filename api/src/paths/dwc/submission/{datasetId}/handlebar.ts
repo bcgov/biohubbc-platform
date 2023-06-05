@@ -34,7 +34,15 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'string'
+            type: 'object',
+            properties: {
+              header: {
+                type: 'string'
+              },
+              details: {
+                type: 'string'
+              }
+            }
           }
         }
       }

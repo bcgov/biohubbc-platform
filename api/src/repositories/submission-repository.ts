@@ -4,9 +4,9 @@ import { getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
-import { simsHandlebarsTemplate, simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
+import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
-export interface IDetailsPage {
+export interface IHandlebarsTemplates {
   header: string
   details: string
 }
@@ -700,12 +700,12 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new metadata record
    *
-   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @param {ISubmissionMetadataRecord} submissionMetadata
    * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionMetadataRecord(
-    submissonMetadata: ISubmissionMetadataRecord
+    submissionMetadata: ISubmissionMetadataRecord
   ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_metadata (
@@ -713,9 +713,9 @@ export class SubmissionRepository extends BaseRepository {
         eml_source,
         eml_json_source
       ) VALUES (
-        ${submissonMetadata.submission_id},
-        ${submissonMetadata.eml_source},
-        ${submissonMetadata.eml_json_source}
+        ${submissionMetadata.submission_id},
+        ${submissionMetadata.eml_source},
+        ${submissionMetadata.eml_json_source}
       )
       RETURNING
         submission_metadata_id
@@ -737,12 +737,12 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new Observation Record
    *
-   * @param {ISubmissionObservationRecord} submissonObservation
+   * @param {ISubmissionObservationRecord} submissionObservation
    * @return {*}  {Promise<{ submission_observation_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionObservationRecord(
-    submissonObservation: ISubmissionObservationRecord
+    submissionObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_observation (
@@ -752,10 +752,10 @@ export class SubmissionRepository extends BaseRepository {
         foi_reason,
         record_effective_timestamp
       ) VALUES (
-        ${submissonObservation.submission_id},
-        ${submissonObservation.darwin_core_source},
-        ${submissonObservation.submission_security_request},
-        ${submissonObservation.foi_reason},
+        ${submissionObservation.submission_id},
+        ${submissionObservation.darwin_core_source},
+        ${submissionObservation.submission_security_request},
+        ${submissionObservation.foi_reason},
         now()
       )
       RETURNING
@@ -870,7 +870,7 @@ export class SubmissionRepository extends BaseRepository {
    * @returns {*} {Promise<IDetailsPage>} an object containing a string of handlebars templates
    * @memberof SubmissionRepository
    */
-  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IDetailsPage> {
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
     return {
       header: simsHandlebarsTemplate_HEADER,
       details: simsHandlebarsTemplate_DETAILS

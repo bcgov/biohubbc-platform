@@ -30,3 +30,5 @@ export interface IRelatedDataset {
 export interface IListRelatedDatasetsResponse {
   datasets: IRelatedDataset[];
 }
+
+export interface IHandlebarsTemplates {header: string, details: string}

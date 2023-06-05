@@ -170,7 +170,10 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   return (
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
-        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data} />
+        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.header} />
+      </Paper>
+      <Paper square elevation={0} className={classes.datasetTitleContainer}>
+        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
       </Paper>
       <Container maxWidth="xl">
         <Box pt={2}>

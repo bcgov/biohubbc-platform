@@ -13,7 +13,8 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SUBMISSION_STATUS_TYPE,
+  IHandlebarsTemplates
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -369,27 +370,27 @@ export class SubmissionService extends DBService {
   /**
    * Insert a new metadata record
    *
-   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @param {ISubmissionMetadataRecord} submissionMetadata
    * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionService
    */
   async insertSubmissionMetadataRecord(
-    submissonMetadata: ISubmissionMetadataRecord
+    submissionMetadata: ISubmissionMetadataRecord
   ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.insertSubmissionMetadataRecord(submissonMetadata);
+    return this.submissionRepository.insertSubmissionMetadataRecord(submissionMetadata);
   }
 
   /**
    * Insert a new Observation Record
    *
-   * @param {ISubmissionObservationRecord} submissonObservation
+   * @param {ISubmissionObservationRecord} submissionObservation
    * @return {*}  {Promise<{ submission_observation_id: number }>}
    * @memberof SubmissionService
    */
   async insertSubmissionObservationRecord(
-    submissonObservation: ISubmissionObservationRecord
+    submissionObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
-    return this.submissionRepository.insertSubmissionObservationRecord(submissonObservation);
+    return this.submissionRepository.insertSubmissionObservationRecord(submissionObservation);
   }
 
   /**
@@ -430,7 +431,7 @@ export class SubmissionService extends DBService {
    * @param datasetId 
    * @returns 
    */
-  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<string> {
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
 
     return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
   }
