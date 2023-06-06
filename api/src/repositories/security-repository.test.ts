@@ -9,7 +9,7 @@ import { SecurityRepository } from './security-repository';
 
 chai.use(sinonChai);
 
-describe.only('SecurityRepository', () => {
+describe('SecurityRepository', () => {
   describe('getPersecutionAndHarmRules', () => {
     afterEach(() => {
       sinon.restore();
