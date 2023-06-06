@@ -147,24 +147,5 @@ describe('SecurityRepository', () => {
 
       expect(response).to.eql(undefined);
     });
-
-    it('throw an error if query fails', async () => {
-      const mockQueryResponse = { rows: undefined, rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: async () => {
-          return mockQueryResponse;
-        }
-      });
-
-      const securityRepository = new SecurityRepository(mockDBConnection);
-
-      try {
-        await securityRepository.removeAllSecurityRulesFromArtifact(1);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to remove all security rules from artifact');
-      }
-    });
   });
 });

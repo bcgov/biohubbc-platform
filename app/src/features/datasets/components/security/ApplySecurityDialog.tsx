@@ -1,6 +1,6 @@
-import { mdiAlphaX, mdiInformationOutline, mdiLock } from '@mdi/js';
+import { mdiInformationOutline, mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Box, Divider, IconButton } from '@mui/material';
+import { Box, Divider, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -10,10 +10,11 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import YesNoDialog from 'components/dialog/YesNoDialog';
+import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
 import { useApi } from 'hooks/useApi';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
-import React, { useRef, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { ISecurityReason } from './SecurityReasonCategory';
 import SecurityReasonSelector, {
   SecurityReasonsInitialValues,
@@ -38,10 +39,12 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
 
+  const dialogContext = useContext(DialogContext);
   const [yesNoDialogOpen, setYesNoDialogOpen] = useState(false);
 
-  const [applySecurityCompleted, setApplySecurityCompleted] = useState(false);
-  const [applySecurityText, setApplySecurityText] = useState('');
+  const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
+    dialogContext.setSnackbar({ ...textDialogProps, open: true });
+  };
 
   const [formikRef] = useState(useRef<FormikProps<any>>(null));
 
@@ -52,21 +55,6 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   return (
     <>
       <Dialog
-        maxWidth="sm"
-        open={applySecurityCompleted}
-        aria-labelledby="component-dialog-title"
-        aria-describedby="component-dialog-description">
-        <Box sx={{ p: 2, display: 'flex', flexDirection: 'row', justifyContent: 'start' }}>
-          <DialogContentText id="alert-dialog-description" sx={{ py: 2 }}>
-            {applySecurityText}
-          </DialogContentText>
-          <IconButton onClick={() => setApplySecurityCompleted(false)} color="primary" aria-label="close">
-            <Icon path={mdiAlphaX} size={1.5} />
-          </IconButton>
-        </Box>
-      </Dialog>
-
-      <Dialog
         fullScreen={fullScreen}
         maxWidth="xl"
         open={open}
@@ -75,8 +63,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
         PaperProps={{
           sx: {
             width: '100%',
-            height: '100%',
-            p: 2
+            height: '100%'
           }
         }}>
         <Formik
@@ -87,10 +74,16 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           validateOnChange={false}
           onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
             await handleSubmit(values.securityReasons);
-            setApplySecurityText(
-              `You successfully applied security reasons to the file${selectedArtifacts.length > 1 ? 's' : ''}.`
-            );
-            setApplySecurityCompleted(true);
+            showSnackBar({
+              snackbarMessage: (
+                <>
+                  <Typography variant="body2" component="div">
+                    You successfully applied security reasons to the file{selectedArtifacts.length > 1 && 's'}.
+                  </Typography>
+                </>
+              ),
+              open: true
+            });
             onClose();
           }}>
           {(formikProps) => (
@@ -100,10 +93,16 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onClose={() => setYesNoDialogOpen(false)}
                 onYes={async () => {
                   await formikProps.submitForm();
-                  setApplySecurityText(
-                    `You successfully  unsecured the file${selectedArtifacts.length > 1 ? 's' : ''}.`
-                  );
-                  setApplySecurityCompleted(true);
+                  showSnackBar({
+                    snackbarMessage: (
+                      <>
+                        <Typography variant="body2" component="div">
+                          You successfully unsecured the file{selectedArtifacts.length > 1 && 's'}.
+                        </Typography>
+                      </>
+                    ),
+                    open: true
+                  });
                   setYesNoDialogOpen(false);
                 }}
                 onNo={() => setYesNoDialogOpen(false)}

@@ -40,9 +40,9 @@ const SelectedDocumentsDataset: React.FC<IRelatedDatasetsProps> = (props) => {
           <DataGrid
             getRowId={(row) => row.artifact_id}
             autoHeight
-            disableVirtualization
             rows={selectedArtifacts}
             columns={columns}
+            disableVirtualization
             disableRowSelectionOnClick
             disableColumnSelector
             disableColumnFilter
