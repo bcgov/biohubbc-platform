@@ -88,7 +88,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
             await handleSubmit(values.securityReasons);
             setApplySecurityText(
-              `You successfully applied security reasons to the file${selectedArtifacts.length > 1 && 's'}.`
+              `You successfully applied security reasons to the file${selectedArtifacts.length > 1 ? 's' : ''}.`
             );
             setApplySecurityCompleted(true);
             onClose();
@@ -100,7 +100,9 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onClose={() => setYesNoDialogOpen(false)}
                 onYes={async () => {
                   await formikProps.submitForm();
-                  setApplySecurityText(`You successfully  unsecured the file${selectedArtifacts.length > 1 && 's'}.`);
+                  setApplySecurityText(
+                    `You successfully  unsecured the file${selectedArtifacts.length > 1 ? 's' : ''}.`
+                  );
                   setApplySecurityCompleted(true);
                   setYesNoDialogOpen(false);
                 }}
@@ -131,7 +133,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 <Box sx={{ mb: 2 }}>
                   <DialogContentText id="alert-dialog-description">
                     Search for the security reasons and apply them to the selected document
-                    {selectedArtifacts.length > 1 && 's'}.
+                    {selectedArtifacts.length > 1 ? 's' : ''}.
                   </DialogContentText>
 
                   <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
