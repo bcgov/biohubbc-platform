@@ -58,12 +58,12 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
   });
 
   return (
-    <>
-      <Box m={4} sx={{ display: 'flex' }}>
-        <Box sx={{ width: '100%' }}>
-          <Typography variant="h3">{categoryName}</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignContent: 'center' }}>
+    <Box px={2}>
+      <Box m={1} sx={{ display: 'flex' }}>
+        <Typography variant="h4" py={1} sx={{ flexGrow: 1, textAlign: 'start' }}>
+          {categoryName}
+        </Typography>
+        <Box>
           <IconButton onClick={() => setOpen(!open)} color="primary" aria-label="dropdown arrow" component="label">
             <Icon path={mdiArrowDown} size={1} />
           </IconButton>
@@ -77,7 +77,7 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
             <>
               {sortedSecurityReasons.map((securityReason) => {
                 return (
-                  <Box key={securityReason.name} py={1} px={2}>
+                  <Box key={securityReason.name} py={0.5}>
                     <SecurityReason
                       securityReason={{ ...securityReason, category: categoryName }}
                       onClickSecurityReason={() => {
@@ -99,7 +99,7 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
         />
       </Collapse>
       <Divider />
-    </>
+    </Box>
   );
 };
 
@@ -108,12 +108,12 @@ export const SecurityReason: React.FC<SecurityReasonProps> = (props) => {
 
   return (
     <Paper elevation={0} variant="outlined">
-      <Box m={2} sx={{ display: 'flex' }}>
+      <Box m={1} sx={{ display: 'flex' }}>
         <Box sx={{ width: '100%' }} mr={2}>
           <Typography variant="h5">{securityReason.name}</Typography>
-          <Typography variant="body1">{securityReason.description}</Typography>
-          <Typography pt={1} variant="body2">
-            {securityReason.category}
+          <Typography variant="body2">{securityReason.description}</Typography>
+          <Typography variant="body2">
+            <i>{securityReason.category}</i>
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

@@ -49,7 +49,7 @@ const SecurityReasonSelector: React.FC = () => {
       <Box sx={{ width: '50%', display: 'flex', flexDirection: 'column' }}>
         <ActionToolbar label={`Security Reasons`} labelProps={{ variant: 'h4' }} />
         <Divider></Divider>
-        <Box sx={{ p: 2, height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
+        <Box sx={{ height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
           {persecutionHarmDataLoader.data && (
             <SecurityReasonCategory
               categoryName={'Persecution or Harm'}

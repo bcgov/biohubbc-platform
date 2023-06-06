@@ -36,21 +36,19 @@ const SelectedDocumentsDataset: React.FC<IRelatedDatasetsProps> = (props) => {
       <ActionToolbar label={`Selected Documents (${selectedArtifacts.length})`} labelProps={{ variant: 'h4' }} />
       <Divider></Divider>
       <Box px={2}>
-        <Box>
-          <DataGrid
-            getRowId={(row) => row.artifact_id}
-            autoHeight
-            rows={selectedArtifacts}
-            columns={columns}
-            disableVirtualization
-            disableRowSelectionOnClick
-            disableColumnSelector
-            disableColumnFilter
-            disableColumnMenu
-            disableDensitySelector
-            hideFooter
-          />
-        </Box>
+        <DataGrid
+          getRowId={(row) => row.artifact_id}
+          autoHeight
+          rows={selectedArtifacts}
+          columns={columns}
+          disableVirtualization
+          disableRowSelectionOnClick
+          disableColumnSelector
+          disableColumnFilter
+          disableColumnMenu
+          disableDensitySelector
+          hideFooter
+        />
       </Box>
     </Paper>
   );

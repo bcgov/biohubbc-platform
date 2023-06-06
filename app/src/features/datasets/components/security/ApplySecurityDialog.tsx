@@ -129,14 +129,12 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
 
               <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <Box sx={{ mb: 2 }}>
-                  <DialogContentText id="alert-dialog-description">
-                    Search for the security reasons and apply them to the selected document
-                    {selectedArtifacts.length > 1 ? 's' : ''}.
-                  </DialogContentText>
+                <DialogContentText id="alert-dialog-description">
+                  Search for the security reasons and apply them to the selected document
+                  {selectedArtifacts.length > 1 ? 's' : ''}.
+                </DialogContentText>
 
-                  <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
-                </Box>
+                <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
 
                 <SecurityReasonSelector />
               </DialogContent>

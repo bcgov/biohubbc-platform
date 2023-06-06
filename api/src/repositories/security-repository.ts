@@ -115,10 +115,6 @@ export class SecurityRepository extends BaseRepository {
         artifact_id = ${artifactId};
     `;
 
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response) {
-      throw new ApiExecuteSQLError('Failed to remove all security rules from artifact');
-    }
+    await this.connection.sql(sqlStatement);
   }
 }
