@@ -5,7 +5,7 @@ import DatasetsForReviewTable from './components/DatasetsForReviewTable';
 
 const DashboardPage = () => {
   return (
-    <Box sx={{ backgroundColor: '#dadada', height: '100%' }}>
+    <>
       <Paper
         square
         elevation={0}
@@ -38,7 +38,7 @@ const DashboardPage = () => {
           <DatasetsForReviewTable />
         </Box>
       </Paper>
-    </Box>
+    </>
   );
 };
 
