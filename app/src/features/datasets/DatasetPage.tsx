@@ -35,11 +35,10 @@ const useStyles = makeStyles((theme: Theme) => ({
       marginTop: '-4px'
     }
   },
+  datasetDetailsContainer: {},
   datasetMapContainer: {
-    width: '100%',
     aspectRatio: '1 / 0.5',
-    borderRadius: '6px',
-    paddingBottom: '16px'
+    borderRadius: '6px'
   }
 }));
 
@@ -169,12 +168,28 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <Box>
-      <Paper square elevation={0} className={classes.datasetTitleContainer}>
-        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.header} />
-      </Paper>
-      <Paper square elevation={0} className={classes.datasetTitleContainer}>
-        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
-      </Paper>
+      <Container maxWidth="xl">
+        <Box>
+          <Paper square elevation={0} className={classes.datasetTitleContainer}>
+            <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.header} />
+          </Paper>
+        </Box>
+      </Container>
+      <Container maxWidth="xl">
+        <Box>
+          <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
+        </Box>
+        <Box p={2} pt={0} className={classes.datasetMapContainer}>
+          <MapContainer
+            mapId="boundary_map"
+            onBoundsChange={onMapViewChange}
+            scrollWheelZoom={true}
+            fullScreenControl={true}
+            markerLayers={markerLayers}
+            staticLayers={staticLayers}
+          />
+        </Box>
+      </Container>
       <Container maxWidth="xl">
         <Box pt={2}>
           <Paper elevation={0}>
@@ -216,14 +231,14 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
               </Grid>
             </Grid>
             <Box p={2} pt={0} className={classes.datasetMapContainer}>
-              <MapContainer
+              {/* <MapContainer
                 mapId="boundary_map"
                 onBoundsChange={onMapViewChange}
                 scrollWheelZoom={true}
                 fullScreenControl={true}
                 markerLayers={markerLayers}
                 staticLayers={staticLayers}
-              />
+              /> */}
             </Box>
           </Card>
         </Box>

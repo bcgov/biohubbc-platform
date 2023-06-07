@@ -130,19 +130,24 @@ export const simsHandlebarsTemplate_DETAILS = `
           </div>
         {{/if}}
 
+        
         <!-- PARTNERS -->
-        {{#if eml:eml.dataset.project.funding.section}}
-          <div>
-            <dt>
-              Partners
-            </dt>
-            <dd>
-              {{#each eml:eml.dataset.project.funding.section as | funding |}}
-                {{funding.para}}{{#unless @last}}, {{/unless}}
+        <div>
+          <dt>
+            Partners
+          </dt>
+          <dd>
+            {{#each eml:eml.additionalMetadata as | amd |}}
+              {{#each amd.metadata as | metadata |}}
+                {{#ifCond @key '===' "partnerships"}}
+                  {{#each metadata.partnership as | partnership |}}
+                    {{partnership.name}}{{#unless @last}}, {{/unless}}
+                  {{/each}}
+                {{/ifCond}}
               {{/each}}
-            </dd>
-          </div>
-        {{/if}}
+            {{/each}}
+          </dd>
+        </div>
 
         <!-- CONSERVATION ACTIONS -->
         {{#each eml:eml.additionalMetadata as | amd |}}

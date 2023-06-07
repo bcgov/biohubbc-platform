@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import {
+  IDatasetForReview,
   IHandlebarsTemplates,
   IListArtifactsResponse,
   IListRelatedDatasetsResponse

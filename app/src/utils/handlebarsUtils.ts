@@ -36,7 +36,7 @@ export const useHandlebars = () => {
   };
 
   const capitalizeFirst = () => {
-    Handlebars.registerHelper('capFirst', (text) => {
+    Handlebars.registerHelper('capFirst', (text: string) => {
       if (typeof text === 'string') {
         return `${text.charAt(0).toUpperCase()}${text.slice(1).toLowerCase()}`;
       }
@@ -45,7 +45,7 @@ export const useHandlebars = () => {
   };
 
   const formatDateHelper = () => {
-    Handlebars.registerHelper('formatDate', (dateString)=> {
+    Handlebars.registerHelper('formatDate', (dateString: string)=> {
       return moment(dateString, 'YYYY-MM-DD').format("MMM YYYY").toString()
     })
   }
