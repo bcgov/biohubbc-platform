@@ -12,16 +12,13 @@ export const simsHandlebarsTemplate_HEADER = `
       {{/each}}
     </div>
   {{/if}}
-`
+`;
 
 export const simsHandlebarsTemplate_DETAILS = `
   <div class="hbr-container">
+
     <!-- DETAILS -->
     <div class="details-container">
-      <div class="details-container-title">
-        Project Details
-      </div>
-      
       <dl class="details-container-metadata">
 
         <!-- PROJECT OBJECTIVES -->
@@ -130,7 +127,6 @@ export const simsHandlebarsTemplate_DETAILS = `
           </div>
         {{/if}}
 
-        
         <!-- PARTNERS -->
         <div>
           <dt>
@@ -155,10 +151,10 @@ export const simsHandlebarsTemplate_DETAILS = `
             {{#ifCond @key '===' "IUCNConservationActions"}}
               <div>
                 <dt>
-                  Activities
+                  Conservation Activities
                 </dt>
                 <dd>
-                  <ul style="padding: 0;">
+                  <ul style="padding-left: 20px">
                     {{#each metadata.IUCNConservationAction as | actions |}}
                       <li>
                         {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}

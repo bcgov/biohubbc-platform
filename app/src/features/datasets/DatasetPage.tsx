@@ -1,19 +1,14 @@
-import { mdiDownload } from '@mdi/js';
-import Icon from '@mdi/react';
 import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import CardHeader from '@mui/material/CardHeader';
 import CircularProgress from '@mui/material/CircularProgress/CircularProgress';
 import Container from '@mui/material/Container';
-import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import { makeStyles } from '@mui/styles';
 import { Buffer } from 'buffer';
 import { IMarkerLayer } from 'components/map/components/MarkerCluster';
 import { IStaticLayer } from 'components/map/components/StaticLayers';
 import MapContainer from 'components/map/MapContainer';
+import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { DialogContext } from 'contexts/dialogContext';
 import { Feature, Polygon } from 'geojson';
@@ -35,10 +30,15 @@ const useStyles = makeStyles((theme: Theme) => ({
       marginTop: '-4px'
     }
   },
-  datasetDetailsContainer: {},
+  datasetDetailsLabel: {
+    borderBottom: '1pt solid #dadada'
+  },
+  datasetDetailsContainer: {
+    flex: 7
+  },
   datasetMapContainer: {
-    aspectRatio: '1 / 0.5',
-    borderRadius: '6px'
+    flex: 3,
+    padding: '30px'
   }
 }));
 
@@ -112,14 +112,6 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
 
-  const downloadDataSet = () => {
-    fileDataLoader.refresh(
-      ALL_OF_BC_BOUNDARY,
-      [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
-      MAP_DEFAULT_ZOOM
-    );
-  };
-
   useEffect(() => {
     if (!fileDataLoader.data) {
       return;
@@ -176,18 +168,21 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
         </Box>
       </Container>
       <Container maxWidth="xl">
-        <Box>
-          <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
-        </Box>
-        <Box p={2} pt={0} className={classes.datasetMapContainer}>
-          <MapContainer
-            mapId="boundary_map"
-            onBoundsChange={onMapViewChange}
-            scrollWheelZoom={true}
-            fullScreenControl={true}
-            markerLayers={markerLayers}
-            staticLayers={staticLayers}
-          />
+        <ActionToolbar className={classes.datasetDetailsLabel} label="Project Details" labelProps={{ variant: 'h4' }} />
+        <Box sx={{ display: 'flex' }}>
+          <Box className={classes.datasetDetailsContainer}>
+            <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
+          </Box>
+          <Box className={classes.datasetMapContainer}>
+            <MapContainer
+              mapId="boundary_map"
+              onBoundsChange={onMapViewChange}
+              scrollWheelZoom={false}
+              fullScreenControl={false}
+              markerLayers={markerLayers}
+              staticLayers={staticLayers}
+            />
+          </Box>
         </Box>
       </Container>
       <Container maxWidth="xl">
@@ -202,45 +197,6 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
           <Paper elevation={0}>
             <RelatedDatasets datasetId={datasetId} />
           </Paper>
-        </Box>
-      </Container>
-      <Container maxWidth="xl">
-        <Box py={2}>
-          <Card data-testid="MapContainer">
-            <Grid sx={{ justify: 'space-between', alignItems: 'center' }}>
-              <Grid item>
-                <Box px={2}>
-                  <CardHeader
-                    title="Occurrences"
-                    titleTypographyProps={{ variant: 'h4', component: 'h2' }}></CardHeader>
-                </Box>
-              </Grid>
-              <Grid item>
-                <Box my={1} mx={2}>
-                  <Button
-                    color="primary"
-                    variant="outlined"
-                    disableElevation
-                    aria-label={'Download occurrence'}
-                    data-testid="export-occurrence"
-                    startIcon={<Icon path={mdiDownload} size={1} />}
-                    onClick={() => downloadDataSet()}>
-                    Export Occurrences
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-            <Box p={2} pt={0} className={classes.datasetMapContainer}>
-              {/* <MapContainer
-                mapId="boundary_map"
-                onBoundsChange={onMapViewChange}
-                scrollWheelZoom={true}
-                fullScreenControl={true}
-                markerLayers={markerLayers}
-                staticLayers={staticLayers}
-              /> */}
-            </Box>
-          </Card>
         </Box>
       </Container>
     </Box>

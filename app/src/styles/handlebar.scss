@@ -42,11 +42,10 @@
     }
 
     .details-container-metadata {
-      padding: 25px;
       div {
         display: flex;
         padding: 10px 0px;
-
+        border-bottom: solid thin #dadada;
         dt {
           color: #787f81;
           flex: 1;
