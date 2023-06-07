@@ -29,7 +29,7 @@ export const simsHandlebarsTemplate_DETAILS = `
           {{#ifCond section.title '===' "Objectives"}}
             <div>
               <dt>
-                Project Objectives:
+                Project Objectives
               </dt>
               <dd>
                 {{section.para}}
@@ -41,7 +41,7 @@ export const simsHandlebarsTemplate_DETAILS = `
         {{#if eml:eml.dataset.contact.individualName.givenName}}
           <div>
               <dt>
-                Lead:
+                Lead
               </dt>
               <dd>
                 {{#if eml:eml.dataset.contact.individualName.givenName}}
@@ -58,7 +58,7 @@ export const simsHandlebarsTemplate_DETAILS = `
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates}}
           <div>
             <dt>
-              Timeline:
+              Timeline
             </dt>
             <dd>
               {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate}}{{/formatDate}} - {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate}}{{/formatDate}}
