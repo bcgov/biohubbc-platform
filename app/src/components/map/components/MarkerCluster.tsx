@@ -1,62 +1,9 @@
 import { createLayerComponent } from '@react-leaflet/core';
-import L, { LatLngExpression } from 'leaflet';
+import L from 'leaflet';
 import 'leaflet.markercluster';
-// import 'leaflet.markercluster/dist/MarkerCluster.css';
-// import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { ReactElement } from 'react';
-import { FeatureGroup, LayersControl, MarkerProps, Popup, PopupProps, Tooltip, TooltipProps } from 'react-leaflet';
-
-export interface IMarker {
-  position: LatLngExpression;
-  count: number;
-  key: string | number;
-  MarkerProps?: Partial<MarkerProps>;
-  popup?: ReactElement;
-  PopupProps?: Partial<PopupProps>;
-  tooltip?: ReactElement;
-  TooltipProps?: Partial<TooltipProps>;
-}
-
-export interface IMarkerLayer {
-  visible: boolean;
-  layerName: string;
-  markers: IMarker[];
-}
-
-export interface IMarkerLayersProps {
-  layers?: IMarkerLayer[];
-}
-
-const makeCountIcon = (count: number) => {
-  return L.divIcon({
-    html: `<div><span>${count}</span></div>`,
-    className: 'marker-cluster marker-cluster-small',
-    iconSize: new L.Point(24, 24)
-  });
-};
-
-const CountMarker: any = L.Marker.extend({
-  options: {
-    count: 1
-  },
-
-  setCount(s: number) {
-    this.options.count = s;
-  },
-
-  initialize(latlng: number[], { count, ...options }: { count: number }) {
-    L.Util.setOptions(this, {
-      count,
-      ...options
-    });
-
-    (L.CircleMarker.prototype as any).initialize.call(this, latlng, {
-      count,
-      ...options,
-      icon: makeCountIcon(count)
-    });
-  }
-});
+import { FeatureGroup, MarkerProps, Popup, Tooltip } from 'react-leaflet';
+import { CountMarker, IMarkerLayersProps } from './MarkerClusterControls';
 
 const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => void }, MarkerProps & { count: number }>(
   ({ position, ...options }: MarkerProps & { count: number }, ctx) => {
@@ -109,36 +56,34 @@ const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (pr
     }
 
     layerControls.push(
-      <LayersControl.Overlay checked={layer.visible} name={layer.layerName} key={`marker-layer-${layer.layerName}}`}>
-        <FeatureGroup>
-          {layer.markers.map((item) => {
-            const id = item.key;
-            return (
-              <Marker
-                count={item.count || 0}
-                key={`marker-cluster-${id}`}
-                position={[item.position[1], item.position[0]]}
-                {...item.MarkerProps}>
-                {item.tooltip && (
-                  <Tooltip key={`marker-cluster-tooltip-${id}`} direction="top" {...item.TooltipProps}>
-                    {item.tooltip}
-                  </Tooltip>
-                )}
-                {item.popup && (
-                  <Popup
-                    key={`marker-cluster-popup-${id}`}
-                    keepInView={false}
-                    closeButton={false}
-                    autoPan={false}
-                    {...item.PopupProps}>
-                    {item.popup}
-                  </Popup>
-                )}
-              </Marker>
-            );
-          })}
-        </FeatureGroup>
-      </LayersControl.Overlay>
+      <FeatureGroup>
+        {layer.markers.map((item) => {
+          const id = item.key;
+          return (
+            <Marker
+              count={item.count || 0}
+              key={`marker-cluster-${id}`}
+              position={[item.position[1], item.position[0]]}
+              {...item.MarkerProps}>
+              {item.tooltip && (
+                <Tooltip key={`marker-cluster-tooltip-${id}`} direction="top" {...item.TooltipProps}>
+                  {item.tooltip}
+                </Tooltip>
+              )}
+              {item.popup && (
+                <Popup
+                  key={`marker-cluster-popup-${id}`}
+                  keepInView={false}
+                  closeButton={false}
+                  autoPan={false}
+                  {...item.PopupProps}>
+                  {item.popup}
+                </Popup>
+              )}
+            </Marker>
+          );
+        })}
+      </FeatureGroup>
     );
   });
 

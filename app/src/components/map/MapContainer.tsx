@@ -9,13 +9,19 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import 'leaflet/dist/leaflet.css';
 import { FeatureGroup, LayersControl, MapContainer as LeafletMapContainer } from 'react-leaflet';
+import BaseLayer from './components/BaseLayer';
 import BaseLayerControls from './components/BaseLayerControls';
 import { GetMapBounds, IMapBoundsOnChange, SetMapBounds } from './components/Bounds';
 import DrawControls, { IDrawControlsOnChange, IDrawControlsProps } from './components/DrawControls';
 import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
-import MarkerClusterGroup, { IMarkerLayer } from './components/MarkerCluster';
-import StaticLayers, { IStaticLayer } from './components/StaticLayers';
+import MarkerCluster from './components/MarkerCluster';
+import MarkerClusterControls, { IMarkerLayer } from './components/MarkerClusterControls';
+import {
+  default as StaticLayers,
+  default as StaticLayersControls,
+  IStaticLayer
+} from './components/StaticLayersControls';
 
 const useStyles = makeStyles(() => ({
   map: {
@@ -35,6 +41,10 @@ export interface IMapContainerProps {
   mapId: string;
   staticLayers?: IStaticLayer[];
   drawControls?: IDrawControlsProps;
+  zoomControlEnabled?: boolean;
+  doubleClickZoomEnabled?: boolean;
+  draggingEnabled?: boolean;
+  layerControlEnabled?: boolean;
   onDrawChange?: IDrawControlsOnChange;
   scrollWheelZoom?: boolean;
   fullScreenControl?: boolean;
@@ -61,7 +71,11 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
     zoom,
     eventHandlers,
     LeafletMapContainerProps,
-    onBoundsChange
+    onBoundsChange,
+    zoomControlEnabled,
+    doubleClickZoomEnabled,
+    draggingEnabled,
+    layerControlEnabled
   } = props;
 
   const fullscreenControlProp = (fullScreenControl && { pseudoFullscreen: true }) || undefined;
@@ -72,8 +86,11 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
       className={classes.map}
       center={[55, -128]}
       zoom={zoom || MAP_DEFAULT_ZOOM}
+      zoomControl={zoomControlEnabled}
       minZoom={MAP_MIN_ZOOM}
       maxZoom={MAP_MAX_ZOOM}
+      doubleClickZoom={doubleClickZoomEnabled}
+      dragging={draggingEnabled}
       maxBounds={[
         [-90, -180],
         [90, 180]
@@ -100,14 +117,19 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
       )}
 
       <EventHandler eventHandlers={eventHandlers} />
-
-      <LayersControl position="bottomright">
-        <StaticLayers layers={staticLayers} />
-
-        <MarkerClusterGroup layers={markerLayers} />
-
-        <BaseLayerControls />
-      </LayersControl>
+      {layerControlEnabled ? (
+        <LayersControl position="bottomright">
+          <StaticLayersControls layers={staticLayers} />
+          <MarkerClusterControls layers={markerLayers} />
+          <BaseLayerControls />
+        </LayersControl>
+      ) : (
+        <>
+          <StaticLayers layers={staticLayers} />
+          <MarkerCluster layers={markerLayers} />
+          <BaseLayer />
+        </>
+      )}
     </LeafletMapContainer>
   );
 };

@@ -1,8 +1,8 @@
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import intersect from '@turf/intersect';
-import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayers';
+import { IMarkerLayer } from 'components/map/components/MarkerClusterControls';
+import { IStaticLayer, IStaticLayerFeature } from 'components/map/components/StaticLayersControls';
 import MapContainer from 'components/map/MapContainer';
 import { AreaToolTip, IFormikAreaUpload } from 'components/upload/UploadArea';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
@@ -197,6 +197,10 @@ const MapPage: React.FC<React.PropsWithChildren> = () => {
           markerLayers={markerLayers}
           staticLayers={[...staticLayers, ...areaStaticLayers]}
           bounds={(shouldUpdateBounds && updatedBounds) || undefined}
+          zoomControlEnabled={true}
+          doubleClickZoomEnabled={true}
+          draggingEnabled={true}
+          layerControlEnabled={true}
         />
       </Box>
     </Box>

@@ -5,8 +5,8 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import { makeStyles } from '@mui/styles';
 import { Buffer } from 'buffer';
-import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import { IMarkerLayer } from 'components/map/components/MarkerClusterControls';
+import { IStaticLayer } from 'components/map/components/StaticLayersControls';
 import MapContainer from 'components/map/MapContainer';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
@@ -182,6 +182,10 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
                   fullScreenControl={false}
                   markerLayers={markerLayers}
                   staticLayers={staticLayers}
+                  zoomControlEnabled={false}
+                  doubleClickZoomEnabled={false}
+                  draggingEnabled={false}
+                  layerControlEnabled={true}
                 />
               </Box>
             </Box>
