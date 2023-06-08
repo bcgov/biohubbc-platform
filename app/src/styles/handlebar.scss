@@ -13,8 +13,15 @@
   }
 
   .hbr-header-title-secondary {
-    font-size: 16px;
-    color: #787f81;
+    background-color: #d9eaf7;
+    border-radius: 16px;
+    padding: 5px 10px;
+    width: fit-content;
+    font-size: 10px;
+    font-family: sans-serif;
+    font-weight: bold;
+    color: black;
+    text-transform: uppercase;
     text-decoration: none solid rgb(0, 0, 0);
   }
 }

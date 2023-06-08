@@ -6,7 +6,7 @@ export const simsHandlebarsTemplate_HEADER = `
       {{#each eml:eml.additionalMetadata as | amd |}}
         {{#with (lookup amd.metadata "types") as | projectType | ~}}
           {{#ifCond amd.describes '===' @root.eml:eml.dataset.[@_id]}}
-            <div class="hbr-header-title-secondary">Species Inventory {{#capFirst projectType.type}}{{/capFirst}}</div>
+            <div class="hbr-header-title-secondary">Inventory {{projectType.type}}</div>
           {{/ifCond}}
         {{/with}}
       {{/each}}
