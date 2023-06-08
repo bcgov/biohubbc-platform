@@ -23,6 +23,20 @@ export const SecurityReason = z.object({
 
 export type SecurityReason = z.infer<typeof SecurityReason>;
 
+export const ArtifactPersecution = z.object({
+  artifact_persecution_id: z.number(),
+  persecution_or_harm_id: z.number(),
+  artifact_id: z.number()
+});
+
+export type ArtifactPersecution = z.infer<typeof ArtifactPersecution>;
+
+export enum SECURITY_APPLIED_STATUS {
+  SECURED = 'SECURED',
+  UNSECURED = 'UNSECURED',
+  PENDING = 'PENDING'
+}
+
 /**
  * A repository for maintaining security on artifacts.
  *
@@ -60,6 +74,32 @@ export class SecurityRepository extends BaseRepository {
     }
 
     return results;
+  }
+
+  /**
+   * Get persecution and harm rules by artifact id.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<ArtifactPersecution[]>}
+   * @memberof SecurityRepository
+   */
+  async getPersecutionAndHarmRulesByArtifactId(artifactId: number): Promise<ArtifactPersecution[]> {
+    defaultLog.debug({ label: 'getPersecutionAndHarmRulesByArtifactId' });
+
+    const sqlStatement = SQL`
+      SELECT
+        artifact_persecution_id,
+        persecution_or_harm_id,
+        artifact_id
+      FROM
+        artifact_persecution
+      WHERE
+        artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql<ArtifactPersecution>(sqlStatement, ArtifactPersecution);
+
+    return response.rows;
   }
 
   /**

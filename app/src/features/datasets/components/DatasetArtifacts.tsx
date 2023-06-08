@@ -14,7 +14,7 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
@@ -61,8 +61,16 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();
 
-  const artifactsList = artifactsDataLoader.data?.artifacts || [];
-  const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
+  const artifactsList = artifactsDataLoader.data || [];
+
+  //TODO: Pending review count is not accurate. How are we tracking pending review?
+  const numPendingDocuments =
+    artifactsList.filter(
+      (artifact) =>
+        artifact.security_review_timestamp === null ||
+        artifact?.supplementaryData?.persecutionAndHarm !== SECURITY_APPLIED_STATUS.PENDING
+    ).length || 0;
+
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
   const handleDownloadAttachment = async (attachment: IArtifact) => {
@@ -104,9 +112,21 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       headerName: 'Status',
       flex: 1,
       renderCell: (params) => {
-        const { security_review_timestamp } = params.row;
-        if (!security_review_timestamp && hasAdministrativePermissions) {
+        const { security_review_timestamp, supplementaryData } = params.row;
+
+        if (
+          !security_review_timestamp &&
+          supplementaryData?.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING &&
+          hasAdministrativePermissions
+        ) {
           return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
+        }
+
+        if (
+          supplementaryData?.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED &&
+          hasAdministrativePermissions
+        ) {
+          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Unsecured" />;
         }
 
         return <Chip color="warning" sx={{ textTransform: 'uppercase' }} label="Secured" />;

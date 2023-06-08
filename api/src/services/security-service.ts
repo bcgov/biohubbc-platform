@@ -1,5 +1,10 @@
 import { IDBConnection } from '../database/db';
-import { PersecutionAndHarmSecurity, SecurityRepository } from '../repositories/security-repository';
+import {
+  ArtifactPersecution,
+  PersecutionAndHarmSecurity,
+  SecurityRepository,
+  SECURITY_APPLIED_STATUS
+} from '../repositories/security-repository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 
@@ -30,6 +35,39 @@ export class SecurityService extends DBService {
     defaultLog.debug({ label: 'getPersecutionAndHarmRules' });
 
     return this.securityRepository.getPersecutionAndHarmRules();
+  }
+
+  /**
+   * Get Security Status by Artifact Id.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<SECURITY_APPLIED_STATUS>}
+   * @memberof SecurityService
+   */
+  async getSecurtyAppliedStatus(artifactId: number): Promise<SECURITY_APPLIED_STATUS> {
+    defaultLog.debug({ label: 'getSecurtyAppliedStatus' });
+
+    const persecutionAndHarmRules = await this.getPersecutionAndHarmRulesByArtifactId(artifactId);
+
+    if (!persecutionAndHarmRules.length) {
+      return SECURITY_APPLIED_STATUS.UNSECURED;
+    }
+    //TODO: PENDING??
+
+    return SECURITY_APPLIED_STATUS.SECURED;
+  }
+
+  /**
+   * Get persecution and harm rules by artifact ID.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<ArtifactPersecution[]>}
+   * @memberof SecurityService
+   */
+  async getPersecutionAndHarmRulesByArtifactId(artifactId: number): Promise<ArtifactPersecution[]> {
+    defaultLog.debug({ label: 'getPersecutionAndHarmRulesByArtifactId' });
+
+    return this.securityRepository.getPersecutionAndHarmRulesByArtifactId(artifactId);
   }
 
   /**
