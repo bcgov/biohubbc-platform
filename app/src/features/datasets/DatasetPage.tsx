@@ -33,13 +33,8 @@ const useStyles = makeStyles((theme: Theme) => ({
   datasetDetailsLabel: {
     borderBottom: '1pt solid #dadada'
   },
-  datasetDetailsContainer: {
-    flex: 7
-  },
-  datasetMapContainer: {
-    flex: 3,
-    padding: '30px'
-  }
+  datasetDetailsContainer: {},
+  datasetMapContainer: {}
 }));
 
 const DatasetPage: React.FC<React.PropsWithChildren> = () => {
@@ -160,43 +155,47 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <Box>
-      <Container maxWidth="xl">
-        <Box>
-          <Paper square elevation={0} className={classes.datasetTitleContainer}>
+      <Paper square elevation={0}>
+        <Container maxWidth="xl">
+          <Box py={3}>
             <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.header} />
-          </Paper>
-        </Box>
-      </Container>
-      <Container maxWidth="xl">
-        <ActionToolbar className={classes.datasetDetailsLabel} label="Project Details" labelProps={{ variant: 'h4' }} />
-        <Box sx={{ display: 'flex' }}>
-          <Box className={classes.datasetDetailsContainer}>
-            <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
           </Box>
-          <Box className={classes.datasetMapContainer}>
-            <MapContainer
-              mapId="boundary_map"
-              onBoundsChange={onMapViewChange}
-              scrollWheelZoom={false}
-              fullScreenControl={false}
-              markerLayers={markerLayers}
-              staticLayers={staticLayers}
+        </Container>
+      </Paper>
+      <Container maxWidth="xl">
+        <Box py={3}>
+          <Paper elevation={0}>
+            <ActionToolbar
+              className={classes.datasetDetailsLabel}
+              label="Project Details"
+              labelProps={{ variant: 'h4' }}
             />
+            <Box display="flex">
+              <Box flex="1 1 auto" className={classes.datasetDetailsContainer}>
+                <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
+              </Box>
+              <Box p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
+                <MapContainer
+                  mapId="boundary_map"
+                  onBoundsChange={onMapViewChange}
+                  scrollWheelZoom={false}
+                  fullScreenControl={false}
+                  markerLayers={markerLayers}
+                  staticLayers={staticLayers}
+                />
+              </Box>
+            </Box>
+          </Paper>
+          <Box mt={3}>
+            <Paper elevation={0}>
+              <DatasetArtifacts datasetId={datasetId} />
+            </Paper>
           </Box>
-        </Box>
-      </Container>
-      <Container maxWidth="xl">
-        <Box pt={2}>
-          <Paper elevation={0}>
-            <DatasetArtifacts datasetId={datasetId} />
-          </Paper>
-        </Box>
-      </Container>
-      <Container maxWidth="xl">
-        <Box pt={2}>
-          <Paper elevation={0}>
-            <RelatedDatasets datasetId={datasetId} />
-          </Paper>
+          <Box mt={3}>
+            <Paper elevation={0}>
+              <RelatedDatasets datasetId={datasetId} />
+            </Paper>
+          </Box>
         </Box>
       </Container>
     </Box>
