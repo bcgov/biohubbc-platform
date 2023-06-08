@@ -2,6 +2,7 @@ import { mdiDotsVertical, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } fr
 import Icon from '@mdi/react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
@@ -19,6 +20,7 @@ import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 
 const VALID_SYSTEM_ROLES: SYSTEM_ROLE[] = [SYSTEM_ROLE.DATA_ADMINISTRATOR, SYSTEM_ROLE.SYSTEM_ADMIN];
 
@@ -137,6 +139,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
+  const [openSecureDataAccessRequestDialog, setOpenSecureDataAccessRequestDialog] = useState<boolean>(false);
 
   const keycloakWrapper = useKeycloakWrapper();
   const biohubApi = useApi();
@@ -214,6 +217,13 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   return (
     <>
+
+      <SecureDataAccessRequestDialog
+        open={openSecureDataAccessRequestDialog}
+        onClose={() => setOpenSecureDataAccessRequestDialog(false)}
+        artifacts={artifactsList}
+      />
+
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
         <Box display="flex" gap={1}>
           {/*
@@ -230,6 +240,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
         */}
+        <Button onClick={() => setOpenSecureDataAccessRequestDialog(true)}>Test Dialog</Button>
         </Box>
       </ActionToolbar>
       <Divider></Divider>
