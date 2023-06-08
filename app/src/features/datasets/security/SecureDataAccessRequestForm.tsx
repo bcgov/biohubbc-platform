@@ -1,14 +1,21 @@
 import { DialogContentText, FormControl, FormControlLabel, FormHelperText, Radio, RadioGroup, Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
 import { makeStyles } from '@mui/styles';
 import CustomTextField from 'components/fields/CustomTextField';
 import yup from 'utils/YupSchema';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { useFormikContext } from 'formik';
 
 const useStyles = makeStyles((theme: Theme) => ({
   subheader: {
     textTransform: 'uppercase'
+  },
+  dataGrid: {
+    borderWidth: 1
   }
 }));
 
@@ -17,7 +24,8 @@ export interface ISecureDataAccessRequestForm {
   emailAddress: string;
   phoneNumber: string;
   reasonDescription: string;
-  hasSigned__: boolean;
+  hasSignedAgreement: 'true' | 'false';
+  selectedArtifacts: IArtifact[];
 }
 
 export const secureDataAccessRequestFormInitialValues: ISecureDataAccessRequestForm = {
@@ -25,7 +33,8 @@ export const secureDataAccessRequestFormInitialValues: ISecureDataAccessRequestF
   emailAddress: '',
   phoneNumber: '',
   reasonDescription: '',
-  hasSigned__: false
+  hasSignedAgreement: '' as 'false',
+  selectedArtifacts: []
 };
 
 export const secureDataAccessRequestFormYupSchema = yup.object().shape({
@@ -37,104 +46,158 @@ export const secureDataAccessRequestFormYupSchema = yup.object().shape({
     .required('Email Address is Required'),
   phoneNumber: yup.string().max(300, 'Cannot exceed 300 characters').required('Phone Number is Required'),
   reasonDescription: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
-  hasSigned__: yup.boolean()
+  hasSignedAgreement: yup.string().required(''), //TODO
+  selectedArtifacts: yup.array().min(1, 'Must select at least one artifact')
 });
+
+interface ISecureDataAccessRequestFormProps {
+  artifacts: IArtifact[];
+}
 
 /**
  * Publish button.
  *
  * @return {*}
  */
-const SecureDataAccessRequestForm = () => {
+const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) => {
   const classes = useStyles();
 
+  const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
+  // const [selectedArtifactIds, setSelectedArtifactIds] = useState([]);
+
+  console.log({ values: formikProps.values })
+
+  const columns: GridColDef<IArtifact>[] = [
+    {
+      field: 'file_name',
+      headerName: 'Title',
+      flex: 2,
+      disableColumnMenu: true
+    },
+    {
+      field: 'file_type',
+      headerName: 'Type',
+      flex: 1
+    }
+  ];
+
+  const onChangeSelection = (rowSelectionModel: GridRowSelectionModel) => {
+    const selectedArtifacts = rowSelectionModel
+      .map((gridRowId) => props.artifacts.find((artifact) => artifact.artifact_id === gridRowId))
+      .filter((artifact: IArtifact | undefined): artifact is IArtifact => Boolean(artifact))
+    
+    formikProps.setFieldValue('selectedArtifacts', selectedArtifacts);
+  }
+
   return (
-    <>
-      <Typography variant="body1" className={classes.subheader}>
-        <strong>Contact Details</strong>
-      </Typography>
-
-      <Box py={2}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <CustomTextField
-              name="fullName"
-              label="Full Name"
-              other={{
-                required: true
-              }}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <CustomTextField
-              name="emailAddress"
-              label="Email Address"
-              other={{
-                required: true
-              }}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <CustomTextField
-              name="phoneNumber"
-              label="Phone Number"
-              other={{
-                required: true
-              }}
-            />
-          </Grid>
-        </Grid>
-      </Box>
-
-      <Box mt={2}>
-        <Typography variant="body1" className={classes.subheader}>
-          <strong>Reason for Request</strong>
+    
+      <>
+        <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>
+          <strong>Documents You Are Requesting</strong>
         </Typography>
-        <DialogContentText variant="body1">Please be specific in describing your request.</DialogContentText>
         <Box py={2}>
-          <CustomTextField
-            name="reasonDescription"
-            label="Description"
-            other={{ multiline: true, required: true, rows: 4 }}
-          />
+          <Paper elevation={0}>
+            <DataGrid
+              className={classes.dataGrid}
+              getRowId={(row) => row.artifact_id}
+              autoHeight
+              rows={props.artifacts}
+              columns={columns}
+              checkboxSelection
+              disableRowSelectionOnClick
+              disableColumnSelector
+              disableColumnFilter
+              disableColumnMenu
+              sortingOrder={['asc', 'desc']}
+              onRowSelectionModelChange={onChangeSelection}
+              />
+            </Paper>
         </Box>
-      </Box>
 
-      <Box mt={2}>
-        <FormControl
-          required={true}
-          component="fieldset"
-          //</Box>error={touched.coordinator?.share_contact_details && Boolean(errors.coordinator?.share_contact_details)}
-        >
-          <Typography component="legend" variant="h5">
-            Confidentiality Agreement
-          </Typography>
-          <Typography color="textSecondary">
-            Do you have a signed and current Confidentiality and Non-Reproduction Agreement?
-          </Typography>
-          <Box mt={2} pl={1}>
-            <RadioGroup
-              name="test"
-              aria-label="Confidentiality Agreement"
-              // value={values.coordinator.share_contact_details}
-              // onChange={handleChange}
-            >
-              <FormControlLabel
-                value="true"
-                control={<Radio required={true} color="primary" size="small" />}
-                label="Yes"
+        <Typography variant="body1" className={classes.subheader}>
+          <strong>Contact Details</strong>
+        </Typography>
+
+        <Box py={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="fullName"
+                label="Full Name"
+                other={{
+                  required: true
+                }}
               />
-              <FormControlLabel
-                value="false"
-                control={<Radio required={true} color="primary" size="small" />}
-                label="No"
+            </Grid>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="emailAddress"
+                label="Email Address"
+                other={{
+                  required: true
+                }}
               />
-              <FormHelperText>{/*errors.coordinator?.share_contact_details*/}</FormHelperText>
-            </RadioGroup>
+            </Grid>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="phoneNumber"
+                label="Phone Number"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Box mt={2}>
+          <Typography variant="body1" className={classes.subheader}>
+            <strong>Reason for Request</strong>
+          </Typography>
+          <DialogContentText variant="body1">Please be specific in describing your request.</DialogContentText>
+          <Box py={2}>
+            <CustomTextField
+              name="reasonDescription"
+              label="Description"
+              other={{ multiline: true, required: true, rows: 4 }}
+            />
           </Box>
-        </FormControl>
-      </Box>
-    </>
+        </Box>
+
+        <Box mt={2}>
+          <FormControl
+            required={true}
+            component="fieldset"
+            //</Box>error={touched.coordinator?.share_contact_details && Boolean(errors.coordinator?.share_contact_details)}
+          >
+            <Typography component="legend" variant="h5">
+              Confidentiality Agreement
+            </Typography>
+            <Typography color="textSecondary">
+              Do you have a signed and current Confidentiality and Non-Reproduction Agreement?
+            </Typography>
+            <Box mt={2} pl={1}>
+              <RadioGroup
+                name="hasSignedAgreement"
+                value={formikProps.values.hasSignedAgreement}
+                onChange={e => {console.log(e); formikProps.handleChange(e)}}
+              >
+                <FormControlLabel
+                  value="true"
+                  control={<Radio required={true} color="primary" size="small" />}
+                  label="Yes"
+                />
+                <FormControlLabel
+                  value="false"
+                  control={<Radio required={true} color="primary" size="small" />}
+                  label="No"
+                />
+                <FormHelperText>{/*errors.coordinator?.share_contact_details*/}</FormHelperText>
+              </RadioGroup>
+            </Box>
+          </FormControl>
+        </Box>
+      </>
   );
 };
 

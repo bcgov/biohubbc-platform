@@ -5,13 +5,11 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
-import Paper from '@mui/material/Paper';
-import Typography from '@mui/material/Typography';
-import { useRef } from 'react';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
-import { Formik, FormikProps } from 'formik';
 import SecureDataAccessRequestForm, { ISecureDataAccessRequestForm, secureDataAccessRequestFormInitialValues, secureDataAccessRequestFormYupSchema } from './SecureDataAccessRequestForm';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { useRef } from 'react';
+import { Formik, FormikProps } from 'formik';
+
 
 interface ISecureDataAccessRequestDialogProps {
   open: boolean;
@@ -21,23 +19,11 @@ interface ISecureDataAccessRequestDialogProps {
 
 
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
-  //const 
+  const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
+    console.log({ values })
+  }
 
   const formikRef = useRef<FormikProps<ISecureDataAccessRequestForm>>(null);
-
-  const columns: GridColDef<IArtifact>[] = [
-    {
-      field: 'file_name',
-      headerName: 'Title',
-      flex: 2,
-      disableColumnMenu: true
-    },
-    {
-      field: 'file_type',
-      headerName: 'Type',
-      flex: 1
-    }
-  ];
 
   return (
     <Dialog
@@ -56,28 +42,6 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
           All secured data and information is governed by the Species and Ecosystems Data and Information Security policy and procedures.
         </DialogContentText>
 
-        <Box py={2}>
-          <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>
-            <strong>Documents You Are Requesting</strong>
-          </Typography>
-          <Box py={2}>
-            <Paper>
-              <DataGrid
-                getRowId={(row) => row.artifact_id}
-                autoHeight
-                rows={props.artifacts}
-                columns={columns}
-                checkboxSelection
-                disableRowSelectionOnClick
-                disableColumnSelector
-                disableColumnFilter
-                disableColumnMenu
-                sortingOrder={['asc', 'desc']}
-                />
-              </Paper>
-          </Box>
-        </Box>
-
         <Box>
           <Formik
             innerRef={formikRef}
@@ -86,8 +50,8 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
             validateOnBlur={true}
             validateOnChange={false}
             enableReinitialize={true}
-            onSubmit={() => { }}>
-            <SecureDataAccessRequestForm />
+            onSubmit={handleSubmit}>
+            <SecureDataAccessRequestForm artifacts={props.artifacts} />
           </Formik>
         </Box>
       </DialogContent>
