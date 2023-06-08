@@ -17,11 +17,8 @@ import EventHandler from './components/EventHandler';
 import FullScreenScrollingEventHandler from './components/FullScreenScrollingEventHandler';
 import MarkerCluster from './components/MarkerCluster';
 import MarkerClusterControls, { IMarkerLayer } from './components/MarkerClusterControls';
-import {
-  default as StaticLayers,
-  default as StaticLayersControls,
-  IStaticLayer
-} from './components/StaticLayersControls';
+import StaticLayers from './components/StaticLayers';
+import StaticLayersControls, { IStaticLayer } from './components/StaticLayersControls';
 
 const useStyles = makeStyles(() => ({
   map: {
@@ -124,6 +121,9 @@ const MapContainer: React.FC<React.PropsWithChildren<IMapContainerProps>> = (pro
           <BaseLayerControls />
         </LayersControl>
       ) : (
+        // each of these layer components was duplicated and had any 'control' components removed
+        // without the <LayersControl> and any of the internal control components these layers
+        // can properly render without the control
         <>
           <StaticLayers layers={staticLayers} />
           <MarkerCluster layers={markerLayers} />

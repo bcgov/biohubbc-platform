@@ -1,10 +1,8 @@
 import { TileLayer } from 'react-leaflet';
 
-interface IBaseLayerProps {
-  layerControlEnabled?: boolean;
-}
-
-const BaseLayer: React.FC<React.PropsWithChildren<IBaseLayerProps>> = (props) => {
+// Compare this with BaseLayerControls.tsx
+// Without the parent control component this component can only return a single Tile Layer
+const BaseLayer: React.FC<React.PropsWithChildren> = () => {
   return (
     <>
       <TileLayer

@@ -3,6 +3,9 @@ import { ReactElement } from 'react';
 import { FeatureGroup, GeoJSON, Popup, Tooltip } from 'react-leaflet';
 import { IStaticLayersProps } from './StaticLayersControls';
 
+// Compare with StaticLayersControl.tsx
+// See that <LayersControl.Overlay> is removed here
+// This allows the static layer data to render properly without the <LayerControl> component visible on the map
 const StaticLayers: React.FC<React.PropsWithChildren<IStaticLayersProps>> = (props) => {
   if (!props.layers?.length) {
     return null;

@@ -179,13 +179,13 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
                   mapId="boundary_map"
                   onBoundsChange={onMapViewChange}
                   scrollWheelZoom={false}
-                  fullScreenControl={false}
+                  fullScreenControl={true}
                   markerLayers={markerLayers}
                   staticLayers={staticLayers}
-                  zoomControlEnabled={false}
+                  zoomControlEnabled={true}
                   doubleClickZoomEnabled={false}
                   draggingEnabled={false}
-                  layerControlEnabled={true}
+                  layerControlEnabled={false}
                 />
               </Box>
             </Box>

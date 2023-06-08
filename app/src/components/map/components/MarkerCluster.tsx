@@ -1,48 +1,11 @@
-import { createLayerComponent } from '@react-leaflet/core';
-import L from 'leaflet';
 import 'leaflet.markercluster';
 import { ReactElement } from 'react';
-import { FeatureGroup, MarkerProps, Popup, Tooltip } from 'react-leaflet';
-import { CountMarker, IMarkerLayersProps } from './MarkerClusterControls';
+import { FeatureGroup, Popup, Tooltip } from 'react-leaflet';
+import { IMarkerLayersProps, Marker } from './MarkerClusterControls';
 
-const Marker = createLayerComponent<L.Marker & { setCount: (count: number) => void }, MarkerProps & { count: number }>(
-  ({ position, ...options }: MarkerProps & { count: number }, ctx) => {
-    const instance = new CountMarker(position, options);
-    return {
-      instance,
-      context: { ...ctx, overlayContainer: instance }
-    };
-  },
-  (marker, props, prevProps) => {
-    if (props.count !== prevProps.count) {
-      marker.setCount(props.count);
-    }
-    if (props.position !== prevProps.position) {
-      marker.setLatLng(props.position);
-    }
-
-    if (props.icon != null && props.icon !== prevProps.icon) {
-      marker.setIcon(props.icon);
-    }
-
-    if (props.zIndexOffset != null && props.zIndexOffset !== prevProps.zIndexOffset) {
-      marker.setZIndexOffset(props.zIndexOffset);
-    }
-
-    if (props.opacity != null && props.opacity !== prevProps.opacity) {
-      marker.setOpacity(props.opacity);
-    }
-
-    if (marker.dragging != null && props.draggable !== prevProps.draggable) {
-      if (props.draggable === true) {
-        marker.dragging.enable();
-      } else {
-        marker.dragging.disable();
-      }
-    }
-  }
-);
-
+// Compare with MarkerClusterControls.tsx
+// See that <LayersControl.Overlay> is removed here
+// This allows the marker data to render properly without the <LayerControl> component visible on the map
 const MarkerCluster: React.FC<React.PropsWithChildren<IMarkerLayersProps>> = (props) => {
   if (!props.layers?.length) {
     return null;
