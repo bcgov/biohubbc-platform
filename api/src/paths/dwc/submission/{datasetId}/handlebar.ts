@@ -73,7 +73,7 @@ export function getHandleBarsTemplateByDatasetId(): RequestHandler {
 
       res.status(200).json(result);
     } catch (error) {
-      defaultLog.error({ label: 'getMetadataByDatasetId', message: 'error', error });
+      defaultLog.error({ label: 'getHandleBarsTemplateByDatasetId', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
