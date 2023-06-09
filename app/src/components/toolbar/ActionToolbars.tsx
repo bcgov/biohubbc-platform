@@ -241,7 +241,7 @@ interface IActionToolbarProps {
 
 export const ActionToolbar: React.FC<React.PropsWithChildren<IActionToolbarProps>> = (props) => {
   return (
-    <Toolbar className={props.className ?? ""} {...props.toolbarProps} style={{ justifyContent: 'space-between' }}>
+    <Toolbar className={props.className ?? ''} {...props.toolbarProps} style={{ justifyContent: 'space-between' }}>
       <Typography {...props.labelProps} color="inherit">
         {props.label}
       </Typography>

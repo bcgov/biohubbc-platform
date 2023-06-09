@@ -45,10 +45,10 @@ export const useHandlebars = () => {
   };
 
   const formatDateHelper = () => {
-    Handlebars.registerHelper('formatDate', (dateString: string)=> {
-      return moment(dateString, 'YYYY-MM-DD').format("MMM YYYY").toString()
-    })
-  }
+    Handlebars.registerHelper('formatDate', (dateString: string) => {
+      return moment(dateString, 'YYYY-MM-DD').format('MMM YYYY').toString();
+    });
+  };
 
   /**
    * This function converts a rawTemplate to a template
