@@ -174,7 +174,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
               <Box flex="1 1 auto" className={classes.datasetDetailsContainer}>
                 <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
               </Box>
-              <Box p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
+              <Box data-testid="MapContainer" p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
                 <MapContainer
                   mapId="boundary_map"
                   onBoundsChange={onMapViewChange}

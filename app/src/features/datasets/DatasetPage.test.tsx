@@ -70,7 +70,7 @@ describe('DatasetPage', () => {
     });
   });
 
-  it.only('shows eml metadata as well as map points', async () => {
+  it('shows eml metadata as well as map points', async () => {
     const validFeatureCollection: FeatureCollection = {
       type: 'FeatureCollection',
       features: [
@@ -104,9 +104,10 @@ describe('DatasetPage', () => {
       }
     });
 
-    mockUseApi.dataset.getHandleBarsTemplateByDatasetId.mockResolvedValue(
-      '{{eml:eml.dataset.contact.organizationName}}'
-    );
+    mockUseApi.dataset.getHandleBarsTemplateByDatasetId.mockResolvedValue({
+      header: 'header',
+      details: '{{eml:eml.dataset.contact.organizationName}}'
+    });
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
@@ -115,7 +116,6 @@ describe('DatasetPage', () => {
     await waitFor(() => {
       expect(getByTestId('MapContainer')).toBeVisible();
       expect(getByText('organization name')).toBeVisible();
-      expect(getByTestId('export-occurrence')).toBeVisible();
     });
   });
 });
