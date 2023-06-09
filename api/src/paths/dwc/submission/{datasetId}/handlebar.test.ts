@@ -6,7 +6,7 @@ import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import { getHandleBarsTemplateByDatasetId} from "./handlebar";
+import { getHandleBarsTemplateByDatasetId } from './handlebar';
 
 chai.use(sinonChai);
 
@@ -20,7 +20,9 @@ describe('handlebar', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(SubmissionService.prototype, 'getHandleBarsTemplateByDatasetId').resolves({header: "hedaer", details: "details"});
+      sinon
+        .stub(SubmissionService.prototype, 'getHandleBarsTemplateByDatasetId')
+        .resolves({ header: 'hedaer', details: 'details' });
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -28,7 +30,7 @@ describe('handlebar', () => {
         datasetId: 'uuid'
       };
 
-      const requestHandler = getHandleBarsTemplateByDatasetId()
+      const requestHandler = getHandleBarsTemplateByDatasetId();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -39,9 +41,7 @@ describe('handlebar', () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon
-        .stub(SubmissionService.prototype, 'getHandleBarsTemplateByDatasetId')
-        .rejects(new Error('a test error'));
+      sinon.stub(SubmissionService.prototype, 'getHandleBarsTemplateByDatasetId').rejects(new Error('a test error'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
