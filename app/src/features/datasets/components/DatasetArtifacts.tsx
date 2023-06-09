@@ -63,12 +63,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const artifactsList = artifactsDataLoader.data || [];
 
-  //TODO: Pending review count is not accurate. How are we tracking pending review?
   const numPendingDocuments =
     artifactsList.filter(
-      (artifact) =>
-        artifact.security_review_timestamp === null ||
-        artifact?.supplementaryData?.persecutionAndHarm !== SECURITY_APPLIED_STATUS.PENDING
+      (artifact) => artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING
     ).length || 0;
 
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
@@ -112,21 +109,15 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       headerName: 'Status',
       flex: 1,
       renderCell: (params) => {
-        const { security_review_timestamp, supplementaryData } = params.row;
+        const { supplementaryData } = params.row;
+        if (hasAdministrativePermissions) {
+          if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING) {
+            return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
+          }
 
-        if (
-          !security_review_timestamp &&
-          supplementaryData?.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING &&
-          hasAdministrativePermissions
-        ) {
-          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
-        }
-
-        if (
-          supplementaryData?.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED &&
-          hasAdministrativePermissions
-        ) {
-          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Unsecured" />;
+          if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED) {
+            return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Available" />;
+          }
         }
 
         return <Chip color="warning" sx={{ textTransform: 'uppercase' }} label="Secured" />;
@@ -154,7 +145,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       <ApplySecurityDialog
         selectedArtifacts={selectedArtifacts}
         open={openApplySecurity}
-        onClose={() => setOpenApplySecurity(false)}
+        onClose={() => {
+          setOpenApplySecurity(false);
+          artifactsDataLoader.refresh();
+        }}
       />
 
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>

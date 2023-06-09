@@ -110,7 +110,31 @@ export class ArtifactService extends DBService {
     return this.artifactRepository.getArtifactsByDatasetId(datasetId);
   }
 
+  /**
+   * Retrieves an artifact by its primary key.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<Artifact>}
+   * @memberof ArtifactService
+   */
   async getArtifactById(artifactId: number): Promise<Artifact> {
     return this.artifactRepository.getArtifactById(artifactId);
+  }
+
+  /**
+   * updates the security review timestamp for an artifact
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<void>}
+   * @memberof ArtifactService
+   */
+  async updateArtifactsSecurityReviewTimestamps(artifactIds: number[]): Promise<void> {
+    defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
+
+    await Promise.all(
+      artifactIds.map(
+        async (artifactId) => await this.artifactRepository.updateArtifactSecurityReviewTimestamp(artifactId)
+      )
+    );
   }
 }

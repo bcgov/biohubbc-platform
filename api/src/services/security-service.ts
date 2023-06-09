@@ -6,6 +6,7 @@ import {
   SECURITY_APPLIED_STATUS
 } from '../repositories/security-repository';
 import { getLogger } from '../utils/logger';
+import { ArtifactService } from './artifact-service';
 import { DBService } from './db-service';
 
 const defaultLog = getLogger('services/security-service');
@@ -47,12 +48,19 @@ export class SecurityService extends DBService {
   async getSecurtyAppliedStatus(artifactId: number): Promise<SECURITY_APPLIED_STATUS> {
     defaultLog.debug({ label: 'getSecurtyAppliedStatus' });
 
+    const artifactService = new ArtifactService(this.connection);
+
+    const artifact = await artifactService.getArtifactById(artifactId);
+
+    if (artifact.security_review_timestamp === null) {
+      return SECURITY_APPLIED_STATUS.PENDING;
+    }
+
     const persecutionAndHarmRules = await this.getPersecutionAndHarmRulesByArtifactId(artifactId);
 
     if (!persecutionAndHarmRules.length) {
       return SECURITY_APPLIED_STATUS.UNSECURED;
     }
-    //TODO: PENDING??
 
     return SECURITY_APPLIED_STATUS.SECURED;
   }
