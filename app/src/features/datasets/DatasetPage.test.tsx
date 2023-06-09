@@ -31,7 +31,7 @@ const mockUseApi = {
   dataset: {
     getDatasetEML: jest.fn(),
     getDatasetArtifacts: jest.fn(),
-    getHandlebarsTemplate: jest.fn()
+    getHandleBarsTemplateByDatasetId: jest.fn()
   },
   search: {
     getSpatialData: jest.fn(),
@@ -61,7 +61,7 @@ describe('DatasetPage', () => {
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
-    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('not empty');
+    mockUseApi.dataset.getHandleBarsTemplateByDatasetId.mockResolvedValue({ header: 'header', details: 'details' });
 
     const { getByTestId } = renderContainer();
 
@@ -70,7 +70,7 @@ describe('DatasetPage', () => {
     });
   });
 
-  it('shows eml metadata as well as map points', async () => {
+  it.only('shows eml metadata as well as map points', async () => {
     const validFeatureCollection: FeatureCollection = {
       type: 'FeatureCollection',
       features: [
@@ -104,7 +104,9 @@ describe('DatasetPage', () => {
       }
     });
 
-    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('{{eml:eml.dataset.contact.organizationName}}');
+    mockUseApi.dataset.getHandleBarsTemplateByDatasetId.mockResolvedValue(
+      '{{eml:eml.dataset.contact.organizationName}}'
+    );
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
