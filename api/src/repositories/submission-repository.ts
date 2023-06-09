@@ -8,8 +8,8 @@ import { BaseRepository } from './base-repository';
 import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 export interface IHandlebarsTemplates {
-  header: string
-  details: string
+  header: string;
+  details: string;
 }
 export interface IDatasetsForReview {
   dataset_id: string; // UUID
@@ -895,19 +895,19 @@ export class SubmissionRepository extends BaseRepository {
     return response.rowCount;
   }
 
-/**
-   * Finds an object of handlebars templates for a given datasetId to power the project details page 
-   * 
+  /**
+   * Finds an object of handlebars templates for a given datasetId to power the project details page
+   *
    * @param datasetId a dataset UUID for determining the handlebars template to fetch
    * @returns {*} {Promise<IDetailsPage>} an object containing a string of handlebars templates
    * @memberof SubmissionRepository
    */
-async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
-  return {
-    header: simsHandlebarsTemplate_HEADER,
-    details: simsHandlebarsTemplate_DETAILS
-  };
-}
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
+    return {
+      header: simsHandlebarsTemplate_HEADER,
+      details: simsHandlebarsTemplate_DETAILS
+    };
+  }
 
   /**
    *

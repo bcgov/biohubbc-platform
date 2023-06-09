@@ -5,6 +5,7 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   IDatasetsForReview,
+  IHandlebarsTemplates,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -15,8 +16,7 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE,
-  IHandlebarsTemplates
+  SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -428,15 +428,14 @@ export class SubmissionService extends DBService {
     });
   }
 
-/**
-   * 
-   * @param datasetId 
-   * @returns 
+  /**
+   *
+   * @param datasetId
+   * @returns
    */
-async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
-
-  return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
-}
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
+    return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
+  }
 
   /**
    * Gets datasets that have artifacts that require a security review.
