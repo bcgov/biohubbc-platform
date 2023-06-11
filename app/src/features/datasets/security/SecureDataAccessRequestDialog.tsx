@@ -20,7 +20,7 @@ interface ISecureDataAccessRequestDialogProps {
 
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
   const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
-    console.log({ values })
+    console.log('handleSubmit()', { values })
   }
 
   const formikRef = useRef<FormikProps<ISecureDataAccessRequestForm>>(null);
@@ -28,7 +28,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
   return (
     <Dialog
       // fullScreen={fullScreen}
-      maxWidth="xl"
+      maxWidth="md"
       open={props.open}
       onClose={props.onClose}
       aria-labelledby="component-dialog-title"

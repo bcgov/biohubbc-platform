@@ -46,7 +46,7 @@ export const secureDataAccessRequestFormYupSchema = yup.object().shape({
     .required('Email Address is Required'),
   phoneNumber: yup.string().max(300, 'Cannot exceed 300 characters').required('Phone Number is Required'),
   reasonDescription: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
-  hasSignedAgreement: yup.string().required(''), //TODO
+  hasSignedAgreement: yup.string().required('Confidentiality Agreement is Required'),
   selectedArtifacts: yup.array().min(1, 'Must select at least one artifact')
 });
 
@@ -65,7 +65,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
   // const [selectedArtifactIds, setSelectedArtifactIds] = useState([]);
 
-  console.log({ values: formikProps.values })
+  console.log({ formikProps })
 
   const columns: GridColDef<IArtifact>[] = [
     {
@@ -108,6 +108,9 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               disableColumnSelector
               disableColumnFilter
               disableColumnMenu
+              disableVirtualization
+              disableDensitySelector
+              hideFooter
               sortingOrder={['asc', 'desc']}
               onRowSelectionModelChange={onChangeSelection}
               />
@@ -129,7 +132,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={6}>
               <CustomTextField
                 name="emailAddress"
                 label="Email Address"
@@ -138,7 +141,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                 }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid item xs={6}>
               <CustomTextField
                 name="phoneNumber"
                 label="Phone Number"
@@ -168,6 +171,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
           <FormControl
             required={true}
             component="fieldset"
+            error={Boolean(formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement'])}
             //</Box>error={touched.coordinator?.share_contact_details && Boolean(errors.coordinator?.share_contact_details)}
           >
             <Typography component="legend" variant="h5">
