@@ -46,14 +46,14 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<void>}
    * @memberof DarwinCoreService
    */
-  async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+  async intakeJob_old(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
     // Step 1: Insert submission metadata record
     const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
 
     // Step 2: Set submission metadata eml source column
     const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
 
-    // Step 2: Convert EML to JSON and set submission metadata eml json source column
+    // Step 3: Convert EML to JSON and set submission metadata eml json source column
     await this.intakeJob_step3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
 
     // Step 4: Update submission metadata record end and effective dates
@@ -67,6 +67,109 @@ export class DarwinCoreService extends DBService {
     await this.intakeJob_step6(jobQueueRecord, dwcaFile);
 
     await this.intakeJob_finishIntake(jobQueueRecord);
+  }
+
+  async intakeBreakdown(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+    // Step 1: Insert submission metadata record
+    const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
+
+    // Step 2: Set submission metadata eml source column
+    const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
+  
+    /* Step 3 */
+    // Convert the EML data from XML to JSON
+    const emlJSON = this.emlService.convertXMLStringToJSObject(dwcaFile.eml!.emlFile.buffer.toString())
+    
+    // Decorate the EML object, adding additional BioHub metadata to the original EML.
+    const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
+
+    await this.submissionService.updateSubmissionRecordEMLJSONSource(
+      jobQueueRecord.submission_id,
+      submissionMetadataId.submission_metadata_id,
+      JSON.stringify(decoratedEMLJSON)
+    );
+    /* Step 3 */
+
+    /* Step 4 */
+    await this.submissionService.updateSubmissionMetadataRecordEndDate(jobQueueRecord.submission_id);
+    await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(jobQueueRecord.submission_id);
+    /* Step 4 */
+
+    /* Step 5 */
+    await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
+    await this.submissionService.insertSubmissionStatus(jobQueueRecord.submission_id, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
+    /* Step 5 */
+
+    /* Step 6 */
+    const jsonData = dwcaFile.normalize();
+    // Set the end timestamp for all existing submission observations
+    await this.updateSubmissionObservationEndTimestamp(jobQueueRecord);
+    // Insert new submission observation record
+    const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, jsonData);
+    // Run spatial and security transforms on observation data
+    await this.runTransformsOnObservations(jobQueueRecord, submissionObservationId.submission_observation_id);
+    /* Step 6 */
+    
+    /* Step 7 */
+    await this.updateS3FileLocation(jobQueueRecord);
+    await this.submissionService.insertSubmissionStatus(
+      jobQueueRecord.submission_id,
+      SUBMISSION_STATUS_TYPE.INGESTED
+    );
+    /* Step 7 */
+  }
+
+
+
+
+
+
+
+
+  async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    console.log("NEW INTAKE JOB IS RUNNING")
+    const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
+    const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
+
+
+    /* Step 3 */
+    // convert EML to JSON and save in table
+    const emlJSON = this.emlService.convertXMLStringToJSObject(dwcaFile.eml!.emlFile.buffer.toString())
+    await this.submissionService.updateSubmissionRecordEMLJSONSource(
+      jobQueueRecord.submission_id,
+      submissionMetadataId.submission_metadata_id,
+      JSON.stringify(emlJSON)
+    );
+
+    /* Step 4 */
+    // run spatial transform on JSON to generate insecure spatial components
+    const initialJSONData = dwcaFile.normalize()
+    const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, initialJSONData);
+    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId.submission_observation_id);
+
+    /* Step 5 */
+    const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
+    await this.submissionService.updateSubmissionRecordEMLJSONSource(
+      jobQueueRecord.submission_id,
+      submissionMetadataId.submission_metadata_id,
+      JSON.stringify(decoratedEMLJSON)
+    );
+
+    /* Step 6 */
+    // run spatial transform on decorated EML
+    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId.submission_observation_id);
+
+    /* Step 7 */
+    await this.runSecurityTransforms(jobQueueRecord);
   }
 
   /**
