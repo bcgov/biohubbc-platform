@@ -2,7 +2,12 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
 import { Route, Router } from 'react-router';
-import { getMockAuthState } from 'test-helpers/auth-helpers';
+import {
+  getMockAuthState,
+  SystemAdminAuthState,
+  SystemUserAuthState,
+  UnauthenticatedUserAuthState
+} from 'test-helpers/auth-helpers';
 import { render } from 'test-helpers/test-utils';
 import { AuthGuard, NoRoleGuard, SystemRoleGuard, UnAuthGuard } from './Guards';
 
@@ -12,9 +17,7 @@ describe('Guards', () => {
   describe('NoRoleGuard', () => {
     describe('with no fallback', () => {
       it('renders the child when user has no matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => false }
-        });
+        const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId } = render(
           <Router history={history}>
@@ -32,9 +35,7 @@ describe('Guards', () => {
       });
 
       it('does not render the child when user has a matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
           <Router history={history}>
@@ -54,9 +55,7 @@ describe('Guards', () => {
 
     describe('with a fallback component', () => {
       it('renders the child when user has no matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => false }
-        });
+        const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { queryByTestId } = render(
           <Router history={history}>
@@ -77,9 +76,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user has a matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -102,9 +99,7 @@ describe('Guards', () => {
 
     describe('with a fallback function', () => {
       it('renders the child when user has no matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => false }
-        });
+        const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -125,9 +120,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user has a matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -153,9 +146,7 @@ describe('Guards', () => {
   describe('SystemRoleGuard', () => {
     describe('with no fallback', () => {
       it('renders the child when user has a matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId } = render(
           <Router history={history}>
@@ -173,9 +164,7 @@ describe('Guards', () => {
       });
 
       it('does not render the child when user has no matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => false }
-        });
+        const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { queryByTestId } = render(
           <Router history={history}>
@@ -195,9 +184,7 @@ describe('Guards', () => {
 
     describe('with a fallback component', () => {
       it('renders the child when user has a matching valid system roles', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
           <Router history={history}>
@@ -218,9 +205,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user has no matching valid system roles', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => false }
-        });
+        const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -243,9 +228,7 @@ describe('Guards', () => {
 
     describe('with a fallback function', () => {
       it('renders the child when user has a matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -266,9 +249,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user has no matching valid system role', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { hasSystemRole: () => false }
-        });
+        const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -293,9 +274,7 @@ describe('Guards', () => {
   describe('AuthGuard', () => {
     describe('with no fallback', () => {
       it('renders the child when user is authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: true }, hasLoadedAllUserInfo: true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId } = render(
           <Router history={history}>
@@ -313,9 +292,7 @@ describe('Guards', () => {
       });
 
       it('does not render the child when user is not authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: false }, hasLoadedAllUserInfo: false }
-        });
+        const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { queryByTestId } = render(
           <Router history={history}>
@@ -335,9 +312,7 @@ describe('Guards', () => {
 
     describe('with a fallback component', () => {
       it('renders the child when user is authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: true }, hasLoadedAllUserInfo: true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -356,9 +331,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user is not authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: false }, hasLoadedAllUserInfo: false }
-        });
+        const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -379,9 +352,7 @@ describe('Guards', () => {
 
     describe('with a fallback function', () => {
       it('renders the child when user is authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: true }, hasLoadedAllUserInfo: true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -400,9 +371,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user is not authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: false }, hasLoadedAllUserInfo: false }
-        });
+        const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -425,10 +394,7 @@ describe('Guards', () => {
   describe('UnAuthGuard', () => {
     describe('with no fallback', () => {
       it('renders the child when user is not authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: false }, hasLoadedAllUserInfo: false }
-        });
-
+        const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
         const { getByTestId } = render(
           <Router history={history}>
             <Route path="test/:id">
@@ -445,9 +411,7 @@ describe('Guards', () => {
       });
 
       it('does not render the child when user is authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: true }, hasLoadedAllUserInfo: true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
           <Router history={history}>
@@ -467,9 +431,7 @@ describe('Guards', () => {
 
     describe('with a fallback component', () => {
       it('renders the child when user is not authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: false }, hasLoadedAllUserInfo: false }
-        });
+        const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -488,9 +450,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user is authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: true }, hasLoadedAllUserInfo: true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -511,9 +471,7 @@ describe('Guards', () => {
 
     describe('with a fallback function', () => {
       it('renders the child when user is not authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: false }, hasLoadedAllUserInfo: false }
-        });
+        const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>
@@ -532,9 +490,7 @@ describe('Guards', () => {
       });
 
       it('renders the fallback component when user is authenticated', () => {
-        const authState = getMockAuthState({
-          keycloakWrapper: { keycloak: { authenticated: true }, hasLoadedAllUserInfo: true }
-        });
+        const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
           <Router history={history}>

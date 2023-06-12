@@ -1,7 +1,5 @@
 'use strict';
 
-let process = require('process');
-
 let options = require('pipeline-cli').Util.parseArguments();
 
 // The root config for common values
@@ -9,10 +7,12 @@ const config = require('../../.config/config.json');
 
 const name = config.module.db;
 
-const changeId = options.pr || `${Math.floor(Date.now() * 1000) / 60.0}`; // aka pull-request or branch
-const version = config.version || '1.0.0';
+const version = config.version;
+
+const changeId = options.pr; // pull-request number or branch name
 
 // A static deployment is when the deployment is updating dev, test, or prod (rather than a temporary PR)
+// See `--type=static` in the `deployStatic.yml` git workflow
 const isStaticDeployment = options.type === 'static';
 
 const deployChangeId = (isStaticDeployment && 'deploy') || changeId;
@@ -76,8 +76,13 @@ const phases = {
     tag: `dev-${version}-${deployChangeId}`,
     env: 'dev',
     tz: config.timezone.db,
-    size: '1Gi',
-    dbSetupDockerfilePath: dbSetupDockerfilePath
+    dbSetupDockerfilePath: dbSetupDockerfilePath,
+    volumeCapacity: (isStaticDeployment && '3Gi') || '500Mi',
+    cpuRequest: '50m',
+    cpuLimit: '200m',
+    memoryRequest: '512Mi',
+    memoryLimit: '2Gi',
+    replicas: '1'
   },
   test: {
     namespace: 'a0ec71-test',
@@ -90,8 +95,13 @@ const phases = {
     tag: `test-${version}`,
     env: 'test',
     tz: config.timezone.db,
-    size: '3Gi',
-    dbSetupDockerfilePath: dbSetupDockerfilePath
+    dbSetupDockerfilePath: dbSetupDockerfilePath,
+    volumeCapacity: '3Gi',
+    cpuRequest: '100m',
+    cpuLimit: '500m',
+    memoryRequest: '512Mi',
+    memoryLimit: '3Gi',
+    replicas: '1'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -104,15 +114,14 @@ const phases = {
     tag: `prod-${version}`,
     env: 'prod',
     tz: config.timezone.db,
-    size: '3Gi',
-    dbSetupDockerfilePath: dbSetupDockerfilePath
+    dbSetupDockerfilePath: dbSetupDockerfilePath,
+    volumeCapacity: '5Gi',
+    cpuRequest: '100m',
+    cpuLimit: '500m',
+    memoryRequest: '512Mi',
+    memoryLimit: '3Gi',
+    replicas: '1'
   }
 };
-
-// This callback forces the node process to exit as failure.
-process.on('unhandledRejection', (reason, promise) => {
-  console.log('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 module.exports = exports = { phases, options };

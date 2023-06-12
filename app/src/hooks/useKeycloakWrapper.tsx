@@ -1,31 +1,41 @@
 import { useKeycloak } from '@react-keycloak/web';
 import Keycloak from 'keycloak-js';
 import { useCallback } from 'react';
+import { buildUrl } from 'utils/Utils';
 import { useApi } from './useApi';
 import useDataLoader from './useDataLoader';
 
 export enum SYSTEM_IDENTITY_SOURCE {
-  BCEID = 'BCEID',
+  BCEID_BUSINESS = 'BCEIDBUSINESS',
+  BCEID_BASIC = 'BCEIDBASIC',
   IDIR = 'IDIR'
 }
 
-const raw_bceid_identity_sources = ['BCEID-BASIC-AND-BUSINESS', 'BCEID'];
-const raw_idir_identity_sources = ['IDIR'];
-
-/**
- * IUserInfo interface, represents the userinfo provided by keycloak.
- *
- * @export
- * @interface IUserInfo
- */
 export interface IUserInfo {
-  name?: string;
-  preferred_username?: string;
-  given_name?: string;
-  username?: string;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
+  sub: string;
+  email_verified: boolean;
+  preferred_username: string;
+  identity_source: string;
+  display_name: string;
+  email: string;
+}
+
+export interface IIDIRUserInfo extends IUserInfo {
+  idir_user_guid: string;
+  idir_username: string;
+  name: string;
+  given_name: string;
+  family_name: string;
+}
+
+interface IBCEIDBasicUserInfo extends IUserInfo {
+  bceid_user_guid: string;
+  bceid_username: string;
+}
+
+export interface IBCEIDBusinessUserInfo extends IBCEIDBasicUserInfo {
+  bceid_business_guid: string;
+  bceid_business_name: string;
 }
 
 /**
@@ -38,10 +48,10 @@ export interface IKeycloakWrapper {
   /**
    * Original raw keycloak object.
    *
-   * @type {(Keycloak | undefined)}
+   * @type {(Keycloak)}
    * @memberof IKeycloakWrapper
    */
-  keycloak: Keycloak | undefined;
+  keycloak: Keycloak;
   /**
    * Returns `true` if the user's information has been loaded, false otherwise.
    *
@@ -63,13 +73,6 @@ export interface IKeycloakWrapper {
    */
   hasSystemRole: (validSystemRoles?: string[]) => boolean;
   /**
-   * True if the user has at least 1 pending access request.
-   *
-   * @type {boolean}
-   * @memberof IKeycloakWrapper
-   */
-  hasAccessRequest: boolean;
-  /**
    * Get out the username portion of the preferred_username from the token.
    *
    * @memberof IKeycloakWrapper
@@ -84,17 +87,20 @@ export interface IKeycloakWrapper {
   username: string | undefined;
   displayName: string | undefined;
   email: string | undefined;
-  firstName: string | undefined;
-  lastName: string | undefined;
   systemUserId: number;
   /**
    * Force this keycloak wrapper to refresh its data.
    *
-   * Note: currently this only refreshes the `hasAccessRequest` property.
-   *
    * @memberof IKeycloakWrapper
    */
   refresh: () => void;
+  /**
+   * Generates the URL to sign in using Keycloak.
+   *
+   * @param {string} [redirectUri] Optionally URL to redirect the user to after logging in
+   * @memberof IKeycloakWrapper
+   */
+  getLoginUrl: (redirectUri?: string) => string;
 }
 
 /**
@@ -109,46 +115,65 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   const biohubApi = useApi();
 
   const keycloakUserDataLoader = useDataLoader(async () => {
-    return (keycloak && (keycloak.loadUserInfo() as IUserInfo)) || undefined;
+    return (
+      (keycloak.token &&
+        (keycloak.loadUserInfo() as unknown as IIDIRUserInfo | IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)) ||
+      undefined
+    );
   });
 
   const userDataLoader = useDataLoader(() => biohubApi.user.getUser());
-
-  // const hasPendingAdministrativeActivitiesDataLoader = useDataLoader(() =>
-  //   biohubApi.admin.hasPendingAdministrativeActivities()
-  // );
 
   if (keycloak) {
     // keycloak is ready, load keycloak user info
     keycloakUserDataLoader.load();
   }
 
-  if (keycloak?.authenticated) {
+  if (keycloak.authenticated) {
     // keycloak user is authenticated, load system user info
     userDataLoader.load();
-
-    if (userDataLoader.data && (!userDataLoader.data.role_names.length || userDataLoader.data?.user_record_end_date)) {
-      // Authenticated user either has has no roles or has been deactivated
-      // Check if the user has a pending access request
-      // TODO removed while access requests are broken
-      // hasPendingAdministrativeActivitiesDataLoader.load();
-    }
   }
 
   /**
-   * Parses out the username portion of the preferred_username from the token.
+   * Coerces a string into a user identity source, e.g. BCEID, IDIR, etc.
+   *
+   * @example _inferIdentitySource('idir') => SYSTEM_IDENTITY_SOURCE.IDIR
+   *
+   * @param userIdentitySource The user identity source string
+   * @returns {*} {SYSTEM_IDENTITY_SOURCE | null}
+   */
+  const _inferIdentitySource = (userIdentitySource: string | undefined): SYSTEM_IDENTITY_SOURCE | null => {
+    switch (userIdentitySource) {
+      case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+        return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
+
+      case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+        return SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS;
+
+      case SYSTEM_IDENTITY_SOURCE.IDIR:
+        return SYSTEM_IDENTITY_SOURCE.IDIR;
+
+      default:
+        return null;
+    }
+  };
+
+  /**
+   * Parses out the username from a keycloak token, from either the `idir_username` or `bceid_username` field.
    *
    * @param {object} keycloakToken
    * @return {*} {(string | null)}
    */
   const getUserIdentifier = useCallback((): string | null => {
-    const userIdentifier = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[0];
+    const userIdentifier =
+      (keycloakUserDataLoader.data as IIDIRUserInfo)?.idir_username ||
+      (keycloakUserDataLoader.data as IBCEIDBasicUserInfo | IBCEIDBusinessUserInfo)?.bceid_username;
 
     if (!userIdentifier) {
       return null;
     }
 
-    return userIdentifier;
+    return userIdentifier.toLowerCase();
   }, [keycloakUserDataLoader.data]);
 
   /**
@@ -158,33 +183,27 @@ function useKeycloakWrapper(): IKeycloakWrapper {
    * @return {*} {(string | null)}
    */
   const getIdentitySource = useCallback((): SYSTEM_IDENTITY_SOURCE | null => {
-    const identitySource = keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[1].toUpperCase();
+    const userIdentitySource =
+      userDataLoader.data?.['identity_source'] ||
+      keycloakUserDataLoader.data?.['preferred_username']?.split('@')?.[1].toUpperCase();
 
-    if (!identitySource) {
+    if (!userIdentitySource) {
       return null;
     }
 
-    if (raw_bceid_identity_sources.includes(identitySource)) {
-      return SYSTEM_IDENTITY_SOURCE.BCEID;
-    }
-
-    if (raw_idir_identity_sources.includes(identitySource)) {
-      return SYSTEM_IDENTITY_SOURCE.IDIR;
-    }
-
-    return null;
-  }, [keycloakUserDataLoader.data]);
+    return _inferIdentitySource(userIdentitySource);
+  }, [keycloakUserDataLoader.data, userDataLoader.data]);
 
   const systemUserId = (): number => {
-    return userDataLoader.data?.id || 0;
+    return userDataLoader.data?.id ?? 0;
   };
 
   const getSystemRoles = (): string[] => {
-    return userDataLoader.data?.role_names || [];
+    return userDataLoader.data?.role_names ?? [];
   };
 
   const hasSystemRole = (validSystemRoles?: string[]) => {
-    if (!validSystemRoles || !validSystemRoles.length) {
+    if (!validSystemRoles?.length) {
       return true;
     }
 
@@ -198,45 +217,41 @@ function useKeycloakWrapper(): IKeycloakWrapper {
   };
 
   const username = (): string | undefined => {
-    return keycloakUserDataLoader.data?.preferred_username;
+    return (
+      (keycloakUserDataLoader.data as IIDIRUserInfo)?.idir_username ||
+      (keycloakUserDataLoader.data as IBCEIDBasicUserInfo)?.bceid_username
+    );
   };
 
   const displayName = (): string | undefined => {
-    return keycloakUserDataLoader.data?.name || keycloakUserDataLoader.data?.preferred_username;
+    return keycloakUserDataLoader.data?.display_name;
   };
 
   const email = (): string | undefined => {
     return keycloakUserDataLoader.data?.email;
   };
 
-  const firstName = (): string | undefined => {
-    return keycloakUserDataLoader.data?.firstName;
-  };
-
-  const lastName = (): string | undefined => {
-    return keycloakUserDataLoader.data?.lastName;
-  };
-
   const refresh = () => {
     userDataLoader.refresh();
-    // hasPendingAdministrativeActivitiesDataLoader.refresh();
+  };
+
+  const getLoginUrl = (redirectUri = '/admin/dashboard'): string => {
+    return keycloak?.createLoginUrl({ redirectUri: buildUrl(window.location.origin, redirectUri) }) ?? '/login';
   };
 
   return {
-    keycloak: keycloak,
-    hasLoadedAllUserInfo: !!userDataLoader.data, // !!(userDataLoader.data || hasPendingAdministrativeActivitiesDataLoader.data),
+    keycloak,
+    hasLoadedAllUserInfo: !!userDataLoader.data,
     systemRoles: getSystemRoles(),
     hasSystemRole,
-    hasAccessRequest: false, // !!hasPendingAdministrativeActivitiesDataLoader.data,
     getUserIdentifier,
     getIdentitySource,
     username: username(),
     email: email(),
     displayName: displayName(),
-    firstName: firstName(),
-    lastName: lastName(),
     systemUserId: systemUserId(),
-    refresh
+    refresh,
+    getLoginUrl
   };
 }
 

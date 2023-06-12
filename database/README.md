@@ -11,31 +11,22 @@
 
 <br />
 
-## Knex Migrations / Seeds
+# Knex Migrations / Seeds
 
-### Migrations
+## Migrations
 
+An ordered list of database changes (creates, deletes, alters, etc).  
+The latest version of your database will then be the summation of all of the migration changes, applied in order.
 
-An ordered list of database changes (creates, deletes, alters, etc). The latest version of your database will then be the summation of all of the migration changes, applied in order.
+Migrations are tracked via a `migrations` database table, and will only ever run once.
 
-Useful resource https://devhints.io/knex
+## Seeds
 
-To run migrations locally using your terminal, export the required environment variables. For example if an env variable is DB_SCHEMA=biohub
-
-```
-EXPORT DB_SCHEMA=biohub
-```
-To test that it worked:
-
-```
-ECHO $DB_SCHEMA 
-```
-
-### Seeds
-
-A set of scripts that populate the database tables with any ephemeral values required for the app to function during development. This can include dummy data so that when the app is running locally, you don't have to manually create a bunch of data in order to experience the app as it would be in a real environment.
+A set of scripts that populate the database tables with any ephemeral values required for the app to function during development. This can include dummy data so that when the app is running locally, you don't have to manually create data in order to experience the app as it would be in a real environment.
 
 Seeds will run in alphanumeric order, so if the order of seeds is important, consider prefixing the file name with a number.
+
+Unlike migrations, seeds are not tracked, and will attempt to run every time the knex seeds command is executed. As a result, seeds should be written such that they can be run repeatedly without error.
 
 # Port forward to remote database
 
@@ -94,12 +85,11 @@ pg_restore dumpFileName
 
 # Troubleshooting
 
-`Error: knex: Required configuration option 'client' is missing.`
+## Knex
 
-- Double check that your environment variables have been set correctly, specifically `NODE_ENV`. To do this you can run the following command from the `database/src` directory:
+### Required configuration option 'client' is missing.
 
-```
-export NODE_ENV = local
-```
+The `Knexfile.ts` defines the settings that Knex will use when running migrations and seeds. It requires several environment variables to function correctly.
 
-- Double check that the line endings of the `.env` file are `LF` and not `CLRF`
+- Double check that your environment variables have been set (`.env`)
+  - See makefile command: `Make env`

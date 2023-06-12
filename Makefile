@@ -22,14 +22,12 @@ export $(shell sed 's/=.*//' .env)
 env: | setup ## Copies the default ./env_config/env.docker to ./.env
 
 postgres: | close build-postgres run-postgres ## Performs all commands necessary to run the postgres project (db) in docker
-backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api) in docker
-web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, app, n8n) in docker
+backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api, queue) in docker
+web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, queue, app) in docker
 
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 db-migrate: | build-db-migrate run-db-migrate ## Performs all commands necessary to run the database migrations
 db-rollback: | build-db-rollback run-db-rollback ## Performs all commands necessary to rollback the latest database migrations
-n8n-setup: | build-n8n-setup run-n8n-setup ## Performs all commands necessary to run the n8n setup
-n8n-export: | build-n8n-export run-n8n-export ## Performs all commands necessary to export the latest n8n credentials and workflows
 
 clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
 geoserver: | build-geoserver run-geoserver ## Performs all commands necessary to run the geoserver project (db, geoserver) in docker
@@ -77,41 +75,37 @@ run-postgres: ## Runs the postgres db containers
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend Commands
-## - Builds all of the BioHub backend projects (db, db_setup, api)
+## - Builds all of the BioHub backend projects (db, db_setup, api, queue)
 ## ------------------------------------------------------------------------------
 
 build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api
+	@docker-compose -f docker-compose.yml build db db_setup api queue
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api
+	@docker-compose -f docker-compose.yml up -d db db_setup api queue
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
-## - Builds all of the BioHub backend+web projects (db, db_setup, api, app, n8n, n8n_nginx, n8n_setup)
+## - Builds all of the BioHub backend+web projects (db, db_setup, api, queue, app)
 ## ------------------------------------------------------------------------------
 
 build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api app
-  # @docker-compose -f docker-compose.yml build db db_setup api app n8n n8n_nginx n8n_setup
+	@docker-compose -f docker-compose.yml build db db_setup api queue app
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api app
-  ## Restart n8n as a workaround to resolve this known issue: https://github.com/n8n-io/n8n/issues/2155
-  # @docker-compose -f docker-compose.yml up -d n8n n8n_nginx n8n_setup
-  # @docker-compose restart n8n
+	@docker-compose -f docker-compose.yml up -d db db_setup api queue app
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container
@@ -136,11 +130,11 @@ api-container: ## Executes into the api container.
 	@echo "==============================================="
 	@docker-compose exec api bash
 
-n8n-container: ## Executes into the n8n container.
+queue-container: ## Executes into the queue container.
 	@echo "==============================================="
-	@echo "Shelling into n8n container"
+	@echo "Shelling into queue container"
 	@echo "==============================================="
-	@docker-compose exec n8n sh
+	@docker-compose exec queue bash
 
 geoserver-container: ## Executes into the geoserver container.
 	@echo "==============================================="
@@ -187,34 +181,6 @@ run-db-rollback: ## Rollback the latest database migrations
 	@echo "Make: run-db-rollback - rolling back the latest database migrations"
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml up db_rollback
-
-## ------------------------------------------------------------------------------
-## n8n commands
-## ------------------------------------------------------------------------------
-
-build-n8n-setup: ## Build the n8n setup image
-	@echo "==============================================="
-	@echo "Make: build-n8n-setup - building n8n setup image"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build n8n_setup
-
-run-n8n-setup: ## Run the n8n setup
-	@echo "==============================================="
-	@echo "Make: run-n8n-setup - running n8n setup"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up n8n_setup
-
-build-n8n-export: ## Build the n8n export image
-	@echo "==============================================="
-	@echo "Make: build-n8n-export - building n8n export image"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build n8n_export
-
-run-n8n-export: ## Run the n8n export
-	@echo "==============================================="
-	@echo "Make: run-n8n-export - exporting the n8n credentials and workflows"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up n8n_export
 
 ## ------------------------------------------------------------------------------
 ## clamav commands
@@ -372,6 +338,12 @@ log-api: ## Runs `docker logs <container> -f` for the api container
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-api-$(DOCKER_NAMESPACE)-container -f $(args)
 
+log-queue: ## Runs `docker logs <container> -f` for the queue container
+	@echo "==============================================="
+	@echo "Running docker logs for the queue container"
+	@echo "==============================================="
+	@docker logs $(DOCKER_PROJECT_NAME)-queue-$(DOCKER_NAMESPACE)-container -f $(args)
+
 log-db: ## Runs `docker logs <container> -f` for the database container
 	@echo "==============================================="
 	@echo "Running docker logs for the db container"
@@ -384,25 +356,7 @@ log-db-setup: ## Runs `docker logs <container> -f` for the database setup contai
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-db-setup-$(DOCKER_NAMESPACE)-container -f $(args)
 
-log-n8n: ## Runs `docker logs <container> -f` for the n8n container
-	@echo "==============================================="
-	@echo "Running docker logs for the n8n container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-n8n-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-n8n-setup: ## Runs `docker logs <container> -f` for the n8n setup container
-	@echo "==============================================="
-	@echo "Running docker logs for the n8n-setup container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-n8n-setup-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-n8n-nginx: ## Runs `docker logs <container> -f` for the n8n nginx container
-	@echo "==============================================="
-	@echo "Running docker logs for the n8n-nginx container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-n8n-nginx-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-geoserver: ## Runs `docker logs <container> -f` for the n8n nginx container
+log-geoserver: ## Runs `docker logs <container> -f` for the geoserver container
 	@echo "==============================================="
 	@echo "Running docker logs for the geoserver container"
 	@echo "==============================================="
@@ -414,3 +368,4 @@ log-geoserver: ## Runs `docker logs <container> -f` for the n8n nginx container
 
 help:	## Display this help screen.
 	@grep -h -E '^[0-9a-zA-Z_-]+:.*?##.*$$|^##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[33m%-20s\033[0m %s\n", $$1, $$2}' | awk 'BEGIN {FS = "## "}; {printf "\033[36m%-1s\033[0m %s\n", $$2, $$1}'
+

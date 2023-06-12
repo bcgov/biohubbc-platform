@@ -1,86 +1,110 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
-export interface IGetUser {
-  system_user_id: number;
-  user_identifier: number;
-  record_end_date: string;
-  role_ids: number[];
-  role_names: string[];
-}
+export const SystemUser = z.object({
+  system_user_id: z.number(),
+  user_identity_source_id: z.number(),
+  user_identifier: z.string(),
+  user_guid: z.string(),
+  record_effective_date: z.date(),
+  record_end_date: z.date().nullable(),
+  create_date: z.date(),
+  create_user: z.number(),
+  update_date: z.date().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
 
-export interface IInsertUser {
-  system_user_id: number;
-  user_identity_source_id: number;
-  user_identifier: number;
-  record_effective_date: string;
-  record_end_date: string;
-}
+export type SystemUser = z.infer<typeof SystemUser>;
 
-export interface IGetRoles {
-  system_role_id: number;
-  name: string;
-}
+export const SystemUserExtended = SystemUser.extend({
+  identity_source: z.string(),
+  role_ids: z.array(z.number()).default([]),
+  role_names: z.array(z.string()).default([])
+});
+
+export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
+
+const SystemRoles = z.object({
+  system_role_id: z.number(),
+  name: z.string()
+});
+
+export type SystemRoles = z.infer<typeof SystemRoles>;
 
 export class UserRepository extends BaseRepository {
   /**
    * Get all system roles in db
    *
-   * @return {*}  {Promise<IGetRoles[]>}
+   * @return {*}  {Promise<SystemRoles[]>}
    * @memberof UserRepository
    */
-  async getRoles(): Promise<IGetRoles[]> {
+  async getRoles(): Promise<SystemRoles[]> {
     const sqlStatement = SQL`
-    SELECT
-      sr.system_role_id,
-      sr.name
-    FROM
-      system_role sr
+      SELECT
+        sr.system_role_id,
+        sr.name
+      FROM
+        system_role sr
     `;
 
-    const response = await this.connection.sql<IGetRoles>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, SystemRoles);
 
     return response.rows;
   }
 
   /**
-   * Fetch a single system user by their ID.
+   * Fetch a single system user by their system user ID.
+   *
    *
    * @param {number} systemUserId
-   * @return {*}  {Promise<IGetUser>}
+   * @return {*}  {Promise<SystemUserExtended>}
    * @memberof UserRepository
    */
-  async getUserById(systemUserId: number): Promise<IGetUser> {
+  async getUserById(systemUserId: number): Promise<SystemUserExtended> {
     const sqlStatement = SQL`
-    SELECT
-      su.system_user_id,
-      su.user_identifier,
-      su.record_end_date,
-      array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
-      array_remove(array_agg(sr.name), NULL) AS role_names
-    FROM
-      system_user su
-    LEFT JOIN
-      system_user_role sur
-    ON
-      su.system_user_id = sur.system_user_id
-    LEFT JOIN
-      system_role sr
-    ON
-      sur.system_role_id = sr.system_role_id
-    WHERE
-      su.system_user_id = ${systemUserId}
-    AND
-      su.record_end_date IS NULL
-    GROUP BY
-      su.system_user_id,
-      su.record_end_date,
-      su.user_identifier;
-  `;
+      SELECT
+        su.*,
+        uis.name AS identity_source,
+        array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
+        array_remove(array_agg(sr.name), NULL) AS role_names
+      FROM
+        system_user su
+      LEFT JOIN
+        system_user_role sur
+      ON
+        su.system_user_id = sur.system_user_id
+      LEFT JOIN
+        system_role sr
+      ON
+        sur.system_role_id = sr.system_role_id
+      LEFT JOIN
+        user_identity_source uis
+      ON
+        uis.user_identity_source_id = su.user_identity_source_id
+      WHERE
+        su.system_user_id = ${systemUserId}
+      AND
+        su.record_end_date IS NULL
+      GROUP BY
+        su.system_user_id,
+        su.user_identity_source_id,
+        su.user_identifier,
+        su.user_guid,
+        su.record_effective_date,
+        su.record_end_date,
+        su.create_date,
+        su.create_user,
+        su.update_date,
+        su.update_user,
+        su.revision_count,
+        uis.name;
+    `;
 
-    const response = await this.connection.sql<IGetUser>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, SystemUserExtended);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get user by id', [
@@ -88,43 +112,56 @@ export class UserRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+
     return response.rows[0];
   }
 
   /**
-   * Get an existing system user.
+   * Get an existing system user by their GUID.
    *
-   * @param {string} userIdentifier
-   * @return {*}  {Promise<IGetUser>}
+   * @param {string} userGuid the user's GUID
+   * @return {*}  {Promise<SystemUserExtended>}
    * @memberof UserRepository
    */
-  async getUserByIdentifier(userIdentifier: string): Promise<IGetUser[]> {
+  async getUserByGuid(userGuid: string): Promise<SystemUserExtended[]> {
     const sqlStatement = SQL`
-    SELECT
-      su.system_user_id,
-      su.user_identifier,
-      su.record_end_date,
-      array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
-      array_remove(array_agg(sr.name), NULL) AS role_names
-    FROM
-      system_user su
-    LEFT JOIN
-      system_user_role sur
-    ON
-      su.system_user_id = sur.system_user_id
-    LEFT JOIN
-      system_role sr
-    ON
-      sur.system_role_id = sr.system_role_id
-    WHERE
-      su.user_identifier = ${userIdentifier}
-    GROUP BY
-      su.system_user_id,
-      su.record_end_date,
-      su.user_identifier;
-  `;
+      SELECT
+        su.*,
+        uis.name AS identity_source,
+        array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
+        array_remove(array_agg(sr.name), NULL) AS role_names
+      FROM
+        system_user su
+      LEFT JOIN
+        system_user_role sur
+      ON
+        su.system_user_id = sur.system_user_id
+      LEFT JOIN
+        system_role sr
+      ON
+        sur.system_role_id = sr.system_role_id
+      LEFT JOIN
+        user_identity_source uis
+      ON
+        uis.user_identity_source_id = su.user_identity_source_id
+      WHERE
+        su.user_guid = ${userGuid}
+      GROUP BY
+        su.system_user_id,
+        su.user_identity_source_id,
+        su.user_identifier,
+        su.user_guid,
+        su.record_effective_date,
+        su.record_end_date,
+        su.create_date,
+        su.create_user,
+        su.update_date,
+        su.update_user,
+        su.revision_count,
+        uis.name;
+    `;
 
-    const response = await this.connection.sql<IGetUser>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, SystemUserExtended);
 
     return response.rows;
   }
@@ -134,30 +171,40 @@ export class UserRepository extends BaseRepository {
    *
    * Note: Will fail if the system user already exists.
    *
+   * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
-   * @return {*}  {Promise<IInsertUser>}
+   * @return {*}  {Promise<SystemUser>}
    * @memberof UserRepository
    */
-  async addSystemUser(userIdentifier: string, identitySource: string): Promise<IInsertUser> {
+  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<SystemUser> {
     const sqlStatement = SQL`
-    INSERT INTO system_user (
-      user_identity_source_id,
-      user_identifier,
-      record_effective_date
-    ) VALUES (
-      (Select user_identity_source_id FROM user_identity_source WHERE name = ${identitySource.toUpperCase()}),
-      ${userIdentifier},
-      now()
-    )
-    RETURNING
-      system_user_id,
-      user_identity_source_id,
-      user_identifier,
-      record_effective_date,
-      record_end_date;
-  `;
-    const response = await this.connection.sql<IInsertUser>(sqlStatement);
+      INSERT INTO
+        system_user
+      (
+        user_guid,
+        user_identity_source_id,
+        user_identifier,
+        record_effective_date
+      )
+      VALUES (
+        ${userGuid},
+        (
+          SELECT
+            user_identity_source_id
+          FROM
+            user_identity_source
+          WHERE
+            name = ${identitySource.toUpperCase()}
+        ),
+        ${userIdentifier},
+        now()
+      )
+      RETURNING
+        *;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SystemUser);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert new user', [
@@ -165,45 +212,55 @@ export class UserRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
+
     return response.rows[0];
   }
 
   /**
    * Get a list of all system users.
    *
-   * @return {*}  {Promise<IGetUser[]>}
+   * @return {*}  {Promise<SystemUserExtended[]>}
    * @memberof UserRepository
    */
-  async listSystemUsers(): Promise<IGetUser[]> {
+  async listSystemUsers(): Promise<SystemUserExtended[]> {
     const sqlStatement = SQL`
-    SELECT
-      su.system_user_id,
-      su.user_identifier,
-      su.record_end_date,
-      array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
-      array_remove(array_agg(sr.name), NULL) AS role_names
-    FROM
-      system_user su
-    LEFT JOIN
-      system_user_role sur
-    ON
-      su.system_user_id = sur.system_user_id
-    LEFT JOIN
-      system_role sr
-    ON
-      sur.system_role_id = sr.system_role_id
-    LEFT JOIN
-    	user_identity_source uis
-    ON
-    	su.user_identity_source_id = uis.user_identity_source_id
-    WHERE
-      su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}, ${SYSTEM_IDENTITY_SOURCE.SYSTEM})
-    GROUP BY
-      su.system_user_id,
-      su.record_end_date,
-      su.user_identifier;
-  `;
-    const response = await this.connection.sql<IGetUser>(sqlStatement);
+      SELECT
+        su.*,
+        uis.name AS identity_source,
+        array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
+        array_remove(array_agg(sr.name), NULL) AS role_names
+      FROM
+        system_user su
+      LEFT JOIN
+        system_user_role sur
+      ON
+        su.system_user_id = sur.system_user_id
+      LEFT JOIN
+        system_role sr
+      ON
+        sur.system_role_id = sr.system_role_id
+      LEFT JOIN
+      	user_identity_source uis
+      ON
+      	su.user_identity_source_id = uis.user_identity_source_id
+      WHERE
+        su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}, ${SYSTEM_IDENTITY_SOURCE.SYSTEM})
+      GROUP BY
+        su.system_user_id,
+        su.user_identity_source_id,
+        su.user_identifier,
+        su.user_guid,
+        su.record_effective_date,
+        su.record_end_date,
+        su.create_date,
+        su.create_user,
+        su.update_date,
+        su.update_user,
+        su.revision_count,
+        uis.name;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SystemUserExtended);
 
     return response.rows;
   }
@@ -216,19 +273,16 @@ export class UserRepository extends BaseRepository {
    */
   async activateSystemUser(systemUserId: number) {
     const sqlStatement = SQL`
-    UPDATE
-      system_user
-    SET
-      record_end_date = NULL
-    WHERE
-      system_user_id = ${systemUserId}
-    RETURNING
-      system_user_id,
-      user_identity_source_id,
-      user_identifier,
-      record_effective_date,
-      record_end_date;
-  `;
+      UPDATE
+        system_user
+      SET
+        record_end_date = NULL
+      WHERE
+        system_user_id = ${systemUserId}
+      RETURNING
+        *;
+    `;
+
     const response = await this.connection.sql(sqlStatement);
 
     if (response.rowCount !== 1) {
@@ -247,15 +301,15 @@ export class UserRepository extends BaseRepository {
    */
   async deactivateSystemUser(systemUserId: number) {
     const sqlStatement = SQL`
-    UPDATE
-      system_user
-    SET
-      record_end_date = now()
-    WHERE
-      system_user_id = ${systemUserId}
-    RETURNING
-      *;
-  `;
+      UPDATE
+        system_user
+      SET
+        record_end_date = now()
+      WHERE
+        system_user_id = ${systemUserId}
+      RETURNING
+        *;
+    `;
 
     const response = await this.connection.sql(sqlStatement);
 
@@ -295,15 +349,15 @@ export class UserRepository extends BaseRepository {
    */
   async addUserSystemRoles(systemUserId: number, roleIds: number[]) {
     const sqlStatement = SQL`
-    INSERT INTO system_user_role (
-      system_user_id,
-      system_role_id
-    ) VALUES `;
+      INSERT INTO system_user_role (
+        system_user_id,
+        system_role_id
+      ) VALUES `;
 
     roleIds.forEach((roleId, index) => {
       sqlStatement.append(SQL`
-      (${systemUserId},${roleId})
-    `);
+        (${systemUserId},${roleId})
+      `);
 
       if (index !== roleIds.length - 1) {
         sqlStatement.append(',');

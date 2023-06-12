@@ -71,7 +71,7 @@ parameters:
     required: true
     value: 'ubi8-14.2-3.1-0'
   - name: CPU_REQUEST
-    value: '10m'
+    value: '50m'
   - name: CPU_LIMIT
     value: '200m'
   - name: MEMORY_REQUEST
@@ -148,7 +148,7 @@ objects:
       name: '${DATABASE_SERVICE_NAME}'
       role: db
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       selector:
         name: '${DATABASE_SERVICE_NAME}'
         role: db
@@ -246,12 +246,12 @@ objects:
                 successThreshold: 1
                 failureThreshold: 10
               resources:
-                requests:
-                  cpu: '${CPU_REQUEST}'
-                  memory: '${MEMORY_REQUEST}'
                 limits:
-                  cpu: '${CPU_LIMIT}'
-                  memory: '${MEMORY_LIMIT}'
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
               securityContext:
                 capabilities: {}
                 privileged: false
@@ -281,4 +281,3 @@ objects:
             lastTriggeredImage: ''
           type: ImageChange
         - type: ConfigChange
-    status: {}

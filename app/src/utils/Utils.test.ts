@@ -2,6 +2,7 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
 import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
+  downloadFile,
   ensureProtocol,
   getFeatureObjectFromLatLngBounds,
   getFormattedAmount,
@@ -17,16 +18,25 @@ import {
 } from './Utils';
 
 describe('ensureProtocol', () => {
-  it('does nothing if string already has `http://`', async () => {
-    const url = 'http://someurl.com';
-    const urlWithProtocol = ensureProtocol(url);
-    expect(urlWithProtocol).toEqual(url);
+  it('upgrades the URL if string begins with `http://`', async () => {
+    const urlWithProtocol = ensureProtocol('http://someurl.com');
+    expect(urlWithProtocol).toEqual('https://someurl.com');
   });
 
   it('does nothing if string already has `https://`', async () => {
     const url = 'https://someurl.com';
     const urlWithProtocol = ensureProtocol(url);
     expect(urlWithProtocol).toEqual(url);
+  });
+
+  it('adds http if string begins with `localhost`', async () => {
+    const urlWithProtocol = ensureProtocol('localhost:1234/test');
+    expect(urlWithProtocol).toEqual('http://localhost:1234/test');
+  });
+
+  it('does nothing if string begins with `http://localhost`', async () => {
+    const urlWithProtocol = ensureProtocol('http://localhost:1234/test');
+    expect(urlWithProtocol).toEqual('http://localhost:1234/test');
   });
 
   it('adds `https://` when no protocol param is provided', async () => {
@@ -135,7 +145,6 @@ describe('getLogOutUrl', () => {
         clientId: ''
       },
       SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      N8N_HOST: '',
       REACT_APP_NODE_ENV: 'local',
       MAX_UPLOAD_NUM_FILES: 10,
       MAX_UPLOAD_FILE_SIZE: 52428800
@@ -156,7 +165,6 @@ describe('getLogOutUrl', () => {
         clientId: ''
       },
       SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      N8N_HOST: '',
       REACT_APP_NODE_ENV: 'local',
       MAX_UPLOAD_NUM_FILES: 10,
       MAX_UPLOAD_FILE_SIZE: 52428800
@@ -177,7 +185,6 @@ describe('getLogOutUrl', () => {
         clientId: ''
       },
       SITEMINDER_LOGOUT_URL: '',
-      N8N_HOST: '',
       REACT_APP_NODE_ENV: 'local',
       MAX_UPLOAD_NUM_FILES: 10,
       MAX_UPLOAD_FILE_SIZE: 52428800
@@ -206,7 +213,6 @@ describe('getLogOutUrl', () => {
         clientId: ''
       },
       SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      N8N_HOST: '',
       REACT_APP_NODE_ENV: 'local',
       MAX_UPLOAD_NUM_FILES: 10,
       MAX_UPLOAD_FILE_SIZE: 52428800
@@ -387,5 +393,22 @@ describe('jsonStringifyObjectProperties', () => {
         bool: true
       })
     ).toEqual(output);
+  });
+});
+
+describe('downloadFile', () => {
+  it('should create an anchor element with the provided URL and simulate a click', () => {
+    const url = 'https://example.com/file.pdf';
+    const anchor = document.createElement('a');
+    jest.spyOn(document, 'createElement').mockReturnValue(anchor);
+    jest.spyOn(anchor, 'click');
+    jest.spyOn(anchor, 'remove');
+
+    downloadFile(url);
+
+    expect(document.createElement).toHaveBeenCalledWith('a');
+    expect(anchor.href).toEqual(url);
+    expect(anchor.click).toHaveBeenCalled();
+    expect(anchor.remove).toHaveBeenCalled();
   });
 });

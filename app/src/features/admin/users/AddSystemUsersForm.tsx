@@ -15,8 +15,9 @@ import yup from 'utils/YupSchema';
 
 export interface IAddSystemUsersFormArrayItem {
   userIdentifier: string;
+  userGuid: string;
   identitySource: string;
-  system_role: number;
+  systemRole: number;
 }
 
 export interface IAddSystemUsersForm {
@@ -25,8 +26,9 @@ export interface IAddSystemUsersForm {
 
 export const AddSystemUsersFormArrayItemInitialValues: IAddSystemUsersFormArrayItem = {
   userIdentifier: '',
+  userGuid: '',
   identitySource: '',
-  system_role: '' as unknown as number
+  systemRole: '' as unknown as number
 };
 
 export const AddSystemUsersFormInitialValues: IAddSystemUsersForm = {
@@ -37,8 +39,9 @@ export const AddSystemUsersFormYupSchema = yup.object().shape({
   systemUsers: yup.array().of(
     yup.object().shape({
       userIdentifier: yup.string().required('Username is required'),
+      userGuid: yup.string().required('GUID is required'),
       identitySource: yup.string().required('Login Method is required'),
-      system_role: yup.number().required('Role is required')
+      systemRole: yup.number().required('Role is required')
     })
   )
 });
@@ -57,10 +60,11 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
         render={(arrayHelpers) => (
           <Box>
             <Box>
-              {values.systemUsers?.map((systemUser, index) => {
+              {values.systemUsers?.map((systemUser: IAddSystemUsersFormArrayItem, index: number) => {
                 const userIdentifierMeta = getFieldMeta(`systemUsers.[${index}].userIdentifier`);
+                const userGuidMeta = getFieldMeta(`systemUsers.[${index}].userGuid`);
                 const identitySourceMeta = getFieldMeta(`systemUsers.[${index}].identitySource`);
-                const systemRoleMeta = getFieldMeta(`systemUsers.[${index}].roleId`);
+                const systemRoleMeta = getFieldMeta(`systemUsers.[${index}].systemRole`);
 
                 return (
                   <Box display="flex" key={index} mx={-0.5} alignItems="flex-start">
@@ -76,15 +80,27 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                         }}
                       />
                     </Box>
+                    <Box width="300px" py={1} px={0.5}>
+                      <CustomTextField
+                        name={`systemUsers.[${index}].userGuid`}
+                        label="User GUID"
+                        other={{
+                          required: true,
+                          value: systemUser.userGuid,
+                          error: userGuidMeta.touched && Boolean(userGuidMeta.error),
+                          helperText: userGuidMeta.touched && userGuidMeta.error
+                        }}
+                      />
+                    </Box>
                     <Box width="250px" py={1} px={0.5}>
                       <FormControl fullWidth required error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}>
-                        <InputLabel id="system_role">System Role</InputLabel>
+                        <InputLabel id="systemRole">System Role</InputLabel>
                         <Select
-                          id={`systemUsers.[${index}].system_role`}
-                          name={`systemUsers.[${index}].system_role`}
-                          labelId="system_role"
+                          id={`systemUsers.[${index}].systemRole`}
+                          name={`systemUsers.[${index}].systemRole`}
+                          labelId="systemRole"
                           label="System Role"
-                          value={systemUser.system_role}
+                          value={systemUser.systemRole}
                           onChange={handleChange}
                           error={systemRoleMeta.touched && Boolean(systemRoleMeta.error)}
                           inputProps={{ 'aria-label': 'System Role' }}>
@@ -115,8 +131,13 @@ const AddSystemUsersForm: React.FC<React.PropsWithChildren<AddSystemUsersFormPro
                           <MenuItem key={SYSTEM_IDENTITY_SOURCE.IDIR} value={SYSTEM_IDENTITY_SOURCE.IDIR}>
                             IDIR
                           </MenuItem>
-                          <MenuItem key={SYSTEM_IDENTITY_SOURCE.BCEID} value={SYSTEM_IDENTITY_SOURCE.BCEID}>
-                            BCEID
+                          <MenuItem key={SYSTEM_IDENTITY_SOURCE.BCEID_BASIC} value={SYSTEM_IDENTITY_SOURCE.BCEID_BASIC}>
+                            BCeID Basic
+                          </MenuItem>
+                          <MenuItem
+                            key={SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS}
+                            value={SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS}>
+                            BCeID Business
                           </MenuItem>
                         </Select>
                         <FormHelperText>{identitySourceMeta.touched && identitySourceMeta.error}</FormHelperText>

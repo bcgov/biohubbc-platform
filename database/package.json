@@ -14,7 +14,7 @@
   "scripts": {
     "setup": "npm-run-all -l -s migrate-latest seed",
     "migrate-latest": "knex migrate:latest --knexfile ./src/knexfile.ts",
-    "migrate-rollback": "knex migrate-rollback --knexfile ./src/knexfile.ts",
+    "migrate-rollback": "knex migrate:rollback --knexfile ./src/knexfile.ts",
     "seed": "knex seed:run --knexfile ./src/knexfile.ts",
     "lint": "eslint src/ --ext .js,.ts",
     "lint-fix": "npm run lint -- --fix",
@@ -22,7 +22,7 @@
     "format-fix": "prettier --write \"./src/**/*.{js,jsx,ts,tsx,json,css,scss}\""
   },
   "dependencies": {
-    "knex": "~1.0.1",
+    "knex": "~2.4.2",
     "pg": "~8.3.0",
     "typescript": "~4.1.6"
   },

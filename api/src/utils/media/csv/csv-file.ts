@@ -1,5 +1,7 @@
 import xlsx from 'xlsx';
+import { safeToLowerCase, safeTrim } from '../../string-utils';
 import { IMediaState, MediaValidation } from '../media-file';
+import { getCellValue, getWorksheetRange, replaceCellDates, trimCellWhitespace } from '../xlsx/xlsx-utils';
 
 export type CSVWorksheets = { [name: string]: CSVWorksheet };
 
@@ -11,7 +13,7 @@ export class CSVWorkBook {
   constructor(workbook?: xlsx.WorkBook) {
     this.rawWorkbook = workbook || xlsx.utils.book_new();
 
-    const worksheets = {};
+    const worksheets: CSVWorksheets = {};
 
     Object.entries(this.rawWorkbook.Sheets).forEach(([key, value]) => {
       worksheets[key] = new CSVWorksheet(key, value);
@@ -59,15 +61,13 @@ export class CSVWorksheet {
       return [];
     }
 
-    const ref = this.worksheet['!ref'];
+    const originalRange = getWorksheetRange(this.worksheet);
 
-    if (!ref) {
+    if (!originalRange) {
       return [];
     }
 
     if (!this._headers.length) {
-      const originalRange = xlsx.utils.decode_range(ref);
-
       // Specify range to only include the 0th row (header row)
       const customRange: xlsx.Range = { ...originalRange, e: { ...originalRange.e, r: 0 } };
 
@@ -79,7 +79,7 @@ export class CSVWorksheet {
 
       if (aoaHeaders.length > 0) {
         // Parse the headers array from the array of arrays produced by calling `xlsx.utils.sheet_to_json`
-        this._headers = aoaHeaders[0].map((item) => item?.trim());
+        this._headers = aoaHeaders[0].map(safeTrim);
       }
     }
 
@@ -88,7 +88,7 @@ export class CSVWorksheet {
 
   getHeadersLowerCase(): string[] {
     if (!this._headersLowerCase.length) {
-      this._headersLowerCase = this.getHeaders().map((item) => item?.toLowerCase());
+      this._headersLowerCase = this.getHeaders().map(safeToLowerCase);
     }
 
     return this._headersLowerCase;
@@ -111,16 +111,14 @@ export class CSVWorksheet {
       return [];
     }
 
-    const ref = this.worksheet['!ref'];
+    const originalRange = getWorksheetRange(this.worksheet);
 
-    if (!ref) {
+    if (!originalRange) {
       return [];
     }
 
     if (!this._rows.length) {
       const rowsToReturn: string[][] = [];
-
-      const originalRange = xlsx.utils.decode_range(ref);
 
       for (let i = 1; i <= originalRange.e.r; i++) {
         const row = new Array(this.getHeaders().length);
@@ -129,17 +127,13 @@ export class CSVWorksheet {
         for (let j = 0; j <= originalRange.e.c; j++) {
           const cellAddress = { c: j, r: i };
           const cellRef = xlsx.utils.encode_cell(cellAddress);
-          const cellValue = this.worksheet[cellRef];
+          const cell = this.worksheet[cellRef];
 
-          if (!cellValue) {
+          if (!cell) {
             continue;
           }
 
-          // Some cell types (like dates) store different interpretations of the raw value in different properties of
-          // the `cellValue`. In these cases, always try and return the string version `w`, before returning the
-          // raw version `v`.
-          // See https://www.npmjs.com/package/xlsx -> Cell Object
-          row[j] = cellValue.w || cellValue.v;
+          row[j] = getCellValue(trimCellWhitespace(replaceCellDates(cell)));
 
           rowHasValues = true;
         }
@@ -175,7 +169,7 @@ export class CSVWorksheet {
         const rowObject = {};
 
         headers.forEach((header: string, index: number) => {
-          rowObject[header] = row[index] || null;
+          rowObject[header] = row[index];
         });
 
         rowObjectsArray.push(rowObject);
@@ -205,6 +199,14 @@ export class CSVWorksheet {
     return row[headerIndex];
   }
 
+  /**
+   * Runs all of the given validators on the worksheet, whereby the results of all validations
+   * are stored in `this.csvValidation`.
+   *
+   * @param {CSVValidator[]} validators A series of CSV validators to be run on the worksheet.
+   * @return {*}  {CSVValidation} The result of all validations, namely `this.csvValidation`.
+   * @memberof CSVWorksheet
+   */
   validate(validators: CSVValidator[]): CSVValidation {
     validators.forEach((validator) => validator(this));
 

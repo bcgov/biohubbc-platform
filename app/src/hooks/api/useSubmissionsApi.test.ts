@@ -23,7 +23,7 @@ describe('useSubmissionApi', () => {
         eml_source: null,
         event_timestamp: '2022-05-24T18:41:42.211Z',
         input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
-        input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
+        input_key: 'biohub/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
         revision_count: 1,
         source: 'SIMS',
         submission_id: 1,

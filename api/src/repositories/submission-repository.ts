@@ -1,10 +1,41 @@
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
-import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
+
+export interface IDatasetsForReview {
+  dataset_id: string; // UUID
+  artifacts_to_review: number;
+  dataset_name: string;
+  last_updated: string;
+  keywords: string[];
+}
+
+export const DatasetMetadata = z.object({
+  dataset_id: z.string(),
+  submission_id: z.number(),
+  dataset_name: z.string(),
+  keywords: z.array(z.string()),
+  related_projects: z
+    .array(z.any())
+    .nullable()
+    .optional()
+    .transform((item) => item || [])
+});
+
+export type DatasetMetadata = z.infer<typeof DatasetMetadata>;
+
+export const DatasetArtifactCount = z.object({
+  dataset_id: z.string(),
+  submission_id: z.number(),
+  artifacts_to_review: z.number(),
+  last_updated: z.string().nullable()
+});
+
+export type DatasetArtifactCount = z.infer<typeof DatasetArtifactCount>;
 
 export interface ISpatialComponentCount {
   spatial_type: string;
@@ -16,20 +47,20 @@ export interface ISearchSubmissionCriteria {
   spatial?: string;
 }
 
-export interface IInsertSubmissionRecord {
+export interface ISubmissionRecord {
+  submission_id?: number;
   source_transform_id: number;
   uuid: string;
-  record_effective_date: string;
-  input_key: string;
-  input_file_name: string;
-  eml_source: string;
-  eml_json_source: string;
-  darwin_core_source: string;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
 }
 
 export interface ISubmissionRecordWithSpatial {
   id: string;
-  source: string;
+  source: Record<string, unknown>;
   observation_count: number;
 }
 
@@ -40,21 +71,14 @@ export interface ISubmissionRecordWithSpatial {
  * @interface ISubmissionModel
  */
 export interface ISubmissionModel {
-  submission_id: number;
+  submission_id?: number;
   source_transform_id: number;
   uuid: string;
-  record_effective_date: string;
-  record_end_date: string | null;
-  input_key: string | null;
-  input_file_name: string | null;
-  eml_source: string | null;
-  eml_json_source: string | null;
-  darwin_core_source: string | null;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
+  create_date?: string;
+  create_user?: number;
+  update_date?: string | null;
+  update_user?: number | null;
+  revision_count?: number;
 }
 
 export interface ISubmissionModelWithStatus extends ISubmissionModel {
@@ -118,6 +142,50 @@ export enum SUBMISSION_MESSAGE_TYPE {
   'DEBUG' = 'Debug'
 }
 
+export interface ISubmissionJobQueueRecord {
+  submission_job_queue_id: number;
+  submission_id: number;
+  job_start_timestamp: string | null;
+  job_end_timestamp: string | null;
+  security_request: string | null; // JSON string
+  key: string | null;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+}
+
+export interface ISubmissionMetadataRecord {
+  submission_metadata_id?: number;
+  submission_id: number;
+  eml_source: string;
+  eml_json_source?: any;
+  record_effective_timestamp?: string | null;
+  record_end_timestamp?: string | null;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
+export interface ISubmissionObservationRecord {
+  submission_observation_id?: number;
+  submission_id: number;
+  darwin_core_source: any;
+  submission_security_request?: string | null;
+  security_review_timestamp?: string | null;
+  foi_reason?: boolean | null;
+  record_effective_timestamp?: string | null;
+  record_end_timestamp?: string | null;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
 /**
  * A repository class for accessing submission data.
  *
@@ -126,76 +194,21 @@ export enum SUBMISSION_MESSAGE_TYPE {
  * @extends {BaseRepository}
  */
 export class SubmissionRepository extends BaseRepository {
-  async findSubmissionByCriteria(criteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
-    const queryBuilder = getKnexQueryBuilder<any, { project_id: number }>()
-      .select('submission.submission_id')
-      .from('submission')
-      .leftJoin('occurrence', 'submission.submission_id', 'occurrence.submission_id');
-
-    if (criteria.keyword) {
-      queryBuilder.and.where(function () {
-        this.or.whereILike('occurrence.taxonid', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.lifestage', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.sex', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.vernacularname', `%${criteria.keyword}%`);
-        this.or.whereILike('occurrence.individualcount', `%${criteria.keyword}%`);
-      });
-    }
-
-    if (criteria.spatial) {
-      const geometryCollectionSQL = generateGeometryCollectionSQL(JSON.parse(criteria.spatial));
-
-      const sqlStatement = SQL`
-      public.ST_INTERSECTS(
-        geography,
-        public.geography(
-          public.ST_Force2D(
-            public.ST_SetSRID(`;
-
-      sqlStatement.append(geometryCollectionSQL);
-
-      sqlStatement.append(`,
-              4326
-            )
-          )
-        )
-      )`);
-
-      queryBuilder.and.whereRaw(sqlStatement.sql, sqlStatement.values);
-    }
-
-    queryBuilder.groupBy('submission.submission_id');
-
-    const response = await this.connection.knex<{ submission_id: number }>(queryBuilder);
-
-    return response.rows;
-  }
-
   /**
    * Insert a new submission record.
    *
-   * @param {IInsertSubmissionRecord} submissionData
+   * @param {ISubmissionRecord} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         source_transform_id,
-        uuid,
-        record_effective_date,
-        input_key,
-        input_file_name,
-        eml_source,
-        darwin_core_source
+        uuid
       ) VALUES (
         ${submissionData.source_transform_id},
-        ${submissionData.uuid},
-        ${submissionData.record_effective_date},
-        ${submissionData.input_key},
-        ${submissionData.input_file_name},
-        ${submissionData.eml_source},
-        ${submissionData.darwin_core_source}
+        ${submissionData.uuid}
       )
       RETURNING
         submission_id;
@@ -214,24 +227,28 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update the `input_key` column of a submission record.
+   * Insert a new submission record, returning the record having the matching UUID if it already exists.
    *
-   * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['input_key']} inputKey
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * Because `ON CONFLICT ... DO NOTHING` fails to yield the submission_id, the query simply updates the
+   * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
+   * and infer that the query ran successfully.
+   *
+   * @param {ISubmissionModel} submissionData The submission record
+   * @return {*} {Promise<{ submission_id: number }>} The primary key of the submission
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordInputKey(
-    submissionId: number,
-    inputKey: IInsertSubmissionRecord['input_key']
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
   ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
-      UPDATE
-        submission
-      SET
-        input_key = ${inputKey}
-      WHERE
-        submission_id = ${submissionId}
+      INSERT INTO submission (
+        source_transform_id,
+        uuid
+      ) VALUES (
+        ${submissionData.source_transform_id},
+        ${submissionData.uuid}
+      )
+      ON CONFLICT (uuid) DO UPDATE SET uuid = ${submissionData.uuid}
       RETURNING
         submission_id;
     `;
@@ -239,8 +256,8 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record key', [
-        'SubmissionRepository->updateSubmissionRecordInputKey',
+      throw new ApiExecuteSQLError('Failed to get or insert submission record', [
+        'SubmissionRepository->insertSubmissionRecordWithPotentialConflict',
         'rowCount was null or undefined, expected rowCount = 1'
       ]);
     }
@@ -252,28 +269,35 @@ export class SubmissionRepository extends BaseRepository {
    * Update the `eml_source` column of a submission record.
    *
    * @param {number} submissionId
+   * @param {number} submissionMetadataId
    * @param {EMLFile} file
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
+  async updateSubmissionMetadataEMLSource(
+    submissionId: number,
+    submissionMetadataId: number,
+    file: EMLFile
+  ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
       UPDATE
-        submission
+        submission_metadata
       SET
-      eml_source = ${file.emlFile.buffer.toString()}
+        eml_source = ${file.emlFile.buffer.toString()}
       WHERE
         submission_id = ${submissionId}
+        AND
+        submission_metadata_id =${submissionMetadataId}
       RETURNING
-        submission_id;
+        submission_metadata_id;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record source', [
-        'SubmissionRepository->updateSubmissionRecordEMLSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update submission Metadata source', [
+        'SubmissionRepository->updateSubmissionMetadataEMLSource',
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -281,34 +305,38 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update the `eml_json_source` column of a submission record.
+   * Update the `eml_json_source` column of a submission metadata.
    *
    * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {number} submissionMetadataId
+   * @param {ISubmissionMetadataRecord['eml_json_source']} EMLJSONSource
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordEMLJSONSource(
+  async updateSubmissionMetadataEMLJSONSource(
     submissionId: number,
-    EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
-  ): Promise<{ submission_id: number }> {
+    submissionMetadataId: number,
+    EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
+  ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
       UPDATE
-        submission
+        submission_metadata
       SET
-      eml_json_source = ${EMLJSONSource}
+        eml_json_source = ${EMLJSONSource}
       WHERE
         submission_id = ${submissionId}
+      AND
+        submission_metadata_id =${submissionMetadataId}
       RETURNING
-        submission_id;
+        submission_metadata_id;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record eml json', [
-        'SubmissionRepository->updateSubmissionRecordEMLJSONSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update submission Metadata eml json', [
+        'SubmissionRepository->updateSubmissionMetadataEMLJSONSource',
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -334,10 +362,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
         'SubmissionRepository->getSubmissionRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -351,171 +379,72 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
     const sqlStatement = SQL`
       SELECT
         submission_id
       FROM
         submission
       WHERE
-        uuid = ${uuid}
-      AND
-        record_end_date IS NULL;
+        uuid = ${uuid};
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    return response.rows[0];
+    if (response.rowCount > 0) {
+      return response.rows[0];
+    } else {
+      return null;
+    }
   }
 
   /**
    * Get submission eml json by dataset id.
    *
    * @param {string} datasetId
-   * @return {*}  {Promise<string>}
+   * @return {*}  {Promise<QueryResult<{ eml_json_source: Record<string, unknown> }>>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<QueryResult<{ eml_json_source: string }>> {
+  async getSubmissionRecordEMLJSONByDatasetId(
+    datasetId: string
+  ): Promise<QueryResult<{ eml_json_source: Record<string, unknown> }>> {
     const sqlStatement = SQL`
       SELECT
-        eml_json_source
-      FROM
-        submission
-      WHERE
-        submission.uuid = ${datasetId}
-      AND
-        record_end_date IS NULL;
+        sm.eml_json_source
+      FROM submission s, submission_metadata sm
+      WHERE s.submission_id = sm.submission_id
+      AND sm.record_end_timestamp IS NULL
+      AND s.uuid = ${datasetId};
     `;
 
-    return this.connection.sql<{ eml_json_source: string }>(sqlStatement);
+    return this.connection.sql<{ eml_json_source: Record<string, unknown> }>(sqlStatement);
   }
 
   /**
-   * Get spatial component counts by dataset id for admins
-   *
-   * @param {string} datasetId
-   * @return {*}  {Promise<ISpatialComponentCount[]>}
-   * @memberof SubmissionRepository
-   */
-  async getSpatialComponentCountByDatasetIdAsAdmin(datasetId: string): Promise<ISpatialComponentCount[]> {
-    const sqlStatement = SQL`
-        SELECT
-          features_array #> '{properties, type}' spatial_type,
-          count(features_array #> '{properties, type}')::integer count
-        FROM 
-          submission_spatial_component ssc,
-          jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
-          submission s
-        WHERE s.uuid = ${datasetId}
-        AND ssc.submission_id = s.submission_id
-        AND s.record_end_date is null
-        GROUP BY spatial_type;
-      `;
-    const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
-    return response.rows;
-  }
-
-  /**
-   * Get spatial component counts by dataset id applying security rules
+   * Get spatial component counts by dataset id
    *
    * @param {string} datasetId
    * @return {*}  {Promise<ISpatialComponentCount[]>}
    * @memberof SubmissionRepository
    */
   async getSpatialComponentCountByDatasetId(datasetId: string): Promise<ISpatialComponentCount[]> {
-    const knex = getKnex();
-    const queryBuilder = knex
-      // get security transforms
-      .with('with_user_security_transform_exceptions', (qb) => {
-        qb.select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
-          .from('system_user_security_exception as suse')
-          .where('suse.system_user_id', this.connection.systemUserId());
-      })
-      // filter spatial components for data set
-      .with(
-        'with_filtered_spatial_component_with_security_transforms',
-        knex.raw(`
-          SELECT 
-            array_remove(array_agg(sts.security_transform_id), null) as spatial_component_security_transforms,
-            ssc.spatial_component,
-            ssc.secured_spatial_component
-          FROM 
-            submission_spatial_component ssc,
-            security_transform_submission sts,
-            submission s
-          WHERE sts.submission_spatial_component_id = ssc.submission_spatial_component_id
-          AND ssc.submission_id = s.submission_id
-          AND s.record_end_date is null
-          AND s.uuid = '${datasetId}'
-          GROUP BY ssc.spatial_component, ssc.secured_spatial_component
-        `)
-      )
-      // perform transforms
-      .with(
-        'combined_spatial_components',
-        knex.raw(`
-          SELECT 
-          case
-            when
-              wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
-            then
-              wfscwst.spatial_component
-            else
-              coalesce(wfscwst.secured_spatial_component, wfscwst.spatial_component)
-          end as spatial_data
-          FROM with_filtered_spatial_component_with_security_transforms as wfscwst, with_user_security_transform_exceptions as wuste
-        `)
-      )
-      // count and group filtered spatial data
-      .with(
-        'results',
-        knex.raw(`
-          SELECT 
-            features_array #> '{properties, type}' spatial_type,
-            count(features_array #> '{properties, type}')::integer count
-          FROM
-            combined_spatial_components csc,
-            jsonb_array_elements(csc.spatial_data -> 'features') features_array
-          GROUP BY spatial_type
-        `)
-      )
-      .select()
-      .from('results');
-
-    const response = await this.connection.knex<ISpatialComponentCount>(queryBuilder);
-    return response.rows;
-  }
-  /**
-   * Update record_end_date of submission id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async setSubmissionEndDateById(submissionId: number): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
-    UPDATE
-      submission
-    SET
-      record_end_date = now()
-    WHERE
-      submission_id = ${submissionId}
-    AND
-      record_end_date is null
-    RETURNING
-      submission_id;
-  `;
-
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update end date in submission record', [
-        'SubmissionRepository->setSubmissionEndDateById',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0];
+        SELECT
+          features_array #> '{properties, type}' spatial_type,
+          count(features_array #> '{properties, type}')::integer count
+        FROM
+          submission_spatial_component ssc,
+          jsonb_array_elements(ssc.spatial_component -> 'features') features_array,
+          submission s,
+          submission_observation so
+        WHERE s.uuid = ${datasetId}
+        AND so.submission_id = s.submission_id 
+        AND ssc.submission_observation_id = so.submission_observation_id
+        AND so.record_end_timestamp is null
+        AND so.security_review_timestamp is not null
+        GROUP BY spatial_type;
+      `;
+    const response = await this.connection.sql<ISpatialComponentCount>(sqlStatement);
+    return response.rows;
   }
 
   /**
@@ -538,10 +467,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.knex<ISourceTransformModel>(queryBuilder);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySystemUserId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -559,10 +488,10 @@ export class SubmissionRepository extends BaseRepository {
   async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
     const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
         'SubmissionRepository->getSubmissionMetadataJson',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -588,10 +517,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySourceTransformId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -755,10 +684,10 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
 
-    if (response.rowCount !== 1) {
+    if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission source transform record', [
         'SubmissionRepository->getSourceTransformRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount = 1'
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -766,36 +695,275 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update darwin_core_source field in submission table
+   * Fetch row of submission job queue by submission Id
    *
    * @param {number} submissionId
-   * @param {string} normalizedData
+   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission_job_queue
+      WHERE
+        submission_id = ${submissionId} ORDER BY CREATE_DATE DESC LIMIT 1
+      ;
+    `;
+
+    const response = await this.connection.sql<ISubmissionJobQueueRecord>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
+        'SubmissionRepository->getSubmissionJobQueue',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert a new metadata record
+   *
+   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionMetadataRecord(
+    submissonMetadata: ISubmissionMetadataRecord
+  ): Promise<{ submission_metadata_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_metadata (
+        submission_id,
+        eml_source,
+        eml_json_source
+      ) VALUES (
+        ${submissonMetadata.submission_id},
+        ${submissonMetadata.eml_source},
+        ${submissonMetadata.eml_json_source}
+      )
+      RETURNING
+        submission_metadata_id
+      ;
+    `;
+
+    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to insert submission metadata record', [
+        'SubmissionRepository->insertSubmissionMetadataRecord',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert a new Observation Record
+   *
+   * @param {ISubmissionObservationRecord} submissonObservation
+   * @return {*}  {Promise<{ submission_observation_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionObservationRecord(
+    submissonObservation: ISubmissionObservationRecord
+  ): Promise<{ submission_observation_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_observation (
+        submission_id,
+        darwin_core_source,
+        submission_security_request,
+        foi_reason,
+        record_effective_timestamp
+      ) VALUES (
+        ${submissonObservation.submission_id},
+        ${submissonObservation.darwin_core_source},
+        ${submissonObservation.submission_security_request},
+        ${submissonObservation.foi_reason},
+        now()
+      )
+      RETURNING
+        submission_observation_id
+      ;
+    `;
+
+    const response = await this.connection.sql<{ submission_observation_id: number }>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to insert submission observation record', [
+        'SubmissionRepository->insertSubmissionObservationRecord',
+        'rowCount was null or undefined, expected rowCount >= 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Update record_end_timestamp of submission id
+   *
+   * @param {number} submissionId
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async updateSubmissionRecordDWCSource(
-    submissionId: number,
-    normalizedData: string
-  ): Promise<{ submission_id: number }> {
+  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<number> {
     const sqlStatement = SQL`
       UPDATE
-        submission
+        submission_metadata
       SET
-        darwin_core_source = ${normalizedData}
+        record_end_timestamp = now()
       WHERE
         submission_id = ${submissionId}
-      RETURNING
-        submission_id;
+      AND
+        record_end_timestamp IS NULL
+      AND
+        record_effective_timestamp IS NOT NULL
+      ;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement);
 
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to update submission record darwin core source', [
-        'SubmissionRepository->updateSubmissionRecordDWCSource',
-        'rowCount was null or undefined, expected rowCount = 1'
+    return response.rowCount;
+  }
+
+  /**
+   * Update start time stamp of submission metadata record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_metadata
+      SET
+        record_effective_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        record_effective_timestamp IS NULL
+      AND
+        record_end_timestamp IS NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission metadata record', [
+        'SubmissionRepository->updateSubmissionMetadataRecordEffectiveDate',
+        'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }
+
+    return response.rowCount;
+  }
+
+  /**
+   * Update end time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
+    const sqlStatement = SQL`
+      UPDATE
+        submission_observation
+      SET
+        record_end_timestamp = now()
+      WHERE
+        submission_id = ${submissionId}
+      AND
+        record_end_timestamp IS NULL
+      AND
+        record_effective_timestamp IS NOT NULL
+      ;
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rowCount;
+  }
+
+  /**
+   *
+   * @param submissionId the submission to update
+   * @param datasetSearch
+   * @returns {*} {Promise<number>} the number of rows updated
+   * @memberof SubmissionRepository
+   */
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
+    const sql = SQL`
+    UPDATE 
+      submission_metadata 
+    SET 
+      dataset_search_criteria=${datasetSearch}
+    WHERE submission_id = ${submissionId}
+    AND record_end_timestamp IS NULL;
+    `;
+
+    const response = await this.connection.sql(sql);
+
+    return response.rowCount;
+  }
+
+  /**
+   * Gets datasets that have artifacts that require a security review.
+   *
+   * @param keywordFilter A list of keys to filter the data based on search criteria defined by the transform process
+   * @returns {*}  {Promise<IDatasetsForReview[]>}
+   */
+  async getDatasetsForReview(keywordFilter: string[]): Promise<DatasetMetadata[]> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        's.uuid as dataset_id',
+        'sm.submission_id',
+        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name`),
+        knex.raw(`sm.dataset_search_criteria::json->'primaryKeywords' as keywords`),
+        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects`)
+      )
+      .from('submission as s')
+      .leftJoin('submission_metadata as sm', 'sm.submission_id', 's.submission_id')
+      .whereNull('sm.record_end_timestamp')
+      // the ?| operator does a containment check meaning it will check if any elements in the left side array exist in the right side array
+      .whereRaw(
+        `(sm.dataset_search_criteria->'primaryKeywords')::jsonb \\?| array[${"'" + keywordFilter.join("','") + "'"}]`
+      );
+
+    const response = await this.connection.knex(queryBuilder, DatasetMetadata);
+
+    return response.rows;
+  }
+
+  /**
+   * Gets a count of all artifacts for a given submission UUID.
+   *
+   * @param uuid UUID of the submission to look for
+   * @returns {*} Promise<DatasetArtifactCount | undefined>
+   */
+  async getArtifactForReviewCountForSubmissionUUID(uuid: string): Promise<DatasetArtifactCount | undefined> {
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(
+        's.uuid as dataset_id',
+        's.submission_id',
+        knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
+        knex.raw(`MAX(a.create_date)::date as last_updated`)
+      )
+      .from('submission as s')
+      .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
+      .whereNull('a.security_review_timestamp')
+      .where('s.uuid', uuid)
+      .groupBy(['s.submission_id', 's.uuid']);
+    const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows[0];
   }

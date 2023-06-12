@@ -18,6 +18,10 @@ GET.apiDoc = {
                 description: 'API Version',
                 type: 'string'
               },
+              change_version: {
+                description: 'API Change Version',
+                type: 'string'
+              },
               environment: {
                 description: 'API Environment',
                 type: 'string'
@@ -43,9 +47,10 @@ GET.apiDoc = {
  * @returns {RequestHandler}
  */
 export function getVersionInformation(): RequestHandler {
-  return (req, res) => {
+  return async (_req, res) => {
     const versionInfo = {
       version: process.env.VERSION,
+      change_version: process.env.CHANGE_VERSION,
       environment: process.env.NODE_ENV,
       timezone: process.env.TZ
     };

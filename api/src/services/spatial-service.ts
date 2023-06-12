@@ -95,10 +95,11 @@ export class SpatialService extends DBService {
    * Collect transforms from db, run transformations on submission id, save result to spatial component table
    *
    * @param {number} submissionId
+   * @param {number} submissionObservationId
    * @return {*}  {Promise<void>}
    * @memberof SpatialService
    */
-  async runSpatialTransforms(submissionId: number): Promise<void> {
+  async runSpatialTransforms(submissionId: number, submissionObservationId: number): Promise<void> {
     const spatialTransformRecords = await this.getSpatialTransformRecords();
 
     const promises1 = spatialTransformRecords.map(async (transformRecord) => {
@@ -109,7 +110,7 @@ export class SpatialService extends DBService {
 
       const promises2 = transformed.map(async (dataPoint) => {
         const submissionSpatialComponentId = await this.spatialRepository.insertSubmissionSpatialComponent(
-          submissionId,
+          submissionObservationId,
           dataPoint.result_data
         );
 
@@ -218,8 +219,8 @@ export class SpatialService extends DBService {
   /**
    * Query builder to find spatial component by given criteria
    *
-   * @param {ISpatialComponentsSearchCriteria} criteria
-   * @return {*}  {Promise<ISubmissionSpatialComponent[]>}
+   * @param {number[]} submissionSpatialComponentIds
+   * @return {*}  {Promise<GeoJsonProperties[]>}
    * @memberof SpatialService
    */
   async findSpatialMetadataBySubmissionSpatialComponentIds(

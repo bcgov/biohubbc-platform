@@ -2,7 +2,8 @@ import { Client } from '@elastic/elasticsearch';
 import { AggregationsAggregate, SearchHit, SearchRequest, SearchResponse } from '@elastic/elasticsearch/lib/api/types';
 
 export const ElasticSearchIndices = {
-  EML: process.env.ELASTICSEARCH_EML_INDEX || 'eml'
+  EML: process.env.ELASTICSEARCH_EML_INDEX || 'eml',
+  TAXONOMY: process.env.ELASTICSEARCH_TAXONOMY_INDEX || 'taxonomy_3.0.0'
 };
 
 /**

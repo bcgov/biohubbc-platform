@@ -3,10 +3,10 @@ import { describe } from 'mocha';
 import * as pg from 'pg';
 import Sinon, { SinonStub } from 'sinon';
 import SQL from 'sql-template-strings';
-import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
-import { Queries } from '../queries';
+import { getMockDBConnection } from '../__mocks__/db';
 import * as db from './db';
 import {
   DB_CLIENT,
@@ -61,7 +61,11 @@ describe('db', () => {
     describe('DBConnection', () => {
       const sinonSandbox = Sinon.createSandbox();
 
-      const mockKeycloakToken = { preferred_username: 'test@idir' };
+      const mockKeycloakToken = {
+        preferred_username: 'testguid@idir',
+        idir_username: 'testuser',
+        identity_provider: SYSTEM_IDENTITY_SOURCE.IDIR
+      };
 
       let queryStub: SinonStub;
       let releaseStub: SinonStub;
@@ -93,10 +97,10 @@ describe('db', () => {
             expect(getDBPoolStub).to.have.been.calledOnce;
             expect(connectStub).to.have.been.calledOnce;
 
-            const expectedSystemUserContextSQL = Queries.database.setSystemUserContextSQL(
-              'test',
+            const expectedSystemUserContextSQL = SQL`select api_set_context(${'testguid'}, ${
               SYSTEM_IDENTITY_SOURCE.IDIR
-            );
+            });`;
+
             expect(queryStub).to.have.been.calledWith(
               expectedSystemUserContextSQL?.text,
               expectedSystemUserContextSQL?.values
@@ -393,13 +397,35 @@ describe('db', () => {
 
   describe('getAPIUserDBConnection', () => {
     it('calls getDBConnection for the biohub_api user', () => {
-      const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(
-        'stubbed DBConnection object' as unknown as IDBConnection
-      );
+      const mockDBConnection = getMockDBConnection();
+      const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
       getAPIUserDBConnection();
 
-      expect(getDBConnectionStub).to.have.been.calledWith({ preferred_username: 'biohub_api@database' });
+      const DB_USERNAME = process.env.DB_USER_API;
+
+      expect(getDBConnectionStub).to.have.been.calledWith({
+        preferred_username: `${DB_USERNAME}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
+        identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
+      });
+
+      getDBConnectionStub.restore();
+    });
+  });
+
+  describe('getServiceAccountDBConnection', () => {
+    it('calls getDBConnection for a service account user', () => {
+      const mockDBConnection = getMockDBConnection();
+      const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+      db.getServiceAccountDBConnection(SOURCE_SYSTEM['SIMS-SVC-4464']);
+
+      expect(getDBConnectionStub).to.have.been.calledWith({
+        preferred_username: `service-account-${SOURCE_SYSTEM['SIMS-SVC-4464']}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
+        identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
+      });
+
+      getDBConnectionStub.restore();
     });
   });
 

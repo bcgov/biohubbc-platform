@@ -61,10 +61,11 @@ export interface ISpatialComponentsSearchCriteria {
 export type EmptyObject = Record<string, never>;
 
 export interface ITaxaData {
-  associated_taxa?: string;
+  taxon_id?: string;
   vernacular_name?: string;
   submission_spatial_component_id: number;
 }
+
 export interface ISubmissionSpatialSearchResponseRow {
   taxa_data: ITaxaData[];
   spatial_component: {
@@ -248,13 +249,6 @@ export class SpatialRepository extends BaseRepository {
   async runSpatialTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSpatialRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
-    if (response.rowCount <= 0) {
-      throw new ApiExecuteSQLError('Failed to run spatial transform on submission id', [
-        'SpatialRepository->runSpatialTransformOnSubmissionId',
-        'rowCount was null or undefined, expected rowCount >= 1'
-      ]);
-    }
-
     return response.rows;
   }
 
@@ -269,35 +263,28 @@ export class SpatialRepository extends BaseRepository {
   async runSecurityTransformOnSubmissionId(submissionId: number, transform: string): Promise<ITransformSecureRow[]> {
     const response = await this.connection.query(transform, [submissionId]);
 
-    if (response.rowCount <= 0) {
-      throw new ApiExecuteSQLError('Failed to run security transform on submission id', [
-        'SpatialRepository->runSecurityTransformOnSubmissionId',
-        'rowCount was null or undefined, expected rowCount >= 1'
-      ]);
-    }
-
     return response.rows;
   }
 
   /**
    * Insert given transformed data into Spatial Component Table
    *
-   * @param {number} submissionId
+   * @param {number} submissionObservationId
    * @param {Feature[]} transformedData
    * @return {*}  {Promise<{ submission_spatial_component_id: number }>}
    * @memberof SpatialRepository
    */
   async insertSubmissionSpatialComponent(
-    submissionId: number,
+    submissionObservationId: number,
     transformedData: FeatureCollection
   ): Promise<{ submission_spatial_component_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_spatial_component (
-        submission_id,
+        submission_observation_id,
         spatial_component,
         geography
       ) VALUES (
-        ${submissionId},
+        ${submissionObservationId},
         ${JSON.stringify(transformedData)}
     `;
 
@@ -384,6 +371,7 @@ export class SpatialRepository extends BaseRepository {
     criteria: ISpatialComponentsSearchCriteria
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
+
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)
@@ -395,20 +383,22 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
             knex.raw(
-              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, taxonID}' as taxon_id"
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
+            'ssc.submission_observation_id',
             'ssc.spatial_component',
             'ssc.geography'
           )
           .from('submission_spatial_component as ssc')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .whereNull('so.record_end_timestamp')
           .groupBy('ssc.submission_spatial_component_id')
-          .groupBy('ssc.submission_id')
+          .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.geography');
 
@@ -433,13 +423,13 @@ export class SpatialRepository extends BaseRepository {
             knex.raw(
               `
                 submission_spatial_component_id,
-                submission_id,
+                submission_observation_id,
                 geography,
                 jsonb_build_object(
                   'submission_spatial_component_id',
                     wfsc.submission_spatial_component_id,
-                  'associated_taxa',
-                    wfsc.associated_taxa,
+                  'taxon_id',
+                    wfsc.taxon_id,
                   'vernacular_name',
                     wfsc.vernacular_name
                 ) taxa_data_object,
@@ -481,6 +471,10 @@ export class SpatialRepository extends BaseRepository {
   ): Promise<ISubmissionSpatialSearchResponseRow[]> {
     const knex = getKnex();
 
+    // non-admin rules:
+    // see the secured spatial component if it is not null (and if you do not have an exception to all security rules applied to it),
+    // otherwise you see the non-secured spatial component
+
     const queryBuilder = knex
       .queryBuilder()
       .with('distinct_geographic_points', this._withDistinctGeographicPoints)
@@ -495,18 +489,20 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
             knex.raw(
-              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, taxonID}' as taxon_id"
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
+            'ssc.submission_observation_id',
             'ssc.spatial_component',
             'ssc.secured_spatial_component',
             'ssc.geography'
           )
           .from('submission_spatial_component as ssc')
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .whereNull('so.record_end_timestamp')
           .leftJoin('distinct_geographic_points as p', 'p.geography', 'ssc.geography')
           .leftJoin(
             'security_transform_submission as sts',
@@ -515,7 +511,7 @@ export class SpatialRepository extends BaseRepository {
           )
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
-          .groupBy('ssc.submission_id')
+          .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.secured_spatial_component')
           .groupBy('ssc.geography');
@@ -539,7 +535,7 @@ export class SpatialRepository extends BaseRepository {
         qb7
           .select(
             'submission_spatial_component_id',
-            'submission_id',
+            'submission_observation_id',
             'geography',
             this._buildSelectForSecureNonSecureSpatialComponents()
           )
@@ -586,7 +582,8 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
-   * Append where clause condition for spatial component associatedTaxa.
+   * Append where clause condition for spatial component taxonID.
+   * Append where clause condition for spatial component taxonID
    *
    * @param {string[]} species
    * @param {Knex.QueryBuilder} qb1
@@ -599,7 +596,7 @@ export class SpatialRepository extends BaseRepository {
         // Append OR clause for each item in species array
         qb2.or.where((qb3) => {
           qb3.whereRaw(
-            `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.associatedTaxa == "${singleSpecies}")')`
+            `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.dwc.taxonID == "${singleSpecies}")')`
           );
         });
       }
@@ -616,7 +613,10 @@ export class SpatialRepository extends BaseRepository {
   _whereDatasetIDIn(datasetIDs: string[], qb1: Knex.QueryBuilder) {
     qb1.where((qb2) => {
       qb2.whereRaw(
-        `submission_id in (select submission_id from submission where uuid in (${"'" + datasetIDs.join("','") + "'"}))`
+        `ssc.submission_observation_id in (
+          select submission_observation_id from submission_observation so
+          left join submission s on so.submission_id = s.submission_id
+          where s.uuid in (${"'" + datasetIDs.join("','") + "'"}))`
       );
     });
   }
@@ -686,6 +686,9 @@ export class SpatialRepository extends BaseRepository {
         qb1
           .select()
           .from('submission_spatial_component as ssc')
+          // Filter out submission_spatial_component records for end dated submission_observation records
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .where('so.record_end_timestamp', null)
           .whereIn('submission_spatial_component_id', submission_spatial_component_ids);
       })
       .select(
@@ -701,6 +704,13 @@ export class SpatialRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Query builder to find spatial component from a given submission id, no security
+   *
+   * @param {number[]} submission_spatial_component_ids
+   * @return {*}  {Promise<ISpatialComponentFeaturePropertiesRow[]>}
+   * @memberof SpatialRepository
+   */
   async findSpatialMetadataBySubmissionSpatialComponentIds(
     submission_spatial_component_ids: number[]
   ): Promise<ISpatialComponentFeaturePropertiesRow[]> {
@@ -718,17 +728,20 @@ export class SpatialRepository extends BaseRepository {
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, datasetID}' as dataset_id"
             ),
             knex.raw(
-              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, associatedTaxa}' as associated_taxa"
+              "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, taxonID}' as taxon_id"
             ),
             knex.raw(
               "jsonb_array_elements(ssc.spatial_component -> 'features') #> '{properties, dwc, vernacularName}' as vernacular_name"
             ),
             'ssc.submission_spatial_component_id',
-            'ssc.submission_id',
+            'ssc.submission_observation_id',
             'ssc.spatial_component',
             'ssc.secured_spatial_component'
           )
           .from('submission_spatial_component as ssc')
+          // Filter out submission_spatial_component records for end dated submission_observation records
+          .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+          .where('so.record_end_timestamp', null)
           .leftJoin(
             'security_transform_submission as sts',
             'sts.submission_spatial_component_id',
@@ -737,7 +750,7 @@ export class SpatialRepository extends BaseRepository {
           .whereIn('ssc.submission_spatial_component_id', submission_spatial_component_ids)
           .groupBy('sts.submission_spatial_component_id')
           .groupBy('ssc.submission_spatial_component_id')
-          .groupBy('ssc.submission_id')
+          .groupBy('ssc.submission_observation_id')
           .groupBy('ssc.spatial_component')
           .groupBy('ssc.secured_spatial_component');
       })
@@ -783,8 +796,8 @@ export class SpatialRepository extends BaseRepository {
       jsonb_build_object(
         'submission_spatial_component_id',
           wfscwst.submission_spatial_component_id,
-        'associated_taxa',
-          wfscwst.associated_taxa,
+        'taxon_id',
+          wfscwst.taxon_id,
         'vernacular_name',
           wfscwst.vernacular_name
       ) taxa_data_object,
@@ -792,7 +805,7 @@ export class SpatialRepository extends BaseRepository {
         'spatial_data',
             -- when: the user's security transform ids array contains all of the rows security transform ids (user has all necessary exceptions)
             -- then: return the spatial component
-            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial compnent (non-secure, no exceptions required)
+            -- else: return the secure spatial component if it is not null (secure, insufficient exceptions), otherwise return the spatial component (non-secure, no exceptions required)
             case
               when
                 wuste.user_security_transform_exceptions @> wfscwst.spatial_component_security_transforms
@@ -816,9 +829,11 @@ export class SpatialRepository extends BaseRepository {
    */
   async _buildSpatialSecurityExceptions(qb: Knex.QueryBuilder, system_user_id: number) {
     const knex = getKnex();
-    qb.select(knex.raw('array_agg(suse.security_transform_id) as user_security_transform_exceptions'))
+    qb.select(knex.raw('array_remove(array_agg(st.security_transform_id), null) as user_security_transform_exceptions'))
       .from('system_user_security_exception as suse')
-      .where('suse.system_user_id', system_user_id);
+      .leftJoin('security_transform as st', 'st.persecution_or_harm_id', 'suse.persecution_or_harm_id')
+      .where('suse.system_user_id', system_user_id)
+      .and.whereRaw('(suse.end_date is null or now() < suse.end_date)');
   }
 
   /**

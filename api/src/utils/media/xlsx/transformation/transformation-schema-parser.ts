@@ -1,4 +1,4 @@
-import jsonpath from 'jsonpath';
+import { JSONPath } from 'jsonpath-plus';
 
 export type FlattenSchema = {
   fileName: string;
@@ -61,19 +61,21 @@ export class TransformationSchemaParser {
   }
 
   getAllFlattenSchemas(): FlattenSchema[] | [] {
-    return jsonpath.query(this.transformationSchema, this.getFlattenJsonPath())?.[0] || [];
+    return JSONPath({ json: this.transformationSchema, path: this.getFlattenJsonPath() })?.[0] || [];
   }
 
   getFlattenSchemas(fileName: string): FlattenSchema | null {
-    return jsonpath.query(this.transformationSchema, this.getFlattenJsonPathByFileName(fileName))?.[0] || null;
+    return (
+      JSONPath({ json: this.transformationSchema, path: this.getFlattenJsonPathByFileName(fileName) })?.[0] || null
+    );
   }
 
   getTransformSchemas(): TransformSchema[] {
-    return jsonpath.query(this.transformationSchema, this.getTransformationJsonPath())?.[0] || [];
+    return JSONPath({ json: this.transformationSchema, path: this.getTransformationJsonPath() })?.[0] || [];
   }
 
   getParseSchemas(): ParseSchema[] {
-    return jsonpath.query(this.transformationSchema, this.getParseJsonPath())?.[0] || [];
+    return JSONPath({ json: this.transformationSchema, path: this.getParseJsonPath() })?.[0] || [];
   }
 
   getFlattenJsonPath(): string {

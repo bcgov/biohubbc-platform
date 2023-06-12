@@ -1,4 +1,6 @@
+import { grey } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
+import type {} from '@mui/x-data-grid/themeAugmentation';
 import 'styles.scss';
 
 const appTheme = createTheme({
@@ -41,7 +43,33 @@ const appTheme = createTheme({
     MuiAlert: {
       styleOverrides: {
         root: {
-          fontSize: '1rem'
+          fontSize: '0.9rem',
+          padding: '12px 20px',
+          borderWidth: '1px',
+          borderStyle: 'solid'
+        },
+        icon: {
+          marginRight: '1rem'
+        },
+        standardInfo: {
+          borderColor: '#a3d4fa',
+          '& .MuiAlert-icon': {
+            color: '#313132'
+          }
+        },
+        standardError: {
+          color: '#A12622',
+          borderColor: '#ebccd1',
+          '& .MuiAlert-icon': {
+            color: '#A12622'
+          }
+        },
+        standardSuccess: {
+          backgroundColor: '#dff0d8',
+          borderColor: '#c0dcb3',
+          '& .MuiAlert-icon': {
+            color: '#2d4821'
+          }
         }
       }
     },
@@ -68,6 +96,7 @@ const appTheme = createTheme({
         root: {
           color: '#1A5A96',
           textDecoration: 'none',
+          cursor: 'pointer',
           textDecorationColor: '#1A5A96',
           ':hover': {
             textDecoration: 'underline'
@@ -96,6 +125,81 @@ const appTheme = createTheme({
             backgroundColor: theme.palette.grey[50]
           })
         })
+      }
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          '& th': {
+            letterSpacing: '0.02rem',
+            textTransform: 'uppercase'
+          },
+          '& tr:last-of-type td': {
+            borderBottom: 'none'
+          },
+          '& .MuiLink-root': {
+            fontFamily: 'inherit',
+            fontSize: 'inherit'
+          }
+        }
+      }
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.9rem'
+        },
+        head: {
+          fontSize: '0.875rem',
+          fontWeight: 700,
+          color: grey[600]
+        }
+      }
+    },
+    MuiDataGrid: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.9rem',
+          border: 0,
+          '& .MuiDataGrid-columnHeaders': {
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            color: grey[600]
+          },
+          '& .MuiDataGrid-columnHeader': {
+            textTransform: 'uppercase',
+            fontWeight: 700,
+            letterSpacing: '0.02rem'
+          },
+          '& .MuiLink-root': {
+            fontFamily: 'inherit',
+            fontSize: 'inherit'
+          },
+          '& .MuiDataGrid-cell:focus-within, & .MuiDataGrid-cellCheckbox:focus-within, & .MuiDataGrid-columnHeader:focus-within':
+            {
+              outline: 'none'
+            }
+        }
+      }
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
+        },
+        colorPrimary: {
+          color: '#003366',
+          backgroundColor: '#DCEBFB',
+          textTransform: 'uppercase',
+          fontSize: '12px',
+          '&.colorSuccess': {
+            color: '#2D4821',
+            backgroundColor: '#DFF0D8'
+          }
+        },
+        colorSecondary: {
+          backgroundColor: 'red'
+        }
       }
     }
   }

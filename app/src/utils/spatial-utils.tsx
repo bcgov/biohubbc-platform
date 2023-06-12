@@ -9,6 +9,8 @@ import { EmptyObject, ISpatialData, ITaxaData } from 'interfaces/useSearchApi.in
 import { LatLngTuple } from 'leaflet';
 import { isObject } from './Utils';
 
+const UNKNOWN_TAXON = 'Unknown';
+
 export interface ISpatialDataGroupedBySpecies {
   [species: string]: ISpatialData[];
 }
@@ -56,7 +58,7 @@ export const parseSpatialDataByType = (
         if (visible) {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
-            key: feature.id || feature.properties.id,
+            key: feature.id,
             popup: <FeaturePopup submissionSpatialComponentIds={ids} />
           });
         }
@@ -73,7 +75,7 @@ export const parseSpatialDataByType = (
         if (visible) {
           boundaryStaticLayer.features.push({
             geoJSON: feature,
-            key: feature.id || feature.properties.id,
+            key: feature.id || feature.properties.datasetID,
             popup: <DatasetPopup submissionSpatialComponentIds={ids} />
           });
         }
@@ -118,10 +120,9 @@ const occurrenceMarkerSetup = (
 ): IMarker | null => {
   const submission_ids: number[] = taxaData
     .filter((item: ITaxaData) => {
-      if (item.associated_taxa) {
-        return datasetVisibility[item.associated_taxa] === undefined ? true : datasetVisibility[item.associated_taxa];
-      }
-      return false;
+      const taxonId = item.taxon_id || UNKNOWN_TAXON;
+
+      return datasetVisibility[taxonId] === undefined ? true : datasetVisibility[taxonId];
     })
     .map((item: ITaxaData) => item.submission_spatial_component_id);
 
@@ -179,18 +180,20 @@ export const parseOccurrenceResults = (
   data.forEach((spatialData) => {
     spatialData.taxa_data.forEach((item) => {
       // need to check if it is an occurrence or not
-      if (isOccurrenceFeature(spatialData.spatial_data.features[0]) && item.associated_taxa) {
-        if (taxaMap[item.associated_taxa] === undefined) {
-          taxaMap[item.associated_taxa] = {
-            key: item.associated_taxa,
-            name: `${item.vernacular_name} (${item.associated_taxa})`,
+      if (isOccurrenceFeature(spatialData.spatial_data.features[0])) {
+        const taxonId = item.taxon_id || UNKNOWN_TAXON;
+        const taxonName = item.vernacular_name || UNKNOWN_TAXON;
+
+        if (taxaMap[taxonId] === undefined) {
+          taxaMap[taxonId] = {
+            key: taxonId,
+            name: `${taxonName} (${taxonId})`,
             count: 0,
-            visible:
-              datasetVisibility[item.associated_taxa] !== undefined ? datasetVisibility[item.associated_taxa] : true
+            visible: datasetVisibility[taxonId] !== undefined ? datasetVisibility[taxonId] : true
           };
         }
 
-        taxaMap[item.associated_taxa].count++;
+        taxaMap[taxonId].count++;
       }
     });
   });

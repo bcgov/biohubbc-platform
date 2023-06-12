@@ -22,10 +22,10 @@ ENV PATH /opt/rh/rh-nodejs8/root/usr/bin:${HOME}/node_modules/.bin/:${HOME}/app.
 COPY . ./
 
 # Cleaning any existing generated file
-RUN rm -rf ./dist
+# RUN rm -rf ./dist
 
 # Build api
-RUN npm run build
+# RUN npm run build
 
 # Application VOLUME
 VOLUME ${HOME}

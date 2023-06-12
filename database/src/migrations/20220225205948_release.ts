@@ -5,7 +5,7 @@ import path from 'path';
 const DB_USER_API_PASS = process.env.DB_USER_API_PASS;
 const DB_USER_API = process.env.DB_USER_API;
 
-const DB_RELEASE = 'release.0.4.0';
+const DB_RELEASE = 'release.0.8.0';
 
 /**
  * Apply biohub-platform release changes.
@@ -39,6 +39,7 @@ export async function up(knex: Knex): Promise<void> {
   const api_get_system_metadata_constant = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'api_get_system_metadata_constant.sql')
   );
+  const create_sequences = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'create_sequences.sql'));
 
   const populate_system_constants = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_constant.sql'));
   const populate_system_role = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_role.sql'));
@@ -53,6 +54,13 @@ export async function up(knex: Knex): Promise<void> {
   );
   const populate_submission_message_type = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_submission_message_type.sql')
+  );
+  const populate_proprietary_type = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_proprietary_type.sql'));
+  const populate_persecution_or_harm_type = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'populate_persecution_or_harm_type.sql')
+  );
+  const populate_persecution_or_harm = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'populate_persecution_or_harm.sql')
   );
 
   const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
@@ -96,6 +104,7 @@ export async function up(knex: Knex): Promise<void> {
     ${tr_generated_journal_triggers}
     ${api_get_system_constant}
     ${api_get_system_metadata_constant}
+    ${create_sequences}
 
     -- populate look up tables
     set search_path = biohub, public;
@@ -105,6 +114,9 @@ export async function up(knex: Knex): Promise<void> {
     ${populate_submission_status_type}
     ${populate_submission_message_class}
     ${populate_submission_message_type}
+    ${populate_proprietary_type}
+    ${populate_persecution_or_harm_type}
+    ${populate_persecution_or_harm}
 
     -- create the views
     set search_path = biohub_dapi_v1;

@@ -1,7 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../constants/roles';
-import { HTTP400 } from '../../errors/http-error';
+import { getDBConnection } from '../../database/db';
 import { IgcNotifyPostReturn } from '../../interfaces/gcnotify.interface';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
@@ -135,39 +135,13 @@ POST.apiDoc = {
  */
 export function sendNotification(): RequestHandler {
   return async (req, res) => {
-    const recipient = req.body?.recipient || null;
-    const message = req.body?.message || null;
+    const connection = getDBConnection(req['keycloak_token']);
+    const gcnotifyService = new GCNotifyService(connection);
 
-    if (!req.body) {
-      throw new HTTP400('Missing required param: body');
-    }
-
-    if (!recipient) {
-      throw new HTTP400('Missing required body param: recipient');
-    }
-
-    if (!message) {
-      throw new HTTP400('Missing required body param: message');
-    }
-
-    if (!message.header) {
-      throw new HTTP400('Missing required body param: message.header');
-    }
-
-    if (!message.body1) {
-      throw new HTTP400('Missing required body param: message.body1');
-    }
-
-    if (!message.body2) {
-      throw new HTTP400('Missing required body param: message.body2');
-    }
-
-    if (!message.footer) {
-      throw new HTTP400('Missing required body param: message.footer');
-    }
+    const recipient = req.body?.recipient;
+    const message = req.body?.message;
 
     try {
-      const gcnotifyService = new GCNotifyService();
       let response = {} as IgcNotifyPostReturn;
 
       if (recipient.emailAddress) {

@@ -1,9 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  resourceVersion: ''
-  selfLink: ''
   name: biohub-platform-app-dc
+  labels:
+    build: biohub-platform-app
 parameters:
   - name: NAME
     value: biohub-platform-app
@@ -16,9 +16,6 @@ parameters:
     value: '0'
   - name: REACT_APP_API_HOST
     description: API host for application backend
-    value: ''
-  - name: REACT_APP_N8N_HOST
-    description: N8N host for application backend
     value: ''
   - name: REACT_APP_SITEMINDER_LOGOUT_URL
     description: Siteminder URL to log out and clear the session for the logged in user
@@ -43,15 +40,15 @@ parameters:
     value: '7100-tcp'
   - name: REACT_APP_KEYCLOAK_HOST
     description: Key clock login url
-    value: 'https://oidc.gov.bc.ca/auth'
+    required: true
   - name: REACT_APP_KEYCLOAK_REALM
     description: Realm identifier or name
-    value: '35r1iman'
+    required: true
   - name: REACT_APP_KEYCLOAK_CLIENT_ID
     description: Client Id for application
-    value: 'biohubbc'
+    required: true
   - name: CPU_REQUEST
-    value: '10m'
+    value: '50m'
   - name: CPU_LIMIT
     value: '200m'
   - name: MEMORY_REQUEST
@@ -60,8 +57,7 @@ parameters:
     value: '200Mi'
   - name: REPLICAS
     value: '1'
-  - name: REPLICA_MAX
-    required: true
+  - name: REPLICAS_MAX
     value: '1'
 objects:
   - apiVersion: image.openshift.io/v1
@@ -88,7 +84,7 @@ objects:
         role: app
       name: ${NAME}${SUFFIX}
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -118,8 +114,6 @@ objects:
                   value: ${CHANGE_ID}
                 - name: REACT_APP_API_HOST
                   value: ${REACT_APP_API_HOST}
-                - name: REACT_APP_N8N_HOST
-                  value: ${REACT_APP_N8N_HOST}
                 - name: REACT_APP_SITEMINDER_LOGOUT_URL
                   value: ${REACT_APP_SITEMINDER_LOGOUT_URL}
                 - name: REACT_APP_MAX_UPLOAD_NUM_FILES
@@ -239,19 +233,24 @@ objects:
       wildcardPolicy: None
     status:
       ingress: null
-  - apiVersion: autoscaling/v1
-    kind: HorizontalPodAutoscaler
+  - kind: HorizontalPodAutoscaler
+    apiVersion: autoscaling/v2beta2
     metadata:
       annotations: {}
       creationTimestamp: null
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
-      maxReplicas: '${{REPLICA_MAX}}'
-      minReplicas: '${{REPLICAS}}'
+      minReplicas: ${{REPLICAS}}
+      maxReplicas: ${{REPLICAS_MAX}}
       scaleTargetRef:
-        apiVersion: v1
+        apiVersion: apps.openshift.io/v1
         kind: DeploymentConfig
         name: ${NAME}${SUFFIX}
-      cpuUtilization:
-        targetPercentage: 95
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 80

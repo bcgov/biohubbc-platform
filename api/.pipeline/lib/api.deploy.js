@@ -34,18 +34,25 @@ const apiDeploy = async (settings) => {
         NODE_ENV: phases[phase].env || 'dev',
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
+        ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         TZ: phases[phase].tz,
-        KEYCLOAK_ADMIN_USERNAME: 'biohubbc-svc',
-        KEYCLOAK_SECRET: 'keycloak-admin-password',
-        KEYCLOAK_SECRET_ADMIN_PASSWORD: 'keycloak_admin_password',
+        KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
+        KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
+        KEYCLOAK_SECRET_ADMIN_PASSWORD: phases[phase].sso.keycloakSecretAdminPassword,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         KEYCLOAK_HOST: phases[phase].sso.url,
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         KEYCLOAK_REALM: phases[phase].sso.realm,
-        REPLICAS: phases[phase].replicas || 1,
-        REPLICA_MAX: phases[phase].maxReplicas || 1,
-        LOG_LEVEL: phases[phase].logLevel || 'info'
+        KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
+        KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
+        LOG_LEVEL: phases[phase].logLevel || 'info',
+        CPU_REQUEST: phases[phase].cpuRequest,
+        CPU_LIMIT: phases[phase].cpuLimit,
+        MEMORY_REQUEST: phases[phase].memoryRequest,
+        MEMORY_LIMIT: phases[phase].memoryLimit,
+        REPLICAS: phases[phase].replicas,
+        REPLICAS_MAX: phases[phase].replicasMax
       }
     })
   );
@@ -53,7 +60,7 @@ const apiDeploy = async (settings) => {
   oc.applyRecommendedLabels(objects, phases[phase].name, phase, `${changeId}`, phases[phase].instance);
   oc.importImageStreams(objects, phases[phase].tag, phases.build.namespace, phases.build.tag);
 
-  oc.applyAndDeploy(objects, phases[phase].instance);
+  await oc.applyAndDeploy(objects, phases[phase].instance);
 };
 
 module.exports = { apiDeploy };

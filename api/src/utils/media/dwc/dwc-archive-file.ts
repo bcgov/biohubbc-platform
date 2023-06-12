@@ -10,6 +10,8 @@ export enum DWC_CLASS {
   MEASUREMENTORFACT = 'measurementorfact',
   RESOURCERELATIONSHIP = 'resourcerelationship',
   TAXON = 'taxon',
+  LOCATION = 'location',
+  RECORD = 'record',
   EML = 'eml'
 }
 
@@ -46,36 +48,51 @@ export class DWCArchive {
   }
 
   _initArchiveFiles() {
+    // See https://www.npmjs.com/package/xlsx#parsing-options for details on parsing options
+    const parsingOptions: xlsx.ParsingOptions = { raw: true };
+
     for (const rawFile of this.rawFile.mediaFiles) {
       switch (rawFile.name) {
         case DWC_CLASS.EVENT:
           this.worksheets[DWC_CLASS.EVENT] = new CSVWorksheet(
             rawFile.name,
-            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
         case DWC_CLASS.OCCURRENCE:
           this.worksheets[DWC_CLASS.OCCURRENCE] = new CSVWorksheet(
             rawFile.name,
-            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
         case DWC_CLASS.MEASUREMENTORFACT:
           this.worksheets[DWC_CLASS.MEASUREMENTORFACT] = new CSVWorksheet(
             rawFile.name,
-            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
         case DWC_CLASS.RESOURCERELATIONSHIP:
           this.worksheets[DWC_CLASS.RESOURCERELATIONSHIP] = new CSVWorksheet(
             rawFile.name,
-            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
         case DWC_CLASS.TAXON:
           this.worksheets[DWC_CLASS.TAXON] = new CSVWorksheet(
             rawFile.name,
-            xlsx.read(rawFile.buffer).Sheets[DEFAULT_XLSX_SHEET]
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
+          );
+          break;
+        case DWC_CLASS.LOCATION:
+          this.worksheets[DWC_CLASS.LOCATION] = new CSVWorksheet(
+            rawFile.name,
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
+          );
+          break;
+        case DWC_CLASS.RECORD:
+          this.worksheets[DWC_CLASS.RECORD] = new CSVWorksheet(
+            rawFile.name,
+            xlsx.read(rawFile.buffer, parsingOptions).Sheets[DEFAULT_XLSX_SHEET]
           );
           break;
         case DWC_CLASS.EML:
@@ -94,10 +111,12 @@ export class DWCArchive {
     return (
       this.eml !== undefined &&
       !this.worksheets.event &&
-      !this.worksheets.measurementorfact &&
       !this.worksheets.occurrence &&
+      !this.worksheets.measurementorfact &&
       !this.worksheets.resourcerelationship &&
-      !this.worksheets.taxon
+      !this.worksheets.taxon &&
+      !this.worksheets.location &&
+      !this.worksheets.record
     );
   }
 
@@ -145,6 +164,23 @@ export class DWCArchive {
     validators.forEach((validator) => validator(this));
 
     return this.mediaValidation;
+  }
+
+  /**
+   * Returns normalized DwC Archive file data
+   *
+   * @return {*}  {string}
+   */
+  normalize(): string {
+    const normalized = {};
+
+    Object.entries(this.worksheets).forEach(([key, value]) => {
+      if (value) {
+        normalized[key] = value.getRowObjects();
+      }
+    });
+
+    return JSON.stringify(normalized);
   }
 }
 

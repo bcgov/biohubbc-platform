@@ -1,4 +1,10 @@
 import { AxiosInstance } from 'axios';
+import { simsHandlebarsTemplate } from 'hooks/templates/SIMS-handlebar-template';
+import {
+  IDatasetForReview,
+  IListArtifactsResponse,
+  IListRelatedDatasetsResponse
+} from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -20,6 +26,17 @@ const useDatasetApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Fetch all unsecure datasets for review.
+   *
+   * @returns {*} {Promise<IDatasetForReview[]>}
+   */
+  const listAllDatasetsForReview = async (): Promise<IDatasetForReview[]> => {
+    const { data } = await axios.get(`api/administrative/review/list`);
+
+    return data;
+  };
+
+  /**
    * Fetch dataset metadata by datasetId.
    *
    * @param {string} datasetId
@@ -31,9 +48,59 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Fetch dataset artifacts by datasetId.
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<any>}
+   */
+  const getDatasetArtifacts = async (datasetId: string): Promise<IListArtifactsResponse> => {
+    const { data } = await axios.get(`api/dwc/submission/${datasetId}/artifacts`);
+
+    return data;
+  };
+
+  /**
+   * Fetch the signed URL of an artifact by its artifact ID.
+   *
+   * @return {*}  {Promise<string>}
+   */
+  const getArtifactSignedUrl = async (artifactId: number): Promise<string> => {
+    const { data } = await axios.get<string>(`api/artifact/${artifactId}/getSignedUrl`);
+
+    return data;
+  };
+
+  /**
+   * Fetch the signed handlebar template for a given dataset ID.
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<string>}
+   */
+  const getHandlebarsTemplate = async (datasetId: string): Promise<string> => {
+    return simsHandlebarsTemplate;
+  };
+
+  /**
+   * Fetch a list of datasets related to the given dataset
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<IRelatedDataset>}
+   */
+  const getRelatedDatasets = async (datasetId: string): Promise<IListRelatedDatasetsResponse> => {
+    const { data } = await axios.get<IListRelatedDatasetsResponse>(`api/dwc/submission/${datasetId}/related`);
+
+    return data;
+  };
+
   return {
     listAllDatasets,
-    getDatasetEML
+    listAllDatasetsForReview,
+    getDatasetEML,
+    getDatasetArtifacts,
+    getArtifactSignedUrl,
+    getHandlebarsTemplate,
+    getRelatedDatasets
   };
 };
 

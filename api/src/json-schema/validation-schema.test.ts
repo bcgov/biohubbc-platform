@@ -175,7 +175,7 @@ describe('example submission validation schema', () => {
                 'occurrenceID',
                 'basisOfRecord',
                 'type',
-                'associatedTaxa',
+                'taxonID',
                 'sex',
                 'lifeStage',
                 'individualCount',

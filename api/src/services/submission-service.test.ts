@@ -1,21 +1,19 @@
 import chai, { expect } from 'chai';
+import * as JSONPathPlus from 'jsonpath-plus';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SYSTEM_ROLE } from '../constants/roles';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { UserObject } from '../models/user';
 import {
-  IInsertSubmissionRecord,
-  ISearchSubmissionCriteria,
   ISourceTransformModel,
+  ISubmissionJobQueueRecord,
   ISubmissionModel,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import * as FileUtils from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
@@ -28,22 +26,6 @@ describe('SubmissionService', () => {
     sinon.restore();
   });
 
-  describe('findSubmissionByCriteria', () => {
-    it('should return array of submission_id on call', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'findSubmissionByCriteria')
-        .resolves([{ submission_id: 1 }]);
-
-      const response = await submissionService.findSubmissionByCriteria({} as unknown as ISearchSubmissionCriteria);
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql([{ submission_id: 1 }]);
-    });
-  });
-
   describe('insertSubmissionRecord', () => {
     it('should return submission_id on insert', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -51,42 +33,45 @@ describe('SubmissionService', () => {
 
       const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionRecord').resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecord({} as unknown as IInsertSubmissionRecord);
+      const response = await submissionService.insertSubmissionRecord({ uuid: '', source_transform_id: 1 });
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
     });
   });
 
-  describe('updateSubmissionRecordInputKey', () => {
-    it('should return submission_id on update', async () => {
+  describe('insertSubmissionRecordWithPotentialConflict', () => {
+    it('should return submission_id on get or insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordInputKey')
+        .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 1 });
 
-      const response = await submissionService.updateSubmissionRecordInputKey(1, 'test');
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
+        uuid: '',
+        source_transform_id: 1
+      });
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
     });
   });
 
-  describe('updateSubmissionRecordEMLSource', () => {
+  describe('updateSubmissionMetadataEMLSource', () => {
     it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordEMLSource')
-        .resolves({ submission_id: 1 });
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataEMLSource')
+        .resolves({ submission_metadata_id: 1 });
 
-      const response = await submissionService.updateSubmissionRecordEMLSource(1, { emlFile: {} } as EMLFile);
+      const response = await submissionService.updateSubmissionMetadataEMLSource(1, 1, { emlFile: {} } as EMLFile);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql({ submission_metadata_id: 1 });
     });
   });
 
@@ -96,13 +81,13 @@ describe('SubmissionService', () => {
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordEMLJSONSource')
-        .resolves({ submission_id: 1 });
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataEMLJSONSource')
+        .resolves({ submission_metadata_id: 1 });
 
-      const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 'test');
+      const response = await submissionService.updateSubmissionRecordEMLJSONSource(1, 1, 'test');
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql({ submission_metadata_id: 1 });
     });
   });
 
@@ -136,19 +121,47 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('setSubmissionEndDateById', () => {
+  describe('updateSubmissionMetadataRecordEndDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionMetadataRecordEndDate').resolves(1);
+
+      const response = await submissionService.updateSubmissionMetadataRecordEndDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionMetadataRecordEffectiveDate', () => {
     it('should return submission_id on update', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
       const repo = sinon
-        .stub(SubmissionRepository.prototype, 'setSubmissionEndDateById')
-        .resolves({ submission_id: 1 });
+        .stub(SubmissionRepository.prototype, 'updateSubmissionMetadataRecordEffectiveDate')
+        .resolves(1);
 
-      const response = await submissionService.setSubmissionEndDateById(1);
+      const response = await submissionService.updateSubmissionMetadataRecordEffectiveDate(1);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('updateSubmissionObservationRecordEndDate', () => {
+    it('should return submission_id on update', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionObservationRecordEndDate').resolves(1);
+
+      const response = await submissionService.updateSubmissionObservationRecordEndDate(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
     });
   });
 
@@ -319,7 +332,7 @@ describe('SubmissionService', () => {
           uuid: '2267501d-c6a9-43b5-b951-2324faff6397',
           record_effective_date: '2022-05-24T18:41:42.211Z',
           record_end_date: null,
-          input_key: 'platform/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
+          input_key: 'biohub/1/moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
           input_file_name: 'moose_aerial_stratifiedrandomblock_composition_recruitment_survey_2.5_withdata.zip',
           eml_source: null,
           eml_json_source: null,
@@ -338,68 +351,6 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(mockResponse);
-    });
-  });
-
-  describe('getIntakeFileFromS3', () => {
-    it('should throw an error if file does not contain input_key', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ uuid: 'validString' } as ISubmissionModel);
-
-      try {
-        await submissionService.getIntakeFileFromS3(1);
-        expect.fail();
-      } catch (actualError) {
-        expect(repo).to.be.calledOnce;
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve input file name');
-      }
-    });
-
-    it('should return s3 file', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionId')
-        .resolves({ input_key: 'validString' } as ISubmissionModel);
-      sinon.stub(SubmissionService.prototype, 'getFileFromS3').resolves({ Body: 'valid' });
-
-      const response = await submissionService.getIntakeFileFromS3(1);
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ Body: 'valid' });
-    });
-  });
-
-  describe('getFileFromS3', () => {
-    it('should throw an error if file could not be fetched from s3', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const s3Stub = sinon.stub(FileUtils, 'getFileFromS3').resolves();
-
-      try {
-        await submissionService.getFileFromS3('fileName');
-        expect.fail();
-      } catch (actualError) {
-        expect(s3Stub).to.be.calledOnce;
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get file from S3');
-      }
-    });
-
-    it('should return s3 file', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const s3Stub = sinon.stub(FileUtils, 'getFileFromS3').resolves({ Body: 'valid' });
-
-      const response = await submissionService.getFileFromS3('fileName');
-
-      expect(s3Stub).to.be.calledOnce;
-      expect(response).to.be.eql({ Body: 'valid' });
     });
   });
 
@@ -434,22 +385,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('updateSubmissionRecordDWCSource', () => {
-    it('should return submission id', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'updateSubmissionRecordDWCSource')
-        .resolves({ submission_id: 1 });
-
-      const response = await submissionService.updateSubmissionRecordDWCSource(1, 'string');
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
-    });
-  });
-
   describe('findSubmissionRecordsWithSpatialCount', () => {
     it('should return array of records', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -458,9 +393,9 @@ describe('SubmissionService', () => {
       const findSubmissionRecordWithSpatialCountStub = sinon
         .stub(SubmissionService.prototype, 'findSubmissionRecordWithSpatialCount')
         .onCall(0)
-        .resolves({ id: '111-111-111', source: 'source string 1', observation_count: 0 })
+        .resolves({ id: '111-111-111', source: {}, observation_count: 0 })
         .onCall(1)
-        .resolves({ id: '222-222-222', source: 'source string 2', observation_count: 200 })
+        .resolves({ id: '222-222-222', source: {}, observation_count: 200 })
         .onCall(2)
         .resolves(null);
 
@@ -472,8 +407,8 @@ describe('SubmissionService', () => {
 
       expect(findSubmissionRecordWithSpatialCountStub).to.be.calledThrice;
       expect(response).to.be.eql([
-        { id: '111-111-111', source: 'source string 1', observation_count: 0 },
-        { id: '222-222-222', source: 'source string 2', observation_count: 200 },
+        { id: '111-111-111', source: {}, observation_count: 0 },
+        { id: '222-222-222', source: {}, observation_count: 200 },
         null
       ]);
     });
@@ -493,7 +428,7 @@ describe('SubmissionService', () => {
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
-          .resolves('source string 1');
+          .resolves({});
 
         const getSpatialComponentCountByDatasetIdStub = sinon
           .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
@@ -503,7 +438,7 @@ describe('SubmissionService', () => {
 
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
-        expect(response).to.be.eql({ id: '111-111-111', source: 'source string 1', observation_count: 0 });
+        expect(response).to.be.eql({ id: '111-111-111', source: {}, observation_count: 0 });
       });
     });
 
@@ -516,8 +451,8 @@ describe('SubmissionService', () => {
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
           .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
-          .resolves('source string 1')
-          .resolves('source string 2');
+          .resolves({})
+          .resolves({});
 
         const getSpatialComponentCountByDatasetIdStub = sinon
           .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetId')
@@ -528,7 +463,7 @@ describe('SubmissionService', () => {
 
         expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
         expect(getSpatialComponentCountByDatasetIdStub).to.be.calledOnce;
-        expect(response).to.be.eql({ id: '222-222-222', source: 'source string 2', observation_count: 200 });
+        expect(response).to.be.eql({ id: '222-222-222', source: {}, observation_count: 200 });
       });
     });
 
@@ -554,49 +489,180 @@ describe('SubmissionService', () => {
         expect(response).to.be.null;
       });
     });
+  });
 
-    describe('with a system admin', () => {
-      it('should call getSpatialComponentCountByDatasetIdAsAdmin as system admin', async () => {
-        const mockDBConnection = getMockDBConnection();
-        const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
-        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+  describe('getSubmissionJobQueue', () => {
+    it('should return a submission job queue record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
 
-        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
-          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
-          .resolves(null);
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionJobQueue')
+        .resolves({ test: 'test' } as unknown as ISubmissionJobQueueRecord);
 
-        const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
-          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
-          .resolves([]);
+      const response = await submissionService.getSubmissionJobQueue(1);
 
-        await submissionService.findSubmissionRecordWithSpatialCount('333-333-333');
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({ test: 'test' });
+    });
+  });
 
-        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
-        expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.be.calledOnce;
-      });
+  describe('findRelatedDatasetsByDatasetId', () => {
+    it('should return a valid array of related datasets on success', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const mockEmlJson = {
+        'eml:eml': {
+          dataset: {
+            project: {
+              relatedProject: [
+                {
+                  '@_id': 'abcde',
+                  title: 'Test-Title',
+                  '@_system': 'http://example.com/datasets'
+                }
+              ]
+            }
+          }
+        }
+      };
+
+      const emlStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+        .resolves(mockEmlJson);
+
+      const response = await submissionService.findRelatedDatasetsByDatasetId('test-dataset-id');
+
+      expect(response).to.eql([
+        {
+          datasetId: 'abcde',
+          title: 'Test-Title',
+          url: 'http://example.com/datasets/abcde'
+        }
+      ]);
+
+      expect(emlStub).to.be.calledOnce;
+      expect(emlStub).to.be.calledWith('test-dataset-id');
     });
 
-    describe('with a system admin', () => {
-      it('should call getSpatialComponentCountByDatasetIdAsAdmin as data admin', async () => {
-        const mockDBConnection = getMockDBConnection();
-        const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
-        sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
+    it('should return an empty array if no EML JSON could be found', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
 
-        const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
-          .stub(SubmissionService.prototype, 'findSubmissionRecordEMLJSONByDatasetId')
-          .resolves(null);
+      const emlStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId')
+        .resolves(null as unknown as Record<string, unknown>);
 
-        const getSpatialComponentCountByDatasetIdAsAdminStub = sinon
-          .stub(SubmissionRepository.prototype, 'getSpatialComponentCountByDatasetIdAsAdmin')
-          .resolves([]);
+      const response = await submissionService.findRelatedDatasetsByDatasetId('test-dataset-id');
 
-        await submissionService.findSubmissionRecordWithSpatialCount('333-333-333');
+      expect(response).to.eql([]);
+      expect(emlStub).to.be.calledOnce;
+      expect(emlStub).to.be.calledWith('test-dataset-id');
+    });
 
-        expect(findSubmissionRecordEMLJSONByDatasetIdStub).to.be.calledOnce;
-        expect(getSpatialComponentCountByDatasetIdAsAdminStub).to.be.calledOnce;
+    it('should return an empty array if JSON Path fails to return any results', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const emlStub = sinon.stub(SubmissionService.prototype, 'getSubmissionRecordEMLJSONByDatasetId').resolves({});
+
+      const jsonPathStub = sinon.stub(JSONPathPlus, 'JSONPath').returns([]);
+
+      const response = await submissionService.findRelatedDatasetsByDatasetId('test-dataset-id');
+
+      expect(response).to.eql([]);
+      expect(emlStub).to.be.calledOnce;
+      expect(emlStub).to.be.calledWith('test-dataset-id');
+      expect(jsonPathStub).to.be.calledOnce;
+      expect(jsonPathStub).to.be.calledWith({
+        path: '$..eml:eml..relatedProject',
+        json: {},
+        resultType: 'all'
       });
+    });
+  });
+
+  describe('getDatasetsForReview', () => {
+    it('should return a rolled up dataset for review', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const stubDataset = sinon.stub(SubmissionRepository.prototype, 'getDatasetsForReview').resolves([
+        {
+          dataset_id: 'UUID',
+          submission_id: 1,
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: []
+        },
+        {
+          dataset_id: 'UUID',
+          submission_id: 2,
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: [{ ['@_id']: 'RP_UUID_1' }, { ['@_id']: 'RP_UUID_2' }]
+        },
+        {
+          dataset_id: 'UUID',
+          submission_id: 3,
+          dataset_name: 'Project Name',
+          keywords: [],
+          related_projects: [{ ['@_id']: 'RP_UUID_3' }]
+        }
+      ]);
+      const stubArtifactCount = sinon
+        .stub(SubmissionRepository.prototype, 'getArtifactForReviewCountForSubmissionUUID')
+        .resolves({
+          dataset_id: '',
+          submission_id: 1,
+          artifacts_to_review: 1,
+          last_updated: ''
+        });
+
+      const response = await submissionService.getDatasetsForReview(['']);
+
+      expect(stubDataset).to.be.calledOnce;
+      expect(stubArtifactCount).to.be.calledWith('RP_UUID_1');
+      expect(stubArtifactCount).to.be.calledWith('RP_UUID_2');
+      expect(stubArtifactCount).to.be.calledWith('RP_UUID_3');
+      expect(response).to.be.eql([
+        {
+          dataset_id: '',
+          artifacts_to_review: 1,
+          dataset_name: 'Project Name',
+          last_updated: '',
+          keywords: []
+        },
+        {
+          dataset_id: '',
+          artifacts_to_review: 3,
+          dataset_name: 'Project Name',
+          last_updated: '',
+          keywords: []
+        },
+        {
+          dataset_id: '',
+          artifacts_to_review: 2,
+          dataset_name: 'Project Name',
+          last_updated: '',
+          keywords: []
+        }
+      ]);
+    });
+  });
+
+  describe('updateSubmissionMetadataWithSearchKeys', () => {
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'updateSubmissionMetadataWithSearchKeys').resolves(1);
+
+      const response = await submissionService.updateSubmissionMetadataWithSearchKeys(1, {});
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(1);
     });
   });
 });

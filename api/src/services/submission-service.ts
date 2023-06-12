@@ -1,21 +1,32 @@
-import { GetObjectOutput } from 'aws-sdk/clients/s3';
+import { JSONPath } from 'jsonpath-plus';
+import moment from 'moment';
+import { z } from 'zod';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import {
-  IInsertSubmissionRecord,
-  ISearchSubmissionCriteria,
+  IDatasetsForReview,
   ISourceTransformModel,
+  ISubmissionJobQueueRecord,
+  ISubmissionMetadataRecord,
   ISubmissionModel,
   ISubmissionModelWithStatus,
+  ISubmissionObservationRecord,
+  ISubmissionRecord,
   ISubmissionRecordWithSpatial,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { getFileFromS3 } from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
-import { UserService } from './user-service';
+
+export const RelatedDataset = z.object({
+  datasetId: z.string(),
+  title: z.string(),
+  url: z.string()
+});
+
+export type RelatedDataset = z.infer<typeof RelatedDataset>;
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -27,40 +38,27 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Search with keyword or spatial for submission IDs
-   *
-   * @param {ISearchSubmissionCriteria} submissionCriteria
-   * @return {*}  {Promise<{ submission_id: number }[]>}
-   * @memberof SubmissionService
-   */
-  async findSubmissionByCriteria(submissionCriteria: ISearchSubmissionCriteria): Promise<{ submission_id: number }[]> {
-    return this.submissionRepository.findSubmissionByCriteria(submissionCriteria);
-  }
-
-  /**
    * Insert a new submission record.
    *
-   * @param {IInsertSubmissionRecord} submissionData
+   * @param {ISubmissionRecord} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecord(submissionData: IInsertSubmissionRecord): Promise<{ submission_id: number }> {
+  async insertSubmissionRecord(submissionData: ISubmissionRecord): Promise<{ submission_id: number }> {
     return this.submissionRepository.insertSubmissionRecord(submissionData);
   }
 
   /**
-   * Update the `input_key` column of a submission record.
+   * Insert a new submission record, returning the record having the matching UUID if it already exists
    *
-   * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['input_key']} inputKey
+   * @param {ISubmissionModel} submissionData
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionRecordInputKey(
-    submissionId: number,
-    inputKey: IInsertSubmissionRecord['input_key']
+  async insertSubmissionRecordWithPotentialConflict(
+    submissionData: ISubmissionModel
   ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.updateSubmissionRecordInputKey(submissionId, inputKey);
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(submissionData);
   }
 
   /**
@@ -71,23 +69,32 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async updateSubmissionRecordEMLSource(submissionId: number, file: EMLFile): Promise<{ submission_id: number }> {
-    return this.submissionRepository.updateSubmissionRecordEMLSource(submissionId, file);
+  async updateSubmissionMetadataEMLSource(
+    submissionId: number,
+    submissionMetadataId: number,
+    file: EMLFile
+  ): Promise<{ submission_metadata_id: number }> {
+    return this.submissionRepository.updateSubmissionMetadataEMLSource(submissionId, submissionMetadataId, file);
   }
 
   /**
    * Update the `eml_json_source` column of a submission record.
    *
    * @param {number} submissionId
-   * @param {IInsertSubmissionRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {ISubmissionRecord['eml_json_source']} EMLJSONSource
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionService
    */
   async updateSubmissionRecordEMLJSONSource(
     submissionId: number,
-    EMLJSONSource: IInsertSubmissionRecord['eml_json_source']
-  ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.updateSubmissionRecordEMLJSONSource(submissionId, EMLJSONSource);
+    submissionMetadataId: number,
+    EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
+  ): Promise<{ submission_metadata_id: number }> {
+    return this.submissionRepository.updateSubmissionMetadataEMLJSONSource(
+      submissionId,
+      submissionMetadataId,
+      EMLJSONSource
+    );
   }
 
   /**
@@ -108,7 +115,7 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number }> {
+  async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
   }
 
@@ -119,8 +126,30 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async setSubmissionEndDateById(submissionId: number): Promise<{ submission_id: number }> {
-    return this.submissionRepository.setSubmissionEndDateById(submissionId);
+  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<number> {
+    return this.submissionRepository.updateSubmissionMetadataRecordEndDate(submissionId);
+  }
+
+  /**
+   * Set record_effective_timestamp of submission id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{ submission_id: number }>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
+    return this.submissionRepository.updateSubmissionMetadataRecordEffectiveDate(submissionId);
+  }
+
+  /**
+   * Update end time stamp for submission observation record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<number>}
+   * @memberof SubmissionService
+   */
+  async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
+    return this.submissionRepository.updateSubmissionObservationRecordEndDate(submissionId);
   }
 
   /**
@@ -161,10 +190,10 @@ export class SubmissionService extends DBService {
    * Get json representation of eml source from submission by datasetId.
    *
    * @param {string} datasetId
-   * @return {string}
+   * @return {Promise<Record<string, unknown>>}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string> {
+  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown>> {
     const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (response.rowCount !== 1) {
@@ -182,10 +211,10 @@ export class SubmissionService extends DBService {
    * any existing records.
    *
    * @param {string} datasetId
-   * @return {string | null}
+   * @return {Record<string, unknown> | null}
    * @memberof SubmissionService
    */
-  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<string | null> {
+  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown> | null> {
     const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (response.rowCount !== 1) {
@@ -254,43 +283,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Returns Intake file from S3
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<GetObjectOutput>}
-   * @memberof SubmissionService
-   */
-  async getIntakeFileFromS3(submissionId: number): Promise<GetObjectOutput> {
-    const transformRecord = await this.submissionRepository.getSubmissionRecordBySubmissionId(submissionId);
-
-    if (!transformRecord.input_key) {
-      throw new ApiGeneralError('Failed to retrieve input file name', [
-        'SubmissionRepository->getInputFileNameKey',
-        'input file name was null'
-      ]);
-    }
-
-    return this.getFileFromS3(transformRecord.input_key);
-  }
-
-  /**
-   * Collect filename from S3
-   *
-   * @param {string} fileName
-   * @return {*}  {Promise<GetObjectOutput>}
-   * @memberof SubmissionService
-   */
-  async getFileFromS3(fileName: string): Promise<GetObjectOutput> {
-    const s3File = await getFileFromS3(fileName);
-
-    if (!s3File) {
-      throw new ApiGeneralError('Failed to get file from S3');
-    }
-
-    return s3File;
-  }
-
-  /**
    * Inserts both the status and message of a submission
    *
    * @param {number} submissionId
@@ -331,21 +323,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   *  Update darwin_core_source field in submission table
-   *
-   * @param {number} submissionId
-   * @param {string} normalizedData
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionRecordDWCSource(
-    submissionId: number,
-    normalizedData: string
-  ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.updateSubmissionRecordDWCSource(submissionId, normalizedData);
-  }
-
-  /**
    * Retrieves an array of submission records with spatial count by dataset id.
    *
    * @param {string[]} datasetIds
@@ -364,12 +341,9 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async findSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial | null> {
-    const userService = new UserService(this.connection);
     const [submissionEMLJSON, spatialComponentCounts] = await Promise.all([
       this.findSubmissionRecordEMLJSONByDatasetId(datasetId),
-      (await userService.isSystemUserAdmin())
-        ? this.submissionRepository.getSpatialComponentCountByDatasetIdAsAdmin(datasetId)
-        : this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
+      this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
     ]);
 
     if (!submissionEMLJSON) {
@@ -379,7 +353,148 @@ export class SubmissionService extends DBService {
     return {
       id: datasetId,
       source: submissionEMLJSON,
-      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count || 0
+      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count ?? 0
     };
+  }
+
+  /**
+   *  Fetch row of submission job queue by submission Id
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionJobQueueRecord>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
+    return this.submissionRepository.getSubmissionJobQueue(submissionId);
+  }
+
+  /**
+   * Insert a new metadata record
+   *
+   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @return {*}  {Promise<{ submission_metadata_id: number }>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionMetadataRecord(
+    submissonMetadata: ISubmissionMetadataRecord
+  ): Promise<{ submission_metadata_id: number }> {
+    return this.submissionRepository.insertSubmissionMetadataRecord(submissonMetadata);
+  }
+
+  /**
+   * Insert a new Observation Record
+   *
+   * @param {ISubmissionObservationRecord} submissonObservation
+   * @return {*}  {Promise<{ submission_observation_id: number }>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionObservationRecord(
+    submissonObservation: ISubmissionObservationRecord
+  ): Promise<{ submission_observation_id: number }> {
+    return this.submissionRepository.insertSubmissionObservationRecord(submissonObservation);
+  }
+
+  /**
+   * Retrieves an array of datasets related to the given dataset.
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<RelatedDataset[]>}
+   * @memberof SubmissionService
+   */
+  async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
+    const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
+
+    if (!emlJson) {
+      return [];
+    }
+
+    const result = JSONPath({
+      path: '$..eml:eml..relatedProject',
+      json: emlJson,
+      resultType: 'all'
+    });
+
+    if (!result.length) {
+      return [];
+    }
+
+    return result[0].value.map((relatedProject: any) => {
+      return {
+        datasetId: relatedProject['@_id'],
+        title: relatedProject['title'],
+        url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
+      };
+    });
+  }
+
+  /**
+   * Gets datasets that have artifacts that require a security review.
+   * This will roll up any related projects to provide a "total" count of artifacts to review
+   *
+   * @param keys A list of keys to filter the data based on search criteria defined by the transform process
+   * @returns {*}  {Promise<IDatasetsForReview[]>}
+   * @memberof SubmissionService
+   */
+  async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
+    const data = await this.submissionRepository.getDatasetsForReview(keys);
+    const datasetsForReview: IDatasetsForReview[] = [];
+
+    for await (const item of data) {
+      let rollUpCount = 0;
+      const dates: string[] = [];
+
+      if (item.related_projects) {
+        for await (const rp of item.related_projects) {
+          const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
+          if (rpCount) {
+            rollUpCount += rpCount.artifacts_to_review;
+            dates.push(rpCount.last_updated ?? '');
+          }
+        }
+      }
+
+      const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(
+        item.dataset_id
+      );
+      if (parentArtifactCount) {
+        const finalCount = rollUpCount + parentArtifactCount.artifacts_to_review;
+
+        // only push projects with artifacts to review
+        if (finalCount > 0) {
+          dates.push(parentArtifactCount.last_updated ?? '');
+          datasetsForReview.push({
+            dataset_id: parentArtifactCount.dataset_id,
+            artifacts_to_review: finalCount,
+            dataset_name: item.dataset_name,
+            last_updated: this.mostRecentDate(dates),
+            keywords: item.keywords
+          });
+        }
+      }
+    }
+    return datasetsForReview;
+  }
+
+  /**
+   * Compares and finds the most recent date given a list of date strings. Todays date is returned if no data is present in the list
+   *
+   * @param dates a list of date strings
+   * @returns {*} {string} the most recent date found
+   */
+  mostRecentDate(dates: string[]): string {
+    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
+    return dates[0] ?? moment();
+  }
+
+  /**
+   *
+   * @param submissionId
+   * @param submitterSystem
+   * @param datasetSearch
+   * @returns
+   * @memberof SubmissionService
+   */
+  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
+    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
   }
 }

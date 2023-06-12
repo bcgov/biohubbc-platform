@@ -23,13 +23,14 @@ import useDataLoaderError from 'hooks/useDataLoaderError';
 import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
+import DatasetArtifacts from './components/DatasetArtifacts';
+import RelatedDatasets from './components/RelatedDatasets';
 import RenderWithHandlebars from './components/RenderWithHandlebars';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
-    paddingTop: theme.spacing(5),
     paddingBottom: theme.spacing(5),
-    background: '#ffffff',
+    background: '#f7f8fa',
     '& h1': {
       marginTop: '-4px'
     }
@@ -42,197 +43,6 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-const simsHandlebarsTemplate = `
-  <div class="hbr-container">
-
-    {{#if eml:eml.dataset.title}}
-      <div>
-        <h1> {{eml:eml.dataset.title}}</h1>
-      </div>
-    {{/if}}
-
-    {{#if eml:eml.dataset.pubDate}}
-      <div>
-        <div class="meta-container">
-          <div class="meta-title-container">
-            Published
-          </div>
-          <div class="meta-body-container">
-            {{eml:eml.dataset.pubDate}}
-          </div>
-        </div>
-      </div>
-    {{/if}}
-
-    {{#if eml:eml.dataset.creator}}
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Creator
-        </div>
-        <div class="meta-body-container">
-          <div>
-            {{#if eml:eml.dataset.creator.organizationName}}
-              <div>
-                {{eml:eml.dataset.creator.organizationName}}
-              </div>
-            {{/if}}
-
-            {{#if eml:eml.dataset.creator.electronicMailAddress}}
-              <div>
-                <a href="mailto: {{eml:eml.dataset.creator.electronicMailAddress}}">
-                  {{eml:eml.dataset.creator.electronicMailAddress}}
-                </a>
-              </div>
-            {{/if}}
-          </div>
-        </div>
-      </div>
-    {{/if}}
-
-    {{#if eml:eml.dataset.metadataProvider}}
-      <div class="meta-container">
-        <div class="meta-title-container">
-            Provider
-        </div>
-        <div class="meta-body-container">
-          <div>
-            <a href="mailto: {{eml:eml.dataset.metadataProvider.onlineUrl}}">
-              {{eml:eml.dataset.metadataProvider.organizationName}}
-            </a>
-          </div>
-        </div>
-      </div>
-    {{/if}}
-
-    {{#each eml:eml.dataset.project.abstract.section as | section |}}
-      {{#ifCond section.title '===' "Objectives"}}
-        <div class="meta-container">
-          <div class="meta-title-container">
-            Objectives
-          </div>
-          <div class="meta-body-container">
-            {{section.para}}
-          </div>
-        </div>
-      {{/ifCond}}
-    {{/each}}
-
-    {{#if eml:eml.dataset.contact}}
-      <div class="meta-container">
-        <div class="meta-title-container">
-          <div class="meta-title">
-          Contacts
-          </div>
-        </div>
-        <div class="meta-body-container">
-
-          <div>
-            {{#if eml:eml.dataset.contact.individualName.givenName}}
-              {{eml:eml.dataset.contact.individualName.givenName}}
-            {{/if}}
-            {{#if eml:eml.dataset.contact.individualName.surName}}
-              {{eml:eml.dataset.contact.individualName.surName}}
-            {{/if}}
-          </div>
-
-          <div>
-            {{#if eml:eml.dataset.contact.organizationName}}
-              {{eml:eml.dataset.contact.organizationName}}
-            {{/if}}
-          </div>
-
-          <div>
-            {{#if eml:eml.dataset.creator.electronicMailAddress}}
-              <a href="mailto:eml:eml.dataset.creator.electronicMailAddress}">
-                {{eml:eml.dataset.creator.electronicMailAddress}}
-              </a>
-            {{/if}}
-          </div>
-
-        </div>
-      </div>
-    {{/if}}
-
-    <div class="meta-container">
-      {{#each eml:eml.additionalMetadata as | amd |}}
-        {{#with (lookup amd.metadata "projectAttachments") as | attachments | ~}}
-
-          <div class="meta-title-container">
-            <div class="meta-title">
-              Documents
-            </div>
-          </div>
-
-          <div class="meta-body-container">
-
-            {{#each attachments.projectAttachment as | a |}}
-              <div>
-                <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{a.file_name}}</a>
-                {{#if a.is_secure}}
-                  (secured)
-                {{else}}
-                  (public)
-                {{/if}}
-              </div>
-            {{/each}}
-
-            {{#if attachments.projectAttachment.file_name}}
-              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectAttachment.file_name}}</a>
-              {{#if attachments.projectAttachment.is_secure}}
-                (secured)
-              {{else}}
-                (public)
-              {{/if}}
-            {{/if}}
-          </div>
-
-        {{/with}}
-      {{/each}}
-    </div>
-
-
-    <div class="meta-container">
-      {{#each eml:eml.additionalMetadata as | amd |}}
-
-        {{#with (lookup amd.metadata "projectReportAttachments") as | attachments | ~}}
-          <div class="meta-title-container">
-            <div class="meta-title">
-              Reports
-            </div>
-          </div>
-          <div class="meta-body-container">
-
-            {{#each attachments.projectReportAttachment as | a |}}
-
-            {{#if a.file_name}}
-                <div>
-                  <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{a.file_name}}</a>
-                  {{#if a.is_secure}}
-                    (secured)
-                  {{else}}
-                    (public)
-                  {{/if}}
-                </div>
-              {{/if}}
-            {{/each}}
-
-
-            {{#if attachments.projectReportAttachment.file_name}}
-              <a href="https://dev-biohubbc.apps.silver.devops.gov.bc.ca/"> {{attachments.projectReportAttachment.file_name}}</a>
-              {{#if attachments.projectReportAttachment.is_secure}}
-                (secured)
-              {{else}}
-                (public)
-              {{/if}}
-            {{/if}}
-          </div>
-        {{/with}}
-
-      {{/each}}
-    </div>
-  </div>
-`;
-
 const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
   const biohubApi = useApi();
@@ -243,6 +53,8 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const datasetId = urlParams['id'];
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
+  const templateDataLoader = useDataLoader(() => biohubApi.dataset.getHandlebarsTemplate(datasetId));
+
   const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialDataFile({
       boundary: [searchBoundary],
@@ -271,6 +83,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   });
 
   datasetDataLoader.load();
+  templateDataLoader.load();
 
   const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialData({
@@ -350,19 +163,31 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     MAP_DEFAULT_ZOOM
   );
 
-  if (!datasetDataLoader.data) {
+  if (!datasetDataLoader.data || !templateDataLoader.data) {
     return <CircularProgress className="pageProgress" size={40} />;
   }
 
   return (
     <Box>
       <Paper square elevation={0} className={classes.datasetTitleContainer}>
-        <Container maxWidth="xl">
-          <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={simsHandlebarsTemplate} />
-        </Container>
+        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data} />
       </Paper>
       <Container maxWidth="xl">
-        <Box py={5}>
+        <Box pt={2}>
+          <Paper elevation={0}>
+            <DatasetArtifacts datasetId={datasetId} />
+          </Paper>
+        </Box>
+      </Container>
+      <Container maxWidth="xl">
+        <Box pt={2}>
+          <Paper elevation={0}>
+            <RelatedDatasets datasetId={datasetId} />
+          </Paper>
+        </Box>
+      </Container>
+      <Container maxWidth="xl">
+        <Box py={2}>
           <Card data-testid="MapContainer">
             <Grid sx={{ justify: 'space-between', alignItems: 'center' }}>
               <Grid item>

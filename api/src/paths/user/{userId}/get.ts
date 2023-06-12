@@ -2,7 +2,6 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
-import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { UserService } from '../../../services/user-service';
@@ -37,7 +36,8 @@ GET.apiDoc = {
       in: 'path',
       name: 'userId',
       schema: {
-        type: 'number'
+        type: 'integer',
+        minimum: 1
       },
       required: true
     }
@@ -50,10 +50,16 @@ GET.apiDoc = {
           schema: {
             title: 'User Response Object',
             type: 'object',
+            required: ['id', 'user_identifier', 'user_guid', 'record_end_date', 'role_ids', 'role_names'],
             properties: {
               id: {
                 description: 'user id',
-                type: 'number'
+                type: 'integer',
+                minimum: 1
+              },
+              user_guid: {
+                type: 'string',
+                description: 'The GUID for the user.'
               },
               user_identifier: {
                 description: 'The unique user identifier',
@@ -67,7 +73,8 @@ GET.apiDoc = {
                 description: 'list of role ids for the user',
                 type: 'array',
                 items: {
-                  type: 'number'
+                  type: 'integer',
+                  minimum: 1
                 }
               },
               role_names: {
@@ -93,10 +100,6 @@ GET.apiDoc = {
  */
 export function getUserById(): RequestHandler {
   return async (req, res) => {
-    if (!req.params.userId) {
-      throw new HTTP400('Missing required param: userId');
-    }
-
     const connection = getDBConnection(req['keycloak_token']);
 
     try {

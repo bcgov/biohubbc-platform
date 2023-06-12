@@ -4,12 +4,18 @@ labels:
   template: allow-same-namespace
 metadata:
   name: allow-same-namespace
+  annotations:
+    description: >-
+      This Template creates several network policy items. Each one grants all resources the ability to communicate with 
+      all other resources in the namespace. This is the simplest way to blanket ensure all pods ar able to communicate 
+      with all other pods, without having to specify a permission for each pair of pods that should be allowed to 
+      communicate.
 parameters:
-  - description: The OpenShift Namespace license plate
-    displayName: Namespace
-    name: NAMESPACE
+  - name: NAMESPACE
+    description: The OpenShift Namespace license plate
     value: "a0ec71"
 objects:
+  ## Dev
   - kind: NetworkPolicy
     apiVersion: networking.k8s.io/v1
     metadata:
@@ -22,6 +28,7 @@ objects:
             - podSelector: {}
       policyTypes:
         - Ingress
+  ## Test
   - kind: NetworkPolicy
     apiVersion: networking.k8s.io/v1
     metadata:
@@ -34,6 +41,7 @@ objects:
             - podSelector: {}
       policyTypes:
         - Ingress
+  ## Prod
   - kind: NetworkPolicy
     apiVersion: networking.k8s.io/v1
     metadata:
@@ -46,6 +54,7 @@ objects:
             - podSelector: {}
       policyTypes:
         - Ingress
+  ## Tools
   - kind: NetworkPolicy
     apiVersion: networking.k8s.io/v1
     metadata:

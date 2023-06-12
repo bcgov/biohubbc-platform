@@ -110,7 +110,10 @@ export const isZipMimetype = (mimetype: string): boolean => {
     return false;
   }
 
-  return [/application\/zip/, /application\/x-zip-compressed/, /application\/x-rar-compressed/].some((regex) =>
-    regex.test(mimetype)
-  );
+  return [
+    /application\/zip/,
+    /application\/x-zip-compressed/,
+    /application\/x-rar-compressed/,
+    /application\/octet-stream/
+  ].some((regex) => regex.test(mimetype));
 };

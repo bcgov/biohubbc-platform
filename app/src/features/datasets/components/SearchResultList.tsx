@@ -42,11 +42,11 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
   }, [searchResults, datasetVisibility]);
 
   const toggleVisibility = (key: string) => {
-    const udpated = datasetVisibility;
+    const updated = datasetVisibility;
     const value = datasetVisibility[key];
-    udpated[key] = !udpated[key];
+    updated[key] = !updated[key];
     setDatasetVisibility({ ...datasetVisibility, [key]: !value });
-    props.onToggleDataVisibility(udpated);
+    props.onToggleDataVisibility(updated);
   };
 
   return (
@@ -54,7 +54,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
       <Box flex="0 0 auto">
         <Box display="flex" alignItems="center" justifyContent="space-between" p={3}>
           <Typography variant="h3" component="h1">
-            Found {searchResults.reduce((runningTotal, item) => runningTotal + item.count, 0)} records
+            Found {searchResults.length} record{searchResults.length === 1 ? '' : 's'}
           </Typography>
           <Button
             variant="text"
@@ -106,7 +106,7 @@ const SearchResultList: React.FC<ISearchResultListProps> = (props) => {
                   </ListItemIcon>
                   <ListItemText
                     primary={item.name}
-                    secondary={item.count > 0 && `${item.count} record${item.count > 1 && 's'}`}
+                    secondary={item.count > 0 && `${item.count} record${item.count > 1 ? 's' : ''}`}
                   />
                 </ListItemButton>
               </ListItem>

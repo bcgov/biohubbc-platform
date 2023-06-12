@@ -7,7 +7,7 @@ import Link from '@mui/material/Link';
 import { makeStyles } from '@mui/styles';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
-import { useContext } from 'react';
+import { useContext, useMemo } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   userInfo: {
@@ -20,11 +20,25 @@ export const LoggedInUserControls = () => {
   const { keycloakWrapper } = useContext(AuthStateContext);
 
   const identitySource = keycloakWrapper?.getIdentitySource() || '';
-
   const userIdentifier = keycloakWrapper?.getUserIdentifier() || '';
 
-  const loggedInUserDisplayName =
-    identitySource === SYSTEM_IDENTITY_SOURCE.BCEID ? `BCEID / ${userIdentifier}` : `IDIR / ${userIdentifier}`;
+  let accountTypeDisplayName = '';
+
+  switch (identitySource) {
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+      accountTypeDisplayName = 'BCeID';
+      break;
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+      accountTypeDisplayName = 'BCeID';
+      break;
+    case SYSTEM_IDENTITY_SOURCE.IDIR:
+      accountTypeDisplayName = 'IDIR';
+      break;
+  }
+
+  const loggedInUserDisplayName = accountTypeDisplayName
+    ? `${accountTypeDisplayName} / ${userIdentifier}`
+    : userIdentifier;
 
   return (
     <Box display="flex" alignItems="center" pl={2}>
@@ -48,10 +62,11 @@ export const LoggedInUserControls = () => {
 
 export const NotLoggedInUserControls = () => {
   const { keycloakWrapper } = useContext(AuthStateContext);
+  const loginUrl = useMemo(() => keycloakWrapper?.getLoginUrl(), [keycloakWrapper]);
 
   return (
     <Button
-      onClick={() => keycloakWrapper?.keycloak?.login()}
+      href={loginUrl}
       size="large"
       type="submit"
       variant="contained"

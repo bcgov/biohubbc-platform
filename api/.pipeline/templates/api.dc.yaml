@@ -1,9 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  resourceVersion: ''
-  selfLink: ''
   name: biohub-platform-api-dc
+  labels:
+    build: biohub-platform-api
 parameters:
   - name: ENABLE_FILE_VIRUS_SCAN
     value: 'true'
@@ -23,7 +23,7 @@ parameters:
     required: true
   - name: APP_HOST
     description: APP host for application frontend
-    value: ''
+    required: true
   - name: CHANGE_ID
     description: Change id of the project. This will help to pull image stream
     required: true
@@ -38,15 +38,19 @@ parameters:
   - name: ELASTICSEARCH_URL
     description: Platform Elasticsearch URL
     required: true
-    value: 'https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca'
+    value: 'http://es01:9200'
   - name: ELASTICSEARCH_EML_INDEX
     description: Platform Elasticsearch index for EML data
     required: true
     value: 'eml'
+  - name: ELASTICSEARCH_TAXONOMY_INDEX
+    description: Platform Elasticsearch Taxonomy Index
+    required: true
+    vale: 'taxonomy_3.0.0'
   - name: S3_KEY_PREFIX
     description: S3 key optional prefix
     required: false
-    value: 'platform'
+    value: 'biohub'
   - name: TZ
     description: Application timezone
     required: false
@@ -57,15 +61,24 @@ parameters:
   - name: KEYCLOAK_REALM
     description: Realm identifier or name
     required: true
+  - name: KEYCLOAK_INTEGRATION_ID
+    description: keycloak integration id
+    required: true
+  - name: KEYCLOAK_API_HOST
+    description: keycloak API host
+    required: true
   - name: KEYCLOAK_CLIENT_ID
     description: Client Id for application
     required: true
   - name: KEYCLOAK_ADMIN_USERNAME
     description: keycloak host admin username
+    required: true
   - name: KEYCLOAK_SECRET
     description: The name of the keycloak secret
+    required: true
   - name: KEYCLOAK_SECRET_ADMIN_PASSWORD
     description: The key of the admin password in the keycloak secret
+    required: true
   - name: API_PORT_DEFAULT
     value: '6100'
   - name: API_PORT_DEFAULT_NAME
@@ -74,8 +87,6 @@ parameters:
   - name: OBJECT_STORE_SECRETS
     description: Secrets used to read and write to the S3 storage
     value: 'biohubbc-object-store'
-  - name: LOG_LEVEL
-    value: 'info'
   - name: GCNOTIFY_API_SECRET
     description: Secret for gcnotify api key
     value: 'gcnotify-api-key'
@@ -92,6 +103,8 @@ parameters:
     value: https://api.notification.canada.ca/v2/notifications/email
   - name: GCNOTIFY_SMS_URL
     value: https://api.notification.canada.ca/v2/notifications/sms
+  - name: LOG_LEVEL
+    value: 'info'
   - name: CPU_REQUEST
     value: '100m'
   - name: CPU_LIMIT
@@ -102,12 +115,11 @@ parameters:
     value: '2Gi'
   - name: REPLICAS
     value: '1'
-  - name: REPLICA_MAX
-    required: true
+  - name: REPLICAS_MAX
     value: '1'
 objects:
-  - apiVersion: image.openshift.io/v1
-    kind: ImageStream
+  - kind: ImageStream
+    apiVersion: image.openshift.io/v1
     metadata:
       annotations:
         description: Nodejs Runtime Image
@@ -119,8 +131,8 @@ objects:
     spec:
       lookupPolicy:
         local: false
-  - apiVersion: apps.openshift.io/v1
-    kind: DeploymentConfig
+  - kind: DeploymentConfig
+    apiVersion: apps.openshift.io/v1
     metadata:
       annotations:
         openshift.io/generated-by: OpenShiftWebConsole
@@ -130,7 +142,7 @@ objects:
         role: api
       name: ${NAME}${SUFFIX}
     spec:
-      replicas: '${{REPLICAS}}'
+      replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
         deploymentConfig: ${NAME}${SUFFIX}
@@ -189,10 +201,14 @@ objects:
                   value: '5432'
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
-                - name: KEYCLOAK_CLIENT_ID
-                  value: ${KEYCLOAK_CLIENT_ID}
+                - name: KEYCLOAK_API_HOST
+                  value: ${KEYCLOAK_API_HOST}
                 - name: KEYCLOAK_REALM
                   value: ${KEYCLOAK_REALM}
+                - name: KEYCLOAK_CLIENT_ID
+                  value: ${KEYCLOAK_CLIENT_ID}
+                - name: KEYCLOAK_INTEGRATION_ID
+                  value: ${KEYCLOAK_INTEGRATION_ID}
                 - name: KEYCLOAK_ADMIN_USERNAME
                   value: ${KEYCLOAK_ADMIN_USERNAME}
                 - name: KEYCLOAK_ADMIN_PASSWORD
@@ -208,6 +224,8 @@ objects:
                   value: ${ELASTICSEARCH_URL}
                 - name: ELASTICSEARCH_EML_INDEX
                   value: ${ELASTICSEARCH_EML_INDEX}
+                - name: ELASTICSEARCH_TAXONOMY_INDEX
+                  value: ${ELASTICSEARCH_TAXONOMY_INDEX}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ
@@ -315,20 +333,20 @@ objects:
       replicas: 0
       unavailableReplicas: 0
       updatedReplicas: 0
-  - apiVersion: v1
+  - kind: Secret
+    apiVersion: v1
     stringData:
       database-name: ''
       database-user-api-password: ''
       database-user-api: ''
-    kind: Secret
     metadata:
       annotations:
         as-copy-of: ${DB_SERVICE_NAME}
       creationTimestamp: null
       name: ${NAME}${SUFFIX}
     type: Opaque
-  - apiVersion: v1
-    kind: Service
+  - kind: Service
+    apiVersion: v1
     metadata:
       annotations: null
       creationTimestamp: null
@@ -346,8 +364,8 @@ objects:
       type: ClusterIP
     status:
       loadBalancer: {}
-  - apiVersion: route.openshift.io/v1
-    kind: Route
+  - kind: Route
+    apiVersion: route.openshift.io/v1
     metadata:
       annotations: {}
       creationTimestamp: null
@@ -367,19 +385,24 @@ objects:
       wildcardPolicy: None
     status:
       ingress: null
-  - apiVersion: autoscaling/v1
-    kind: HorizontalPodAutoscaler
+  - kind: HorizontalPodAutoscaler
+    apiVersion: autoscaling/v2beta2
     metadata:
       annotations: {}
       creationTimestamp: null
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
-      maxReplicas: '${{REPLICA_MAX}}'
-      minReplicas: '${{REPLICAS}}'
+      minReplicas: ${{REPLICAS}}
+      maxReplicas: ${{REPLICAS_MAX}}
       scaleTargetRef:
-        apiVersion: v1
+        apiVersion: apps.openshift.io/v1
         kind: DeploymentConfig
         name: ${NAME}${SUFFIX}
-      cpuUtilization:
-        targetPercentage: 95
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 80

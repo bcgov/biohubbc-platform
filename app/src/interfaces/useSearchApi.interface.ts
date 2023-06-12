@@ -10,7 +10,7 @@ export interface IGetSearchResultsResponse {
   id: string;
   name?: string;
   objectives?: string;
-  associatedtaxa?: string;
+  taxonID?: string;
   lifestage?: string;
   geometry: Feature[];
 }
@@ -18,7 +18,7 @@ export interface IGetSearchResultsResponse {
 export type EmptyObject = Record<string, never>;
 
 export interface ITaxaData {
-  associated_taxa?: string;
+  taxon_id?: string;
   vernacular_name?: string;
   submission_spatial_component_id: number;
 }

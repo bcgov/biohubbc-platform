@@ -5,14 +5,30 @@ import { LatLngBounds } from 'leaflet';
 import moment from 'moment';
 
 /**
- * Checks if a url string starts with an `http(s)://` protocol, and adds `https://` if it does not.
+ * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
+ * begins with `localhost`, the `http` protocol is used.
  *
  * @param {string} url
  * @param {('http://' | 'https://')} [protocol='https://'] The protocol to add, if necessary. Defaults to `https://`.
  * @return {*}  {string} the url which is guaranteed to have an `http(s)://` protocol.
  */
 export const ensureProtocol = (url: string, protocol: 'http://' | 'https://' = 'https://'): string => {
-  return ((url.startsWith('http://') || url.startsWith('https://')) && url) || `${protocol}${url}`;
+  if (url.startsWith('localhost')) {
+    return `${'http://'}${url}`;
+  }
+
+  if (url.startsWith('https://') || url.startsWith('http://localhost')) {
+    return url;
+  }
+
+  if (url.startsWith('http://')) {
+    // If protocol is HTTPS, upgrade the URL
+    if (protocol === 'https://') {
+      return `${'https://'}${url.slice(7)}`;
+    }
+  }
+
+  return `${protocol}${url}`;
 };
 
 /**
@@ -32,7 +48,7 @@ export const getFormattedDateRangeString = (
 ): string => {
   const startDateFormatted = getFormattedDate(dateFormat, startDate);
 
-  const endDateFormatted = getFormattedDate(dateFormat, endDate || '');
+  const endDateFormatted = getFormattedDate(dateFormat, endDate ?? '');
 
   if (!startDateFormatted || (endDate && !endDateFormatted)) {
     return '';
@@ -264,4 +280,33 @@ export const makeCsvObjectUrl = (entries: Array<Record<string, any>>) => {
   const blob = new Blob([csvContent], { type: 'text/csv' });
 
   return window.URL.createObjectURL(blob);
+};
+
+export const downloadFile = async (url: string): Promise<void> => {
+  return new Promise((resolve) => {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.addEventListener('click', () => {
+      anchor.remove();
+      resolve();
+    });
+
+    anchor.click();
+  });
+};
+
+/**
+ * Builds a URL from multiple (possibly null or undefined) url parts, stripping any
+ * double slashes from the resulting URL.
+ *
+ * @param {(string | undefined)[]} urlParts The parts of the URL
+ * @returns The built URL
+ */
+export const buildUrl = (...urlParts: (string | undefined)[]): string => {
+  return urlParts
+    .filter((urlPart): urlPart is string => Boolean(urlPart))
+    .map((urlPart) => String(urlPart).trim()) // Trim leading and trailing whitespace
+    .filter(Boolean)
+    .join('/')
+    .replace(/([^:]\/)\/+/g, '$1'); // Trim double slashes
 };
