@@ -128,41 +128,45 @@ export const simsHandlebarsTemplate_DETAILS = `
         {{/if}}
 
         <!-- PARTNERS -->
-        <div>
-          <dt>
-            Partners
-          </dt>
-          <dd>
-            {{#each eml:eml.additionalMetadata as | amd |}}
-              {{#each amd.metadata as | metadata |}}
-                {{#ifCond @key '===' "partnerships"}}
-                  {{#each metadata.partnership as | partnership |}}
-                    {{partnership.name}}{{#unless @last}}, {{/unless}}
-                  {{/each}}
-                {{/ifCond}}
-              {{/each}}
-            {{/each}}
-          </dd>
-        </div>
+        {{#each eml:eml.additionalMetadata as | amd |}}
+          {{#each amd.metadata as | metadata |}}
+            {{#ifCond @key '===' "partnerships"}}
+              {{#ifCond metadata '!==' ""}}
+                <div>
+                  <dt>
+                    Partners
+                  </dt>
+                  <dd>
+                    {{#each metadata.partnership as | partnership |}}
+                      {{partnership.name}}{{#unless @last}}, {{/unless}}
+                    {{/each}}
+                  </dd>
+                </div>
+              {{/ifCond}}
+            {{/ifCond}}
+          {{/each}}
+        {{/each}}
 
         <!-- CONSERVATION ACTIONS -->
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#each amd.metadata as | metadata |}}
             {{#ifCond @key '===' "IUCNConservationActions"}}
-              <div>
-                <dt>
-                  Conservation Activities
-                </dt>
-                <dd>
-                  <ul style="padding-left: 20px">
-                    {{#each metadata.IUCNConservationAction as | actions |}}
-                      <li>
-                        {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
-                      </li>
-                    {{/each}}
-                  </ul>
-                </dd>
-              </div>
+              {{#ifCond metadata '!==' ""}}
+                <div>
+                  <dt>
+                    Conservation Activities
+                  </dt>
+                  <dd>
+                    <ul style="padding-left: 20px">
+                      {{#each metadata.IUCNConservationAction as | actions |}}
+                        <li>
+                          {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                        </li>
+                      {{/each}}
+                    </ul>
+                  </dd>
+                </div>
+              {{/ifCond}}
             {{/ifCond}}
           {{/each}}
         {{/each}}
