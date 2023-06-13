@@ -11,12 +11,14 @@ import MapContainer from 'components/map/MapContainer';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { DialogContext } from 'contexts/dialogContext';
-import { Feature, Polygon } from 'geojson';
+import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
+import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
+import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 import DatasetArtifacts from './components/DatasetArtifacts';
 import RelatedDatasets from './components/RelatedDatasets';
@@ -34,7 +36,9 @@ const useStyles = makeStyles((theme: Theme) => ({
     borderBottom: '1pt solid #dadada'
   },
   datasetDetailsContainer: {},
-  datasetMapContainer: {}
+  datasetMapContainer: {
+    minHeight: '400px'
+  }
 }));
 
 const DatasetPage: React.FC<React.PropsWithChildren> = () => {
@@ -106,6 +110,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
+  const [mapBoundary, setMapBoundary] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   useEffect(() => {
     if (!fileDataLoader.data) {
@@ -135,13 +140,22 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data);
+    if (
+      result &&
+      result.staticLayers &&
+      result.staticLayers[0] &&
+      result.staticLayers[0].features[0] &&
+      result.staticLayers[0].features[0].geoJSON
+    ) {
+      const bounds = calculateUpdatedMapBounds([result.staticLayers[0].features[0].geoJSON]);
+      if (bounds) {
+        const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+        setMapBoundary(newBounds);
+      }
+    }
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
-
-  const onMapViewChange = (bounds: Feature<Polygon>, newZoom: number) => {
-    mapDataLoader.refresh(bounds, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE], newZoom);
-  };
 
   mapDataLoader.load(
     ALL_OF_BC_BOUNDARY,
@@ -177,14 +191,14 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
               <Box data-testid="MapContainer" p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
                 <MapContainer
                   mapId="boundary_map"
-                  onBoundsChange={onMapViewChange}
+                  bounds={mapBoundary}
                   scrollWheelZoom={false}
                   fullScreenControl={true}
                   markerLayers={markerLayers}
                   staticLayers={staticLayers}
                   zoomControlEnabled={true}
                   doubleClickZoomEnabled={false}
-                  draggingEnabled={false}
+                  draggingEnabled={true}
                   layerControlEnabled={false}
                 />
               </Box>
