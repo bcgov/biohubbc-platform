@@ -107,9 +107,9 @@ export function requestAccess(): RequestHandler {
     try {
       await connection.open();
 
-      const gcNotifyService = new GCNotifyService();
+      const gcNotifyService = new GCNotifyService(connection);
 
-      const response = await gcNotifyService.sendNotificationForRequestAccess(resubmitData);
+      const response = await gcNotifyService.sendNotificationForArtifactRequestAccess(resubmitData);
 
       await connection.commit();
 

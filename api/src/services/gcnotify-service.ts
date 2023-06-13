@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { ACCESS_REQUEST_ADMIN_EMAIL, ACCESS_REQUEST_APPROVAL_ADMIN_EMAIL } from '../constants/notifications';
 import { IDBConnection } from '../database/db';
 import { ApiError, ApiErrorType, ApiGeneralError } from '../errors/api-error';
@@ -6,32 +6,49 @@ import { IgcNotifyGenericMessage, IgcNotifyPostReturn } from '../interfaces/gcno
 import { AdministrativeRepository } from '../repositories/administrative-repository';
 import { DBService } from './db-service';
 import { KeycloakService } from './keycloak-service';
-import { makeLoginUrl } from '../utils/string-utils';
+import { formatPhoneNumber, makeLoginUrl } from '../utils/string-utils';
 
-const EMAIL_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE || '';
-const SMS_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_SMS_TEMPLATE || '';
-const EMAIL_URL = process.env.GCNOTIFY_EMAIL_URL || '';
-const SMS_URL = process.env.GCNOTIFY_SMS_URL || '';
-const API_KEY = process.env.GCNOTIFY_SECRET_API_KEY || '';
-
-const config = {
-  headers: {
-    Authorization: API_KEY,
-    'Content-Type': 'application/json'
-  }
-};
+const GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS = '4bb42a76-f79b-424f-ad0f-ad3671389ec2'; // @TODO
 
 export interface IGcNotifyArtifactRequestAccess {
-  // TODO
+  fullName: string;
+  emailAddress: string;
+  phoneNumber: string;
+  reasonDescription: string;
+  hasSignedAgreement: boolean;
+  requestedDocuments: string[];
+  pathToParent: string;
 }
 
 export class GCNotifyService extends DBService {
   administrativeRepository: AdministrativeRepository;
+  axiosConfig: AxiosRequestConfig;
+  EMAIL_TEMPLATE: string;
+  SMS_TEMPLATE: string;
+  EMAIL_URL: string;
+  SMS_URL: string;
+  API_KEY: string;
+  APP_HOST: string;
+  adminEmail: string;
 
   constructor(connection: IDBConnection) {
     super(connection);
-
     this.administrativeRepository = new AdministrativeRepository(connection);
+
+    this.EMAIL_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE || '';
+    this.SMS_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_SMS_TEMPLATE || '';
+    this.EMAIL_URL = process.env.GCNOTIFY_EMAIL_URL || '';
+    this.SMS_URL = process.env.GCNOTIFY_SMS_URL || '';
+    this.API_KEY = process.env.GCNOTIFY_SECRET_API_KEY || '';
+    this.APP_HOST = process.env.APP_HOST || '';
+    this.adminEmail = process.env.GCNOTIFY_ADMIN_EMAIL || '';
+  
+    this.axiosConfig = {
+      headers: {
+        Authorization: this.API_KEY,
+        'Content-Type': 'application/json'
+      }
+    };
   }
   /**
    * Send email notification to recipient
@@ -44,7 +61,7 @@ export class GCNotifyService extends DBService {
   async sendEmailGCNotification(emailAddress: string, message: IgcNotifyGenericMessage): Promise<IgcNotifyPostReturn> {
     const data = {
       email_address: emailAddress,
-      template_id: EMAIL_TEMPLATE,
+      template_id: this.EMAIL_TEMPLATE,
       personalisation: {
         subject: message.subject,
         header: message.header,
@@ -54,7 +71,7 @@ export class GCNotifyService extends DBService {
       }
     };
 
-    const response = await axios.post(EMAIL_URL, data, config);
+    const response = await axios.post(this.EMAIL_URL, data, this.axiosConfig);
 
     const result = (response && response.data) || null;
 
@@ -66,40 +83,55 @@ export class GCNotifyService extends DBService {
   }
 
   async sendNotificationForArtifactRequestAccess(requestData: IGcNotifyArtifactRequestAccess): Promise<boolean> {
-    const url = makeLoginUrl(process.env.APP_HOST, requestData.pathToParent);
-    const hrefUrl = `[${resubmitData.parentName}](${url})`;
+    const url = makeLoginUrl(this.APP_HOST, requestData.pathToParent);
+    const link = `[${requestData.pathToParent}](${url})`;
+    const email = `[${requestData.emailAddress}](mailto:${requestData.emailAddress})`;
+    const phone = `[${formatPhoneNumber(requestData.phoneNumber)}](tel:${requestData.phoneNumber.replace(/\D/g,'')}`
 
-    const message: IgcNotifyRequestRemovalMessage = {
+    const baseMessage = {
       subject: '',
       header: '',
       date: new Date().toLocaleString(),
-      file_name: resubmitData.fileName,
-      link: hrefUrl,
-      description: resubmitData.formValues.description,
-      full_name: resubmitData.formValues.full_name,
-      email: resubmitData.formValues.email_address,
-      phone: resubmitData.formValues.phone_number
+      reason_description: requestData.reasonDescription,
+      link,
+      full_name: requestData.fullName,
+      email,
+      phone
     };
 
-    const submitterMessage: IgcNotifyRequestRemovalMessage = {
-      ...message,
-      subject: 'Species Inventory Management System - Your Request to Remove or Resubmit Has Been Sent',
-      header: `Your request to remove or resubmit data has been sent.
+    const submitterMessage = {
+      ...baseMessage,
+      subject: 'Species Inventory Management System - Your Request to Access Secure Documents Has Been Sent',
+      header: `Your request to access secure documents has been sent.
 
       A BioHub Administrator should be in contact with you shortly to discuss your request.`
     };
 
-    const adminMessage: IgcNotifyRequestRemovalMessage = {
-      ...message,
-      subject: 'Species Inventory Management System -  Request to Remove or Resubmit',
-      header: ''
+    const adminMessage = {
+      ...baseMessage,
+      subject: 'Species Inventory Management System - Request to Access Secure Documents',
+      header: 'A request to access secured documents has been submitted.'
     };
 
-    const submitterEmailResponse = await this.requestRemovalEmailNotification(
-      resubmitData.formValues.email_address,
-      submitterMessage
+    const submitterEmailResponse = await axios.post(
+      this.EMAIL_URL,
+      {
+        email_address: requestData.emailAddress,
+        template_id: GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS,
+        personalisation: submitterMessage
+      },
+      this.axiosConfig
     );
-    const adminEmailResponse = await this.requestRemovalEmailNotification(adminEmail, adminMessage);
+
+    const adminEmailResponse = await axios.post(
+      this.EMAIL_URL,
+      {
+        email_address: this.adminEmail,
+        template_id: GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS,
+        personalisation: adminMessage
+      },
+      this.axiosConfig
+    );
 
     if (!submitterEmailResponse || !adminEmailResponse) {
       throw new ApiError(ApiErrorType.UNKNOWN, 'Failed to send Notification');
@@ -119,7 +151,7 @@ export class GCNotifyService extends DBService {
   async sendPhoneNumberGCNotification(sms: string, message: IgcNotifyGenericMessage): Promise<IgcNotifyPostReturn> {
     const data = {
       phone_number: sms,
-      template_id: SMS_TEMPLATE,
+      template_id: this.SMS_TEMPLATE,
       personalisation: {
         header: message.header,
         main_body1: message.body1,
@@ -128,7 +160,7 @@ export class GCNotifyService extends DBService {
       }
     };
 
-    const response = await axios.post(SMS_URL, data, config);
+    const response = await axios.post(this.SMS_URL, data, this.axiosConfig);
 
     const result = (response && response.data) || null;
 
