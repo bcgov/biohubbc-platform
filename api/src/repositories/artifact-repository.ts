@@ -200,7 +200,9 @@ export class ArtifactRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement);
 
-    if (!response || !response.rowCount) {
+    const results = (response && response.rowCount && response.rows) || null;
+
+    if (!results) {
       throw new ApiExecuteSQLError('Failed to update artifact security review timestamp');
     }
   }
