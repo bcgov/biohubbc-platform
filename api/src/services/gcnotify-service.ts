@@ -7,6 +7,8 @@ import { AdministrativeRepository } from '../repositories/administrative-reposit
 import { DBService } from './db-service';
 import { KeycloakService } from './keycloak-service';
 import { formatPhoneNumber, makeLoginUrl } from '../utils/string-utils';
+import { ArtifactService } from './artifact-service';
+import { getLogger } from '../utils/logger';
 
 const GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS = '4bb42a76-f79b-424f-ad0f-ad3671389ec2'; // @TODO
 
@@ -16,9 +18,11 @@ export interface IGcNotifyArtifactRequestAccess {
   phoneNumber: string;
   reasonDescription: string;
   hasSignedAgreement: boolean;
-  requestedDocuments: string[];
+  artifactIds: number[];
   pathToParent: string;
 }
+
+const defaultLog = getLogger('services/gcnotify-service');
 
 export class GCNotifyService extends DBService {
   administrativeRepository: AdministrativeRepository;
@@ -83,18 +87,27 @@ export class GCNotifyService extends DBService {
   }
 
   async sendNotificationForArtifactRequestAccess(requestData: IGcNotifyArtifactRequestAccess): Promise<boolean> {
+    defaultLog.debug({ label: 'sendNotificationForArtifactRequestAccess' });
+
     const url = makeLoginUrl(this.APP_HOST, requestData.pathToParent);
     const link = `[${requestData.pathToParent}](${url})`;
     const email = `[${requestData.emailAddress}](mailto:${requestData.emailAddress})`;
-    const phone = `[${formatPhoneNumber(requestData.phoneNumber)}](tel:${requestData.phoneNumber.replace(/\D/g,'')}`
+    const phone = `[${formatPhoneNumber(requestData.phoneNumber)}](tel:${requestData.phoneNumber.replace(/\D/g,'')})`
+
+    const artifactService = new ArtifactService(this.connection);
+    const artifacts = await artifactService.getArtifactsByIds(requestData.artifactIds);
 
     const baseMessage = {
       subject: '',
       header: '',
       date: new Date().toLocaleString(),
       reason_description: requestData.reasonDescription,
-      link,
       full_name: requestData.fullName,
+      requested_documents: artifacts.map((artifact) => ` - ${artifact.file_name}`).join('\r\n'),
+      confidentiality_agreement: requestData.hasSignedAgreement
+        ? '**YES**, the requester has a signed and current Confidentiality and Non-Reproduction Agreeement.'
+        : '**NO**, the requester does not have a signed and current Confidentiality and Non-Reproduction Agreeement.',
+      link,
       email,
       phone
     };

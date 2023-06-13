@@ -9,6 +9,7 @@ import CustomTextField from 'components/fields/CustomTextField';
 import yup from 'utils/YupSchema';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useFormikContext } from 'formik';
+import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 
 const useStyles = makeStyles((theme: Theme) => ({
   subheader: {
@@ -19,22 +20,14 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
-export interface ISecureDataAccessRequestForm {
-  fullName: string;
-  emailAddress: string;
-  phoneNumber: string;
-  reasonDescription: string;
-  hasSignedAgreement: 'true' | 'false';
-  selectedArtifacts: IArtifact[];
-}
-
 export const secureDataAccessRequestFormInitialValues: ISecureDataAccessRequestForm = {
   fullName: '',
   emailAddress: '',
   phoneNumber: '',
   reasonDescription: '',
-  hasSignedAgreement: '' as 'false',
-  selectedArtifacts: []
+  hasSignedAgreement: undefined as unknown as boolean,
+  artifactIds: [],
+  pathToParent: ''
 };
 
 export const secureDataAccessRequestFormYupSchema = yup.object().shape({
@@ -46,7 +39,7 @@ export const secureDataAccessRequestFormYupSchema = yup.object().shape({
     .required('Email Address is Required'),
   phoneNumber: yup.string().max(300, 'Cannot exceed 300 characters').required('Phone Number is Required'),
   reasonDescription: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
-  hasSignedAgreement: yup.string().required('Confidentiality Agreement is Required'),
+  hasSignedAgreement: yup.boolean().required('Confidentiality Agreement is Required'),
   selectedArtifacts: yup.array().min(1, 'Must select at least one artifact')
 });
 
@@ -61,11 +54,7 @@ interface ISecureDataAccessRequestFormProps {
  */
 const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) => {
   const classes = useStyles();
-
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
-  // const [selectedArtifactIds, setSelectedArtifactIds] = useState([]);
-
-  console.log({ formikProps })
 
   const columns: GridColDef<IArtifact>[] = [
     {
@@ -82,11 +71,11 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
   ];
 
   const onChangeSelection = (rowSelectionModel: GridRowSelectionModel) => {
-    const selectedArtifacts = rowSelectionModel
-      .map((gridRowId) => props.artifacts.find((artifact) => artifact.artifact_id === gridRowId))
-      .filter((artifact: IArtifact | undefined): artifact is IArtifact => Boolean(artifact))
-    
-    formikProps.setFieldValue('selectedArtifacts', selectedArtifacts);
+    formikProps.setFieldValue('artifactIds', rowSelectionModel);
+  }
+
+  const onChangeAgreementConfirmation = (event: React.ChangeEvent<HTMLInputElement>) => {
+    formikProps.setFieldValue('hasSignedAgreement', event.target.value !== 'false');
   }
 
   const agreementSignedError = Boolean(formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement'])
@@ -185,7 +174,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               <RadioGroup
                 name="hasSignedAgreement"
                 value={formikProps.values.hasSignedAgreement}
-                onChange={e => {console.log(e); formikProps.handleChange(e)}}
+                onChange={onChangeAgreementConfirmation}
               >
                 <FormControlLabel
                   value="true"

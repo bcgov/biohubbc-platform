@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
+import { getKnex } from '../database/db';
 
 const defaultLog = getLogger('repositories/artifact-repository');
 
@@ -170,5 +171,20 @@ export class ArtifactRepository extends BaseRepository {
     }
 
     return result;
+  }
+
+  async getArtifactsByIds(artifactIds: number[]): Promise<Artifact[]> {
+    defaultLog.debug({ label: 'getArtifactByIds', artifactIds });
+
+    const knex = getKnex();
+    const queryBuilder = knex
+      .queryBuilder()
+      .select()
+      .from('artifact')
+      .whereIn('artifact_id', artifactIds);
+
+    const response = await this.connection.knex<Artifact>(queryBuilder, Artifact);
+
+    return response.rows;
   }
 }

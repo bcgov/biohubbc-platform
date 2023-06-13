@@ -6,9 +6,12 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
-import SecureDataAccessRequestForm, { ISecureDataAccessRequestForm, secureDataAccessRequestFormInitialValues, secureDataAccessRequestFormYupSchema } from './SecureDataAccessRequestForm';
+import SecureDataAccessRequestForm, { secureDataAccessRequestFormInitialValues, secureDataAccessRequestFormYupSchema } from './SecureDataAccessRequestForm';
 import { useRef } from 'react';
 import { Formik, FormikProps } from 'formik';
+import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
+import { useApi } from 'hooks/useApi';
+import { useHistory } from 'react-router';
 
 
 interface ISecureDataAccessRequestDialogProps {
@@ -19,8 +22,15 @@ interface ISecureDataAccessRequestDialogProps {
 
 
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
+  const biohubApi = useApi();
+  const history = useHistory();
+
   const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
     console.log('handleSubmit()', { values })
+    biohubApi.security.sendSecureArtifactAccessRequest({
+      ...values,
+      pathToParent: history.location.pathname
+    });
   }
 
   const formikRef = useRef<FormikProps<ISecureDataAccessRequestForm>>(null);

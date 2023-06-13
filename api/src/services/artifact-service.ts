@@ -110,7 +110,13 @@ export class ArtifactService extends DBService {
     return this.artifactRepository.getArtifactsByDatasetId(datasetId);
   }
 
+  // @TODO jsdoc
   async getArtifactById(artifactId: number): Promise<Artifact> {
     return this.artifactRepository.getArtifactById(artifactId);
+  }
+
+  // @TODO jsdoc
+  async getArtifactsByIds(artifactIds: number[]): Promise<Artifact[]> {
+    return this.artifactRepository.getArtifactsByIds(artifactIds);
   }
 }

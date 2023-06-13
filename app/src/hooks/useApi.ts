@@ -7,6 +7,7 @@ import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
+import useSecurityApi from './api/useSecurityApi';
 
 /**
  * Returns a set of supported api methods.
@@ -33,7 +34,10 @@ export const useApi = () => {
 
   const dataset = useDatasetApi(apiAxios);
 
+  const security = useSecurityApi(apiAxios);
+
   return {
+    security,
     user,
     admin,
     submissions,

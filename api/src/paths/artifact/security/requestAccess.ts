@@ -1,21 +1,19 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../database/db';
+import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { GCNotifyService } from '../../../services/gcnotify-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('/api/artifact/security/requestAccess');
 
-export const POST: Operation = [
-  requestAccess()
-];
+export const POST: Operation = [requestAccess()];
 
 POST.apiDoc = {
-  description: 'request access to secure artifacts in Biohub.',
-  tags: ['attachment', 'biohub'],
+  description: 'Request access to secure artifacts in Biohub.',
+  tags: ['documents', 'security', 'biohub'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   requestBody: {
@@ -100,7 +98,7 @@ POST.apiDoc = {
  */
 export function requestAccess(): RequestHandler {
   return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     const resubmitData = req.body;
 
