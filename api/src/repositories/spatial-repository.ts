@@ -1,8 +1,10 @@
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
+import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { SpatialProjection } from '../services/geo-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -837,6 +839,8 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
+   * // TODO - The SQL is outdated - `submission_id` no longer exists on table `submission_spatial_component`
+   *
    * Deletes spatial components in a submission id before updating it with new data
    *
    * @param {number} submission_id
@@ -859,6 +863,8 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
+   * // TODO - The SQL is outdated - `submission_id` no longer exists on table `submission_spatial_component`
+   *
    * Remove references in spatial_transform_submission table
    *
    * @param {number} submission_id
@@ -890,6 +896,8 @@ export class SpatialRepository extends BaseRepository {
   }
 
   /**
+   * // TODO - The SQL is outdated - `submission_id` no longer exists on table `submission_spatial_component`
+   *
    * Remove references in security_transform_submission table
    *
    * @param {number} submission_id
@@ -918,5 +926,47 @@ export class SpatialRepository extends BaseRepository {
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
 
     return response.rows;
+  }
+
+  /**
+   * Returns the geometry of a `Boundary` or `Boundary Centroid` type spatial component for a given submission id, in
+   * WKT format using the provided `srid`.
+   *
+   * @param {number} submissionId A submission id
+   * @param {(SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID)} spatialComponentType
+   * @param {SpatialProjection.Srid} srid The id of the projection used when converting the geography to WKT
+   * @return {*}
+   * @memberof SpatialRepository
+   */
+  async getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+    submissionId: number,
+    spatialComponentType: SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
+    srid: SpatialProjection.Srid
+  ) {
+    const knex = getKnex();
+
+    // Fetch the spatial component
+    const queryBuilder = knex
+      .queryBuilder()
+      .select(knex.raw(`ST_AsText(ST_TRANSFORM(geography::geometry, ${srid})) as geometry`))
+      .from('submission_spatial_component as ssc')
+      .leftJoin('submission_observation as so', 'so.submission_observation_id', 'ssc.submission_observation_id')
+      .where('so.record_end_timestamp', null)
+      .where('so.record_effective_timestamp', 'is not', null)
+      .where('so.submission_id', submissionId)
+      .whereRaw(
+        `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${spatialComponentType}")')`
+      );
+
+    const response = await this.connection.knex(queryBuilder);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get boundary spatial component', [
+        'SpatialRepository->getBoundarySpatialComponentBySubmissionId',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
   }
 }

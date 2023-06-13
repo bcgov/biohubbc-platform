@@ -1,4 +1,5 @@
 import { GeoJsonProperties } from 'geojson';
+import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { IDBConnection } from '../database/db';
 import {
   IGetSecurityTransformRecord,
@@ -9,6 +10,7 @@ import {
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { DBService } from './db-service';
+import { SpatialProjection } from './geo-service';
 import { UserService } from './user-service';
 
 export class SpatialService extends DBService {
@@ -161,7 +163,9 @@ export class SpatialService extends DBService {
   }
 
   /**
-   * Query builder to find spatial component by given criteria
+   * Query builder to find spatial component by given criteria.
+   *
+   * Note: Returns an empty array of results if no matches are found.
    *
    * @param {ISpatialComponentsSearchCriteria} criteria
    * @return {*}  {Promise<ISubmissionSpatialSearchResponseRow[]>}
@@ -233,5 +237,32 @@ export class SpatialService extends DBService {
       : this.spatialRepository.findSpatialMetadataBySubmissionSpatialComponentIds(submissionSpatialComponentIds);
 
     return (await response).map((row) => row.spatial_component_properties);
+  }
+
+  /**
+   * Get the `Boundary` or `Boundary Centroid` spatial component for a specified dataset and return as WKT projected
+   * using the provided SRID.
+   *
+   * Note: Does not check roles or permissions. Should only be used for internal functionality.
+   *
+   * Note: Can be used as part of a CQL Filter when making WFS requests (see GeoService).
+   *
+   * @param {number} submissionId A submission id
+   * @param {(SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID)} spatialComponentType
+   * @param {SpatialProjection.Srid} srid The id of the projection used when converting the geography to WKT
+   * @return {*}  {Promise<FeatureCollection[]>}
+   * @throws {Error} if no matches are found.
+   * @memberof SpatialService
+   */
+  async getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+    submissionId: number,
+    spatialComponentType: SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
+    srid: SpatialProjection.Srid
+  ) {
+    return this.spatialRepository.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+      submissionId,
+      spatialComponentType,
+      srid
+    );
   }
 }

@@ -413,6 +413,7 @@ export class SubmissionRepository extends BaseRepository {
       FROM submission s, submission_metadata sm
       WHERE s.submission_id = sm.submission_id
       AND sm.record_end_timestamp IS NULL
+      AND sm.record_effective_timestamp IS NOT NULL
       AND s.uuid = ${datasetId};
     `;
 
@@ -904,7 +905,8 @@ export class SubmissionRepository extends BaseRepository {
     SET 
       dataset_search_criteria=${datasetSearch}
     WHERE submission_id = ${submissionId}
-    AND record_end_timestamp IS NULL;
+    AND record_end_timestamp IS NULL
+    AND record_effective_timestamp IS NOT NULL;
     `;
 
     const response = await this.connection.sql(sql);

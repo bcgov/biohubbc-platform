@@ -83,7 +83,7 @@ export class DarwinCoreService extends DBService {
     submission_metadata_id: number;
   }> {
     try {
-      const submissionMetadata: ISubmissionMetadataRecord = {
+      const submissionMetadata: ISubmissionMetadataRecord   = {
         submission_id: submissionId,
         eml_source: '',
         eml_json_source: null
@@ -162,11 +162,13 @@ export class DarwinCoreService extends DBService {
         throw new ApiGeneralError('file eml is empty');
       }
 
+      const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+
       // Convert the EML data from XML to JSON
       const emlJSON = this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
 
       // Decorate the EML object, adding additional BioHub metadata to the original EML.
-      const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
+      const decoratedEMLJSON = await this.emlService.decorateEML(submissionId, submissionRecord.uuid, emlJSON);
 
       await this.submissionService.updateSubmissionRecordEMLJSONSource(
         submissionId,

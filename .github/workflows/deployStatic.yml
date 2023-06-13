@@ -289,6 +289,7 @@ jobs:
   buildQueue:
     name: Build Queue Image
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
@@ -544,6 +545,7 @@ jobs:
   deployQueue:
     name: Deploy Queue Image
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}

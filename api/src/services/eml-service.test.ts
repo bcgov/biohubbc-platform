@@ -207,6 +207,10 @@ describe('EMLService', () => {
     });
   });
 
+  describe('getRegionAdditionalMetadataNode', () => {
+    it('returns an region additionalMetadata object', async () => {});
+  });
+
   describe('decorateEML', () => {
     afterEach(() => {
       sinon.restore();
