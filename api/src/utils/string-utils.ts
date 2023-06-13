@@ -35,3 +35,7 @@ export function safeTrim<T>(value: T): T {
 
   return value;
 }
+
+export const makeLoginUrl = (host: string, redirectTo?: string) => {
+  return `${host}/login${redirectTo && `?redirect=${encodeURIComponent(redirectTo)}`}`;
+}

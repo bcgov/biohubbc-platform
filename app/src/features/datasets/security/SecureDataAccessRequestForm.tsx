@@ -89,6 +89,8 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
     formikProps.setFieldValue('selectedArtifacts', selectedArtifacts);
   }
 
+  const agreementSignedError = Boolean(formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement'])
+
   return (
     
       <>
@@ -171,8 +173,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
           <FormControl
             required={true}
             component="fieldset"
-            error={Boolean(formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement'])}
-            //</Box>error={touched.coordinator?.share_contact_details && Boolean(errors.coordinator?.share_contact_details)}
+            error={agreementSignedError}
           >
             <Typography component="legend" variant="h5">
               Confidentiality Agreement
@@ -196,7 +197,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                   control={<Radio required={true} color="primary" size="small" />}
                   label="No"
                 />
-                <FormHelperText>{/*errors.coordinator?.share_contact_details*/}</FormHelperText>
+                <FormHelperText>{formikProps.errors['hasSignedAgreement']}</FormHelperText>
               </RadioGroup>
             </Box>
           </FormControl>

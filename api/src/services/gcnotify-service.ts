@@ -6,6 +6,7 @@ import { IgcNotifyGenericMessage, IgcNotifyPostReturn } from '../interfaces/gcno
 import { AdministrativeRepository } from '../repositories/administrative-repository';
 import { DBService } from './db-service';
 import { KeycloakService } from './keycloak-service';
+import { makeLoginUrl } from '../utils/string-utils';
 
 const EMAIL_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE || '';
 const SMS_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_SMS_TEMPLATE || '';
@@ -19,6 +20,10 @@ const config = {
     'Content-Type': 'application/json'
   }
 };
+
+export interface IGcNotifyArtifactRequestAccess {
+  // TODO
+}
 
 export class GCNotifyService extends DBService {
   administrativeRepository: AdministrativeRepository;
@@ -58,6 +63,49 @@ export class GCNotifyService extends DBService {
     }
 
     return result;
+  }
+
+  async sendNotificationForArtifactRequestAccess(requestData: IGcNotifyArtifactRequestAccess): Promise<boolean> {
+    const url = makeLoginUrl(process.env.APP_HOST, requestData.pathToParent);
+    const hrefUrl = `[${resubmitData.parentName}](${url})`;
+
+    const message: IgcNotifyRequestRemovalMessage = {
+      subject: '',
+      header: '',
+      date: new Date().toLocaleString(),
+      file_name: resubmitData.fileName,
+      link: hrefUrl,
+      description: resubmitData.formValues.description,
+      full_name: resubmitData.formValues.full_name,
+      email: resubmitData.formValues.email_address,
+      phone: resubmitData.formValues.phone_number
+    };
+
+    const submitterMessage: IgcNotifyRequestRemovalMessage = {
+      ...message,
+      subject: 'Species Inventory Management System - Your Request to Remove or Resubmit Has Been Sent',
+      header: `Your request to remove or resubmit data has been sent.
+
+      A BioHub Administrator should be in contact with you shortly to discuss your request.`
+    };
+
+    const adminMessage: IgcNotifyRequestRemovalMessage = {
+      ...message,
+      subject: 'Species Inventory Management System -  Request to Remove or Resubmit',
+      header: ''
+    };
+
+    const submitterEmailResponse = await this.requestRemovalEmailNotification(
+      resubmitData.formValues.email_address,
+      submitterMessage
+    );
+    const adminEmailResponse = await this.requestRemovalEmailNotification(adminEmail, adminMessage);
+
+    if (!submitterEmailResponse || !adminEmailResponse) {
+      throw new ApiError(ApiErrorType.UNKNOWN, 'Failed to send Notification');
+    }
+
+    return Boolean(submitterEmailResponse && adminEmailResponse);
   }
 
   /**
