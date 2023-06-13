@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { ArtifactService } from '../../../services/artifact-service';
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
@@ -94,14 +95,20 @@ export function applySecurityRulesToArtifacts(): RequestHandler {
       await connection.open();
 
       const securityService = new SecurityService(connection);
+      const artifactService = new ArtifactService(connection);
 
+      // Remove all security rules from artifacts.
       await securityService.removeAllSecurityRulesFromArtifact(artifactIds);
 
       let response: { artifact_persecution_id: number }[] = [];
 
       if (securityReasonIds.length > 0) {
+        // Apply security rules to artifacts.
         response = await securityService.applySecurityRulesToArtifacts(artifactIds, securityReasonIds);
       }
+
+      // Update artifacts security review timestamps.
+      await artifactService.updateArtifactsSecurityReviewTimestamps(artifactIds);
 
       res.status(200).json(response);
       await connection.commit();

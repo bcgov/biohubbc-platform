@@ -110,16 +110,15 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       flex: 1,
       renderCell: (params) => {
         const { supplementaryData } = params.row;
+        if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED) {
+          return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Available" />;
+        }
+
         if (hasAdministrativePermissions) {
           if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING) {
             return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
           }
-
-          if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED) {
-            return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Available" />;
-          }
         }
-
         return <Chip color="warning" sx={{ textTransform: 'uppercase' }} label="Secured" />;
       }
     },
@@ -159,7 +158,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => setOpenApplySecurity(true)}
-            disabled={selectedArtifacts.length > 0 ? false : true}>
+            disabled={hasAdministrativePermissions && selectedArtifacts.length > 0 ? false : true}>
             Apply Security
           </Button>
           <IconButton disabled title="Download Files" aria-label={`Download selected files`}>

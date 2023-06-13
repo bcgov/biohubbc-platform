@@ -5,7 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 
 interface IAttachmentItemMenuButtonProps {
@@ -50,7 +50,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
               'aria-labelledby': 'basic-button'
             }}>
             <MenuItem
-              disabled={!props.hasAdministrativePermissions}
+              disabled={props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED}
               onClick={() => {
                 props.onDownload(props.artifact);
                 setAnchorEl(null);
