@@ -69,109 +69,114 @@ export class DarwinCoreService extends DBService {
     await this.intakeJob_finishIntake(jobQueueRecord);
   }
 
-  async intakeBreakdown(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
-    // Step 1: Insert submission metadata record
+  async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
     const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
-
-    // Step 2: Set submission metadata eml source column
     const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
-  
-    /* Step 3 */
-    // Convert the EML data from XML to JSON
-    const emlJSON = this.emlService.convertXMLStringToJSObject(dwcaFile.eml!.emlFile.buffer.toString())
+
+    // convert EML to JSON and save in table
+    const emlJSON = await this.intakeJob_step_3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id)
+
+    await this.intakeJob_step_4(jobQueueRecord.submission_id, submissionMetadataId.submission_metadata_id, emlJSON);
+
+    await this.intakeJob_step_5(jobQueueRecord, dwcaFile);
+
+    // run spatial transform on JSON to generate insecure spatial components
+    const submissionObservationId = await this.intakeJob_step_6(jobQueueRecord, dwcaFile);
+
+    await this.intakeJob_step_7(jobQueueRecord, submissionObservationId.submission_observation_id)
+
+    const decoratedEML = await this.intakeJob_step_8(emlJSON)
+    await this.intakeJob_step_9(jobQueueRecord.submission_id, submissionMetadataId.submission_metadata_id, decoratedEML)
+    await this.intakeJob_step_10(jobQueueRecord, submissionObservationId.submission_observation_id)
+    await this.intakeJob_step_11(jobQueueRecord)
+    await this.intakeJob_step_12(jobQueueRecord)
+
     
-    // Decorate the EML object, adding additional BioHub metadata to the original EML.
-    const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
-
-    await this.submissionService.updateSubmissionRecordEMLJSONSource(
-      jobQueueRecord.submission_id,
-      submissionMetadataId.submission_metadata_id,
-      JSON.stringify(decoratedEMLJSON)
-    );
-    /* Step 3 */
-
-    /* Step 4 */
-    await this.submissionService.updateSubmissionMetadataRecordEndDate(jobQueueRecord.submission_id);
-    await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(jobQueueRecord.submission_id);
-    /* Step 4 */
-
-    /* Step 5 */
-    await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
-    await this.submissionService.insertSubmissionStatus(jobQueueRecord.submission_id, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
-    /* Step 5 */
-
-    /* Step 6 */
-    const jsonData = dwcaFile.normalize();
-    // Set the end timestamp for all existing submission observations
-    await this.updateSubmissionObservationEndTimestamp(jobQueueRecord);
-    // Insert new submission observation record
-    const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, jsonData);
-    // Run spatial and security transforms on observation data
-    await this.runTransformsOnObservations(jobQueueRecord, submissionObservationId.submission_observation_id);
-    /* Step 6 */
-    
-    /* Step 7 */
-    await this.updateS3FileLocation(jobQueueRecord);
     await this.submissionService.insertSubmissionStatus(
       jobQueueRecord.submission_id,
       SUBMISSION_STATUS_TYPE.INGESTED
     );
-    /* Step 7 */
   }
 
+   /**
+   * Step 3
+   * - Convert EML to JSON
+   * - Update submission record, set EML JSON source column
+   *
+   * @param {number} submissionId
+   * @param {DWCArchive} file
+   * @return {*}  {Promise<any>}
+   * @memberof DarwinCoreService
+   */
+   async intakeJob_step_3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<Record<string, any>> {
+    try {
+      if (!file.eml) {
+        throw new ApiGeneralError('eml file is empty');
+      }
 
+      // Convert the EML data from XML to JSON
+      return this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step3', message: 'error', error });
 
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
 
+      throw new ApiGeneralError('Converting EML to JSON and Storing data', error.message);
+    }
+  }
 
-
-
-
-  async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    console.log("NEW INTAKE JOB IS RUNNING")
-    const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
-    const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
-
-
-    /* Step 3 */
-    // convert EML to JSON and save in table
-    const emlJSON = this.emlService.convertXMLStringToJSObject(dwcaFile.eml!.emlFile.buffer.toString())
+  async intakeJob_step_4(submissionId: number, submissionMetadataId: number, emlJSON: any): Promise<void> {
     await this.submissionService.updateSubmissionRecordEMLJSONSource(
-      jobQueueRecord.submission_id,
-      submissionMetadataId.submission_metadata_id,
+      submissionId,
+      submissionMetadataId,
       JSON.stringify(emlJSON)
     );
-
-    /* Step 4 */
-    // run spatial transform on JSON to generate insecure spatial components
+  }
+  
+  async intakeJob_step_5(jobQueueRecord: ISubmissionJobQueueRecord, dwcaFile: DWCArchive): Promise<void> {
+    // normalize and insert observations
     const initialJSONData = dwcaFile.normalize()
     const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, initialJSONData);
     await this.runSpatialTransforms(jobQueueRecord, submissionObservationId.submission_observation_id);
+  }
 
-    /* Step 5 */
-    const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
+  async intakeJob_step_6(jobQueueRecord: ISubmissionJobQueueRecord, dwcaFile: DWCArchive): Promise<{submission_observation_id: number}> {
+    const initialJSONData = dwcaFile.normalize()
+    return await this.insertSubmissionObservationRecord(jobQueueRecord, initialJSONData);
+  }
+
+  async intakeJob_step_7(jobQueueRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
+    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
+  }
+
+  async intakeJob_step_8(emlJSON: Record<string, any>): Promise<Record<string, any>> {
+    return await this.emlService.decorateEML(emlJSON)
+  }
+
+  async intakeJob_step_9(submissionId: number, submissionMetadataId: number, emlJSON: Record<string, any>) {
     await this.submissionService.updateSubmissionRecordEMLJSONSource(
-      jobQueueRecord.submission_id,
-      submissionMetadataId.submission_metadata_id,
-      JSON.stringify(decoratedEMLJSON)
+      submissionId,
+      submissionMetadataId,
+      JSON.stringify(emlJSON)
     );
+  }
 
-    /* Step 6 */
-    // run spatial transform on decorated EML
-    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId.submission_observation_id);
+  async intakeJob_step_10(jobQueueRecord: ISubmissionJobQueueRecord, submissionObservationId: number) {
+    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
+  }
 
-    /* Step 7 */
+  async intakeJob_step_11(jobQueueRecord: ISubmissionJobQueueRecord) {
     await this.runSecurityTransforms(jobQueueRecord);
   }
 
+  async intakeJob_step_12(jobQueueRecord: ISubmissionJobQueueRecord) {
+    await this.updateS3FileLocation(jobQueueRecord);
+  }
   /**
    * Step 1
    * - Insert submission metadata record
@@ -249,7 +254,7 @@ export class DarwinCoreService extends DBService {
     }
   }
 
-  /**
+ /**
    * Step 3
    * - Convert EML to JSON
    * - Update submission record, set EML JSON source column
@@ -259,36 +264,27 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-  async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<void> {
-    try {
-      if (!file.eml) {
-        throw new ApiGeneralError('file eml is empty');
-      }
-
-      // Convert the EML data from XML to JSON
-      const emlJSON = this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
-
-      // Decorate the EML object, adding additional BioHub metadata to the original EML.
-      const decoratedEMLJSON = await this.emlService.decorateEML(emlJSON);
-
-      await this.submissionService.updateSubmissionRecordEMLJSONSource(
-        submissionId,
-        submissionMetadataId,
-        JSON.stringify(decoratedEMLJSON)
-      );
-    } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step3', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      throw new ApiGeneralError('Converting EML to JSON and Storing data', error.message);
+ async intakeJob_step3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<Record<string, any>> {
+  try {
+    if (!file.eml) {
+      throw new ApiGeneralError('eml file is empty');
     }
+
+    // Convert the EML data from XML to JSON
+    return this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
+  } catch (error: any) {
+    defaultLog.debug({ label: 'intakeJob_step3', message: 'error', error });
+
+    await this.submissionService.insertSubmissionStatusAndMessage(
+      submissionId,
+      SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
+      SUBMISSION_MESSAGE_TYPE.ERROR,
+      error.message
+    );
+
+    throw new ApiGeneralError('Converting EML to JSON and Storing data', error.message);
   }
+}
 
   /**
    * Step 4
