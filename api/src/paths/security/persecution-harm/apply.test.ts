@@ -5,6 +5,7 @@ import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
+import { ArtifactService } from '../../../services/artifact-service';
 import { SecurityService } from '../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as apply from './apply';
@@ -244,6 +245,10 @@ describe('apply', () => {
         .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
         .resolves([]);
 
+      const updateArtifactsSecurityReviewTimestampsStub = sinon
+        .stub(ArtifactService.prototype, 'updateArtifactsSecurityReviewTimestamps')
+        .resolves();
+
       mockReq.body = {
         artifactIds: [1, 2, 3, 4],
         securityReasonIds: [1, 2, 3, 4]
@@ -255,6 +260,7 @@ describe('apply', () => {
 
       expect(removeAllSecurityRulesFromArtifactStub).to.have.been.calledOnce;
       expect(applySecurityRulesToArtifactsStub).to.have.been.calledOnce;
+      expect(updateArtifactsSecurityReviewTimestampsStub).to.have.been.calledOnce;
 
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([]);
@@ -288,12 +294,17 @@ describe('apply', () => {
         .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
         .resolves([data]);
 
+      const updateArtifactsSecurityReviewTimestampsStub = sinon
+        .stub(ArtifactService.prototype, 'updateArtifactsSecurityReviewTimestamps')
+        .resolves();
+
       const requestHandler = apply.applySecurityRulesToArtifacts();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
       expect(removeAllSecurityRulesFromArtifactStub).to.have.been.calledOnce;
       expect(applySecurityRulesToArtifactsStub).to.have.been.calledOnce;
+      expect(updateArtifactsSecurityReviewTimestampsStub).to.have.been.calledOnce;
 
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([data]);
