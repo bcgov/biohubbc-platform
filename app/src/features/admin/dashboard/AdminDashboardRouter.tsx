@@ -1,7 +1,7 @@
 import { Switch } from 'react-router';
-import DashboardPage from './DashboardPage';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
+import DashboardPage from './DashboardPage';
 
 /**
  * Router for all `/*` pages.

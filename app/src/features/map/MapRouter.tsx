@@ -1,7 +1,7 @@
 import { Switch } from 'react-router';
-import MapPage from './MapPage';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
+import MapPage from './MapPage';
 
 /**
  * Router for all `/map` pages.

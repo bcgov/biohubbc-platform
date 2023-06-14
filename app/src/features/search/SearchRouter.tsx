@@ -1,7 +1,7 @@
 import { Redirect, Route, Switch } from 'react-router';
-import SearchPage from './SearchPage';
-import { getTitle } from 'utils/Utils';
 import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
+import SearchPage from './SearchPage';
 
 /**
  * Router for all `/search/*` pages.

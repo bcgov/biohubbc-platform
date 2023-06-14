@@ -104,7 +104,6 @@ export const UnAuthenticatedRouteGuard = (props: RouteProps) => {
   );
 };
 
-
 /**
  * Checks if the user is not a registered user.
  *

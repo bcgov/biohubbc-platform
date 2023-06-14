@@ -1,7 +1,7 @@
 import { Redirect, Route, Switch } from 'react-router';
-import DatasetPage from './DatasetPage';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
+import DatasetPage from './DatasetPage';
 
 /**
  * Router for all `/datasets/*` pages.
