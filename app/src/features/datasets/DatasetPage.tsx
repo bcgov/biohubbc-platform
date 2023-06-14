@@ -140,13 +140,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data);
-    if (
-      result &&
-      result.staticLayers &&
-      result.staticLayers[0] &&
-      result.staticLayers[0].features[0] &&
-      result.staticLayers[0].features[0].geoJSON
-    ) {
+    if (result.staticLayers[0]?.features[0]?.geoJSON) {
       const bounds = calculateUpdatedMapBounds([result.staticLayers[0].features[0].geoJSON]);
       if (bounds) {
         const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
