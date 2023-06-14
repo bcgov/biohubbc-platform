@@ -1,6 +1,7 @@
 import { Switch } from 'react-router';
-import AppRoute from 'utils/AppRoute';
 import MapPage from './MapPage';
+import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
 
 /**
  * Router for all `/map` pages.
@@ -10,9 +11,9 @@ import MapPage from './MapPage';
 const MapRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/map">
+      <RouteWithTitle exact path="/map" title={getTitle('Map')}>
         <MapPage />
-      </AppRoute>
+      </RouteWithTitle>
     </Switch>
   );
 };

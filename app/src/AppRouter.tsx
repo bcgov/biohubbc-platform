@@ -1,5 +1,5 @@
 import { SystemRoleGuard } from 'components/security/Guards';
-import { AuthenticatedRouteGuard } from 'components/security/RouteGuards';
+import { AuthenticatedRouteGuard, UnAuthenticatedRouteGuard } from 'components/security/RouteGuards';
 import { SYSTEM_ROLE } from 'constants/roles';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
@@ -12,75 +12,97 @@ import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
 import BaseLayout from 'layouts/BaseLayout';
 import ContentLayout from 'layouts/ContentLayout';
-import { Redirect, Switch, useLocation } from 'react-router-dom';
-import AppRoute from 'utils/AppRoute';
+import LoginPage from 'pages/authentication/LoginPage';
+import { Redirect, Route, Switch, useLocation } from 'react-router-dom';
+import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
 
 const AppRouter: React.FC<React.PropsWithChildren> = () => {
   const location = useLocation();
-
-  const getTitle = (page: string) => {
-    return `BioHub - ${page}`;
-  };
 
   return (
     <Switch>
       <Redirect from="/:url*(/+)" to={{ ...location, pathname: location.pathname.slice(0, -1) }} />
 
-      <AppRoute exact path="/" title={getTitle('Home')} layout={BaseLayout}>
-        <HomeRouter />
-      </AppRoute>
+      <Route exact path="/">
+        <BaseLayout>
+          <HomeRouter />
+        </BaseLayout>
+      </Route>
 
-      <AppRoute path="/search" title={getTitle('Search')} layout={BaseLayout}>
-        <SearchRouter />
-      </AppRoute>
+      <Route path="/search">
+        <BaseLayout>
+          <SearchRouter />
+        </BaseLayout>
+      </Route>
 
-      <AppRoute path="/datasets" title={getTitle('Datasets')} layout={BaseLayout}>
-        <DatasetsRouter />
-      </AppRoute>
+      <Route path="/datasets">
+        <BaseLayout>
+          <DatasetsRouter />
+        </BaseLayout>
+      </Route>
 
-      <AppRoute path="/map" title={getTitle('Map')} layout={ContentLayout}>
-        <MapRouter />
-      </AppRoute>
+      <Route path="/map">
+        <ContentLayout>
+          <MapRouter />
+        </ContentLayout>
+      </Route>
 
-      <AppRoute path="/page-not-found" title={getTitle('Page Not Found')} layout={BaseLayout}>
-        <NotFoundPage />
-      </AppRoute>
+      <RouteWithTitle path="/page-not-found" title={getTitle('Page Not Found')}>
+        <BaseLayout>
+          <NotFoundPage />
+        </BaseLayout>
+      </RouteWithTitle>
 
-      <AppRoute path="/forbidden" title={getTitle('Forbidden')} layout={BaseLayout}>
-        <AccessDenied />
-      </AppRoute>
+      <RouteWithTitle path="/forbidden" title={getTitle('Forbidden')}>
+        <BaseLayout>
+          <AccessDenied />
+        </BaseLayout>
+      </RouteWithTitle>
 
       <Redirect exact from="/admin" to="/admin/dashboard" />
 
-      <AppRoute exact path="/admin/dashboard" title={getTitle('Dashboard')} layout={BaseLayout}>
-        <AuthenticatedRouteGuard>
-          <SystemRoleGuard
-            validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
-            fallback={<Redirect to="/forbidden" />}>
-            <AdminDashboardRouter />
-          </SystemRoleGuard>
-        </AuthenticatedRouteGuard>
-      </AppRoute>
+      <Route exact path="/admin/dashboard">
+        <BaseLayout>
+          <AuthenticatedRouteGuard>
+            <SystemRoleGuard
+              validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+              fallback={<Redirect to="/forbidden" />}>
+              <AdminDashboardRouter />
+            </SystemRoleGuard>
+          </AuthenticatedRouteGuard>
+        </BaseLayout>
+      </Route>
 
-      <AppRoute path="/admin/users" title={getTitle('Users')} layout={BaseLayout}>
-        <AuthenticatedRouteGuard>
-          <SystemRoleGuard
-            validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
-            fallback={<Redirect to="/forbidden" />}>
-            <AdminUsersRouter />
-          </SystemRoleGuard>
-        </AuthenticatedRouteGuard>
-      </AppRoute>
+      <Route path="/admin/users">
+        <BaseLayout>
+          <AuthenticatedRouteGuard>
+            <SystemRoleGuard
+              validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+              fallback={<Redirect to="/forbidden" />}>
+              <AdminUsersRouter />
+            </SystemRoleGuard>
+          </AuthenticatedRouteGuard>
+        </BaseLayout>
+      </Route>
 
-      <AppRoute path="/logout" title={getTitle('Logout')} layout={BaseLayout}>
-        <AuthenticatedRouteGuard>
-          <LogOutPage />
-        </AuthenticatedRouteGuard>
-      </AppRoute>
+      <RouteWithTitle path="/logout" title={getTitle('Logout')}>
+        <BaseLayout>
+          <AuthenticatedRouteGuard>
+            <LogOutPage />
+          </AuthenticatedRouteGuard>
+        </BaseLayout>
+      </RouteWithTitle>
 
-      <AppRoute title="*" path="*">
+      <Route path="/login">
+        <UnAuthenticatedRouteGuard>
+          <LoginPage />
+        </UnAuthenticatedRouteGuard>
+      </Route>
+
+      <RouteWithTitle title="*" path="*">
         <Redirect to="/page-not-found" />
-      </AppRoute>
+      </RouteWithTitle>
     </Switch>
   );
 };

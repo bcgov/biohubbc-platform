@@ -1,6 +1,7 @@
 import { Switch } from 'react-router';
-import AppRoute from 'utils/AppRoute';
 import DashboardPage from './DashboardPage';
+import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
 
 /**
  * Router for all `/*` pages.
@@ -10,9 +11,9 @@ import DashboardPage from './DashboardPage';
 const AdminDashboardRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/admin/dashboard">
+      <RouteWithTitle exact path="/admin/dashboard" title={getTitle('Dashboard')}>
         <DashboardPage />
-      </AppRoute>
+      </RouteWithTitle>
     </Switch>
   );
 };

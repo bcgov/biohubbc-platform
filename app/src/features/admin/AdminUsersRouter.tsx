@@ -1,6 +1,7 @@
-import { Redirect, Switch } from 'react-router';
-import AppRoute from 'utils/AppRoute';
+import { Redirect, Route, Switch } from 'react-router';
 import ManageUsersPage from './users/ManageUsersPage';
+import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
 
 /**
  * Router for all `/admin/users/*` pages.
@@ -10,14 +11,14 @@ import ManageUsersPage from './users/ManageUsersPage';
 const AdminUsersRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/admin/users">
+      <RouteWithTitle exact path="/admin/users" title={getTitle('Manage Users')}>
         <ManageUsersPage />
-      </AppRoute>
+      </RouteWithTitle>
 
       {/*  Catch any unknown routes, and re-direct to the not found page */}
-      <AppRoute path="/admin/users/*">
+      <Route path="/admin/users/*">
         <Redirect to="/page-not-found" />
-      </AppRoute>
+      </Route>
     </Switch>
   );
 };

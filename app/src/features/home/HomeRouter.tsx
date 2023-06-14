@@ -1,6 +1,7 @@
 import { Switch } from 'react-router';
-import AppRoute from 'utils/AppRoute';
 import HomePage from './HomePage';
+import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
 
 /**
  * Router for all `/*` pages.
@@ -10,9 +11,9 @@ import HomePage from './HomePage';
 const HomeRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/">
+      <RouteWithTitle exact path="/" title={getTitle('Home')}>
         <HomePage />
-      </AppRoute>
+      </RouteWithTitle>
     </Switch>
   );
 };

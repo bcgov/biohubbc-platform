@@ -1,6 +1,7 @@
-import { Redirect, Switch } from 'react-router';
-import AppRoute from 'utils/AppRoute';
+import { Redirect, Route, Switch } from 'react-router';
 import SearchPage from './SearchPage';
+import { getTitle } from 'utils/Utils';
+import RouteWithTitle from 'utils/RouteWithTitle';
 
 /**
  * Router for all `/search/*` pages.
@@ -10,14 +11,14 @@ import SearchPage from './SearchPage';
 const SearchRouter: React.FC<React.PropsWithChildren> = () => {
   return (
     <Switch>
-      <AppRoute exact path="/search">
+      <RouteWithTitle exact path="/search" title={getTitle('Search')}>
         <SearchPage />
-      </AppRoute>
+      </RouteWithTitle>
 
       {/*  Catch any unknown routes, and re-direct to the not found page */}
-      <AppRoute path="/search/*">
+      <Route path="/search/*">
         <Redirect to="/page-not-found" />
-      </AppRoute>
+      </Route>
     </Switch>
   );
 };
