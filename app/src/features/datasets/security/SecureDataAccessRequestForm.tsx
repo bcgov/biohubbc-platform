@@ -191,6 +191,87 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             </Box>
           </FormControl>
         </Box>
+
+        <Typography variant="body1" className={classes.subheader}>
+          <strong>Company Information</strong>
+        </Typography>
+
+        <Box py={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="company.companyName"
+                label="Company Name"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="company.jobTitle"
+                label="Job/Position Title"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="company.streetAddress"
+                label="Street Address"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <CustomTextField
+                name="company.city"
+                label="City / Town"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <CustomTextField
+                name="company.postalCode"
+                label="Postal Code"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        <Typography variant="body1" className={classes.subheader}>
+          <strong>Professional Organization (Optional)</strong>
+        </Typography>
+
+        <Box py={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={6}>
+              <CustomTextField
+                name="organization.organizationName"
+                label="Organization Name"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <CustomTextField
+                name="organization.memberNumber"
+                label="Member Number"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+        </Grid>
+        </Box>
       </>
   );
 };
