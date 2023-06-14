@@ -39,76 +39,137 @@ export class DarwinCoreService extends DBService {
     this.emlService = new EMLService(this.connection);
   }
 
-  /**
-   * Start intake job for job queue record
-   *
-   * @param {ISubmissionJobQueueRecord} jobQueueRecord
-   * @return {*}  {Promise<void>}
-   * @memberof DarwinCoreService
-   */
-  async intakeJob_old(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
-    // Step 1: Insert submission metadata record
-    const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
-
-    // Step 2: Set submission metadata eml source column
-    const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
-
-    // Step 3: Convert EML to JSON and set submission metadata eml json source column
-    await this.intakeJob_step3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id);
-
-    // Step 4: Update submission metadata record end and effective dates
-    await this.intakeJob_step4(jobQueueRecord.submission_id);
-
-    // Step 5: transform EML JSON and upload to Elastic Search
-    await this.intakeJob_step5(jobQueueRecord.submission_id);
-
-    // Step 6: Update existing submission observation end and effective dates, insert new submission observation record,
-    // run spatial + security transforms
-    await this.intakeJob_step6(jobQueueRecord, dwcaFile);
-
-    await this.intakeJob_finishIntake(jobQueueRecord);
-  }
-
+  // Look and see if the decorate needs to be run on a fresh record
   async intakeJob(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
-    const submissionMetadataId = await this.intakeJob_step1(jobQueueRecord.submission_id);
-    const dwcaFile = await this.intakeJob_step2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
+    // Step 1: Insert submission metadata record
+    const submissionMetadataId = await this.intakeJob_step_1(jobQueueRecord.submission_id);
 
-    // convert EML to JSON and save in table
-    const emlJSON = await this.intakeJob_step_3(jobQueueRecord.submission_id, dwcaFile, submissionMetadataId.submission_metadata_id)
+    // Step 2: Prep file and set submission metadata eml source column
+    const dwcaFile = await this.intakeJob_step_2(jobQueueRecord, submissionMetadataId.submission_metadata_id);
 
+    // Step 3: Convert eml to JSON object
+    const emlJSON = await this.intakeJob_step_3(jobQueueRecord.submission_id, dwcaFile)
+
+    // Step 4: Update submission JSON column
     await this.intakeJob_step_4(jobQueueRecord.submission_id, submissionMetadataId.submission_metadata_id, emlJSON);
 
-    await this.intakeJob_step_5(jobQueueRecord, dwcaFile);
+    // Step 5: Normalize data
+    const normalizedJSON = await this.intakeJob_step_5(dwcaFile);
 
-    // run spatial transform on JSON to generate insecure spatial components
-    const submissionObservationId = await this.intakeJob_step_6(jobQueueRecord, dwcaFile);
+    // Step 6: Insert submission observation record
+    const submissionObservation = await this.intakeJob_step_6(jobQueueRecord, normalizedJSON)
 
-    await this.intakeJob_step_7(jobQueueRecord, submissionObservationId.submission_observation_id)
+    // Step 7: Run spatial transforms
+    await this.intakeJob_step_7(jobQueueRecord, submissionObservation.submission_observation_id)
 
+    // Step 8: Decorate EML
     const decoratedEML = await this.intakeJob_step_8(emlJSON)
+
+    // Step 9: Update submission json column with decorated eml
     await this.intakeJob_step_9(jobQueueRecord.submission_id, submissionMetadataId.submission_metadata_id, decoratedEML)
-    await this.intakeJob_step_10(jobQueueRecord, submissionObservationId.submission_observation_id)
+
+    // Step 10: Run spatial transforms on decorated data
+    await this.intakeJob_step_10(jobQueueRecord, submissionObservation.submission_observation_id)
+
+    // Step 11: Run security transforms
     await this.intakeJob_step_11(jobQueueRecord)
+
+    // Step 12: Update S3 location
     await this.intakeJob_step_12(jobQueueRecord)
 
-    
     await this.submissionService.insertSubmissionStatus(
       jobQueueRecord.submission_id,
       SUBMISSION_STATUS_TYPE.INGESTED
     );
   }
 
+/**
+   * Step 1
+   * - Insert submission metadata record
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<{
+   *     submission_metadata_id: number;
+   *   }>}
+   * @memberof DarwinCoreService
+   */
+async intakeJob_step_1(submissionId: number): Promise<{
+  submission_metadata_id: number;
+}> {
+  try {
+    const submissionMetadata: ISubmissionMetadataRecord = {
+      submission_id: submissionId,
+      eml_source: '',
+      eml_json_source: null
+    };
+
+    return await this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
+  } catch (error: any) {
+    defaultLog.debug({ label: 'intakeJob_step1', message: 'error', error });
+
+    await this.submissionService.insertSubmissionStatusAndMessage(
+      submissionId,
+      SUBMISSION_STATUS_TYPE.FAILED_INGESTION,
+      SUBMISSION_MESSAGE_TYPE.ERROR,
+      error.message
+    );
+
+    throw new ApiGeneralError('Inserting new Metadata record', error.message);
+  }
+}
+
+/**
+ * Step 2
+ * - Download DwCA file form S3
+ * - Update submission metadata record - set EML source column
+ *
+ * @param {number} submissionJobQueueId
+ * @return {*}  {Promise<any>}
+ * @memberof DarwinCoreService
+ */
+async intakeJob_step_2(jobQueueRecord: ISubmissionJobQueueRecord, submissionMetadataId: number): Promise<DWCArchive> {
+  try {
+    if (!jobQueueRecord.key) {
+      throw new ApiGeneralError('No S3 Key given');
+    }
+
+    const file = await this.getAndPrepFileFromS3(jobQueueRecord.key);
+
+    if (!file.eml) {
+      throw new ApiGeneralError('Accessing S3 File, file eml is empty');
+    }
+
+    await this.submissionService.updateSubmissionMetadataEMLSource(
+      jobQueueRecord.submission_id,
+      submissionMetadataId,
+      file.eml
+    );
+
+    return file;
+  } catch (error: any) {
+    defaultLog.debug({ label: 'intakeJob_step2', message: 'error', error });
+
+    await this.submissionService.insertSubmissionStatusAndMessage(
+      jobQueueRecord.submission_id,
+      SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
+      SUBMISSION_MESSAGE_TYPE.ERROR,
+      error.message
+    );
+
+    throw new ApiGeneralError('Accessing S3 File and Updating new Metadata record', error.message);
+  }
+}
+
    /**
    * Step 3
    * - Convert EML to JSON
-   * - Update submission record, set EML JSON source column
    *
    * @param {number} submissionId
    * @param {DWCArchive} file
    * @return {*}  {Promise<any>}
    * @memberof DarwinCoreService
    */
-   async intakeJob_step_3(submissionId: number, file: DWCArchive, submissionMetadataId: number): Promise<Record<string, any>> {
+   async intakeJob_step_3(submissionId: number, file: DWCArchive): Promise<Record<string, any>> {
     try {
       if (!file.eml) {
         throw new ApiGeneralError('eml file is empty');
@@ -130,6 +191,14 @@ export class DarwinCoreService extends DBService {
     }
   }
 
+  /**
+   * Step 4
+   * Update submission record json column
+   * 
+   * @param submissionId 
+   * @param submissionMetadataId 
+   * @param emlJSON 
+   */
   async intakeJob_step_4(submissionId: number, submissionMetadataId: number, emlJSON: any): Promise<void> {
     await this.submissionService.updateSubmissionRecordEMLJSONSource(
       submissionId,
@@ -138,26 +207,60 @@ export class DarwinCoreService extends DBService {
     );
   }
   
-  async intakeJob_step_5(jobQueueRecord: ISubmissionJobQueueRecord, dwcaFile: DWCArchive): Promise<void> {
-    // normalize and insert observations
-    const initialJSONData = dwcaFile.normalize()
-    const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, initialJSONData);
-    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId.submission_observation_id);
+
+  /**
+   * Step 5
+   * Normalize DWCArchive file
+   *
+   * @param dwcaFile 
+   * @returns {*} Promise<string>
+   */
+  async intakeJob_step_5(dwcaFile: DWCArchive): Promise<string> {
+    return dwcaFile.normalize()
   }
 
-  async intakeJob_step_6(jobQueueRecord: ISubmissionJobQueueRecord, dwcaFile: DWCArchive): Promise<{submission_observation_id: number}> {
-    const initialJSONData = dwcaFile.normalize()
-    return await this.insertSubmissionObservationRecord(jobQueueRecord, initialJSONData);
-  }
+  /**
+   * Step 6 
+   * Create submission observation record with normalized JSON
+   * 
+   * @param jobQueueRecord 
+   * @param normalizedJSON 
+   * @returns 
+   */
+async intakeJob_step_6(jobQueueRecord: ISubmissionJobQueueRecord, normalizedJSON: string): Promise<{submission_observation_id: number}> {
+  return await this.insertSubmissionObservationRecord(jobQueueRecord, normalizedJSON);
+}
 
+/**
+ * Step 7 
+ * Run spatial transformations
+ * 
+ * @param jobQueueRecord 
+ * @param submissionObservationId 
+ */
   async intakeJob_step_7(jobQueueRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
     await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
   }
 
+  /**
+   * Step 8
+   * Decorate EML 
+   *  
+   * @param emlJSON 
+   * @returns  {*} Promise<Record<string, any>> Decorated JSON object
+   */
   async intakeJob_step_8(emlJSON: Record<string, any>): Promise<Record<string, any>> {
     return await this.emlService.decorateEML(emlJSON)
   }
 
+  /**
+   * Step 9
+   * Update submission record with decorated EML
+   * 
+   * @param submissionId number
+   * @param submissionMetadataId  number
+   * @param emlJSON Record<string, any>
+   */
   async intakeJob_step_9(submissionId: number, submissionMetadataId: number, emlJSON: Record<string, any>) {
     await this.submissionService.updateSubmissionRecordEMLJSONSource(
       submissionId,
@@ -166,92 +269,32 @@ export class DarwinCoreService extends DBService {
     );
   }
 
+  /**
+   * Step 10
+   * Run spatial transform on decorated JSON
+   * @param jobQueueRecord 
+   * @param submissionObservationId 
+   */
   async intakeJob_step_10(jobQueueRecord: ISubmissionJobQueueRecord, submissionObservationId: number) {
     await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
   }
 
+  /**
+   * Step 11
+   * Run security transforms on decorated JSON
+   * @param jobQueueRecord 
+   */
   async intakeJob_step_11(jobQueueRecord: ISubmissionJobQueueRecord) {
     await this.runSecurityTransforms(jobQueueRecord);
   }
 
+  /**
+   * Step 12
+   * Updated S3 file location
+   * @param jobQueueRecord 
+   */
   async intakeJob_step_12(jobQueueRecord: ISubmissionJobQueueRecord) {
     await this.updateS3FileLocation(jobQueueRecord);
-  }
-  /**
-   * Step 1
-   * - Insert submission metadata record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{
-   *     submission_metadata_id: number;
-   *   }>}
-   * @memberof DarwinCoreService
-   */
-  async intakeJob_step1(submissionId: number): Promise<{
-    submission_metadata_id: number;
-  }> {
-    try {
-      const submissionMetadata: ISubmissionMetadataRecord = {
-        submission_id: submissionId,
-        eml_source: '',
-        eml_json_source: null
-      };
-
-      return await this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step1', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_INGESTION,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      throw new ApiGeneralError('Inserting new Metadata record', error.message);
-    }
-  }
-
-  /**
-   * Step 2
-   * - Download DwCA file form S3
-   * - Update submission metadata record - set EML source column
-   *
-   * @param {number} submissionJobQueueId
-   * @return {*}  {Promise<any>}
-   * @memberof DarwinCoreService
-   */
-  async intakeJob_step2(jobQueueRecord: ISubmissionJobQueueRecord, submissionMetadataId: number): Promise<DWCArchive> {
-    try {
-      if (!jobQueueRecord.key) {
-        throw new ApiGeneralError('No S3 Key given');
-      }
-
-      const file = await this.getAndPrepFileFromS3(jobQueueRecord.key);
-
-      if (!file.eml) {
-        throw new ApiGeneralError('Accessing S3 File, file eml is empty');
-      }
-
-      await this.submissionService.updateSubmissionMetadataEMLSource(
-        jobQueueRecord.submission_id,
-        submissionMetadataId,
-        file.eml
-      );
-
-      return file;
-    } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step2', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        jobQueueRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.FAILED_EML_INGESTION,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      throw new ApiGeneralError('Accessing S3 File and Updating new Metadata record', error.message);
-    }
   }
 
  /**
