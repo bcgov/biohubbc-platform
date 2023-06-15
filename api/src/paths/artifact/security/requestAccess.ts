@@ -55,6 +55,39 @@ POST.apiDoc = {
                 type: 'integer',
                 minimum: 1
               }
+            },
+            companyInformation: {
+              type: 'object',
+              required: ['companyName', 'jobTitle', 'streetAddress', 'city', 'postalCode'],
+              properties: {
+                companyName: {
+                  type: 'string'
+                },
+                jobTitle: {
+                  type: 'string'
+                },
+                streetAddress: {
+                  type: 'string'
+                },
+                city: {
+                  type: 'string'
+                },
+                postalCode: {
+                  type: 'string'
+                }
+              }
+            },
+            professionalOrganization: {
+              type: 'object',
+              required: ['organizationName', 'memberNumber'],
+              properties: {
+                organizationName: {
+                  type: 'string'
+                },
+                memberNumber: {
+                  type: 'string'
+                }
+              }
             }
           }
         }
