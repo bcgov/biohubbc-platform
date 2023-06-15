@@ -56,7 +56,7 @@ export class DarwinCoreService extends DBService {
     // Step 5: Normalize data
     const normalizedJSON = await this.intakeJob_step_5(dwcaFile);
 
-    await this.intakeJob_step_6(jobQueueRecord)
+    await this.intakeJob_step_6(jobQueueRecord);
 
     // Step 6: Insert submission observation record
     const submissionObservation = await this.intakeJob_step_7(jobQueueRecord, normalizedJSON);
@@ -108,7 +108,7 @@ export class DarwinCoreService extends DBService {
 
       return await this.submissionService.insertSubmissionMetadataRecord(submissionMetadata);
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step1', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step_1', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -150,7 +150,7 @@ export class DarwinCoreService extends DBService {
 
       return file;
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step2', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step_2', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         jobQueueRecord.submission_id,
@@ -181,7 +181,7 @@ export class DarwinCoreService extends DBService {
       // Convert the EML data from XML to JSON
       return this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step3', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step_3', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         submissionId,
@@ -203,11 +203,24 @@ export class DarwinCoreService extends DBService {
    * @param emlJSON
    */
   async intakeJob_step_4(submissionId: number, submissionMetadataId: number, emlJSON: any): Promise<void> {
-    await this.submissionService.updateSubmissionRecordEMLJSONSource(
-      submissionId,
-      submissionMetadataId,
-      JSON.stringify(emlJSON)
-    );
+    try {
+      await this.submissionService.updateSubmissionRecordEMLJSONSource(
+        submissionId,
+        submissionMetadataId,
+        JSON.stringify(emlJSON)
+      );
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_4', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Storing eml JSON data', error.message);
+    }
   }
 
   /**
@@ -218,7 +231,13 @@ export class DarwinCoreService extends DBService {
    * @returns {*} Promise<string>
    */
   async intakeJob_step_5(dwcaFile: DWCArchive): Promise<string> {
-    return dwcaFile.normalize();
+    try {
+      return dwcaFile.normalize();
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_5', message: 'error', error });
+
+      throw new ApiGeneralError('Normalizing DWC Archive', error.message);
+    }
   }
 
   /**
@@ -228,12 +247,25 @@ export class DarwinCoreService extends DBService {
    * @param jobQueueRecord
    */
   async intakeJob_step_6(jobQueueRecord: ISubmissionJobQueueRecord) {
-    // END DATE OLD METADATA
-    await this.submissionService.updateSubmissionMetadataRecordEndDate(jobQueueRecord.submission_id);
-    await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(jobQueueRecord.submission_id);
+    try {
+      // END DATE OLD METADATA
+      await this.submissionService.updateSubmissionMetadataRecordEndDate(jobQueueRecord.submission_id);
+      await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(jobQueueRecord.submission_id);
 
-    // END DATE OLF OBSERVATION RECORD
-    await this.updateSubmissionObservationEndTimestamp(jobQueueRecord);
+      // END DATE OLF OBSERVATION RECORD
+      await this.updateSubmissionObservationEndTimestamp(jobQueueRecord);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_6', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.OUT_DATED_RECORD,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Storing eml JSON data', error.message);
+    }
   }
 
   /**
@@ -248,7 +280,19 @@ export class DarwinCoreService extends DBService {
     jobQueueRecord: ISubmissionJobQueueRecord,
     normalizedJSON: string
   ): Promise<{ submission_observation_id: number }> {
-    return await this.insertSubmissionObservationRecord(jobQueueRecord, normalizedJSON);
+    try {
+      return await this.insertSubmissionObservationRecord(jobQueueRecord, normalizedJSON);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_7', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+      throw new ApiGeneralError('Inserting Observation JSON', error.message);
+    }
   }
 
   /**
@@ -259,7 +303,19 @@ export class DarwinCoreService extends DBService {
    * @param submissionObservationId
    */
   async intakeJob_step_8(jobQueueRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
-    await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
+    try {
+      await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_8', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+      throw new ApiGeneralError('Spatial transform', error.message);
+    }
   }
 
   /**
@@ -270,7 +326,13 @@ export class DarwinCoreService extends DBService {
    * @returns  {*} Promise<Record<string, any>> Decorated JSON object
    */
   async intakeJob_step_9(emlJSON: Record<string, any>): Promise<Record<string, any>> {
-    return await this.emlService.decorateEML(emlJSON);
+    try {
+      return await this.emlService.decorateEML(emlJSON);
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_9', message: 'error', error });
+
+      throw new ApiGeneralError('EML Decoration', error.message);
+    }
   }
 
   /**
@@ -282,11 +344,24 @@ export class DarwinCoreService extends DBService {
    * @param emlJSON Record<string, any>
    */
   async intakeJob_step_10(submissionId: number, submissionMetadataId: number, emlJSON: Record<string, any>) {
-    await this.submissionService.updateSubmissionRecordEMLJSONSource(
-      submissionId,
-      submissionMetadataId,
-      JSON.stringify(emlJSON)
-    );
+    try {
+      await this.submissionService.updateSubmissionRecordEMLJSONSource(
+        submissionId,
+        submissionMetadataId,
+        JSON.stringify(emlJSON)
+      );
+    } catch (error: any) {
+      defaultLog.debug({ label: 'intakeJob_step_10', message: 'error', error });
+
+      await this.submissionService.insertSubmissionStatusAndMessage(
+        submissionId,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_MESSAGE_TYPE.ERROR,
+        error.message
+      );
+
+      throw new ApiGeneralError('Updating Record EML', error.message);
+    }
   }
 
   /**
@@ -296,109 +371,13 @@ export class DarwinCoreService extends DBService {
    * @param submissionObservationId
    */
   async intakeJob_step_11(jobQueueRecord: ISubmissionJobQueueRecord) {
-    await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
-  }
-
-  /**
-   * Step 12
-   * Run security transforms on decorated JSON
-   * @param jobQueueRecord
-   */
-  async intakeJob_step_12(jobQueueRecord: ISubmissionJobQueueRecord) {
-    await this.runSecurityTransforms(jobQueueRecord);
-  }
-
-  /**
-   * Step 13
-   * Updated S3 file location
-   * @param jobQueueRecord
-   */
-  async intakeJob_step_13(jobQueueRecord: ISubmissionJobQueueRecord) {
-    await this.updateS3FileLocation(jobQueueRecord);
-  }
-
-  /**
-   * Step 3
-   * - Convert EML to JSON
-   * - Update submission record, set EML JSON source column
-   *
-   * @param {number} submissionId
-   * @param {DWCArchive} file
-   * @return {*}  {Promise<any>}
-   * @memberof DarwinCoreService
-   */
-  async intakeJob_step3(
-    submissionId: number,
-    file: DWCArchive,
-    submissionMetadataId: number
-  ): Promise<Record<string, any>> {
     try {
-      if (!file.eml) {
-        throw new ApiGeneralError('eml file is empty');
-      }
-
-      // Convert the EML data from XML to JSON
-      return this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
+      await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step3', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step_11', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_EML_TO_JSON,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      throw new ApiGeneralError('Converting EML to JSON and Storing data', error.message);
-    }
-  }
-
-  /**
-   * Step 4
-   * - Update submission metadata record end date
-   * - Update submission metadata record effective date
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<any>}
-   * @memberof DarwinCoreService
-   */
-  async intakeJob_step4(submissionId: number): Promise<void> {
-    try {
-      await this.submissionService.updateSubmissionMetadataRecordEndDate(submissionId);
-      await this.submissionService.updateSubmissionMetadataRecordEffectiveDate(submissionId);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step4', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
-        SUBMISSION_STATUS_TYPE.FAILED_INGESTION,
-        SUBMISSION_MESSAGE_TYPE.ERROR,
-        error.message
-      );
-
-      throw new ApiGeneralError('Updating Submission Record End/Effective Date', error.message);
-    }
-  }
-
-  /**
-   * Step 5
-   * - Transform
-   *
-   * @param {number} submissionId
-   * @param {string} dataPackageId
-   * @return {*}  {Promise<void>}
-   * @memberof DarwinCoreService
-   */
-  async intakeJob_step5(submissionId: number): Promise<void> {
-    try {
-      await this.transformAndUploadMetaData(submissionId);
-
-      await this.submissionService.insertSubmissionStatus(submissionId, SUBMISSION_STATUS_TYPE.METADATA_TO_ES);
-    } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step5', message: 'error', error });
-
-      await this.submissionService.insertSubmissionStatusAndMessage(
-        submissionId,
+        jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.FAILED_METADATA_TO_ES,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
@@ -409,59 +388,37 @@ export class DarwinCoreService extends DBService {
   }
 
   /**
-   * Step 6
-   * - End date all existing submission observation records
-   * - Insert new submission observation record
-   * - Run observation transforms (spatial + security)
-   *
-   * @param {ISubmissionJobQueueRecord} jobQueueRecord
-   * @return {*}  {Promise<any>}
-   * @memberof DarwinCoreService
+   * Step 12
+   * Run security transforms on decorated JSON
+   * @param jobQueueRecord
    */
-  async intakeJob_step6(jobQueueRecord: ISubmissionJobQueueRecord, dwcaWorksheets: DWCArchive): Promise<void> {
+  async intakeJob_step_12(jobQueueRecord: ISubmissionJobQueueRecord) {
     try {
-      const jsonData = dwcaWorksheets.normalize();
-
-      // Set the end timestamp for all existing submission observations
-      await this.updateSubmissionObservationEndTimestamp(jobQueueRecord);
-
-      // Insert new submission observation record
-      const submissionObservationId = await this.insertSubmissionObservationRecord(jobQueueRecord, jsonData);
-
-      // Run spatial and security transforms on observation data
-      await this.runTransformsOnObservations(jobQueueRecord, submissionObservationId.submission_observation_id);
+      await this.runSecurityTransforms(jobQueueRecord);
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_step6', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step_12', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         jobQueueRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_UNSECURE,
+        SUBMISSION_STATUS_TYPE.FAILED_SPATIAL_TRANSFORM_SECURE,
         SUBMISSION_MESSAGE_TYPE.ERROR,
         error.message
       );
 
-      throw new ApiGeneralError('Transforming and uploading metadata', error.message);
+      throw new ApiGeneralError('Secure spatial transforms', error.message);
     }
   }
 
   /**
-   * Step 7
-   * - Move DwCA S3 file from temp location to final location
-   *
-   * @param {ISubmissionJobQueueRecord} jobQueueRecord
-   * @return {*}  {Promise<void>}
-   * @memberof DarwinCoreService
+   * Step 13
+   * Updated S3 file location
+   * @param jobQueueRecord
    */
-  async intakeJob_finishIntake(jobQueueRecord: ISubmissionJobQueueRecord): Promise<void> {
+  async intakeJob_step_13(jobQueueRecord: ISubmissionJobQueueRecord) {
     try {
       await this.updateS3FileLocation(jobQueueRecord);
-
-      await this.submissionService.insertSubmissionStatus(
-        jobQueueRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.INGESTED
-      );
     } catch (error: any) {
-      defaultLog.debug({ label: 'intakeJob_finishIntake', message: 'error', error });
+      defaultLog.debug({ label: 'intakeJob_step_13', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
         jobQueueRecord.submission_id,
@@ -470,7 +427,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Transforming and uploading metadata', error.message);
+      throw new ApiGeneralError('S3 location update', error.message);
     }
   }
 
