@@ -1,5 +1,5 @@
-import { IMarker, IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import { IMarker, IMarkerLayer } from 'components/map/components/MarkerClusterControls';
+import { IStaticLayer } from 'components/map/components/StaticLayersControls';
 import DatasetPopup from 'components/map/DatasetPopup';
 import FeaturePopup, { BoundaryCentroidFeature, BoundaryFeature, OccurrenceFeature } from 'components/map/FeaturePopup';
 import { LAYER_NAME, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';

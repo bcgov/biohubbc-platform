@@ -1,27 +1,24 @@
-import { mdiDownload } from '@mdi/js';
-import Icon from '@mdi/react';
 import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import CardHeader from '@mui/material/CardHeader';
 import CircularProgress from '@mui/material/CircularProgress/CircularProgress';
 import Container from '@mui/material/Container';
-import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import { makeStyles } from '@mui/styles';
 import { Buffer } from 'buffer';
-import { IMarkerLayer } from 'components/map/components/MarkerCluster';
-import { IStaticLayer } from 'components/map/components/StaticLayers';
+import { IMarkerLayer } from 'components/map/components/MarkerClusterControls';
+import { IStaticLayer } from 'components/map/components/StaticLayersControls';
 import MapContainer from 'components/map/MapContainer';
+import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { ALL_OF_BC_BOUNDARY, MAP_DEFAULT_ZOOM, SPATIAL_COMPONENT_TYPE } from 'constants/spatial';
 import { DialogContext } from 'contexts/dialogContext';
-import { Feature, Polygon } from 'geojson';
+import { Feature } from 'geojson';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDataLoaderError from 'hooks/useDataLoaderError';
+import { LatLngBounds, LatLngBoundsExpression, LatLngTuple } from 'leaflet';
 import { useContext, useEffect, useState } from 'react';
 import { useHistory, useParams } from 'react-router';
+import { calculateUpdatedMapBounds } from 'utils/mapUtils';
 import { parseSpatialDataByType } from 'utils/spatial-utils';
 import DatasetArtifacts from './components/DatasetArtifacts';
 import RelatedDatasets from './components/RelatedDatasets';
@@ -35,11 +32,12 @@ const useStyles = makeStyles((theme: Theme) => ({
       marginTop: '-4px'
     }
   },
+  datasetDetailsLabel: {
+    borderBottom: '1pt solid #dadada'
+  },
+  datasetDetailsContainer: {},
   datasetMapContainer: {
-    width: '100%',
-    aspectRatio: '1 / 0.5',
-    borderRadius: '6px',
-    paddingBottom: '16px'
+    minHeight: '400px'
   }
 }));
 
@@ -53,7 +51,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const datasetId = urlParams['id'];
 
   const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetEML(datasetId));
-  const templateDataLoader = useDataLoader(() => biohubApi.dataset.getHandlebarsTemplate(datasetId));
+  const templateDataLoader = useDataLoader(() => biohubApi.dataset.getHandleBarsTemplateByDatasetId(datasetId));
 
   const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
     biohubApi.search.getSpatialDataFile({
@@ -98,7 +96,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     return {
       dialogTitle: 'Error Exporting Data',
       dialogText:
-        'An error has occurred while attempting to archive and download occurance data, please try again. If the error persists, please contact your system administrator.'
+        'An error has occurred while attempting to archive and download occurrence data, please try again. If the error persists, please contact your system administrator.'
     };
   });
 
@@ -112,14 +110,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
 
   const [markerLayers, setMarkerLayers] = useState<IMarkerLayer[]>([]);
   const [staticLayers, setStaticLayers] = useState<IStaticLayer[]>([]);
-
-  const downloadDataSet = () => {
-    fileDataLoader.refresh(
-      ALL_OF_BC_BOUNDARY,
-      [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE],
-      MAP_DEFAULT_ZOOM
-    );
-  };
+  const [mapBoundary, setMapBoundary] = useState<LatLngBoundsExpression | undefined>(undefined);
 
   useEffect(() => {
     if (!fileDataLoader.data) {
@@ -149,13 +140,16 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     }
 
     const result = parseSpatialDataByType(mapDataLoader.data);
+    if (result.staticLayers[0]?.features[0]?.geoJSON) {
+      const bounds = calculateUpdatedMapBounds([result.staticLayers[0].features[0].geoJSON]);
+      if (bounds) {
+        const newBounds = new LatLngBounds(bounds[0] as LatLngTuple, bounds[1] as LatLngTuple);
+        setMapBoundary(newBounds);
+      }
+    }
     setStaticLayers(result.staticLayers);
     setMarkerLayers(result.markerLayers);
   }, [mapDataLoader.data]);
-
-  const onMapViewChange = (bounds: Feature<Polygon>, newZoom: number) => {
-    mapDataLoader.refresh(bounds, [SPATIAL_COMPONENT_TYPE.BOUNDARY, SPATIAL_COMPONENT_TYPE.OCCURRENCE], newZoom);
-  };
 
   mapDataLoader.load(
     ALL_OF_BC_BOUNDARY,
@@ -169,60 +163,51 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <Box>
-      <Paper square elevation={0} className={classes.datasetTitleContainer}>
-        <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data} />
+      <Paper square elevation={0}>
+        <Container maxWidth="xl">
+          <Box py={3}>
+            <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.header} />
+          </Box>
+        </Container>
       </Paper>
       <Container maxWidth="xl">
-        <Box pt={2}>
+        <Box py={3}>
           <Paper elevation={0}>
-            <DatasetArtifacts datasetId={datasetId} />
-          </Paper>
-        </Box>
-      </Container>
-      <Container maxWidth="xl">
-        <Box pt={2}>
-          <Paper elevation={0}>
-            <RelatedDatasets datasetId={datasetId} />
-          </Paper>
-        </Box>
-      </Container>
-      <Container maxWidth="xl">
-        <Box py={2}>
-          <Card data-testid="MapContainer">
-            <Grid sx={{ justify: 'space-between', alignItems: 'center' }}>
-              <Grid item>
-                <Box px={2}>
-                  <CardHeader
-                    title="Occurrences"
-                    titleTypographyProps={{ variant: 'h4', component: 'h2' }}></CardHeader>
-                </Box>
-              </Grid>
-              <Grid item>
-                <Box my={1} mx={2}>
-                  <Button
-                    color="primary"
-                    variant="outlined"
-                    disableElevation
-                    aria-label={'Download occurrence'}
-                    data-testid="export-occurrence"
-                    startIcon={<Icon path={mdiDownload} size={1} />}
-                    onClick={() => downloadDataSet()}>
-                    Export Occurrences
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
-            <Box p={2} pt={0} className={classes.datasetMapContainer}>
-              <MapContainer
-                mapId="boundary_map"
-                onBoundsChange={onMapViewChange}
-                scrollWheelZoom={true}
-                fullScreenControl={true}
-                markerLayers={markerLayers}
-                staticLayers={staticLayers}
-              />
+            <ActionToolbar
+              className={classes.datasetDetailsLabel}
+              label="Project Details"
+              labelProps={{ variant: 'h4' }}
+            />
+            <Box display="flex">
+              <Box flex="1 1 auto" className={classes.datasetDetailsContainer}>
+                <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} />
+              </Box>
+              <Box data-testid="MapContainer" p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
+                <MapContainer
+                  mapId="boundary_map"
+                  bounds={mapBoundary}
+                  scrollWheelZoom={false}
+                  fullScreenControl={true}
+                  markerLayers={markerLayers}
+                  staticLayers={staticLayers}
+                  zoomControlEnabled={true}
+                  doubleClickZoomEnabled={false}
+                  draggingEnabled={true}
+                  layerControlEnabled={false}
+                />
+              </Box>
             </Box>
-          </Card>
+          </Paper>
+          <Box mt={3}>
+            <Paper elevation={0}>
+              <DatasetArtifacts datasetId={datasetId} />
+            </Paper>
+          </Box>
+          <Box mt={3}>
+            <Paper elevation={0}>
+              <RelatedDatasets datasetId={datasetId} />
+            </Paper>
+          </Box>
         </Box>
       </Container>
     </Box>
