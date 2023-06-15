@@ -166,7 +166,7 @@ export class ArtifactRepository extends BaseRepository {
     const result = (response && response.rowCount && response.rows[0]) || null;
 
     if (!result) {
-      throw new ApiExecuteSQLError('Failed to retreive artifact record by ID');
+      throw new ApiExecuteSQLError('Failed to retrieve artifact record by ID');
     }
 
     return result;
