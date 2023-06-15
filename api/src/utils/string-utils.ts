@@ -35,3 +35,14 @@ export function safeTrim<T>(value: T): T {
 
   return value;
 }
+
+/**
+ * Generates a login URL the includes an optional redirect URL.
+ *
+ * @param {string} host The host of the application
+ * @param {[string]} redirectTo The URL that the user will be redirected to upon logging in
+ * @returns The login URL
+ */
+export const makeLoginUrl = (host: string, redirectTo?: string) => {
+  return `${host}/login${redirectTo && `?redirect=${encodeURIComponent(redirectTo)}`}`;
+};
