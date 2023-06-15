@@ -40,7 +40,7 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('insertSubmissionRecordWithPotentialConflict', () => {
+  describe('insertSubmissionRe', () => {
     it('should return submission_id on get or insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
@@ -663,6 +663,12 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('getGeometryAsWktFromBoundarySpatialComponentBySubmissionId', () => {
+    it('returns a geometry string', () => {
+        // TODO
     });
   });
 });

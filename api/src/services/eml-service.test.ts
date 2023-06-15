@@ -208,9 +208,12 @@ describe('EMLService', () => {
   });
 
   describe('getRegionAdditionalMetadataNode', () => {
-    it('returns an region additionalMetadata object', async () => {});
+    it('returns an region additionalMetadata object', async () => {
+      // TODO
+    });
   });
 
+  // TODO
   describe('decorateEML', () => {
     afterEach(() => {
       sinon.restore();
@@ -259,7 +262,10 @@ describe('EMLService', () => {
       // Generate the sample test object using the real xml convert function
       const emlObject = emlService.convertXMLStringToJSObject(emlXMLString);
 
-      const decoratedEMLObject = await emlService.decorateEML(emlObject);
+      const submissionId = 1;
+      const datasetId = '123-456-789';
+
+      const decoratedEMLObject = await emlService.decorateEML(submissionId, datasetId, emlObject);
 
       expect(decoratedEMLObject).to.eql({
         '?xml': {

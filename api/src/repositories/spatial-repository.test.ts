@@ -611,4 +611,10 @@ describe('SpatialRepository', () => {
       expect(response[0].submission_id).to.equal(2);
     });
   });
+
+  describe('getGeometryAsWktFromBoundarySpatialComponentBySubmissionId', () => {
+    it('returns a geometry string', () => {
+      // TODO
+    });
+  });
 });
