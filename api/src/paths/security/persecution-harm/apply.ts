@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { ArtifactService } from '../../../services/artifact-service';
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
@@ -55,7 +54,7 @@ POST.apiDoc = {
             items: {
               title: 'Artifact Persecution',
               type: 'object',
-              required: ['artifact_persecution_id'],
+              nullable: true,
               properties: {
                 artifact_persecution_id: {
                   type: 'integer',
@@ -95,22 +94,13 @@ export function applySecurityRulesToArtifacts(): RequestHandler {
       await connection.open();
 
       const securityService = new SecurityService(connection);
-      const artifactService = new ArtifactService(connection);
 
-      // Remove all security rules from artifacts.
-      await securityService.removeAllSecurityRulesFromArtifact(artifactIds);
+      const response: { artifact_persecution_id: number }[] = await securityService.applySecurityRulesToArtifacts(
+        artifactIds,
+        securityReasonIds
+      );
 
-      let response: { artifact_persecution_id: number }[] = [];
-
-      if (securityReasonIds.length > 0) {
-        // Apply security rules to artifacts.
-        response = await securityService.applySecurityRulesToArtifacts(artifactIds, securityReasonIds);
-      }
-
-      // Update artifacts security review timestamps.
-      await artifactService.updateArtifactsSecurityReviewTimestamps(artifactIds);
-
-      res.status(200).json(response);
+      res.status(200).json(response.flat());
       await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'applySecurityRulesToArtifacts', message: 'error', error });

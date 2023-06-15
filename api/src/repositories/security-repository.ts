@@ -142,17 +142,19 @@ export class SecurityRepository extends BaseRepository {
    * Remove a security rule from an artifact.
    *
    * @param {number} artifactId
+   * @param {number} securityId
    * @return {*}  {Promise<void>}
    * @memberof SecurityRepository
    */
-  async removeAllSecurityRulesFromArtifact(artifactId: number): Promise<void> {
-    defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
+  async deleteSecurityRuleFromArtifact(artifactId: number, securityId: number): Promise<void> {
+    defaultLog.debug({ label: 'deleteSecurityRuleFromArtifact' });
 
     const sqlStatement = SQL`
       DELETE FROM
         artifact_persecution
       WHERE
-        artifact_id = ${artifactId};
+        artifact_id = ${artifactId}
+        AND persecution_or_harm_id = ${securityId};
     `;
 
     await this.connection.sql(sqlStatement);

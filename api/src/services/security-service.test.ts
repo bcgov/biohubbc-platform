@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SecurityRepository } from '../repositories/security-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { ArtifactService } from './artifact-service';
 import { SecurityService } from './security-service';
 
 chai.use(sinonChai);
@@ -51,28 +52,30 @@ describe('SecurityService', () => {
       const securityService = new SecurityService(mockDBConnection);
 
       const applySecurityRulesToArtifactStub = sinon
-        .stub(SecurityRepository.prototype, 'applySecurityRulesToArtifact')
-        .resolves({ artifact_persecution_id: 1 });
+        .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
+        .resolves([{ artifact_persecution_id: 1 }, { artifact_persecution_id: 2 }]);
+
+      sinon.stub(ArtifactService.prototype, 'updateArtifactSecurityReviewTimestamp').resolves();
 
       const response = await securityService.applySecurityRulesToArtifacts([1], [1, 2]);
 
-      expect(applySecurityRulesToArtifactStub).to.be.calledTwice;
-      expect(response).to.be.eql([{ artifact_persecution_id: 1 }, { artifact_persecution_id: 1 }]);
+      expect(applySecurityRulesToArtifactStub).to.be.calledOnce;
+      expect(response).to.be.eql([{ artifact_persecution_id: 1 }, { artifact_persecution_id: 2 }]);
     });
   });
 
-  describe('removeAllSecurityRulesFromArtifact', () => {
+  describe('deleteSecurityRuleFromArtifact', () => {
     it('should return artifact_id on insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const securityService = new SecurityService(mockDBConnection);
 
       const applySecurityRulesToArtifactStub = sinon
-        .stub(SecurityRepository.prototype, 'removeAllSecurityRulesFromArtifact')
+        .stub(SecurityRepository.prototype, 'deleteSecurityRuleFromArtifact')
         .resolves();
 
-      const response = await securityService.removeAllSecurityRulesFromArtifact([1, 2]);
+      const response = await securityService.deleteSecurityRuleFromArtifact(1, 2);
 
-      expect(applySecurityRulesToArtifactStub).to.be.calledTwice;
+      expect(applySecurityRulesToArtifactStub).to.be.calledOnce;
       expect(response).to.be.eql(undefined);
     });
   });

@@ -88,7 +88,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
             await handleSubmit(values.securityReasons);
             handleShowSnackBar(
-              `You successfully applied security reasons to the file${selectedArtifacts.length !== 1 && 's'}.`
+              `You successfully applied security reasons to the file${selectedArtifacts.length !== 1 ? 's' : ''}.`
             );
             onClose();
           }}>
@@ -99,7 +99,9 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onClose={() => setYesNoDialogOpen(false)}
                 onYes={async () => {
                   await formikProps.submitForm();
-                  handleShowSnackBar(`You successfully unsecured the file${selectedArtifacts.length !== 1 && 's'}.`);
+                  handleShowSnackBar(
+                    `You successfully unsecured the file${selectedArtifacts.length !== 1 ? 's' : ''}.`
+                  );
                   setYesNoDialogOpen(false);
                 }}
                 onNo={() => setYesNoDialogOpen(false)}

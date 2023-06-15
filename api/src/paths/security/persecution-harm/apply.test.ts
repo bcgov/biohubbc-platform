@@ -5,7 +5,6 @@ import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
-import { ArtifactService } from '../../../services/artifact-service';
 import { SecurityService } from '../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as apply from './apply';
@@ -184,15 +183,6 @@ describe('apply', () => {
         });
 
         describe('artifact_persecution_id', () => {
-          it('is undefined', async () => {
-            const apiResponse = [{ artifact_persecution_id: undefined }];
-            const response = responseValidator.validateResponse(200, apiResponse);
-
-            expect(response.message).to.equal('The response was not valid.');
-            expect(response.errors.length).to.equal(1);
-            expect(response.errors[0].message).to.equal("must have required property 'artifact_persecution_id'");
-          });
-
           it('is null', async () => {
             const apiResponse = [{ artifact_persecution_id: null }];
             const response = responseValidator.validateResponse(200, apiResponse);
@@ -237,17 +227,9 @@ describe('apply', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const removeAllSecurityRulesFromArtifactStub = sinon
-        .stub(SecurityService.prototype, 'removeAllSecurityRulesFromArtifact')
-        .resolves();
-
       const applySecurityRulesToArtifactsStub = sinon
         .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
         .resolves([]);
-
-      const updateArtifactsSecurityReviewTimestampsStub = sinon
-        .stub(ArtifactService.prototype, 'updateArtifactsSecurityReviewTimestamps')
-        .resolves();
 
       mockReq.body = {
         artifactIds: [1, 2, 3, 4],
@@ -258,10 +240,7 @@ describe('apply', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(removeAllSecurityRulesFromArtifactStub).to.have.been.calledOnce;
       expect(applySecurityRulesToArtifactsStub).to.have.been.calledOnce;
-      expect(updateArtifactsSecurityReviewTimestampsStub).to.have.been.calledOnce;
-
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([]);
     });
@@ -286,26 +265,15 @@ describe('apply', () => {
         securityReasonIds: [1, 2, 3, 4]
       };
 
-      const removeAllSecurityRulesFromArtifactStub = sinon
-        .stub(SecurityService.prototype, 'removeAllSecurityRulesFromArtifact')
-        .resolves();
-
       const applySecurityRulesToArtifactsStub = sinon
         .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
         .resolves([data]);
-
-      const updateArtifactsSecurityReviewTimestampsStub = sinon
-        .stub(ArtifactService.prototype, 'updateArtifactsSecurityReviewTimestamps')
-        .resolves();
 
       const requestHandler = apply.applySecurityRulesToArtifacts();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(removeAllSecurityRulesFromArtifactStub).to.have.been.calledOnce;
       expect(applySecurityRulesToArtifactsStub).to.have.been.calledOnce;
-      expect(updateArtifactsSecurityReviewTimestampsStub).to.have.been.calledOnce;
-
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql([data]);
     });
