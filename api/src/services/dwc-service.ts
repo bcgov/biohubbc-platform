@@ -56,31 +56,32 @@ export class DarwinCoreService extends DBService {
     // Step 5: Normalize data
     const normalizedJSON = await this.intakeJob_step_5(dwcaFile);
 
+    // Step 6: End date old records
     await this.intakeJob_step_6(jobQueueRecord);
 
-    // Step 6: Insert submission observation record
+    // Step 7: Insert submission observation record
     const submissionObservation = await this.intakeJob_step_7(jobQueueRecord, normalizedJSON);
 
-    // Step 7: Run spatial transforms
+    // Step 8: Run spatial transforms
     await this.intakeJob_step_8(jobQueueRecord, submissionObservation.submission_observation_id);
 
-    // Step 8: Decorate EML
+    // Step 9: Decorate EML
     const decoratedEML = await this.intakeJob_step_9(emlJSON);
 
-    // Step 9: Update submission json column with decorated eml
+    // Step 10: Update submission json column with decorated eml
     await this.intakeJob_step_10(
       jobQueueRecord.submission_id,
       submissionMetadataId.submission_metadata_id,
       decoratedEML
     );
 
-    // Step 10: Run source transforms on decorated data
+    // Step 11: Run source transforms on decorated data
     await this.intakeJob_step_11(jobQueueRecord);
 
-    // Step 11: Run security transforms
+    // Step 12: Run security transforms
     await this.intakeJob_step_12(jobQueueRecord);
 
-    // Step 12: Update S3 location
+    // Step 13: Update S3 location
     await this.intakeJob_step_13(jobQueueRecord);
 
     await this.submissionService.insertSubmissionStatus(jobQueueRecord.submission_id, SUBMISSION_STATUS_TYPE.INGESTED);
@@ -175,12 +176,13 @@ export class DarwinCoreService extends DBService {
   async intakeJob_step_3(submissionId: number, file: DWCArchive): Promise<Record<string, any>> {
     try {
       if (!file.eml) {
-        throw new ApiGeneralError('eml file is empty');
+        throw new ApiGeneralError('file eml is empty');
       }
 
       // Convert the EML data from XML to JSON
       return this.emlService.convertXMLStringToJSObject(file.eml.emlFile.buffer.toString());
     } catch (error: any) {
+      // TODO: does it make sense to throw/ catch here? is it even possible
       defaultLog.debug({ label: 'intakeJob_step_3', message: 'error', error });
 
       await this.submissionService.insertSubmissionStatusAndMessage(
@@ -190,7 +192,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Converting EML to JSON and Storing data', error.message);
+      throw new ApiGeneralError('Converting EML to JSON', error.message);
     }
   }
 
