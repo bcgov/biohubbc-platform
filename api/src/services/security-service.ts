@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { HTTP401, HTTP403 } from '../errors/http-error';
+import { HTTP403 } from '../errors/http-error';
 import { PersecutionAndHarmSecurity, SecurityRepository } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -86,13 +86,17 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Determines ability to download a document based on the security status of the document
-   * as well as user permissions.
+   * Returns the signed URL of a document for which a user has permissions.
    *
    * Rules:
    * non-admin user cannot access the document when:
-   ** it is pending review, OR
-   ** user hasn't been granted an exception to every security rule
+   ** - it is pending review, OR
+   ** - user hasn't been granted an exception to every security rule
+   *
+   * non-admin user can access the document when:
+   * - document is not secured
+   * - user has the correct exceptions
+   *
    *
    * @param {number} artifactId
    * @return {*}  {Promise<any>}
@@ -108,7 +112,7 @@ export class SecurityService extends DBService {
       : true;
 
     if (!isSystemUserAdmin && isDocumentPendingReview) {
-      throw new HTTP401('You do not have access to this document - it is pending review');
+      throw new HTTP403('You do not have access to this document - it is pending review');
     }
 
     const documentSecurityRules = await this.getDocumentPersecutionAndHarmRules(artifactId);
