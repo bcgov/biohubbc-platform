@@ -159,4 +159,54 @@ export class SecurityRepository extends BaseRepository {
 
     await this.connection.sql(sqlStatement);
   }
+
+  /**
+   * Get the persecution or harm rules for which a user is granted exception
+   *
+   * @param {number} userId
+   * @return {*}  {Promise<{ persecution_or_harm_id: number }[]>}
+   * @memberof SecurityRepository
+   */
+  async getPersecutionAndHarmRulesExceptionsByUserId(userId: number): Promise<{ persecution_or_harm_id: number }[]> {
+    defaultLog.debug({ label: 'getPersecutionAndHarmRulesExceptionsByUserId' });
+
+    const sqlStatement = SQL`
+      SELECT
+        persecution_or_harm_id
+      FROM
+        system_user_security_exception suse
+      WHERE
+        system_user_id =${userId} and end_date is null;
+    `;
+
+    const response = await this.connection.sql<{ persecution_or_harm_id: number }>(sqlStatement);
+
+    return (response.rowCount && response.rows) || [];
+  }
+
+  /**
+   * Get the persecution and harm rules for a given artifact
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<{ persecution_or_harm_id: number }[]>}
+   * @memberof SecurityRepository
+   */
+  async getDocumentPersecutionAndHarmRules(artifactId: number): Promise<{ persecution_or_harm_id: number }[]> {
+    defaultLog.debug({ label: 'getPersecutionAndHarmRulesExceptionsByUserId' });
+
+    const sqlStatement = SQL`
+      select
+        persecution_or_harm_id
+      from
+        artifact_persecution ap
+      where
+        artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql<{ persecution_or_harm_id: number }>(sqlStatement);
+
+    const results = (response.rowCount && response.rows) || [];
+
+    return results;
+  }
 }
