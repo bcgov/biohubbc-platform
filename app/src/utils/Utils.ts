@@ -310,3 +310,12 @@ export const buildUrl = (...urlParts: (string | undefined)[]): string => {
     .join('/')
     .replace(/([^:]\/)\/+/g, '$1'); // Trim double slashes
 };
+
+/**
+ * Generates the <title> tag text for a React route
+ * @param pageName The name of the page, e.g. 'Projects'
+ * @returns The content to be rendered in the <title> tag
+ */
+export const getTitle = (pageName?: string) => {
+  return pageName ? `BioHub - ${pageName}` : 'BioHub';
+};
