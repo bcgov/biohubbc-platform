@@ -477,6 +477,36 @@ describe.only('DarwinCoreService', () => {
     });
   })
 
+  describe('intakeJob_step_5', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const mediaFileStub = sinon.createStubInstance(MediaFile);
+      const bufferStub = sinon.createStubInstance(Buffer);
+
+      bufferStub.toString.returns(
+        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
+      );
+
+      mediaFileStub.buffer = bufferStub as unknown as Buffer;
+
+      const mockDWCAFile = {
+        submission_id: 1,
+        eml: {
+          emlFile: mediaFileStub
+        },
+        worksheets: {},
+        normalize: () => 'normalized data'
+      } as unknown as DWCArchive;
+      const service = new DarwinCoreService(mockDBConnection);
+      const response = await service.intakeJob_step_5(mockDWCAFile);
+      expect(response).to.be.eql('normalized data');
+    });
+  })
+
   describe.only('intakeJob_step_6', () => {
     afterEach(() => {
       sinon.restore();
@@ -485,31 +515,57 @@ describe.only('DarwinCoreService', () => {
     it('should run without issue', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueueRecord;
 
-      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEndDate').resolves();
-      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEffectiveDate').resolves();
+      const updateEndDate = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEndDate').resolves();
+      const updateEffectiveDate = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEffectiveDate').resolves();
+      const updateObservationEndDate = sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEndTimestamp').resolves();
       const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
-      await service.intakeJob_step_4(1, 1, {});
+      await service.intakeJob_step_6(mockJobQueue);
+
+      expect(updateEndDate).to.be.called;
+      expect(updateEffectiveDate).to.be.called;
+      expect(updateObservationEndDate).to.be.called;
       expect(insertStatus).to.not.be.called;
     });
 
     it('should throw `Update Submission` error', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueueRecord;
 
-      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEndDate').throws();
-      sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEffectiveDate').resolves();
+      const updateEndDate = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEndDate').rejects();
+      const updateEffectiveDate = sinon.stub(SubmissionService.prototype, 'updateSubmissionMetadataRecordEffectiveDate').resolves();
+      const updateObservationEndDate = sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEndTimestamp').resolves();
       const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
-        await service.intakeJob_step_4(1, 1, {});
+        await service.intakeJob_step_6(mockJobQueue);
         expect.fail();
-      } catch (error) {
-        expect(insertStatus).to.be.calledOnce;
-        expect((error as ApiGeneralError).message).to.equal('Updating Submission Record End/Effective Date');
+      } catch (error: any) {
+        expect(updateEndDate).to.be.called;
+        expect(updateEffectiveDate).to.not.be.called;
+        expect(updateObservationEndDate).to.not.be.called;
+        expect(insertStatus).to.be.called;
+
+        expect((error as ApiGeneralError).message).to.equal('Update Submission dates');
       }
     });
+  });
+
+  describe('intakeJob_step_7', () => {
+    
   });
 
   describe('intakeJob_step_5', () => {
@@ -604,14 +660,6 @@ describe.only('DarwinCoreService', () => {
         '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
       );
       mediaFileStub.buffer = bufferStub as unknown as Buffer;
-
-      // const mockDWCAFile = {
-      //   submission_id: 1,
-      //   eml: {
-      //     emlFile: mediaFileStub
-      //   },
-      //   worksheets: {}
-      // } as unknown as DWCArchive;
 
       sinon
         .stub(DarwinCoreService.prototype, 'insertSubmissionObservationRecord')

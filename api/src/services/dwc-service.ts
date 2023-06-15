@@ -237,7 +237,7 @@ export class DarwinCoreService extends DBService {
       return dwcaFile.normalize();
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step_5', message: 'error', error });
-
+      // TODO: does this try catch make sense?
       throw new ApiGeneralError('Normalizing DWC Archive', error.message);
     }
   }
@@ -266,7 +266,7 @@ export class DarwinCoreService extends DBService {
         error.message
       );
 
-      throw new ApiGeneralError('Storing eml JSON data', error.message);
+      throw new ApiGeneralError('Update Submission dates', error.message);
     }
   }
 
