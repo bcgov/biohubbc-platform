@@ -1,7 +1,7 @@
 import { AxiosInstance } from 'axios';
-import { simsHandlebarsTemplate } from 'hooks/templates/SIMS-handlebar-template';
 import {
   IDatasetForReview,
+  IHandlebarsTemplates,
   IListArtifactsResponse,
   IListRelatedDatasetsResponse
 } from 'interfaces/useDatasetApi.interface';
@@ -77,8 +77,10 @@ const useDatasetApi = (axios: AxiosInstance) => {
    * @param {string} datasetId
    * @return {*}  {Promise<string>}
    */
-  const getHandlebarsTemplate = async (datasetId: string): Promise<string> => {
-    return simsHandlebarsTemplate;
+  const getHandleBarsTemplateByDatasetId = async (datasetId: string): Promise<IHandlebarsTemplates> => {
+    const { data } = await axios.get<IHandlebarsTemplates>(`api/dwc/submission/${datasetId}/handlebar`);
+
+    return data;
   };
 
   /**
@@ -99,7 +101,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
     getDatasetEML,
     getDatasetArtifacts,
     getArtifactSignedUrl,
-    getHandlebarsTemplate,
+    getHandleBarsTemplateByDatasetId,
     getRelatedDatasets
   };
 };
