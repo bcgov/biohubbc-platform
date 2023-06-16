@@ -12,7 +12,7 @@ import { getLogger } from '../utils/logger';
 
 const GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS = '4bb42a76-f79b-424f-ad0f-ad3671389ec2'; // @TODO
 
-export interface IGcNotifyArtifactRequestAccess {
+export interface ISubmitArtifactRequestAccess {
   fullName: string;
   emailAddress: string;
   phoneNumber: string;
@@ -20,6 +20,39 @@ export interface IGcNotifyArtifactRequestAccess {
   hasSignedAgreement: boolean;
   artifactIds: number[];
   pathToParent: string;
+  companyInformation?: {
+    companyName: string;
+    jobTitle: string;
+    streetAddress: string;
+    city: string;
+    postalCode: string;
+  };
+  professionalOrganization?: {
+    organizationName: string;
+    memberNumber: string;
+  };
+}
+
+interface IGcNotifyArtifactRequestAccess {
+  subject: string;
+  header: string;
+  date: string;
+  reason_description: string;
+  full_name: string;
+  requested_documents: string;
+  link: string;
+  email: string;
+  phone: string;
+  confidentiality_agreement: string;
+  company_information: boolean;
+  professional_organization: boolean;
+  company_name: string;
+  job_title: string;
+  street_address: string;
+  city: string;
+  postal_code: string;
+  organization_name: string;
+  member_number: string;
 }
 
 const defaultLog = getLogger('services/gcnotify-service');
@@ -54,6 +87,7 @@ export class GCNotifyService extends DBService {
       }
     };
   }
+
   /**
    * Send email notification to recipient
    *
@@ -86,7 +120,7 @@ export class GCNotifyService extends DBService {
     return result;
   }
 
-  async sendNotificationForArtifactRequestAccess(requestData: IGcNotifyArtifactRequestAccess): Promise<boolean> {
+  async sendNotificationForArtifactRequestAccess(requestData: ISubmitArtifactRequestAccess): Promise<boolean> {
     defaultLog.debug({ label: 'sendNotificationForArtifactRequestAccess' });
 
     const url = makeLoginUrl(this.APP_HOST, requestData.pathToParent);
@@ -97,7 +131,7 @@ export class GCNotifyService extends DBService {
     const artifactService = new ArtifactService(this.connection);
     const artifacts = await artifactService.getArtifactsByIds(requestData.artifactIds);
 
-    const baseMessage = {
+    const baseMessage: IGcNotifyArtifactRequestAccess = {
       subject: '',
       header: '',
       date: new Date().toLocaleString(),
@@ -107,6 +141,15 @@ export class GCNotifyService extends DBService {
       confidentiality_agreement: requestData.hasSignedAgreement
         ? '**YES**, the requester has a signed and current Confidentiality and Non-Reproduction Agreeement.'
         : '**NO**, the requester does not have a signed and current Confidentiality and Non-Reproduction Agreeement.',
+      company_information: !requestData.hasSignedAgreement,
+      professional_organization: !requestData.hasSignedAgreement,
+      company_name: requestData.companyInformation?.companyName ?? '',
+      job_title: requestData.companyInformation?.jobTitle ?? '',
+      street_address: requestData.companyInformation?.streetAddress ?? '',
+      city: requestData.companyInformation?.city ?? '',
+      postal_code: requestData.companyInformation?.postalCode ?? '',
+      organization_name: requestData.professionalOrganization?.organizationName ?? 'N/A',
+      member_number: requestData.professionalOrganization?.memberNumber ?? '',
       link,
       email,
       phone
