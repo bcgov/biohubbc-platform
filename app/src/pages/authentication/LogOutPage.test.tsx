@@ -63,11 +63,8 @@ describe('LogOutPage', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      REACT_APP_NODE_ENV: 'local',
-      MAX_UPLOAD_NUM_FILES: 10,
-      MAX_UPLOAD_FILE_SIZE: 52428800
-    };
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+    } as IConfig;
 
     const { getByText } = render(
       <ConfigContext.Provider value={config}>
@@ -95,11 +92,8 @@ describe('LogOutPage', () => {
         realm: 'myrealm',
         clientId: ''
       },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      REACT_APP_NODE_ENV: 'local',
-      MAX_UPLOAD_NUM_FILES: 10,
-      MAX_UPLOAD_FILE_SIZE: 52428800
-    };
+      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com'
+    } as IConfig;
 
     const { getByText } = render(
       <ConfigContext.Provider value={config}>

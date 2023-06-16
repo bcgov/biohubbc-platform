@@ -1,7 +1,5 @@
 import { AxiosInstance } from 'axios';
-import {
-  ISecureDataAccessRequestForm
-} from 'interfaces/useSecurityApi.interface';
+import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 
 /**
  * Returns a set of supported api methods for working with security.
@@ -11,19 +9,46 @@ import {
  */
 const useSecurityApi = (axios: AxiosInstance) => {
   /**
-   * Fetch dataset artifacts by datasetId.
+   * Fetches a list of persecution and harm rules.
    *
-   * @param {string} datasetId
-   * @return {*}  {Promise<any>}
+   * @return {*}  {Promise<IListPersecutionHarmResponse>}
+   */
+  const listPersecutionHarmRules = async (): Promise<IListPersecutionHarmResponse> => {
+    const { data } = await axios.get('/api/security/persecution-harm/list');
+
+    return data;
+  };
+
+  const applySecurityReasonsToArtifacts = async (
+    selectedArtifacts: { artifact_id: number }[],
+    securityReasons: { id: number }[]
+  ): Promise<{ artifact_persecution_id: number }[]> => {
+    const artifactIds = selectedArtifacts.map((artifact) => artifact.artifact_id);
+    const securityReasonIds = securityReasons.map((securityReason) => securityReason.id);
+
+    const { data } = await axios.post('/api/security/persecution-harm/apply', {
+      artifactIds: artifactIds,
+      securityReasonIds: securityReasonIds
+    });
+
+    return data;
+  };
+
+  /**
+   * @TODO jsdoc
+   * @param requestData 
+   * @returns 
    */
   const sendSecureArtifactAccessRequest = async (requestData: ISecureDataAccessRequestForm): Promise<boolean> => {
     const { data } = await axios.post(`api/artifact/security/requestAccess`, requestData);
 
     return data;
-  };
+  }
 
   return {
-    sendSecureArtifactAccessRequest
+    sendSecureArtifactAccessRequest,
+    listPersecutionHarmRules,
+    applySecurityReasonsToArtifacts
   };
 };
 
