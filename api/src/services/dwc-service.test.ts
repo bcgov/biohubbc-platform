@@ -564,7 +564,10 @@ describe.only('DarwinCoreService', () => {
     });
   });
 
-  describe('intakeJob_step_7', () => {
+  describe.only('intakeJob_step_7', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
     
   });
 
