@@ -331,6 +331,7 @@ export class DarwinCoreService extends DBService {
     try {
       return await this.emlService.decorateEML(emlJSON);
     } catch (error: any) {
+      // TODO: does this trycatch here make sense? 
       defaultLog.debug({ label: 'intakeJob_step_9', message: 'error', error });
 
       throw new ApiGeneralError('EML Decoration', error.message);
