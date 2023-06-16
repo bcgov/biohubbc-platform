@@ -4,7 +4,6 @@ import useAdminApi from './api/useAdminApi';
 import useAxios from './api/useAxios';
 import useDatasetApi from './api/useDatasetApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
-import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
@@ -23,8 +22,6 @@ export const useApi = () => {
 
   const admin = useAdminApi(apiAxios);
 
-  const security = useSecurityApi(apiAxios);
-
   const submissions = useSubmissionsApi(apiAxios);
 
   const taxonomy = useTaxonomyApi(apiAxios);
@@ -40,7 +37,6 @@ export const useApi = () => {
   const security = useSecurityApi(apiAxios);
 
   return {
-    security,
     user,
     admin,
     submissions,
