@@ -307,6 +307,10 @@ export class DarwinCoreService extends DBService {
   async intakeJob_step_8(jobQueueRecord: ISubmissionJobQueueRecord, submissionObservationId: number): Promise<void> {
     try {
       await this.runSpatialTransforms(jobQueueRecord, submissionObservationId);
+      await this.submissionService.insertSubmissionStatus(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
+      );
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step_8', message: 'error', error });
 
@@ -376,6 +380,10 @@ export class DarwinCoreService extends DBService {
   async intakeJob_step_11(jobQueueRecord: ISubmissionJobQueueRecord) {
     try {
       await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
+      await this.submissionService.insertSubmissionStatus(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.METADATA_TO_ES
+      );
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step_11', message: 'error', error });
 
@@ -398,6 +406,10 @@ export class DarwinCoreService extends DBService {
   async intakeJob_step_12(jobQueueRecord: ISubmissionJobQueueRecord) {
     try {
       await this.runSecurityTransforms(jobQueueRecord);
+      await this.submissionService.insertSubmissionStatus(
+        jobQueueRecord.submission_id,
+        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
+      );
     } catch (error: any) {
       defaultLog.debug({ label: 'intakeJob_step_12', message: 'error', error });
 
@@ -541,11 +553,6 @@ export class DarwinCoreService extends DBService {
     try {
       //run transform on observation data
       await this.spatialService.runSpatialTransforms(jobQueueRecord.submission_id, submissionObservationId);
-
-      await this.submissionService.insertSubmissionStatus(
-        jobQueueRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
-      );
     } catch (error: any) {
       defaultLog.debug({ label: 'runSpatialTransforms', message: 'error', error });
 
@@ -571,11 +578,6 @@ export class DarwinCoreService extends DBService {
     try {
       //run transform on observation data
       await this.spatialService.runSecurityTransforms(jobQueueRecord.submission_id);
-
-      await this.submissionService.insertSubmissionStatus(
-        jobQueueRecord.submission_id,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_SECURE
-      );
     } catch (error: any) {
       defaultLog.debug({ label: 'runSecurityTransforms', message: 'error', error });
 

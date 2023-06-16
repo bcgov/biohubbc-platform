@@ -760,6 +760,8 @@ describe('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
       const transform = sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
+
       await service.intakeJob_step_11(mockJobQueue);
 
       expect(transform).to.be.calledOnce;
@@ -775,6 +777,7 @@ describe('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
       sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').throws();
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertError = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
@@ -802,6 +805,7 @@ describe('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
       const transform = sinon.stub(DarwinCoreService.prototype, 'runSecurityTransforms').resolves();
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       await service.intakeJob_step_12(mockJobQueue);
 
       expect(transform).to.be.calledOnce;
@@ -817,6 +821,7 @@ describe('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
       sinon.stub(DarwinCoreService.prototype, 'runSecurityTransforms').throws();
+      sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertError = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
@@ -984,16 +989,11 @@ describe('DarwinCoreService', () => {
       const submissionObservationId = 2;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').resolves();
-      const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       await service.runSpatialTransforms(mockJobQueue, submissionObservationId);
 
       expect(transform).to.be.calledOnceWith(mockJobQueue.submission_id, submissionObservationId);
-      expect(status).to.be.calledOnceWith(
-        mockJobQueue.submission_id,
-        SUBMISSION_STATUS_TYPE.SPATIAL_TRANSFORM_UNSECURE
-      );
       expect(insertErrorStatus).to.not.be.called;
     });
 
@@ -1008,7 +1008,6 @@ describe('DarwinCoreService', () => {
       } as ISubmissionJobQueueRecord;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSpatialTransforms').throws();
-      const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
@@ -1016,7 +1015,6 @@ describe('DarwinCoreService', () => {
         expect.fail();
       } catch (error) {
         expect(transform).to.be.calledOnce;
-        expect(status).to.not.be.called;
         expect(insertErrorStatus).to.be.calledOnce;
         expect((error as ApiGeneralError).message).to.equal('Transforming and uploading spatial transforms');
       }
@@ -1039,13 +1037,11 @@ describe('DarwinCoreService', () => {
       } as ISubmissionJobQueueRecord;
 
       const transform = sinon.stub(SpatialService.prototype, 'runSecurityTransforms').resolves();
-      const status = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
       const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       await service.runSecurityTransforms(mockJobQueue);
 
       expect(transform).to.be.calledOnce;
-      expect(status).to.be.calledOnce;
       expect(insertErrorStatus).to.not.be.called;
     });
 
