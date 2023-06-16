@@ -3,7 +3,6 @@ import {
   IArtifact,
   IDatasetForReview,
   IHandlebarsTemplates,
-  IListArtifactsResponse,
   IListRelatedDatasetsResponse
 } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
