@@ -81,198 +81,201 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
   const agreementSignedError = Boolean(formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement'])
 
   return (
-    
-      <>
-        <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>
-          <strong>Documents You Are Requesting</strong>
-        </Typography>
-        <Box py={2}>
-          <Paper elevation={0}>
-            <DataGrid
-              className={classes.dataGrid}
-              getRowId={(row) => row.artifact_id}
-              autoHeight
-              rows={props.artifacts}
-              columns={columns}
-              checkboxSelection
-              disableRowSelectionOnClick
-              disableColumnSelector
-              disableColumnFilter
-              disableColumnMenu
-              disableVirtualization
-              disableDensitySelector
-              hideFooter
-              sortingOrder={['asc', 'desc']}
-              onRowSelectionModelChange={onChangeSelection}
-              />
-            </Paper>
-        </Box>
+    <>
+      <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>
+        <strong>Documents You Are Requesting</strong>
+      </Typography>
+      <Box py={2}>
+        <Paper elevation={0}>
+          <DataGrid
+            className={classes.dataGrid}
+            getRowId={(row) => row.artifact_id}
+            autoHeight
+            rows={props.artifacts}
+            columns={columns}
+            checkboxSelection
+            disableRowSelectionOnClick
+            disableColumnSelector
+            disableColumnFilter
+            disableColumnMenu
+            disableVirtualization
+            disableDensitySelector
+            hideFooter
+            sortingOrder={['asc', 'desc']}
+            onRowSelectionModelChange={onChangeSelection}
+          />
+        </Paper>
+      </Box>
 
-        <Typography variant="body1" className={classes.subheader}>
-          <strong>Contact Details</strong>
-        </Typography>
+      <Typography variant="body1" className={classes.subheader}>
+        <strong>Contact Details</strong>
+      </Typography>
 
-        <Box py={2}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <CustomTextField
-                name="fullName"
-                label="Full Name"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <CustomTextField
-                name="emailAddress"
-                label="Email Address"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <CustomTextField
-                name="phoneNumber"
-                label="Phone Number"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-          </Grid>
-        </Box>
-
-        <Box mt={2}>
-          <Typography variant="body1" className={classes.subheader}>
-            <strong>Reason for Request</strong>
-          </Typography>
-          <DialogContentText variant="body1">Please be specific in describing your request.</DialogContentText>
-          <Box py={2}>
+      <Box py={2}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
             <CustomTextField
-              name="reasonDescription"
-              label="Description"
-              other={{ multiline: true, required: true, rows: 4 }}
+              name="fullName"
+              label="Full Name"
+              other={{
+                required: true
+              }}
             />
-          </Box>
-        </Box>
-
-        <Box mt={2}>
-          <FormControl
-            required={true}
-            component="fieldset"
-            error={agreementSignedError}
-          >
-            <Typography component="legend" variant="h5">
-              Confidentiality Agreement
-            </Typography>
-            <Typography color="textSecondary">
-              Do you have a signed and current Confidentiality and Non-Reproduction Agreement?
-            </Typography>
-            <Box mt={2} pl={1}>
-              <RadioGroup
-                name="hasSignedAgreement"
-                value={formikProps.values.hasSignedAgreement}
-                onChange={onChangeAgreementConfirmation}
-              >
-                <FormControlLabel
-                  value="true"
-                  control={<Radio required={true} color="primary" size="small" />}
-                  label="Yes"
-                />
-                <FormControlLabel
-                  value="false"
-                  control={<Radio required={true} color="primary" size="small" />}
-                  label="No"
-                />
-                <FormHelperText>{formikProps.errors['hasSignedAgreement']}</FormHelperText>
-              </RadioGroup>
-            </Box>
-          </FormControl>
-        </Box>
-
-        <Typography variant="body1" className={classes.subheader}>
-          <strong>Company Information</strong>
-        </Typography>
-
-        <Box py={2}>
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <CustomTextField
-                name="company.companyName"
-                label="Company Name"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <CustomTextField
-                name="company.jobTitle"
-                label="Job/Position Title"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <CustomTextField
-                name="company.streetAddress"
-                label="Street Address"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <CustomTextField
-                name="company.city"
-                label="City / Town"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <CustomTextField
-                name="company.postalCode"
-                label="Postal Code"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
           </Grid>
-        </Box>
-
-        <Typography variant="body1" className={classes.subheader}>
-          <strong>Professional Organization (Optional)</strong>
-        </Typography>
-
-        <Box py={2}>
-          <Grid container spacing={3}>
-            <Grid item xs={6}>
-              <CustomTextField
-                name="organization.organizationName"
-                label="Organization Name"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <CustomTextField
-                name="organization.memberNumber"
-                label="Member Number"
-                other={{
-                  required: true
-                }}
-              />
-            </Grid>
+          <Grid item xs={6}>
+            <CustomTextField
+              name="emailAddress"
+              label="Email Address"
+              other={{
+                required: true
+              }}
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <CustomTextField
+              name="phoneNumber"
+              label="Phone Number"
+              other={{
+                required: true
+              }}
+            />
+          </Grid>
         </Grid>
+      </Box>
+
+      <Box mt={2}>
+        <Typography variant="body1" className={classes.subheader}>
+          <strong>Reason for Request</strong>
+        </Typography>
+        <DialogContentText variant="body1">Please be specific in describing your request.</DialogContentText>
+        <Box py={2}>
+          <CustomTextField
+            name="reasonDescription"
+            label="Description"
+            other={{ multiline: true, required: true, rows: 4 }}
+          />
         </Box>
-      </>
+      </Box>
+
+      <Box mt={2}>
+        <FormControl
+          required={true}
+          component="fieldset"
+          error={agreementSignedError}
+        >
+          <Typography component="legend" variant="h5">
+            Confidentiality Agreement
+          </Typography>
+          <Typography color="textSecondary">
+            Do you have a signed and current Confidentiality and Non-Reproduction Agreement?
+          </Typography>
+          <Box mt={2} pl={1}>
+            <RadioGroup
+              name="hasSignedAgreement"
+              value={formikProps.values.hasSignedAgreement}
+              onChange={onChangeAgreementConfirmation}
+            >
+              <FormControlLabel
+                value="true"
+                control={<Radio required={true} color="primary" size="small" />}
+                label="Yes"
+              />
+              <FormControlLabel
+                value="false"
+                control={<Radio required={true} color="primary" size="small" />}
+                label="No"
+              />
+              <FormHelperText>{formikProps.errors['hasSignedAgreement']}</FormHelperText>
+            </RadioGroup>
+          </Box>
+        </FormControl>
+      </Box>
+
+      {formikProps.values['hasSignedAgreement'] === false && (
+        <>
+          <Typography variant="body1" className={classes.subheader}>
+            <strong>Company Information</strong>
+          </Typography>
+
+          <Box py={2}>
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <CustomTextField
+                  name="company.companyName"
+                  label="Company Name"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <CustomTextField
+                  name="company.jobTitle"
+                  label="Job/Position Title"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <CustomTextField
+                  name="company.streetAddress"
+                  label="Street Address"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <CustomTextField
+                  name="company.city"
+                  label="City / Town"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <CustomTextField
+                  name="company.postalCode"
+                  label="Postal Code"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Box>
+
+          <Typography variant="body1" className={classes.subheader}>
+            <strong>Professional Organization (Optional)</strong>
+          </Typography>
+
+          <Box py={2}>
+            <Grid container spacing={3}>
+              <Grid item xs={6}>
+                <CustomTextField
+                  name="organization.organizationName"
+                  label="Organization Name"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <CustomTextField
+                  name="organization.memberNumber"
+                  label="Member Number"
+                  other={{
+                    required: true
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        </>
+      )}
+    </>
   );
 };
 
