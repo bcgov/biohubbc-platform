@@ -28,7 +28,7 @@ import { EMLService } from './eml-service';
 
 chai.use(sinonChai);
 
-describe.only('DarwinCoreService', () => {
+describe('DarwinCoreService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -69,13 +69,14 @@ describe.only('DarwinCoreService', () => {
       const step4 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_4').resolves();
       const step5 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_5').resolves();
       const step6 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_6').resolves();
-      const step7 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_7').resolves();
+      const step7 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_7').resolves({submission_observation_id: 1});
       const step8 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_8').resolves();
-      const step9 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_9').resolves();
+      const step9 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_9').resolves({});
       const step10 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_10').resolves();
       const step11 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_11').resolves();
       const step12 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_12').resolves();
       const step13 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_13').resolves();
+      const submissionStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
 
       await service.intakeJob(mockJobQueue);
 
@@ -92,6 +93,7 @@ describe.only('DarwinCoreService', () => {
       expect(step11).to.be.calledOnce;
       expect(step12).to.be.calledOnce;
       expect(step13).to.be.calledOnce;
+      expect(submissionStatus).to.be.calledOnce;
     });
   });
 
@@ -701,8 +703,7 @@ describe.only('DarwinCoreService', () => {
     })
   })
 
-
-  describe('intakeJob_step6', () => {
+  describe('intakeJob_step_10', async () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -710,7 +711,119 @@ describe.only('DarwinCoreService', () => {
     it('should run without issue', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
+      const update = sinon.stub(SubmissionService.prototype, 'updateSubmissionRecordEMLJSONSource').resolves()
 
+      await service.intakeJob_step_10(1, 1, {});
+
+      expect(update).to.be.calledOnce;
+    });
+
+    it('should throw a `Updating Record EML` error', async () => {
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return { rowCount: 0, rows: [] } as any as Promise<QueryResult<any>>;
+        }
+      });
+      const service = new DarwinCoreService(mockDBConnection);
+      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+
+      try {
+        await service.intakeJob_step_10(1, 1, {});
+      } catch (error) {
+        expect(insertStatus).to.be.calledOnce;
+        expect((error as ApiGeneralError).message).to.equal('Updating Record EML');
+      }
+    });
+  })
+
+  describe('intakeJob_step_11', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueueRecord;
+      const transform = sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').resolves();
+      await service.intakeJob_step_11(mockJobQueue)
+
+      expect(transform).to.be.calledOnce;
+    })
+
+    it('should throw `Transforming and uploading metadata` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueueRecord;
+      sinon.stub(DarwinCoreService.prototype, 'transformAndUploadMetaData').throws();
+      const insertError = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+      
+      try {
+        await service.intakeJob_step_11(mockJobQueue)
+        expect.fail();
+      } catch (error: any) {
+        expect(insertError).to.be.calledOnce;
+        expect(error.message).to.be.eq('Transforming and uploading metadata')
+      }
+    })
+  })
+
+  describe('intakeJob_step_12', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueueRecord;
+      const transform = sinon.stub(DarwinCoreService.prototype, 'runSecurityTransforms').resolves();
+      await service.intakeJob_step_12(mockJobQueue)
+
+      expect(transform).to.be.calledOnce;
+    })
+
+    it('should throw `Secure spatial transforms` error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
+      const mockJobQueue = {
+        submission_job_queue_id: 1,
+        submission_id: 1,
+        job_start_timestamp: '',
+        job_end_timestamp: ''
+      } as ISubmissionJobQueueRecord;
+      sinon.stub(DarwinCoreService.prototype, 'runSecurityTransforms').throws();
+      const insertError = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+      
+      try {
+        await service.intakeJob_step_12(mockJobQueue)
+        expect.fail();
+      } catch (error: any) {
+        expect(insertError).to.be.calledOnce;
+        expect(error.message).to.be.eq('Secure spatial transforms')
+      }
+    })
+  })
+
+  describe('intakeJob_step_13', () => {
+    it('should run without issue', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new DarwinCoreService(mockDBConnection);
       const mockJobQueue = {
         submission_job_queue_id: 1,
         submission_id: 1,
@@ -718,32 +831,16 @@ describe.only('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
 
-      const mediaFileStub = sinon.createStubInstance(MediaFile);
-      const bufferStub = sinon.createStubInstance(Buffer);
+      const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').resolves();
 
-      bufferStub.toString.returns(
-        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
-      );
-
-      mediaFileStub.buffer = bufferStub as unknown as Buffer;
-
-      const update = sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEndTimestamp').resolves();
-      const insert = sinon
-        .stub(DarwinCoreService.prototype, 'insertSubmissionObservationRecord')
-        .resolves({ submission_observation_id: 1 });
-      const transform = sinon.stub(DarwinCoreService.prototype, 'runTransformsOnObservations').resolves();
-
-      await service.intakeJob_step_6(mockJobQueue);
+      await service.intakeJob_step_13(mockJobQueue);
 
       expect(update).to.be.calledOnce;
-      expect(insert).to.be.calledOnce;
-      expect(transform).to.be.calledOnce;
     });
 
     it('should throw `Transforming and uploading` error', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new DarwinCoreService(mockDBConnection);
-
       const mockJobQueue = {
         submission_job_queue_id: 1,
         submission_id: 1,
@@ -751,74 +848,18 @@ describe.only('DarwinCoreService', () => {
         job_end_timestamp: ''
       } as ISubmissionJobQueueRecord;
 
-      const mediaFileStub = sinon.createStubInstance(MediaFile);
-      const bufferStub = sinon.createStubInstance(Buffer);
-      bufferStub.toString.returns(
-        '<?xml version="1.0" encoding="UTF-8"?><eml:eml packageId="urn:uuid:0cf8169f-b159-4ef9-bd43-93348bdc1e9f"></eml:eml>'
-      );
-      mediaFileStub.buffer = bufferStub as unknown as Buffer;
-
-      sinon
-        .stub(DarwinCoreService.prototype, 'insertSubmissionObservationRecord')
-        .resolves({ submission_observation_id: 1 });
-      sinon.stub(DarwinCoreService.prototype, 'runTransformsOnObservations').resolves();
-      sinon.stub(DarwinCoreService.prototype, 'updateSubmissionObservationEndTimestamp').throws();
-      const insertStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
+      const updateS3 = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
+      const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
-        await service.intakeJob_step_6(mockJobQueue);
+        await service.intakeJob_step_13(mockJobQueue);
         expect.fail();
       } catch (error) {
-        expect(insertStatus).to.be.calledOnce;
-        expect((error as ApiGeneralError).message).to.equal('Transforming and uploading metadata');
+        expect(updateS3).to.be.called;
+        expect(insertErrorStatus).to.be.called;
       }
     });
   });
-
-  // describe('intakeJob_finishIntake', () => {
-  //   it('should run without issue', async () => {
-  //     const mockDBConnection = getMockDBConnection();
-  //     const service = new DarwinCoreService(mockDBConnection);
-  //     const mockJobQueue = {
-  //       submission_job_queue_id: 1,
-  //       submission_id: 1,
-  //       job_start_timestamp: '',
-  //       job_end_timestamp: ''
-  //     } as ISubmissionJobQueueRecord;
-
-  //     const update = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').resolves();
-  //     const insert = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-
-  //     await service.intakeJob_finishIntake(mockJobQueue);
-
-  //     expect(update).to.be.calledOnce;
-  //     expect(insert).to.be.calledOnce;
-  //   });
-
-  //   it('should throw `Transforming and uploading` error', async () => {
-  //     const mockDBConnection = getMockDBConnection();
-  //     const service = new DarwinCoreService(mockDBConnection);
-  //     const mockJobQueue = {
-  //       submission_job_queue_id: 1,
-  //       submission_id: 1,
-  //       job_start_timestamp: '',
-  //       job_end_timestamp: ''
-  //     } as ISubmissionJobQueueRecord;
-
-  //     const updateS3 = sinon.stub(DarwinCoreService.prototype, 'updateS3FileLocation').throws();
-  //     const insertSubmissionStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatus').resolves();
-  //     const insertErrorStatus = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
-
-  //     try {
-  //       await service.intakeJob_finishIntake(mockJobQueue);
-  //       expect.fail();
-  //     } catch (error) {
-  //       expect(updateS3).to.be.called;
-  //       expect(insertErrorStatus).to.be.called;
-  //       expect(insertSubmissionStatus).not.to.be.called;
-  //     }
-  //   });
-  // });
 
   describe('updateSubmissionObservationEndTimestamp', () => {
     it('should run without issue', async () => {
