@@ -50,6 +50,7 @@ POST.apiDoc = {
             },
             artifactIds: {
               type: 'array',
+              minItems: 1,
               description: 'The primary keys belonging to the requested artifacts',
               items: {
                 type: 'integer',
