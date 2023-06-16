@@ -52,6 +52,19 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
     await biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, securityReasons);
   };
 
+  const handleShowSnackBar = (message: string) => {
+    showSnackBar({
+      snackbarMessage: (
+        <>
+          <Typography variant="body2" component="div">
+            {message}
+          </Typography>
+        </>
+      ),
+      open: true
+    });
+  };
+
   return (
     <>
       <Dialog
@@ -74,16 +87,9 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           validateOnChange={false}
           onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
             await handleSubmit(values.securityReasons);
-            showSnackBar({
-              snackbarMessage: (
-                <>
-                  <Typography variant="body2" component="div">
-                    You successfully applied security reasons to the file{selectedArtifacts.length > 1 && 's'}.
-                  </Typography>
-                </>
-              ),
-              open: true
-            });
+            handleShowSnackBar(
+              `You successfully applied security reasons to the file${selectedArtifacts.length !== 1 ? 's' : ''}.`
+            );
             onClose();
           }}>
           {(formikProps) => (
@@ -93,16 +99,9 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onClose={() => setYesNoDialogOpen(false)}
                 onYes={async () => {
                   await formikProps.submitForm();
-                  showSnackBar({
-                    snackbarMessage: (
-                      <>
-                        <Typography variant="body2" component="div">
-                          You successfully unsecured the file{selectedArtifacts.length > 1 && 's'}.
-                        </Typography>
-                      </>
-                    ),
-                    open: true
-                  });
+                  handleShowSnackBar(
+                    `You successfully unsecured the file${selectedArtifacts.length !== 1 ? 's' : ''}.`
+                  );
                   setYesNoDialogOpen(false);
                 }}
                 onNo={() => setYesNoDialogOpen(false)}
@@ -131,7 +130,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <DialogContentText id="alert-dialog-description">
                   Search for the security reasons and apply them to the selected document
-                  {selectedArtifacts.length > 1 ? 's' : ''}.
+                  {selectedArtifacts.length !== 1 ? 's' : ''}.
                 </DialogContentText>
 
                 <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
