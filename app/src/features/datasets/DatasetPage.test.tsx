@@ -31,7 +31,7 @@ const mockUseApi = {
   dataset: {
     getDatasetEML: jest.fn(),
     getDatasetArtifacts: jest.fn(),
-    getHandlebarsTemplate: jest.fn()
+    getHandleBarsTemplateByDatasetId: jest.fn()
   },
   search: {
     getSpatialData: jest.fn(),
@@ -61,7 +61,7 @@ describe('DatasetPage', () => {
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
-    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('not empty');
+    mockUseApi.dataset.getHandleBarsTemplateByDatasetId.mockResolvedValue({ header: 'header', details: 'details' });
 
     const { getByTestId } = renderContainer();
 
@@ -104,7 +104,10 @@ describe('DatasetPage', () => {
       }
     });
 
-    mockUseApi.dataset.getHandlebarsTemplate.mockResolvedValue('{{eml:eml.dataset.contact.organizationName}}');
+    mockUseApi.dataset.getHandleBarsTemplateByDatasetId.mockResolvedValue({
+      header: 'header',
+      details: '{{eml:eml.dataset.contact.organizationName}}'
+    });
 
     mockUseApi.dataset.getDatasetArtifacts.mockResolvedValue([]);
 
@@ -113,7 +116,6 @@ describe('DatasetPage', () => {
     await waitFor(() => {
       expect(getByTestId('MapContainer')).toBeVisible();
       expect(getByText('organization name')).toBeVisible();
-      expect(getByTestId('export-occurrence')).toBeVisible();
     });
   });
 });

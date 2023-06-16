@@ -1,4 +1,5 @@
 import Handlebars, { HelperOptions } from 'handlebars';
+import moment from 'moment';
 
 export const useHandlebars = () => {
   /**
@@ -35,13 +36,20 @@ export const useHandlebars = () => {
   };
 
   const capitalizeFirst = () => {
-    Handlebars.registerHelper('capFirst', (text) => {
+    Handlebars.registerHelper('capFirst', (text: string) => {
       if (typeof text === 'string') {
         return `${text.charAt(0).toUpperCase()}${text.slice(1).toLowerCase()}`;
       }
       return text;
     });
   };
+
+  const formatDateHelper = () => {
+    Handlebars.registerHelper('formatDate', (dateString: string) => {
+      return moment(dateString, 'YYYY-MM-DD').format('MMM YYYY').toString();
+    });
+  };
+
   /**
    * This function converts a rawTemplate to a template
    *
@@ -51,6 +59,7 @@ export const useHandlebars = () => {
   const compileFromRawTemplate = (template: TemplateSpecification): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
     capitalizeFirst();
+    formatDateHelper();
     return Handlebars.compile(template);
   };
 
@@ -58,14 +67,14 @@ export const useHandlebars = () => {
    * This function converts a precompiled template
    * see Readme/handlebars.md for more information
    *
-   * @param {TemplateSpecification} preCompiledtemplate
+   * @param {TemplateSpecification} preCompiledTemplate
    * @return {*}  {HandlebarsTemplateDelegate}
    */
-  const compileFromPrecompiledTemplate = (preCompiledtemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
+  const compileFromPrecompiledTemplate = (preCompiledTemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
     // This is a workaround to using Handlebars.template(preCompiledTemplate)
     // in order to avoid an unknown object exception
 
-    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledtemplate})`;
+    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledTemplate})`;
     // eslint-disable-next-line no-eval
     const handlebarsFunction = eval(encodedHandlebarsFunction);
 

@@ -54,7 +54,7 @@ POST.apiDoc = {
             items: {
               title: 'Artifact Persecution',
               type: 'object',
-              required: ['artifact_persecution_id'],
+              nullable: true,
               properties: {
                 artifact_persecution_id: {
                   type: 'integer',
@@ -95,15 +95,12 @@ export function applySecurityRulesToArtifacts(): RequestHandler {
 
       const securityService = new SecurityService(connection);
 
-      await securityService.removeAllSecurityRulesFromArtifact(artifactIds);
+      const response: { artifact_persecution_id: number }[] = await securityService.applySecurityRulesToArtifacts(
+        artifactIds,
+        securityReasonIds
+      );
 
-      let response: { artifact_persecution_id: number }[] = [];
-
-      if (securityReasonIds.length > 0) {
-        response = await securityService.applySecurityRulesToArtifacts(artifactIds, securityReasonIds);
-      }
-
-      res.status(200).json(response);
+      res.status(200).json(response.flat());
       await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'applySecurityRulesToArtifacts', message: 'error', error });

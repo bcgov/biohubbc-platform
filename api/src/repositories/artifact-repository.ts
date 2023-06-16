@@ -149,6 +149,13 @@ export class ArtifactRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Retrieves all artifacts belonging to the given submission.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<Artifact>}
+   * @memberof ArtifactRepository
+   */
   async getArtifactById(artifactId: number): Promise<Artifact> {
     defaultLog.debug({ label: 'getArtifactById', artifactId });
 
@@ -170,5 +177,33 @@ export class ArtifactRepository extends BaseRepository {
     }
 
     return result;
+  }
+
+  /**
+   * updates the security review timestamp for the given artifact.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<void>}
+   * @memberof ArtifactRepository
+   */
+  async updateArtifactSecurityReviewTimestamp(artifactId: number): Promise<void> {
+    defaultLog.debug({ label: 'updateArtifactSecurityReviewTimestamp', artifactId });
+
+    const sqlStatement = SQL`
+      UPDATE
+        artifact
+      SET
+        security_review_timestamp = NOW()
+      WHERE
+        artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    const results = (response?.rowCount && response?.rows) || null;
+
+    if (!results) {
+      throw new ApiExecuteSQLError('Failed to update artifact security review timestamp');
+    }
   }
 }

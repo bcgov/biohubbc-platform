@@ -5,6 +5,7 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   IDatasetsForReview,
+  IHandlebarsTemplates,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
@@ -371,27 +372,27 @@ export class SubmissionService extends DBService {
   /**
    * Insert a new metadata record
    *
-   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @param {ISubmissionMetadataRecord} submissionMetadata
    * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionService
    */
   async insertSubmissionMetadataRecord(
-    submissonMetadata: ISubmissionMetadataRecord
+    submissionMetadata: ISubmissionMetadataRecord
   ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.insertSubmissionMetadataRecord(submissonMetadata);
+    return this.submissionRepository.insertSubmissionMetadataRecord(submissionMetadata);
   }
 
   /**
    * Insert a new Observation Record
    *
-   * @param {ISubmissionObservationRecord} submissonObservation
+   * @param {ISubmissionObservationRecord} submissionObservation
    * @return {*}  {Promise<{ submission_observation_id: number }>}
    * @memberof SubmissionService
    */
   async insertSubmissionObservationRecord(
-    submissonObservation: ISubmissionObservationRecord
+    submissionObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
-    return this.submissionRepository.insertSubmissionObservationRecord(submissonObservation);
+    return this.submissionRepository.insertSubmissionObservationRecord(submissionObservation);
   }
 
   /**
@@ -425,6 +426,16 @@ export class SubmissionService extends DBService {
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });
+  }
+
+  /**
+   * Gets an object containing handlebars templates for the dataset page for a given dataset ID
+   *
+   * @param datasetId uuid used to fetch handlebars templates
+   * @returns An object containing
+   */
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
+    return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
   }
 
   /**

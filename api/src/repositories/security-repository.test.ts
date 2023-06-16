@@ -120,7 +120,7 @@ describe('SecurityRepository', () => {
     });
   });
 
-  describe('removeAllSecurityRulesFromArtifact', () => {
+  describe('deleteSecurityRuleFromArtifact', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -143,7 +143,7 @@ describe('SecurityRepository', () => {
 
       const securityRepository = new SecurityRepository(mockDBConnection);
 
-      const response = await securityRepository.removeAllSecurityRulesFromArtifact(1);
+      const response = await securityRepository.deleteSecurityRuleFromArtifact(1, 1);
 
       expect(response).to.eql(undefined);
     });
