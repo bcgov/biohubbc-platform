@@ -1,8 +1,8 @@
 import { AxiosInstance } from 'axios';
 import {
+  IArtifact,
   IDatasetForReview,
   IHandlebarsTemplates,
-  IListArtifactsResponse,
   IListRelatedDatasetsResponse
 } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
@@ -54,7 +54,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
    * @param {string} datasetId
    * @return {*}  {Promise<any>}
    */
-  const getDatasetArtifacts = async (datasetId: string): Promise<IListArtifactsResponse> => {
+  const getDatasetArtifacts = async (datasetId: string): Promise<IArtifact[]> => {
     const { data } = await axios.get(`api/dwc/submission/${datasetId}/artifacts`);
 
     return data;
