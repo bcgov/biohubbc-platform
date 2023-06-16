@@ -26,14 +26,6 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
     setAnchorEl(null);
   };
 
-  const checkPermissions = () => {
-    if (props.hasAdministrativePermissions) {
-      return false;
-    } else {
-      return props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED;
-    }
-  };
-
   return (
     <>
       <Box my={-1}>
@@ -58,7 +50,11 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
               'aria-labelledby': 'basic-button'
             }}>
             <MenuItem
-              disabled={checkPermissions()}
+              disabled={
+                props.hasAdministrativePermissions
+                  ? false
+                  : props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED
+              }
               onClick={() => {
                 props.onDownload(props.artifact);
                 setAnchorEl(null);

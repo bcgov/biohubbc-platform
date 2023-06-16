@@ -63,10 +63,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const artifactsList = artifactsDataLoader.data || [];
 
-  const numPendingDocuments =
-    artifactsList.filter(
-      (artifact) => artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING
-    ).length || 0;
+  const numPendingDocuments = artifactsList.filter(
+    (artifact) => artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING
+  ).length;
 
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
@@ -158,7 +157,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => setOpenApplySecurity(true)}
-            disabled={hasAdministrativePermissions && selectedArtifacts.length > 0 ? false : true}>
+            disabled={!hasAdministrativePermissions || selectedArtifacts.length === 0}>
             Apply Security
           </Button>
           <IconButton disabled title="Download Files" aria-label={`Download selected files`}>
