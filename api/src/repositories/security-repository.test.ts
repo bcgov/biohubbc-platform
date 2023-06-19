@@ -185,7 +185,6 @@ describe('SecurityRepository', () => {
     });
   });
 
-
   describe('getDocumentPersecutionAndHarmRules', () => {
     it('should succeed with valid data', async () => {
       const mockQueryResponse = {

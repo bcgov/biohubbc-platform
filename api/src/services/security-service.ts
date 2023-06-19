@@ -180,9 +180,9 @@ export class SecurityService extends DBService {
 
     const userId = this.connection.systemUserId();
 
-    const isDocumentPendingReview = (await this.artifactService.getArtifactById(artifactId)).security_review_timestamp
-      ? false
-      : true;
+    const artifact = await this.artifactService.getArtifactById(artifactId);
+
+    const isDocumentPendingReview = artifact.security_review_timestamp ? false : true;
 
     if (!isSystemUserAdmin && isDocumentPendingReview) {
       throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
@@ -200,15 +200,15 @@ export class SecurityService extends DBService {
       documentSecurityRules.length > 0 &&
       !userHasExceptionsToAllRules
     ) {
-      throw new HTTP403('You do not have access to this document');
+      throw new HTTP403('You do not have access to this document.');
     }
 
     // access is granted because
     // 1) admin
     // 2) document is unsecured (not pending review, and has no security rules)
     // 3) non-admin has exceptions all security rules
-    const response = await this.artifactService.getArtifactById(artifactId);
-    return getS3SignedURL(response.key);
+
+    return getS3SignedURL(artifact.key);
   }
 
   /**
