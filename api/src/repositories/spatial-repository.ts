@@ -4,6 +4,7 @@ import SQL from 'sql-template-strings';
 import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { Srid } from '../services/geo-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
