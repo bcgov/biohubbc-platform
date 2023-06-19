@@ -34,22 +34,6 @@ export const simsHandlebarsTemplate_DETAILS = `
             </div>
           {{/ifCond}}
         {{/each}}
-        
-        {{#if eml:eml.dataset.contact.individualName.givenName}}
-          <div>
-              <dt>
-                Lead
-              </dt>
-              <dd>
-                {{#if eml:eml.dataset.contact.individualName.givenName}}
-                  {{eml:eml.dataset.contact.individualName.givenName}}
-                {{/if}}
-                {{#if eml:eml.dataset.contact.individualName.surName}}
-                  {{eml:eml.dataset.contact.individualName.surName}}
-                {{/if}}
-              </dd>
-          </div>
-        {{/if}}
 
         <!-- TIMELINE -->
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates}}
@@ -58,7 +42,7 @@ export const simsHandlebarsTemplate_DETAILS = `
               Timeline
             </dt>
             <dd>
-              {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate}}{{/formatDate}} - {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate}}{{/formatDate}}
+              {{formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate 'YYYY-MM-DD' 'MMM YYYY'}} - {{formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate 'YYYY-MM-DD' 'MMM YYYY'}}
             </dd>
           </div>
         {{/if}}
@@ -88,9 +72,13 @@ export const simsHandlebarsTemplate_DETAILS = `
                 Activities
               </dt>
               <dd>
-                {{#each metadata.projectActivity as | activities |}}
-                  {{activities.name}}{{#unless @last}}, {{/unless}}
-                {{/each}}
+                {{#if (isAnArray metadata.projectActivity)}}
+                  {{#each metadata.projectActivity as | activities |}}
+                    {{activities.name}}{{#unless @last}}, {{/unless}}
+                  {{/each}}
+                {{else}}
+                  {{metadata.projectActivity.name}}
+                {{/if}}
               </dd>
             </div>
             {{/ifCond}}
@@ -137,9 +125,13 @@ export const simsHandlebarsTemplate_DETAILS = `
                     Partners
                   </dt>
                   <dd>
-                    {{#each metadata.partnership as | partnership |}}
-                      {{partnership.name}}{{#unless @last}}, {{/unless}}
-                    {{/each}}
+                    {{#if (isAnArray metadata.partnership)}}
+                      {{#each metadata.partnership as | partnership |}}
+                        {{partnership.name}}{{#unless @last}}, {{/unless}}
+                      {{/each}}
+                    {{else}}
+                      {{metadata.partnership.name}}
+                    {{/if}}
                   </dd>
                 </div>
               {{/ifCond}}
@@ -150,20 +142,28 @@ export const simsHandlebarsTemplate_DETAILS = `
         <!-- CONSERVATION ACTIONS -->
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#each amd.metadata as | metadata |}}
-            {{#ifCond @key '===' "IUCNConservationActions"}}
+            {{#ifCond @key '===' "IUCNConservationActions"}}              
               {{#ifCond metadata '!==' ""}}
                 <div>
                   <dt>
                     Conservation Activities
                   </dt>
                   <dd>
-                    <ul style="padding-left: 20px">
-                      {{#each metadata.IUCNConservationAction as | actions |}}
+                    {{#if (isAnArray metadata.IUCNConservationAction)}}
+                      <ul style="padding-left: 20px">
+                        {{#each metadata.IUCNConservationAction as | actions |}}
+                          <li>
+                            {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                          </li>
+                        {{/each}}
+                      </ul>
+                    {{else}}
+                      <ul style="padding-left: 20px">
                         <li>
-                          {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                          {{metadata.IUCNConservationAction.IUCNConservationActionLevel1Classification}} > {{metadata.IUCNConservationAction.IUCNConservationActionLevel2SubClassification}} > {{metadata.IUCNConservationAction.IUCNConservationActionLevel3SubClassification}}
                         </li>
-                      {{/each}}
-                    </ul>
+                      </ul>
+                    {{/if}}
                   </dd>
                 </div>
               {{/ifCond}}
