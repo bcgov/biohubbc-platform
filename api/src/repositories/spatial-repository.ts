@@ -4,7 +4,6 @@ import SQL from 'sql-template-strings';
 import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { SpatialProjection } from '../services/geo-service';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { BaseRepository } from './base-repository';
 
@@ -934,14 +933,14 @@ export class SpatialRepository extends BaseRepository {
    *
    * @param {number} submissionId A submission id
    * @param {(SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID)} spatialComponentType
-   * @param {SpatialProjection.Srid} srid The id of the projection used when converting the geography to WKT
+   * @param {Srid} srid The id of the projection used when converting the geography to WKT
    * @return {*}
    * @memberof SpatialRepository
    */
   async getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
     submissionId: number,
     spatialComponentType: SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
-    srid: SpatialProjection.Srid
+    srid: Srid
   ) {
     const knex = getKnex();
 

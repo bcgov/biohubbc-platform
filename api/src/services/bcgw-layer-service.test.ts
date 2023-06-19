@@ -6,8 +6,6 @@ chai.use(sinonChai);
 
 // TODO
 describe('BcgwLayerService', () => {
-  beforeEach(() => {});
-
   afterEach(() => {
     sinon.restore();
   });

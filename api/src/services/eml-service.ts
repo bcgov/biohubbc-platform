@@ -7,7 +7,7 @@ import { IDBConnection } from '../database/db';
 import { getLogger } from '../utils/logger';
 import { BcgwLayerService } from './bcgw-layer-service';
 import { DBService } from './db-service';
-import { SpatialProjection } from './geo-service';
+import { Srid3005 } from './geo-service';
 import { SpatialService } from './spatial-service';
 import { SystemConstantService } from './system-constant-service';
 
@@ -140,7 +140,7 @@ export class EMLService extends DBService {
     const boundarySpatialComponent = await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
       submissionId,
       SPATIAL_COMPONENT_TYPE.BOUNDARY,
-      SpatialProjection.Srid3005
+      Srid3005
     );
 
     // Fetch the submission `Boundary Centroid` spatial component
@@ -148,7 +148,7 @@ export class EMLService extends DBService {
       await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
         submissionId,
         SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
-        SpatialProjection.Srid3005
+        Srid3005
       );
 
     const datasetRegionService = new BcgwLayerService();

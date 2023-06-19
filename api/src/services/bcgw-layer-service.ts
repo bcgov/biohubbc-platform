@@ -1,36 +1,34 @@
 import { XMLParser } from 'fast-xml-parser';
 import { z } from 'zod';
-import { SpatialProjection, WebFeatureService, WebMapService } from './geo-service';
+import { Epsg3005, WebFeatureService, WebMapService } from './geo-service';
 
-export namespace BcgwLayers {
-  /**
-   * BCGW (BCGov) ENV regional boundaries layer.
-   *
-   * @see https://catalogue.data.gov.bc.ca/dataset/env-regional-boundaries
-   */
-  export type BcgwEnvRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.EADM_WLAP_REGION_BND_AREA_SVW';
-  export const BcgwEnvRegionsLayer: BcgwEnvRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.EADM_WLAP_REGION_BND_AREA_SVW';
-  /**
-   * The name of the field in the layer that contains the spatial data.
-   *
-   * Note: this value is needed when creating a CQL filter.
-   */
-  export const BcgwEnvRegionsLayerGeometryField = 'GEOMETRY';
+/**
+ * BCGW (BCGov) ENV regional boundaries layer.
+ *
+ * @see https://catalogue.data.gov.bc.ca/dataset/env-regional-boundaries
+ */
+export type BcgwEnvRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.EADM_WLAP_REGION_BND_AREA_SVW';
+export const BcgwEnvRegionsLayer: BcgwEnvRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.EADM_WLAP_REGION_BND_AREA_SVW';
+/**
+ * The name of the field in the layer that contains the spatial data.
+ *
+ * Note: this value is needed when creating a CQL filter.
+ */
+export const BcgwEnvRegionsLayerGeometryField = 'GEOMETRY';
 
-  /**
-   * BCGW (BCGov) NRM regional boundaries layer.
-   *
-   * @see https://catalogue.data.gov.bc.ca/dataset/natural-resource-nr-regions
-   */
-  export type BcgwNrmRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.ADM_NR_REGIONS_SPG';
-  export const BcgwNrmRegionsLayer: BcgwNrmRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.ADM_NR_REGIONS_SPG';
-  /**
-   * The name of the field in the layer that contains the spatial data.
-   *
-   * Note: this value is needed when creating a CQL filter.
-   */
-  export const BcgwNrmRegionsLayerGeometryField = 'SHAPE';
-}
+/**
+ * BCGW (BCGov) NRM regional boundaries layer.
+ *
+ * @see https://catalogue.data.gov.bc.ca/dataset/natural-resource-nr-regions
+ */
+export type BcgwNrmRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.ADM_NR_REGIONS_SPG';
+export const BcgwNrmRegionsLayer: BcgwNrmRegionsLayer = 'WHSE_ADMIN_BOUNDARIES.ADM_NR_REGIONS_SPG';
+/**
+ * The name of the field in the layer that contains the spatial data.
+ *
+ * Note: this value is needed when creating a CQL filter.
+ */
+export const BcgwNrmRegionsLayerGeometryField = 'SHAPE';
 
 /**
  * Service for fetching information from known BCGW layers.
@@ -85,9 +83,9 @@ export class BcgwLayerService {
    */
   async getEnvRegionNames(geometry: string): Promise<string[]> {
     const responseXml = await this.webFeatureService.getPropertyValue({
-      typeNames: BcgwLayers.BcgwEnvRegionsLayer,
-      srsName: SpatialProjection.Epsg3005,
-      cql_filter: `INTERSECTS(${BcgwLayers.BcgwEnvRegionsLayerGeometryField}, ${geometry})`,
+      typeNames: BcgwEnvRegionsLayer,
+      srsName: Epsg3005,
+      cql_filter: `INTERSECTS(${BcgwEnvRegionsLayerGeometryField}, ${geometry})`,
       valueReference: 'REGION_NAME'
     });
 
@@ -107,9 +105,9 @@ export class BcgwLayerService {
    */
   async getNrmRegionNames(geometry: string): Promise<string[]> {
     const responseXml = await this.webFeatureService.getPropertyValue({
-      typeNames: BcgwLayers.BcgwNrmRegionsLayer,
-      srsName: SpatialProjection.Epsg3005,
-      cql_filter: `INTERSECTS(${BcgwLayers.BcgwNrmRegionsLayerGeometryField}, ${geometry})`,
+      typeNames: BcgwNrmRegionsLayer,
+      srsName: Epsg3005,
+      cql_filter: `INTERSECTS(${BcgwNrmRegionsLayerGeometryField}, ${geometry})`,
       valueReference: 'REGION_NAME'
     });
 

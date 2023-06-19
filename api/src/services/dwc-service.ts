@@ -83,7 +83,7 @@ export class DarwinCoreService extends DBService {
     submission_metadata_id: number;
   }> {
     try {
-      const submissionMetadata: ISubmissionMetadataRecord   = {
+      const submissionMetadata: ISubmissionMetadataRecord = {
         submission_id: submissionId,
         eml_source: '',
         eml_json_source: null

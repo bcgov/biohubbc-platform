@@ -10,7 +10,6 @@ import {
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { DBService } from './db-service';
-import { SpatialProjection } from './geo-service';
 import { UserService } from './user-service';
 
 export class SpatialService extends DBService {
@@ -249,7 +248,7 @@ export class SpatialService extends DBService {
    *
    * @param {number} submissionId A submission id
    * @param {(SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID)} spatialComponentType
-   * @param {SpatialProjection.Srid} srid The id of the projection used when converting the geography to WKT
+   * @param {Srid} srid The id of the projection used when converting the geography to WKT
    * @return {*}  {Promise<FeatureCollection[]>}
    * @throws {Error} if no matches are found.
    * @memberof SpatialService
@@ -257,7 +256,7 @@ export class SpatialService extends DBService {
   async getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
     submissionId: number,
     spatialComponentType: SPATIAL_COMPONENT_TYPE.BOUNDARY | SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
-    srid: SpatialProjection.Srid
+    srid: Srid
   ) {
     return this.spatialRepository.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
       submissionId,

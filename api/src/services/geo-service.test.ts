@@ -6,8 +6,6 @@ chai.use(sinonChai);
 
 // TODO
 describe('GeoService', () => {
-  beforeEach(() => {});
-
   afterEach(() => {
     sinon.restore();
   });
@@ -44,8 +42,6 @@ describe('GeoService', () => {
 });
 
 describe('WebFeatureService', () => {
-  beforeEach(() => {});
-
   afterEach(() => {
     sinon.restore();
   });
@@ -64,8 +60,6 @@ describe('WebFeatureService', () => {
 });
 
 describe('WebMapService', () => {
-  beforeEach(() => {});
-
   afterEach(() => {
     sinon.restore();
   });
