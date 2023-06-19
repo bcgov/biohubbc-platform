@@ -35,26 +35,36 @@ export const useHandlebars = () => {
     });
   };
 
-  const capitalizeFirst = () => {
-    Handlebars.registerHelper('capFirst', (text: string) => {
-      if (typeof text === 'string') {
-        return `${text.charAt(0).toUpperCase()}${text.slice(1).toLowerCase()}`;
-      }
-      return text;
-    });
-  };
-
+  /**
+   * This is a Handlesbars helper to format date strings from a given format to another using moment
+   * Example of use
+   * <MyHandleBarsTemplate>
+   *  {{formatDate MyDateProperty 'YYYY-MM-DD' 'MMM YYYY'}}
+   * </MyHandleBarsTemplate>
+   */
   const formatDateHelper = () => {
     Handlebars.registerHelper('formatDate', (dateString: string, ogFormat: string, newFormat: string) => {
-      return moment(dateString, 'YYYY-MM-DD').format('MMM YYYY').toString();
+      return moment(dateString, ogFormat).format(newFormat).toString();
     });
   };
 
+  /**
+   * This is a Handlesbars helper to check if a passed item is an array or not
+   * Example of use in a template
+   *
+   * <MyHandleBarsTemplate>
+   *  {{#if (isAnArray AnyObject)}}
+   *    <!-- This is an array, act accordingly -->
+   *  {{else}}
+   *    <!-- This is not an array -->
+   *  {{/if}}
+   * </MyHandleBarsTemplate>
+   */
   const isAnArray = () => {
     Handlebars.registerHelper('isAnArray', (item: any) => {
-      return Array.isArray(item)
-    })
-  }
+      return Array.isArray(item);
+    });
+  };
 
   /**
    * This function converts a rawTemplate to a template
@@ -64,7 +74,6 @@ export const useHandlebars = () => {
    */
   const compileFromRawTemplate = (template: TemplateSpecification): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
-    capitalizeFirst();
     formatDateHelper();
     isAnArray();
     return Handlebars.compile(template);
