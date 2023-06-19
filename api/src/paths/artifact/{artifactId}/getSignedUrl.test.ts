@@ -6,10 +6,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
-import { Artifact } from '../../../repositories/artifact-repository';
-import { ArtifactService } from '../../../services/artifact-service';
-import { UserService } from '../../../services/user-service';
-import * as file_utils from '../../../utils/file-utils';
+import { SecurityService } from '../../../services/security-service';
 import { getMockDBConnection } from '../../../__mocks__/db';
 import * as getSignedUrl from './getSignedUrl';
 import { GET } from './getSignedUrl';
@@ -113,13 +110,9 @@ describe('getSignedUrl', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: null,
-        key: 'sample-key'
-      } as Artifact);
-
-      const systemAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-      const getS3SignedURLStub = sinon.stub(file_utils, 'getS3SignedURL').resolves('http://example.com');
+      const getSignedURLStub = sinon
+        .stub(SecurityService.prototype, 'getSecuredArtifactBasedOnRulesAndPermissions')
+        .resolves('sample-signedURL');
 
       let actualResult: any = null;
 
@@ -143,85 +136,8 @@ describe('getSignedUrl', () => {
 
       await result(sampleReq, sampleRes as any, null as unknown as any);
 
-      expect(actualResult).to.eql('http://example.com');
-      expect(getArtifactStub).to.be.calledWith(200);
-      expect(systemAdminStub).to.be.calledOnce;
-      expect(getS3SignedURLStub).to.be.calledWith('sample-key');
-    });
-
-    it('should return a URL for a non-pending artifact to administrators', async () => {
-      const dbConnectionObj = getMockDBConnection({
-        systemUserId: () => 1000
-      });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
-        key: 'sample-key'
-      } as Artifact);
-
-      const systemAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
-      const getS3SignedURLStub = sinon.stub(file_utils, 'getS3SignedURL').resolves('http://example.com');
-
-      let actualResult: any = null;
-
-      const sampleReq = {
-        params: {
-          artifactId: 200
-        }
-      } as any;
-
-      const sampleRes = {
-        status: () => {
-          return {
-            send: (result: any) => {
-              actualResult = result;
-            }
-          };
-        }
-      };
-
-      const result = getSignedUrl.getArtifactSignedUrl();
-
-      await result(sampleReq, sampleRes as any, null as unknown as any);
-
-      expect(actualResult).to.eql('http://example.com');
-      expect(getArtifactStub).to.be.calledWith(200);
-      expect(systemAdminStub).to.be.calledOnce;
-      expect(getS3SignedURLStub).to.be.calledWith('sample-key');
-    });
-
-    it('should not return a URL for a pending artifact to non-administrators', async () => {
-      const dbConnectionObj = getMockDBConnection({
-        systemUserId: () => 1000
-      });
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: null,
-        key: 'sample-key'
-      } as Artifact);
-
-      const systemAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
-
-      const sampleReq = {
-        params: {
-          artifactId: 200
-        }
-      } as any;
-
-      try {
-        const result = getSignedUrl.getArtifactSignedUrl();
-
-        await result(sampleReq, null as unknown as any, null as unknown as any);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as HTTPError).message).to.equal(
-          'Documents that are pending review can only be downloaded by administrators.'
-        );
-        expect(getArtifactStub).to.be.calledWith(200);
-        expect(systemAdminStub).to.be.calledOnce;
-      }
+      expect(actualResult).to.eql('sample-signedURL');
+      expect(getSignedURLStub).to.be.calledWith(200);
     });
 
     it('should catch and rethrow errors', async () => {
@@ -230,14 +146,8 @@ describe('getSignedUrl', () => {
       });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
-        key: 'sample-key'
-      } as Artifact);
-
-      const systemAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
       const getS3SignedURLStub = sinon
-        .stub(file_utils, 'getS3SignedURL')
+        .stub(SecurityService.prototype, 'getSecuredArtifactBasedOnRulesAndPermissions')
         .throws(new Error('test failed to get signed URL'));
 
       const sampleReq = {
@@ -253,8 +163,6 @@ describe('getSignedUrl', () => {
         expect.fail();
       } catch (actualError) {
         expect((actualError as HTTPError).message).to.equal('test failed to get signed URL');
-        expect(getArtifactStub).to.be.calledWith(200);
-        expect(systemAdminStub).to.be.calledOnce;
         expect(getS3SignedURLStub).to.be.calledOnce;
       }
     });

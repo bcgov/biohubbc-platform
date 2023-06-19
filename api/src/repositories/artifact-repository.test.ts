@@ -156,7 +156,7 @@ describe('ArtifactRepository', () => {
         await artifactRepository.getArtifactById(1);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retreive artifact record by ID');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve artifact record by ID');
       }
     });
   });
