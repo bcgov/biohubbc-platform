@@ -366,7 +366,7 @@ export class WebMapService extends GeoService {
    * @return {*}  {Promise<unknown>}
    * @memberof WebMapService
    */
-  async GetCapabilities(options?: OwsBaseOptions): Promise<unknown> {
+  async getCapabilities(options?: OwsBaseOptions): Promise<unknown> {
     const version = options?.version || '2.0.0';
 
     const url = this._buildURL({

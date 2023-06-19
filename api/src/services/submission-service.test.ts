@@ -40,7 +40,7 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('insertSubmissionRe', () => {
+  describe('insertSubmissionRecordWithPotentialConflict', () => {
     it('should return submission_id on get or insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
