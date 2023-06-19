@@ -56,12 +56,6 @@ export const useHandlebars = () => {
     })
   }
 
-  const isAnObject = () => {
-    // Handlebars.registerHelper('isAnObject', (item: any) => {
-    //   return 
-    // })
-  }
-
   /**
    * This function converts a rawTemplate to a template
    *
@@ -72,6 +66,7 @@ export const useHandlebars = () => {
     applyConditionalChecks();
     capitalizeFirst();
     formatDateHelper();
+    isAnArray();
     return Handlebars.compile(template);
   };
 

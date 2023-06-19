@@ -72,9 +72,13 @@ export const simsHandlebarsTemplate_DETAILS = `
                 Activities
               </dt>
               <dd>
-                {{#each metadata.projectActivity as | activities |}}
-                  {{activities.name}}{{#unless @last}}, {{/unless}}
-                {{/each}}
+                {{#if (isAnArray metadata.projectActivity)}}
+                  {{#each metadata.projectActivity as | activities |}}
+                    {{activities.name}}{{#unless @last}}, {{/unless}}
+                  {{/each}}
+                {{else}}
+                  {{metadata.projectActivity.name}}
+                {{/if}}
               </dd>
             </div>
             {{/ifCond}}
@@ -121,9 +125,13 @@ export const simsHandlebarsTemplate_DETAILS = `
                     Partners
                   </dt>
                   <dd>
-                    {{#each metadata.partnership as | partnership |}}
-                      {{partnership.name}}{{#unless @last}}, {{/unless}}
-                    {{/each}}
+                    {{#if (isAnArray metadata.partnership)}}
+                      {{#each metadata.partnership as | partnership |}}
+                        {{partnership.name}}{{#unless @last}}, {{/unless}}
+                      {{/each}}
+                    {{else}}
+                      {{metadata.partnership.name}}
+                    {{/if}}
                   </dd>
                 </div>
               {{/ifCond}}
@@ -141,13 +149,21 @@ export const simsHandlebarsTemplate_DETAILS = `
                     Conservation Activities
                   </dt>
                   <dd>
-                    <ul style="padding-left: 20px">
-                      {{#each metadata.IUCNConservationAction as | actions |}}
+                    {{#if (isAnArray metadata.IUCNConservationAction)}}
+                      <ul style="padding-left: 20px">
+                        {{#each metadata.IUCNConservationAction as | actions |}}
+                          <li>
+                            {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                          </li>
+                        {{/each}}
+                      </ul>
+                    {{else}}
+                      <ul style="padding-left: 20px">
                         <li>
-                          {{actions.IUCNConservationActionLevel1Classification}} > {{actions.IUCNConservationActionLevel2SubClassification}} > {{actions.IUCNConservationActionLevel3SubClassification}}
+                          {{metadata.IUCNConservationAction.IUCNConservationActionLevel1Classification}} > {{metadata.IUCNConservationAction.IUCNConservationActionLevel2SubClassification}} > {{metadata.IUCNConservationAction.IUCNConservationActionLevel3SubClassification}}
                         </li>
-                      {{/each}}
-                    </ul>
+                      </ul>
+                    {{/if}}
                   </dd>
                 </div>
               {{/ifCond}}
