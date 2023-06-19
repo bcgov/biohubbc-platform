@@ -65,8 +65,12 @@ export class DarwinCoreService extends DBService {
     // Step 8: Run spatial transforms
     await this.intakeJob_step_8(jobQueueRecord, submissionObservation.submission_observation_id);
 
+    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(
+      jobQueueRecord.submission_id
+    );
+
     // Step 9: Decorate EML
-    const decoratedEML = await this.intakeJob_step_9(emlJSON);
+    const decoratedEML = await this.intakeJob_step_9(jobQueueRecord.submission_id, submissionRecord.uuid, emlJSON);
 
     // Step 10: Update submission json column with decorated eml
     await this.intakeJob_step_10(
@@ -328,12 +332,19 @@ export class DarwinCoreService extends DBService {
    * Step 9
    * Decorate EML
    *
-   * @param emlJSON
-   * @returns  {*} Promise<Record<string, any>> Decorated JSON object
+   * @param {number} submissionId
+   * @param {string} datasetId
+   * @param {Record<string, any>} emlJSON
+   * @return {*}  {Promise<Record<string, any>>} Decorated JSON object
+   * @memberof DarwinCoreService
    */
-  async intakeJob_step_9(emlJSON: Record<string, any>): Promise<Record<string, any>> {
+  async intakeJob_step_9(
+    submissionId: number,
+    datasetId: string,
+    emlJSON: Record<string, any>
+  ): Promise<Record<string, any>> {
     try {
-      return await this.emlService.decorateEML(emlJSON);
+      return await this.emlService.decorateEML(submissionId, datasetId, emlJSON);
     } catch (error: any) {
       // TODO: does this trycatch here make sense?
       defaultLog.debug({ label: 'intakeJob_step_9', message: 'error', error });
