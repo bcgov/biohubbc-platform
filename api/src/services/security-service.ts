@@ -15,7 +15,7 @@ import { UserService } from './user-service';
 const defaultLog = getLogger('services/security-service');
 
 /**
- * A service for maintaining securty artifacts.
+ * A service for maintaining security artifacts.
  *
  * @export
  * @class SecurityService
@@ -185,7 +185,7 @@ export class SecurityService extends DBService {
       : true;
 
     if (!isSystemUserAdmin && isDocumentPendingReview) {
-      throw new HTTP403('You do not have access to this document - it is pending review');
+      throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
     }
 
     const documentSecurityRules = await this.getDocumentPersecutionAndHarmRules(artifactId);
@@ -208,7 +208,7 @@ export class SecurityService extends DBService {
     // 2) document is unsecured (not pending review, and has no security rules)
     // 3) non-admin has exceptions all security rules
     const response = await this.artifactService.getArtifactById(artifactId);
-    return await getS3SignedURL(response.key);
+    return getS3SignedURL(response.key);
   }
 
   /**
