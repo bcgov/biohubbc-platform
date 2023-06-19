@@ -148,4 +148,77 @@ describe('SecurityRepository', () => {
       expect(response).to.eql(undefined);
     });
   });
+
+  describe('getPersecutionAndHarmRulesExceptionsByUserId', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ artifact_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getPersecutionAndHarmRulesExceptionsByUserId(1);
+
+      expect(response).to.eql([{ artifact_id: 1 }]);
+    });
+
+    it('should return an empty array if not exceptions exists for the user', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getPersecutionAndHarmRulesExceptionsByUserId(1);
+
+      expect(response).to.eql([]);
+    });
+  });
+
+
+  describe('getDocumentPersecutionAndHarmRules', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ persecution_or_harm_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getDocumentPersecutionAndHarmRules(1);
+
+      expect(response).to.eql([{ persecution_or_harm_id: 1 }]);
+    });
+
+    it('should return an empty array if the document has no rules applied', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getDocumentPersecutionAndHarmRules(1);
+
+      expect(response).to.eql([]);
+    });
+  });
 });

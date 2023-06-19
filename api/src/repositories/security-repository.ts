@@ -150,7 +150,7 @@ export class SecurityRepository extends BaseRepository {
    * @memberof SecurityRepository
    */
   async getDocumentPersecutionAndHarmRules(artifactId: number): Promise<{ persecution_or_harm_id: number }[]> {
-    defaultLog.debug({ label: 'getPersecutionAndHarmRulesExceptionsByUserId' });
+    defaultLog.debug({ label: 'getDocumentPersecutionAndHarmRules' });
 
     const sqlStatement = SQL`
       select
