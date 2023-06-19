@@ -15,10 +15,15 @@ export interface IArtifact {
   update_date: string | null;
   update_user: number | null;
   uuid: string;
+  supplementaryData: {
+    persecutionAndHarm: SECURITY_APPLIED_STATUS;
+  };
 }
 
-export interface IListArtifactsResponse {
-  artifacts: IArtifact[];
+export enum SECURITY_APPLIED_STATUS {
+  SECURED = 'SECURED',
+  UNSECURED = 'UNSECURED',
+  PENDING = 'PENDING'
 }
 
 export interface IRelatedDataset {
@@ -31,6 +36,10 @@ export interface IListRelatedDatasetsResponse {
   datasets: IRelatedDataset[];
 }
 
+export interface IHandlebarsTemplates {
+  header: string;
+  details: string;
+}
 export interface IDatasetForReview {
   dataset_id: string; // UUID
   artifacts_to_review: number;

@@ -1,5 +1,6 @@
-import { Redirect, Switch } from 'react-router';
-import AppRoute from 'utils/AppRoute';
+import { Redirect, Route, Switch } from 'react-router';
+import RouteWithTitle from 'utils/RouteWithTitle';
+import { getTitle } from 'utils/Utils';
 import DatasetPage from './DatasetPage';
 
 /**
@@ -12,14 +13,14 @@ const DatasetsRouter: React.FC<React.PropsWithChildren> = () => {
     <Switch>
       <Redirect exact from="/datasets/:id" to="/datasets/:id/details" />
 
-      <AppRoute exact path="/datasets/:id/details">
+      <RouteWithTitle exact path="/datasets/:id/details" title={getTitle('Datasets')}>
         <DatasetPage />
-      </AppRoute>
+      </RouteWithTitle>
 
       {/*  Catch any unknown routes, and re-direct to the not found page */}
-      <AppRoute path="/datasets/*">
+      <Route path="/datasets/*">
         <Redirect to="/page-not-found" />
-      </AppRoute>
+      </Route>
     </Switch>
   );
 };

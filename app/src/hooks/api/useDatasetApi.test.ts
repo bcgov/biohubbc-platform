@@ -74,4 +74,17 @@ describe('useDatasetApi', () => {
       datasets: [{ datasetId: 'bbb' }, { datasetId: 'ccc' }]
     });
   });
+
+  it('getHandleBarsTemplateByDatasetId works as expected', async () => {
+    mock.onGet(`api/dwc/submission/uuid/handlebar`).reply(200, {
+      header: 'Header Template',
+      details: 'Details Template'
+    });
+
+    const results = await useDatasetApi(axios).getHandleBarsTemplateByDatasetId('uuid');
+    expect(results).toEqual({
+      header: 'Header Template',
+      details: 'Details Template'
+    });
+  });
 });

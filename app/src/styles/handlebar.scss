@@ -1,23 +1,32 @@
+.hbr-header {
+  display: flex;
+  flex-direction: column;
+
+  .hbr-header-title-primary {
+    font-size: 32px;
+    color: #313132;
+    font-weight: bold;
+    margin: 0;
+  }
+
+  .hbr-header-badge {
+    background-color: #d9eaf7;
+    border-radius: 16px;
+    padding: 5px 10px;
+    width: fit-content;
+    font-size: 10px;
+    font-weight: bold;
+    color: #313132;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+}
+
 .hbr-container {
-  .hbr-header {
-    display: flex;
-    flex-direction: column;
-    padding: 24px;
-    margin-bottom: 16px;
-    background-color: #ffffff;
-
-    .hbr-header-title-primary {
-      font-size: 32px;
-      color: #000000;
-      font-weight: bold;
-      text-decoration: none solid rgb(0, 0, 0);
-    }
-
-    .hbr-header-title-secondary {
-      font-size: 16px;
-      color: #787f81;
-      text-decoration: none solid rgb(0, 0, 0);
-    }
+  .hbr-project-coordinator {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
   }
 
   .details-container {
@@ -35,11 +44,10 @@
     }
 
     .details-container-metadata {
-      padding: 25px;
       div {
         display: flex;
         padding: 10px 0px;
-
+        border-bottom: solid thin #dadada;
         dt {
           color: #787f81;
           flex: 1;
