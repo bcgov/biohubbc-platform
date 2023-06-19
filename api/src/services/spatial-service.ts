@@ -10,6 +10,7 @@ import {
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { DBService } from './db-service';
+import { Srid } from './geo-service';
 import { UserService } from './user-service';
 
 export class SpatialService extends DBService {
