@@ -138,7 +138,7 @@ export class EMLService extends DBService {
 
     // Fetch the submission `Boundary` spatial component
     const boundarySpatialComponent = await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
-      1 || submissionId,
+      submissionId,
       SPATIAL_COMPONENT_TYPE.BOUNDARY,
       SpatialProjection.Srid3005
     );
@@ -146,7 +146,7 @@ export class EMLService extends DBService {
     // Fetch the submission `Boundary Centroid` spatial component
     const bondaryCentroidSpatialComponent =
       await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
-        1 || submissionId,
+        submissionId,
         SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
         SpatialProjection.Srid3005
       );
