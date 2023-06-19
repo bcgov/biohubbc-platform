@@ -42,7 +42,7 @@ export const simsHandlebarsTemplate_DETAILS = `
               Timeline
             </dt>
             <dd>
-              {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate}}{{/formatDate}} - {{#formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate}}{{/formatDate}}
+              {{formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.beginDate.calendarDate 'YYYY-MM-DD' 'MMM YYYY'}} - {{formatDate eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates.endDate.calendarDate 'YYYY-MM-DD' 'MMM YYYY'}}
             </dd>
           </div>
         {{/if}}

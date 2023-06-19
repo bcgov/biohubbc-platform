@@ -45,7 +45,7 @@ export const useHandlebars = () => {
   };
 
   const formatDateHelper = () => {
-    Handlebars.registerHelper('formatDate', (dateString: string) => {
+    Handlebars.registerHelper('formatDate', (dateString: string, ogFormat: string, newFormat: string) => {
       return moment(dateString, 'YYYY-MM-DD').format('MMM YYYY').toString();
     });
   };

@@ -161,8 +161,6 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     return <CircularProgress className="pageProgress" size={40} />;
   }
 
-  console.log(datasetDataLoader.data);
-
   return (
     <Box>
       <Paper square elevation={0}>
