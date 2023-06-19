@@ -21,7 +21,13 @@ export class EMLService extends DBService {
     // interpreted as text.
     parseTagValue: false,
     isArray: (tagName: string) => {
-      const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage', 'metadataProvider'];
+      const tagsArray: Array<string> = [
+        'relatedProject',
+        'section',
+        'taxonomicCoverage',
+        'metadataProvider',
+        'additionalMetadata'
+      ];
 
       return tagsArray.includes(tagName);
     }

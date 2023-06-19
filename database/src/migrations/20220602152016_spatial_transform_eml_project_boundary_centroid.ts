@@ -100,9 +100,7 @@ export async function up(knex: Knex): Promise<void> {
       select
         st_asgeojson(
           ST_PointOnSurface(
-            geography(
-              ST_Multi('POLYGON(' || string_agg(strp, ',') || ')')
-            )
+            ST_Multi('POLYGON(' || string_agg(strp, ',') || ')')
           )
         ) centroid
       from
