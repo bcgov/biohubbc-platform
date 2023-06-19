@@ -56,9 +56,9 @@ export const getLogger = function (logLabel: string) {
         level: process.env.LOG_LEVEL || 'info',
         format: winston.format.combine(
           winston.format((info) => {
-            const { timestamp, level, ...rest } = info;
+            const { level, ...rest } = info;
             // Return the properties of info in a specific order
-            return { timestamp, level, logger: logLabel, ...rest };
+            return { level, logger: logLabel, ...rest };
           })(),
           winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
           winston.format.prettyPrint({ colorize: true, depth: 5 })

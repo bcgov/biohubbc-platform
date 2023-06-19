@@ -668,7 +668,27 @@ describe('SubmissionService', () => {
 
   describe('getGeometryAsWktFromBoundarySpatialComponentBySubmissionId', () => {
     it('returns a geometry string', () => {
-        // TODO
+      // TODO
+    });
+  });
+
+  describe('getHandleBarsTemplateByDatasetId', () => {
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'getHandleBarsTemplateByDatasetId').resolves({
+        header: 'header',
+        details: 'details'
+      });
+
+      const response = await submissionService.getHandleBarsTemplateByDatasetId('uuid');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({
+        header: 'header',
+        details: 'details'
+      });
     });
   });
 });
