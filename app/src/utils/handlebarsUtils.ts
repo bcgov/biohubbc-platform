@@ -50,6 +50,18 @@ export const useHandlebars = () => {
     });
   };
 
+  const isAnArray = () => {
+    Handlebars.registerHelper('isAnArray', (item: any) => {
+      return Array.isArray(item)
+    })
+  }
+
+  const isAnObject = () => {
+    // Handlebars.registerHelper('isAnObject', (item: any) => {
+    //   return 
+    // })
+  }
+
   /**
    * This function converts a rawTemplate to a template
    *

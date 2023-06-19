@@ -34,22 +34,6 @@ export const simsHandlebarsTemplate_DETAILS = `
             </div>
           {{/ifCond}}
         {{/each}}
-        
-        {{#if eml:eml.dataset.contact.individualName.givenName}}
-          <div>
-              <dt>
-                Lead
-              </dt>
-              <dd>
-                {{#if eml:eml.dataset.contact.individualName.givenName}}
-                  {{eml:eml.dataset.contact.individualName.givenName}}
-                {{/if}}
-                {{#if eml:eml.dataset.contact.individualName.surName}}
-                  {{eml:eml.dataset.contact.individualName.surName}}
-                {{/if}}
-              </dd>
-          </div>
-        {{/if}}
 
         <!-- TIMELINE -->
         {{#if eml:eml.dataset.project.studyAreaDescription.coverage.temporalCoverage.rangeOfDates}}
@@ -150,7 +134,7 @@ export const simsHandlebarsTemplate_DETAILS = `
         <!-- CONSERVATION ACTIONS -->
         {{#each eml:eml.additionalMetadata as | amd |}}
           {{#each amd.metadata as | metadata |}}
-            {{#ifCond @key '===' "IUCNConservationActions"}}
+            {{#ifCond @key '===' "IUCNConservationActions"}}              
               {{#ifCond metadata '!==' ""}}
                 <div>
                   <dt>
