@@ -125,7 +125,7 @@ describe('SecurityService', () => {
       } as Artifact);
 
       const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getDocumentPersecutionAndHarmRules')
+        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRules')
         .resolves([1, 2, 3, 4]);
       const getUserExceptionStub = sinon
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsByUser')
@@ -158,7 +158,7 @@ describe('SecurityService', () => {
       } as Artifact);
 
       const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getDocumentPersecutionAndHarmRules')
+        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRules')
         .resolves([1, 2, 3, 4]);
       const getUserExceptionStub = sinon
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsByUser')
@@ -186,7 +186,7 @@ describe('SecurityService', () => {
       } as Artifact);
 
       const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getDocumentPersecutionAndHarmRules')
+        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRules')
         .resolves([]);
       const getUserExceptionStub = sinon
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsByUser')
@@ -214,7 +214,7 @@ describe('SecurityService', () => {
       } as Artifact);
 
       const getDocumentRulesStub = sinon
-        .stub(SecurityService.prototype, 'getDocumentPersecutionAndHarmRules')
+        .stub(SecurityService.prototype, 'getArtifactPersecutionAndHarmRules')
         .resolves([1, 2, 3, 4]);
       const getUserExceptionStub = sinon
         .stub(SecurityService.prototype, 'getPersecutionAndHarmExceptionsByUser')
@@ -283,7 +283,7 @@ describe('SecurityService', () => {
           }
         ]);
 
-      const result = await securityService.getDocumentPersecutionAndHarmRules(1000);
+      const result = await securityService.getArtifactPersecutionAndHarmRules(1000);
 
       expect(getDocumentPersecutionAndHarmRulesStub).to.be.calledWith(1000);
       expect(result).to.eql([1, 2, 3]);

@@ -1,6 +1,11 @@
 import { IDBConnection } from '../database/db';
 import { HTTP403 } from '../errors/http-error';
-import { ArtifactPersecution, PersecutionAndHarmSecurity, SECURITY_APPLIED_STATUS, SecurityRepository } from '../repositories/security-repository';
+import {
+  ArtifactPersecution,
+  PersecutionAndHarmSecurity,
+  SecurityRepository,
+  SECURITY_APPLIED_STATUS
+} from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ArtifactService } from './artifact-service';
@@ -158,8 +163,8 @@ export class SecurityService extends DBService {
    *
    * Rules:
    * non-admin user cannot access the document when:
-   ** - it is pending review, OR
-   ** - user hasn't been granted an exception to every security rule
+   * - it is pending review, OR
+   * - user hasn't been granted an exception to every security rule
    *
    * non-admin user can access the document when:
    * - document is not secured
@@ -177,22 +182,24 @@ export class SecurityService extends DBService {
 
     const artifact = await this.artifactService.getArtifactById(artifactId);
 
-    const isDocumentPendingReview = artifact.security_review_timestamp ? false : true;
+    const isArtifactPendingReview = artifact.security_review_timestamp ? false : true;
 
-    if (!isSystemUserAdmin && isDocumentPendingReview) {
+    //non-admin user cannot access a document pending review
+    if (!isSystemUserAdmin && isArtifactPendingReview) {
       throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
     }
 
-    const documentSecurityRules = await this.getDocumentPersecutionAndHarmRules(artifactId);
+    const artifactSecurityRules = await this.getArtifactPersecutionAndHarmRules(artifactId);
 
     const pers_harm_exceptions = await this.getPersecutionAndHarmExceptionsByUser(userId);
 
-    const userHasExceptionsToAllRules = documentSecurityRules.every((rule) => pers_harm_exceptions.includes(rule));
+    const userHasExceptionsToAllRules = artifactSecurityRules.every((rule) => pers_harm_exceptions.includes(rule));
 
+    //non-admin user cannot access a document if they don't have exceptions to all the rules applied to that document
     if (
       !isSystemUserAdmin &&
-      !isDocumentPendingReview &&
-      documentSecurityRules.length > 0 &&
+      !isArtifactPendingReview &&
+      artifactSecurityRules.length > 0 &&
       !userHasExceptionsToAllRules
     ) {
       throw new HTTP403('You do not have access to this document.');
@@ -228,92 +235,10 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<number[]>}
    * @memberof SecurityService
    */
-  async getDocumentPersecutionAndHarmRules(artifactId: number): Promise<number[]> {
+  async getArtifactPersecutionAndHarmRules(artifactId: number): Promise<number[]> {
     defaultLog.debug({ label: 'getDocumentPersecutionAndHarmRules' });
     return (await this.securityRepository.getDocumentPersecutionAndHarmRules(artifactId)).map(
       (item) => item.persecution_or_harm_id
     );
   }
-
-  /**
-   * Returns the signed URL of a document for which a user has permissions.
-   *
-   * Rules:
-   * non-admin user cannot access the document when:
-   ** - it is pending review, OR
-   ** - user hasn't been granted an exception to every security rule
-   *
-   * non-admin user can access the document when:
-   * - document is not secured
-   * - user has the correct exceptions
-   *
-   *
-   * @param {number} artifactId
-   * @return {*}  {Promise<any>}
-   * @memberof SecurityService
-   */
-  // async getSecuredArtifactBasedOnRulesAndPermissions(artifactId: number): Promise<any> {
-  //   const isSystemUserAdmin = await this.userService.isSystemUserAdmin();
-
-  //   const userId = this.connection.systemUserId();
-
-  //   const artifact = await this.artifactService.getArtifactById(artifactId);
-
-  //   const isDocumentPendingReview = artifact.security_review_timestamp ? false : true;
-
-  //   if (!isSystemUserAdmin && isDocumentPendingReview) {
-  //     throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
-  //   }
-
-  //   const documentSecurityRules = await this.getDocumentPersecutionAndHarmRules(artifactId);
-
-  //   const pers_harm_exceptions = await this.getPersecutionAndHarmExceptionsByUser(userId);
-
-  //   const userHasExceptionsToAllRules = documentSecurityRules.every((rule) => pers_harm_exceptions.includes(rule));
-
-  //   if (
-  //     !isSystemUserAdmin &&
-  //     !isDocumentPendingReview &&
-  //     documentSecurityRules.length > 0 &&
-  //     !userHasExceptionsToAllRules
-  //   ) {
-  //     throw new HTTP403('You do not have access to this document.');
-  //   }
-
-  //   // access is granted because
-  //   // 1) admin
-  //   // 2) document is unsecured (not pending review, and has no security rules)
-  //   // 3) non-admin has exceptions all security rules
-
-  //   return getS3SignedURL(artifact.key);
-  // }
-
-  /**
-   * Get the persecution or harm rules for which a user is granted exception
-   *
-   * @param {number} userId
-   * @return {*}  {Promise<number[]>}
-   * @memberof SecurityService
-   */
-  // async getPersecutionAndHarmExceptionsByUser(userId: number): Promise<number[]> {
-  //   defaultLog.debug({ label: 'getPersecutionAndHarmExceptionsByUser' });
-
-  //   return (await this.securityRepository.getPersecutionAndHarmRulesExceptionsByUserId(userId)).map(
-  //     (item) => item.persecution_or_harm_id
-  //   );
-  // }
-
-  /**
-   * Get the persecution and harm rules for a given artifact
-   *
-   * @param {number} artifactId
-   * @return {*}  {Promise<number[]>}
-   * @memberof SecurityService
-   */
-  // async getDocumentPersecutionAndHarmRules(artifactId: number): Promise<number[]> {
-  //   defaultLog.debug({ label: 'getDocumentPersecutionAndHarmRules' });
-  //   return (await this.securityRepository.getDocumentPersecutionAndHarmRules(artifactId)).map(
-  //     (item) => item.persecution_or_harm_id
-  //   );
-  // }
 }
