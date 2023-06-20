@@ -142,13 +142,6 @@ export class EMLService extends DBService {
   async getRegionAdditionalMetadataNode(submissionId: number, datasetId: string): Promise<any> {
     const spatialService = new SpatialService(this.connection);
 
-    // Fetch the submission `Boundary` spatial component
-    const boundarySpatialComponent = await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
-      submissionId,
-      SPATIAL_COMPONENT_TYPE.BOUNDARY,
-      Srid3005
-    );
-
     // Fetch the submission `Boundary Centroid` spatial component
     const bondaryCentroidSpatialComponent =
       await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
@@ -157,9 +150,16 @@ export class EMLService extends DBService {
         Srid3005
       );
 
+    // Fetch the submission `Boundary` spatial component
+    const boundarySpatialComponent = await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+      submissionId,
+      SPATIAL_COMPONENT_TYPE.BOUNDARY,
+      Srid3005
+    );
+
     const datasetRegionService = new BcgwLayerService();
 
-    // Fetch nrm `Boundary Centroid` and `Boundary` regions
+    // Fetch env `Boundary Centroid` and `Boundary` regions
     const envBoundaryCentroidRegionNames = await datasetRegionService.getEnvRegionNames(
       bondaryCentroidSpatialComponent.geometry
     );
@@ -177,16 +177,26 @@ export class EMLService extends DBService {
       metadata: {
         regions: {
           env: [
-            ...envBoundaryCentroidRegionNames.map((name) => ({ name: name, from: 'Boundary Centroid' })),
+            // Add renv egions found based on the boundary centroid
+            ...envBoundaryCentroidRegionNames.map((name) => ({
+              name: name,
+              from: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
+            })),
+            // Add env regions found based on the boundary
             ...envBoundaryRegionNames
               .filter((item) => !envBoundaryCentroidRegionNames.includes(item))
-              .map((name) => ({ name: name, from: 'Boundary' }))
+              .map((name) => ({ name: name, from: SPATIAL_COMPONENT_TYPE.BOUNDARY }))
           ],
           nrm: [
-            ...nrmBoundaryCentroidRegionNames.map((name) => ({ name: name, from: 'Boundary Centroid' })),
+            // Add nrm regions found based on the boundary centroid
+            ...nrmBoundaryCentroidRegionNames.map((name) => ({
+              name: name,
+              from: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
+            })),
+            // Add nrm regions found based on the boundary
             ...nrmBoundaryRegionNames
-              .filter((item) => !envBoundaryCentroidRegionNames.includes(item))
-              .map((name) => ({ name: name, from: 'Boundary' }))
+              .filter((item) => !nrmBoundaryCentroidRegionNames.includes(item))
+              .map((name) => ({ name: name, from: SPATIAL_COMPONENT_TYPE.BOUNDARY }))
           ]
         }
       }
@@ -251,7 +261,7 @@ export class EMLService extends DBService {
       },
       {
         // Add a `additionalMetadata` node if one does not already exist
-        path: '$..eml:eml.dataset',
+        path: '$..eml:eml',
         property: 'additionalMetadata',
         value: []
       },
@@ -263,12 +273,12 @@ export class EMLService extends DBService {
       }
     ];
 
-    const patchOperations: Operation[] = [];
-
     // Iterates over `patches` in order from first to last, applying all resulting patch operations one by one.
     // Note: subsequent patches will operate on the output of the previous patches. This means iterative patches are
     // possible, if needed.
     for (const patch of patches) {
+      const patchOperations: Operation[] = [];
+
       try {
         const paths = JSONPath({
           path: patch.path,

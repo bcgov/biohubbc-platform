@@ -73,6 +73,11 @@ describe('DarwinCoreService', () => {
         .stub(DarwinCoreService.prototype, 'intakeJob_step_7')
         .resolves({ submission_observation_id: 1 });
       const step8 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_8').resolves();
+      sinon.stub(SubmissionService.prototype, 'getSubmissionRecordBySubmissionId').resolves({
+        submission_id: 1,
+        source_transform_id: 3,
+        uuid: '123-456-789'
+      });
       const step9 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_9').resolves({});
       const step10 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_10').resolves();
       const step11 = sinon.stub(DarwinCoreService.prototype, 'intakeJob_step_11').resolves();
