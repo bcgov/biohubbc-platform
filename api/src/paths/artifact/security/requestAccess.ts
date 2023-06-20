@@ -7,25 +7,14 @@ import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('/api/artifact/security/requestAccess');
 
-export const POST: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          discriminator: 'SystemUser'
-        }
-      ]
-    };
-  }),
-  requestAccess()
-];
+export const POST: Operation = [requestAccess()];
 
 POST.apiDoc = {
   description: 'Request access to secure artifacts in Biohub.',
   tags: ['documents', 'security', 'biohub'],
   security: [
     {
-      Bearer: []
+      OptionalBearer: []
     }
   ],
   requestBody: {
