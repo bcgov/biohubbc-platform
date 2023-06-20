@@ -692,7 +692,7 @@ describe('DarwinCoreService', () => {
         }
       });
 
-      await service.intakeJob_step_9({});
+      await service.intakeJob_step_9(1, '123-456-789', {});
       expect(decorate).to.be.calledOnce;
     });
 
@@ -703,7 +703,7 @@ describe('DarwinCoreService', () => {
       // const insertError = sinon.stub(SubmissionService.prototype, 'insertSubmissionStatusAndMessage').resolves();
 
       try {
-        await service.intakeJob_step_9({});
+        await service.intakeJob_step_9(1, '123-456-789', {});
         expect.fail();
       } catch (error: any) {
         // expect(insertError).to.be.calledOnce;
