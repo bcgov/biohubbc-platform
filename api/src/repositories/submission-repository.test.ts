@@ -690,7 +690,7 @@ describe('SubmissionRepository', () => {
         submission_id: 1,
         darwin_core_source: '',
         submission_security_request: '',
-        foi_reason_description: ''
+        foi_reason: ''
       };
       try {
         await submissionRepository.insertSubmissionObservationRecord(submissionData);
@@ -715,7 +715,7 @@ describe('SubmissionRepository', () => {
         submission_id: 1,
         darwin_core_source: '',
         submission_security_request: '',
-        foi_reason_description: ''
+        foi_reason: ''
       };
 
       const response = await submissionRepository.insertSubmissionObservationRecord(submissionData);

@@ -1,9 +1,9 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
-import { getKnex } from '../database/db';
 
 const defaultLog = getLogger('repositories/artifact-repository');
 
@@ -22,7 +22,7 @@ export const Artifact = ArtifactMetadata.extend({
   submission_id: z.number(),
   uuid: z.string().uuid(),
   key: z.string(),
-  foi_reason_description: z.boolean().nullable().optional(),
+  foi_reason: z.boolean().nullable().optional(),
   security_review_timestamp: z.date().nullable().optional(),
   create_date: z.date().optional()
 });
@@ -182,7 +182,7 @@ export class ArtifactRepository extends BaseRepository {
 
   /**
    * Fetches multiple artifact records by the given artifact IDs
-   * 
+   *
    * @param {number[]} artifactIds
    * @return {*}  {Promise<Artifact[]>}
    * @memberof ArtifactRepository
@@ -191,11 +191,7 @@ export class ArtifactRepository extends BaseRepository {
     defaultLog.debug({ label: 'getArtifactByIds', artifactIds });
 
     const knex = getKnex();
-    const queryBuilder = knex
-      .queryBuilder()
-      .select()
-      .from('artifact')
-      .whereIn('artifact_id', artifactIds);
+    const queryBuilder = knex.queryBuilder().select().from('artifact').whereIn('artifact_id', artifactIds);
 
     const response = await this.connection.knex<Artifact>(queryBuilder, Artifact);
 

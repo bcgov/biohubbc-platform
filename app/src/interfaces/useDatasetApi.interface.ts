@@ -6,7 +6,7 @@ export interface IArtifact {
   file_name: string;
   file_size: number;
   file_type: string;
-  foi_reason_description: boolean | null;
+  foi_reason: boolean | null;
   key: string;
   revision_count: number;
   security_review_timestamp: string | null;
