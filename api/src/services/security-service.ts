@@ -180,35 +180,35 @@ export class SecurityService extends DBService {
 
     const userId = this.connection.systemUserId();
 
-    const artifact = await this.artifactService.getArtifactById(artifactId);
-
-    const isArtifactPendingReview = artifact.security_review_timestamp ? false : true;
+    const isArtifactPendingReview = await this.isArtifactPendingReview(artifactId);
 
     //non-admin user cannot access a document pending review
     if (!isSystemUserAdmin && isArtifactPendingReview) {
       throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
     }
 
-    const artifactSecurityRules = await this.getArtifactPersecutionAndHarmRules(artifactId);
+    const artifactSecurityRuleIds = await this.getArtifactPersecutionAndHarmRulesIds(artifactId);
 
-    const pers_harm_exceptions = await this.getPersecutionAndHarmExceptionsByUser(userId);
+    const pers_harm_exceptionIds = await this.getPersecutionAndHarmExceptionsIdsByUser(userId);
 
-    const userHasExceptionsToAllRules = artifactSecurityRules.every((rule) => pers_harm_exceptions.includes(rule));
+    const userHasExceptionsToAllRules = artifactSecurityRuleIds.every((rule) => pers_harm_exceptionIds.includes(rule));
 
     //non-admin user cannot access a document if they don't have exceptions to all the rules applied to that document
     if (
       !isSystemUserAdmin &&
       !isArtifactPendingReview &&
-      artifactSecurityRules.length > 0 &&
+      artifactSecurityRuleIds.length > 0 &&
       !userHasExceptionsToAllRules
     ) {
       throw new HTTP403('You do not have access to this document.');
     }
 
     // access is granted because
-    // 1) admin
-    // 2) document is unsecured (not pending review, and has no security rules)
-    // 3) non-admin has exceptions all security rules
+    // 1) admin (isSystemAdmin is true)
+    // 2) document is unsecured (not pending review, and has no security rules applied)
+    // 3) non-admin user has exceptions all security rules
+
+    const artifact = await this.artifactService.getArtifactById(artifactId);
 
     return getS3SignedURL(artifact.key);
   }
@@ -220,8 +220,8 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<number[]>}
    * @memberof SecurityService
    */
-  async getPersecutionAndHarmExceptionsByUser(userId: number): Promise<number[]> {
-    defaultLog.debug({ label: 'getPersecutionAndHarmExceptionsByUser' });
+  async getPersecutionAndHarmExceptionsIdsByUser(userId: number): Promise<number[]> {
+    defaultLog.debug({ label: 'getPersecutionAndHarmExceptionsIdsByUser' });
 
     return (await this.securityRepository.getPersecutionAndHarmRulesExceptionsByUserId(userId)).map(
       (item) => item.persecution_or_harm_id
@@ -235,10 +235,26 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<number[]>}
    * @memberof SecurityService
    */
-  async getArtifactPersecutionAndHarmRules(artifactId: number): Promise<number[]> {
-    defaultLog.debug({ label: 'getDocumentPersecutionAndHarmRules' });
+  async getArtifactPersecutionAndHarmRulesIds(artifactId: number): Promise<number[]> {
+    defaultLog.debug({ label: 'getDocumentPersecutionAndHarmRulesIds' });
     return (await this.securityRepository.getDocumentPersecutionAndHarmRules(artifactId)).map(
       (item) => item.persecution_or_harm_id
     );
+  }
+
+  /**
+   * Returns true if security_review_timestamp is null
+   *
+   * Context: A null security_review_timestamp indicates that the artifact is pending review
+   * Otherwise, the timestamp indicates that the artifact has been reviewed, and either has security rules applied or it,
+   * or the artifact has no security rules( the reviewer did not apply security rules)
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<boolean>}
+   * @memberof SecurityService
+   */
+  async isArtifactPendingReview(artifactId: number): Promise<boolean> {
+    const artifact = await this.artifactService.getArtifactById(artifactId);
+    return artifact.security_review_timestamp ? false : true;
   }
 }
