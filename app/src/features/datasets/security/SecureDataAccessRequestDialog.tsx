@@ -1,19 +1,21 @@
+import { useMediaQuery, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
-import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
-import SecureDataAccessRequestForm, { secureDataAccessRequestFormInitialValues, secureDataAccessRequestFormYupSchema } from './SecureDataAccessRequestForm';
-import { useRef } from 'react';
+import DialogTitle from '@mui/material/DialogTitle';
 import { Formik, FormikProps } from 'formik';
-import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useApi } from 'hooks/useApi';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
+import { useRef } from 'react';
 import { useHistory } from 'react-router';
-import { useMediaQuery, useTheme } from '@mui/material';
-
+import SecureDataAccessRequestForm, {
+  secureDataAccessRequestFormInitialValues,
+  secureDataAccessRequestFormYupSchema
+} from './SecureDataAccessRequestForm';
 
 interface ISecureDataAccessRequestDialogProps {
   open: boolean;
@@ -21,7 +23,6 @@ interface ISecureDataAccessRequestDialogProps {
   artifacts: IArtifact[];
   initialArtifactSelection: number[];
 }
-
 
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
   const biohubApi = useApi();
@@ -34,7 +35,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
       ...values,
       pathToParent: history.location.pathname
     });
-  }
+  };
 
   const formikRef = useRef<FormikProps<ISecureDataAccessRequestForm>>(null);
 
@@ -52,7 +53,8 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
           Request access to the following documents by filling in and submitting the secured data access form below.
         </DialogContentText>
         <DialogContentText id="alert-dialog-description">
-          All secured data and information is governed by the Species and Ecosystems Data and Information Security policy and procedures.
+          All secured data and information is governed by the Species and Ecosystems Data and Information Security
+          policy and procedures.
         </DialogContentText>
 
         <Box>
@@ -64,7 +66,10 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
             validateOnChange={false}
             enableReinitialize={true}
             onSubmit={handleSubmit}>
-            <SecureDataAccessRequestForm artifacts={props.artifacts} initialArtifactSelection={props.initialArtifactSelection} />
+            <SecureDataAccessRequestForm
+              artifacts={props.artifacts}
+              initialArtifactSelection={props.initialArtifactSelection}
+            />
           </Formik>
         </Box>
       </DialogContent>
@@ -77,7 +82,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
         </Button>
       </DialogActions>
     </Dialog>
-  )
-}
+  );
+};
 
-export default SecureDataAccessRequestDialog
+export default SecureDataAccessRequestDialog;

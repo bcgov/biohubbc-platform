@@ -123,7 +123,7 @@ export class ArtifactService extends DBService {
 
   /**
    * Fetches multiple artifact records by the given artifact IDs
-   * 
+   *
    * @param {number[]} artifactIds
    * @return {*}  {Promise<Artifact[]>}
    * @memberof ArtifactService

@@ -1,9 +1,9 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { GCNotifyService } from '../../../services/gcnotify-service';
 import { getLogger } from '../../../utils/logger';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 
 const defaultLog = getLogger('/api/artifact/security/requestAccess');
 
@@ -34,7 +34,15 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['fullName', 'emailAddress', 'phoneNumber', 'reasonDescription', 'hasSignedAgreement', 'artifactIds', 'pathToParent'],
+          required: [
+            'fullName',
+            'emailAddress',
+            'phoneNumber',
+            'reasonDescription',
+            'hasSignedAgreement',
+            'artifactIds',
+            'pathToParent'
+          ],
           properties: {
             fullName: {
               type: 'string',
@@ -54,7 +62,8 @@ POST.apiDoc = {
             },
             hasSignedAgreement: {
               type: 'boolean',
-              description: 'Requester affirms that they have a signed and current Confidentiality and Non-Reproduction Agreement'
+              description:
+                'Requester affirms that they have a signed and current Confidentiality and Non-Reproduction Agreement'
             },
             pathToParent: {
               type: 'string',

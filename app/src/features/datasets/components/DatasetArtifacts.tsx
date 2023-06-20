@@ -52,8 +52,10 @@ const NoArtifactRowsOverlay = () => (
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
-  const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(null);
-  console.log({ initialSecureDataAccessRequestSelection })
+  const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(
+    null
+  );
+  console.log({ initialSecureDataAccessRequestSelection });
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
@@ -144,12 +146,13 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   return (
     <>
-
       <SecureDataAccessRequestDialog
         open={Boolean(initialSecureDataAccessRequestSelection)}
         onClose={() => setInitialSecureDataAccessRequestSelection(null)}
         artifacts={artifactsList}
-        initialArtifactSelection={initialSecureDataAccessRequestSelection ? [initialSecureDataAccessRequestSelection] : []}
+        initialArtifactSelection={
+          initialSecureDataAccessRequestSelection ? [initialSecureDataAccessRequestSelection] : []
+        }
       />
 
       <ApplySecurityDialog

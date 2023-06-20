@@ -1,16 +1,24 @@
-import { DialogContentText, FormControl, FormControlLabel, FormHelperText, Radio, RadioGroup, Theme } from '@mui/material';
+import {
+  DialogContentText,
+  FormControl,
+  FormControlLabel,
+  FormHelperText,
+  Radio,
+  RadioGroup,
+  Theme
+} from '@mui/material';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import Typography from '@mui/material/Typography';
 import Paper from '@mui/material/Paper';
+import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import CustomTextField from 'components/fields/CustomTextField';
-import yup from 'utils/YupSchema';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useFormikContext } from 'formik';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useState } from 'react';
+import yup from 'utils/YupSchema';
 
 const useStyles = makeStyles((theme: Theme) => ({
   subheader: {
@@ -56,21 +64,29 @@ export const secureDataAccessRequestFormYupSchema = yup.lazy((formData: ISecureD
     selectedArtifacts: yup.array().min(1, 'Must select at least one artifact'),
     companyInformation: formData.hasSignedAgreement
       ? yup.mixed().notRequired()
-      : yup.object().required().shape({
-          companyName: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
-          jobTitle: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Job/Position Title is Required'),
-          streetAddress: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Street Address is Required'),
-          city: yup.string().max(3000, 'Cannot exceed 3000 characters').required('City is Required'),
-          postalCode: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Postal Code is Required'),
-        }),
+      : yup
+          .object()
+          .required()
+          .shape({
+            companyName: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
+            jobTitle: yup
+              .string()
+              .max(3000, 'Cannot exceed 3000 characters')
+              .required('Job/Position Title is Required'),
+            streetAddress: yup
+              .string()
+              .max(3000, 'Cannot exceed 3000 characters')
+              .required('Street Address is Required'),
+            city: yup.string().max(3000, 'Cannot exceed 3000 characters').required('City is Required'),
+            postalCode: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Postal Code is Required')
+          }),
     professionalOrganization: formData.hasSignedAgreement
       ? yup.mixed().notRequired()
       : yup.object().shape({
           organizationName: yup.string().max(3000, 'Cannot exceed 3000 characters'),
-          memberNumber: yup.string().max(3000, 'Cannot exceed 3000 characters'),
+          memberNumber: yup.string().max(3000, 'Cannot exceed 3000 characters')
         })
   });
-
 });
 
 interface ISecureDataAccessRequestFormProps {
@@ -104,14 +120,16 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
 
   const onChangeSelection = (rowSelectionModel: GridRowSelectionModel) => {
     formikProps.setFieldValue('artifactIds', rowSelectionModel);
-    setCurrentRowSelection(rowSelectionModel)
-  }
+    setCurrentRowSelection(rowSelectionModel);
+  };
 
   const onChangeAgreementConfirmation = (event: React.ChangeEvent<HTMLInputElement>) => {
     formikProps.setFieldValue('hasSignedAgreement', event.target.value !== 'false');
-  }
+  };
 
-  const agreementSignedError = Boolean(formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement'])
+  const agreementSignedError = Boolean(
+    formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement']
+  );
 
   return (
     <>
@@ -192,11 +210,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
       </Box>
 
       <Box mt={2}>
-        <FormControl
-          required={true}
-          component="fieldset"
-          error={agreementSignedError}
-        >
+        <FormControl required={true} component="fieldset" error={agreementSignedError}>
           <Typography component="legend" variant="h5">
             Confidentiality Agreement
           </Typography>
@@ -207,8 +221,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             <RadioGroup
               name="hasSignedAgreement"
               value={formikProps.values.hasSignedAgreement}
-              onChange={onChangeAgreementConfirmation}
-            >
+              onChange={onChangeAgreementConfirmation}>
               <FormControlLabel
                 value="true"
                 control={<Radio required={true} color="primary" size="small" />}

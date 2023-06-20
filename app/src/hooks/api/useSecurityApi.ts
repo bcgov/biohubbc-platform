@@ -19,6 +19,13 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Apply security reasons for artifacts
+   *
+   * @param {{ artifact_id: number }[]} selectedArtifacts
+   * @param {{ id: number }[]} securityReasons
+   * @return {*}  {Promise<{ artifact_persecution_id: number }[]>}
+   */
   const applySecurityReasonsToArtifacts = async (
     selectedArtifacts: { artifact_id: number }[],
     securityReasons: { id: number }[]
@@ -35,15 +42,16 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * @TODO jsdoc
-   * @param requestData 
-   * @returns 
+   * Send secure artifact access request
+   *
+   * @param {ISecureDataAccessRequestForm} requestData
+   * @return {*}  {Promise<boolean>}
    */
   const sendSecureArtifactAccessRequest = async (requestData: ISecureDataAccessRequestForm): Promise<boolean> => {
     const { data } = await axios.post(`api/artifact/security/requestAccess`, requestData);
 
     return data;
-  }
+  };
 
   return {
     sendSecureArtifactAccessRequest,

@@ -45,17 +45,17 @@ export function safeTrim<T>(value: T): T {
  */
 export const makeLoginUrl = (host: string, redirectTo?: string) => {
   return `${host}/login${redirectTo && `?redirect=${encodeURIComponent(redirectTo)}`}`;
-}
+};
 
 /**
  * Pretty-prints a phone number.
- * 
+ *
  * @example formatPhoneNumber(12505551234); // => "+1 (250) 555-1234"
- * @param {string} phoneNumber The phone number to format 
+ * @param {string} phoneNumber The phone number to format
  * @returns {string} The formatted phonenumber
  */
 export const formatPhoneNumber = (phoneNumber: string) => {
-  const fullNumeric = phoneNumber.replace(/\D/g,'');
+  const fullNumeric = phoneNumber.replace(/\D/g, '');
 
   if (fullNumeric.length <= 1 || fullNumeric.replace(/^1/, '').length > 10) {
     return fullNumeric;
@@ -78,4 +78,4 @@ export const formatPhoneNumber = (phoneNumber: string) => {
   }
 
   return `${countryCode} (${areaCode}) ${[exchangeCode, subscriberCode].filter(Boolean).join('-')}`.trim();
-}
+};

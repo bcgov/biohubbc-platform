@@ -4,10 +4,10 @@ import useAdminApi from './api/useAdminApi';
 import useAxios from './api/useAxios';
 import useDatasetApi from './api/useDatasetApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
+import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
 import useUserApi from './api/useUserApi';
-import useSecurityApi from './api/useSecurityApi';
 
 /**
  * Returns a set of supported api methods.

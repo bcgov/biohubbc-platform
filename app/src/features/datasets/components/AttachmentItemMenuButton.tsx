@@ -19,7 +19,9 @@ interface IAttachmentItemMenuButtonProps {
 const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (props) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
-  const canDownload = props.hasAdministrativePermissions || props.artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED
+  const canDownload =
+    props.hasAdministrativePermissions ||
+    props.artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED;
 
   const handleClick = (event: any) => {
     setAnchorEl(event.currentTarget);

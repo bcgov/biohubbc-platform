@@ -4,11 +4,11 @@ import { IDBConnection } from '../database/db';
 import { ApiError, ApiErrorType, ApiGeneralError } from '../errors/api-error';
 import { IgcNotifyGenericMessage, IgcNotifyPostReturn } from '../interfaces/gcnotify.interface';
 import { AdministrativeRepository } from '../repositories/administrative-repository';
-import { DBService } from './db-service';
-import { KeycloakService } from './keycloak-service';
+import { getLogger } from '../utils/logger';
 import { formatPhoneNumber, makeLoginUrl } from '../utils/string-utils';
 import { ArtifactService } from './artifact-service';
-import { getLogger } from '../utils/logger';
+import { DBService } from './db-service';
+import { KeycloakService } from './keycloak-service';
 
 const GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS = '4bb42a76-f79b-424f-ad0f-ad3671389ec2'; // @TODO
 
@@ -79,7 +79,7 @@ export class GCNotifyService extends DBService {
     this.API_KEY = process.env.GCNOTIFY_SECRET_API_KEY || '';
     this.APP_HOST = process.env.APP_HOST || '';
     this.adminEmail = process.env.GCNOTIFY_ADMIN_EMAIL || '';
-  
+
     this.axiosConfig = {
       headers: {
         Authorization: this.API_KEY,
@@ -126,7 +126,7 @@ export class GCNotifyService extends DBService {
     const url = makeLoginUrl(this.APP_HOST, requestData.pathToParent);
     const link = `[${requestData.pathToParent}](${url})`;
     const email = `[${requestData.emailAddress}](mailto:${requestData.emailAddress})`;
-    const phone = `[${formatPhoneNumber(requestData.phoneNumber)}](tel:${requestData.phoneNumber.replace(/\D/g,'')})`
+    const phone = `[${formatPhoneNumber(requestData.phoneNumber)}](tel:${requestData.phoneNumber.replace(/\D/g, '')})`;
 
     const artifactService = new ArtifactService(this.connection);
     const artifacts = await artifactService.getArtifactsByIds(requestData.artifactIds);
