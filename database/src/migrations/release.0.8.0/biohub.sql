@@ -21,7 +21,7 @@ CREATE TABLE artifact(
     file_size                      integer,
     key                            varchar(1000),
     security_review_timestamp      timestamptz(6),
-    foi_reason                     boolean,
+    foi_reason_description                     boolean,
     security_reason_name           varchar(300),
     security_reason_description    varchar(3000),
     security_reason_end_date       timestamptz(6),
@@ -56,7 +56,7 @@ COMMENT ON COLUMN artifact.key IS 'The identifying key to the file in the storag
 ;
 COMMENT ON COLUMN artifact.security_review_timestamp IS 'The timestamp that the security review of the submission artifact was completed.'
 ;
-COMMENT ON COLUMN artifact.foi_reason IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.'
+COMMENT ON COLUMN artifact.foi_reason_description IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.'
 ;
 COMMENT ON COLUMN artifact.security_reason_name IS 'The name of the custom security reason.'
 ;
@@ -938,7 +938,7 @@ CREATE TABLE submission_observation(
     darwin_core_source             jsonb             NOT NULL,
     submission_security_request    jsonb,
     security_review_timestamp      timestamptz(6),
-    foi_reason                     boolean,
+    foi_reason_description                     boolean,
     security_reason_name           varchar(300),
     security_reason_description    varchar(3000),
     security_reason_end_date       timestamptz(6),
@@ -965,7 +965,7 @@ COMMENT ON COLUMN submission_observation.submission_security_request IS 'A JSON 
 ;
 COMMENT ON COLUMN submission_observation.security_review_timestamp IS 'The timestamp of the associated event.'
 ;
-COMMENT ON COLUMN submission_observation.foi_reason IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.'
+COMMENT ON COLUMN submission_observation.foi_reason_description IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.'
 ;
 COMMENT ON COLUMN submission_observation.security_reason_name IS 'The name of the custom security reason.'
 ;

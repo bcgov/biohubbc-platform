@@ -52,7 +52,7 @@ const NoArtifactRowsOverlay = () => (
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
-  const [openSecureDataAccessRequestDialog, setOpenSecureDataAccessRequestDialog] = useState<boolean>(false);
+  const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(null);
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
@@ -132,6 +132,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
+            onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />
@@ -144,9 +145,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     <>
 
       <SecureDataAccessRequestDialog
-        open={openSecureDataAccessRequestDialog}
-        onClose={() => setOpenSecureDataAccessRequestDialog(false)}
+        open={Boolean(initialSecureDataAccessRequestSelection)}
+        onClose={() => setInitialSecureDataAccessRequestSelection(null)}
         artifacts={artifactsList}
+        initialArtifactSelection={initialSecureDataAccessRequestSelection ? [initialSecureDataAccessRequestSelection] : []}
       />
 
       <ApplySecurityDialog
@@ -172,7 +174,6 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <IconButton disabled title="Download Files" aria-label={`Download selected files`}>
             <Icon path={mdiTrayArrowDown} color="primary" size={1} />
           </IconButton>
-          <Button onClick={() => setOpenSecureDataAccessRequestDialog(true)}>Test Dialog</Button>
         </Box>
       </ActionToolbar>
       <Divider></Divider>

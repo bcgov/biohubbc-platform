@@ -10,6 +10,7 @@ import yup from 'utils/YupSchema';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useFormikContext } from 'formik';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
+import { useEffect } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   subheader: {
@@ -45,6 +46,7 @@ export const secureDataAccessRequestFormYupSchema = yup.object().shape({
 
 interface ISecureDataAccessRequestFormProps {
   artifacts: IArtifact[];
+  initialArtifactSelection: number[];
 }
 
 /**
@@ -53,6 +55,7 @@ interface ISecureDataAccessRequestFormProps {
  * @return {*}
  */
 const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) => {
+  const { initialArtifactSelection } = props;
   const classes = useStyles();
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
 
@@ -69,6 +72,10 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
       flex: 1
     }
   ];
+
+  useEffect(() => {
+    formikProps.setFieldValue('artifactIds', initialArtifactSelection);
+  }, [initialArtifactSelection]);
 
   const onChangeSelection = (rowSelectionModel: GridRowSelectionModel) => {
     formikProps.setFieldValue('artifactIds', rowSelectionModel);
@@ -192,7 +199,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
       </Box>
 
       {formikProps.values['hasSignedAgreement'] === false && (
-        <>
+        <Box mt={2}>
           <Typography variant="body1" className={classes.subheader}>
             <strong>Company Information</strong>
           </Typography>
@@ -273,7 +280,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               </Grid>
             </Grid>
           </Box>
-        </>
+        </Box>
       )}
     </>
   );

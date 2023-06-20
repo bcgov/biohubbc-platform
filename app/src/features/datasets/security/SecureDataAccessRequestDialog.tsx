@@ -17,7 +17,8 @@ import { useHistory } from 'react-router';
 interface ISecureDataAccessRequestDialogProps {
   open: boolean;
   onClose: () => void;
-  artifacts: IArtifact[]
+  artifacts: IArtifact[];
+  initialArtifactSelection: number[];
 }
 
 
@@ -26,7 +27,6 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
   const history = useHistory();
 
   const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
-    console.log('handleSubmit()', { values })
     biohubApi.security.sendSecureArtifactAccessRequest({
       ...values,
       pathToParent: history.location.pathname
@@ -61,7 +61,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
             validateOnChange={false}
             enableReinitialize={true}
             onSubmit={handleSubmit}>
-            <SecureDataAccessRequestForm artifacts={props.artifacts} />
+            <SecureDataAccessRequestForm artifacts={props.artifacts} initialArtifactSelection={props.initialArtifactSelection} />
           </Formik>
         </Box>
       </DialogContent>
