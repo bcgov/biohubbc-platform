@@ -179,7 +179,7 @@ export class SecurityRepository extends BaseRepository {
         system_user_id =${userId} and end_date is null;
     `;
 
-    const response = await this.connection.sql<{ persecution_or_harm_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ persecution_or_harm_id: z.number() }));
 
     return (response.rowCount && response.rows) || [];
   }
@@ -203,7 +203,7 @@ export class SecurityRepository extends BaseRepository {
         artifact_id = ${artifactId};
     `;
 
-    const response = await this.connection.sql<{ persecution_or_harm_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ persecution_or_harm_id: z.number() }));
 
     const results = (response.rowCount && response.rows) || [];
 
