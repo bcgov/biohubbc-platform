@@ -121,7 +121,13 @@ export class ArtifactService extends DBService {
     return this.artifactRepository.getArtifactById(artifactId);
   }
 
-  // @TODO jsdoc
+  /**
+   * Fetches multiple artifact records by the given artifact IDs
+   * 
+   * @param {number[]} artifactIds
+   * @return {*}  {Promise<Artifact[]>}
+   * @memberof ArtifactService
+   */
   async getArtifactsByIds(artifactIds: number[]): Promise<Artifact[]> {
     return this.artifactRepository.getArtifactsByIds(artifactIds);
   }

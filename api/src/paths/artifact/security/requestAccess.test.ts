@@ -12,7 +12,7 @@ import { GCNotifyService } from '../../../services/gcnotify-service';
 
 chai.use(sinonChai);
 
-describe.only('requestAccess', () => {
+describe('requestAccess', () => {
   afterEach(() => {
     sinon.restore();
   });

@@ -181,9 +181,11 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
-   * @TODO jsdoc
-   * @param artifactIds 
-   * @returns 
+   * Fetches multiple artifact records by the given artifact IDs
+   * 
+   * @param {number[]} artifactIds
+   * @return {*}  {Promise<Artifact[]>}
+   * @memberof ArtifactRepository
    */
   async getArtifactsByIds(artifactIds: number[]): Promise<Artifact[]> {
     defaultLog.debug({ label: 'getArtifactByIds', artifactIds });
