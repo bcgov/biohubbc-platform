@@ -55,7 +55,6 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(
     null
   );
-  console.log({ initialSecureDataAccessRequestSelection });
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
