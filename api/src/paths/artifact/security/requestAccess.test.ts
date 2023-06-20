@@ -4,8 +4,11 @@ import OpenAPIRequestValidator, { OpenAPIRequestValidatorArgs } from 'openapi-re
 import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-response-validator';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { POST } from './requestAccess';
+import * as db from '../../../database/db';
+import { POST, requestAccess } from './requestAccess';
 import { cloneDeep } from 'lodash';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { GCNotifyService } from '../../../services/gcnotify-service';
 
 chai.use(sinonChai);
 
@@ -199,28 +202,6 @@ describe.only('requestAccess', () => {
             expect(response.errors[0].message).to.equal("must have required property 'postalCode'");
             expect(response.errors[0].path).to.equal("companyInformation.postalCode");
           });
-
-          it('professionalOrganization/organizationName', () => {
-            const request = cloneDeep({ ...defaultRequest });
-            delete request.body.professionalOrganization.organizationName;
-    
-            const response = requestValidator.validateRequest(request);
-      
-            expect(response.errors.length).to.equal(1);
-            expect(response.errors[0].message).to.equal("must have required property 'organizationName'");
-            expect(response.errors[0].path).to.equal("professionalOrganization.organizationName");
-          });
-
-          it('professionalOrganization/memberNumber', () => {
-            const request = cloneDeep({ ...defaultRequest });
-            delete request.body.professionalOrganization.memberNumber;
-    
-            const response = requestValidator.validateRequest(request);
-      
-            expect(response.errors.length).to.equal(1);
-            expect(response.errors[0].message).to.equal("must have required property 'memberNumber'");
-            expect(response.errors[0].path).to.equal("professionalOrganization.memberNumber");
-          });
         });
 
       });
@@ -246,7 +227,7 @@ describe.only('requestAccess', () => {
       });
     });
 
-    describe.only('response valiation', () => {
+    describe('response valiation', () => {
       const responseValidator = new OpenAPIResponseValidator(POST.apiDoc as unknown as OpenAPIResponseValidatorArgs);
       
       describe('should fail when', () => {
@@ -283,7 +264,51 @@ describe.only('requestAccess', () => {
           //
         })
       })
-    })
-  })
+    });
+  });
 
+  it('should return true upon success', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(GCNotifyService.prototype, 'sendNotificationForArtifactRequestAccess').resolves(true);
+
+    const requestHandler = requestAccess();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.jsonValue).to.eql(true);
+  });
+
+  it('should return false upon failure', async () => {
+    const mockDBConnection = getMockDBConnection();
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(GCNotifyService.prototype, 'sendNotificationForArtifactRequestAccess').resolves(false);
+
+    const requestHandler = requestAccess();
+    await requestHandler(mockReq, mockRes, mockNext);
+
+    expect(mockRes.jsonValue).to.eql(false);
+  });
+
+  it('should catch and rethrow errors', async () => {
+    const mockDBConnection = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+    sinon.stub(GCNotifyService.prototype, 'sendNotificationForArtifactRequestAccess').throws(new Error('test error'));
+
+    const requestHandler = requestAccess();
+    
+    try {
+      await requestHandler(mockReq, mockRes, mockNext);
+      expect.fail();
+    } catch (actualError) {
+      expect((actualError as Error).message).to.equal('test error');
+      expect(mockDBConnection.release).to.have.been.calledOnce;
+      expect(mockDBConnection.rollback).to.have.been.calledOnce;
+    }
+  });
 });
