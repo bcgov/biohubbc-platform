@@ -5,8 +5,10 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
+import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { ApiGeneralError } from '../errors/api-error';
 import { UserObject } from '../models/user';
+import { Srid3005 } from '../services/geo-service';
 import { UserService } from '../services/user-service';
 import * as spatialUtils from '../utils/spatial-utils';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -613,8 +615,24 @@ describe('SpatialRepository', () => {
   });
 
   describe('getGeometryAsWktFromBoundarySpatialComponentBySubmissionId', () => {
-    it('returns a geometry string', () => {
-      // TODO
+    it('returns a geometry WKT string', async () => {
+      const mockResponse = { rowCount: 1, rows: [{ geometry: 'POLYGON(123,456,789)' }] } as any as Promise<
+        QueryResult<any>
+      >;
+
+      const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+      const spatialRepository = new SpatialRepository(mockDBConnection);
+
+      const submissionId = 1;
+
+      const response = await spatialRepository.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+        submissionId,
+        SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
+        Srid3005
+      );
+
+      expect(response).to.eql({ geometry: 'POLYGON(123,456,789)' });
     });
   });
 });

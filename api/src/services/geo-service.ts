@@ -408,7 +408,7 @@ export class WebMapService extends GeoService {
    * @memberof WebMapService
    */
   async getCapabilities(options?: OwsBaseOptions): Promise<unknown> {
-    const version = options?.version || '2.0.0';
+    const version = options?.version || '1.3.0';
 
     const url = this._buildURL({
       ...options,

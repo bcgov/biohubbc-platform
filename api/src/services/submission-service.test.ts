@@ -687,12 +687,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getGeometryAsWktFromBoundarySpatialComponentBySubmissionId', () => {
-    it('returns a geometry string', () => {
-      // TODO
-    });
-  });
-
   describe('getHandleBarsTemplateByDatasetId', () => {
     it('should succeed with valid data', async () => {
       const mockDBConnection = getMockDBConnection();

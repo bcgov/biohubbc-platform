@@ -1,6 +1,7 @@
 import { Feature, FeatureCollection, GeoJsonProperties } from 'geojson';
 import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -958,7 +959,7 @@ export class SpatialRepository extends BaseRepository {
         `jsonb_path_exists(spatial_component,'$.features[*] \\? (@.properties.type == "${spatialComponentType}")')`
       );
 
-    const response = await this.connection.knex(queryBuilder);
+    const response = await this.connection.knex(queryBuilder, z.object({ geometry: z.string() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get boundary spatial component', [
