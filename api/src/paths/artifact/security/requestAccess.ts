@@ -3,17 +3,29 @@ import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
 import { GCNotifyService } from '../../../services/gcnotify-service';
 import { getLogger } from '../../../utils/logger';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 
 const defaultLog = getLogger('/api/artifact/security/requestAccess');
 
-export const POST: Operation = [requestAccess()];
+export const POST: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  requestAccess()
+];
 
 POST.apiDoc = {
   description: 'Request access to secure artifacts in Biohub.',
   tags: ['documents', 'security', 'biohub'],
   security: [
     {
-      OptionalBearer: []
+      Bearer: []
     }
   ],
   requestBody: {
