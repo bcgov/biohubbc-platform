@@ -6,6 +6,17 @@ export interface ISecureDataAccessRequestForm {
   hasSignedAgreement: boolean;
   artifactIds: number[];
   pathToParent: string;
+  companyInformation: {
+    companyName: string;
+    jobTitle: string;
+    streetAddress: string;
+    city: string;
+    postalCode: string;
+  };
+  professionalOrganization: {
+    organizationName?: string;
+    memberNumber?: string;
+  };
 }
 
 export type IListPersecutionHarmResponse = Array<IPersecutionHarmRule>;

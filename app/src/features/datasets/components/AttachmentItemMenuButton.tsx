@@ -24,6 +24,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
   const handleClick = (event: any) => {
     setAnchorEl(event.currentTarget);
   };
+
   const handleClose = () => {
     setAnchorEl(null);
   };
@@ -55,7 +56,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
               <MenuItem
                 onClick={() => {
                   props.onDownload(props.artifact);
-                  setAnchorEl(null);
+                  handleClose();
                 }}
                 data-testid="attachment-action-menu-download">
                 <ListItemIcon>
@@ -66,7 +67,8 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             ) : (
               <MenuItem
                 onClick={() => {
-                  props.onRequestAccess(props.artifact)
+                  props.onRequestAccess(props.artifact);
+                  handleClose();
                 }}
                 data-testid="attachment-action-menu-request-access">
                 <ListItemIcon>
@@ -80,7 +82,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
               <MenuItem
                 onClick={() => {
                   console.log('Delete artifact not implemented yet.');
-                  setAnchorEl(null);
+                  handleClose();
                 }}
                 data-testid="attachment-action-menu-delete">
                 <ListItemIcon>

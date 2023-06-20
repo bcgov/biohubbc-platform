@@ -53,6 +53,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
   const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(null);
+  console.log({ initialSecureDataAccessRequestSelection })
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
@@ -132,7 +133,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
-            onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection}
+            onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection(artifact.artifact_id)}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />

@@ -10,7 +10,7 @@ import yup from 'utils/YupSchema';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { useFormikContext } from 'formik';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
-import { useEffect } from 'react';
+import { useState } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   subheader: {
@@ -28,20 +28,49 @@ export const secureDataAccessRequestFormInitialValues: ISecureDataAccessRequestF
   reasonDescription: '',
   hasSignedAgreement: undefined as unknown as boolean,
   artifactIds: [],
-  pathToParent: ''
+  pathToParent: '',
+  companyInformation: {
+    companyName: '',
+    jobTitle: '',
+    streetAddress: '',
+    city: '',
+    postalCode: ''
+  },
+  professionalOrganization: {
+    organizationName: '',
+    memberNumber: ''
+  }
 };
 
-export const secureDataAccessRequestFormYupSchema = yup.object().shape({
-  fullName: yup.string().max(50, 'Cannot exceed 50 characters').required('Full Name is Required'),
-  emailAddress: yup
-    .string()
-    .max(500, 'Cannot exceed 500 characters')
-    .email('Must be a valid email address')
-    .required('Email Address is Required'),
-  phoneNumber: yup.string().max(300, 'Cannot exceed 300 characters').required('Phone Number is Required'),
-  reasonDescription: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
-  hasSignedAgreement: yup.boolean().required('Confidentiality Agreement is Required'),
-  selectedArtifacts: yup.array().min(1, 'Must select at least one artifact')
+export const secureDataAccessRequestFormYupSchema = yup.lazy((formData: ISecureDataAccessRequestForm) => {
+  return yup.object().shape({
+    fullName: yup.string().max(50, 'Cannot exceed 50 characters').required('Full Name is Required'),
+    emailAddress: yup
+      .string()
+      .max(500, 'Cannot exceed 500 characters')
+      .email('Must be a valid email address')
+      .required('Email Address is Required'),
+    phoneNumber: yup.string().max(300, 'Cannot exceed 300 characters').required('Phone Number is Required'),
+    reasonDescription: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
+    hasSignedAgreement: yup.boolean().required('Confidentiality Agreement is Required'),
+    selectedArtifacts: yup.array().min(1, 'Must select at least one artifact'),
+    companyInformation: formData.hasSignedAgreement
+      ? yup.mixed().notRequired()
+      : yup.object().required().shape({
+          companyName: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
+          jobTitle: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Job/Position Title is Required'),
+          streetAddress: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Street Address is Required'),
+          city: yup.string().max(3000, 'Cannot exceed 3000 characters').required('City is Required'),
+          postalCode: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Postal Code is Required'),
+        }),
+    professionalOrganization: formData.hasSignedAgreement
+      ? yup.mixed().notRequired()
+      : yup.object().shape({
+          organizationName: yup.string().max(3000, 'Cannot exceed 3000 characters'),
+          memberNumber: yup.string().max(3000, 'Cannot exceed 3000 characters'),
+        })
+  });
+
 });
 
 interface ISecureDataAccessRequestFormProps {
@@ -55,9 +84,9 @@ interface ISecureDataAccessRequestFormProps {
  * @return {*}
  */
 const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) => {
-  const { initialArtifactSelection } = props;
   const classes = useStyles();
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
+  const [currentRowSelection, setCurrentRowSelection] = useState<GridRowSelectionModel>(props.initialArtifactSelection);
 
   const columns: GridColDef<IArtifact>[] = [
     {
@@ -73,12 +102,9 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
     }
   ];
 
-  useEffect(() => {
-    formikProps.setFieldValue('artifactIds', initialArtifactSelection);
-  }, [initialArtifactSelection]);
-
   const onChangeSelection = (rowSelectionModel: GridRowSelectionModel) => {
     formikProps.setFieldValue('artifactIds', rowSelectionModel);
+    setCurrentRowSelection(rowSelectionModel)
   }
 
   const onChangeAgreementConfirmation = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,6 +135,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             disableDensitySelector
             hideFooter
             sortingOrder={['asc', 'desc']}
+            rowSelectionModel={currentRowSelection}
             onRowSelectionModelChange={onChangeSelection}
           />
         </Paper>
@@ -208,7 +235,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             <Grid container spacing={3}>
               <Grid item xs={12}>
                 <CustomTextField
-                  name="company.companyName"
+                  name="companyInformation.companyName"
                   label="Company Name"
                   other={{
                     required: true
@@ -217,7 +244,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               </Grid>
               <Grid item xs={12}>
                 <CustomTextField
-                  name="company.jobTitle"
+                  name="companyInformation.jobTitle"
                   label="Job/Position Title"
                   other={{
                     required: true
@@ -226,7 +253,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               </Grid>
               <Grid item xs={12}>
                 <CustomTextField
-                  name="company.streetAddress"
+                  name="companyInformation.streetAddress"
                   label="Street Address"
                   other={{
                     required: true
@@ -235,7 +262,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               </Grid>
               <Grid item xs={6}>
                 <CustomTextField
-                  name="company.city"
+                  name="companyInformation.city"
                   label="City / Town"
                   other={{
                     required: true
@@ -244,7 +271,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               </Grid>
               <Grid item xs={6}>
                 <CustomTextField
-                  name="company.postalCode"
+                  name="companyInformation.postalCode"
                   label="Postal Code"
                   other={{
                     required: true
@@ -262,19 +289,19 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             <Grid container spacing={3}>
               <Grid item xs={6}>
                 <CustomTextField
-                  name="organization.organizationName"
+                  name="organizationInformation.organizationName"
                   label="Organization Name"
                   other={{
-                    required: true
+                    required: false
                   }}
                 />
               </Grid>
               <Grid item xs={6}>
                 <CustomTextField
-                  name="organization.memberNumber"
+                  name="organizationInformation.memberNumber"
                   label="Member Number"
                   other={{
-                    required: true
+                    required: false
                   }}
                 />
               </Grid>

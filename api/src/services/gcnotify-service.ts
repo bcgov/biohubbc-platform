@@ -28,8 +28,8 @@ export interface ISubmitArtifactRequestAccess {
     postalCode: string;
   };
   professionalOrganization?: {
-    organizationName: string;
-    memberNumber: string;
+    organizationName?: string;
+    memberNumber?: string;
   };
 }
 
