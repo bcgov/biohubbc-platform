@@ -160,4 +160,44 @@ describe('ArtifactRepository', () => {
       }
     });
   });
+
+  describe('updateArtifactSecurityReviewTimestamp', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ artifact_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateArtifactSecurityReviewTimestamp(1);
+
+      expect(response).to.eql(undefined);
+    });
+
+    it('throw an error if query fails', async () => {
+      const mockQueryResponse = { rows: undefined, rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+
+      try {
+        await artifactRepository.updateArtifactSecurityReviewTimestamp(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to update artifact security review timestamp'
+        );
+      }
+    });
+  });
 });

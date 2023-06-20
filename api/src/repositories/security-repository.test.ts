@@ -70,6 +70,43 @@ describe('SecurityRepository', () => {
     });
   });
 
+  describe('getPersecutionAndHarmRulesByArtifactId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns an array of PersecutionAndHarmSecurity', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            artifact_persecution_id: 1,
+            persecution_or_harm_id: 1,
+            artifact_id: 1
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const securityRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await securityRepository.getPersecutionAndHarmRulesByArtifactId(1);
+
+      expect(response).to.eql([
+        {
+          artifact_persecution_id: 1,
+          persecution_or_harm_id: 1,
+          artifact_id: 1
+        }
+      ]);
+    });
+  });
+
   describe('applySecurityRulesToArtifact', () => {
     afterEach(() => {
       sinon.restore();

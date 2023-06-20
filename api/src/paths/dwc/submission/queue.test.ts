@@ -392,6 +392,178 @@ describe('queue', () => {
       }
     });
 
+    it('throws an error when req.body.security_request.first_nations_id is empty', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = {
+        originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+      } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        security_request: {
+          first_nations_id: -1,
+          proprietor_type_id: '2',
+          survey_id: '3',
+          rational: 'string',
+          proprietor_name: 'name',
+          disa_required: 'true'
+        }
+      };
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      const requestHandler = queue.queueForProcess();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('First nations id is a required field');
+      }
+    });
+
+    it('throws an error when req.body.security_request.proprietor_type_id is empty', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = {
+        originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+      } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        security_request: {
+          first_nations_id: '1',
+          proprietor_type_id: -1,
+          survey_id: '3',
+          rational: 'string',
+          proprietor_name: 'name',
+          disa_required: 'true'
+        }
+      };
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      const requestHandler = queue.queueForProcess();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Proprietor type id is a required field');
+      }
+    });
+
+    it('throws an error when req.body.security_request.survey_id is empty', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = {
+        originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+      } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        security_request: {
+          first_nations_id: '1',
+          proprietor_type_id: '2',
+          survey_id: -1,
+          rational: 'string',
+          proprietor_name: 'name',
+          disa_required: 'true'
+        }
+      };
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      const requestHandler = queue.queueForProcess();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Survey id is a required field');
+      }
+    });
+
+    it('throws an error when req.body.security_request.rational is empty', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = {
+        originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+      } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        security_request: {
+          first_nations_id: '1',
+          proprietor_type_id: '2',
+          survey_id: '3',
+          rational: null,
+          proprietor_name: 'name',
+          disa_required: 'true'
+        }
+      };
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      const requestHandler = queue.queueForProcess();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Rational is a required field');
+      }
+    });
+
+    it('throws an error when req.body.security_request.proprietor_name is empty', async () => {
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+      const mockFile = {
+        originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip'
+      } as unknown as Express.Multer.File;
+
+      mockReq.files = [mockFile];
+      mockReq.body = {
+        media: 'file-binary',
+        data_package_id: '64f47e65-f306-410e-82fa-115f9916910b',
+        security_request: {
+          first_nations_id: '1',
+          proprietor_type_id: '2',
+          survey_id: '3',
+          rational: 'string',
+          proprietor_name: null,
+          disa_required: 'true'
+        }
+      };
+
+      sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+
+      const requestHandler = queue.queueForProcess();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as HTTPError).status).to.equal(400);
+        expect((actualError as HTTPError).message).to.equal('Proprietor name is a required field');
+      }
+    });
+
     it('returns 200', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);

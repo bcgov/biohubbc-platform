@@ -13,7 +13,7 @@ import { UserService } from './user-service';
 chai.use(sinonChai);
 
 describe('SecurityService', () => {
-  describe('getNextArtifactIds', () => {
+  describe('getPersecutionAndHarmRules', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -49,13 +49,98 @@ describe('SecurityService', () => {
     });
   });
 
+  describe('getSecurityAppliedStatus', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns pending when no security applied', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
+        security_review_timestamp: null,
+        key: 'sample-key'
+      } as Artifact);
+
+      const result = await securityService.getSecurityAppliedStatus(1);
+
+      expect(getArtifactStub).to.be.calledWith(1);
+      expect(result).to.eql('PENDING');
+    });
+
+    it('returns unsecured when no security applied', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
+        security_review_timestamp: '2021-01-01',
+        key: 'sample-key'
+      } as unknown as Artifact);
+
+      const getPersecutionAndHarmRulesByArtifactIdStub = sinon
+        .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+        .resolves([]);
+
+      const result = await securityService.getSecurityAppliedStatus(1);
+
+      expect(getArtifactStub).to.be.calledWith(1);
+      expect(getPersecutionAndHarmRulesByArtifactIdStub).to.be.calledWith(1);
+      expect(result).to.eql('UNSECURED');
+    });
+
+    it('returns unsecured when no security applied', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
+        security_review_timestamp: '2021-01-01',
+        key: 'sample-key'
+      } as unknown as Artifact);
+
+      const getPersecutionAndHarmRulesByArtifactIdStub = sinon
+        .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+        .resolves([{ persecution_or_harm_id: 1, artifact_id: 1, artifact_persecution_id: 1 }]);
+
+      const result = await securityService.getSecurityAppliedStatus(1);
+
+      expect(getArtifactStub).to.be.calledWith(1);
+      expect(getPersecutionAndHarmRulesByArtifactIdStub).to.be.calledWith(1);
+      expect(result).to.eql('SECURED');
+    });
+  });
+
+  describe('getPersecutionAndHarmRulesByArtifactId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should retrieve an array of artifact PersecutionAndHarmSecurity Rules', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getPersecutionAndHarmRulesByArtifactIdStub = sinon
+        .stub(SecurityRepository.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+        .resolves([]);
+
+      const result = await securityService.getPersecutionAndHarmRulesByArtifactId(1);
+
+      expect(getPersecutionAndHarmRulesByArtifactIdStub).to.be.calledWith(1);
+      expect(result).to.eql([]);
+    });
+  });
+
   describe('applySecurityRulesToArtifacts', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
     it('should return artifact_id on insert', async () => {
       const mockDBConnection = getMockDBConnection();
       const securityService = new SecurityService(mockDBConnection);
 
       const applySecurityRulesToArtifactStub = sinon
-        .stub(SecurityService.prototype, 'applySecurityRulesToArtifacts')
+        .stub(SecurityService.prototype, 'applySecurityRulesToArtifact')
         .resolves([{ artifact_persecution_id: 1 }, { artifact_persecution_id: 2 }]);
 
       sinon.stub(ArtifactService.prototype, 'updateArtifactSecurityReviewTimestamp').resolves();
@@ -63,7 +148,71 @@ describe('SecurityService', () => {
       const response = await securityService.applySecurityRulesToArtifacts([1], [1, 2]);
 
       expect(applySecurityRulesToArtifactStub).to.be.calledOnce;
-      expect(response).to.be.eql([{ artifact_persecution_id: 1 }, { artifact_persecution_id: 2 }]);
+      expect(response).to.be.eql([[{ artifact_persecution_id: 1 }, { artifact_persecution_id: 2 }]]);
+    });
+  });
+
+  describe('applySecurityRulesToArtifact', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    describe('with no existing rules', () => {
+      it('handles permit deletes/updates/creates', async () => {
+        const mockDBConnection = getMockDBConnection();
+
+        const getPersecutionAndHarmRulesByArtifactIdStub = sinon
+          .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+          .resolves([]);
+
+        const deleteSecurityRuleFromArtifactStub = sinon
+          .stub(SecurityService.prototype, 'deleteSecurityRuleFromArtifact')
+          .resolves();
+
+        const applySecurityRulesToArtifactStub = sinon
+          .stub(SecurityRepository.prototype, 'applySecurityRulesToArtifact')
+          .resolves();
+
+        const securityService = new SecurityService(mockDBConnection);
+
+        await securityService.applySecurityRulesToArtifact(1, [1]);
+
+        expect(getPersecutionAndHarmRulesByArtifactIdStub).to.have.been.calledOnceWith(1);
+
+        expect(deleteSecurityRuleFromArtifactStub).not.to.have.been.called;
+
+        expect(applySecurityRulesToArtifactStub).to.have.been.calledOnceWith(1, 1);
+      });
+    });
+
+    describe('with existing permits', () => {
+      it('handles permit deletes/updates/creates', async () => {
+        const mockDBConnection = getMockDBConnection();
+
+        const getPersecutionAndHarmRulesByArtifactIdStub = sinon
+          .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+          .resolves([{ persecution_or_harm_id: 3, artifact_id: 1, artifact_persecution_id: 1 }]);
+
+        const deleteSecurityRuleFromArtifactStub = sinon
+          .stub(SecurityRepository.prototype, 'deleteSecurityRuleFromArtifact')
+          .resolves();
+
+        const applySecurityRulesToArtifactStub = sinon
+          .stub(SecurityRepository.prototype, 'applySecurityRulesToArtifact')
+          .resolves();
+
+        const securityService = new SecurityService(mockDBConnection);
+
+        await securityService.applySecurityRulesToArtifact(1, [1, 2]);
+
+        expect(getPersecutionAndHarmRulesByArtifactIdStub).to.have.been.calledOnceWith(1);
+
+        expect(deleteSecurityRuleFromArtifactStub).to.have.been.calledOnceWith(1, 3);
+
+        expect(applySecurityRulesToArtifactStub).to.have.callCount(2);
+        expect(applySecurityRulesToArtifactStub).to.have.been.calledWith(1, 1);
+        expect(applySecurityRulesToArtifactStub).to.have.been.calledWith(1, 2);
+      });
     });
   });
 
