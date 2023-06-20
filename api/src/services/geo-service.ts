@@ -141,15 +141,6 @@ export type WfsGetFilterBaseOptions = WfsGetBaseOptions & {
 };
 
 /**
- * Parameters required to make a WFS GetFeature request.
- */
-export type WfsGetFeatureOptions = WfsGetBaseOptions;
-/**
- * Parameters required to make a WFS GetFeature request with CQL filter.
- */
-export type WfsGetFeatureFilterOptions = WfsGetFilterBaseOptions;
-
-/**
  * Parameters required to make a WFS GetPropertyValue request.
  */
 export type WfsGetPropertyValueOptions = WfsGetBaseOptions & {
@@ -273,6 +264,24 @@ export class GeoService {
 
     return data;
   }
+
+  /**
+   * Executes a Http Post request, using `content-type=application/x-www-form-urlencoded`, returning the response data.
+   *
+   * @param {string} url
+   * @param {Record<string, any>} body
+   * @param {CancelTokenSource} [cancelTokenSource]
+   * @return {*}  {Promise<unknown>}
+   * @memberof GeoService
+   */
+  async _externalPost(url: string, body: Record<string, any>, cancelTokenSource?: CancelTokenSource): Promise<unknown> {
+    const { data } = await axios.post(url, qs.stringify(body), {
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      cancelToken: cancelTokenSource?.token
+    });
+
+    return data;
+  }
 }
 
 /**
@@ -313,7 +322,23 @@ export class WebFeatureService extends GeoService {
   async getFeature(options: WfsGetBaseOptions | WfsGetFilterBaseOptions): Promise<unknown> {
     const version = options?.version || '2.0.0';
 
-    const url = this._buildURL({ ...options, request: 'GetFeature', service: Wfs, version: version });
+    if ('cql_filter' in options) {
+      const { cql_filter, ...rest } = options;
+
+      const url = this._buildURL({ ...rest, request: 'GetFeature', service: Wfs, version: version });
+
+      // cql_filter can get too big for a traditional GET request, and so must be sent in the body of a post request
+      const body = { cql_filter: cql_filter };
+
+      return this._externalPost(url, body);
+    }
+
+    const url = this._buildURL({
+      ...options,
+      request: 'GetFeature',
+      service: Wfs,
+      version: version
+    });
 
     return this._externalGet(url);
   }
@@ -327,6 +352,22 @@ export class WebFeatureService extends GeoService {
    */
   async getPropertyValue(options: WfsGetPropertyValueOptions | WfsGetPropertyValueFilterOptions): Promise<unknown> {
     const version = options?.version || '2.0.0';
+
+    if ('cql_filter' in options) {
+      const { cql_filter, ...rest } = options;
+
+      const url = this._buildURL({
+        ...rest,
+        request: 'GetPropertyValue',
+        service: Wfs,
+        version: version
+      });
+
+      // cql_filter can get too big for a traditional GET request, and so must be sent in the body of a post request
+      const body = { cql_filter: cql_filter };
+
+      return this._externalPost(url, body);
+    }
 
     const url = this._buildURL({
       ...options,
