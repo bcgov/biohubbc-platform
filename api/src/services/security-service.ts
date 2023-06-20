@@ -184,7 +184,7 @@ export class SecurityService extends DBService {
 
     //non-admin user cannot access a document pending review
     if (!isSystemUserAdmin && isArtifactPendingReview) {
-      throw new HTTP403('Documents that are pending review can only be downloaded by administrators.');
+      throw new HTTP403('You do not have access to this document.');
     }
 
     const artifactSecurityRuleIds = await this.getArtifactPersecutionAndHarmRulesIds(artifactId);
