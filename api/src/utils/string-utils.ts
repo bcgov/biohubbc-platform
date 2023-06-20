@@ -38,11 +38,7 @@ export function safeTrim<T>(value: T): T {
 
 /**
  * Generates a login URL the includes an optional redirect URL.
-<<<<<<< HEAD
- * 
-=======
  *
->>>>>>> dev
  * @param {string} host The host of the application
  * @param {[string]} redirectTo The URL that the user will be redirected to upon logging in
  * @returns The login URL
@@ -52,9 +48,11 @@ export const makeLoginUrl = (host: string, redirectTo?: string) => {
 }
 
 /**
- * @TODO jsdoc
- * @param phoneNumber 
- * @returns 
+ * Pretty-prints a phone number.
+ * 
+ * @example formatPhoneNumber(12505551234); // => "+1 (250) 555-1234"
+ * @param {string} phoneNumber The phone number to format 
+ * @returns {string} The formatted phonenumber
  */
 export const formatPhoneNumber = (phoneNumber: string) => {
   const fullNumeric = phoneNumber.replace(/\D/g,'');

@@ -12,6 +12,7 @@ import { Formik, FormikProps } from 'formik';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useApi } from 'hooks/useApi';
 import { useHistory } from 'react-router';
+import { useMediaQuery, useTheme } from '@mui/material';
 
 
 interface ISecureDataAccessRequestDialogProps {
@@ -25,6 +26,8 @@ interface ISecureDataAccessRequestDialogProps {
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
   const biohubApi = useApi();
   const history = useHistory();
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
     biohubApi.security.sendSecureArtifactAccessRequest({
@@ -37,7 +40,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
 
   return (
     <Dialog
-      // fullScreen={fullScreen}
+      fullScreen={fullScreen}
       maxWidth="md"
       open={props.open}
       onClose={props.onClose}
