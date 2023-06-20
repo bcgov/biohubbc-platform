@@ -135,7 +135,7 @@ export function getArtifactsByDatasetId(): RequestHandler {
 
       const artifactsWithRules = await Promise.all(
         artifacts.map(async (artifact) => {
-          const appliedSecurity = await securityService.getSecurtyAppliedStatus(artifact.artifact_id);
+          const appliedSecurity = await securityService.getSecurityAppliedStatus(artifact.artifact_id);
           return {
             ...artifact,
             supplementaryData: { persecutionAndHarm: appliedSecurity }
