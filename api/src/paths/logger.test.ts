@@ -11,7 +11,9 @@ describe('logger', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-      mockReq.query = {};
+      mockReq.query = {
+        level: undefined
+      };
 
       try {
         await requestHandler(mockReq, mockRes, mockNext);

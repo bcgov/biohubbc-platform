@@ -1,29 +1,36 @@
 import { IDBConnection } from '../database/db';
+import { HTTP403 } from '../errors/http-error';
 import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
   SecurityRepository,
   SECURITY_APPLIED_STATUS
 } from '../repositories/security-repository';
+import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { ArtifactService } from './artifact-service';
 import { DBService } from './db-service';
+import { UserService } from './user-service';
 
 const defaultLog = getLogger('services/security-service');
 
 /**
- * A service for maintaining securty artifacts.
+ * A service for maintaining security artifacts.
  *
  * @export
  * @class SecurityService
  */
 export class SecurityService extends DBService {
   securityRepository: SecurityRepository;
+  artifactService: ArtifactService;
+  userService: UserService;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.securityRepository = new SecurityRepository(connection);
+    this.artifactService = new ArtifactService(connection);
+    this.userService = new UserService(connection);
   }
 
   /**
@@ -45,8 +52,8 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<SECURITY_APPLIED_STATUS>}
    * @memberof SecurityService
    */
-  async getSecurtyAppliedStatus(artifactId: number): Promise<SECURITY_APPLIED_STATUS> {
-    defaultLog.debug({ label: 'getSecurtyAppliedStatus' });
+  async getSecurityAppliedStatus(artifactId: number): Promise<SECURITY_APPLIED_STATUS> {
+    defaultLog.debug({ label: 'getSecurityAppliedStatus' });
 
     const artifactService = new ArtifactService(this.connection);
 
@@ -104,6 +111,14 @@ export class SecurityService extends DBService {
     return Promise.all(promises);
   }
 
+  /**
+   *
+   *
+   * @param {number} artifactId
+   * @param {number[]} securityReasonIds
+   * @return {*}  {Promise<{ artifact_persecution_id: number }[]>}
+   * @memberof SecurityService
+   */
   async applySecurityRulesToArtifact(
     artifactId: number,
     securityReasonIds: number[]
@@ -144,10 +159,117 @@ export class SecurityService extends DBService {
 
     return Promise.all(promises);
   }
-
+  /**
+   *
+   *
+   * @param {number} artifactId
+   * @param {number} securityReasonId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityService
+   */
   async deleteSecurityRuleFromArtifact(artifactId: number, securityReasonId: number): Promise<void> {
     defaultLog.debug({ label: 'deleteSecurityRuleFromArtifact' });
 
     await this.securityRepository.deleteSecurityRuleFromArtifact(artifactId, securityReasonId);
+  }
+
+  /**
+   * Returns the signed URL of a document for which a user has permissions.
+   *
+   * Rules:
+   * non-admin user cannot access the document when:
+   * - it is pending review, OR
+   * - user hasn't been granted an exception to every security rule
+   *
+   * non-admin user can access the document when:
+   * - document is not secured
+   * - user has the correct exceptions
+   *
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<any>}
+   * @memberof SecurityService
+   */
+  async getSecuredArtifactBasedOnRulesAndPermissions(artifactId: number): Promise<any> {
+    const isSystemUserAdmin = await this.userService.isSystemUserAdmin();
+
+    const userId = this.connection.systemUserId();
+
+    const isArtifactPendingReview = await this.isArtifactPendingReview(artifactId);
+
+    //non-admin user cannot access a document pending review
+    if (!isSystemUserAdmin && isArtifactPendingReview) {
+      throw new HTTP403('You do not have access to this document.');
+    }
+
+    const artifactSecurityRuleIds = await this.getArtifactPersecutionAndHarmRulesIds(artifactId);
+
+    const pers_harm_exceptionIds = await this.getPersecutionAndHarmExceptionsIdsByUser(userId);
+
+    const userHasExceptionsToAllRules = artifactSecurityRuleIds.every((rule) => pers_harm_exceptionIds.includes(rule));
+
+    //non-admin user cannot access a document if they don't have exceptions to all the rules applied to that document
+    if (
+      !isSystemUserAdmin &&
+      !isArtifactPendingReview &&
+      artifactSecurityRuleIds.length > 0 &&
+      !userHasExceptionsToAllRules
+    ) {
+      throw new HTTP403('You do not have access to this document.');
+    }
+
+    // access is granted because
+    // 1) admin (isSystemAdmin is true)
+    // 2) document is unsecured (not pending review, and has no security rules applied)
+    // 3) non-admin user has exceptions all security rules
+
+    const artifact = await this.artifactService.getArtifactById(artifactId);
+
+    return getS3SignedURL(artifact.key);
+  }
+
+  /**
+   * Get the persecution or harm rules for which a user is granted exception
+   *
+   * @param {number} userId
+   * @return {*}  {Promise<number[]>}
+   * @memberof SecurityService
+   */
+  async getPersecutionAndHarmExceptionsIdsByUser(userId: number): Promise<number[]> {
+    defaultLog.debug({ label: 'getPersecutionAndHarmExceptionsIdsByUser' });
+
+    return (await this.securityRepository.getPersecutionAndHarmRulesExceptionsByUserId(userId)).map(
+      (item) => item.persecution_or_harm_id
+    );
+  }
+
+  /**
+   * Get the persecution and harm rules for a given artifact
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<number[]>}
+   * @memberof SecurityService
+   */
+  async getArtifactPersecutionAndHarmRulesIds(artifactId: number): Promise<number[]> {
+    defaultLog.debug({ label: 'getDocumentPersecutionAndHarmRulesIds' });
+    return (await this.securityRepository.getDocumentPersecutionAndHarmRules(artifactId)).map(
+      (item) => item.persecution_or_harm_id
+    );
+  }
+
+  /**
+   * Returns true if security_review_timestamp is null
+   *
+   * Context: A null security_review_timestamp indicates that the artifact is pending review
+   * Otherwise, the timestamp indicates that the artifact has been reviewed, and either has security rules applied or it,
+   * or the artifact has no security rules( the reviewer did not apply security rules)
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<boolean>}
+   * @memberof SecurityService
+   */
+  async isArtifactPendingReview(artifactId: number): Promise<boolean> {
+    const artifact = await this.artifactService.getArtifactById(artifactId);
+    return artifact.security_review_timestamp ? false : true;
   }
 }

@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
+import { HTTPError } from '../../../errors/http-error';
 import { SubmissionService } from '../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as list from './list';
@@ -12,6 +13,27 @@ chai.use(sinonChai);
 describe('list', () => {
   afterEach(() => {
     sinon.restore();
+  });
+
+  it('re-throws any error that is thrown', async () => {
+    const mockDBConnection = getMockDBConnection({
+      open: () => {
+        throw new Error('test error');
+      }
+    });
+
+    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
+
+    const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    const requestHandler = list.getDatasetsForReview();
+
+    try {
+      await requestHandler(mockReq, mockRes, mockNext);
+      expect.fail();
+    } catch (actualError) {
+      expect((actualError as HTTPError).message).to.equal('test error');
+    }
   });
 
   it('should return 200 after update is completed', async () => {
