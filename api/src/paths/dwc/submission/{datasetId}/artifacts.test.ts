@@ -214,7 +214,7 @@ describe('getArtifactsByDatasetId', () => {
       .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
 
     const securityServiceStub = sinon
-      .stub(SecurityService.prototype, 'getSecurtyAppliedStatus')
+      .stub(SecurityService.prototype, 'getSecurityAppliedStatus')
       .resolves(SECURITY_APPLIED_STATUS.SECURED);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();

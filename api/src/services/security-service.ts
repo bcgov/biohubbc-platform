@@ -52,8 +52,8 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<SECURITY_APPLIED_STATUS>}
    * @memberof SecurityService
    */
-  async getSecurtyAppliedStatus(artifactId: number): Promise<SECURITY_APPLIED_STATUS> {
-    defaultLog.debug({ label: 'getSecurtyAppliedStatus' });
+  async getSecurityAppliedStatus(artifactId: number): Promise<SECURITY_APPLIED_STATUS> {
+    defaultLog.debug({ label: 'getSecurityAppliedStatus' });
 
     const artifactService = new ArtifactService(this.connection);
 
@@ -111,6 +111,14 @@ export class SecurityService extends DBService {
     return Promise.all(promises);
   }
 
+  /**
+   *
+   *
+   * @param {number} artifactId
+   * @param {number[]} securityReasonIds
+   * @return {*}  {Promise<{ artifact_persecution_id: number }[]>}
+   * @memberof SecurityService
+   */
   async applySecurityRulesToArtifact(
     artifactId: number,
     securityReasonIds: number[]
@@ -151,7 +159,14 @@ export class SecurityService extends DBService {
 
     return Promise.all(promises);
   }
-
+  /**
+   *
+   *
+   * @param {number} artifactId
+   * @param {number} securityReasonId
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityService
+   */
   async deleteSecurityRuleFromArtifact(artifactId: number, securityReasonId: number): Promise<void> {
     defaultLog.debug({ label: 'deleteSecurityRuleFromArtifact' });
 
