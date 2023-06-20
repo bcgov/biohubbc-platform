@@ -17,7 +17,7 @@ import CustomTextField from 'components/fields/CustomTextField';
 import { useFormikContext } from 'formik';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import yup from 'utils/YupSchema';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -103,6 +103,11 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
   const classes = useStyles();
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
   const [currentRowSelection, setCurrentRowSelection] = useState<GridRowSelectionModel>(props.initialArtifactSelection);
+
+  useEffect(() => {
+    // Ensure that the initially selected artifact is persisted
+    formikProps.setFieldValue('artifactIds', props.initialArtifactSelection);
+  }, [])
 
   const columns: GridColDef<IArtifact>[] = [
     {
