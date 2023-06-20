@@ -189,4 +189,20 @@ describe('ArtifactService', () => {
       expect(response).to.be.eql({ artifact_id: 1 });
     });
   });
+
+  describe('updateArtifactSecurityReviewTimestamp', () => {
+    it('should update artifact security review timestamp', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+
+      const getArtifactRecordsStub = sinon
+        .stub(ArtifactRepository.prototype, 'updateArtifactSecurityReviewTimestamp')
+        .resolves();
+
+      const response = await artifactService.updateArtifactSecurityReviewTimestamp(1);
+
+      expect(getArtifactRecordsStub).to.be.calledWith(1);
+      expect(response).to.be.eql(undefined);
+    });
+  });
 });

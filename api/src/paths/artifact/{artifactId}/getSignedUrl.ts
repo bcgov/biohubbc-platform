@@ -1,11 +1,8 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { HTTP401 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
-import { ArtifactService } from '../../../services/artifact-service';
-import { UserService } from '../../../services/user-service';
-import { getS3SignedURL } from '../../../utils/file-utils';
+import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/eml/get');
@@ -60,18 +57,9 @@ export function getArtifactSignedUrl(): RequestHandler {
 
     try {
       await connection.open();
+      const securityService = new SecurityService(connection);
 
-      const artifactService = new ArtifactService(connection);
-      const userService = new UserService(connection);
-      const isSystemUserAdmin = await userService.isSystemUserAdmin();
-
-      const response = await artifactService.getArtifactById(artifactId);
-
-      if (!response.security_review_timestamp && !isSystemUserAdmin) {
-        throw new HTTP401('Documents that are pending review can only be downloaded by administrators.');
-      }
-
-      const signedUrl = await getS3SignedURL(response.key);
+      const signedUrl = await securityService.getSecuredArtifactBasedOnRulesAndPermissions(artifactId);
 
       await connection.commit();
 

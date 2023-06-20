@@ -175,4 +175,18 @@ describe('SubmissionJobQueueService', () => {
       expect(response).to.be.undefined;
     });
   });
+
+  describe('incrementAttemptCount', () => {
+    it('should increment attempt count', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const repo = sinon.stub(SubmissionJobQueueRepository.prototype, 'incrementAttemptCount').resolves();
+
+      const service = new SubmissionJobQueueService(mockDBConnection);
+      const response = await service.incrementAttemptCount(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.undefined;
+    });
+  });
 });

@@ -70,6 +70,43 @@ describe('SecurityRepository', () => {
     });
   });
 
+  describe('getPersecutionAndHarmRulesByArtifactId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('returns an array of PersecutionAndHarmSecurity', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            artifact_persecution_id: 1,
+            persecution_or_harm_id: 1,
+            artifact_id: 1
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const securityRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await securityRepository.getPersecutionAndHarmRulesByArtifactId(1);
+
+      expect(response).to.eql([
+        {
+          artifact_persecution_id: 1,
+          persecution_or_harm_id: 1,
+          artifact_id: 1
+        }
+      ]);
+    });
+  });
+
   describe('applySecurityRulesToArtifact', () => {
     afterEach(() => {
       sinon.restore();
@@ -146,6 +183,78 @@ describe('SecurityRepository', () => {
       const response = await securityRepository.deleteSecurityRuleFromArtifact(1, 1);
 
       expect(response).to.eql(undefined);
+    });
+  });
+
+  describe('getPersecutionAndHarmRulesExceptionsByUserId', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ artifact_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getPersecutionAndHarmRulesExceptionsByUserId(1);
+
+      expect(response).to.eql([{ artifact_id: 1 }]);
+    });
+
+    it('should return an empty array if not exceptions exists for the user', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getPersecutionAndHarmRulesExceptionsByUserId(1);
+
+      expect(response).to.eql([]);
+    });
+  });
+
+  describe('getDocumentPersecutionAndHarmRules', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ persecution_or_harm_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getDocumentPersecutionAndHarmRules(1);
+
+      expect(response).to.eql([{ persecution_or_harm_id: 1 }]);
+    });
+
+    it('should return an empty array if the document has no rules applied', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new SecurityRepository(mockDBConnection);
+
+      const response = await submissionRepository.getDocumentPersecutionAndHarmRules(1);
+
+      expect(response).to.eql([]);
     });
   });
 });
