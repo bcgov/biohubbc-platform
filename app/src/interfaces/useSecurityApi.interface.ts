@@ -19,7 +19,7 @@ export interface ISecureDataAccessRequestForm {
   };
 }
 
-export type IListPersecutionHarmResponse = Array<IPersecutionHarmRule>;
+export type IListPersecutionHarmResponse = IPersecutionHarmRule[];
 
 export interface IPersecutionHarmRule {
   persecution_or_harm_id: number;

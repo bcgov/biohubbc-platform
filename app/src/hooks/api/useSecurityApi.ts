@@ -48,7 +48,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @return {*}  {Promise<boolean>}
    */
   const sendSecureArtifactAccessRequest = async (requestData: ISecureDataAccessRequestForm): Promise<boolean> => {
-    const { data } = await axios.post(`api/artifact/security/requestAccess`, requestData);
+    const { data } = await axios.post('api/artifact/security/requestAccess', requestData);
 
     return data;
   };
