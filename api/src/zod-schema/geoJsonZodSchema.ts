@@ -71,7 +71,7 @@ export const GeoJSONGeometryCollectionZodSchema = z.object({
   bbox: z.array(z.number()).min(4).optional()
 });
 
-export const GeoJSONFeature = z.object({
+export const GeoJSONFeatureZodSchema = z.object({
   type: z.enum(['Feature']),
   id: z
     .any()
@@ -216,7 +216,8 @@ export const GeoJSONZodSchema = z.any().superRefine((x, ctx) => {
     GeoJSONMultiLineStringZodSchema,
     GeoJSONMultiPolygonZodSchema,
     GeoJSONGeometryCollectionZodSchema,
-    GeoJSONFeature
+    GeoJSONFeatureCollectionZodSchema,
+    GeoJSONFeatureZodSchema
   ];
   const errors = schemas.reduce(
     (errors: z.ZodError[], schema) =>

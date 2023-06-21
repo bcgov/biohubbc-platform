@@ -378,18 +378,6 @@ export class WebFeatureService extends GeoService {
 
     return this._externalGet(url);
   }
-
-  /**
-   * Executes a WFS describeFeatureType request, returning a data element that describes the layer (names,
-   * types, properties, etc).
-   *
-   * Note: the BCGW
-   *
-   * @memberof WebFeatureService
-   */
-  async describeFeatureType() {
-    return;
-  }
 }
 
 /**
@@ -433,14 +421,5 @@ export class WebMapService extends GeoService {
     const url = this._buildURL({ ...options, request: 'GetMap', service: Wms, version: version });
 
     return this._externalGet(url);
-  }
-
-  /**
-   * // TODO Not implemented
-   *
-   * @memberof WebMapService
-   */
-  getFeatureInfo() {
-    return;
   }
 }
