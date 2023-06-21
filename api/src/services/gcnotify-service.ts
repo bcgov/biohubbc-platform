@@ -189,11 +189,11 @@ export class GCNotifyService extends DBService {
       this.axiosConfig
     );
 
-    if (!submitterEmailResponse || !adminEmailResponse) {
+    if (!submitterEmailResponse.data || !adminEmailResponse.data) {
       throw new ApiError(ApiErrorType.UNKNOWN, 'Failed to send Notification');
     }
 
-    return Boolean(submitterEmailResponse && adminEmailResponse);
+    return true;
   }
 
   /**
