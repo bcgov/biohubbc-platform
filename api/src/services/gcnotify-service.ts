@@ -149,7 +149,7 @@ export class GCNotifyService extends DBService {
       city: requestData.companyInformation?.city ?? '',
       postal_code: requestData.companyInformation?.postalCode ?? '',
       organization_name: requestData.professionalOrganization?.organizationName ?? 'N/A',
-      member_number: requestData.professionalOrganization?.memberNumber ?? '',
+      member_number: requestData.professionalOrganization?.memberNumber ?? 'N/A',
       link,
       email,
       phone

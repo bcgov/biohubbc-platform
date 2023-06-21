@@ -138,66 +138,70 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
 
   return (
     <>
-      <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>
-        <strong>Documents You Are Requesting</strong>
-      </Typography>
-      <Box py={2}>
-        <Paper elevation={0}>
-          <DataGrid
-            className={classes.dataGrid}
-            getRowId={(row) => row.artifact_id}
-            autoHeight
-            rows={props.artifacts}
-            columns={columns}
-            checkboxSelection
-            disableRowSelectionOnClick
-            disableColumnSelector
-            disableColumnFilter
-            disableColumnMenu
-            disableVirtualization
-            disableDensitySelector
-            hideFooter
-            sortingOrder={['asc', 'desc']}
-            rowSelectionModel={currentRowSelection}
-            onRowSelectionModelChange={onChangeSelection}
-          />
-        </Paper>
+      <Box mt={2}>
+        <Typography variant="body1" sx={{ textTransform: 'uppercase' }}>
+          <strong>Documents You Are Requesting</strong>
+        </Typography>
+        <Box py={2}>
+          <Paper elevation={0}>
+            <DataGrid
+              className={classes.dataGrid}
+              getRowId={(row) => row.artifact_id}
+              autoHeight
+              rows={props.artifacts}
+              columns={columns}
+              checkboxSelection
+              disableRowSelectionOnClick
+              disableColumnSelector
+              disableColumnFilter
+              disableColumnMenu
+              disableVirtualization
+              disableDensitySelector
+              hideFooter
+              sortingOrder={['asc', 'desc']}
+              rowSelectionModel={currentRowSelection}
+              onRowSelectionModelChange={onChangeSelection}
+            />
+          </Paper>
+        </Box>
       </Box>
 
-      <Typography variant="body1" className={classes.subheader}>
-        <strong>Contact Details</strong>
-      </Typography>
+      <Box mt={2}>
+        <Typography variant="body1" className={classes.subheader}>
+          <strong>Contact Details</strong>
+        </Typography>
 
-      <Box py={2}>
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <CustomTextField
-              name="fullName"
-              label="Full Name"
-              other={{
-                required: true
-              }}
-            />
+        <Box py={2}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <CustomTextField
+                name="fullName"
+                label="Full Name"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <CustomTextField
+                name="emailAddress"
+                label="Email Address"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <CustomTextField
+                name="phoneNumber"
+                label="Phone Number"
+                other={{
+                  required: true
+                }}
+              />
+            </Grid>
           </Grid>
-          <Grid item xs={6}>
-            <CustomTextField
-              name="emailAddress"
-              label="Email Address"
-              other={{
-                required: true
-              }}
-            />
-          </Grid>
-          <Grid item xs={6}>
-            <CustomTextField
-              name="phoneNumber"
-              label="Phone Number"
-              other={{
-                required: true
-              }}
-            />
-          </Grid>
-        </Grid>
+        </Box>
       </Box>
 
       <Box mt={2}>
@@ -299,31 +303,33 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
             </Grid>
           </Box>
 
-          <Typography variant="body1" className={classes.subheader}>
-            <strong>Professional Organization (Optional)</strong>
-          </Typography>
+          <Box mt={2}>
+            <Typography variant="body1" className={classes.subheader}>
+              <strong>Professional Organization (Optional)</strong>
+            </Typography>
 
-          <Box py={2}>
-            <Grid container spacing={3}>
-              <Grid item xs={6}>
-                <CustomTextField
-                  name="organizationInformation.organizationName"
-                  label="Organization Name"
-                  other={{
-                    required: false
-                  }}
-                />
+            <Box py={2}>
+              <Grid container spacing={3}>
+                <Grid item xs={6}>
+                  <CustomTextField
+                    name="professionalOrganization.organizationName"
+                    label="Organization Name"
+                    other={{
+                      required: false
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <CustomTextField
+                    name="professionalOrganization.memberNumber"
+                    label="Member Number"
+                    other={{
+                      required: false
+                    }}
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={6}>
-                <CustomTextField
-                  name="organizationInformation.memberNumber"
-                  label="Member Number"
-                  other={{
-                    required: false
-                  }}
-                />
-              </Grid>
-            </Grid>
+            </Box>
           </Box>
         </Box>
       )}
