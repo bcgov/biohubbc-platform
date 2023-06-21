@@ -1,7 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../database/db';
-import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { GCNotifyService } from '../../../services/gcnotify-service';
 import { getLogger } from '../../../utils/logger';
 
