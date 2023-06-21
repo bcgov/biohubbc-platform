@@ -5,10 +5,10 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiError } from '../errors/api-error';
 import { IgcNotifyGenericMessage } from '../interfaces/gcnotify.interface';
-import { getMockDBConnection } from '../__mocks__/db';
-import { GCNotifyService, ISubmitArtifactRequestAccess } from './gcnotify-service';
-import { ArtifactService } from './artifact-service';
 import { Artifact } from '../repositories/artifact-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { ArtifactService } from './artifact-service';
+import { GCNotifyService, ISubmitArtifactRequestAccess } from './gcnotify-service';
 
 chai.use(sinonChai);
 
@@ -70,10 +70,9 @@ describe('GCNotifyService', () => {
 
   describe('sendNotificationForArtifactRequestAccess', () => {
     beforeEach(() => {
-      sinon.stub(ArtifactService.prototype, 'getArtifactsByIds').resolves([
-        { artifact_id: 1 },
-        { artifact_id: 2 }
-      ] as Artifact[])
+      sinon
+        .stub(ArtifactService.prototype, 'getArtifactsByIds')
+        .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
     });
 
     afterEach(() => {
@@ -93,13 +92,13 @@ describe('GCNotifyService', () => {
         jobTitle: 'job',
         streetAddress: 'address',
         city: 'city',
-        postalCode: 'postal',
+        postalCode: 'postal'
       },
       professionalOrganization: {
         organizationName: 'org',
-        memberNumber: 'member',
+        memberNumber: 'member'
       }
-    }
+    };
 
     it('should throw a 400 error when submitter email response is empty', async () => {
       const mockDBConnection = getMockDBConnection();
