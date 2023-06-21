@@ -164,6 +164,67 @@ describe('WebFeatureService', () => {
       });
     });
   });
+
+  describe('getPropertyValue', async () => {
+    describe('with no CQL Filter', () => {
+      it('makes a WFS getPropertyValue post request', async () => {
+        const _buildURLSpy = sinon.spy(GeoService.prototype, '_buildURL');
+        const _externalGetStub = sinon
+          .stub(GeoService.prototype, '_externalGet')
+          .resolves('mockGetFeatureResponseData');
+
+        sinon.stub(GeoService.prototype, '_externalPost').rejects('Should have called _externalGet');
+
+        const webFeatureService = new WebFeatureService();
+
+        const response = await webFeatureService.getPropertyValue({
+          typeNames: BcgwEnvRegionsLayer,
+          valueReference: 'REGION_NAME'
+        });
+
+        expect(_buildURLSpy).to.have.been.calledOnceWith({
+          typeNames: BcgwEnvRegionsLayer,
+          valueReference: 'REGION_NAME',
+          request: 'GetPropertyValue',
+          service: Wfs,
+          version: '2.0.0'
+        });
+        expect(_externalGetStub).to.have.been.calledOnceWith(_buildURLSpy.returnValues[0]);
+        expect(response).to.equal('mockGetFeatureResponseData');
+      });
+    });
+
+    describe('with CQL Filter', () => {
+      it('makes a WFS getPropertyValue post request', async () => {
+        const _buildURLSpy = sinon.spy(GeoService.prototype, '_buildURL');
+        const _externalPostStub = sinon
+          .stub(GeoService.prototype, '_externalPost')
+          .resolves('mockGetFeatureResponseData');
+
+        sinon.stub(GeoService.prototype, '_externalGet').rejects('Should have called _externalPost');
+
+        const webFeatureService = new WebFeatureService();
+
+        const response = await webFeatureService.getPropertyValue({
+          cql_filter: 'INTERSECTS(GEOMETRY, POLYGON(123,456,789))',
+          valueReference: 'REGION_NAME',
+          typeNames: BcgwEnvRegionsLayer
+        });
+
+        expect(_buildURLSpy).to.have.been.calledOnceWith({
+          typeNames: BcgwEnvRegionsLayer,
+          valueReference: 'REGION_NAME',
+          request: 'GetPropertyValue',
+          service: Wfs,
+          version: '2.0.0'
+        });
+        expect(_externalPostStub).to.have.been.calledOnceWith(_buildURLSpy.returnValues[0], {
+          cql_filter: 'INTERSECTS(GEOMETRY, POLYGON(123,456,789))'
+        });
+        expect(response).to.equal('mockGetFeatureResponseData');
+      });
+    });
+  });
 });
 
 describe('WebMapService', () => {
