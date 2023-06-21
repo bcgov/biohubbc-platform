@@ -86,7 +86,6 @@ describe('requestAccess', () => {
             delete request.body.phoneNumber;
 
             const response = requestValidator.validateRequest(request);
-            console.log(response);
 
             expect(response.errors.length).to.equal(1);
             expect(response.errors[0].message).to.equal("must have required property 'phoneNumber'");
