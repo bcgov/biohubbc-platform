@@ -7,6 +7,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
 import { makeStyles } from '@mui/styles';
 import DOMPurify from 'dompurify';
 import { useState } from 'react';
@@ -137,6 +138,7 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
             )}
           </DialogContent>
         )}
+        <Divider />
         <DialogActions>
           <Button onClick={props.onOk} color="primary" variant="contained" autoFocus>
             Ok

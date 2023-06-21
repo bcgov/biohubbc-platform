@@ -31,8 +31,10 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
   const [errorOccurred, setErrorOccurred] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
+    setIsSubmitting(true);
     try {
       await biohubApi.security.sendSecureArtifactAccessRequest({
         ...values,
@@ -41,6 +43,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
     } catch (error) {
       setErrorOccurred(true);
     } finally {
+      setIsSubmitting(false);
       props.onClose();
     }
   };
@@ -92,7 +95,12 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => formikRef.current?.submitForm()} color="primary" variant="contained" autoFocus>
+          <Button
+            disabled={isSubmitting}
+            onClick={() => formikRef.current?.submitForm()}
+            color="primary"
+            variant="contained"
+            autoFocus>
             Submit Request
           </Button>
           <Button onClick={() => props.onClose()} color="primary" variant="outlined" autoFocus>
