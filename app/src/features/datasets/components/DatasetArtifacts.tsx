@@ -73,6 +73,11 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
+  const handleApplySecurity = (artifact: IArtifact) => {
+    setSelectedArtifacts([artifact]);
+    setOpenApplySecurity(true);
+  };
+
   const handleDownloadAttachment = async (attachment: IArtifact) => {
     const signedUrl = await biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id);
     if (!signedUrl) {
@@ -135,6 +140,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             artifact={params.row}
             onDownload={handleDownloadAttachment}
             onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection(artifact.artifact_id)}
+            onApplySecurity={handleApplySecurity}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />

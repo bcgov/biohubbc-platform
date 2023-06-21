@@ -1,4 +1,4 @@
-import { mdiDotsVertical, mdiLockOutline, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiDotsVertical, mdiLockOutline, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -12,6 +12,7 @@ interface IAttachmentItemMenuButtonProps {
   artifact: IArtifact;
   onDownload: (artifact: IArtifact) => void;
   onRequestAccess: (artifact: IArtifact) => void;
+  onApplySecurity: (artifact: IArtifact) => void;
   hasAdministrativePermissions: boolean;
   isPendingReview: boolean;
 }
@@ -79,6 +80,39 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
                 Request Access
               </MenuItem>
             )}
+            <MenuItem
+              disabled={
+                props.hasAdministrativePermissions
+                  ? false
+                  : props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED
+              }
+              onClick={() => {
+                props.onDownload(props.artifact);
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-download">
+              <ListItemIcon>
+                <Icon path={mdiTrayArrowDown} size={0.875} />
+              </ListItemIcon>
+              Download Document
+            </MenuItem>
+
+            <MenuItem
+              disabled={
+                props.hasAdministrativePermissions
+                  ? false
+                  : props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED
+              }
+              onClick={() => {
+                props.onApplySecurity(props.artifact);
+                setAnchorEl(null);
+              }}
+              data-testid="attachment-action-menu-download">
+              <ListItemIcon>
+                <Icon path={mdiLockPlus} size={0.875} />
+              </ListItemIcon>
+              Apply Security to Document
+            </MenuItem>
 
             {props.hasAdministrativePermissions && (
               <MenuItem
