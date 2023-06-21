@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { safeToLowerCase, safeTrim } from './string-utils';
+import { formatPhoneNumber, makeLoginUrl, safeToLowerCase, safeTrim } from './string-utils';
 
 describe('safeToLowerCase', () => {
   describe('returns value lowercase', () => {
@@ -116,5 +116,69 @@ describe('safeTrim', () => {
       const fn = (a: number, b: number) => a * b;
       expect(safeTrim(fn)).to.equal(fn);
     });
+  });
+});
+
+describe('makeLoginUrl', () => {
+  it('should generate a login URL without a redirect', () => {
+    const url = makeLoginUrl('http://example.com');
+
+    expect(url).to.equal('http://example.com/login');
+  });
+
+  it('should generate a login URL with a relative redirect', () => {
+    const url = makeLoginUrl('http://example.com', '/admin/dashboard');
+
+    expect(url).to.equal('http://example.com/login?redirect=%2Fadmin%2Fdashboard');
+  });
+
+  it('should generate a login URL with an absolute redirect', () => {
+    const url = makeLoginUrl('http://example.com', 'http://example.net');
+
+    expect(url).to.equal('http://example.com/login?redirect=http%3A%2F%2Fexample.net');
+  });
+});
+
+describe('formatPhoneNumber', () => {
+  it('should strip non-numerics', () => {
+    const phone = formatPhoneNumber('Phone: 1250 555_1234');
+
+    expect(phone).to.equal('+1 (250) 555-1234');
+  });
+
+  it('returns empty string', () => {
+    const phone = formatPhoneNumber('');
+
+    expect(phone).to.equal('');
+  });
+
+  it('should return a single char', () => {
+    const phone = formatPhoneNumber('1');
+
+    expect(phone).to.equal('1');
+  });
+
+  it('should return an unformatted phone number for strings beginning with 1 and exceeding 11 numbers', () => {
+    const phone = formatPhoneNumber('123456789012');
+
+    expect(phone).to.equal('123456789012');
+  });
+
+  it('should return an unformatted phone number for strings not beginning with 1 and exceeding 10 numbers', () => {
+    const phone = formatPhoneNumber('07785551234');
+
+    expect(phone).to.equal('07785551234');
+  });
+
+  it('returns a string with country code', () => {
+    const phone = formatPhoneNumber('17785551234');
+
+    expect(phone).to.equal('+1 (778) 555-1234');
+  });
+
+  it('returns a string without country code', () => {
+    const phone = formatPhoneNumber('7785551234');
+
+    expect(phone).to.equal('(778) 555-1234');
   });
 });
