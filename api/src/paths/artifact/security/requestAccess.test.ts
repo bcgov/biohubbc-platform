@@ -260,7 +260,10 @@ describe('requestAccess', () => {
 
       describe('should succeed when', () => {
         it('response is boolean', () => {
-          //
+          const apiResponse = true;
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response).to.be.undefined;
         });
       });
     });
