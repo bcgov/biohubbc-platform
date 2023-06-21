@@ -9,7 +9,6 @@ import {
 } from '@mui/material';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
@@ -61,7 +60,7 @@ export const secureDataAccessRequestFormYupSchema = yup.lazy((formData: ISecureD
     phoneNumber: yup.string().max(300, 'Cannot exceed 300 characters').required('Phone Number is Required'),
     reasonDescription: yup.string().max(3000, 'Cannot exceed 3000 characters').required('Description is Required'),
     hasSignedAgreement: yup.boolean().required('Confidentiality Agreement is Required'),
-    selectedArtifacts: yup.array().min(1, 'Must select at least one artifact'),
+    artifactIds: yup.array().min(1, 'Must select at least one artifact'),
     companyInformation: formData.hasSignedAgreement
       ? yup.mixed().notRequired()
       : yup
@@ -136,6 +135,8 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
     formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement']
   );
 
+  console.log(formikProps)
+
   return (
     <>
       <Box mt={2}>
@@ -143,7 +144,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
           <strong>Documents You Are Requesting</strong>
         </Typography>
         <Box py={2}>
-          <Paper elevation={0}>
+          <Box mb={1}>
             <DataGrid
               className={classes.dataGrid}
               getRowId={(row) => row.artifact_id}
@@ -162,7 +163,10 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               rowSelectionModel={currentRowSelection}
               onRowSelectionModelChange={onChangeSelection}
             />
-          </Paper>
+          </Box>
+          {formikProps.touched['artifactIds'] && formikProps.errors['artifactIds'] && (
+            <FormHelperText error={true}>{formikProps.errors['artifactIds']}</FormHelperText>
+          )}
         </Box>
       </Box>
 

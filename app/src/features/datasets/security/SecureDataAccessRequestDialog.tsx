@@ -1,3 +1,4 @@
+import LoadingButton from '@mui/lab/LoadingButton';
 import { useMediaQuery, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -30,7 +31,8 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
   const history = useHistory();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-  const [errorOccurred, setErrorOccurred] = useState(false);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (values: ISecureDataAccessRequestForm) => {
@@ -40,8 +42,9 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
         ...values,
         pathToParent: history.location.pathname
       });
+      setShowSuccessDialog(true);
     } catch (error) {
-      setErrorOccurred(true);
+      setShowErrorDialog(true);
     } finally {
       setIsSubmitting(false);
       props.onClose();
@@ -53,12 +56,22 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
   return (
     <>
       <ErrorDialog
+        // TODO Replace this with a "Success" Dialog at some point
+        dialogTitle='Request Submitted'
+        dialogSubTitle="Your secure data sccess request has been submitted"
+        dialogText='A BioHub Administrator will contact you shortly.'
+        open={showSuccessDialog}
+        onClose={() => setShowSuccessDialog(false)}
+        onOk={() => setShowSuccessDialog(false)}
+      />
+
+      <ErrorDialog
         dialogTitle="An Error Occurred"
         dialogSubTitle="An error occurred while attempting to submit your request"
         dialogText='If you continue to have difficulties submitting your request, please contact BioHub Support at <a href="mailto: biohub@gov.bc.ca">biohub@gov.bc.ca.</a>'
-        open={errorOccurred}
-        onClose={() => setErrorOccurred(false)}
-        onOk={() => setErrorOccurred(false)}
+        open={showErrorDialog}
+        onClose={() => setShowErrorDialog(false)}
+        onOk={() => setShowErrorDialog(false)}
       />
 
       <Dialog
@@ -95,14 +108,14 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button
-            disabled={isSubmitting}
+          <LoadingButton
+            loading={isSubmitting}
             onClick={() => formikRef.current?.submitForm()}
             color="primary"
             variant="contained"
             autoFocus>
             Submit Request
-          </Button>
+          </LoadingButton>
           <Button onClick={() => props.onClose()} color="primary" variant="outlined" autoFocus>
             Cancel
           </Button>
