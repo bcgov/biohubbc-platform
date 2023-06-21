@@ -89,7 +89,6 @@ POST.apiDoc = {
             },
             professionalOrganization: {
               type: 'object',
-              // required: ['organizationName', 'memberNumber'],
               properties: {
                 organizationName: {
                   type: 'string'

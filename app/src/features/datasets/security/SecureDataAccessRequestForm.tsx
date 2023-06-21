@@ -312,7 +312,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
               <Grid container spacing={3}>
                 <Grid item xs={6}>
                   <CustomTextField
-                    name="organizationInformation.organizationName"
+                    name="professionalOrganization.organizationName"
                     label="Organization Name"
                     other={{
                       required: false
@@ -321,7 +321,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                 </Grid>
                 <Grid item xs={6}>
                   <CustomTextField
-                    name="organizationInformation.memberNumber"
+                    name="professionalOrganization.memberNumber"
                     label="Member Number"
                     other={{
                       required: false
