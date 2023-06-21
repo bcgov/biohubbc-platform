@@ -10,8 +10,6 @@ import { ArtifactService } from './artifact-service';
 import { DBService } from './db-service';
 import { KeycloakService } from './keycloak-service';
 
-const GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS = '4bb42a76-f79b-424f-ad0f-ad3671389ec2'; // @TODO
-
 export interface ISubmitArtifactRequestAccess {
   fullName: string;
   emailAddress: string;
@@ -61,6 +59,7 @@ export class GCNotifyService extends DBService {
   administrativeRepository: AdministrativeRepository;
   axiosConfig: AxiosRequestConfig;
   EMAIL_TEMPLATE: string;
+  SECURE_DOCUMENT_REQUEST_TEMPLATE: string;
   SMS_TEMPLATE: string;
   EMAIL_URL: string;
   SMS_URL: string;
@@ -72,6 +71,7 @@ export class GCNotifyService extends DBService {
     super(connection);
     this.administrativeRepository = new AdministrativeRepository(connection);
 
+    this.SECURE_DOCUMENT_REQUEST_TEMPLATE = process.env.GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS || '';
     this.EMAIL_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE || '';
     this.SMS_TEMPLATE = process.env.GCNOTIFY_ONBOARDING_REQUEST_SMS_TEMPLATE || '';
     this.EMAIL_URL = process.env.GCNOTIFY_EMAIL_URL || '';
@@ -173,7 +173,7 @@ export class GCNotifyService extends DBService {
       this.EMAIL_URL,
       {
         email_address: requestData.emailAddress,
-        template_id: GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS,
+        template_id: this.SECURE_DOCUMENT_REQUEST_TEMPLATE,
         personalisation: submitterMessage
       },
       this.axiosConfig
@@ -183,7 +183,7 @@ export class GCNotifyService extends DBService {
       this.EMAIL_URL,
       {
         email_address: this.adminEmail,
-        template_id: GC_NOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS,
+        template_id: this.SECURE_DOCUMENT_REQUEST_TEMPLATE,
         personalisation: adminMessage
       },
       this.axiosConfig
