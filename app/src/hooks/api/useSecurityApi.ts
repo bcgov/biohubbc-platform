@@ -1,8 +1,8 @@
 import { AxiosInstance } from 'axios';
-import { IListPersecutionHarmResponse } from 'interfaces/useSecurityApi.interface';
+import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 
 /**
- * This hook is used to fetch data from the security api.
+ * Returns a set of supported api methods for working with security.
  *
  * @param {AxiosInstance} axios
  * @return {*} object whose properties are supported api methods.
@@ -19,6 +19,13 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Apply security reasons for artifacts
+   *
+   * @param {{ artifact_id: number }[]} selectedArtifacts
+   * @param {{ id: number }[]} securityReasons
+   * @return {*}  {Promise<{ artifact_persecution_id: number }[]>}
+   */
   const applySecurityReasonsToArtifacts = async (
     selectedArtifacts: { artifact_id: number }[],
     securityReasons: { id: number }[]
@@ -34,7 +41,20 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Send secure artifact access request
+   *
+   * @param {ISecureDataAccessRequestForm} requestData
+   * @return {*}  {Promise<boolean>}
+   */
+  const sendSecureArtifactAccessRequest = async (requestData: ISecureDataAccessRequestForm): Promise<boolean> => {
+    const { data } = await axios.post('api/artifact/security/requestAccess', requestData);
+
+    return data;
+  };
+
   return {
+    sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts
   };

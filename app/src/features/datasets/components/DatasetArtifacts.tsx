@@ -17,6 +17,7 @@ import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
 
@@ -51,6 +52,9 @@ const NoArtifactRowsOverlay = () => (
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
+  const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(
+    null
+  );
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
@@ -130,6 +134,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
+            onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection(artifact.artifact_id)}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />
@@ -140,6 +145,15 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   return (
     <>
+      <SecureDataAccessRequestDialog
+        open={Boolean(initialSecureDataAccessRequestSelection)}
+        onClose={() => setInitialSecureDataAccessRequestSelection(null)}
+        artifacts={artifactsList}
+        initialArtifactSelection={
+          initialSecureDataAccessRequestSelection ? [initialSecureDataAccessRequestSelection] : []
+        }
+      />
+
       <ApplySecurityDialog
         selectedArtifacts={selectedArtifacts}
         open={openApplySecurity}

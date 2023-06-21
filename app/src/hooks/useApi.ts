@@ -22,8 +22,6 @@ export const useApi = () => {
 
   const admin = useAdminApi(apiAxios);
 
-  const security = useSecurityApi(apiAxios);
-
   const submissions = useSubmissionsApi(apiAxios);
 
   const taxonomy = useTaxonomyApi(apiAxios);
@@ -35,6 +33,8 @@ export const useApi = () => {
   const search = useSearchApi(apiAxios);
 
   const dataset = useDatasetApi(apiAxios);
+
+  const security = useSecurityApi(apiAxios);
 
   return {
     user,

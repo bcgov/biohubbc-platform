@@ -181,7 +181,7 @@ export interface ISubmissionObservationRecord {
   darwin_core_source: any;
   submission_security_request?: string | null;
   security_review_timestamp?: string | null;
-  foi_reason?: boolean | null;
+  foi_reason?: string | boolean | null;
   record_effective_timestamp?: string | null;
   record_end_timestamp?: string | null;
   create_date?: string;
@@ -442,7 +442,7 @@ export class SubmissionRepository extends BaseRepository {
           submission s,
           submission_observation so
         WHERE s.uuid = ${datasetId}
-        AND so.submission_id = s.submission_id 
+        AND so.submission_id = s.submission_id
         AND ssc.submission_observation_id = so.submission_observation_id
         AND so.record_end_timestamp is null
         AND so.security_review_timestamp is not null
@@ -918,9 +918,9 @@ export class SubmissionRepository extends BaseRepository {
    */
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     const sql = SQL`
-    UPDATE 
-      submission_metadata 
-    SET 
+    UPDATE
+      submission_metadata
+    SET
       dataset_search_criteria=${datasetSearch}
     WHERE submission_id = ${submissionId}
     AND record_end_timestamp IS NULL;
