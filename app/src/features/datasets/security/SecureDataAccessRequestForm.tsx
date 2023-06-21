@@ -135,7 +135,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
     formikProps.touched['hasSignedAgreement'] && formikProps.errors['hasSignedAgreement']
   );
 
-  console.log(formikProps)
+  console.log(formikProps);
 
   return (
     <>

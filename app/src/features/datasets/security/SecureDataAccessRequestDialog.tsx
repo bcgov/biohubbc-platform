@@ -57,9 +57,9 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
     <>
       <ErrorDialog
         // TODO Replace this with a "Success" Dialog at some point
-        dialogTitle='Request Submitted'
+        dialogTitle="Request Submitted"
         dialogSubTitle="Your secure data sccess request has been submitted"
-        dialogText='A BioHub Administrator will contact you shortly.'
+        dialogText="A BioHub Administrator will contact you shortly."
         open={showSuccessDialog}
         onClose={() => setShowSuccessDialog(false)}
         onOk={() => setShowSuccessDialog(false)}

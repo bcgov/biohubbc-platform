@@ -1,0 +1,148 @@
+# ------------------------------------------------------------------------------
+# Notes
+#
+# - Exposed Ports/URLs
+#   - Certain ports/urls are exposed in docker-compose and may conflict with other
+#     docker-containers if they are exposing the same ports/urls.
+#
+#   - If conflicts arise, modify the conflicting values in your `.env` and re-build.
+#
+#   - List of exposed ports/urls:
+#     - APP_PORT
+#     - API_PORT
+#     - APP_HOST
+#     - DB_PORT
+#     - CLAMAV_PORT      # Only relevant if you have `ENABLE_FILE_VIRUS_SCAN=true`
+#     - DOCKER_NAMESPACE # Only relevant if you wish to run the same repo multiple times
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# Environment Details
+# ------------------------------------------------------------------------------
+NODE_ENV=local
+
+# ------------------------------------------------------------------------------
+# App
+# ------------------------------------------------------------------------------
+APP_PORT=7200
+
+SITEMINDER_LOGOUT_URL=https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi
+
+# ------------------------------------------------------------------------------
+# API
+# ------------------------------------------------------------------------------
+API_HOST=localhost
+API_PORT=6200
+API_TZ=America/Vancouver
+
+# Used by the API to generate APP urls
+APP_HOST=http://localhost:7200
+
+# See `api/utils/logger.ts` for details on LOG_LEVEL
+LOG_LEVEL=debug
+
+# ------------------------------------------------------------------------------
+# Postgres Database
+# ------------------------------------------------------------------------------
+POSTGRES_VERSION=12.5
+POSTGIS_VERSION=3
+DB_HOST=db
+DB_ADMIN=postgres
+DB_ADMIN_PASS=postgres
+DB_USER_API=biohub_api
+DB_USER_API_PASS=postgres
+DB_PORT=5532
+DB_DATABASE=biohubbc
+DB_SCHEMA=biohub
+DB_SCHEMA_DAPI_V1=biohub_dapi_v1
+DB_TZ=America/Vancouver
+
+# ------------------------------------------------------------------------------
+# KeyCloak URLS
+# ------------------------------------------------------------------------------
+
+# The host URL used to authenticate with Keycloak
+KEYCLOAK_HOST=https://dev.loginproxy.gov.bc.ca/auth
+
+# The Keycloak Realm used for authentication
+KEYCLOAK_REALM=standard
+
+# The identifier for the BioHub Browser Login CSS resource
+KEYCLOAK_CLIENT_ID=bio-hub-browser-4230
+
+# The identifier for the BioHub Keycloak CSS integration
+KEYCLOAK_INTEGRATION_ID=4230
+
+# The targeted Keycloak environment (dev, test or prod)
+KEYCLOAK_ENVIRONMENT=dev
+
+# The identifier for the BioHub Service User CSS resource
+KEYCLOAK_ADMIN_USERNAME=biohub-svc-4466
+
+# The secret identifier fo the BioHub Service User CSS resource
+KEYCLOAK_ADMIN_PASSWORD=zEVlXZSky4gk0X5KUFltBBE9lgsDNyQY
+
+# The Keycloak API host URL 
+KEYCLOAK_API_HOST=https://api.loginproxy.gov.bc.ca/api/v1
+
+# ------------------------------------------------------------------------------
+# File Upload
+# ------------------------------------------------------------------------------
+# Max request size for a non-file-upload request (bytes)
+MAX_REQ_BODY_SIZE=52428800
+
+# Max size of each file in a file-upload request
+MAX_UPLOAD_NUM_FILES=10
+
+# Max size of each file in a file-upload request (bytes)
+MAX_UPLOAD_FILE_SIZE=52428800
+
+# ------------------------------------------------------------------------------
+# Object Store (S3)
+# ------------------------------------------------------------------------------
+OBJECT_STORE_URL=nrs.objectstore.gov.bc.ca
+OBJECT_STORE_ACCESS_KEY_ID=nr-sims-dlv
+OBJECT_STORE_SECRET_KEY_ID=FBLFvdQeGk5hMvy6L4u8BGPZ1zAyMBPcVN09Itqf
+OBJECT_STORE_BUCKET_NAME=gblhvt
+S3_KEY_PREFIX=cupshall/platform
+
+# ------------------------------------------------------------------------------
+# Docker Details
+# ------------------------------------------------------------------------------
+DOCKER_PROJECT_NAME=platform
+DOCKER_NAMESPACE=all
+
+# ------------------------------------------------------------------------------
+# Clamav - Virus scanning
+# ------------------------------------------------------------------------------
+CLAMAV_PORT=3410
+CLAMAV_HOST=clamav
+ENABLE_FILE_VIRUS_SCAN=false
+
+# ------------------------------------------------------------------------------
+# GCNotify - Email and SMS api
+# ------------------------------------------------------------------------------
+GCNOTIFY_SECRET_API_KEY=
+GCNOTIFY_ADMIN_EMAIL=simulate-delivered@notification.canada.ca
+GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE=7779a104-b863-40ac-902f-1aa607d2071a
+GCNOTIFY_ONBOARDING_REQUEST_SMS_TEMPLATE=af2f1e40-bd72-4612-9c5a-567ee5b26ca5
+GCNOTIFY_EMAIL_URL=https://api.notification.canada.ca/v2/notifications/email
+GCNOTIFY_SMS_URL=https://api.notification.canada.ca/v2/notifications/sms
+
+# ------------------------------------------------------------------------------
+# Elasticsearch Platform API
+# ------------------------------------------------------------------------------
+ELASTICSEARCH_URL=https://elasticsearch-a0ec71-dev.apps.silver.devops.gov.bc.ca
+ELASTICSEARCH_EML_INDEX=eml
+
+# ------------------------------------------------------------------------------
+# GeoServer - https://geoserver.org/
+# ------------------------------------------------------------------------------
+GEOSERVER_PORT=8200
+GEOSERVER_TIMEZONE=America/Vancouver
+
+GEOSERVER_ADMIN_USER=admin
+GEOSERVER_ADMIN_PASSWORD=geoserver
+
+ROOT_WEBAPP_REDIRECT=true
+TOMCAT_EXTRAS=false
