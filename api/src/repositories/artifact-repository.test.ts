@@ -78,10 +78,10 @@ describe('ArtifactRepository', () => {
         sql: () => mockQueryResponse
       });
 
-      const submissionRepository = new ArtifactRepository(mockDBConnection);
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertArtifactRecord(mockArtifact);
+        await artifactRepository.insertArtifactRecord(mockArtifact);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert artifact record');
@@ -95,9 +95,9 @@ describe('ArtifactRepository', () => {
         sql: () => mockQueryResponse
       });
 
-      const submissionRepository = new ArtifactRepository(mockDBConnection);
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertArtifactRecord(mockArtifact);
+      const response = await artifactRepository.insertArtifactRecord(mockArtifact);
 
       expect(response.artifact_id).to.equal(1);
     });
@@ -114,9 +114,9 @@ describe('ArtifactRepository', () => {
         sql: () => mockQueryResponse
       });
 
-      const submissionRepository = new ArtifactRepository(mockDBConnection);
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
 
-      const response = await submissionRepository.getArtifactsByDatasetId('abcd');
+      const response = await artifactRepository.getArtifactsByDatasetId('abcd');
 
       expect(response[0].artifact_id).to.equal(1);
       expect(response[1].artifact_id).to.equal(2);
@@ -134,9 +134,9 @@ describe('ArtifactRepository', () => {
         sql: () => mockQueryResponse
       });
 
-      const submissionRepository = new ArtifactRepository(mockDBConnection);
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
 
-      const response = await submissionRepository.getArtifactById(1);
+      const response = await artifactRepository.getArtifactById(1);
 
       expect(response).to.eql({ artifact_id: 1 });
     });
@@ -156,8 +156,84 @@ describe('ArtifactRepository', () => {
         await artifactRepository.getArtifactById(1);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to retreive artifact record by ID');
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to retrieve artifact record by ID');
       }
+    });
+  });
+
+  describe('updateArtifactSecurityReviewTimestamp', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ artifact_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const submissionRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await submissionRepository.updateArtifactSecurityReviewTimestamp(1);
+
+      expect(response).to.eql(undefined);
+    });
+
+    it('throw an error if query fails', async () => {
+      const mockQueryResponse = { rows: undefined, rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: async () => {
+          return mockQueryResponse;
+        }
+      });
+
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+
+      try {
+        await artifactRepository.updateArtifactSecurityReviewTimestamp(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to update artifact security review timestamp'
+        );
+      }
+    });
+  });
+
+  describe('getArtifactsByIds', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 2,
+        rows: [{ artifact_id: 1 }, { artifact_id: 2 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await artifactRepository.getArtifactsByIds([1, 2]);
+
+      expect(response).to.eql([{ artifact_id: 1 }, { artifact_id: 2 }]);
+    });
+
+    it('should succeed with empty array as response', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+
+      const response = await artifactRepository.getArtifactsByIds([1, 2]);
+
+      expect(response).to.eql([]);
     });
   });
 });

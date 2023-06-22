@@ -10,6 +10,7 @@ import {
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
   ISubmissionModel,
+  ISubmissionObservationRecord,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -507,6 +508,26 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('insertSubmissionObservationRecord', () => {
+    it('should return a submission observation record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionObservationRecord').resolves({
+        submission_observation_id: 1
+      });
+
+      const response = await submissionService.insertSubmissionObservationRecord({
+        test: 'test'
+      } as unknown as ISubmissionObservationRecord);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({
+        submission_observation_id: 1
+      });
+    });
+  });
+
   describe('findRelatedDatasetsByDatasetId', () => {
     it('should return a valid array of related datasets on success', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -663,6 +684,26 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql(1);
+    });
+  });
+
+  describe('getHandleBarsTemplateByDatasetId', () => {
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'getHandleBarsTemplateByDatasetId').resolves({
+        header: 'header',
+        details: 'details'
+      });
+
+      const response = await submissionService.getHandleBarsTemplateByDatasetId('uuid');
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({
+        header: 'header',
+        details: 'details'
+      });
     });
   });
 });

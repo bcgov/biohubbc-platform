@@ -14,9 +14,10 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
 
@@ -51,6 +52,9 @@ const NoArtifactRowsOverlay = () => (
 const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const { datasetId } = props;
   const [showAlert, setShowAlert] = useState<boolean>(true);
+  const [initialSecureDataAccessRequestSelection, setInitialSecureDataAccessRequestSelection] = useState<number | null>(
+    null
+  );
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
@@ -61,8 +65,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();
 
-  const artifactsList = artifactsDataLoader.data?.artifacts || [];
-  const numPendingDocuments = artifactsList.filter((artifact) => artifact.security_review_timestamp === null).length;
+  const artifactsList = artifactsDataLoader.data || [];
+
+  const numPendingDocuments = artifactsList.filter(
+    (artifact) => artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING
+  ).length;
+
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
   const handleDownloadAttachment = async (attachment: IArtifact) => {
@@ -104,11 +112,16 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       headerName: 'Status',
       flex: 1,
       renderCell: (params) => {
-        const { security_review_timestamp } = params.row;
-        if (!security_review_timestamp && hasAdministrativePermissions) {
-          return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
+        const { supplementaryData } = params.row;
+        if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED) {
+          return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Available" />;
         }
 
+        if (hasAdministrativePermissions) {
+          if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING) {
+            return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
+          }
+        }
         return <Chip color="warning" sx={{ textTransform: 'uppercase' }} label="Secured" />;
       }
     },
@@ -121,6 +134,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
+            onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection(artifact.artifact_id)}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />
@@ -131,10 +145,22 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   return (
     <>
+      <SecureDataAccessRequestDialog
+        open={Boolean(initialSecureDataAccessRequestSelection)}
+        onClose={() => setInitialSecureDataAccessRequestSelection(null)}
+        artifacts={artifactsList}
+        initialArtifactSelection={
+          initialSecureDataAccessRequestSelection ? [initialSecureDataAccessRequestSelection] : []
+        }
+      />
+
       <ApplySecurityDialog
         selectedArtifacts={selectedArtifacts}
         open={openApplySecurity}
-        onClose={() => setOpenApplySecurity(false)}
+        onClose={() => {
+          setOpenApplySecurity(false);
+          artifactsDataLoader.refresh();
+        }}
       />
 
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
@@ -145,7 +171,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             color="primary"
             startIcon={<Icon path={mdiLockPlus} size={1} />}
             onClick={() => setOpenApplySecurity(true)}
-            disabled={selectedArtifacts.length > 0 ? false : true}>
+            disabled={!hasAdministrativePermissions || selectedArtifacts.length === 0}>
             Apply Security
           </Button>
           <IconButton disabled title="Download Files" aria-label={`Download selected files`}>

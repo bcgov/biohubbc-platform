@@ -5,7 +5,12 @@ import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
+export interface IHandlebarsTemplates {
+  header: string;
+  details: string;
+}
 export interface IDatasetsForReview {
   dataset_id: string; // UUID
   artifacts_to_review: number;
@@ -176,7 +181,7 @@ export interface ISubmissionObservationRecord {
   darwin_core_source: any;
   submission_security_request?: string | null;
   security_review_timestamp?: string | null;
-  foi_reason?: boolean | null;
+  foi_reason?: string | boolean | null;
   record_effective_timestamp?: string | null;
   record_end_timestamp?: string | null;
   create_date?: string;
@@ -413,6 +418,7 @@ export class SubmissionRepository extends BaseRepository {
       FROM submission s, submission_metadata sm
       WHERE s.submission_id = sm.submission_id
       AND sm.record_end_timestamp IS NULL
+      AND sm.record_effective_timestamp IS NOT NULL
       AND s.uuid = ${datasetId};
     `;
 
@@ -437,7 +443,7 @@ export class SubmissionRepository extends BaseRepository {
           submission s,
           submission_observation so
         WHERE s.uuid = ${datasetId}
-        AND so.submission_id = s.submission_id 
+        AND so.submission_id = s.submission_id
         AND ssc.submission_observation_id = so.submission_observation_id
         AND so.record_end_timestamp is null
         AND so.security_review_timestamp is not null
@@ -727,12 +733,12 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new metadata record
    *
-   * @param {ISubmissionMetadataRecord} submissonMetadata
+   * @param {ISubmissionMetadataRecord} submissionMetadata
    * @return {*}  {Promise<{ submission_metadata_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionMetadataRecord(
-    submissonMetadata: ISubmissionMetadataRecord
+    submissionMetadata: ISubmissionMetadataRecord
   ): Promise<{ submission_metadata_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_metadata (
@@ -740,9 +746,9 @@ export class SubmissionRepository extends BaseRepository {
         eml_source,
         eml_json_source
       ) VALUES (
-        ${submissonMetadata.submission_id},
-        ${submissonMetadata.eml_source},
-        ${submissonMetadata.eml_json_source}
+        ${submissionMetadata.submission_id},
+        ${submissionMetadata.eml_source},
+        ${submissionMetadata.eml_json_source}
       )
       RETURNING
         submission_metadata_id
@@ -764,12 +770,12 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new Observation Record
    *
-   * @param {ISubmissionObservationRecord} submissonObservation
+   * @param {ISubmissionObservationRecord} submissionObservation
    * @return {*}  {Promise<{ submission_observation_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionObservationRecord(
-    submissonObservation: ISubmissionObservationRecord
+    submissionObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_observation (
@@ -779,10 +785,10 @@ export class SubmissionRepository extends BaseRepository {
         foi_reason,
         record_effective_timestamp
       ) VALUES (
-        ${submissonObservation.submission_id},
-        ${submissonObservation.darwin_core_source},
-        ${submissonObservation.submission_security_request},
-        ${submissonObservation.foi_reason},
+        ${submissionObservation.submission_id},
+        ${submissionObservation.darwin_core_source},
+        ${submissionObservation.submission_security_request},
+        ${submissionObservation.foi_reason},
         now()
       )
       RETURNING
@@ -891,6 +897,20 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Finds an object of handlebars templates for a given datasetId to power the project details page
+   *
+   * @param datasetId a dataset UUID for determining the handlebars template to fetch
+   * @returns {*} {Promise<IDetailsPage>} an object containing a string of handlebars templates
+   * @memberof SubmissionRepository
+   */
+  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
+    return {
+      header: simsHandlebarsTemplate_HEADER,
+      details: simsHandlebarsTemplate_DETAILS
+    };
+  }
+
+  /**
    *
    * @param submissionId the submission to update
    * @param datasetSearch
@@ -899,12 +919,13 @@ export class SubmissionRepository extends BaseRepository {
    */
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     const sql = SQL`
-    UPDATE 
-      submission_metadata 
-    SET 
+    UPDATE
+      submission_metadata
+    SET
       dataset_search_criteria=${datasetSearch}
     WHERE submission_id = ${submissionId}
-    AND record_end_timestamp IS NULL;
+    AND record_end_timestamp IS NULL
+    AND record_effective_timestamp IS NOT NULL;
     `;
 
     const response = await this.connection.sql(sql);

@@ -1,4 +1,5 @@
 import Handlebars, { HelperOptions } from 'handlebars';
+import moment from 'moment';
 
 export const useHandlebars = () => {
   /**
@@ -34,14 +35,37 @@ export const useHandlebars = () => {
     });
   };
 
-  const capitalizeFirst = () => {
-    Handlebars.registerHelper('capFirst', (text) => {
-      if (typeof text === 'string') {
-        return `${text.charAt(0).toUpperCase()}${text.slice(1).toLowerCase()}`;
-      }
-      return text;
+  /**
+   * This is a Handlesbars helper to format date strings from a given format to another using moment
+   * Example of use
+   * <MyHandleBarsTemplate>
+   *  {{formatDate MyDateProperty 'YYYY-MM-DD' 'MMM YYYY'}}
+   * </MyHandleBarsTemplate>
+   */
+  const formatDateHelper = () => {
+    Handlebars.registerHelper('formatDate', (dateString: string, ogFormat: string, newFormat: string) => {
+      return moment(dateString, ogFormat).format(newFormat).toString();
     });
   };
+
+  /**
+   * This is a Handlesbars helper to check if a passed item is an array or not
+   * Example of use in a template
+   *
+   * <MyHandleBarsTemplate>
+   *  {{#if (isAnArray AnyObject)}}
+   *    <!-- This is an array, act accordingly -->
+   *  {{else}}
+   *    <!-- This is not an array -->
+   *  {{/if}}
+   * </MyHandleBarsTemplate>
+   */
+  const isAnArray = () => {
+    Handlebars.registerHelper('isAnArray', (item: any) => {
+      return Array.isArray(item);
+    });
+  };
+
   /**
    * This function converts a rawTemplate to a template
    *
@@ -50,7 +74,8 @@ export const useHandlebars = () => {
    */
   const compileFromRawTemplate = (template: TemplateSpecification): HandlebarsTemplateDelegate => {
     applyConditionalChecks();
-    capitalizeFirst();
+    formatDateHelper();
+    isAnArray();
     return Handlebars.compile(template);
   };
 
@@ -58,14 +83,14 @@ export const useHandlebars = () => {
    * This function converts a precompiled template
    * see Readme/handlebars.md for more information
    *
-   * @param {TemplateSpecification} preCompiledtemplate
+   * @param {TemplateSpecification} preCompiledTemplate
    * @return {*}  {HandlebarsTemplateDelegate}
    */
-  const compileFromPrecompiledTemplate = (preCompiledtemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
+  const compileFromPrecompiledTemplate = (preCompiledTemplate: TemplateSpecification): HandlebarsTemplateDelegate => {
     // This is a workaround to using Handlebars.template(preCompiledTemplate)
     // in order to avoid an unknown object exception
 
-    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledtemplate})`;
+    const encodedHandlebarsFunction = `(handlebars) => handlebars.template(${preCompiledTemplate})`;
     // eslint-disable-next-line no-eval
     const handlebarsFunction = eval(encodedHandlebarsFunction);
 

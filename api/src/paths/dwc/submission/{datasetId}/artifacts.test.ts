@@ -7,7 +7,9 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { Artifact } from '../../../../repositories/artifact-repository';
+import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
+import { SecurityService } from '../../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { GET, getArtifactsByDatasetId } from './artifacts';
 
@@ -77,21 +79,12 @@ describe('getArtifactsByDatasetId', () => {
         security_review_timestamp: null,
         submission_id: 1,
         title: 'Report 2',
-        uuid: '374c4d6a-3a04-405b-af6d-b6497800a691'
+        uuid: '374c4d6a-3a04-405b-af6d-b6497800a691',
+        supplementaryData: { persecutionAndHarm: 'SECURED' }
       };
-
       describe('should throw an error when', () => {
         it('returns a null response', async () => {
           const apiResponse = null;
-          const response = responseValidator.validateResponse(200, apiResponse);
-
-          expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors.length).to.equal(1);
-          expect(response.errors[0].message).to.equal('must be object');
-        });
-
-        it('returns a null array', async () => {
-          const apiResponse = { artifacts: null };
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
@@ -101,7 +94,7 @@ describe('getArtifactsByDatasetId', () => {
 
         describe('artifact', () => {
           it('returns a null response', async () => {
-            const apiResponse = { artifacts: [null] };
+            const apiResponse = [null];
             const response = responseValidator.validateResponse(200, apiResponse);
 
             expect(response.message).to.equal('The response was not valid.');
@@ -111,14 +104,12 @@ describe('getArtifactsByDatasetId', () => {
 
           describe('artifact_id', () => {
             it('is undefined', async () => {
-              const apiResponse = {
-                artifacts: [
-                  {
-                    ...mockResponse,
-                    artifact_id: undefined
-                  }
-                ]
-              };
+              const apiResponse = [
+                {
+                  ...mockResponse,
+                  artifact_id: undefined
+                }
+              ];
               const response = responseValidator.validateResponse(200, apiResponse);
 
               expect(response.message).to.equal('The response was not valid.');
@@ -127,14 +118,12 @@ describe('getArtifactsByDatasetId', () => {
             });
 
             it('is null', async () => {
-              const apiResponse = {
-                artifacts: [
-                  {
-                    ...mockResponse,
-                    artifact_id: null
-                  }
-                ]
-              };
+              const apiResponse = [
+                {
+                  ...mockResponse,
+                  artifact_id: null
+                }
+              ];
               const response = responseValidator.validateResponse(200, apiResponse);
 
               expect(response.message).to.equal('The response was not valid.');
@@ -143,14 +132,12 @@ describe('getArtifactsByDatasetId', () => {
             });
 
             it('is wrong type', async () => {
-              const apiResponse = {
-                artifacts: [
-                  {
-                    ...mockResponse,
-                    artifact_id: '1'
-                  }
-                ]
-              };
+              const apiResponse = [
+                {
+                  ...mockResponse,
+                  artifact_id: '1'
+                }
+              ];
               const response = responseValidator.validateResponse(200, apiResponse);
 
               expect(response.message).to.equal('The response was not valid.');
@@ -161,14 +148,12 @@ describe('getArtifactsByDatasetId', () => {
 
           describe('create_date', () => {
             it('is undefined', async () => {
-              const apiResponse = {
-                artifacts: [
-                  {
-                    ...mockResponse,
-                    create_date: undefined
-                  }
-                ]
-              };
+              const apiResponse = [
+                {
+                  ...mockResponse,
+                  create_date: undefined
+                }
+              ];
               const response = responseValidator.validateResponse(200, apiResponse);
 
               expect(response.message).to.equal('The response was not valid.');
@@ -177,14 +162,12 @@ describe('getArtifactsByDatasetId', () => {
             });
 
             it('is null', async () => {
-              const apiResponse = {
-                artifacts: [
-                  {
-                    ...mockResponse,
-                    create_date: null
-                  }
-                ]
-              };
+              const apiResponse = [
+                {
+                  ...mockResponse,
+                  create_date: null
+                }
+              ];
               const response = responseValidator.validateResponse(200, apiResponse);
 
               expect(response.message).to.equal('The response was not valid.');
@@ -198,25 +181,23 @@ describe('getArtifactsByDatasetId', () => {
 
       describe('should succeed when', () => {
         it('required values are valid', async () => {
-          const apiResponse = {
-            artifacts: [
-              {
-                artifact_id: 1,
-                create_date: '1970-01-01T00:00:00.000Z',
-                description: 'Test description',
-                file_name: 'Filename.docx',
-                file_size: 1024,
-                file_type: 'Report',
-                foi_reason: false,
-                key: 'platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip',
-                security_review_timestamp: null,
-                submission_id: 1,
-                title: 'Test Report',
-                uuid: '374c4d6a-3a04-405b-af6d-b6497800a691'
-              }
-            ]
-          };
-
+          const apiResponse = [
+            {
+              artifact_id: 1,
+              create_date: '1970-01-01T00:00:00.000Z',
+              description: 'Test description',
+              file_name: 'Filename.docx',
+              file_size: 1024,
+              file_type: 'Report',
+              foi_reason: false,
+              key: 'platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip',
+              security_review_timestamp: null,
+              submission_id: 1,
+              title: 'Test Report',
+              uuid: '374c4d6a-3a04-405b-af6d-b6497800a691',
+              supplementaryData: { persecutionAndHarm: 'SECURED' }
+            }
+          ];
           const response = responseValidator.validateResponse(200, apiResponse);
           expect(response).to.equal(undefined);
         });
@@ -232,6 +213,10 @@ describe('getArtifactsByDatasetId', () => {
       .stub(ArtifactService.prototype, 'getArtifactsByDatasetId')
       .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
 
+    const securityServiceStub = sinon
+      .stub(SecurityService.prototype, 'getSecurityAppliedStatus')
+      .resolves(SECURITY_APPLIED_STATUS.SECURED);
+
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.params = {
@@ -244,9 +229,11 @@ describe('getArtifactsByDatasetId', () => {
 
     expect(mockRes.statusValue).to.equal(200);
     expect(artifactServiceStub).to.be.calledWith('abcd');
-    expect(mockRes.jsonValue).to.eql({
-      artifacts: [{ artifact_id: 1 }, { artifact_id: 2 }]
-    });
+    expect(securityServiceStub).to.be.calledTwice;
+    expect(mockRes.jsonValue).to.eql([
+      { artifact_id: 1, supplementaryData: { persecutionAndHarm: 'SECURED' } },
+      { artifact_id: 2, supplementaryData: { persecutionAndHarm: 'SECURED' } }
+    ]);
   });
 
   it('catches and re-throws an error', async () => {

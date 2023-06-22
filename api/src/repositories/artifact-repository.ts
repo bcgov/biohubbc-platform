@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
@@ -149,6 +150,13 @@ export class ArtifactRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Retrieves all artifacts belonging to the given submission.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<Artifact>}
+   * @memberof ArtifactRepository
+   */
   async getArtifactById(artifactId: number): Promise<Artifact> {
     defaultLog.debug({ label: 'getArtifactById', artifactId });
 
@@ -166,9 +174,55 @@ export class ArtifactRepository extends BaseRepository {
     const result = (response && response.rowCount && response.rows[0]) || null;
 
     if (!result) {
-      throw new ApiExecuteSQLError('Failed to retreive artifact record by ID');
+      throw new ApiExecuteSQLError('Failed to retrieve artifact record by ID');
     }
 
     return result;
+  }
+
+  /**
+   * Fetches multiple artifact records by the given artifact IDs
+   *
+   * @param {number[]} artifactIds
+   * @return {*}  {Promise<Artifact[]>}
+   * @memberof ArtifactRepository
+   */
+  async getArtifactsByIds(artifactIds: number[]): Promise<Artifact[]> {
+    defaultLog.debug({ label: 'getArtifactByIds', artifactIds });
+
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder().select().from('artifact').whereIn('artifact_id', artifactIds);
+
+    const response = await this.connection.knex<Artifact>(queryBuilder, Artifact);
+
+    return response.rows;
+  }
+
+  /**
+   * updates the security review timestamp for the given artifact.
+   *
+   * @param {number} artifactId
+   * @return {*}  {Promise<void>}
+   * @memberof ArtifactRepository
+   */
+  async updateArtifactSecurityReviewTimestamp(artifactId: number): Promise<void> {
+    defaultLog.debug({ label: 'updateArtifactSecurityReviewTimestamp', artifactId });
+
+    const sqlStatement = SQL`
+      UPDATE
+        artifact
+      SET
+        security_review_timestamp = NOW()
+      WHERE
+        artifact_id = ${artifactId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    const results = (response?.rowCount && response?.rows) || null;
+
+    if (!results) {
+      throw new ApiExecuteSQLError('Failed to update artifact security review timestamp');
+    }
   }
 }
