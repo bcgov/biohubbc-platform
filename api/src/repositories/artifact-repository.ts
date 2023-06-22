@@ -180,6 +180,36 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
+   * Retrieves all artifacts belonging to the given submission.
+   *
+   * @param {string} uuid
+   * @return {*}  {Promise<Artifact>}
+   * @memberof ArtifactRepository
+   */
+  async getArtifactByUUID(uuid: string): Promise<Artifact> {
+    defaultLog.debug({ label: 'getArtifactByUUID', uuid });
+
+    const sqlStatement = SQL`
+      SELECT
+        a.*
+      FROM
+        artifact a
+      WHERE
+        a.uuid = ${uuid};
+    `;
+
+    const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
+
+    const result = (response && response.rowCount && response.rows[0]) || null;
+
+    if (!result) {
+      throw new ApiExecuteSQLError('Failed to retrieve artifact record by UUID');
+    }
+
+    return result;
+  }
+
+  /**
    * updates the security review timestamp for the given artifact.
    *
    * @param {number} artifactId
@@ -205,5 +235,10 @@ export class ArtifactRepository extends BaseRepository {
     if (!results) {
       throw new ApiExecuteSQLError('Failed to update artifact security review timestamp');
     }
+  }
+
+  async deleteArtifactByUUID(uuid: string): Promise<void> {
+    const sql = SQL`DELETE FROM artifact WHERE uuid='${uuid}';`;
+    await this.connection.sql(sql);
   }
 }

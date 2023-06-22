@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
+import { ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
-import { generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import { deleteFileFromS3, generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
@@ -132,5 +133,33 @@ export class ArtifactService extends DBService {
     defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
 
     await this.artifactRepository.updateArtifactSecurityReviewTimestamp(artifactId);
+  }
+
+  async deleteArtifacts(uuids: string[]): Promise<void> {
+    try {
+      for (const uuid of uuids) {
+        await this.deleteArtifact(uuid);
+      }
+    } catch (error) {
+      throw new ApiGeneralError(`There was an issue deleting an artifact.`);
+    }
+  }
+
+  async deleteArtifact(uuid: string): Promise<void> {
+    // need to get artifact key
+    // delete from S3
+    // delete from database
+    const artifact = await this.artifactRepository.getArtifactByUUID(uuid);
+
+    // tracking this to roll back incase of an error
+    let deleteMarker: string | undefined;
+    try {
+      const deleteResponse = await deleteFileFromS3(artifact.key);
+      deleteMarker = deleteResponse?.VersionId;
+      await this.artifactRepository.deleteArtifactByUUID(uuid);
+    } catch (error) {
+      await deleteFileFromS3(artifact.key, deleteMarker);
+      throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`);
+    }
   }
 }
