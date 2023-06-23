@@ -80,52 +80,33 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
                 Request Access
               </MenuItem>
             )}
-            <MenuItem
-              disabled={
-                props.hasAdministrativePermissions
-                  ? false
-                  : props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED
-              }
-              onClick={() => {
-                props.onDownload(props.artifact);
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-download">
-              <ListItemIcon>
-                <Icon path={mdiTrayArrowDown} size={0.875} />
-              </ListItemIcon>
-              Download Document
-            </MenuItem>
-
-            <MenuItem
-              disabled={
-                props.hasAdministrativePermissions
-                  ? false
-                  : props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED
-              }
-              onClick={() => {
-                props.onApplySecurity(props.artifact);
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-download">
-              <ListItemIcon>
-                <Icon path={mdiLockPlus} size={0.875} />
-              </ListItemIcon>
-              Apply Security to Document
-            </MenuItem>
 
             {props.hasAdministrativePermissions && (
-              <MenuItem
-                onClick={() => {
-                  console.log('Delete artifact not implemented yet.');
-                  handleClose();
-                }}
-                data-testid="attachment-action-menu-delete">
-                <ListItemIcon>
-                  <Icon path={mdiTrashCanOutline} size={0.8} />
-                </ListItemIcon>
-                Delete Document
-              </MenuItem>
+              <>
+                <MenuItem
+                  onClick={() => {
+                    props.onApplySecurity(props.artifact);
+                    setAnchorEl(null);
+                  }}
+                  data-testid="attachment-action-menu-download">
+                  <ListItemIcon>
+                    <Icon path={mdiLockPlus} size={0.875} />
+                  </ListItemIcon>
+                  Apply Security to Document
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    console.log('Delete artifact not implemented yet.');
+                    handleClose();
+                  }}
+                  data-testid="attachment-action-menu-delete">
+                  <ListItemIcon>
+                    <Icon path={mdiTrashCanOutline} size={0.8} />
+                  </ListItemIcon>
+                  Delete Document
+                </MenuItem>
+              </>
             )}
           </Menu>
         </Box>
