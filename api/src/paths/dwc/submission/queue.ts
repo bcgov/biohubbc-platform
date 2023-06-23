@@ -160,28 +160,24 @@ export function queueForProcess(): RequestHandler {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
-    if (!sourceSystem) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
-      ]);
-    }
+    if (sourceSystem) {
+      const id = req.body.data_package_id;
+      const connection = getServiceAccountDBConnection(sourceSystem);
 
-    const id = req.body.data_package_id;
-    const connection = getServiceAccountDBConnection(sourceSystem);
+      try {
+        await connection.open();
+        const service = new SubmissionJobQueueService(connection);
+        const queueRecord = await service.intake(id, file, securityRequest);
 
-    try {
-      await connection.open();
-      const service = new SubmissionJobQueueService(connection);
-      const queueRecord = await service.intake(id, file, securityRequest);
-
-      await connection.commit();
-      res.status(200).json(queueRecord);
-    } catch (error) {
-      defaultLog.error({ label: 'queueForProcess', message: 'error', error });
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+        await connection.commit();
+        res.status(200).json(queueRecord);
+      } catch (error) {
+        defaultLog.error({ label: 'queueForProcess', message: 'error', error });
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
     }
   };
 }
