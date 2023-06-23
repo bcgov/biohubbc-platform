@@ -78,6 +78,11 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     await downloadFile(signedUrl);
   };
 
+  const handleDeleteArtifact = async (artifactUUIDs: string[]) => {
+    const data = await biohubApi.artifact.deleteArtifacts(artifactUUIDs);
+    console.log(data);
+  };
+
   const columns: GridColDef<IArtifact>[] = [
     {
       field: 'file_name',
@@ -130,6 +135,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
+            onDelete={handleDeleteArtifact}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />

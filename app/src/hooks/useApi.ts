@@ -1,6 +1,7 @@
 import { ConfigContext } from 'contexts/configContext';
 import { useContext } from 'react';
 import useAdminApi from './api/useAdminApi';
+import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import useDatasetApi from './api/useDatasetApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
@@ -36,6 +37,8 @@ export const useApi = () => {
 
   const dataset = useDatasetApi(apiAxios);
 
+  const artifact = useArtifactApi(apiAxios);
+
   return {
     user,
     admin,
@@ -44,6 +47,7 @@ export const useApi = () => {
     search,
     dataset,
     taxonomy,
-    security
+    security,
+    artifact
   };
 };

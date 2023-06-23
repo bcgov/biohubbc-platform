@@ -2,8 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SOURCE_SYSTEM } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
-import { getServiceAccountDBConnection } from '../../database/db';
-import { HTTP400 } from '../../errors/http-error';
+import { getDBConnection, getServiceAccountDBConnection, IDBConnection } from '../../database/db';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
@@ -16,12 +15,12 @@ export const POST: Operation = [
     return {
       or: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
-          discriminator: 'ServiceClient'
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
+          discriminator: 'SystemRole'
         },
         {
-          validSystemRoles: [SYSTEM_ROLE.DATA_ADMINISTRATOR, SYSTEM_ROLE.SYSTEM_ADMIN],
-          discriminator: 'SystemRole'
+          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
+          discriminator: 'ServiceClient'
         }
       ]
     };
@@ -30,8 +29,13 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Deletes an artifact.',
+  description: 'Deletes artifacts.',
   tags: ['artifact'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   requestBody: {
     content: {
       'application/json': {
@@ -40,7 +44,7 @@ POST.apiDoc = {
           type: 'object',
           required: ['artifactUUIDs'],
           properties: {
-            uuids: {
+            artifactUUIDs: {
               type: 'array',
               items: {
                 type: 'string'
@@ -60,21 +64,9 @@ POST.apiDoc = {
           schema: {
             type: 'object',
             properties: {
-              searchResponse: {
-                type: 'array',
-                items: {
-                  title: 'Species',
-                  type: 'object',
-                  required: ['id', 'label'],
-                  properties: {
-                    id: {
-                      type: 'string'
-                    },
-                    label: {
-                      type: 'string'
-                    }
-                  }
-                }
+              success: {
+                type: 'boolean',
+                description: 'A boolean indicating if the delete action successfully completed.'
               }
             }
           }
@@ -101,27 +93,27 @@ POST.apiDoc = {
 export function deleteArtifact(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
-
+    let connection: IDBConnection;
+    let success = true;
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
-    if (!sourceSystem) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
-      ]);
+    if (sourceSystem) {
+      connection = getServiceAccountDBConnection(sourceSystem);
+    } else {
+      connection = getDBConnection(req['keycloak_token']);
     }
-    const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
       const service = new ArtifactService(connection);
-      await service.deleteArtifacts(req.body.uuids);
 
-      res.status(200);
+      await service.deleteArtifacts(req.body.artifactUUIDs);
     } catch (error) {
       defaultLog.error({ label: 'deleteArtifact', message: 'error', error });
-
+      success = false;
       await connection.rollback();
       throw error;
     } finally {
       connection.release();
+      res.status(200).json({ success });
     }
   };
 }
