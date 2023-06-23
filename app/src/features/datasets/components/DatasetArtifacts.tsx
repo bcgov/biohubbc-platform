@@ -211,8 +211,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           setShowDeleteFileDialog(false);
           setArtifactToDelete(undefined);
         }}
-        dialogTitle="Are you sure you would like to delete this document?"
-        dialogText=""
+        dialogTitle="Delete document?"
+        dialogText="Are you sure you want to permanently delete this document? This action cannot be undone."
+        yesButtonProps={{ color: 'error' }}
       />
 
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
