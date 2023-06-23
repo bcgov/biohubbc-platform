@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
+import { SecurityRepository } from '../repositories/security-repository';
 import { deleteFileFromS3, generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -141,6 +142,8 @@ export class ArtifactService extends DBService {
    * @param {string[]} uuids UUIDs of artifacts to delete
    */
   async deleteArtifacts(uuids: string[]): Promise<void> {
+    defaultLog.debug({ label: 'deleteArtifacts' });
+
     try {
       for (const uuid of uuids) {
         await this.deleteArtifact(uuid);
@@ -156,6 +159,9 @@ export class ArtifactService extends DBService {
    * @param {string} uuid UUID of artifact to delete
    */
   async deleteArtifact(uuid: string): Promise<void> {
+    defaultLog.debug({ label: 'deleteArtifact' });
+
+    const service = new SecurityRepository(this.connection);
     const artifact = await this.artifactRepository.getArtifactByUUID(uuid);
 
     // tracking this to roll back incase of an error
@@ -163,10 +169,13 @@ export class ArtifactService extends DBService {
     try {
       const deleteResponse = await deleteFileFromS3(artifact.key);
       deleteMarker = deleteResponse?.VersionId;
+      await service.deleteSecurityRulesForArtifactUUID(uuid);
       await this.artifactRepository.deleteArtifactByUUID(uuid);
     } catch (error) {
-      // Remove 'Delete Marker' to restore S3 object
-      await deleteFileFromS3(artifact.key, deleteMarker);
+      if (deleteMarker) {
+        // Remove 'Delete Marker' to restore S3 object
+        await deleteFileFromS3(artifact.key, deleteMarker);
+      }
       throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`);
     }
   }

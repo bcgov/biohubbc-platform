@@ -161,6 +161,26 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
+   * Delete persecution rules for a given artifact uuid
+   *
+   * @param {string} artifactUUID
+   */
+  async deleteSecurityRulesForArtifactUUID(artifactUUID: string): Promise<void> {
+    defaultLog.debug({ label: 'deleteSecurityRulesForArtifactUUID' });
+
+    const sql = SQL`
+      DELETE 
+      FROM artifact_persecution 
+      WHERE artifact_id IN (
+        SELECT a.artifact_id 
+        FROM artifact a 
+        WHERE a.uuid = ${artifactUUID}
+      );
+    `;
+    await this.connection.sql(sql);
+  }
+
+  /**
    * Get the persecution or harm rules for which a user is granted exception
    *
    * @param {number} userId

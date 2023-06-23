@@ -8,6 +8,7 @@ import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { ErrorDialog } from 'components/dialog/ErrorDialog';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
@@ -56,8 +57,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
-  const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false);
+  const [showDeleteFileDialog, setShowDeleteFileDialog] = useState(false);
   const [artifactToDelete, setArtifactToDelete] = useState<IArtifact | undefined>(undefined);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
 
   const keycloakWrapper = useKeycloakWrapper();
   const biohubApi = useApi();
@@ -83,11 +85,11 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     await downloadFile(signedUrl);
   };
 
-  const handleDeleteArtifact = async (artifactUUIDs: string[]) => {
+  const handleDeleteArtifact = async (artifactUUIDs: string[]): Promise<{ success: boolean }> => {
     const data = await biohubApi.artifact.deleteArtifacts(artifactUUIDs);
     artifactsDataLoader.refresh();
 
-    console.log(data);
+    return data;
   };
 
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
@@ -161,7 +163,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             onDownload={handleDownloadAttachment}
             onDelete={() => {
               setArtifactToDelete(params.row);
-              setDeleteFileDialogOpen(true);
+              setShowDeleteFileDialog(true);
             }}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
@@ -182,19 +184,31 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
         }}
       />
 
+      <ErrorDialog
+        dialogTitle="Error deleting document"
+        dialogText="If you continue to have difficulties deleting a document, please contact BioHub Support at biohub@gov.bc.ca."
+        open={showErrorDialog}
+        onClose={() => setShowErrorDialog(false)}
+        onOk={() => setShowErrorDialog(false)}
+      />
+
       <YesNoDialog
-        open={deleteFileDialogOpen}
-        onClose={() => setDeleteFileDialogOpen(false)}
+        open={showDeleteFileDialog}
+        onClose={() => setShowDeleteFileDialog(false)}
         onYes={async () => {
           if (artifactToDelete) {
-            await handleDeleteArtifact([artifactToDelete.uuid]);
-            handleShowSnackBar(`You successfully deleted ${artifactToDelete.file_name}.`);
-            setDeleteFileDialogOpen(false);
+            const response = await handleDeleteArtifact([artifactToDelete.uuid]);
+            if (response.success) {
+              handleShowSnackBar(`You successfully deleted ${artifactToDelete.file_name}.`);
+            } else {
+              setShowErrorDialog(true);
+            }
+            setShowDeleteFileDialog(false);
             setArtifactToDelete(undefined);
           }
         }}
         onNo={() => {
-          setDeleteFileDialogOpen(false);
+          setShowDeleteFileDialog(false);
           setArtifactToDelete(undefined);
         }}
         dialogTitle="Are you sure you would like to delete this document?"
