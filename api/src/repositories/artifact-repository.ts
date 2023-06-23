@@ -243,7 +243,13 @@ export class ArtifactRepository extends BaseRepository {
    * @param uuid UUID of the artifact to delete
    */
   async deleteArtifactByUUID(uuid: string): Promise<void> {
-    const sql = SQL`DELETE FROM artifact WHERE uuid = ${uuid};`;
+    defaultLog.debug({ label: 'deleteArtifactByUUID' });
+
+    const sql = SQL`
+      DELETE 
+      FROM artifact 
+      WHERE uuid = ${uuid}
+      RETURNING *;`;
     const results = await this.connection.sql(sql);
     if (results.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to delete artifact');

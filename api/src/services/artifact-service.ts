@@ -135,6 +135,11 @@ export class ArtifactService extends DBService {
     await this.artifactRepository.updateArtifactSecurityReviewTimestamp(artifactId);
   }
 
+  /**
+   * Deletes multiple artifacts and their related S3 objects for a given list of UUIDs
+   *
+   * @param {string[]} uuids UUIDs of artifacts to delete
+   */
   async deleteArtifacts(uuids: string[]): Promise<void> {
     try {
       for (const uuid of uuids) {
@@ -145,10 +150,12 @@ export class ArtifactService extends DBService {
     }
   }
 
+  /**
+   * Deletes an artifact and related S3 object for a given UUID
+   *
+   * @param {string} uuid UUID of artifact to delete
+   */
   async deleteArtifact(uuid: string): Promise<void> {
-    // need to get artifact key
-    // delete from S3
-    // delete from database
     const artifact = await this.artifactRepository.getArtifactByUUID(uuid);
 
     // tracking this to roll back incase of an error

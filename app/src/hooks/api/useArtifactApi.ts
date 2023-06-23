@@ -7,8 +7,8 @@ import { AxiosInstance } from 'axios';
  * @return {*} object whose properties are supported api methods.
  */
 const useArtifactApi = (axios: AxiosInstance) => {
-  const deleteArtifacts = async (artifactUUIDs: string[]): Promise<any> => {
-    const { data } = await axios.post<any>(`/api/artifact/delete`, {
+  const deleteArtifacts = async (artifactUUIDs: string[]): Promise<{ success: boolean }> => {
+    const { data } = await axios.post<{ success: boolean }>(`/api/artifact/delete`, {
       artifactUUIDs
     });
 

@@ -80,6 +80,8 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const handleDeleteArtifact = async (artifactUUIDs: string[]) => {
     const data = await biohubApi.artifact.deleteArtifacts(artifactUUIDs);
+    artifactsDataLoader.refresh();
+
     console.log(data);
   };
 
