@@ -158,6 +158,7 @@ export class ArtifactService extends DBService {
       deleteMarker = deleteResponse?.VersionId;
       await this.artifactRepository.deleteArtifactByUUID(uuid);
     } catch (error) {
+      // Remove 'Delete Marker' to restore S3 object
       await deleteFileFromS3(artifact.key, deleteMarker);
       throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`);
     }
