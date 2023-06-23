@@ -8,14 +8,16 @@ import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import YesNoDialog from 'components/dialog/YesNoDialog';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SYSTEM_ROLE } from 'constants/roles';
+import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
@@ -54,9 +56,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
+  const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false);
+  const [artifactToDelete, setArtifactToDelete] = useState<IArtifact | undefined>(undefined);
 
   const keycloakWrapper = useKeycloakWrapper();
   const biohubApi = useApi();
+  const dialogContext = useContext(DialogContext);
 
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();
@@ -83,6 +88,23 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     artifactsDataLoader.refresh();
 
     console.log(data);
+  };
+
+  const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
+    dialogContext.setSnackbar({ ...textDialogProps, open: true });
+  };
+
+  const handleShowSnackBar = (message: string) => {
+    showSnackBar({
+      snackbarMessage: (
+        <>
+          <Typography variant="body2" component="div">
+            {message}
+          </Typography>
+        </>
+      ),
+      open: true
+    });
   };
 
   const columns: GridColDef<IArtifact>[] = [
@@ -137,7 +159,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
-            onDelete={handleDeleteArtifact}
+            onDelete={() => {
+              setArtifactToDelete(params.row);
+              setDeleteFileDialogOpen(true);
+            }}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />
@@ -155,6 +180,25 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           setOpenApplySecurity(false);
           artifactsDataLoader.refresh();
         }}
+      />
+
+      <YesNoDialog
+        open={deleteFileDialogOpen}
+        onClose={() => setDeleteFileDialogOpen(false)}
+        onYes={async () => {
+          if (artifactToDelete) {
+            await handleDeleteArtifact([artifactToDelete.uuid]);
+            handleShowSnackBar(`You successfully deleted ${artifactToDelete.file_name}.`);
+            setDeleteFileDialogOpen(false);
+            setArtifactToDelete(undefined);
+          }
+        }}
+        onNo={() => {
+          setDeleteFileDialogOpen(false);
+          setArtifactToDelete(undefined);
+        }}
+        dialogTitle="Are you sure you would like to delete this document?"
+        dialogText=""
       />
 
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
