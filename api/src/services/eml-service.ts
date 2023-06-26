@@ -2,9 +2,13 @@ import jsonpatch, { Operation } from 'fast-json-patch';
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 import { JSONPath } from 'jsonpath-plus';
 import { z } from 'zod';
+import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { IDBConnection } from '../database/db';
 import { getLogger } from '../utils/logger';
+import { BcgwLayerService } from './bcgw-layer-service';
 import { DBService } from './db-service';
+import { Srid3005 } from './geo-service';
+import { SpatialService } from './spatial-service';
 import { SystemConstantService } from './system-constant-service';
 
 const defaultLog = getLogger('services/eml-service');
@@ -17,7 +21,13 @@ export class EMLService extends DBService {
     // interpreted as text.
     parseTagValue: false,
     isArray: (tagName: string) => {
-      const tagsArray: Array<string> = ['relatedProject', 'section', 'taxonomicCoverage', 'metadataProvider'];
+      const tagsArray: Array<string> = [
+        'relatedProject',
+        'section',
+        'taxonomicCoverage',
+        'metadataProvider',
+        'additionalMetadata'
+      ];
 
       return tagsArray.includes(tagName);
     }
@@ -92,7 +102,7 @@ export class EMLService extends DBService {
   }
 
   /**
-   * Get the BioHub taxonomic system URL.F
+   * Get the BioHub taxonomic system URL.
    *
    * @example
    * www.biohub-elastic-search.gov.bc.ca/taxonomy_index
@@ -121,13 +131,88 @@ export class EMLService extends DBService {
   }
 
   /**
+   * Compares the submission `Boundary` spatial component against BCGW layers, and builds an `additionalMetadata`
+   * object containing the names of the matching layer features (ie: which regions does the submission boundary cross).
+   *
+   * @param {number} submissionId
+   * @param {string} datasetId
+   * @return {*}  {Promise<any>}
+   * @memberof EMLService
+   */
+  async getRegionAdditionalMetadataNode(submissionId: number, datasetId: string): Promise<any> {
+    const spatialService = new SpatialService(this.connection);
+
+    // Fetch the submission `Boundary Centroid` spatial component
+    const bondaryCentroidSpatialComponent =
+      await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+        submissionId,
+        SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
+        Srid3005
+      );
+
+    // Fetch the submission `Boundary` spatial component
+    const boundarySpatialComponent = await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+      submissionId,
+      SPATIAL_COMPONENT_TYPE.BOUNDARY,
+      Srid3005
+    );
+
+    const datasetRegionService = new BcgwLayerService();
+
+    // Fetch env `Boundary Centroid` and `Boundary` regions
+    const envBoundaryCentroidRegionNames = await datasetRegionService.getEnvRegionNames(
+      bondaryCentroidSpatialComponent.geometry
+    );
+    const envBoundaryRegionNames = await datasetRegionService.getEnvRegionNames(boundarySpatialComponent.geometry);
+
+    // Fetch nrm `Boundary Centroid` and `Boundary` regions
+    const nrmBoundaryCentroidRegionNames = await datasetRegionService.getNrmRegionNames(
+      bondaryCentroidSpatialComponent.geometry
+    );
+    const nrmBoundaryRegionNames = await datasetRegionService.getNrmRegionNames(boundarySpatialComponent.geometry);
+
+    // Build additionalMetadata object for region names
+    return {
+      describes: datasetId,
+      metadata: {
+        regions: {
+          env: [
+            // Add renv egions found based on the boundary centroid
+            ...envBoundaryCentroidRegionNames.map((name) => ({
+              name: name,
+              from: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
+            })),
+            // Add env regions found based on the boundary
+            ...envBoundaryRegionNames
+              .filter((item) => !envBoundaryCentroidRegionNames.includes(item))
+              .map((name) => ({ name: name, from: SPATIAL_COMPONENT_TYPE.BOUNDARY }))
+          ],
+          nrm: [
+            // Add nrm regions found based on the boundary centroid
+            ...nrmBoundaryCentroidRegionNames.map((name) => ({
+              name: name,
+              from: SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID
+            })),
+            // Add nrm regions found based on the boundary
+            ...nrmBoundaryRegionNames
+              .filter((item) => !nrmBoundaryCentroidRegionNames.includes(item))
+              .map((name) => ({ name: name, from: SPATIAL_COMPONENT_TYPE.BOUNDARY }))
+          ]
+        }
+      }
+    };
+  }
+
+  /**
    * Decorates an EML object, adding additional BioHub metadata to the original EML.
    *
+   * @param {number} submissionId
+   * @param {string} datasetId
    * @param {Record<string, any>} eml
    * @return {*}  {Promise<Record<string, any>>}
    * @memberof EMLService
    */
-  async decorateEML(eml: Record<string, any>): Promise<Record<string, any>> {
+  async decorateEML(submissionId: number, datasetId: string, eml: Record<string, any>): Promise<Record<string, any>> {
     // The config for a list of patch operations to perform on the EML.
     // Note: the order of these patches may be important. Below, when patches are being applied, they are applied in
     // order, allows iterative patches to be supported.
@@ -173,15 +258,27 @@ export class EMLService extends DBService {
         path: '$..eml:eml.dataset.metadataProvider',
         property: '-', // append to the end of the array
         value: await this.getMetadataProviderNode()
+      },
+      {
+        // Add a `additionalMetadata` node if one does not already exist
+        path: '$..eml:eml',
+        property: 'additionalMetadata',
+        value: []
+      },
+      {
+        // Append an object to the `additionalMetadata` node.
+        path: '$..eml:eml.additionalMetadata',
+        property: '-', // append to the end of the array
+        value: await this.getRegionAdditionalMetadataNode(submissionId, datasetId)
       }
     ];
-
-    const patchOperations: Operation[] = [];
 
     // Iterates over `patches` in order from first to last, applying all resulting patch operations one by one.
     // Note: subsequent patches will operate on the output of the previous patches. This means iterative patches are
     // possible, if needed.
     for (const patch of patches) {
+      const patchOperations: Operation[] = [];
+
       try {
         const paths = JSONPath({
           path: patch.path,

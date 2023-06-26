@@ -93,6 +93,9 @@ parameters:
   - name: GCNOTIFY_ADMIN_EMAIL
     description: admin email for gcnotify api
     value: biohub@gov.bc.ca
+  - name: GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS
+    description: 'GC Notify template ID for secure document access requests'
+    value: 4bb42a76-f79b-424f-ad0f-ad3671389ec2
   - name: GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE
     description: gcnotify email template id
     value: 7779a104-b863-40ac-902f-1aa607d2071a
@@ -261,6 +264,8 @@ objects:
                       name: ${GCNOTIFY_API_SECRET}
                 - name: GCNOTIFY_ADMIN_EMAIL
                   value: ${GCNOTIFY_ADMIN_EMAIL}
+                - name: GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS
+                  value: ${GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS}
                 - name: GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE
                   value: ${GCNOTIFY_ONBOARDING_REQUEST_EMAIL_TEMPLATE}
                 - name: GCNOTIFY_ONBOARDING_REQUEST_SMS_TEMPLATE
