@@ -186,7 +186,7 @@ export class ArtifactRepository extends BaseRepository {
    * @return {*}  {Promise<Artifact>}
    * @memberof ArtifactRepository
    */
-  async getArtifactByUUID(uuid: string): Promise<Artifact> {
+  async getArtifactByUUID(uuid: string): Promise<Artifact | null> {
     defaultLog.debug({ label: 'getArtifactByUUID', uuid });
 
     const sqlStatement = SQL`
@@ -200,11 +200,7 @@ export class ArtifactRepository extends BaseRepository {
 
     const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
 
-    const result = (response && response.rowCount && response.rows[0]) || null;
-
-    if (!result) {
-      throw new ApiExecuteSQLError('Failed to retrieve artifact record by UUID');
-    }
+    const result = (response.rowCount && response?.rows[0]) || null;
 
     return result;
   }
@@ -250,9 +246,6 @@ export class ArtifactRepository extends BaseRepository {
       FROM artifact 
       WHERE uuid = ${uuid}
       RETURNING *;`;
-    const results = await this.connection.sql(sql);
-    if (results.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to delete artifact');
-    }
+    await this.connection.sql(sql);
   }
 }

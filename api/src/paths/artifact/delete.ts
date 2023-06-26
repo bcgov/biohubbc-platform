@@ -104,7 +104,6 @@ export function deleteArtifact(): RequestHandler {
 
     try {
       await connection.open();
-
       const service = new ArtifactService(connection);
 
       await service.deleteArtifacts(req.body.artifactUUIDs);
