@@ -21,6 +21,7 @@ import SecurityReasonSelector, {
   SecurityReasonsYupSchema
 } from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
+import { pluralize as p } from 'utils/Utils';
 export interface IApplySecurityDialog {
   selectedArtifacts: IArtifact[];
   open: boolean;
@@ -88,7 +89,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
           onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
             await handleSubmit(values.securityReasons);
             handleShowSnackBar(
-              `You successfully applied security reasons to the file${selectedArtifacts.length !== 1 ? 's' : ''}.`
+              `You successfully applied security reasons to ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
             );
             onClose();
           }}>
@@ -100,7 +101,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 onYes={async () => {
                   await formikProps.submitForm();
                   handleShowSnackBar(
-                    `You successfully unsecured the file${selectedArtifacts.length !== 1 ? 's' : ''}.`
+                    `You successfully unsecured ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
                   );
                   setYesNoDialogOpen(false);
                 }}
@@ -129,8 +130,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
               <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <DialogContentText id="alert-dialog-description">
-                  Search for the security reasons and apply them to the selected document
-                  {selectedArtifacts.length !== 1 ? 's' : ''}.
+                  {`Search for the security reasons and apply them to the selected ${p(selectedArtifacts.length, 'document')}`}
                 </DialogContentText>
 
                 <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />

@@ -16,8 +16,8 @@ import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
-import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
 import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
+import { downloadFile, getFormattedDate, getFormattedFileSize, pluralize as p } from 'utils/Utils';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
 
@@ -185,7 +185,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <Box pt={2} pb={2}>
             <Alert onClose={() => setShowAlert(false)} severity="info">
               <strong>
-                {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
+                {`You have ${numPendingDocuments} project ${p(numPendingDocuments, 'document')} to review.`}
               </strong>
             </Alert>
           </Box>
