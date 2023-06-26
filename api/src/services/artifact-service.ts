@@ -124,6 +124,17 @@ export class ArtifactService extends DBService {
   }
 
   /**
+   * Fetches multiple artifact records by the given artifact IDs
+   *
+   * @param {number[]} artifactIds
+   * @return {*}  {Promise<Artifact[]>}
+   * @memberof ArtifactService
+   */
+  async getArtifactsByIds(artifactIds: number[]): Promise<Artifact[]> {
+    return this.artifactRepository.getArtifactsByIds(artifactIds);
+  }
+
+  /**
    * updates the security review timestamp for an artifact
    *
    * @param {number} artifactId

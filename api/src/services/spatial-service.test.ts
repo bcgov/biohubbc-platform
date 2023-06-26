@@ -4,6 +4,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SYSTEM_ROLE } from '../constants/roles';
+import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { UserObject } from '../models/user';
 import {
   IGetSecurityTransformRecord,
@@ -15,6 +16,7 @@ import {
   SpatialRepository
 } from '../repositories/spatial-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { Srid3005 } from './geo-service';
 import { SpatialService } from './spatial-service';
 import { UserService } from './user-service';
 
@@ -653,6 +655,30 @@ describe('SpatialService', () => {
         expect(repo).to.be.calledOnce;
         expect(response).to.be.eql([]);
       });
+    });
+  });
+
+  describe('getGeometryAsWktFromBoundarySpatialComponentBySubmissionId', () => {
+    it('returns a geometry WKT string', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const spatialService = new SpatialService(mockDBConnection);
+
+      const submissionId = 1;
+
+      const mockResponse = { geometry: 'POLYGON(123,456,789)' };
+
+      const repo = sinon
+        .stub(SpatialRepository.prototype, 'getGeometryAsWktFromBoundarySpatialComponentBySubmissionId')
+        .resolves(mockResponse);
+
+      const response = await spatialService.getGeometryAsWktFromBoundarySpatialComponentBySubmissionId(
+        submissionId,
+        SPATIAL_COMPONENT_TYPE.BOUNDARY_CENTROID,
+        Srid3005
+      );
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(mockResponse);
     });
   });
 });

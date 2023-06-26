@@ -160,7 +160,7 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           fontSize: '0.9rem',
-          border: 0,
+          borderWidth: 0,
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
             fontWeight: 700,
