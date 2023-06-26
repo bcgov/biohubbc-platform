@@ -98,7 +98,7 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
 
                 <MenuItem
                   onClick={() => {
-                    console.log('Delete artifact not implemented yet.');
+                    props.onDelete([props.artifact.uuid]);
                     handleClose();
                   }}
                   data-testid="attachment-action-menu-delete">
