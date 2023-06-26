@@ -16,12 +16,12 @@ interface IAttachmentItemMenuButtonProps {
   isPendingReview: boolean;
 }
 
-const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (props) => {
+const AttachmentItemMenuButton = (props: IAttachmentItemMenuButtonProps) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const canDownload =
     props.hasAdministrativePermissions ||
-    props.artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED;
+    props.artifact.supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.UNSECURED;
 
   const handleClick = (event: any) => {
     setAnchorEl(event.currentTarget);

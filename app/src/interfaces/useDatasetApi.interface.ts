@@ -16,7 +16,8 @@ export interface IArtifact {
   update_user: number | null;
   uuid: string;
   supplementaryData: {
-    persecutionAndHarm: SECURITY_APPLIED_STATUS;
+    persecutionAndHarmStatus: SECURITY_APPLIED_STATUS;
+    persecutionAndHarmRules: number[]; // @TODO
   };
 }
 

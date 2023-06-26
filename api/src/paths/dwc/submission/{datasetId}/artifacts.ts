@@ -5,6 +5,7 @@ import { defaultErrorResponses } from '../../../../openapi/schemas/http-response
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
 import { getLogger } from '../../../../utils/logger';
+import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 
 const defaultLog = getLogger('paths/dwc/submission/{datasetId}/artifacts');
 
@@ -96,11 +97,28 @@ GET.apiDoc = {
                 },
                 supplementaryData: {
                   type: 'object',
-                  required: ['persecutionAndHarm'],
+                  required: ['persecutionAndHarmRules', 'persecutionAndHarmStatus'],
                   properties: {
-                    persecutionAndHarm: {
+                    persecutionAndHarmStatus: {
                       type: 'string',
                       enum: ['SECURED', 'UNSECURED', 'PENDING']
+                    },
+                    persecutionAndHarmRules: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          artifact_id: {
+                            type: 'integer'
+                          },
+                          artifact_persecution_id: {
+                            type: 'integer'
+                          },
+                          persecution_or_harm_id: {
+                            type: 'integer'
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -134,12 +152,22 @@ export function getArtifactsByDatasetId(): RequestHandler {
       const artifacts = await artifactService.getArtifactsByDatasetId(datasetId);
 
       const artifactsWithRules = await Promise.all(
-        artifacts.map(async (artifact) => {
-          const appliedSecurity = await securityService.getSecurityAppliedStatus(artifact.artifact_id);
-          return {
-            ...artifact,
-            supplementaryData: { persecutionAndHarm: appliedSecurity }
-          };
+        artifacts.map((artifact) => {
+          return securityService.getPersecutionAndHarmRulesByArtifactId(artifact.artifact_id).then((persecutionAndHarmRules) => {
+            const persecutionAndHarmStatus = artifact.security_review_timestamp === null
+              ? SECURITY_APPLIED_STATUS.PENDING
+              : (
+                persecutionAndHarmRules.length > 0 ? SECURITY_APPLIED_STATUS.SECURED : SECURITY_APPLIED_STATUS.UNSECURED
+              );
+
+            return {
+              ...artifact,
+              supplementaryData: {
+                persecutionAndHarmRules,
+                persecutionAndHarmStatus
+              }
+            }
+          });
         })
       );
 
