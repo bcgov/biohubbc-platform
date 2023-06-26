@@ -47,9 +47,10 @@ POST.apiDoc = {
             artifactUUIDs: {
               type: 'array',
               items: {
-                type: 'string'
+                type: 'string',
+                format: 'uuid'
               },
-              minLength: 1
+              minItems: 1
             }
           }
         }
