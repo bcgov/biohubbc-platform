@@ -1,4 +1,4 @@
-import { mdiDotsVertical, mdiLockOutline, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiDotsVertical, mdiLockOutline, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -12,6 +12,7 @@ interface IAttachmentItemMenuButtonProps {
   artifact: IArtifact;
   onDownload: (artifact: IArtifact) => void;
   onRequestAccess: (artifact: IArtifact) => void;
+  onApplySecurity: (artifact: IArtifact) => void;
   hasAdministrativePermissions: boolean;
   isPendingReview: boolean;
 }
@@ -81,17 +82,31 @@ const AttachmentItemMenuButton = (props: IAttachmentItemMenuButtonProps) => {
             )}
 
             {props.hasAdministrativePermissions && (
-              <MenuItem
-                onClick={() => {
-                  console.log('Delete artifact not implemented yet.');
-                  handleClose();
-                }}
-                data-testid="attachment-action-menu-delete">
-                <ListItemIcon>
-                  <Icon path={mdiTrashCanOutline} size={0.8} />
-                </ListItemIcon>
-                Delete Document
-              </MenuItem>
+              <>
+                <MenuItem
+                  onClick={() => {
+                    props.onApplySecurity(props.artifact);
+                    setAnchorEl(null);
+                  }}
+                  data-testid="attachment-action-menu-download">
+                  <ListItemIcon>
+                    <Icon path={mdiLockPlus} size={0.875} />
+                  </ListItemIcon>
+                  Apply Security to Document
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    console.log('Delete artifact not implemented yet.');
+                    handleClose();
+                  }}
+                  data-testid="attachment-action-menu-delete">
+                  <ListItemIcon>
+                    <Icon path={mdiTrashCanOutline} size={0.8} />
+                  </ListItemIcon>
+                  Delete Document
+                </MenuItem>
+              </>
             )}
           </Menu>
         </Box>

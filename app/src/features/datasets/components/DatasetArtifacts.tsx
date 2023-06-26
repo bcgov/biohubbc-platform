@@ -7,7 +7,7 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SYSTEM_ROLE } from 'constants/roles';
@@ -56,6 +56,8 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     null
   );
 
+  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
+
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
 
@@ -72,6 +74,11 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   ).length;
 
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
+
+  const handleApplySecurity = (artifact: IArtifact) => {
+    setSelectedArtifacts([artifact]);
+    setOpenApplySecurity(true);
+  };
 
   const handleDownloadAttachment = async (attachment: IArtifact) => {
     const signedUrl = await biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id);
@@ -135,6 +142,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             artifact={params.row}
             onDownload={handleDownloadAttachment}
             onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection(artifact.artifact_id)}
+            onApplySecurity={handleApplySecurity}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />
@@ -160,6 +168,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
         onClose={() => {
           setOpenApplySecurity(false);
           artifactsDataLoader.refresh();
+
+          setSelectedArtifacts([]);
+          setRowSelectionModel([]);
         }}
       />
 
@@ -216,8 +227,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             slots={{
               noRowsOverlay: NoArtifactRowsOverlay
             }}
-            onRowSelectionModelChange={(params) => {
-              const selectedArtifacts = params.map((rowId) => {
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={(newRowSelectionModel) => {
+              const selectedArtifacts = newRowSelectionModel.map((rowId) => {
                 const findArtifact = artifactsList.find((artifact) => artifact.artifact_id === rowId);
                 if (findArtifact === undefined) {
                   throw Error('Artifact not found');
@@ -229,6 +241,8 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
               if (selectedArtifacts) {
                 setSelectedArtifacts(selectedArtifacts);
               }
+
+              setRowSelectionModel(newRowSelectionModel);
             }}
           />
         </Box>
