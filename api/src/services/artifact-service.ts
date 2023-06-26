@@ -174,7 +174,6 @@ export class ArtifactService extends DBService {
 
     // tracking delete marker to roll back S3 delete incase of an error
     let deleteMarker: string | undefined;
-    const service = new SecurityRepository(this.connection);
     const artifact = await this.artifactRepository.getArtifactByUUID(uuid);
 
     if (artifact) {
@@ -182,7 +181,9 @@ export class ArtifactService extends DBService {
         const deleteResponse = await deleteFileFromS3(artifact.key);
         deleteMarker = deleteResponse?.VersionId;
 
+        const service = new SecurityRepository(this.connection);
         await service.deleteSecurityRulesForArtifactUUID(uuid);
+
         await this.artifactRepository.deleteArtifactByUUID(uuid);
       } catch (error) {
         if (deleteMarker) {
