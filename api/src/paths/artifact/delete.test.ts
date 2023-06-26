@@ -52,9 +52,36 @@ describe.only('delete artifact', () => {
       });
     });
 
-    describe.only('response validation', () => {
+    describe('response validation', () => {
       const responseValidator = new OpenAPIResponseValidator(POST.apiDoc as unknown as OpenAPIResponseValidatorArgs);
-      describe('should throw an error', () => {});
+      describe('should throw an error', () => {
+        it('has null value', async () => {
+          const apiResponse = null;
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal('must be object');
+        });
+
+        it('returning wrong response', async () => {
+          const apiResponse = { wrong_property: 1 };
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response.message).to.equal('The response was not valid.');
+          expect(response.errors[0].message).to.equal("must have required property 'success'");
+        });
+      });
+
+      describe('responders properly', () => {
+        it('has valid values', async () => {
+          const apiResponse = {
+            success: true
+          };
+          const response = responseValidator.validateResponse(200, apiResponse);
+
+          expect(response).to.equal(undefined);
+        });
+      });
     });
   });
   // let actualResult: any = null;

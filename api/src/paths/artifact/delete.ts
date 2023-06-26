@@ -64,6 +64,7 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
+            required: ['success'],
             properties: {
               success: {
                 type: 'boolean',
