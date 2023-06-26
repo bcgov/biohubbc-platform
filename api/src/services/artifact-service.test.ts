@@ -234,9 +234,31 @@ describe('ArtifactService', () => {
     });
   });
 
-  describe('deleteArtifacts', () => {});
+  describe('deleteArtifacts', () => {
+    it('should work with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+      const deleteStub = sinon.stub(ArtifactService.prototype, 'deleteArtifact').resolves();
+      await artifactService.deleteArtifacts(['uuid', 'uuid2']);
 
-  describe.only('deleteArtifact', () => {
+      expect(deleteStub).to.be.calledTwice;
+    });
+
+    it('should throw an error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+      sinon.stub(ArtifactService.prototype, 'deleteArtifact').rejects('Oops');
+
+      try {
+        await artifactService.deleteArtifacts(['uuid', 'uuid2']);
+        expect.fail();
+      } catch (error: any) {
+        expect(error.message).to.be.eql('There was an issue deleting an artifact.');
+      }
+    });
+  });
+
+  describe('deleteArtifact', () => {
     it('works with valid data', async () => {
       const mockDBConnection = getMockDBConnection();
       const mockS3Client = new AWS.S3();
