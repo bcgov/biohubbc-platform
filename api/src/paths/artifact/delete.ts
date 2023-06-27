@@ -97,6 +97,7 @@ export function deleteArtifact(): RequestHandler {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
     let connection: IDBConnection;
     let success = true;
+
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
     if (sourceSystem) {
       connection = getServiceAccountDBConnection(sourceSystem);
@@ -109,11 +110,10 @@ export function deleteArtifact(): RequestHandler {
       const service = new ArtifactService(connection);
 
       await service.deleteArtifacts(req.body.artifactUUIDs);
-    } catch (error) {
+    } catch (error: any) {
       defaultLog.error({ label: 'deleteArtifact', message: 'error', error });
       success = false;
       await connection.rollback();
-      throw error;
     } finally {
       connection.release();
       res.status(200).json({ success });

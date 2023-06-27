@@ -5,12 +5,14 @@ import OpenAPIResponseValidator, { OpenAPIResponseValidatorArgs } from 'openapi-
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
-import { getMockDBConnection } from '../../__mocks__/db';
-import { POST } from './delete';
+import { ArtifactService } from '../../services/artifact-service';
+import * as keycloakUtils from '../../utils/keycloak-utils';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
+import { deleteArtifact, POST } from './delete';
 
 chai.use(sinonChai);
 
-describe.only('delete artifact', () => {
+describe('delete artifact', () => {
   describe('openApiSchema', () => {
     describe('request validation', () => {
       const requestValidator = new OpenAPIRequestValidator(POST.apiDoc as unknown as OpenAPIRequestValidatorArgs);
@@ -84,33 +86,46 @@ describe.only('delete artifact', () => {
       });
     });
   });
-  // let actualResult: any = null;
-
-  // const sampleRes = {
-  //   status: () => {
-  //     return {
-  //       json: (result: any) => {
-  //         actualResult = result;
-  //       }
-  //     };
-  //   }
-  // };
 
   describe('deleteArtifact', () => {
     afterEach(() => {
       sinon.restore();
     });
 
-    it('should return a success object', async () => {});
-    it('should catch and re throw an error', async () => {
+    it('catches and responds', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      // const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      // sinon.stub(keycloackUtils, 'getKeycloakSource').resolves(true);
-      // const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      // mockReq.body = {
-      //   artifactUUIDs: ['UUID-TO-DELETE']
-      // };
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(false);
+      sinon.stub(ArtifactService.prototype, 'deleteArtifacts').throws('There was an issue deleting an artifact.');
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        artifactUUIDs: ['ff84ecfc-046e-4cac-af59-a597047ce63d']
+      };
+      const requestHandler = deleteArtifact();
+
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect(dbConnectionObj.release).to.have.been.calledOnce;
+        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+      }
+    });
+
+    it('responds with proper data', async () => {
+      const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
+      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(false);
+      sinon.stub(ArtifactService.prototype, 'deleteArtifacts').resolves();
+      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+      mockReq.body = {
+        artifactUUIDs: ['ff84ecfc-046e-4cac-af59-a597047ce63d']
+      };
+      const requestHandler = deleteArtifact();
+
+      await requestHandler(mockReq, mockRes, mockNext);
+      expect(dbConnectionObj.release).to.have.been.calledOnce;
+      expect(dbConnectionObj.rollback).to.have.not.been.calledOnce;
     });
   });
 });
