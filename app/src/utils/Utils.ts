@@ -326,7 +326,7 @@ export const getTitle = (pageName?: string) => {
  * @example p(2, 'apple'); // => 'apples'
  * @example p(null, 'orange'); // => 'oranges'
  * @example p(1, 'banana'); // => 'banana'
- * @example p(10 'berr', 'y', 'ies'); // => 'berries'
+ * @example p(10, 'berr', 'y', 'ies'); // => 'berries'
  *
  * @param quantity The quantity used to infer plural or singular
  * @param word The word to pluralize

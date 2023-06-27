@@ -7,7 +7,6 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { Artifact } from '../../../../repositories/artifact-repository';
-import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
@@ -80,7 +79,10 @@ describe('getArtifactsByDatasetId', () => {
         submission_id: 1,
         title: 'Report 2',
         uuid: '374c4d6a-3a04-405b-af6d-b6497800a691',
-        supplementaryData: { persecutionAndHarm: 'SECURED' }
+        supplementaryData: {
+          persecutionAndHarmStatus: 'SECURED',
+          persecutionAndHarmRules: []
+        }
       };
       describe('should throw an error when', () => {
         it('returns a null response', async () => {
@@ -195,7 +197,10 @@ describe('getArtifactsByDatasetId', () => {
               submission_id: 1,
               title: 'Test Report',
               uuid: '374c4d6a-3a04-405b-af6d-b6497800a691',
-              supplementaryData: { persecutionAndHarm: 'SECURED' }
+              supplementaryData: {
+                persecutionAndHarmStatus: 'SECURED',
+                persecutionAndHarmRules: []
+              }
             }
           ];
           const response = responseValidator.validateResponse(200, apiResponse);
@@ -214,8 +219,8 @@ describe('getArtifactsByDatasetId', () => {
       .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
 
     const securityServiceStub = sinon
-      .stub(SecurityService.prototype, 'getSecurityAppliedStatus')
-      .resolves(SECURITY_APPLIED_STATUS.SECURED);
+      .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+      .resolves([]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -231,8 +236,14 @@ describe('getArtifactsByDatasetId', () => {
     expect(artifactServiceStub).to.be.calledWith('abcd');
     expect(securityServiceStub).to.be.calledTwice;
     expect(mockRes.jsonValue).to.eql([
-      { artifact_id: 1, supplementaryData: { persecutionAndHarm: 'SECURED' } },
-      { artifact_id: 2, supplementaryData: { persecutionAndHarm: 'SECURED' } }
+      { artifact_id: 1, supplementaryData: {
+        persecutionAndHarmStatus: 'UNSECURED',
+        persecutionAndHarmRules: []
+      } },
+      { artifact_id: 2, supplementaryData: {
+        persecutionAndHarmStatus: 'UNSECURED',
+        persecutionAndHarmRules: []
+      } }
     ]);
   });
 
