@@ -13,22 +13,38 @@ import YesNoDialog from 'components/dialog/YesNoDialog';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
 import { useApi } from 'hooks/useApi';
-import { IArtifact } from 'interfaces/useDatasetApi.interface';
+import { IArtifact, IPersecutionAndHarmRule } from 'interfaces/useDatasetApi.interface';
 import React, { useContext, useRef, useState } from 'react';
 import { ISecurityReason } from './SecurityReasonCategory';
-import SecurityReasonSelector, {
-  ISelectSecurityReasonForm,
-  SecurityReasonsYupSchema
-} from './SecurityReasonSelector';
+import SecurityReasonSelector from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
 import { pluralize as p } from 'utils/Utils';
 import LoadingButton from '@mui/lab/LoadingButton';
+import yup from 'utils/YupSchema';
+import useDataLoader from 'hooks/useDataLoader';
 
 export interface IApplySecurityDialog {
   selectedArtifacts: IArtifact[];
   open: boolean;
   onClose: () => void;
 }
+
+export interface ISelectSecurityReasonForm {
+  securityReasons: ISecurityReason[];
+}
+
+export const SecurityReasonsYupSchema = yup.object().shape({
+  securityReasons: yup.array().of(
+    yup.object().shape({
+      name: yup.string(),
+      description: yup.string(),
+      category: yup.string(),
+      id: yup.number(),
+      type_id: yup.number(),
+      wldtaxonomic_units_id: yup.number()
+    })
+  )
+});
 
 /**
  * Publish button.
@@ -37,18 +53,52 @@ export interface IApplySecurityDialog {
  */
 const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const { selectedArtifacts, open, onClose } = props;
+
+  const [yesNoDialogOpen, setYesNoDialogOpen] = useState<boolean>(false);
+  const [isPendingApplySecurity, setIsPendingApplySecurity] = useState<boolean>(false);
+  const [isPendingUnapplySecurity, setIsPendingUnapplySecurity] = useState<boolean>(false);
+  const [formikRef] = useState(useRef<FormikProps<any>>(null));
   
   const biohubApi = useApi();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
   const dialogContext = useContext(DialogContext);
 
-  const [yesNoDialogOpen, setYesNoDialogOpen] = useState<boolean>(false);
-  const [isPendingApplySecurity, setIsPendingApplySecurity] = useState<boolean>(false);
-  const [isPendingUnapplySecurity, setIsPendingUnapplySecurity] = useState<boolean>(false);
-  const [formikRef] = useState(useRef<FormikProps<any>>(null));
+  const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
+  persecutionHarmDataLoader.load();
 
-  const initialSecurityReasons: ISecurityReason[] = [];
+  const persecutionHarmRules: ISecurityReason[] = (persecutionHarmDataLoader.data || []).map((rule) => {
+    return {
+      category: 'Persecution or Harm',
+      name: rule.name,
+      description: rule.description,
+      id: rule.persecution_or_harm_id,
+      type_id: rule.persecution_or_harm_type_id,
+      wldtaxonomic_units_id: rule.wldtaxonomic_units_id
+    }
+  });
+
+  const initialSecurityReasons: ISecurityReason[] = props.selectedArtifacts
+    // Find IDs of all applied security reasons
+    .reduce((securityRuleIds: number[], artifact: IArtifact) => {
+      const appliedSecurityReasons = artifact
+        .supplementaryData
+        .persecutionAndHarmRules
+        .map((rule: IPersecutionAndHarmRule) => rule.persecution_or_harm_id);
+
+      return [...securityRuleIds, ...appliedSecurityReasons];
+    }, [])
+
+    // Filter duplicate IDs
+    .filter((value, index, array) => array.indexOf(value) === index)
+
+    // Map IDs to security rules
+    .map((securityRuleId: number) => {
+      return persecutionHarmRules.find((persecutionAndHarmRule) => persecutionAndHarmRule.id === securityRuleId)
+    })
+
+    // Filter missing security rules
+    .filter((value): value is ISecurityReason => Boolean(value));
 
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
@@ -169,7 +219,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
 
                 <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
 
-                <SecurityReasonSelector />
+                <SecurityReasonSelector securityReasons={persecutionHarmRules} />
               </DialogContent>
               <Divider />
               <DialogActions>
