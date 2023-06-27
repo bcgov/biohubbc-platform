@@ -216,7 +216,10 @@ describe('getArtifactsByDatasetId', () => {
 
     const artifactServiceStub = sinon
       .stub(ArtifactService.prototype, 'getArtifactsByDatasetId')
-      .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
+      .resolves([
+        { artifact_id: 1, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') },
+        { artifact_id: 2, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') }
+      ] as Artifact[]);
 
     const securityServiceStub = sinon
       .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
@@ -238,6 +241,7 @@ describe('getArtifactsByDatasetId', () => {
     expect(mockRes.jsonValue).to.eql([
       {
         artifact_id: 1,
+        security_review_timestamp: new Date('1970-01-01T00:00:00.000Z'),
         supplementaryData: {
           persecutionAndHarmStatus: 'UNSECURED',
           persecutionAndHarmRules: []
@@ -245,6 +249,7 @@ describe('getArtifactsByDatasetId', () => {
       },
       {
         artifact_id: 2,
+        security_review_timestamp: new Date('1970-01-01T00:00:00.000Z'),
         supplementaryData: {
           persecutionAndHarmStatus: 'UNSECURED',
           persecutionAndHarmRules: []
