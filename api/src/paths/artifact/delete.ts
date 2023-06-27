@@ -29,7 +29,8 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Deletes artifacts.',
+  description:
+    'Deletes artifacts. This will always return an object { success: boolean } to indicate if the deletion was successful or not.',
   tags: ['artifact'],
   security: [
     {
@@ -68,7 +69,7 @@ POST.apiDoc = {
             properties: {
               success: {
                 type: 'boolean',
-                description: 'A boolean indicating if the delete action successfully completed.'
+                description: 'A boolean indicating if the delete action was successful or not.'
               }
             }
           }
@@ -88,7 +89,9 @@ POST.apiDoc = {
 };
 
 /**
- * Get taxonomic search results.
+ * Deletes artifacts for a given array of UUIDs.
+ * This will always respond with a JSON object {success: boolean} indicating
+ * if the artifacts have been successfully removed or not
  *
  * @returns {RequestHandler}
  */
