@@ -103,13 +103,10 @@ describe('delete artifact', () => {
       };
       const requestHandler = deleteArtifact();
 
-      try {
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (actualError) {
-        expect(dbConnectionObj.release).to.have.been.calledOnce;
-        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
-      }
+      await requestHandler(mockReq, mockRes, mockNext);
+
+      expect(dbConnectionObj.release).to.have.been.calledOnce;
+      expect(dbConnectionObj.rollback).to.have.been.calledOnce;
     });
 
     it('responds with proper data', async () => {
