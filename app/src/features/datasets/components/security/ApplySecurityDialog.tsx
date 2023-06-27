@@ -1,5 +1,6 @@
 import { mdiInformationOutline, mdiLock } from '@mdi/js';
 import Icon from '@mdi/react';
+import LoadingButton from '@mui/lab/LoadingButton';
 import { Box, Divider, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -13,15 +14,14 @@ import YesNoDialog from 'components/dialog/YesNoDialog';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
 import { useApi } from 'hooks/useApi';
+import useDataLoader from 'hooks/useDataLoader';
 import { IArtifact, IPersecutionAndHarmRule } from 'interfaces/useDatasetApi.interface';
 import React, { useContext, useRef, useState } from 'react';
+import { pluralize as p } from 'utils/Utils';
+import yup from 'utils/YupSchema';
 import { ISecurityReason } from './SecurityReasonCategory';
 import SecurityReasonSelector from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
-import { pluralize as p } from 'utils/Utils';
-import LoadingButton from '@mui/lab/LoadingButton';
-import yup from 'utils/YupSchema';
-import useDataLoader from 'hooks/useDataLoader';
 
 export interface IApplySecurityDialog {
   selectedArtifacts: IArtifact[];
@@ -58,7 +58,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const [isPendingApplySecurity, setIsPendingApplySecurity] = useState<boolean>(false);
   const [isPendingUnapplySecurity, setIsPendingUnapplySecurity] = useState<boolean>(false);
   const [formikRef] = useState(useRef<FormikProps<any>>(null));
-  
+
   const biohubApi = useApi();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
@@ -67,7 +67,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
   persecutionHarmDataLoader.load();
 
-  const persecutionHarmRules: ISecurityReason[] = (persecutionHarmDataLoader.data || []).map((rule) => {
+  const persecutionHarmRules: ISecurityReason[] = (persecutionHarmDataLoader.data ?? []).map((rule) => {
     return {
       category: 'Persecution or Harm',
       name: rule.name,
@@ -75,16 +75,15 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
       id: rule.persecution_or_harm_id,
       type_id: rule.persecution_or_harm_type_id,
       wldtaxonomic_units_id: rule.wldtaxonomic_units_id
-    }
+    };
   });
 
   const initialSecurityReasons: ISecurityReason[] = props.selectedArtifacts
     // Find IDs of all applied security reasons
     .reduce((securityRuleIds: number[], artifact: IArtifact) => {
-      const appliedSecurityReasons = artifact
-        .supplementaryData
-        .persecutionAndHarmRules
-        .map((rule: IPersecutionAndHarmRule) => rule.persecution_or_harm_id);
+      const appliedSecurityReasons = artifact.supplementaryData.persecutionAndHarmRules.map(
+        (rule: IPersecutionAndHarmRule) => rule.persecution_or_harm_id
+      );
 
       return [...securityRuleIds, ...appliedSecurityReasons];
     }, [])
@@ -94,7 +93,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
 
     // Map IDs to security rules
     .map((securityRuleId: number) => {
-      return persecutionHarmRules.find((persecutionAndHarmRule) => persecutionAndHarmRule.id === securityRuleId)
+      return persecutionHarmRules.find((persecutionAndHarmRule) => persecutionAndHarmRule.id === securityRuleId);
     })
 
     // Filter missing security rules
@@ -111,11 +110,10 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
       setIsPendingUnapplySecurity(true);
     }
 
-    return biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, values.securityReasons)
-      .finally(() => {
-        setIsPendingApplySecurity(false);
-        setIsPendingUnapplySecurity(false);
-      });
+    return biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, values.securityReasons).finally(() => {
+      setIsPendingApplySecurity(false);
+      setIsPendingUnapplySecurity(false);
+    });
   };
 
   const handleShowSnackBar = (message: string) => {
@@ -157,15 +155,17 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
             return handleSubmit(values)
               .then(() => {
                 handleShowSnackBar(
-                  `You successfully applied security reasons to ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
+                  `You successfully applied security reasons to ${selectedArtifacts.length} ${p(
+                    selectedArtifacts.length,
+                    'file'
+                  )}.`
                 );
                 onClose();
               })
               .catch(() => {
                 // @TODO show an error dialog
                 throw new Error('Failed to apply security to the selected documents. Please try again.');
-              })
-            
+              });
           }}>
           {(formikProps) => (
             <>
@@ -214,7 +214,10 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
               <DialogTitle id="component-dialog-title">Apply Security Reasons</DialogTitle>
               <DialogContent sx={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <DialogContentText id="alert-dialog-description">
-                  {`Search for the security reasons and apply them to the selected ${p(selectedArtifacts.length, 'document')}`}
+                  {`Search for the security reasons and apply them to the selected ${p(
+                    selectedArtifacts.length,
+                    'document'
+                  )}`}
                 </DialogContentText>
 
                 <SelectedDocumentsDataset selectedArtifacts={selectedArtifacts} />
@@ -245,7 +248,12 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                   disabled={isPendingApplySecurity}>
                   No Security Required
                 </Button>
-                <Button onClick={onClose} color="primary" variant="outlined" autoFocus disabled={isPendingApplySecurity}>
+                <Button
+                  onClick={onClose}
+                  color="primary"
+                  variant="outlined"
+                  autoFocus
+                  disabled={isPendingApplySecurity}>
                   Cancel
                 </Button>
               </DialogActions>

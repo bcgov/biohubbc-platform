@@ -434,7 +434,7 @@ describe('pluralize', () => {
     const response = pluralize(10, 'berr', 'y', 'ies');
     expect(response).toEqual('berries');
   });
-  
+
   it('does not pluralize a word with a custom suffix and single quantity', () => {
     const response = pluralize(1, 'berr', 'y', 'ies');
     expect(response).toEqual('berry');

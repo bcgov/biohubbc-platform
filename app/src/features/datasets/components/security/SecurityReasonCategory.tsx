@@ -34,10 +34,6 @@ const SecurityReasonCategory = (props: ISecurityReasonCategoryProps) => {
 
   const [open, setOpen] = useState(true);
 
-  const sortedSecurityReasons = securityReasons.sort((a, b) => {
-    return a.name.localeCompare(b.name);
-  });
-
   return (
     <Box px={2}>
       <Box m={1} sx={{ display: 'flex' }}>
@@ -56,25 +52,27 @@ const SecurityReasonCategory = (props: ISecurityReasonCategoryProps) => {
           name="securityReasons"
           render={(arrayHelpers) => (
             <>
-              {sortedSecurityReasons.map((securityReason) => {
-                return (
-                  <Box key={securityReason.name} py={0.5}>
-                    <SecurityReason
-                      securityReason={{ ...securityReason, category: categoryName }}
-                      onClick={() => {
-                        if (
-                          !arrayHelpers.form.values.securityReasons.find(
-                            (sr: ISecurityReason) => sr.name === securityReason.name
-                          )
-                        ) {
-                          arrayHelpers.push({ ...securityReason, category: categoryName });
-                        }
-                      }}
-                      isSelected={false}
-                    />
-                  </Box>
-                );
-              })}
+              {securityReasons
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((securityReason) => {
+                  return (
+                    <Box key={securityReason.name} py={0.5}>
+                      <SecurityReason
+                        securityReason={{ ...securityReason, category: categoryName }}
+                        onClick={() => {
+                          if (
+                            !arrayHelpers.form.values.securityReasons.find(
+                              (sr: ISecurityReason) => sr.name === securityReason.name
+                            )
+                          ) {
+                            arrayHelpers.push({ ...securityReason, category: categoryName });
+                          }
+                        }}
+                        isSelected={false}
+                      />
+                    </Box>
+                  );
+                })}
             </>
           )}
         />

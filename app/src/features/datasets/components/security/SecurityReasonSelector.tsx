@@ -3,8 +3,8 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { FieldArray, useFormikContext } from 'formik';
-import SecurityReasonCategory, { ISecurityReason, SecurityReason } from './SecurityReasonCategory';
 import { ISelectSecurityReasonForm } from './ApplySecurityDialog';
+import SecurityReasonCategory, { ISecurityReason, SecurityReason } from './SecurityReasonCategory';
 
 /**
  * Security Reason Selector for security application.
@@ -12,7 +12,7 @@ import { ISelectSecurityReasonForm } from './ApplySecurityDialog';
  * @return {*}
  */
 const SecurityReasonSelector = (props: ISelectSecurityReasonForm) => {
-  const { securityReasons } = props
+  const { securityReasons } = props;
   const { values, setFieldValue } = useFormikContext<ISelectSecurityReasonForm>();
 
   return (

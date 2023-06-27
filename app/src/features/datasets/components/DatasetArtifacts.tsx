@@ -16,8 +16,8 @@ import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
-import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import { downloadFile, getFormattedDate, getFormattedFileSize, pluralize as p } from 'utils/Utils';
+import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
 

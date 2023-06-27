@@ -20,8 +20,8 @@ import { truncate } from 'lodash';
 import qs from 'qs';
 import { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
-import SearchComponent from './SearchComponent';
 import { pluralize as p } from 'utils/Utils';
+import SearchComponent from './SearchComponent';
 
 const useStyles = makeStyles((theme: Theme) => ({
   searchResultTitle: {

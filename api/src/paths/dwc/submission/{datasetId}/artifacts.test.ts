@@ -236,14 +236,20 @@ describe('getArtifactsByDatasetId', () => {
     expect(artifactServiceStub).to.be.calledWith('abcd');
     expect(securityServiceStub).to.be.calledTwice;
     expect(mockRes.jsonValue).to.eql([
-      { artifact_id: 1, supplementaryData: {
-        persecutionAndHarmStatus: 'UNSECURED',
-        persecutionAndHarmRules: []
-      } },
-      { artifact_id: 2, supplementaryData: {
-        persecutionAndHarmStatus: 'UNSECURED',
-        persecutionAndHarmRules: []
-      } }
+      {
+        artifact_id: 1,
+        supplementaryData: {
+          persecutionAndHarmStatus: 'UNSECURED',
+          persecutionAndHarmRules: []
+        }
+      },
+      {
+        artifact_id: 2,
+        supplementaryData: {
+          persecutionAndHarmStatus: 'UNSECURED',
+          persecutionAndHarmRules: []
+        }
+      }
     ]);
   });
 
