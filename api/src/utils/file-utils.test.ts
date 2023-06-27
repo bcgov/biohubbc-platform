@@ -201,7 +201,8 @@ describe('file-utils', () => {
       expect(deleteObjectStub).to.have.been.calledOnce;
       expect(deleteObjectStub).to.have.been.calledWith({
         Bucket: 'object-store-bucket-name',
-        Key: 'my-delete-key'
+        Key: 'my-delete-key',
+        VersionId: undefined
       });
       expect(result).to.eql({ DeleteMarker: true });
     });
