@@ -1,9 +1,8 @@
-import { mdiArrowDown, mdiMinus, mdiPlus } from '@mdi/js';
+import { mdiArrowDown, mdiArrowUp, mdiMinus, mdiPlus } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Collapse, Divider, IconButton, Paper, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import { FieldArray } from 'formik';
-import { IPersecutionHarmRule } from 'interfaces/useSecurityApi.interface';
 import { useState } from 'react';
 
 export interface ISecurityReason {
@@ -15,31 +14,13 @@ export interface ISecurityReason {
   category: string;
 }
 
-export class SecurityReasonClass implements ISecurityReason {
-  name: string;
-  id: number;
-  type_id: number;
-  wldtaxonomic_units_id: number;
-  description: string | null;
-  category: string;
-
-  constructor(props: IPersecutionHarmRule, category: string) {
-    this.name = props.name;
-    this.description = props.description;
-    this.category = category;
-    this.id = props.persecution_or_harm_id;
-    this.type_id = props.persecution_or_harm_type_id;
-    this.wldtaxonomic_units_id = props.wldtaxonomic_units_id;
-  }
-}
-
-export interface SecurityReasonProps {
+export interface ISecurityReasonProps {
   securityReason: ISecurityReason;
-  onClickSecurityReason: (securityReason: ISecurityReason) => void;
-  icon: string;
+  onClick: (securityReason: ISecurityReason) => void;
+  isSelected: boolean;
 }
 
-export interface SecurityReasonCategoryProps {
+export interface ISecurityReasonCategoryProps {
   categoryName: string;
   securityReasons: ISecurityReason[];
 }
@@ -48,10 +29,10 @@ export interface SecurityReasonCategoryProps {
  *
  * @return {*}
  */
-const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) => {
+const SecurityReasonCategory = (props: ISecurityReasonCategoryProps) => {
   const { categoryName, securityReasons } = props;
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const sortedSecurityReasons = securityReasons.sort((a, b) => {
     return a.name.localeCompare(b.name);
@@ -65,7 +46,7 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
         </Typography>
         <Box>
           <IconButton onClick={() => setOpen(!open)} color="primary" aria-label="dropdown arrow" component="label">
-            <Icon path={mdiArrowDown} size={1} />
+            <Icon path={open ? mdiArrowUp : mdiArrowDown} size={1} />
           </IconButton>
         </Box>
       </Box>
@@ -80,7 +61,7 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
                   <Box key={securityReason.name} py={0.5}>
                     <SecurityReason
                       securityReason={{ ...securityReason, category: categoryName }}
-                      onClickSecurityReason={() => {
+                      onClick={() => {
                         if (
                           !arrayHelpers.form.values.securityReasons.find(
                             (sr: ISecurityReason) => sr.name === securityReason.name
@@ -89,7 +70,7 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
                           arrayHelpers.push({ ...securityReason, category: categoryName });
                         }
                       }}
-                      icon={'add'}
+                      isSelected={false}
                     />
                   </Box>
                 );
@@ -103,8 +84,8 @@ const SecurityReasonCategory: React.FC<SecurityReasonCategoryProps> = (props) =>
   );
 };
 
-export const SecurityReason: React.FC<SecurityReasonProps> = (props) => {
-  const { securityReason, onClickSecurityReason, icon } = props;
+export const SecurityReason = (props: ISecurityReasonProps) => {
+  const { securityReason, onClick, isSelected } = props;
 
   return (
     <Paper elevation={0} variant="outlined">
@@ -117,8 +98,8 @@ export const SecurityReason: React.FC<SecurityReasonProps> = (props) => {
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <IconButton onClick={() => onClickSecurityReason(securityReason)} color="primary" aria-label="add security">
-            <Icon path={icon === 'add' ? mdiPlus : mdiMinus} size={1} />
+          <IconButton onClick={() => onClick(securityReason)} color="primary" aria-label="add security">
+            <Icon path={isSelected ? mdiMinus : mdiPlus} size={1} />
           </IconButton>
         </Box>
       </Box>

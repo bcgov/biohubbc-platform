@@ -66,6 +66,8 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
     });
   };
 
+  console.log({ selectedArtifacts })
+
   return (
     <>
       <Dialog

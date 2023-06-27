@@ -6,7 +6,7 @@ import { FieldArray, useFormikContext } from 'formik';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import yup from 'utils/YupSchema';
-import SecurityReasonCategory, { ISecurityReason, SecurityReason, SecurityReasonClass } from './SecurityReasonCategory';
+import SecurityReasonCategory, { ISecurityReason, SecurityReason } from './SecurityReasonCategory';
 
 export interface ISelectSecurityReasonForm {
   securityReasons: ISecurityReason[];
@@ -40,8 +40,15 @@ const SecurityReasonSelector: React.FC = () => {
     return <></>;
   }
 
-  const persecutionHarmRules = persecutionHarmDataLoader.data.map((rule) => {
-    return new SecurityReasonClass(rule, 'Persecution or Harm');
+  const persecutionHarmRules: ISecurityReason[] = persecutionHarmDataLoader.data.map((rule) => {
+    return {
+      category: 'Persecution or Harm',
+      name: rule.name,
+      description: rule.description,
+      id: rule.persecution_or_harm_id,
+      type_id: rule.persecution_or_harm_type_id,
+      wldtaxonomic_units_id: rule.wldtaxonomic_units_id
+    }
   });
 
   return (
@@ -95,8 +102,8 @@ const SecurityReasonSelector: React.FC = () => {
                       <SecurityReason
                         key={securityReason.id}
                         securityReason={securityReason}
-                        onClickSecurityReason={() => arrayHelpers.remove(index)}
-                        icon="minus"
+                        onClick={() => arrayHelpers.remove(index)}
+                        isSelected={true}
                       />
                     </Box>
                   );
