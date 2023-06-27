@@ -17,11 +17,13 @@ import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import React, { useContext, useRef, useState } from 'react';
 import { ISecurityReason } from './SecurityReasonCategory';
 import SecurityReasonSelector, {
-  SecurityReasonsInitialValues,
+  ISelectSecurityReasonForm,
   SecurityReasonsYupSchema
 } from './SecurityReasonSelector';
 import SelectedDocumentsDataset from './SelectedDocumentsDataset';
 import { pluralize as p } from 'utils/Utils';
+import LoadingButton from '@mui/lab/LoadingButton';
+
 export interface IApplySecurityDialog {
   selectedArtifacts: IArtifact[];
   open: boolean;
@@ -34,23 +36,36 @@ export interface IApplySecurityDialog {
  * @return {*}
  */
 const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
-  const biohubApi = useApi();
   const { selectedArtifacts, open, onClose } = props;
-
+  
+  const biohubApi = useApi();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
-
   const dialogContext = useContext(DialogContext);
-  const [yesNoDialogOpen, setYesNoDialogOpen] = useState(false);
+
+  const [yesNoDialogOpen, setYesNoDialogOpen] = useState<boolean>(false);
+  const [isPendingApplySecurity, setIsPendingApplySecurity] = useState<boolean>(false);
+  const [isPendingUnapplySecurity, setIsPendingUnapplySecurity] = useState<boolean>(false);
+  const [formikRef] = useState(useRef<FormikProps<any>>(null));
+
+  const initialSecurityReasons: ISecurityReason[] = [];
 
   const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
 
-  const [formikRef] = useState(useRef<FormikProps<any>>(null));
+  const handleSubmit = async (values: { securityReasons: ISecurityReason[] }) => {
+    if (values.securityReasons.length > 0) {
+      setIsPendingApplySecurity(true);
+    } else {
+      setIsPendingUnapplySecurity(true);
+    }
 
-  const handleSubmit = async (securityReasons: ISecurityReason[]) => {
-    await biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, securityReasons);
+    return biohubApi.security.applySecurityReasonsToArtifacts(selectedArtifacts, values.securityReasons)
+      .finally(() => {
+        setIsPendingApplySecurity(false);
+        setIsPendingUnapplySecurity(false);
+      });
   };
 
   const handleShowSnackBar = (message: string) => {
@@ -66,8 +81,6 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
     });
   };
 
-  console.log({ selectedArtifacts })
-
   return (
     <>
       <Dialog
@@ -82,31 +95,50 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
             height: '100%'
           }
         }}>
-        <Formik
+        <Formik<ISelectSecurityReasonForm>
           innerRef={formikRef}
-          initialValues={SecurityReasonsInitialValues}
+          initialValues={{
+            securityReasons: initialSecurityReasons
+          }}
           validationSchema={SecurityReasonsYupSchema}
           validateOnBlur={true}
           validateOnChange={false}
-          onSubmit={async (values: { securityReasons: ISecurityReason[] }) => {
-            await handleSubmit(values.securityReasons);
-            handleShowSnackBar(
-              `You successfully applied security reasons to ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
-            );
-            onClose();
+          onSubmit={async (values) => {
+            return handleSubmit(values)
+              .then(() => {
+                handleShowSnackBar(
+                  `You successfully applied security reasons to ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
+                );
+                onClose();
+              })
+              .catch(() => {
+                // @TODO show an error dialog
+                throw new Error('Failed to apply security to the selected documents. Please try again.');
+              })
+            
           }}>
           {(formikProps) => (
             <>
               <YesNoDialog
                 open={yesNoDialogOpen}
                 onClose={() => setYesNoDialogOpen(false)}
-                onYes={async () => {
-                  await formikProps.submitForm();
-                  handleShowSnackBar(
-                    `You successfully unsecured ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
-                  );
-                  setYesNoDialogOpen(false);
+                onYes={() => {
+                  handleSubmit({ securityReasons: [] })
+                    .then(() => {
+                      handleShowSnackBar(
+                        `You successfully unsecured ${selectedArtifacts.length} ${p(selectedArtifacts.length, 'file')}.`
+                      );
+                      onClose();
+                    })
+                    .catch(() => {
+                      // @TODO show an error dialog
+                      throw new Error('Failed to unsecure the selected documents. Please try again.');
+                    })
+                    .finally(() => {
+                      setYesNoDialogOpen(false);
+                    });
                 }}
+                yesButtonProps={{ loading: isPendingUnapplySecurity }}
                 onNo={() => setYesNoDialogOpen(false)}
                 dialogTitle=""
                 dialogText=""
@@ -141,7 +173,8 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
               </DialogContent>
               <Divider />
               <DialogActions>
-                <Button
+                <LoadingButton
+                  loading={isPendingApplySecurity}
                   title="Apply Security Rules"
                   variant="contained"
                   color="primary"
@@ -149,7 +182,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                   startIcon={<Icon path={mdiLock} size={1} />}
                   onClick={formikProps.submitForm}>
                   Apply Security
-                </Button>
+                </LoadingButton>
 
                 <Button
                   title="No Security Required"
@@ -157,12 +190,12 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                   color="primary"
                   startIcon={<Icon path={mdiLock} size={1} />}
                   onClick={() => {
-                    formikProps.setFieldValue('securityReasons', SecurityReasonsInitialValues.securityReasons);
                     setYesNoDialogOpen(true);
-                  }}>
+                  }}
+                  disabled={isPendingApplySecurity}>
                   No Security Required
                 </Button>
-                <Button onClick={onClose} color="primary" variant="outlined" autoFocus>
+                <Button onClick={onClose} color="primary" variant="outlined" autoFocus disabled={isPendingApplySecurity}>
                   Cancel
                 </Button>
               </DialogActions>
