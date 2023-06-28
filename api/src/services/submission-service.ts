@@ -3,6 +3,8 @@ import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
+import { ArtifactRepository } from '../repositories/artifact-repository';
+import { SecurityRepository } from '../repositories/security-repository';
 import {
   IDatasetsForReview,
   IHandlebarsTemplates,
@@ -31,11 +33,15 @@ export type RelatedDataset = z.infer<typeof RelatedDataset>;
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
+  artifactRepository: ArtifactRepository;
+  securityRepository: SecurityRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
+    this.artifactRepository = new ArtifactRepository(connection);
+    this.securityRepository = new SecurityRepository(connection);
   }
 
   /**
@@ -403,6 +409,7 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
+    console.log('my datasetId is: ', datasetId);
     const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (!emlJson) {
@@ -419,13 +426,17 @@ export class SubmissionService extends DBService {
       return [];
     }
 
-    return result[0].value.map((relatedProject: any) => {
+    console.log('result:', result);
+
+    const relatedDatasets = result[0].value.map((relatedProject: any) => {
       return {
         datasetId: relatedProject['@_id'],
         title: relatedProject['title'],
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });
+
+    return relatedDatasets;
   }
 
   /**

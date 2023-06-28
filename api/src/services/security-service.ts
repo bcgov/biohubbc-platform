@@ -272,4 +272,23 @@ export class SecurityService extends DBService {
     const artifact = await this.artifactService.getArtifactById(artifactId);
     return artifact.security_review_timestamp ? false : true;
   }
+
+  /**
+   * Returns true is any artifacts in the dataset are pending review
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<boolean>}
+   * @memberof SecurityService
+   */
+  async isDatasetPendingReview(datasetId: string): Promise<boolean> {
+    const artifactIds = (await this.artifactService.getArtifactsByDatasetId(datasetId)).map((item) => item.artifact_id);
+
+    const artifactSecurityRules = await Promise.all(
+      artifactIds.map(async (artifactId) => await this.isArtifactPendingReview(artifactId))
+    );
+
+    const isPendingReview = artifactSecurityRules.find((item) => item === true) ? true : false;
+
+    return isPendingReview;
+  }
 }

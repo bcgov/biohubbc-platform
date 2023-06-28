@@ -129,7 +129,7 @@ export class ArtifactService extends DBService {
    * @memberof ArtifactService
    */
   async updateArtifactSecurityReviewTimestamp(artifactId: number): Promise<void> {
-    defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
+    defaultLog.debug({ label: 'updateArtifactSecurityReviewTimestamp' });
 
     await this.artifactRepository.updateArtifactSecurityReviewTimestamp(artifactId);
   }
