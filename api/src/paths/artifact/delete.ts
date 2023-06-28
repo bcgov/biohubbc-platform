@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SOURCE_SYSTEM } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
-import { getDBConnection, getServiceAccountDBConnection, IDBConnection } from '../../database/db';
+import { getDBConnection, getServiceAccountDBConnection } from '../../database/db';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
@@ -64,14 +64,8 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            required: ['success'],
-            properties: {
-              success: {
-                type: 'boolean',
-                description: 'A boolean indicating if the delete action was successful or not.'
-              }
-            }
+            type: 'boolean',
+            description: 'A boolean indicating if the delete action was successful or not.'
           }
         }
       }
@@ -98,28 +92,24 @@ POST.apiDoc = {
 export function deleteArtifact(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
-    let connection: IDBConnection;
-    let success = true;
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
-    if (sourceSystem) {
-      connection = getServiceAccountDBConnection(sourceSystem);
-    } else {
-      connection = getDBConnection(req['keycloak_token']);
-    }
+    const connection = sourceSystem
+      ? getServiceAccountDBConnection(sourceSystem)
+      : getDBConnection(req['keycloak_token']);
 
     try {
       await connection.open();
       const service = new ArtifactService(connection);
 
       await service.deleteArtifacts(req.body.artifactUUIDs);
+      res.status(200).json(true);
     } catch (error: any) {
       defaultLog.error({ label: 'deleteArtifact', message: 'error', error });
-      success = false;
       await connection.rollback();
+      throw error;
     } finally {
       connection.release();
-      res.status(200).json({ success });
     }
   };
 }

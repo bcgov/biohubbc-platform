@@ -96,7 +96,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     await downloadFile(signedUrl);
   };
 
-  const handleDeleteArtifact = async (artifactUUIDs: string[]): Promise<{ success: boolean }> => {
+  const handleDeleteArtifact = async (artifactUUIDs: string[]): Promise<boolean> => {
     const data = await biohubApi.artifact.deleteArtifacts(artifactUUIDs);
     artifactsDataLoader.refresh();
 
@@ -223,7 +223,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
         onYes={async () => {
           if (artifactToDelete) {
             const response = await handleDeleteArtifact([artifactToDelete.uuid]);
-            if (response.success) {
+            if (response) {
               handleShowSnackBar(`You successfully deleted ${artifactToDelete.file_name}.`);
             } else {
               setShowErrorDialog(true);
