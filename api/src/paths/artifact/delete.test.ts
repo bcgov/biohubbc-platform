@@ -62,7 +62,7 @@ describe('delete artifact', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal('must be object');
+          expect(response.errors[0].message).to.equal('must be boolean');
         });
 
         it('returning wrong response', async () => {
@@ -70,15 +70,13 @@ describe('delete artifact', () => {
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response.message).to.equal('The response was not valid.');
-          expect(response.errors[0].message).to.equal("must have required property 'success'");
+          expect(response.errors[0].message).to.equal('must be boolean');
         });
       });
 
       describe('responders properly', () => {
         it('has valid values', async () => {
-          const apiResponse = {
-            success: true
-          };
+          const apiResponse = true;
           const response = responseValidator.validateResponse(200, apiResponse);
 
           expect(response).to.equal(undefined);
@@ -92,7 +90,7 @@ describe('delete artifact', () => {
       sinon.restore();
     });
 
-    it('catches and responds', async () => {
+    it('catches and throws error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(false);
@@ -103,10 +101,14 @@ describe('delete artifact', () => {
       };
       const requestHandler = deleteArtifact();
 
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(dbConnectionObj.release).to.have.been.calledOnce;
-      expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (error: any) {
+        expect(error.name).to.be.eql('There was an issue deleting an artifact.');
+        expect(dbConnectionObj.release).to.have.been.calledOnce;
+        expect(dbConnectionObj.rollback).to.have.been.calledOnce;
+      }
     });
 
     it('responds with proper data', async () => {
