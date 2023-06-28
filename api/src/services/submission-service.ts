@@ -3,8 +3,6 @@ import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { ArtifactRepository } from '../repositories/artifact-repository';
-import { SecurityRepository } from '../repositories/security-repository';
 import {
   IDatasetsForReview,
   IHandlebarsTemplates,
@@ -33,15 +31,11 @@ export type RelatedDataset = z.infer<typeof RelatedDataset>;
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
-  artifactRepository: ArtifactRepository;
-  securityRepository: SecurityRepository;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.submissionRepository = new SubmissionRepository(connection);
-    this.artifactRepository = new ArtifactRepository(connection);
-    this.securityRepository = new SecurityRepository(connection);
   }
 
   /**
