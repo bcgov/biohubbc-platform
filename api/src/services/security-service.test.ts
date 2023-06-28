@@ -494,4 +494,70 @@ describe('SecurityService', () => {
       expect(result).to.eql(false);
     });
   });
+
+  describe('isDatasetPendingReview', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return true if the any artifact in the dataset is pending review', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+        {
+          artifact_id: 1,
+          key: 'secured-string-a',
+          security_review_timestamp: null
+        } as Artifact,
+        {
+          artifact_id: 2,
+          key: 'secured-string-b',
+          security_review_timestamp: null
+        } as Artifact
+      ]);
+
+      sinon
+        .stub(SecurityService.prototype, 'isArtifactPendingReview')
+        .onFirstCall()
+        .resolves(true)
+        .onSecondCall()
+        .resolves(false);
+
+      const result = await securityService.isDatasetPendingReview('datasetId');
+
+      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(result).to.eql(true);
+    });
+
+    it('should return false if the no artifact in the dataset is pending review', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+        {
+          artifact_id: 1,
+          key: 'secured-string-a',
+          security_review_timestamp: null
+        } as Artifact,
+        {
+          artifact_id: 2,
+          key: 'secured-string-b',
+          security_review_timestamp: null
+        } as Artifact
+      ]);
+
+      sinon
+        .stub(SecurityService.prototype, 'isArtifactPendingReview')
+        .onFirstCall()
+        .resolves(false)
+        .onSecondCall()
+        .resolves(false);
+
+      const result = await securityService.isDatasetPendingReview('datasetId');
+
+      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(result).to.eql(false);
+    });
+  });
 });

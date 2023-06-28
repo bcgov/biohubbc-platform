@@ -48,7 +48,7 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
   const relatedDatasetsDataLoader = useDataLoader(() => biohubApi.dataset.getRelatedDatasets(datasetId));
   relatedDatasetsDataLoader.load();
 
-  const relatedDatasetsList: IRelatedDataset[] = relatedDatasetsDataLoader.data?.datasetsWithSupplementaryData || [];
+  const relatedDatasetsList: IRelatedDataset[] = relatedDatasetsDataLoader.data?.datasetsWithSupplementaryData ?? [];
 
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
