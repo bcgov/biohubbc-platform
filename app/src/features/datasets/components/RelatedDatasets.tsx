@@ -48,11 +48,8 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
   const relatedDatasetsDataLoader = useDataLoader(() => biohubApi.dataset.getRelatedDatasets(datasetId));
   relatedDatasetsDataLoader.load();
 
-  console.log('relatedDatasetsDataLoader:', relatedDatasetsDataLoader);
-
   const relatedDatasetsList: IRelatedDataset[] = relatedDatasetsDataLoader.data?.datasetsWithSupplementaryData || [];
 
-  console.log('relatedDatasetsList:', relatedDatasetsList);
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
 
   const columns: GridColDef<IRelatedDataset>[] = [
