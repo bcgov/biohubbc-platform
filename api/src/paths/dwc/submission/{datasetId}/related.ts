@@ -105,10 +105,13 @@ export function getRelatedDatasetsByDatasetId(): RequestHandler {
         })
       );
 
+      console.log('datasetsWithSupplementaryData', datasetsWithSupplementaryData);
+
       await connection.commit();
 
       res.status(200).json({ datasetsWithSupplementaryData });
     } catch (error) {
+      console.log('error is: ', error);
       defaultLog.error({ label: 'getRelatedDatasetsByDatasetId', message: 'error', error });
       await connection.rollback();
       throw error;
