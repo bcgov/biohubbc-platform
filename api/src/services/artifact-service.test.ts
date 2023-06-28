@@ -13,11 +13,11 @@ import { SubmissionService } from './submission-service';
 chai.use(sinonChai);
 
 describe('ArtifactService', () => {
-  describe('getNextArtifactIds', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
+  afterEach(() => {
+    sinon.restore();
+  });
 
+  describe('getNextArtifactIds', () => {
     it('should retrieve an array of artifact primary keys', async () => {
       const mockDBConnection = getMockDBConnection();
       const artifactService = new ArtifactService(mockDBConnection);
@@ -76,10 +76,6 @@ describe('ArtifactService', () => {
   });
 
   describe('uploadAndPersistArtifact', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
     const mockDataPackageId = '64f47e65-f306-410e-82fa-115f9916910b';
     const mockArtifactMetadata: ArtifactMetadata = {
       title: 'Title',
@@ -203,6 +199,36 @@ describe('ArtifactService', () => {
 
       expect(getArtifactRecordsStub).to.be.calledWith(1);
       expect(response).to.be.eql(undefined);
+    });
+  });
+
+  describe('getArtifactsByIds', () => {
+    it('should return multiple artifacts successfully', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+
+      const getArtifactRecordsStub = sinon
+        .stub(ArtifactRepository.prototype, 'getArtifactsByIds')
+        .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
+
+      const response = await artifactService.getArtifactsByIds([1, 2]);
+
+      expect(getArtifactRecordsStub).to.be.calledWith([1, 2]);
+      expect(response).to.be.eql([{ artifact_id: 1 }, { artifact_id: 2 }]);
+    });
+
+    it('should return zero artifacts successfully', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+
+      const getArtifactRecordsStub = sinon
+        .stub(ArtifactRepository.prototype, 'getArtifactsByIds')
+        .resolves([] as Artifact[]);
+
+      const response = await artifactService.getArtifactsByIds([1, 2]);
+
+      expect(getArtifactRecordsStub).to.be.calledWith([1, 2]);
+      expect(response).to.be.eql([]);
     });
   });
 });

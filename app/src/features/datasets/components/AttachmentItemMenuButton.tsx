@@ -1,4 +1,4 @@
-import { mdiDotsVertical, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiDotsVertical, mdiLockOutline, mdiLockPlus, mdiTrashCanOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -11,6 +11,8 @@ import { useState } from 'react';
 interface IAttachmentItemMenuButtonProps {
   artifact: IArtifact;
   onDownload: (artifact: IArtifact) => void;
+  onRequestAccess: (artifact: IArtifact) => void;
+  onApplySecurity: (artifact: IArtifact) => void;
   hasAdministrativePermissions: boolean;
   isPendingReview: boolean;
 }
@@ -18,10 +20,14 @@ interface IAttachmentItemMenuButtonProps {
 const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (props) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
+  const canDownload =
+    props.hasAdministrativePermissions ||
+    props.artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED;
 
   const handleClick = (event: any) => {
     setAnchorEl(event.currentTarget);
   };
+
   const handleClose = () => {
     setAnchorEl(null);
   };
@@ -49,34 +55,58 @@ const AttachmentItemMenuButton: React.FC<IAttachmentItemMenuButtonProps> = (prop
             MenuListProps={{
               'aria-labelledby': 'basic-button'
             }}>
-            <MenuItem
-              disabled={
-                props.hasAdministrativePermissions
-                  ? false
-                  : props.artifact.supplementaryData.persecutionAndHarm !== SECURITY_APPLIED_STATUS.UNSECURED
-              }
-              onClick={() => {
-                props.onDownload(props.artifact);
-                setAnchorEl(null);
-              }}
-              data-testid="attachment-action-menu-download">
-              <ListItemIcon>
-                <Icon path={mdiTrayArrowDown} size={0.875} />
-              </ListItemIcon>
-              Download Document
-            </MenuItem>
-            {props.hasAdministrativePermissions && (
+            {canDownload ? (
               <MenuItem
                 onClick={() => {
-                  console.log('Delete artifact not implemented yet.');
-                  setAnchorEl(null);
+                  props.onDownload(props.artifact);
+                  handleClose();
                 }}
-                data-testid="attachment-action-menu-delete">
+                data-testid="attachment-action-menu-download">
                 <ListItemIcon>
-                  <Icon path={mdiTrashCanOutline} size={0.8} />
+                  <Icon path={mdiTrayArrowDown} size={0.875} />
                 </ListItemIcon>
-                Delete Document
+                Download Document
               </MenuItem>
+            ) : (
+              <MenuItem
+                onClick={() => {
+                  props.onRequestAccess(props.artifact);
+                  handleClose();
+                }}
+                data-testid="attachment-action-menu-request-access">
+                <ListItemIcon>
+                  <Icon path={mdiLockOutline} size={0.875} />
+                </ListItemIcon>
+                Request Access
+              </MenuItem>
+            )}
+
+            {props.hasAdministrativePermissions && (
+              <>
+                <MenuItem
+                  onClick={() => {
+                    props.onApplySecurity(props.artifact);
+                    setAnchorEl(null);
+                  }}
+                  data-testid="attachment-action-menu-download">
+                  <ListItemIcon>
+                    <Icon path={mdiLockPlus} size={0.875} />
+                  </ListItemIcon>
+                  Apply Security to Document
+                </MenuItem>
+
+                <MenuItem
+                  onClick={() => {
+                    console.log('Delete artifact not implemented yet.');
+                    handleClose();
+                  }}
+                  data-testid="attachment-action-menu-delete">
+                  <ListItemIcon>
+                    <Icon path={mdiTrashCanOutline} size={0.8} />
+                  </ListItemIcon>
+                  Delete Document
+                </MenuItem>
+              </>
             )}
           </Menu>
         </Box>

@@ -1,3 +1,4 @@
+import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
@@ -6,7 +7,18 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
+import { makeStyles } from '@mui/styles';
+import DOMPurify from 'dompurify';
 import { useState } from 'react';
+
+const useStyles = makeStyles((theme: Theme) => ({
+  dialogSubTitle: {
+    fontSize: '14px',
+    color: '#787f81',
+    fontWeight: 'bold'
+  }
+}));
 
 export interface IErrorDialogProps {
   /**
@@ -16,6 +28,13 @@ export interface IErrorDialogProps {
    * @memberof IErrorDialogProps
    */
   dialogTitle: string;
+  /**
+   * The dialog window title sub text.
+   *
+   * @type {string}
+   * @memberof IErrorDialogProps
+   */
+  dialogSubTitle?: string;
   /**
    * The dialog window body text.
    *
@@ -67,6 +86,7 @@ export interface IErrorDialogProps {
  */
 export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> = (props) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const classes = useStyles();
 
   const ErrorDetailsList = (errorProps: { errors: (string | object)[] }) => {
     const items = errorProps.errors.map((error, index) => {
@@ -94,7 +114,14 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
         aria-describedby="alert-dialog-description">
         <DialogTitle id="alert-dialog-title">{props.dialogTitle}</DialogTitle>
         <DialogContent>
-          <DialogContentText id="alert-dialog-description">{props.dialogText}</DialogContentText>
+          {props.dialogSubTitle && (
+            <DialogContentText mb={'1em'} className={classes.dialogSubTitle} id="alert-dialog-sub-title">
+              {props.dialogSubTitle}
+            </DialogContentText>
+          )}
+          <DialogContentText id="alert-dialog-description">
+            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(props.dialogText as string) }} />
+          </DialogContentText>
         </DialogContent>
         {props.dialogError && (
           <DialogContent>
@@ -111,6 +138,7 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
             )}
           </DialogContent>
         )}
+        <Divider />
         <DialogActions>
           <Button onClick={props.onOk} color="primary" variant="contained" autoFocus>
             Ok

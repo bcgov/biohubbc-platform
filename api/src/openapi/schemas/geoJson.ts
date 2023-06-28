@@ -1,9 +1,9 @@
 /**
- * GeoJSON schemas derived from: https://geojson.org/schema/GeoJSON.json
+ * GeoJSON schemas derived from {@link https://geojson.org/schema/GeoJSON.json}.
  *
  * Modifications made to match OpenAPI V3:
  * - Removed root `$schema` and `$id` properties.
- * - Replaced oneOf option `{type: 'null'}` with `nullable: true`
+ * - Replaced `oneOf` option `{type: 'null'}` with `nullable: true`
  */
 
 import { OpenAPIV3 } from 'openapi-types';
@@ -348,7 +348,6 @@ export const GeoJSON: OpenAPIV3.SchemaObject = {
     GeoJSONMultiLineString,
     GeoJSONMultiPolygon,
     GeoJSONGeometryCollection,
-    GeoJSONFeature,
-    GeoJSONGeometryCollection
+    GeoJSONFeature
   ]
 };
