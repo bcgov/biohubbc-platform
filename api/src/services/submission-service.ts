@@ -409,7 +409,6 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
-    console.log('my datasetId is: ', datasetId);
     const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
 
     if (!emlJson) {
@@ -425,8 +424,6 @@ export class SubmissionService extends DBService {
     if (!result.length) {
       return [];
     }
-
-    console.log('result:', result);
 
     const relatedDatasets = result[0].value.map((relatedProject: any) => {
       return {
