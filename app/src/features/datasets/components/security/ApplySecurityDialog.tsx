@@ -11,6 +11,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import YesNoDialog from 'components/dialog/YesNoDialog';
+import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
 import { useApi } from 'hooks/useApi';
@@ -162,9 +163,20 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                 );
                 onClose();
               })
-              .catch(() => {
-                // @TODO show an error dialog
-                throw new Error('Failed to apply security to the selected documents. Please try again.');
+              .catch((apiError) => {
+                dialogContext.setErrorDialog({
+                  open: true,
+                  dialogTitle: ApplySecurityRulesI18N.applySecurityRulesErrorTitle,
+                  dialogText: ApplySecurityRulesI18N.applySecurityRulesErrorText,
+                  dialogError: apiError.message,
+                  dialogErrorDetails: apiError.errors,
+                  onClose: () => {
+                    dialogContext.setErrorDialog({ open: false });
+                  },
+                  onOk: () => {
+                    dialogContext.setErrorDialog({ open: false });
+                  }
+                });
               });
           }}>
           {(formikProps) => (
@@ -180,9 +192,20 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
                       );
                       onClose();
                     })
-                    .catch(() => {
-                      // @TODO show an error dialog
-                      throw new Error('Failed to unsecure the selected documents. Please try again.');
+                    .catch((apiError) => {
+                      dialogContext.setErrorDialog({
+                        open: true,
+                        dialogTitle: ApplySecurityRulesI18N.unapplySecurityRulesErrorTitle,
+                        dialogText: ApplySecurityRulesI18N.unapplySecurityRulesErrorText,
+                        dialogError: apiError.message,
+                        dialogErrorDetails: apiError.errors,
+                        onClose: () => {
+                          dialogContext.setErrorDialog({ open: false });
+                        },
+                        onOk: () => {
+                          dialogContext.setErrorDialog({ open: false });
+                        }
+                      });
                     })
                     .finally(() => {
                       setYesNoDialogOpen(false);
