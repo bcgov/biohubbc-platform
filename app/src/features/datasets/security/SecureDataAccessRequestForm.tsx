@@ -106,6 +106,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
   useEffect(() => {
     // Ensure that the initially selected artifact is persisted
     formikProps.setFieldValue('artifactIds', props.initialArtifactSelection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const columns: GridColDef<IArtifact>[] = [
