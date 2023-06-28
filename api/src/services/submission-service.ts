@@ -425,15 +425,13 @@ export class SubmissionService extends DBService {
       return [];
     }
 
-    const relatedDatasets = result[0].value.map((relatedProject: any) => {
+    return result[0].value.map((relatedProject: any) => {
       return {
         datasetId: relatedProject['@_id'],
         title: relatedProject['title'],
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });
-
-    return relatedDatasets;
   }
 
   /**
