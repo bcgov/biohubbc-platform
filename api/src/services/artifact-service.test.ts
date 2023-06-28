@@ -337,11 +337,12 @@ describe('ArtifactService', () => {
       } catch (error: any) {
         expect(error.message).to.be.eql('Issue deleting artifact: uuid');
         expect(getStub).to.be.called;
-        expect(deleteS3).to.be.called;
         expect(deleteSecurityStub).to.be.called;
         expect(deleteStub).to.be.called;
+        expect(deleteS3).to.not.be.called;
       }
     });
+
     it('S3 error thrown', async () => {
       const mockDBConnection = getMockDBConnection();
       const mockS3Client = new AWS.S3();
@@ -364,8 +365,8 @@ describe('ArtifactService', () => {
         expect(error.message).to.be.eql('Issue deleting artifact: uuid');
         expect(getStub).to.be.called;
         expect(deleteS3).to.be.called;
-        expect(deleteSecurityStub).to.not.be.called;
-        expect(deleteStub).to.not.be.called;
+        expect(deleteSecurityStub).to.be.called;
+        expect(deleteStub).to.be.called;
       }
     });
   });
