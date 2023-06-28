@@ -287,7 +287,7 @@ export class SecurityService extends DBService {
       artifactIds.map(async (artifactId) => await this.isArtifactPendingReview(artifactId))
     );
 
-    const isPendingReview = artifactSecurityRules.find((item) => item === true) ? true : false;
+    const isPendingReview = artifactSecurityRules.includes(true);
 
     return isPendingReview;
   }
