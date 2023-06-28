@@ -214,12 +214,10 @@ describe('getArtifactsByDatasetId', () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-    const artifactServiceStub = sinon
-      .stub(ArtifactService.prototype, 'getArtifactsByDatasetId')
-      .resolves([
-        { artifact_id: 1, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') },
-        { artifact_id: 2, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') }
-      ] as Artifact[]);
+    const artifactServiceStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+      { artifact_id: 1, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') },
+      { artifact_id: 2, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') }
+    ] as Artifact[]);
 
     const securityServiceStub = sinon
       .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
