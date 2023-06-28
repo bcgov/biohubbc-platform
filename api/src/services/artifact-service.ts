@@ -172,24 +172,17 @@ export class ArtifactService extends DBService {
   async deleteArtifact(uuid: string): Promise<void> {
     defaultLog.debug({ label: 'deleteArtifact' });
 
-    // tracking delete marker to roll back S3 delete incase of an error
-    let deleteMarker: string | undefined;
     const artifact = await this.artifactRepository.getArtifactByUUID(uuid);
 
     if (artifact) {
       try {
-        const deleteResponse = await deleteFileFromS3(artifact.key);
-        deleteMarker = deleteResponse?.VersionId;
-
         const service = new SecurityRepository(this.connection);
         await service.deleteSecurityRulesForArtifactUUID(uuid);
 
         await this.artifactRepository.deleteArtifactByUUID(uuid);
+
+        await deleteFileFromS3(artifact.key);
       } catch (error) {
-        if (deleteMarker) {
-          // Remove 'Delete Marker' to restore S3 object
-          await deleteFileFromS3(artifact.key, deleteMarker);
-        }
         throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`);
       }
     }
