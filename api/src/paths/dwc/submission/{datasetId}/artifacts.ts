@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
 import { getLogger } from '../../../../utils/logger';
@@ -96,11 +97,28 @@ GET.apiDoc = {
                 },
                 supplementaryData: {
                   type: 'object',
-                  required: ['persecutionAndHarm'],
+                  required: ['persecutionAndHarmRules', 'persecutionAndHarmStatus'],
                   properties: {
-                    persecutionAndHarm: {
+                    persecutionAndHarmStatus: {
                       type: 'string',
                       enum: ['SECURED', 'UNSECURED', 'PENDING']
+                    },
+                    persecutionAndHarmRules: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          artifact_id: {
+                            type: 'integer'
+                          },
+                          artifact_persecution_id: {
+                            type: 'integer'
+                          },
+                          persecution_or_harm_id: {
+                            type: 'integer'
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -135,10 +153,22 @@ export function getArtifactsByDatasetId(): RequestHandler {
 
       const artifactsWithRules = await Promise.all(
         artifacts.map(async (artifact) => {
-          const appliedSecurity = await securityService.getSecurityAppliedStatus(artifact.artifact_id);
+          const persecutionAndHarmRules = await securityService.getPersecutionAndHarmRulesByArtifactId(
+            artifact.artifact_id
+          );
+          let persecutionAndHarmStatus: SECURITY_APPLIED_STATUS = SECURITY_APPLIED_STATUS.PENDING;
+
+          if (artifact.security_review_timestamp) {
+            persecutionAndHarmStatus =
+              persecutionAndHarmRules.length > 0 ? SECURITY_APPLIED_STATUS.SECURED : SECURITY_APPLIED_STATUS.UNSECURED;
+          }
+
           return {
             ...artifact,
-            supplementaryData: { persecutionAndHarm: appliedSecurity }
+            supplementaryData: {
+              persecutionAndHarmRules,
+              persecutionAndHarmStatus
+            }
           };
         })
       );
