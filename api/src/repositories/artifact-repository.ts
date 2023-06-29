@@ -181,6 +181,32 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
+   * Retrieves all artifacts belonging to the given submission.
+   *
+   * @param {string} uuid
+   * @return {*}  {Promise<Artifact>}
+   * @memberof ArtifactRepository
+   */
+  async getArtifactByUUID(uuid: string): Promise<Artifact | null> {
+    defaultLog.debug({ label: 'getArtifactByUUID', uuid });
+
+    const sqlStatement = SQL`
+      SELECT
+        a.*
+      FROM
+        artifact a
+      WHERE
+        a.uuid = ${uuid};
+    `;
+
+    const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
+
+    const result = (response.rowCount && response?.rows[0]) || null;
+
+    return result;
+  }
+
+  /**
    * Fetches multiple artifact records by the given artifact IDs
    *
    * @param {number[]} artifactIds
@@ -224,5 +250,21 @@ export class ArtifactRepository extends BaseRepository {
     if (!results) {
       throw new ApiExecuteSQLError('Failed to update artifact security review timestamp');
     }
+  }
+
+  /**
+   * Deletes a single artifact for a given UUID.
+   *
+   * @param uuid UUID of the artifact to delete
+   */
+  async deleteArtifactByUUID(uuid: string): Promise<void> {
+    defaultLog.debug({ label: 'deleteArtifactByUUID' });
+
+    const sql = SQL`
+      DELETE
+      FROM artifact
+      WHERE uuid = ${uuid}
+      RETURNING *;`;
+    await this.connection.sql(sql);
   }
 }

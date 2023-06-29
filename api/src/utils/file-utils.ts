@@ -102,19 +102,20 @@ export const getS3HostUrl = (key?: string): string => {
  * Delete a file from S3, based on its key.
  *
  * For potential future reference, for deleting the delete marker of a file in S3:
- * https://docs.aws.amazon.com/AmazonS3/latest/userguide/RemDelMarker.html
+ * https://docs.aws.amazon.com/AmazonS3/latest/userguide/DeleteMarker.html
  *
  * @export
  * @param {string} key the unique key assigned to the file in S3 when it was originally uploaded
+ * @param {string} versionId Version Id of an S3 object to be deleted. Can also remove a Delete Marker to "restore" a previously deleted object
  * @returns {Promise<GetObjectOutput>} the response from S3 or null if required parameters are null
  */
-export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput | null> {
+export async function deleteFileFromS3(key: string, versionId?: string): Promise<DeleteObjectOutput | null> {
   const s3Client = _getS3Client();
   if (!key || !s3Client) {
     return null;
   }
 
-  return s3Client.deleteObject({ Bucket: _getObjectStoreBucketName(), Key: key }).promise();
+  return s3Client.deleteObject({ Bucket: _getObjectStoreBucketName(), Key: key, VersionId: versionId }).promise();
 }
 
 /**
@@ -235,7 +236,7 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 }
 
 /**
- * Fetchs a list of files in S3 at the given path
+ * Fetches a list of files in S3 at the given path
  *
  * @export
  * @param {string} path the path (Prefix) of the directory in S3

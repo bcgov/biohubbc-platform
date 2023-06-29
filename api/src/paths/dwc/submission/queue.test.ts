@@ -330,7 +330,7 @@ describe('queue', () => {
       }
     });
 
-    it('throws an error when getKeycloakSource returns null', async () => {
+    it('throws error when getKeycloakSource returns null', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
@@ -348,7 +348,7 @@ describe('queue', () => {
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
       sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
-
+      const intakeStub = sinon.stub(SubmissionJobQueueService.prototype, 'intake').resolves();
       const requestHandler = queue.queueForProcess();
 
       try {
@@ -356,6 +356,7 @@ describe('queue', () => {
         expect.fail();
       } catch (actualError) {
         expect((actualError as Error).message).to.equal('Failed to identify known submission source system');
+        expect(intakeStub).to.not.be.called;
       }
     });
 
