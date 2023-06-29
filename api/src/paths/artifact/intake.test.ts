@@ -726,7 +726,7 @@ describe('intake', () => {
       }
     });
 
-    it('returns gracefully if getKeycloakSource returns null', async () => {
+    it('throws error if getKeycloakSource returns null', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
@@ -754,9 +754,13 @@ describe('intake', () => {
       const uploadStub = sinon.stub(ArtifactService.prototype, 'uploadAndPersistArtifact').resolves();
 
       const requestHandler = intake.intakeArtifacts();
-      await requestHandler(mockReq, mockRes, mockNext);
-
-      expect(uploadStub).to.not.be.called;
+      try {
+        await requestHandler(mockReq, mockRes, mockNext);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as Error).message).to.equal('Failed to identify known submission source system');
+        expect(uploadStub).to.not.be.called;
+      }
     });
 
     it('catches and re-throws an error', async () => {
