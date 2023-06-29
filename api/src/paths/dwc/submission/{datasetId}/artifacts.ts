@@ -152,27 +152,24 @@ export function getArtifactsByDatasetId(): RequestHandler {
       const artifacts = await artifactService.getArtifactsByDatasetId(datasetId);
 
       const artifactsWithRules = await Promise.all(
-        artifacts.map((artifact) => {
-          return securityService
-            .getPersecutionAndHarmRulesByArtifactId(artifact.artifact_id)
-            .then((persecutionAndHarmRules) => {
-              let persecutionAndHarmStatus: SECURITY_APPLIED_STATUS = SECURITY_APPLIED_STATUS.PENDING;
+        artifacts.map(async (artifact) => {
+          const persecutionAndHarmRules = await securityService.getPersecutionAndHarmRulesByArtifactId(
+            artifact.artifact_id
+          );
+          let persecutionAndHarmStatus: SECURITY_APPLIED_STATUS = SECURITY_APPLIED_STATUS.PENDING;
 
-              if (artifact.security_review_timestamp) {
-                persecutionAndHarmStatus =
-                  persecutionAndHarmRules.length > 0
-                    ? SECURITY_APPLIED_STATUS.SECURED
-                    : SECURITY_APPLIED_STATUS.UNSECURED;
-              }
+          if (artifact.security_review_timestamp) {
+            persecutionAndHarmStatus =
+              persecutionAndHarmRules.length > 0 ? SECURITY_APPLIED_STATUS.SECURED : SECURITY_APPLIED_STATUS.UNSECURED;
+          }
 
-              return {
-                ...artifact,
-                supplementaryData: {
-                  persecutionAndHarmRules,
-                  persecutionAndHarmStatus
-                }
-              };
-            });
+          return {
+            ...artifact,
+            supplementaryData: {
+              persecutionAndHarmRules,
+              persecutionAndHarmStatus
+            }
+          };
         })
       );
 
