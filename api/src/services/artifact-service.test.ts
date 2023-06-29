@@ -1,9 +1,11 @@
+import AWS from 'aws-sdk';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { HTTPError } from '../errors/http-error';
 import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
+import { SecurityRepository } from '../repositories/security-repository';
 import { ISourceTransformModel } from '../repositories/submission-repository';
 import * as file_utils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -229,6 +231,143 @@ describe('ArtifactService', () => {
 
       expect(getArtifactRecordsStub).to.be.calledWith([1, 2]);
       expect(response).to.be.eql([]);
+    });
+  });
+
+  describe('deleteArtifacts', () => {
+    it('should work with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+      const deleteStub = sinon.stub(ArtifactService.prototype, 'deleteArtifact').resolves();
+      await artifactService.deleteArtifacts(['uuid', 'uuid2']);
+
+      expect(deleteStub).to.be.calledTwice;
+    });
+
+    it('should throw an error', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const artifactService = new ArtifactService(mockDBConnection);
+      sinon.stub(ArtifactService.prototype, 'deleteArtifact').rejects('Oops');
+
+      try {
+        await artifactService.deleteArtifacts(['uuid', 'uuid2']);
+        expect.fail();
+      } catch (error: any) {
+        expect(error.message).to.be.eql('There was an issue deleting an artifact.');
+      }
+    });
+  });
+
+  describe('deleteArtifact', () => {
+    it('works with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const mockS3Client = new AWS.S3();
+      const artifactService = new ArtifactService(mockDBConnection);
+      const artifact = {
+        key: 's3 key'
+      } as Artifact;
+      const getStub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByUUID').resolves(artifact);
+      const deleteStub = sinon.stub(ArtifactRepository.prototype, 'deleteArtifactByUUID').resolves();
+      const deleteSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'deleteSecurityRulesForArtifactUUID')
+        .resolves();
+      sinon.stub(AWS, 'S3').returns(mockS3Client);
+      const deleteS3 = sinon.stub(mockS3Client, 'deleteObject').returns({
+        promise: () =>
+          Promise.resolve({
+            DeleteMarker: true
+          })
+      } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
+
+      await artifactService.deleteArtifact('uuid');
+      expect(getStub).to.be.called;
+      expect(deleteS3).to.be.called;
+      expect(deleteSecurityStub).to.be.called;
+      expect(deleteStub).to.be.called;
+    });
+
+    it('artifact not found for uuid', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const mockS3Client = new AWS.S3();
+      const artifactService = new ArtifactService(mockDBConnection);
+      const getStub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByUUID').resolves(null);
+      const deleteStub = sinon.stub(ArtifactRepository.prototype, 'deleteArtifactByUUID').resolves();
+      const deleteSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'deleteSecurityRulesForArtifactUUID')
+        .resolves();
+      sinon.stub(AWS, 'S3').returns(mockS3Client);
+      const deleteS3 = sinon.stub(mockS3Client, 'deleteObject').returns({
+        promise: () =>
+          Promise.resolve({
+            DeleteMarker: true
+          })
+      } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
+
+      await artifactService.deleteArtifact('uuid');
+      expect(getStub).to.be.called;
+      expect(deleteS3).to.not.be.called;
+      expect(deleteSecurityStub).to.not.be.called;
+      expect(deleteStub).to.not.be.called;
+    });
+
+    it('repo error thrown', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const mockS3Client = new AWS.S3();
+      const artifactService = new ArtifactService(mockDBConnection);
+      const artifact = {
+        key: 's3 key'
+      } as Artifact;
+      const getStub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByUUID').resolves(artifact);
+      const deleteStub = sinon.stub(ArtifactRepository.prototype, 'deleteArtifactByUUID').throws('Oops');
+      const deleteSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'deleteSecurityRulesForArtifactUUID')
+        .resolves();
+      sinon.stub(AWS, 'S3').returns(mockS3Client);
+      const deleteS3 = sinon.stub(mockS3Client, 'deleteObject').returns({
+        promise: () =>
+          Promise.resolve({
+            DeleteMarker: true,
+            VersionId: 1
+          })
+      } as unknown as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
+
+      try {
+        await artifactService.deleteArtifact('uuid');
+        expect.fail();
+      } catch (error: any) {
+        expect(error.message).to.be.eql('Issue deleting artifact: uuid');
+        expect(getStub).to.be.called;
+        expect(deleteSecurityStub).to.be.called;
+        expect(deleteStub).to.be.called;
+        expect(deleteS3).to.not.be.called;
+      }
+    });
+
+    it('S3 error thrown', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const mockS3Client = new AWS.S3();
+      const artifactService = new ArtifactService(mockDBConnection);
+      const artifact = {
+        key: 's3 key'
+      } as Artifact;
+      const getStub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByUUID').resolves(artifact);
+      const deleteStub = sinon.stub(ArtifactRepository.prototype, 'deleteArtifactByUUID').resolves();
+      const deleteSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'deleteSecurityRulesForArtifactUUID')
+        .resolves();
+      sinon.stub(AWS, 'S3').returns(mockS3Client);
+      const deleteS3 = sinon.stub(mockS3Client, 'deleteObject').rejects('oops');
+
+      try {
+        await artifactService.deleteArtifact('uuid');
+        expect.fail();
+      } catch (error: any) {
+        expect(error.message).to.be.eql('Issue deleting artifact: uuid');
+        expect(getStub).to.be.called;
+        expect(deleteS3).to.be.called;
+        expect(deleteSecurityStub).to.be.called;
+        expect(deleteStub).to.be.called;
+      }
     });
   });
 });

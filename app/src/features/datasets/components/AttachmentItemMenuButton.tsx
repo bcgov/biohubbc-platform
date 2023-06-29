@@ -12,6 +12,7 @@ import { useState } from 'react';
 interface IAttachmentItemMenuButtonProps {
   artifact: IArtifact;
   onDownload: (artifact: IArtifact) => void;
+  onDelete: (artifactUUID: string[]) => void;
   onRequestAccess: (artifact: IArtifact) => void;
   onApplySecurity: (artifact: IArtifact) => void;
   hasAdministrativePermissions: boolean;
@@ -96,7 +97,7 @@ const AttachmentItemMenuButton = (props: IAttachmentItemMenuButtonProps) => {
 
                   <MenuItem
                     onClick={() => {
-                      console.log('Delete artifact not implemented yet.');
+                      props.onDelete([props.artifact.uuid]);
                       handleClose();
                     }}
                     data-testid="attachment-action-menu-delete">

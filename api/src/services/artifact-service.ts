@@ -1,6 +1,8 @@
 import { IDBConnection } from '../database/db';
+import { ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
-import { generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import { SecurityRepository } from '../repositories/security-repository';
+import { deleteFileFromS3, generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
@@ -143,5 +145,46 @@ export class ArtifactService extends DBService {
     defaultLog.debug({ label: 'removeAllSecurityRulesFromArtifact' });
 
     await this.artifactRepository.updateArtifactSecurityReviewTimestamp(artifactId);
+  }
+
+  /**
+   * Deletes multiple artifacts and their related S3 objects for a given list of UUIDs
+   *
+   * @param {string[]} uuids UUIDs of artifacts to delete
+   */
+  async deleteArtifacts(uuids: string[]): Promise<void> {
+    defaultLog.debug({ label: 'deleteArtifacts' });
+
+    try {
+      for (const uuid of uuids) {
+        await this.deleteArtifact(uuid);
+      }
+    } catch (error) {
+      throw new ApiGeneralError(`There was an issue deleting an artifact.`);
+    }
+  }
+
+  /**
+   * Deletes an artifact and related S3 object for a given UUID
+   *
+   * @param {string} uuid UUID of artifact to delete
+   */
+  async deleteArtifact(uuid: string): Promise<void> {
+    defaultLog.debug({ label: 'deleteArtifact' });
+
+    const artifact = await this.artifactRepository.getArtifactByUUID(uuid);
+
+    if (artifact) {
+      try {
+        const service = new SecurityRepository(this.connection);
+        await service.deleteSecurityRulesForArtifactUUID(uuid);
+
+        await this.artifactRepository.deleteArtifactByUUID(uuid);
+
+        await deleteFileFromS3(artifact.key);
+      } catch (error) {
+        throw new ApiGeneralError(`Issue deleting artifact: ${uuid}`);
+      }
+    }
   }
 }

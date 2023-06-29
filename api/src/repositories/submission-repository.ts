@@ -899,7 +899,7 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Finds an object of handlebars templates for a given datasetId to power the project details page
    *
-   * @param datasetId a dataset UUID for determining the handlebars template to fetch
+   * //TODO: Eventually will integrate datasetId specific handlebars  @param datasetId a dataset UUID for determining the handlebars template to fetch
    * @returns {*} {Promise<IDetailsPage>} an object containing a string of handlebars templates
    * @memberof SubmissionRepository
    */
