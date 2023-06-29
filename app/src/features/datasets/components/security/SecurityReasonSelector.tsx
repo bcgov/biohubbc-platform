@@ -3,46 +3,17 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { FieldArray, useFormikContext } from 'formik';
-import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import yup from 'utils/YupSchema';
-import SecurityReasonCategory, { ISecurityReason, SecurityReason, SecurityReasonClass } from './SecurityReasonCategory';
-
-export interface ISelectSecurityReasonForm {
-  securityReasons: ISecurityReason[];
-}
-
-export const SecurityReasonsInitialValues: ISelectSecurityReasonForm = {
-  securityReasons: []
-};
-
-export const SecurityReasonsYupSchema = yup.object().shape({
-  securityReasons: yup.array().of(
-    yup.object().shape({
-      name: yup.string(),
-      description: yup.string()
-    })
-  )
-});
+import { ISelectSecurityReasonForm } from './ApplySecurityDialog';
+import SecurityReasonCategory, { ISecurityReason, SecurityReason } from './SecurityReasonCategory';
 
 /**
  * Security Reason Selector for security application.
  *
  * @return {*}
  */
-const SecurityReasonSelector: React.FC = () => {
-  const biohubApi = useApi();
+const SecurityReasonSelector = (props: ISelectSecurityReasonForm) => {
+  const { securityReasons } = props;
   const { values, setFieldValue } = useFormikContext<ISelectSecurityReasonForm>();
-  const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
-  persecutionHarmDataLoader.load();
-
-  if (!persecutionHarmDataLoader.data) {
-    return <></>;
-  }
-
-  const persecutionHarmRules = persecutionHarmDataLoader.data.map((rule) => {
-    return new SecurityReasonClass(rule, 'Persecution or Harm');
-  });
 
   return (
     <Paper elevation={3} sx={{ height: '100%', width: '100%', display: 'flex', overflow: 'hidden' }}>
@@ -50,14 +21,12 @@ const SecurityReasonSelector: React.FC = () => {
         <ActionToolbar label={`Security Reasons`} labelProps={{ variant: 'h4' }} />
         <Divider></Divider>
         <Box sx={{ height: '100%', overflow: 'hidden', overflowY: 'scroll' }}>
-          {persecutionHarmDataLoader.data && (
-            <SecurityReasonCategory
-              categoryName={'Persecution or Harm'}
-              securityReasons={persecutionHarmRules.filter((value: ISecurityReason) => {
-                return !values.securityReasons.some((reason) => reason.name === value.name);
-              })}
-            />
-          )}
+          <SecurityReasonCategory
+            categoryName={'Persecution or Harm'}
+            securityReasons={securityReasons.filter((value: ISecurityReason) => {
+              return !values.securityReasons.some((reason) => reason.name === value.name);
+            })}
+          />
         </Box>
       </Box>
 
@@ -77,7 +46,7 @@ const SecurityReasonSelector: React.FC = () => {
               variant="text"
               color="primary"
               onClick={() => {
-                setFieldValue('securityReasons', SecurityReasonsInitialValues.securityReasons);
+                setFieldValue('securityReasons', []);
               }}>
               Remove All
             </Button>
@@ -95,8 +64,8 @@ const SecurityReasonSelector: React.FC = () => {
                       <SecurityReason
                         key={securityReason.id}
                         securityReason={securityReason}
-                        onClickSecurityReason={() => arrayHelpers.remove(index)}
-                        icon="minus"
+                        onClick={() => arrayHelpers.remove(index)}
+                        isSelected={true}
                       />
                     </Box>
                   );

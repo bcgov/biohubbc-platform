@@ -16,7 +16,7 @@ import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
-import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+import { downloadFile, getFormattedDate, getFormattedFileSize, pluralize as p } from 'utils/Utils';
 import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
@@ -70,7 +70,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsList = artifactsDataLoader.data || [];
 
   const numPendingDocuments = artifactsList.filter(
-    (artifact) => artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING
+    (artifact) => artifact.supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING
   ).length;
 
   const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
@@ -120,12 +120,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       flex: 1,
       renderCell: (params) => {
         const { supplementaryData } = params.row;
-        if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED) {
+        if (supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.UNSECURED) {
           return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Available" />;
         }
 
         if (hasAdministrativePermissions) {
-          if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING) {
+          if (supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING) {
             return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
           }
         }
@@ -196,7 +196,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <Box pt={2} pb={2}>
             <Alert onClose={() => setShowAlert(false)} severity="info">
               <strong>
-                {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
+                {`You have ${numPendingDocuments} project ${p(numPendingDocuments, 'document')} to review.`}
               </strong>
             </Alert>
           </Box>

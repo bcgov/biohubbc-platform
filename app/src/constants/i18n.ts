@@ -22,3 +22,10 @@ export const DeleteSystemUserI18N = {
   deleteUserErrorText:
     'An error has occurred while attempting to delete the system user. If the error persists, please contact your system administrator.'
 };
+
+export const ApplySecurityRulesI18N = {
+  applySecurityRulesErrorTitle: 'Error Securing Documents',
+  applySecurityRulesErrorText: 'Failed to apply security to the selected documents. Please try again.',
+  unapplySecurityRulesErrorTitle: 'Error Unsecuring Documents',
+  unapplySecurityRulesErrorText: 'Failed to unsecure the selected documents. Please try again.'
+};
