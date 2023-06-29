@@ -16,7 +16,8 @@ export interface IArtifact {
   update_user: number | null;
   uuid: string;
   supplementaryData: {
-    persecutionAndHarm: SECURITY_APPLIED_STATUS;
+    persecutionAndHarmStatus: SECURITY_APPLIED_STATUS;
+    persecutionAndHarmRules: IPersecutionAndHarmRule[];
   };
 }
 
@@ -24,6 +25,12 @@ export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
   UNSECURED = 'UNSECURED',
   PENDING = 'PENDING'
+}
+
+export interface IPersecutionAndHarmRule {
+  artifact_id: number;
+  artifact_persecution_id: number;
+  persecution_or_harm_id: number;
 }
 
 export interface IRelatedDataset {

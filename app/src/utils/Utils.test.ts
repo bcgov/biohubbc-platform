@@ -13,6 +13,7 @@ import {
   isObject,
   jsonParseObjectProperties,
   jsonStringifyObjectProperties,
+  pluralize,
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
@@ -410,5 +411,32 @@ describe('downloadFile', () => {
     expect(anchor.href).toEqual(url);
     expect(anchor.click).toHaveBeenCalled();
     expect(anchor.remove).toHaveBeenCalled();
+  });
+});
+
+describe('pluralize', () => {
+  it('pluralizes a word', () => {
+    const response = pluralize(2, 'apple');
+    expect(response).toEqual('apples');
+  });
+
+  it('pluralizes a word with undefined quantity', () => {
+    const response = pluralize(null as unknown as number, 'orange');
+    expect(response).toEqual('oranges');
+  });
+
+  it('does not pluralize a single item', () => {
+    const response = pluralize(1, 'banana');
+    expect(response).toEqual('banana');
+  });
+
+  it('pluralizes a word with a custom suffix', () => {
+    const response = pluralize(10, 'berr', 'y', 'ies');
+    expect(response).toEqual('berries');
+  });
+
+  it('does not pluralize a word with a custom suffix and single quantity', () => {
+    const response = pluralize(1, 'berr', 'y', 'ies');
+    expect(response).toEqual('berry');
   });
 });

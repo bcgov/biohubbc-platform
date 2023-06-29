@@ -7,7 +7,6 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { Artifact } from '../../../../repositories/artifact-repository';
-import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
@@ -76,11 +75,14 @@ describe('getArtifactsByDatasetId', () => {
         file_type: 'Report',
         foi_reason: false,
         key: 'cupshall/platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip',
-        security_review_timestamp: null,
+        security_review_timestamp: '1970-01-01T00:00:00.000Z',
         submission_id: 1,
         title: 'Report 2',
         uuid: '374c4d6a-3a04-405b-af6d-b6497800a691',
-        supplementaryData: { persecutionAndHarm: 'SECURED' }
+        supplementaryData: {
+          persecutionAndHarmStatus: 'SECURED',
+          persecutionAndHarmRules: []
+        }
       };
       describe('should throw an error when', () => {
         it('returns a null response', async () => {
@@ -191,11 +193,14 @@ describe('getArtifactsByDatasetId', () => {
               file_type: 'Report',
               foi_reason: false,
               key: 'platform/datasets/de621765-9fd0-4216-91b7-ec455d9c3eb1/artifacts/1/374c4d6a-3a04-405b-af6d-b6497800a691.zip',
-              security_review_timestamp: null,
+              security_review_timestamp: '1970-01-01T00:00:00.000Z',
               submission_id: 1,
               title: 'Test Report',
               uuid: '374c4d6a-3a04-405b-af6d-b6497800a691',
-              supplementaryData: { persecutionAndHarm: 'SECURED' }
+              supplementaryData: {
+                persecutionAndHarmStatus: 'SECURED',
+                persecutionAndHarmRules: []
+              }
             }
           ];
           const response = responseValidator.validateResponse(200, apiResponse);
@@ -209,13 +214,14 @@ describe('getArtifactsByDatasetId', () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-    const artifactServiceStub = sinon
-      .stub(ArtifactService.prototype, 'getArtifactsByDatasetId')
-      .resolves([{ artifact_id: 1 }, { artifact_id: 2 }] as Artifact[]);
+    const artifactServiceStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+      { artifact_id: 1, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') },
+      { artifact_id: 2, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') }
+    ] as Artifact[]);
 
     const securityServiceStub = sinon
-      .stub(SecurityService.prototype, 'getSecurityAppliedStatus')
-      .resolves(SECURITY_APPLIED_STATUS.SECURED);
+      .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
+      .resolves([]);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -231,8 +237,22 @@ describe('getArtifactsByDatasetId', () => {
     expect(artifactServiceStub).to.be.calledWith('abcd');
     expect(securityServiceStub).to.be.calledTwice;
     expect(mockRes.jsonValue).to.eql([
-      { artifact_id: 1, supplementaryData: { persecutionAndHarm: 'SECURED' } },
-      { artifact_id: 2, supplementaryData: { persecutionAndHarm: 'SECURED' } }
+      {
+        artifact_id: 1,
+        security_review_timestamp: new Date('1970-01-01T00:00:00.000Z'),
+        supplementaryData: {
+          persecutionAndHarmStatus: 'UNSECURED',
+          persecutionAndHarmRules: []
+        }
+      },
+      {
+        artifact_id: 2,
+        security_review_timestamp: new Date('1970-01-01T00:00:00.000Z'),
+        supplementaryData: {
+          persecutionAndHarmStatus: 'UNSECURED',
+          persecutionAndHarmRules: []
+        }
+      }
     ]);
   });
 

@@ -20,6 +20,7 @@ import { truncate } from 'lodash';
 import qs from 'qs';
 import { useCallback, useContext, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
+import { pluralize as p } from 'utils/Utils';
 import SearchComponent from './SearchComponent';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -196,10 +197,10 @@ const SearchPage = () => {
           {formikRef.current?.values.keywords && (
             <Typography variant="h2" className={classes.searchResultTitle}>
               {searchDataLoader.isLoading ? (
-                <>Loading...</>
+                <span>Loading...</span>
               ) : (
                 <>
-                  Found {`${results.length} result${results.length !== 1 ? 's' : ''}`}
+                  <span>{`Found ${results.length} ${p(results.length, 'result')}`}</span>
                   <Typography
                     variant="inherit"
                     component="span"
