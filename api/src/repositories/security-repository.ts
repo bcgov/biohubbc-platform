@@ -161,7 +161,7 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Delete persecution rules for a given artifact uuid
+   * Deletes all persecution and hard rules for a given UUID if they exists
    *
    * @param {string} artifactUUID
    */

@@ -29,8 +29,7 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description:
-    'Deletes artifacts. This will always return an object { success: boolean } to indicate if the deletion was successful or not.',
+  description: 'Deletes artifacts for a given list of UUIDs.',
   tags: ['artifact'],
   security: [
     {
@@ -73,6 +72,12 @@ POST.apiDoc = {
     400: {
       $ref: '#/components/responses/400'
     },
+    401: {
+      $ref: '#/components/responses/401'
+    },
+    403: {
+      $ref: '#/components/responses/403'
+    },
     500: {
       $ref: '#/components/responses/500'
     },
@@ -104,6 +109,7 @@ export function deleteArtifact(): RequestHandler {
 
       await service.deleteArtifacts(req.body.artifactUUIDs);
       res.status(200).json(true);
+      await connection.commit();
     } catch (error: any) {
       defaultLog.error({ label: 'deleteArtifact', message: 'error', error });
       await connection.rollback();

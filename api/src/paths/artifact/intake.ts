@@ -154,31 +154,35 @@ export function intakeArtifacts(): RequestHandler {
     }
 
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
-    if (sourceSystem) {
-      const connection = getServiceAccountDBConnection(sourceSystem);
+    if (!sourceSystem) {
+      throw new HTTP400('Failed to identify known submission source system', [
+        'token did not contain a clientId/azp or clientId/azp value is unknown'
+      ]);
+    }
 
-      try {
-        await connection.open();
+    const connection = getServiceAccountDBConnection(sourceSystem);
 
-        const artifactService = new ArtifactService(connection);
+    try {
+      await connection.open();
 
-        const response = await artifactService.uploadAndPersistArtifact(
-          dataPackageId,
-          { ...metadata, file_size },
-          fileUuid,
-          file
-        );
+      const artifactService = new ArtifactService(connection);
 
-        res.status(200).json(response);
+      const response = await artifactService.uploadAndPersistArtifact(
+        dataPackageId,
+        { ...metadata, file_size },
+        fileUuid,
+        file
+      );
 
-        await connection.commit();
-      } catch (error) {
-        defaultLog.error({ label: 'intakeArtifacts', message: 'error', error });
-        await connection.rollback();
-        throw error;
-      } finally {
-        connection.release();
-      }
+      res.status(200).json(response);
+
+      await connection.commit();
+    } catch (error) {
+      defaultLog.error({ label: 'intakeArtifacts', message: 'error', error });
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
     }
   };
 }
