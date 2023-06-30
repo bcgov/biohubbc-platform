@@ -8,6 +8,7 @@ import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { SecurityService } from '../../../../services/security-service';
 import { RelatedDataset, SubmissionService } from '../../../../services/submission-service';
+import { UserService } from '../../../../services/user-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { GET, getRelatedDatasetsByDatasetId } from './related';
 
@@ -285,6 +286,8 @@ describe('getRelatedDatasetsByDatasetId', () => {
       .stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId')
       .resolves([{ datasetId: 'aaa' }, { datasetId: 'bbb' }] as RelatedDataset[]);
 
+    const isSystemUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
+
     const securityStub = sinon.stub(SecurityService.prototype, 'isDatasetPendingReview');
     securityStub.onFirstCall().resolves(true);
     securityStub.onSecondCall().resolves(false);
@@ -317,11 +320,13 @@ describe('getRelatedDatasetsByDatasetId', () => {
         }
       ]
     });
+    expect(isSystemUserAdminStub).to.be.calledOnce;
   });
 
   it('catches and re-throws an error', async () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
     sinon.stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId').rejects(new Error('a test error'));
 
