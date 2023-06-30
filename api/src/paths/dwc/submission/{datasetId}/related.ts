@@ -4,6 +4,7 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { SecurityService } from '../../../../services/security-service';
 import { SubmissionService } from '../../../../services/submission-service';
+import { UserService } from '../../../../services/user-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/{datasetId}/related');
@@ -56,7 +57,6 @@ GET.apiDoc = {
                     },
                     supplementaryData: {
                       type: 'object',
-                      required: ['isPendingReview'],
                       properties: {
                         isPendingReview: {
                           type: 'boolean'
@@ -91,11 +91,20 @@ export function getRelatedDatasetsByDatasetId(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
       const securityService = new SecurityService(connection);
+      const userService = new UserService(connection);
 
+      const isAdmin = await userService.isSystemUserAdmin();
       const datasets = await submissionService.findRelatedDatasetsByDatasetId(datasetId);
 
       const datasetsWithSupplementaryData = await Promise.all(
         datasets.map(async (dataset) => {
+          if (!isAdmin) {
+            return {
+              ...dataset,
+              supplementaryData: {}
+            };
+          }
+
           const isDatasetPendingReview = await securityService.isDatasetPendingReview(dataset.datasetId);
 
           return {
