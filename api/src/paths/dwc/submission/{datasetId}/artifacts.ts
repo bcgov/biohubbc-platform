@@ -2,9 +2,9 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
+import { UserService } from '../../../../services/user-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/{datasetId}/artifacts');
@@ -145,30 +145,19 @@ export function getArtifactsByDatasetId(): RequestHandler {
 
     try {
       await connection.open();
-
+      const userService = new UserService(connection);
       const artifactService = new ArtifactService(connection);
       const securityService = new SecurityService(connection);
 
+      const isAdmin = await userService.isSystemUserAdmin();
       const artifacts = await artifactService.getArtifactsByDatasetId(datasetId);
 
       const artifactsWithRules = await Promise.all(
         artifacts.map(async (artifact) => {
-          const persecutionAndHarmRules = await securityService.getPersecutionAndHarmRulesByArtifactId(
-            artifact.artifact_id
-          );
-          let persecutionAndHarmStatus: SECURITY_APPLIED_STATUS = SECURITY_APPLIED_STATUS.PENDING;
-
-          if (artifact.security_review_timestamp) {
-            persecutionAndHarmStatus =
-              persecutionAndHarmRules.length > 0 ? SECURITY_APPLIED_STATUS.SECURED : SECURITY_APPLIED_STATUS.UNSECURED;
-          }
-
+          const supplementaryData = await securityService.getArtifactSupplementaryData(artifact.artifact_id, isAdmin);
           return {
             ...artifact,
-            supplementaryData: {
-              persecutionAndHarmRules,
-              persecutionAndHarmStatus
-            }
+            supplementaryData: supplementaryData
           };
         })
       );
