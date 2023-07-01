@@ -7,8 +7,10 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { Artifact } from '../../../../repositories/artifact-repository';
+import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
+import { UserService } from '../../../../services/user-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { GET, getArtifactsByDatasetId } from './artifacts';
 
@@ -219,9 +221,11 @@ describe('getArtifactsByDatasetId', () => {
       { artifact_id: 2, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') }
     ] as Artifact[]);
 
-    const securityServiceStub = sinon
-      .stub(SecurityService.prototype, 'getPersecutionAndHarmRulesByArtifactId')
-      .resolves([]);
+    const isSystemUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
+
+    const getArtifactSupplementaryDataStub = sinon
+      .stub(SecurityService.prototype, 'getArtifactSupplementaryData')
+      .resolves({ persecutionAndHarmRules: [], persecutionAndHarmStatus: SECURITY_APPLIED_STATUS.UNSECURED });
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -235,7 +239,6 @@ describe('getArtifactsByDatasetId', () => {
 
     expect(mockRes.statusValue).to.equal(200);
     expect(artifactServiceStub).to.be.calledWith('abcd');
-    expect(securityServiceStub).to.be.calledTwice;
     expect(mockRes.jsonValue).to.eql([
       {
         artifact_id: 1,
@@ -254,6 +257,8 @@ describe('getArtifactsByDatasetId', () => {
         }
       }
     ]);
+    expect(isSystemUserAdminStub).to.be.calledOnce;
+    expect(getArtifactSupplementaryDataStub).to.be.calledTwice;
   });
 
   it('catches and re-throws an error', async () => {
@@ -261,6 +266,7 @@ describe('getArtifactsByDatasetId', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').rejects(new Error('a test error'));
+    sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

@@ -86,6 +86,39 @@ export class SecurityService extends DBService {
   }
 
   /**
+   * Get Artifact Supplementary Data.
+   *
+   * @param {number} artifactId
+   * @param {boolean} isAdmin
+   * @return {*}  {Promise<{ persecutionAndHarmRules: ArtifactPersecution[]; persecutionAndHarmStatus: SECURITY_APPLIED_STATUS }>}
+   * @memberof SecurityService
+   */
+  async getArtifactSupplementaryData(
+    artifactId: number,
+    isAdmin: boolean
+  ): Promise<{ persecutionAndHarmRules: ArtifactPersecution[]; persecutionAndHarmStatus: SECURITY_APPLIED_STATUS }> {
+    defaultLog.debug({ label: 'getArtifactSupplementaryData' });
+
+    let persecutionAndHarmRules: ArtifactPersecution[] = [];
+
+    //If user is Admin, get all rules
+    if (isAdmin) {
+      persecutionAndHarmRules = await this.getPersecutionAndHarmRulesByArtifactId(artifactId);
+    }
+
+    let persecutionAndHarmStatus = await this.getSecurityAppliedStatus(artifactId);
+    //If user is not Admin and status is pending, set to secured
+    if (!isAdmin && persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING) {
+      persecutionAndHarmStatus = SECURITY_APPLIED_STATUS.SECURED;
+    }
+
+    return {
+      persecutionAndHarmRules: persecutionAndHarmRules,
+      persecutionAndHarmStatus: persecutionAndHarmStatus
+    };
+  }
+
+  /**
    * Apply security rules to all selected artifacts.
    *
    * @param {SecurityReason[]} securityReasons
@@ -271,5 +304,24 @@ export class SecurityService extends DBService {
   async isArtifactPendingReview(artifactId: number): Promise<boolean> {
     const artifact = await this.artifactService.getArtifactById(artifactId);
     return artifact.security_review_timestamp ? false : true;
+  }
+
+  /**
+   * Returns true is any artifacts in the dataset are pending review
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<boolean>}
+   * @memberof SecurityService
+   */
+  async isDatasetPendingReview(datasetId: string): Promise<boolean> {
+    const artifactIds = (await this.artifactService.getArtifactsByDatasetId(datasetId)).map((item) => item.artifact_id);
+
+    const artifactSecurityRules = await Promise.all(
+      artifactIds.map(async (artifactId) => await this.isArtifactPendingReview(artifactId))
+    );
+
+    const isPendingReview = artifactSecurityRules.includes(true);
+
+    return isPendingReview;
   }
 }

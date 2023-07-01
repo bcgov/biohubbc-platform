@@ -37,10 +37,13 @@ export interface IRelatedDataset {
   datasetId: string;
   title: string;
   url: string;
+  supplementaryData: {
+    isPendingReview: boolean;
+  };
 }
 
 export interface IListRelatedDatasetsResponse {
-  datasets: IRelatedDataset[];
+  datasetsWithSupplementaryData: IRelatedDataset[];
 }
 
 export interface IHandlebarsTemplates {

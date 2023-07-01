@@ -6,7 +6,9 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
+import { SecurityService } from '../../../../services/security-service';
 import { RelatedDataset, SubmissionService } from '../../../../services/submission-service';
+import { UserService } from '../../../../services/user-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { GET, getRelatedDatasetsByDatasetId } from './related';
 
@@ -67,7 +69,10 @@ describe('getRelatedDatasetsByDatasetId', () => {
       const mockRelatedDataset = {
         datasetId: '374c4d6a-3a04-405b-af6d-b6497800a691',
         title: 'Test-Related-Dataset',
-        url: 'https://example.com/374c4d6a-3a04-405b-af6d-b6497800a691'
+        url: 'https://example.com/374c4d6a-3a04-405b-af6d-b6497800a691',
+        supplementaryData: {
+          isPendingReview: false
+        }
       };
 
       describe('should throw an error when', () => {
@@ -281,6 +286,12 @@ describe('getRelatedDatasetsByDatasetId', () => {
       .stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId')
       .resolves([{ datasetId: 'aaa' }, { datasetId: 'bbb' }] as RelatedDataset[]);
 
+    const isSystemUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
+
+    const securityStub = sinon.stub(SecurityService.prototype, 'isDatasetPendingReview');
+    securityStub.onFirstCall().resolves(true);
+    securityStub.onSecondCall().resolves(false);
+
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
     mockReq.params = {
@@ -294,13 +305,28 @@ describe('getRelatedDatasetsByDatasetId', () => {
     expect(mockRes.statusValue).to.equal(200);
     expect(submissionServiceStub).to.be.calledWith('abcd');
     expect(mockRes.jsonValue).to.eql({
-      datasets: [{ datasetId: 'aaa' }, { datasetId: 'bbb' }]
+      datasetsWithSupplementaryData: [
+        {
+          datasetId: 'aaa',
+          supplementaryData: {
+            isPendingReview: true
+          }
+        },
+        {
+          datasetId: 'bbb',
+          supplementaryData: {
+            isPendingReview: false
+          }
+        }
+      ]
     });
+    expect(isSystemUserAdminStub).to.be.calledOnce;
   });
 
   it('catches and re-throws an error', async () => {
     const dbConnectionObj = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
     sinon.stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId').rejects(new Error('a test error'));
 
