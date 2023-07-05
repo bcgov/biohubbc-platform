@@ -451,11 +451,14 @@ export class SubmissionService extends DBService {
     const datasetsForReview: IDatasetsForReview[] = [];
 
     for await (const item of data) {
+      // total of all artifacts needing review
       let rollUpCount = 0;
       const dates: string[] = [];
 
+      // fetch artifact count for any related datasets
       if (item.related_projects) {
         for await (const rp of item.related_projects) {
+          console.log(rp['@_id']);
           const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
           if (rpCount) {
             rollUpCount += rpCount.artifacts_to_review;
@@ -464,25 +467,27 @@ export class SubmissionService extends DBService {
         }
       }
 
+      // fetch artifact count for primary datasets
       const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(
         item.dataset_id
       );
       if (parentArtifactCount) {
-        const finalCount = rollUpCount + parentArtifactCount.artifacts_to_review;
+        rollUpCount += parentArtifactCount.artifacts_to_review;
+        dates.push(parentArtifactCount.last_updated ?? '');
+      }
 
-        // only push projects with artifacts to review
-        if (finalCount > 0) {
-          dates.push(parentArtifactCount.last_updated ?? '');
-          datasetsForReview.push({
-            dataset_id: parentArtifactCount.dataset_id,
-            artifacts_to_review: finalCount,
-            dataset_name: item.dataset_name,
-            last_updated: this.mostRecentDate(dates),
-            keywords: item.keywords
-          });
-        }
+      // only add to returned list if there are any artifacts for review
+      if (rollUpCount > 0) {
+        datasetsForReview.push({
+          dataset_id: item.dataset_id,
+          artifacts_to_review: rollUpCount,
+          dataset_name: item.dataset_name,
+          last_updated: this.mostRecentDate(dates),
+          keywords: item.keywords
+        });
       }
     }
+
     return datasetsForReview;
   }
 
