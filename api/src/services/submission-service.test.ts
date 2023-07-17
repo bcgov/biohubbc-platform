@@ -649,21 +649,21 @@ describe('SubmissionService', () => {
       expect(stubArtifactCount).to.be.calledWith('RP_UUID_3');
       expect(response).to.be.eql([
         {
-          dataset_id: '',
+          dataset_id: 'UUID',
           artifacts_to_review: 1,
           dataset_name: 'Project Name',
           last_updated: '',
           keywords: []
         },
         {
-          dataset_id: '',
+          dataset_id: 'UUID',
           artifacts_to_review: 3,
           dataset_name: 'Project Name',
           last_updated: '',
           keywords: []
         },
         {
-          dataset_id: '',
+          dataset_id: 'UUID',
           artifacts_to_review: 2,
           dataset_name: 'Project Name',
           last_updated: '',
