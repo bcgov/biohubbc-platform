@@ -458,7 +458,6 @@ export class SubmissionService extends DBService {
       // fetch artifact count for any related datasets
       if (item.related_projects) {
         for await (const rp of item.related_projects) {
-          console.log(rp['@_id']);
           const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
           if (rpCount) {
             rollUpCount += rpCount.artifacts_to_review;
