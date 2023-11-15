@@ -1,8 +1,5 @@
 import { Knex } from 'knex';
 
-const DB_SCHEMA = process.env.DB_SCHEMA;
-const DB_SCHEMA_DAPI_V1 = process.env.DB_SCHEMA_DAPI_V1;
-
 /**
  * Add spatial transform
  *
@@ -12,8 +9,8 @@ const DB_SCHEMA_DAPI_V1 = process.env.DB_SCHEMA_DAPI_V1;
  */
 export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`
-    SET SCHEMA '${DB_SCHEMA}';
-    SET SEARCH_PATH = ${DB_SCHEMA}, ${DB_SCHEMA_DAPI_V1};
+    SET SCHEMA 'biohub';
+    SET SEARCH_PATH = 'biohub';
   `);
 
   const response = await knex.raw(checkTransformExists());

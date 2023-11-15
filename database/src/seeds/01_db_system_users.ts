@@ -1,6 +1,5 @@
 import { Knex } from 'knex';
 
-const DB_SCHEMA = process.env.DB_SCHEMA;
 const DB_ADMIN = process.env.DB_ADMIN;
 
 export enum SYSTEM_IDENTITY_SOURCE {
@@ -86,8 +85,8 @@ const systemUsers = [
  */
 export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`
-    set schema '${DB_SCHEMA}';
-    set search_path = ${DB_SCHEMA};
+    set schema 'biohub';
+    set search_path = 'biohub';
   `);
 
   for (const systemUser of systemUsers) {

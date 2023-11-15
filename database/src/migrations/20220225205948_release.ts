@@ -63,35 +63,21 @@ export async function up(knex: Knex): Promise<void> {
     path.join(__dirname, DB_RELEASE, 'populate_persecution_or_harm.sql')
   );
 
-  const vw_generated_dapi_views = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'vw_generated_dapi_views.sql'));
-
   await knex.raw(`
     -- set up spatial extensions
     ${create_spatial_extensions}
 
     -- set up biohub schema
     create schema if not exists biohub;
+    
+    -- setup postgres user
     GRANT ALL ON SCHEMA biohub TO postgres;
-    set search_path = biohub, public;
-
-    -- setup biohub api schema
-    create schema if not exists biohub_dapi_v1;
+    set search_path = biohub, public, topology;
 
     -- setup api user
     create user ${DB_USER_API} password '${DB_USER_API_PASS}';
-    alter schema biohub_dapi_v1 owner to ${DB_USER_API};
-
-    -- Grant rights on biohub_dapi_v1 to biohub_api user
-    grant all on schema biohub_dapi_v1 to ${DB_USER_API};
-    grant all on schema biohub_dapi_v1 to postgres;
-    alter DEFAULT PRIVILEGES in SCHEMA biohub_dapi_v1 grant ALL on tables to ${DB_USER_API};
-    alter DEFAULT PRIVILEGES in SCHEMA biohub_dapi_v1 grant ALL on tables to postgres;
-
-    -- biohub grants
-    GRANT USAGE ON SCHEMA biohub TO ${DB_USER_API};
-    ALTER DEFAULT PRIVILEGES IN SCHEMA biohub GRANT ALL ON TABLES TO ${DB_USER_API};
-
-    alter role ${DB_USER_API} set search_path to biohub_dapi_v1, biohub, public, topology;
+    GRANT ALL ON SCHEMA biohub TO ${DB_USER_API};
+    alter role ${DB_USER_API} set search_path to biohub, public, topology;
 
     ${biohub_ddl}
     ${populate_user_identity_source}
@@ -118,21 +104,14 @@ export async function up(knex: Knex): Promise<void> {
     ${populate_persecution_or_harm_type}
     ${populate_persecution_or_harm}
 
-    -- create the views
-    set search_path = biohub_dapi_v1;
-    set role biohub_api;
-    ${vw_generated_dapi_views}
-
     set role postgres;
-    set search_path = biohub;
-    grant execute on function biohub.api_set_context(_system_user_identifier system_user.user_identifier%type, _user_identity_source_name user_identity_source.name%type) to ${DB_USER_API};
+    set search_path = biohub, public;
   `);
 }
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     DROP SCHEMA IF EXISTS biohub CASCADE;
-    DROP SCHEMA IF EXISTS biohub_dapi_v1 CASCADE;
     DROP USER IF EXISTS ${DB_USER_API};
   `);
 }

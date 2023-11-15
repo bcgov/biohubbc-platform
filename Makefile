@@ -56,6 +56,14 @@ clean: ## Closes and cleans (removes) all project containers
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml down -v --rmi all --remove-orphans
 
+prune: ## Deletes ALL docker artifacts (even those not associated to this project)
+	@echo -n "Delete ALL docker artifacts? [y/n] " && read ans && [ $${ans:-n} = y ]
+	@echo "==============================================="
+	@echo "Make: prune - deleting all docker artifacts"
+	@echo "==============================================="
+	@docker system prune --all --volumes -f
+	@docker volume prune --all -f
+
 ## ------------------------------------------------------------------------------
 ## Build/Run Postgres DB Commands
 ## - Builds all of the BioHub postgres db projects (db, db_setup)
