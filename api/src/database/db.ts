@@ -421,7 +421,7 @@ export const getAPIUserDBConnection = (): IDBConnection => {
  */
 export const getServiceAccountDBConnection = (sourceSystem: SOURCE_SYSTEM): IDBConnection => {
   return getDBConnection({
-    preferred_username: `service-account-${sourceSystem}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
+    preferred_username: `-${sourceSystem}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
     identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
   });
 };
