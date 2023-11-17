@@ -45,7 +45,7 @@ export async function up(knex: Knex): Promise<void> {
     insert into feature_type (name, display_name, description, record_effective_date) values ('sample_period', 'Sample Period', 'A datetime period in which data was collected', now());
     insert into feature_type (name, display_name, description, record_effective_date) values ('observation',   'Observation',   'An observation record',                         now());
     insert into feature_type (name, display_name, description, record_effective_date) values ('animal',        'Animal',        'An individual animal record',                   now());
-    insert into feature_type (name, display_name, description, record_effective_date) values ('telemetry',     'Telemetry       ', 'A telemetry record',                         now());
+    insert into feature_type (name, display_name, description, record_effective_date) values ('telemetry',     'Telemetry',     'A telemetry record',                         now());
 
     -- populate feature_type_property table
     -- feature_type: dataset
