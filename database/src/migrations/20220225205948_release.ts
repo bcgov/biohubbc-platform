@@ -76,8 +76,7 @@ export async function up(knex: Knex): Promise<void> {
 
     -- setup biohub_api user
     create user ${DB_USER_API} password '${DB_USER_API_PASS}';
-    -- GRANT ALL ON SCHEMA biohub TO ${DB_USER_API};
-    -- GRANT ALL ON ALL TABLES IN SCHEMA biohub TO ${DB_USER_API};
+    GRANT USAGE ON SCHEMA biohub TO ${DB_USER_API};
     alter role ${DB_USER_API} set search_path to "$user", biohub, public;
 
     ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
