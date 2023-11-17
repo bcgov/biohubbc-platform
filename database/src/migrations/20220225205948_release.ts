@@ -72,12 +72,25 @@ export async function up(knex: Knex): Promise<void> {
     
     -- setup postgres user
     GRANT ALL ON SCHEMA biohub TO postgres;
-    set search_path = biohub, public, topology;
+    set search_path = biohub, public;
 
-    -- setup api user
+    -- setup biohub_api user
     create user ${DB_USER_API} password '${DB_USER_API_PASS}';
-    GRANT ALL ON SCHEMA biohub TO ${DB_USER_API};
-    alter role ${DB_USER_API} set search_path to biohub, public, topology;
+    -- GRANT ALL ON SCHEMA biohub TO ${DB_USER_API};
+    -- GRANT ALL ON ALL TABLES IN SCHEMA biohub TO ${DB_USER_API};
+    alter role ${DB_USER_API} set search_path to "$user", biohub, public;
+
+    ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO biohub_api;
+
+    ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
+    GRANT EXECUTE ON FUNCTIONS TO biohub_api;
+
+    ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
+    GRANT USAGE ON TYPES TO biohub_api;
+
+    ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
+    GRANT USAGE, SELECT ON SEQUENCES TO biohub_api;
 
     ${biohub_ddl}
     ${populate_user_identity_source}
@@ -93,7 +106,6 @@ export async function up(knex: Knex): Promise<void> {
     ${create_sequences}
 
     -- populate look up tables
-    set search_path = biohub, public;
     ${populate_system_constants}
     ${populate_system_role}
     ${populate_system_metadata_constant}
