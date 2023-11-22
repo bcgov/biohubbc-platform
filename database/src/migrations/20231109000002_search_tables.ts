@@ -123,32 +123,6 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON TABLE  search_spatial                        IS 'Spatial search values';
 
     ----------------------------------------------------------------------------------------
-
-    CREATE TABLE search_taxonomy(
-      search_taxonomy_id       integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      submission_feature_id    integer           NOT NULL,
-      feature_property_id      integer           NOT NULL,
-      value                    numeric           NOT NULL,
-      create_date              timestamptz(6)    DEFAULT now() NOT NULL,
-      create_user              integer           NOT NULL,
-      update_date              timestamptz(6),
-      update_user              integer,
-      revision_count           integer           DEFAULT 0 NOT NULL,
-      CONSTRAINT search_taxonomy_pk PRIMARY KEY (search_taxonomy_id)
-    );
-
-    COMMENT ON COLUMN search_taxonomy.search_taxonomy_id     IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN search_taxonomy.submission_feature_id  IS 'Foreign key to the submission_feature table.';
-    COMMENT ON COLUMN search_taxonomy.feature_property_id    IS 'Foreign key to the feature_property table.';
-    COMMENT ON COLUMN search_taxonomy.value                  IS 'The search value of the record.';
-    COMMENT ON COLUMN search_taxonomy.create_date            IS 'The taxonomy the record was created.';
-    COMMENT ON COLUMN search_taxonomy.create_user            IS 'The id of the user who created the record as identified in the system user table.';
-    COMMENT ON COLUMN search_taxonomy.update_date            IS 'The taxonomy the record was updated.';
-    COMMENT ON COLUMN search_taxonomy.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
-    COMMENT ON COLUMN search_taxonomy.revision_count         IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  search_taxonomy                        IS 'Taxonomy search values';
-
-    ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: search_string
     ----------------------------------------------------------------------------------------
 
@@ -230,26 +204,6 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX search_spatial_idx3 ON search_spatial using GIST(value);
 
     ----------------------------------------------------------------------------------------
-    -- Create Indexes and Constraints for table: search_taxonomy
-    ----------------------------------------------------------------------------------------
-
-    -- Add foreign key constraint
-    ALTER TABLE search_taxonomy ADD CONSTRAINT search_taxonomy_fk1
-      FOREIGN KEY (submission_feature_id)
-      REFERENCES submission_feature(submission_feature_id);
-
-    ALTER TABLE search_taxonomy ADD CONSTRAINT search_taxonomy_fk2
-      FOREIGN KEY (feature_property_id)
-      REFERENCES feature_property(feature_property_id);
-
-    -- add indexes for foreign keys
-    CREATE INDEX search_taxonomy_idx1 ON search_taxonomy(submission_feature_id);
-
-    CREATE INDEX search_taxonomy_idx2 ON search_taxonomy(feature_property_id);
-
-    CREATE INDEX search_taxonomy_idx3 ON search_taxonomy(value);
-
-    ----------------------------------------------------------------------------------------
     -- Create audit and journal triggers
     ----------------------------------------------------------------------------------------
 
@@ -264,9 +218,6 @@ export async function up(knex: Knex): Promise<void> {
 
     create trigger audit_search_spatial before insert or update or delete on search_spatial for each row execute procedure tr_audit_trigger();
     create trigger journal_search_spatial after insert or update or delete on search_spatial for each row execute procedure tr_journal_trigger();
-
-    create trigger audit_search_taxonomy before insert or update or delete on search_taxonomy for each row execute procedure tr_audit_trigger();
-    create trigger journal_search_taxonomy after insert or update or delete on search_taxonomy for each row execute procedure tr_journal_trigger();
   `);
 }
 

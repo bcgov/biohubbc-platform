@@ -299,7 +299,7 @@ const insertSearchTaxonomy = (options: { submission_feature_id: number }) => `
     values
     (
         ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'taxonomy'),
+        (select feature_property_id from feature_property where name = 'number'),
         $$${faker.number.int({ min: 10000, max: 99999 })}$$
     );
 `;
