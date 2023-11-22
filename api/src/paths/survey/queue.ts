@@ -1,9 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SOURCE_SYSTEM } from '../../constants/database';
+import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { SubmissionService } from '../../services/submission-service';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
@@ -36,8 +39,12 @@ POST.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
-          required: ['surveyId', 'additionalInformation'],
+          required: ['uuid', 'surveyId', 'additionalInformation'],
           properties: {
+            uuid: {
+              type: 'string',
+              description: 'UUID'
+            },
             surveyId: {
               type: 'number',
               description: 'Survey Id'
@@ -58,9 +65,9 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['queue_id'],
+            required: ['submission_id'],
             properties: {
-              queue_id: {
+              submission_id: {
                 type: 'integer'
               }
             }
@@ -82,27 +89,36 @@ export function queueForProcess(): RequestHandler {
       ]);
     }
 
-    const id = req.body.surveyId;
+    const uuid = req.body.uuid;
     const additionalInformation = req.body.additionalInformation;
-    console.log('id', id);
-    console.log('additionalInformation', additionalInformation);
 
-    // const connection = getServiceAccountDBConnection(sourceSystem);
+    const connection = getServiceAccountDBConnection(sourceSystem);
 
     try {
-      // await connection.open();
+      await connection.open();
 
-      // const service = new SubmissionJobQueueService(connection);
-      // const queueRecord = await service.intake(id, file, );
+      const submissionService = new SubmissionService(connection);
 
-      // await connection.commit();
-      res.status(200).json({ queue_id: 1 });
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
+        uuid: uuid,
+        source_transform_id: 1
+      });
+
+      await submissionService.insertSubmissionStatusAndMessage(
+        response.submission_id,
+        SUBMISSION_STATUS_TYPE.PUBLISHED,
+        SUBMISSION_MESSAGE_TYPE.NOTICE,
+        additionalInformation
+      );
+
+      await connection.commit();
+      res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'queueForProcess', message: 'error', error });
-      // await connection.rollback();
+      await connection.rollback();
       throw error;
     } finally {
-      // connection.release();
+      connection.release();
     }
   };
 }
