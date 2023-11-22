@@ -3,8 +3,9 @@ import { faker } from '@faker-js/faker';
 import random from 'geojson-random';
 import { Knex } from 'knex';
 
-// Disable mock data seeding by default, unless manually enabled
-const ENABLED = false;
+// Disable mock data seeding by default. Set `ENABLE_MOCK_FEATURE_DATA=true` to enable.
+const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
+const NUM_MOCK_FEATURE_SUBMISSIONS = Number(process.env.NUM_MOCK_FEATURE_SUBMISSIONS || 0);
 
 /**
  * Sample query for performance testing.
@@ -40,7 +41,7 @@ const ENABLED = false;
  * @return {*}  {Promise<void>}
  */
 export async function seed(knex: Knex): Promise<void> {
-  if (!ENABLED) {
+  if (!ENABLE_MOCK_FEATURE_SEEDING) {
     return knex.raw(`SELECT null;`); // dummy query to appease knex
   }
 
@@ -49,9 +50,7 @@ export async function seed(knex: Knex): Promise<void> {
     SET SEARCH_PATH = 'biohub','public';
   `);
 
-  const numSubmissions = 10000; // Number of submissions (ie: surveys)
-
-  for (let i = 0; i < numSubmissions; i++) {
+  for (let i = 0; i < NUM_MOCK_FEATURE_SUBMISSIONS; i++) {
     await insertRecord(knex);
   }
 }
