@@ -17,7 +17,7 @@ export async function up(knex: Knex): Promise<void> {
     ----------------------------------------------------------------------------------------
     -- Create tables
     ----------------------------------------------------------------------------------------
-    set search_path=biohub,public;  
+    set search_path=biohub,public;
 
     CREATE TABLE submission_feature(
       submission_feature_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
@@ -34,7 +34,7 @@ export async function up(knex: Knex): Promise<void> {
       revision_count                 integer           DEFAULT 0 NOT NULL,
       CONSTRAINT submission_feature_pk PRIMARY KEY (submission_feature_id)
     );
-  
+
     COMMENT ON COLUMN submission_feature.submission_feature_id           IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN submission_feature.submission_id                   IS 'Foreign key to the submission table.';
     COMMENT ON COLUMN submission_feature.feature_type_id                 IS 'Foreign key to the feature_type table.';
@@ -48,14 +48,14 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN submission_feature.update_user                     IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN submission_feature.revision_count                  IS 'Revision count used for concurrency control.';
     COMMENT ON TABLE  submission_feature                                 IS 'A set of data for a specific feature of a submission.';
-    
+
     ----------------------------------------------------------------------------------------
 
     CREATE TABLE feature_type(
       feature_type_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      name                     varchar(50)       NOT NULL,
+      name                     varchar(100)      NOT NULL,
       display_name             varchar(100)      NOT NULL,
-      description              varchar(3000),
+      description              varchar(500),
       record_effective_date    date              NOT NULL,
       record_end_date          date,
       create_date              timestamptz(6)    DEFAULT now() NOT NULL,
@@ -78,7 +78,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN feature_type.update_user              IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN feature_type.revision_count           IS 'Revision count used for concurrency control.';
     COMMENT ON TABLE  feature_type                          IS 'Defines feature types.';
-      
+
     ----------------------------------------------------------------------------------------
 
     CREATE TABLE feature_type_property(
@@ -106,15 +106,15 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN feature_type_property.update_user                 IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN feature_type_property.revision_count              IS 'Revision count used for concurrency control.';
     COMMENT ON TABLE  feature_type_property                             IS 'A join table on feature type and feature_property. Defines which properties can be used by a given feature type.';
-    
+
     ----------------------------------------------------------------------------------------
 
     CREATE TABLE feature_property(
       feature_property_id           integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       feature_property_type_id      integer           NOT NULL,
-      name                          varchar(50)       NOT NULL,
+      name                          varchar(100)      NOT NULL,
       display_name                  varchar(100)      NOT NULL,
-      description                   varchar(3000),
+      description                   varchar(500),
       parent_feature_property_id    integer,
       record_effective_date         date              NOT NULL,
       record_end_date               date,
@@ -146,7 +146,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TABLE feature_property_type(
       feature_property_type_id   integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       name                       varchar(100)      NOT NULL,
-      description                varchar(3000),
+      description                varchar(500),
       record_effective_date      date              NOT NULL,
       record_end_date            date,
       create_date                timestamptz(6)    DEFAULT now() NOT NULL,

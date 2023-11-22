@@ -25,8 +25,6 @@ export async function up(knex: Knex): Promise<void> {
       submission_feature_id    integer           NOT NULL,
       feature_property_id      integer           NOT NULL,
       value                    varchar(250)      NOT NULL,
---    record_effective_date    date              NOT NULL,
---    record_end_date          date,
       create_date              timestamptz(6)    DEFAULT now() NOT NULL,
       create_user              integer           NOT NULL,
       update_date              timestamptz(6),
@@ -34,20 +32,18 @@ export async function up(knex: Knex): Promise<void> {
       revision_count           integer           DEFAULT 0 NOT NULL,
       CONSTRAINT search_string_pk PRIMARY KEY (search_string_id)
     );
-  
+
     COMMENT ON COLUMN search_string.search_string_id       IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN search_string.submission_feature_id  IS 'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN search_string.feature_property_id    IS 'Foreign key to the feature_property table.';
     COMMENT ON COLUMN search_string.value                  IS 'The search value of the record.';
---  COMMENT ON COLUMN search_string.record_effective_date  IS 'Record level effective date.';
---  COMMENT ON COLUMN search_string.record_end_date        IS 'Record level end date.';
     COMMENT ON COLUMN search_string.create_date            IS 'The datetime the record was created.';
     COMMENT ON COLUMN search_string.create_user            IS 'The id of the user who created the record as identified in the system user table.';
     COMMENT ON COLUMN search_string.update_date            IS 'The datetime the record was updated.';
     COMMENT ON COLUMN search_string.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN search_string.revision_count         IS 'Revision count used for concurrency control.';
     COMMENT ON TABLE  search_string                        IS 'String search values';
-    
+
     ----------------------------------------------------------------------------------------
 
     CREATE TABLE search_number(
@@ -55,8 +51,6 @@ export async function up(knex: Knex): Promise<void> {
       submission_feature_id    integer           NOT NULL,
       feature_property_id      integer           NOT NULL,
       value                    numeric           NOT NULL,
---    record_effective_date    date              NOT NULL,
---    record_end_date          date,
       create_date              timestamptz(6)    DEFAULT now() NOT NULL,
       create_user              integer           NOT NULL,
       update_date              timestamptz(6),
@@ -64,13 +58,11 @@ export async function up(knex: Knex): Promise<void> {
       revision_count           integer           DEFAULT 0 NOT NULL,
       CONSTRAINT search_number_pk PRIMARY KEY (search_number_id)
     );
-  
+
     COMMENT ON COLUMN search_number.search_number_id       IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN search_number.submission_feature_id  IS 'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN search_number.feature_property_id    IS 'Foreign key to the feature_property table.';
     COMMENT ON COLUMN search_number.value                  IS 'The search value of the record.';
---  COMMENT ON COLUMN search_number.record_effective_date  IS 'Record level effective date.';
---  COMMENT ON COLUMN search_number.record_end_date        IS 'Record level end date.';
     COMMENT ON COLUMN search_number.create_date            IS 'The datetime the record was created.';
     COMMENT ON COLUMN search_number.create_user            IS 'The id of the user who created the record as identified in the system user table.';
     COMMENT ON COLUMN search_number.update_date            IS 'The datetime the record was updated.';
@@ -85,8 +77,6 @@ export async function up(knex: Knex): Promise<void> {
       submission_feature_id    integer           NOT NULL,
       feature_property_id      integer           NOT NULL,
       value                    timestamptz(6)    NOT NULL,
---    record_effective_date    date              NOT NULL,
---    record_end_date          date,
       create_date              timestamptz(6)    DEFAULT now() NOT NULL,
       create_user              integer           NOT NULL,
       update_date              timestamptz(6),
@@ -94,13 +84,11 @@ export async function up(knex: Knex): Promise<void> {
       revision_count           integer           DEFAULT 0 NOT NULL,
       CONSTRAINT search_datetime_pk PRIMARY KEY (search_datetime_id)
     );
-  
+
     COMMENT ON COLUMN search_datetime.search_datetime_id     IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN search_datetime.submission_feature_id  IS 'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN search_datetime.feature_property_id    IS 'Foreign key to the feature_property table.';
     COMMENT ON COLUMN search_datetime.value                  IS 'The search value of the record.';
---  COMMENT ON COLUMN search_datetime.record_effective_date  IS 'Record level effective date.';
---  COMMENT ON COLUMN search_datetime.record_end_date        IS 'Record level end date.';
     COMMENT ON COLUMN search_datetime.create_date            IS 'The datetime the record was created.';
     COMMENT ON COLUMN search_datetime.create_user            IS 'The id of the user who created the record as identified in the system user table.';
     COMMENT ON COLUMN search_datetime.update_date            IS 'The datetime the record was updated.';
@@ -115,8 +103,6 @@ export async function up(knex: Knex): Promise<void> {
       submission_feature_id    integer                    NOT NULL,
       feature_property_id      integer                    NOT NULL,
       value                    geometry                   NOT NULL,
---    record_effective_date    date                       NOT NULL,
---    record_end_date          date,
       create_date              timestamptz(6)             DEFAULT now() NOT NULL,
       create_user              integer                    NOT NULL,
       update_date              timestamptz(6),
@@ -124,13 +110,11 @@ export async function up(knex: Knex): Promise<void> {
       revision_count           integer                    DEFAULT 0 NOT NULL,
       CONSTRAINT search_spatial_pk PRIMARY KEY (search_spatial_id)
     );
-  
+
     COMMENT ON COLUMN search_spatial.search_spatial_id      IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN search_spatial.submission_feature_id  IS 'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN search_spatial.feature_property_id    IS 'Foreign key to the feature_property table.';
     COMMENT ON COLUMN search_spatial.value                  IS 'The search value of the record.';
---  COMMENT ON COLUMN search_spatial.record_effective_date  IS 'Record level effective date.';
---  COMMENT ON COLUMN search_spatial.record_end_date        IS 'Record level end date.';
     COMMENT ON COLUMN search_spatial.create_date            IS 'The spatial the record was created.';
     COMMENT ON COLUMN search_spatial.create_user            IS 'The id of the user who created the record as identified in the system user table.';
     COMMENT ON COLUMN search_spatial.update_date            IS 'The spatial the record was updated.';
@@ -145,8 +129,6 @@ export async function up(knex: Knex): Promise<void> {
       submission_feature_id    integer           NOT NULL,
       feature_property_id      integer           NOT NULL,
       value                    numeric           NOT NULL,
---    record_effective_date    date              NOT NULL,
---    record_end_date          date,
       create_date              timestamptz(6)    DEFAULT now() NOT NULL,
       create_user              integer           NOT NULL,
       update_date              timestamptz(6),
@@ -154,13 +136,11 @@ export async function up(knex: Knex): Promise<void> {
       revision_count           integer           DEFAULT 0 NOT NULL,
       CONSTRAINT search_taxonomy_pk PRIMARY KEY (search_taxonomy_id)
     );
-  
+
     COMMENT ON COLUMN search_taxonomy.search_taxonomy_id     IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN search_taxonomy.submission_feature_id  IS 'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN search_taxonomy.feature_property_id    IS 'Foreign key to the feature_property table.';
     COMMENT ON COLUMN search_taxonomy.value                  IS 'The search value of the record.';
---  COMMENT ON COLUMN search_taxonomy.record_effective_date  IS 'Record level effective date.';
---  COMMENT ON COLUMN search_taxonomy.record_end_date        IS 'Record level end date.';
     COMMENT ON COLUMN search_taxonomy.create_date            IS 'The taxonomy the record was created.';
     COMMENT ON COLUMN search_taxonomy.create_user            IS 'The id of the user who created the record as identified in the system user table.';
     COMMENT ON COLUMN search_taxonomy.update_date            IS 'The taxonomy the record was updated.';

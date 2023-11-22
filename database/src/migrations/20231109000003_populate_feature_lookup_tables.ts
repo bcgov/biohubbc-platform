@@ -45,7 +45,7 @@ export async function up(knex: Knex): Promise<void> {
     insert into feature_type (name, display_name, description, record_effective_date) values ('sample_period', 'Sample Period', 'A datetime period in which data was collected', now());
     insert into feature_type (name, display_name, description, record_effective_date) values ('observation',   'Observation',   'An observation record',                         now());
     insert into feature_type (name, display_name, description, record_effective_date) values ('animal',        'Animal',        'An individual animal record',                   now());
-    insert into feature_type (name, display_name, description, record_effective_date) values ('telemetry',     'Telemetry',     'A telemetry record',                         now());
+    insert into feature_type (name, display_name, description, record_effective_date) values ('telemetry',     'Telemetry',     'A telemetry record',                            now());
 
     -- populate feature_type_property table
     -- feature_type: dataset
@@ -56,21 +56,21 @@ export async function up(knex: Knex): Promise<void> {
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'dataset'), (select feature_property_id from feature_property where name = 'start_date'),  now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'dataset'), (select feature_property_id from feature_property where name = 'end_date'),    now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'dataset'), (select feature_property_id from feature_property where name = 'geometry'),    now());
-    
+
     -- feature_type: sample_site
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_site'), (select feature_property_id from feature_property where name = 'name'),        now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_site'), (select feature_property_id from feature_property where name = 'description'), now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_site'), (select feature_property_id from feature_property where name = 'geometry'),    now());
-    
+
     -- feature_type: sample_method
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_method'), (select feature_property_id from feature_property where name = 'name'),        now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_method'), (select feature_property_id from feature_property where name = 'description'), now());
-    
+
     -- feature_type: sample_period
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_period'), (select feature_property_id from feature_property where name = 'date_range'), now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_period'), (select feature_property_id from feature_property where name = 'start_date'), now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_period'), (select feature_property_id from feature_property where name = 'end_date'),   now());
-    
+
     -- feature_type: observation
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'observation'), (select feature_property_id from feature_property where name = 'taxonomy'),   now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'observation'), (select feature_property_id from feature_property where name = 'date_range'), now());
@@ -78,10 +78,10 @@ export async function up(knex: Knex): Promise<void> {
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'observation'), (select feature_property_id from feature_property where name = 'end_date'),   now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'observation'), (select feature_property_id from feature_property where name = 'geometry'),   now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'observation'), (select feature_property_id from feature_property where name = 'count'),      now());
-    
+
     -- feature_type: animal
-    insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'animal'),        (select feature_property_id from feature_property where name = 'taxonomy'), now());
-    
+    insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'animal'), (select feature_property_id from feature_property where name = 'taxonomy'), now());
+
     -- feature_type: telemetry
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'telemetry'), (select feature_property_id from feature_property where name = 'date_range'),  now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'telemetry'), (select feature_property_id from feature_property where name = 'start_date'),  now());
