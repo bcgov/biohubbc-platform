@@ -35,6 +35,7 @@ parameters:
     description: Application Environment type variable
     required: true
     value: 'dev'
+  - name: NODE_OPTIONS
   - name: ELASTICSEARCH_URL
     description: Platform Elasticsearch URL
     required: true
@@ -223,6 +224,8 @@ objects:
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
                   value: ${NODE_ENV}
+                - name: NODE_OPTIONS
+                  value: ${NODE_OPTIONS}
                 - name: ELASTICSEARCH_URL
                   value: ${ELASTICSEARCH_URL}
                 - name: ELASTICSEARCH_EML_INDEX
