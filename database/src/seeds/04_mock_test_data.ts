@@ -8,27 +8,23 @@ const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEED
 const NUM_MOCK_FEATURE_SUBMISSIONS = Number(process.env.NUM_MOCK_FEATURE_SUBMISSIONS || 0);
 
 /**
- * Sample query for performance testing.
+ * Search query for performance testing.
  *
  * -- Select feature_submissions on multiple conditions (AND)
- * select * from submission_feature
- *   where feature_type_id = 1 and submission_feature_id in (
- *     select distinct t1.submission_feature_id
- *     FROM search_string t1
+ * SELECT * FROM submission_feature WHERE submission_feature_id IN (
+ *     SELECT DISTINCT t1.submission_feature_id FROM submission_feature t1
  *     WHERE EXISTS (
- *       select 1 from search_string t3 where t3.submission_feature_id = t1.submission_feature_id and t3.value like '%cor%'
- *     ) and exists (
- *       select 1 from search_string t4 where t4.submission_feature_id = t1.submission_feature_id and t4.value like '%arx%'
- *     ) and exists (
- *       select 1 from search_number t5 where t5.submission_feature_id = t1.submission_feature_id and t5.value > 40 and t5.value < 50
- *     ) and exists (
- *       select 1 from search_taxonomy t6 where t6.submission_feature_id = t1.submission_feature_id and t6.value > 50000 and t6.value < 50100
- *     ) and exists (
- *       select 1 from search_datetime t7 where t7.submission_feature_id = t1.submission_feature_id and t7.value > '2023-08-01' and t7.value < '2024-04-01' and t7.feature_property_id = (select feature_property_id from feature_property where name = 'start_date')
- *     ) and exists (
- *       select 1 from search_datetime t7 where t7.submission_feature_id = t1.submission_feature_id and t7.value > '2023-08-01' and t7.value < '2024-04-01' and t7.feature_property_id = (select feature_property_id from feature_property where name = 'end_date')
- *     ) and exists (
- *       select 1 from search_spatial t8 where t8.submission_feature_id = t1.submission_feature_id and public.ST_INTERSECTS(t8.value, public.ST_GeomFromGeoJSON('{"coordinates":[[[-128.12596524778567,50.90095573861839],[-128.6951954392062,50.75063500834236],[-127.71373499792975,49.63640480052965],[-125.38308025753057,48.53083459202276],[-123.3647465830768,48.15806226354249],[-122.94623399379441,48.36504151433127],[-123.37439502763095,49.13209156231335],[-124.66835857611437,49.81654191782255],[-126.6572708981094,50.607171392416745],[-127.89342678974776,50.9888374217299],[-128.12596524778567,50.90095573861839]]],"type":"Polygon"}'))
+ *         SELECT 1 FROM search_string t3 WHERE t3.submission_feature_id = t1.submission_feature_id AND t3.value LIKE '%cor%'
+ *     ) AND EXISTS (
+ *         SELECT 1 FROM search_string t4 WHERE t4.submission_feature_id = t1.submission_feature_id AND t4.value LIKE '%arx%'
+ *     ) AND EXISTS (
+ *         SELECT 1 FROM search_number t5 WHERE t5.submission_feature_id = t1.submission_feature_id AND t5.feature_property_id = (SELECT feature_property_id FROM feature_property fp WHERE fp.name = 'count') AND t5.value > 40 AND t5.value < 50
+ *     ) AND EXISTS (
+ *         SELECT 1 FROM search_datetime t7 WHERE t7.submission_feature_id = t1.submission_feature_id AND t7.value > '2023-08-01' AND t7.value < '2024-04-01' AND t7.feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'start_date')
+ *     ) AND EXISTS (
+ *         SELECT 1 FROM search_datetime t8 WHERE t8.submission_feature_id = t1.submission_feature_id AND t8.value > '2023-08-01' AND t8.value < '2024-04-01' AND t8.feature_property_id = (SELECT feature_property_id FROM feature_property WHERE name = 'end_date')
+ *     ) AND EXISTS (
+ *         SELECT 1 FROM search_spatial t9 WHERE t9.submission_feature_id = t1.submission_feature_id AND public.ST_INTERSECTS(t9.value, public.ST_GeomFromGeoJSON('{"coordinates":[[[-128.12596524778567,50.90095573861839],[-128.6951954392062,50.75063500834236],[-127.71373499792975,49.63640480052965],[-125.38308025753057,48.53083459202276],[-123.3647465830768,48.15806226354249],[-122.94623399379441,48.36504151433127],[-123.37439502763095,49.13209156231335],[-124.66835857611437,49.81654191782255],[-126.6572708981094,50.607171392416745],[-127.89342678974776,50.9888374217299],[-128.12596524778567,50.90095573861839]]],"type":"Polygon"}'))
  *     )
  * );
  */
