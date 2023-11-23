@@ -11,7 +11,7 @@ import { Knex } from 'knex';
  * @param {Knex} knex
  * @return {*}  {Promise<void>}
  */
-export async function up(knex: Knex): Promise<void> {
+export async function seed(knex: Knex): Promise<void> {
   await knex.raw(`
     ----------------------------------------------------------------------------------------
     -- Create tables
@@ -86,8 +86,4 @@ export async function up(knex: Knex): Promise<void> {
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'telemetry'), (select feature_property_id from feature_property where name = 'start_date'),  now());
     insert into feature_type_property (feature_type_id, feature_property_id, record_effective_date) values ((select feature_type_id from feature_type where name = 'telemetry'), (select feature_property_id from feature_property where name = 'end_date'),    now());
   `);
-}
-
-export async function down(knex: Knex): Promise<void> {
-  await knex.raw(``);
 }

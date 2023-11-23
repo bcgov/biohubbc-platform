@@ -105,7 +105,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN security_string.update_date             IS 'The datetime the record was updated.';
     COMMENT ON COLUMN security_string.update_user             IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN security_string.revision_count          IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  security_string                         IS 'String search values';
+    COMMENT ON TABLE  security_string                         IS 'String security condition.';
 
     ----------------------------------------------------------------------------------------
 
@@ -139,7 +139,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN security_number.update_date             IS 'The datetime the record was updated.';
     COMMENT ON COLUMN security_number.update_user             IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN security_number.revision_count          IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  security_number                         IS 'Numeric search values';
+    COMMENT ON TABLE  security_number                         IS 'Number security condition.';
 
     ----------------------------------------------------------------------------------------
 
@@ -173,7 +173,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN security_datetime.update_date             IS 'The datetime the record was updated.';
     COMMENT ON COLUMN security_datetime.update_user             IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN security_datetime.revision_count          IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  security_datetime                         IS 'Numeric search values';
+    COMMENT ON TABLE  security_datetime                         IS 'Datetime security condition.';
 
     ----------------------------------------------------------------------------------------
 
@@ -207,7 +207,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN security_spatial.update_date             IS 'The spatial the record was updated.';
     COMMENT ON COLUMN security_spatial.update_user             IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN security_spatial.revision_count          IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  security_spatial                         IS 'Numeric search values';
+    COMMENT ON TABLE  security_spatial                         IS 'Spatial security condition.';
 
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: security_rule

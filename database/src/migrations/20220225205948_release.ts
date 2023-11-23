@@ -28,9 +28,6 @@ export async function up(knex: Knex): Promise<void> {
     path.join(__dirname, DB_RELEASE, 'tr_generated_audit_triggers.sql')
   );
   const api_get_context_user_id = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'api_get_context_user_id.sql'));
-  const api_get_context_system_user_role_id = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'api_get_context_system_user_role_id.sql')
-  );
   const tr_journal_trigger = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'tr_journal_trigger.sql'));
   const tr_generated_journal_triggers = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'tr_generated_journal_triggers.sql')
@@ -45,22 +42,6 @@ export async function up(knex: Knex): Promise<void> {
   const populate_system_role = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_role.sql'));
   const populate_system_metadata_constant = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_system_metadata_constant.sql')
-  );
-  const populate_submission_status_type = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_submission_status_type.sql')
-  );
-  const populate_submission_message_class = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_submission_message_class.sql')
-  );
-  const populate_submission_message_type = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_submission_message_type.sql')
-  );
-  const populate_proprietary_type = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_proprietary_type.sql'));
-  const populate_persecution_or_harm_type = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_persecution_or_harm_type.sql')
-  );
-  const populate_persecution_or_harm = fs.readFileSync(
-    path.join(__dirname, DB_RELEASE, 'populate_persecution_or_harm.sql')
   );
 
   await knex.raw(`
@@ -79,6 +60,7 @@ export async function up(knex: Knex): Promise<void> {
     GRANT USAGE ON SCHEMA biohub TO ${DB_USER_API};
     alter role ${DB_USER_API} set search_path to "$user", biohub, public;
 
+    -- alter default privileges for the biohub_api user so that it is granted access to all future tables/functions/etc
     ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO biohub_api;
 
@@ -91,13 +73,13 @@ export async function up(knex: Knex): Promise<void> {
     ALTER DEFAULT PRIVILEGES IN SCHEMA biohub, public
     GRANT USAGE, SELECT ON SEQUENCES TO biohub_api;
 
+    -- create tables/triggers/functions/etc
     ${biohub_ddl}
     ${populate_user_identity_source}
     ${api_set_context}
     ${tr_audit_trigger}
     ${tr_generated_audit_triggers}
     ${api_get_context_user_id}
-    ${api_get_context_system_user_role_id}
     ${tr_journal_trigger}
     ${tr_generated_journal_triggers}
     ${api_get_system_constant}
@@ -105,15 +87,9 @@ export async function up(knex: Knex): Promise<void> {
     ${create_sequences}
 
     -- populate look up tables
-    ${populate_system_constants}
     ${populate_system_role}
+    ${populate_system_constants}
     ${populate_system_metadata_constant}
-    ${populate_submission_status_type}
-    ${populate_submission_message_class}
-    ${populate_submission_message_type}
-    ${populate_proprietary_type}
-    ${populate_persecution_or_harm_type}
-    ${populate_persecution_or_harm}
 
     set role postgres;
     set search_path = biohub, public;

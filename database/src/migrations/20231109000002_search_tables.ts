@@ -42,7 +42,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN search_string.update_date            IS 'The datetime the record was updated.';
     COMMENT ON COLUMN search_string.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN search_string.revision_count         IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  search_string                        IS 'String search values';
+    COMMENT ON TABLE  search_string                        IS 'String search values.';
 
     ----------------------------------------------------------------------------------------
 
@@ -68,7 +68,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN search_number.update_date            IS 'The datetime the record was updated.';
     COMMENT ON COLUMN search_number.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN search_number.revision_count         IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  search_number                        IS 'Number search values';
+    COMMENT ON TABLE  search_number                        IS 'Number search values.';
 
     ----------------------------------------------------------------------------------------
 
@@ -94,7 +94,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN search_datetime.update_date            IS 'The datetime the record was updated.';
     COMMENT ON COLUMN search_datetime.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN search_datetime.revision_count         IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  search_datetime                        IS 'Datetime search values';
+    COMMENT ON TABLE  search_datetime                        IS 'Datetime search values.';
 
     ----------------------------------------------------------------------------------------
 
@@ -120,7 +120,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN search_spatial.update_date            IS 'The spatial the record was updated.';
     COMMENT ON COLUMN search_spatial.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN search_spatial.revision_count         IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  search_spatial                        IS 'Spatial search values';
+    COMMENT ON TABLE  search_spatial                        IS 'Spatial search values.';
 
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: search_string
