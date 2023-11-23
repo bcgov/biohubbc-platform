@@ -47,6 +47,34 @@ export async function up(knex: Knex): Promise<void> {
 
     ----------------------------------------------------------------------------------------
 
+    CREATE TABLE feature_submission_security(
+      feature_submission_security_id   integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      feature_submission_id            integer           NOT NULL,
+      security_rule_id                 integer           NOT NULL,
+      record_effective_date            date              NOT NULL,
+      record_end_date                  date,
+      create_date                      timestamptz(6)    DEFAULT now() NOT NULL,
+      create_user                      integer           NOT NULL,
+      update_date                      timestamptz(6),
+      update_user                      integer,
+      revision_count                   integer           DEFAULT 0 NOT NULL,
+      CONSTRAINT feature_submission_security_pk PRIMARY KEY (feature_submission_security_id)
+    );
+
+    COMMENT ON COLUMN feature_submission_security.feature_submission_security_id    IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN feature_submission_security.feature_submission_id             IS 'Foreign key to the feature_submission table.';
+    COMMENT ON COLUMN feature_submission_security.security_rule_id                  IS 'Foreign key to the security_rule table.';
+    COMMENT ON COLUMN feature_submission_security.record_effective_date             IS 'Record level effective date.';
+    COMMENT ON COLUMN feature_submission_security.record_end_date                   IS 'Record level end date.';
+    COMMENT ON COLUMN feature_submission_security.create_date                       IS 'The datetime the record was created.';
+    COMMENT ON COLUMN feature_submission_security.create_user                       IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN feature_submission_security.update_date                       IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN feature_submission_security.update_user                       IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN feature_submission_security.revision_count                    IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  feature_submission_security                                   IS 'A join table between feature_submission and security_rule. Defines which security rules are applied to the a feature submission.';
+  
+    ----------------------------------------------------------------------------------------
+
     CREATE TABLE security_string(
       security_string_id       integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       security_rule_id         integer           NOT NULL,
@@ -187,6 +215,27 @@ export async function up(knex: Knex): Promise<void> {
 
     -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
     CREATE UNIQUE INDEX security_rule_nuk1 ON security_rule(name, (record_end_date is NULL)) where record_end_date is null;
+
+    ----------------------------------------------------------------------------------------
+    -- Create Indexes and Constraints for table: feature_submission_security
+    ----------------------------------------------------------------------------------------
+
+    -- Add unique end-date key constraint (don't allow 2 records with the same feature_submission_id, security_rule_id, and a NULL record_end_date)
+    CREATE UNIQUE INDEX feature_submission_security_nuk1 ON feature_submission_security(feature_submission_id, security_rule_id, (record_end_date is NULL)) where record_end_date is null;
+
+    -- Add foreign key constraint
+    ALTER TABLE feature_submission_security ADD CONSTRAINT feature_submission_security_fk1
+      FOREIGN KEY (feature_submission_id)
+      REFERENCES feature_submission(feature_submission_id);
+
+    ALTER TABLE feature_submission_security ADD CONSTRAINT feature_submission_security_fk2
+      FOREIGN KEY (security_rule_id)
+      REFERENCES security_rule(security_rule_id);
+
+    -- add indexes for foreign keys
+    CREATE INDEX feature_submission_security_idx1 ON feature_submission_security(feature_submission_id);
+
+    CREATE INDEX feature_submission_security_idx2 ON feature_submission_security(security_rule_id);
 
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: security_string
