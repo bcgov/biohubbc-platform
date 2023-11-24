@@ -2,12 +2,11 @@ import { Knex } from 'knex';
 
 /**
  * Add tables:
- * - search_string
- * - search_string
- * - search_number
- * - search_datetime
- * - search_spatial
- * - search_taxonomy
+ * - submission_message
+ * - submission_message_type
+ *
+ * Populate tables:
+ * - submission_message_type
  *
  * @export
  * @param {Knex} knex
