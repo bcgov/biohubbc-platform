@@ -77,6 +77,7 @@ COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire 
 CREATE TABLE submission(
     submission_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     uuid                   uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    publish_timestamp      timestamptz(6),
     create_date            timestamptz(6)    DEFAULT now() NOT NULL,
     create_user            integer           NOT NULL,
     update_date            timestamptz(6),
@@ -87,6 +88,7 @@ CREATE TABLE submission(
 
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
+COMMENT ON COLUMN submission.publish_timestamp IS 'The timestamp of when the submission was published. Null indicates the submission is not published.';
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.';
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.';
 COMMENT ON COLUMN submission.update_date IS 'The datetime the record was updated.';
@@ -310,10 +312,10 @@ COMMENT ON COLUMN user_identity_source.revision_count IS 'Revision count used fo
 COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. This source is traditionally the system that authenticates the user. Example sources could include IDIR, BCEID and DATABASE.';
 
 -- 
--- INDEX: "Ref165191" 
+-- INDEX: "artifact_idx1" 
 --
 
-CREATE INDEX "Ref165191" ON artifact(submission_id);
+CREATE INDEX artifact_idx1 ON artifact(submission_id);
 
 -- 
 -- INDEX: submission_uk1 
@@ -322,62 +324,68 @@ CREATE INDEX "Ref165191" ON artifact(submission_id);
 CREATE UNIQUE INDEX submission_uk1 ON submission(uuid);
 
 -- 
--- INDEX: "Ref165208" 
+-- INDEX: "submission_job_queue_idx1" 
 --
 
-CREATE INDEX "Ref165208" ON submission_job_queue(submission_id);
+CREATE INDEX submission_job_queue_idx1 ON submission_job_queue(submission_id);
 
 -- 
 -- INDEX: system_constant_uk1 
 --
 
 CREATE UNIQUE INDEX system_constant_uk1 ON system_constant(constant_name);
+
 -- 
 -- INDEX: system_metadata_constant_uk1 
 --
 
 CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(constant_name);
+
 -- 
 -- INDEX: system_role_nuk1 
 --
 
-CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, record_end_date);
+CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NULL)) where record_end_date is null;
+
 -- 
 -- INDEX: system_user_nuk1 
 --
 
-CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, record_end_date);
+CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, (record_end_date is NULL)) where record_end_date is null;
+
 -- 
--- INDEX: "Ref190178" 
+-- INDEX: "system_user_idx1" 
 --
 
-CREATE INDEX "Ref190178" ON system_user(user_identity_source_id);
+CREATE INDEX system_user_id_idx1 ON system_user(user_identity_source_id);
 -- 
 -- INDEX: system_user_role_uk1 
 --
 
 CREATE UNIQUE INDEX system_user_role_uk1 ON system_user_role(system_user_id, system_role_id);
+
 -- 
--- INDEX: "Ref191179" 
+-- INDEX: "system_user_role_idx1" 
 --
 
-CREATE INDEX "Ref191179" ON system_user_role(system_user_id);
+CREATE INDEX system_user_role_idx1 ON system_user_role(system_user_id);
 -- 
--- INDEX: "Ref192180" 
+-- INDEX: "system_user_role_idx2" 
 --
 
-CREATE INDEX "Ref192180" ON system_user_role(system_role_id);
+CREATE INDEX system_user_role_idx2 ON system_user_role(system_role_id);
 
 -- 
 -- INDEX: user_identity_source_nuk1 
 --
 
-CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, record_end_date);
+CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null;
+
 -- 
 -- TABLE: artifact 
 --
 
-ALTER TABLE artifact ADD CONSTRAINT "Refsubmission191" 
+ALTER TABLE artifact ADD CONSTRAINT artifact_fk1
     FOREIGN KEY (submission_id)
     REFERENCES submission(submission_id);
 
@@ -385,7 +393,7 @@ ALTER TABLE artifact ADD CONSTRAINT "Refsubmission191"
 -- TABLE: submission_job_queue 
 --
 
-ALTER TABLE submission_job_queue ADD CONSTRAINT "Refsubmission208" 
+ALTER TABLE submission_job_queue ADD CONSTRAINT submission_job_queue_fk1
     FOREIGN KEY (submission_id)
     REFERENCES submission(submission_id);
 
@@ -393,7 +401,7 @@ ALTER TABLE submission_job_queue ADD CONSTRAINT "Refsubmission208"
 -- TABLE: system_user 
 --
 
-ALTER TABLE system_user ADD CONSTRAINT "Refuser_identity_source178" 
+ALTER TABLE system_user ADD CONSTRAINT system_user_fk1
     FOREIGN KEY (user_identity_source_id)
     REFERENCES user_identity_source(user_identity_source_id);
 
@@ -401,10 +409,10 @@ ALTER TABLE system_user ADD CONSTRAINT "Refuser_identity_source178"
 -- TABLE: system_user_role 
 --
 
-ALTER TABLE system_user_role ADD CONSTRAINT "Refsystem_user179" 
+ALTER TABLE system_user_role ADD CONSTRAINT system_user_role_fk1
     FOREIGN KEY (system_user_id)
     REFERENCES system_user(system_user_id);
 
-ALTER TABLE system_user_role ADD CONSTRAINT "Refsystem_role180" 
+ALTER TABLE system_user_role ADD CONSTRAINT system_user_role_fk2
     FOREIGN KEY (system_role_id)
     REFERENCES system_role(system_role_id);
