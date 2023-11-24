@@ -13,10 +13,6 @@ CREATE TABLE artifact(
     file_size                      integer,
     key                            varchar(1000),
     security_review_timestamp      timestamptz(6),
-    foi_reason                     boolean,
-    security_reason_name           varchar(300),
-    security_reason_description    varchar(3000),
-    security_reason_end_date       timestamptz(6),
     create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                    integer           NOT NULL,
     update_date                    timestamptz(6),
@@ -35,16 +31,12 @@ COMMENT ON COLUMN artifact.description IS 'The description of the record.';
 COMMENT ON COLUMN artifact.file_size IS 'The size of the artifact in bytes.';
 COMMENT ON COLUMN artifact.key IS 'The identifying key to the file in the storage system.';
 COMMENT ON COLUMN artifact.security_review_timestamp IS 'The timestamp that the security review of the submission artifact was completed.';
-COMMENT ON COLUMN artifact.foi_reason IS 'A boolean flag indicating whether the data is secured due to Freedom of Information data being present.';
-COMMENT ON COLUMN artifact.security_reason_name IS 'The name of the custom security reason.';
-COMMENT ON COLUMN artifact.security_reason_description IS 'A reason description that is secures this data and is specific to this artifact or dataset.';
-COMMENT ON COLUMN artifact.security_reason_end_date IS 'Custom security reason end date.';
 COMMENT ON COLUMN artifact.create_date IS 'The datetime the record was created.';
 COMMENT ON COLUMN artifact.create_user IS 'The id of the user who created the record as identified in the system user table.';
 COMMENT ON COLUMN artifact.update_date IS 'The datetime the record was updated.';
 COMMENT ON COLUMN artifact.update_user IS 'The id of the user who updated the record as identified in the system user table.';
 COMMENT ON COLUMN artifact.revision_count IS 'Revision count used for concurrency control.';
-COMMENT ON TABLE artifact IS 'A listing of historical data submission artifacts. The record with the most recent security review timestamp is the currently published data set for each artifact identified by UUID.';
+COMMENT ON TABLE artifact IS 'A listing of historical data submission artifacts.';
 
 -- 
 -- TABLE: audit_log 
