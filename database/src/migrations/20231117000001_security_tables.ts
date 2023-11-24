@@ -76,30 +76,30 @@ export async function up(knex: Knex): Promise<void> {
     ----------------------------------------------------------------------------------------
 
     CREATE TABLE artifact_security(
-        artifact_security_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-        artifact_id                      integer           NOT NULL,
-        security_rule_id                 integer           NOT NULL,
-        record_effective_date            date              NOT NULL,
-        record_end_date                  date,
-        create_date                      timestamptz(6)    DEFAULT now() NOT NULL,
-        create_user                      integer           NOT NULL,
-        update_date                      timestamptz(6),
-        update_user                      integer,
-        revision_count                   integer           DEFAULT 0 NOT NULL,
-        CONSTRAINT artifact_security_pk PRIMARY KEY (artifact_security_id)
-      );
+      artifact_security_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      artifact_id                      integer           NOT NULL,
+      security_rule_id                 integer           NOT NULL,
+      record_effective_date            date              NOT NULL,
+      record_end_date                  date,
+      create_date                      timestamptz(6)    DEFAULT now() NOT NULL,
+      create_user                      integer           NOT NULL,
+      update_date                      timestamptz(6),
+      update_user                      integer,
+      revision_count                   integer           DEFAULT 0 NOT NULL,
+      CONSTRAINT artifact_security_pk PRIMARY KEY (artifact_security_id)
+    );
   
-      COMMENT ON COLUMN artifact_security.artifact_security_id      IS 'System generated surrogate primary key identifier.';
-      COMMENT ON COLUMN artifact_security.artifact_id               IS 'Foreign key to the artifact table.';
-      COMMENT ON COLUMN artifact_security.security_rule_id          IS 'Foreign key to the security_rule table.';
-      COMMENT ON COLUMN artifact_security.record_effective_date     IS 'Record level effective date.';
-      COMMENT ON COLUMN artifact_security.record_end_date           IS 'Record level end date.';
-      COMMENT ON COLUMN artifact_security.create_date               IS 'The datetime the record was created.';
-      COMMENT ON COLUMN artifact_security.create_user               IS 'The id of the user who created the record as identified in the system user table.';
-      COMMENT ON COLUMN artifact_security.update_date               IS 'The datetime the record was updated.';
-      COMMENT ON COLUMN artifact_security.update_user               IS 'The id of the user who updated the record as identified in the system user table.';
-      COMMENT ON COLUMN artifact_security.revision_count            IS 'Revision count used for concurrency control.';
-      COMMENT ON TABLE  artifact_security                           IS 'A join table between artifact and security_rule. Defines which security rules are applied to the an artifact.';
+    COMMENT ON COLUMN artifact_security.artifact_security_id      IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN artifact_security.artifact_id               IS 'Foreign key to the artifact table.';
+    COMMENT ON COLUMN artifact_security.security_rule_id          IS 'Foreign key to the security_rule table.';
+    COMMENT ON COLUMN artifact_security.record_effective_date     IS 'Record level effective date.';
+    COMMENT ON COLUMN artifact_security.record_end_date           IS 'Record level end date.';
+    COMMENT ON COLUMN artifact_security.create_date               IS 'The datetime the record was created.';
+    COMMENT ON COLUMN artifact_security.create_user               IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN artifact_security.update_date               IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN artifact_security.update_user               IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN artifact_security.revision_count            IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  artifact_security                           IS 'A join table between artifact and security_rule. Defines which security rules are applied to the an artifact.';
   
     ----------------------------------------------------------------------------------------
 
