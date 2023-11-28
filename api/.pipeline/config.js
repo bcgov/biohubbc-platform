@@ -62,9 +62,9 @@ const phases = {
     env: 'build',
     tz: config.timezone.api,
     branch: branch,
-    cpuRequest: '100m',
+    cpuRequest: '50m',
     cpuLimit: '1250m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '3Gi'
   },
   dev: {
@@ -87,9 +87,10 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.dev,
     logLevel: 'debug',
-    cpuRequest: '100m',
+    nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
+    cpuRequest: '50m',
     cpuLimit: '500m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '2Gi',
     replicas: '1',
     replicasMax: (isStaticDeployment && '2') || '1'
@@ -114,9 +115,10 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.test,
     logLevel: 'info',
-    cpuRequest: '200m',
+    nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '2Gi',
     replicas: '2',
     replicasMax: '3'
@@ -141,9 +143,10 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.prod,
     logLevel: 'info',
-    cpuRequest: '200m',
+    nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '2Gi',
     replicas: '2',
     replicasMax: '3'
