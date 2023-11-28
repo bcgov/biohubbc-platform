@@ -38,22 +38,58 @@ POST.apiDoc = {
     content: {
       'application/json': {
         schema: {
+          title: 'BioHub Data Submission',
           type: 'object',
-          required: ['uuid', 'surveyId', 'additionalInformation'],
+          required: ['id', 'type', 'features'],
           properties: {
-            uuid: {
-              type: 'string',
-              description: 'UUID'
+            id: {
+              title: 'Unique id of the submission',
+              type: 'string'
             },
-            surveyId: {
-              type: 'number',
-              description: 'Survey Id'
-            },
-            additionalInformation: {
+            type: {
               type: 'string',
-              description: 'Additional Information'
+              enum: ['dataset']
+            },
+            properties: {
+              title: 'Dataset properties',
+              type: 'object',
+              properties: {}
+            },
+            features: {
+              type: 'array',
+              items: {
+                title: 'BioHub Data Submission Feature',
+                type: 'object',
+                required: ['id', 'type', 'properties'],
+                properties: {
+                  id: {
+                    title: 'Unique id of the observation',
+                    type: 'string'
+                  },
+                  type: {
+                    title: 'Feature type',
+                    type: 'string',
+                    enum: ['observation']
+                  },
+                  properties: {
+                    title: 'Feature properties',
+                    type: 'object',
+                    properties: {}
+                  }
+                  // features: {
+                  //   title: 'Feature child features',
+                  //   type: 'array',
+                  //   items: {
+                  //     $ref: '#/$defs/Feature'
+                  //   }
+                  // }
+                },
+                additionalProperties: false
+              },
+              additionalProperties: false
             }
-          }
+          },
+          additionalProperties: false
         }
       }
     }
@@ -89,8 +125,9 @@ export function queueForProcess(): RequestHandler {
       ]);
     }
 
-    const uuid = req.body.uuid;
-    const additionalInformation = req.body.additionalInformation;
+    console.log('req.body', JSON.stringify(req.body));
+    const id = req.body.id;
+    const additionalInformation = req.body.properties.additionalInformation;
 
     const connection = getServiceAccountDBConnection(sourceSystem);
 
@@ -100,7 +137,7 @@ export function queueForProcess(): RequestHandler {
       const submissionService = new SubmissionService(connection);
 
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
-        uuid: uuid,
+        uuid: id,
         source_transform_id: 1
       });
 
