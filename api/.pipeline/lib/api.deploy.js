@@ -31,22 +31,30 @@ const apiDeploy = async (settings) => {
         HOST: phases[phase].host,
         CHANGE_ID: phases.build.changeId || changeId,
         APP_HOST: phases[phase].appHost,
+        // Node
         NODE_ENV: phases[phase].env || 'dev',
+        NODE_OPTIONS: phases[phase].nodeOptions,
+        // Elastic Search
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
         ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
+        // S3 (Object Store)
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
+        // Database
         TZ: phases[phase].tz,
+        DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
+        // Keycloak
         KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
         KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
         KEYCLOAK_SECRET_ADMIN_PASSWORD: phases[phase].sso.keycloakSecretAdminPassword,
-        DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         KEYCLOAK_HOST: phases[phase].sso.url,
         KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
         KEYCLOAK_REALM: phases[phase].sso.realm,
         KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
         KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
+        // Log Level
         LOG_LEVEL: phases[phase].logLevel || 'info',
+        // OPenshift Resources
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,
         MEMORY_REQUEST: phases[phase].memoryRequest,
