@@ -1,4 +1,6 @@
+import traverse from 'json-schema-traverse';
 import { IDBConnection } from '../database/db';
+import { IDatasetSubmission } from '../repositories/submission-repository';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
@@ -13,6 +15,55 @@ export class ValidationService extends DBService {
     super(connection);
 
     this.validationRepository = new ValidationRepository(connection);
+  }
+
+  /**
+   * Validate dataset submission
+   *
+   * @param {IDatasetSubmission} dataset
+   * @return {*}  {Promise<boolean>}
+   * @memberof ValidationService
+   */
+  async validateDatasetSubmission(dataset: IDatasetSubmission): Promise<boolean> {
+    const traverseCallBack = (dataset: any) => {
+      if (dataset.id === undefined) {
+        throw new Error('Invalid dataset submission: missing id');
+      }
+      if (dataset.type === undefined) {
+        throw new Error('Invalid dataset submission: missing type');
+      }
+      if (dataset.properties === undefined) {
+        throw new Error('Invalid dataset submission: missing properties');
+      }
+
+      if (typeof dataset.id !== 'string') {
+        throw new Error('Invalid dataset submission: id must be a string');
+      }
+      if (typeof dataset.type !== 'string') {
+        throw new Error('Invalid dataset submission: type must be a string');
+      }
+      if (typeof dataset.properties !== 'object') {
+        throw new Error('Invalid dataset submission: properties must be an object');
+      }
+
+      if (dataset.features) {
+        if (!Array.isArray(dataset.features)) {
+          throw new Error('Invalid dataset submission: features must be an array');
+        }
+        dataset.features.forEach((feature: any) => {
+          traverseCallBack(feature);
+        });
+      }
+    };
+
+    traverse(dataset, (data: any) => {
+      if (data.features === undefined) {
+        throw new Error('Invalid dataset submission: missing features');
+      }
+      traverseCallBack(data);
+    });
+
+    return true;
   }
 
   /**

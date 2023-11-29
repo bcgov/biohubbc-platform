@@ -68,9 +68,9 @@ export class ArtifactService extends DBService {
     defaultLog.debug({ label: 'uploadAndPersistArtifact' });
 
     // Fetch the source transform record for this submission based on the source system user id
-    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
-      this.connection.systemUserId()
-    );
+    // const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
+    //   this.connection.systemUserId()
+    // );
 
     // Retrieve the next artifact primary key assigned to this artifact once it is inserted
     const artifact_id = (await this.getNextArtifactIds())[0];
@@ -83,10 +83,7 @@ export class ArtifactService extends DBService {
     });
 
     // Create a new submission for the artifact collection
-    const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict({
-      source_transform_id: sourceTransformRecord.source_transform_id,
-      uuid: dataPackageId
-    });
+    const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict(dataPackageId);
 
     // Upload the artifact to S3
     await uploadFileToS3(file, s3Key, { filename: file.originalname });

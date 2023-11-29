@@ -35,7 +35,8 @@ export const BioHubDataSubmission = {
         },
         type: {
           title: 'Feature type',
-          type: 'string'
+          type: 'string',
+          enum: ['observation']
         },
         properties: {
           title: 'Feature properties',

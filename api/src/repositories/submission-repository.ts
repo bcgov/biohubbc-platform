@@ -19,6 +19,19 @@ export interface IDatasetsForReview {
   keywords: string[];
 }
 
+export interface IFeatureSubmission {
+  id: string;
+  type: string;
+  properties: object;
+}
+
+export interface IDatasetSubmission {
+  id: string;
+  type: string;
+  properties: object;
+  features: IFeatureSubmission[];
+}
+
 export const DatasetMetadata = z.object({
   dataset_id: z.string(),
   submission_id: z.number(),
@@ -238,22 +251,20 @@ export class SubmissionRepository extends BaseRepository {
    * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
    * and infer that the query ran successfully.
    *
-   * @param {ISubmissionModel} submissionData The submission record
-   * @return {*} {Promise<{ submission_id: number }>} The primary key of the submission
+   * @param {string} uuid
+   * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecordWithPotentialConflict(
-    submissionData: ISubmissionModel
-  ): Promise<{ submission_id: number }> {
+  async insertSubmissionRecordWithPotentialConflict(uuid: string): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source_transform_id,
-        uuid
+        uuid,
+        publish_timestamp
       ) VALUES (
-        ${submissionData.source_transform_id},
-        ${submissionData.uuid}
+        ${uuid},
+        now()
       )
-      ON CONFLICT (uuid) DO UPDATE SET uuid = ${submissionData.uuid}
+      ON CONFLICT (uuid) DO UPDATE SET publish_timestamp = now()
       RETURNING
         submission_id;
     `;
@@ -264,6 +275,77 @@ export class SubmissionRepository extends BaseRepository {
       throw new ApiExecuteSQLError('Failed to get or insert submission record', [
         'SubmissionRepository->insertSubmissionRecordWithPotentialConflict',
         'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Insert a new submission feature record.
+   *
+   * @param {number} submissionId
+   * @param {IFeatureSubmission} feature
+   * @param {number} featureTypeId
+   * @return {*}  {Promise<{ submission_feature_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async insertSubmissionFeatureRecord(
+    submissionId: number,
+    featureTypeId: number,
+    feature: IFeatureSubmission
+  ): Promise<{ submission_feature_id: number }> {
+    const sqlStatement = SQL`
+      INSERT INTO submission_feature (
+        submission_id,
+        feature_type_id,
+        data,
+        record_effective_date
+      ) VALUES (
+        ${submissionId},
+        ${featureTypeId},
+        ${feature},
+        now()
+      )
+      RETURNING
+        submission_feature_id;
+    `;
+
+    const response = await this.connection.sql<{ submission_feature_id: number }>(sqlStatement);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert submission feature record', [
+        'SubmissionRepository->insertSubmissionFeatureRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get feature type id by name.
+   *
+   * @param {string} name
+   * @return {*}  {Promise<{ feature_type_id: number }>}
+   * @memberof SubmissionRepository
+   */
+  async getFeatureTypeIdByName(name: string): Promise<{ feature_type_id: number }> {
+    const sqlStatement = SQL`
+      SELECT
+        feature_type_id
+      FROM
+        feature_type
+      WHERE
+        name = ${name};
+    `;
+
+    const response = await this.connection.sql<{ feature_type_id: number }>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get feature type record', [
+        'SubmissionRepository->getFeatureTypeByName',
+        'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
 
@@ -904,6 +986,7 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
+    console.log('datasetId', datasetId);
     return {
       header: simsHandlebarsTemplate_HEADER,
       details: simsHandlebarsTemplate_DETAILS

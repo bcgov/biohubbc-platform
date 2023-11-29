@@ -5,6 +5,7 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   IDatasetsForReview,
+  IFeatureSubmission,
   IHandlebarsTemplates,
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
@@ -51,15 +52,39 @@ export class SubmissionService extends DBService {
 
   /**
    * Insert a new submission record, returning the record having the matching UUID if it already exists
+   * in the database.
    *
-   * @param {ISubmissionModel} submissionData
+   * @param {string} uuid
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecordWithPotentialConflict(
-    submissionData: ISubmissionModel
-  ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(submissionData);
+  async insertSubmissionRecordWithPotentialConflict(uuid: string): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(uuid);
+  }
+
+  /**
+   * insert submission feature record
+   *
+   * @param {number} submissionId
+   * @param {IFeatureSubmission[]} submissionFeature
+   * @return {*}  {Promise<{ submission_feature_id: number }[]>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionFeatureRecords(
+    submissionId: number,
+    submissionFeature: IFeatureSubmission[]
+  ): Promise<{ submission_feature_id: number }[]> {
+    const promise = submissionFeature.map(async (feature) => {
+      const featureTypeId = await this.submissionRepository.getFeatureTypeIdByName(feature.type);
+
+      return this.submissionRepository.insertSubmissionFeatureRecord(
+        submissionId,
+        featureTypeId.feature_type_id,
+        feature
+      );
+    });
+
+    return Promise.all(promise);
   }
 
   /**

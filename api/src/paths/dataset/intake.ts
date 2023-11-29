@@ -4,13 +4,13 @@ import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { SubmissionService } from '../../services/submission-service';
+import { ValidationService } from '../../services/validation-service';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('paths/survey/queue');
+const defaultLog = getLogger('paths/dataset/intake');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -23,12 +23,12 @@ export const POST: Operation = [
       ]
     };
   }),
-  queueForProcess()
+  datasetIntake()
 ];
 
 POST.apiDoc = {
-  description: 'Submit Survey Id to be queued and processed',
-  tags: ['survey'],
+  description: 'Submit dataset to BioHub',
+  tags: ['dataset'],
   security: [
     {
       Bearer: []
@@ -40,7 +40,7 @@ POST.apiDoc = {
         schema: {
           title: 'BioHub Data Submission',
           type: 'object',
-          required: ['id', 'type', 'features'],
+          required: ['id', 'type', 'properties', 'features'],
           properties: {
             id: {
               title: 'Unique id of the submission',
@@ -76,13 +76,6 @@ POST.apiDoc = {
                     type: 'object',
                     properties: {}
                   }
-                  // features: {
-                  //   title: 'Feature child features',
-                  //   type: 'array',
-                  //   items: {
-                  //     $ref: '#/$defs/Feature'
-                  //   }
-                  // }
                 },
                 additionalProperties: false
               },
@@ -115,7 +108,7 @@ POST.apiDoc = {
   }
 };
 
-export function queueForProcess(): RequestHandler {
+export function datasetIntake(): RequestHandler {
   return async (req, res) => {
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
@@ -125,9 +118,11 @@ export function queueForProcess(): RequestHandler {
       ]);
     }
 
-    console.log('req.body', JSON.stringify(req.body));
+    const dataset = {
+      ...req.body,
+      properties: { ...req.body.properties, additionalInformation: req.body.properties.additionalInformation }
+    };
     const id = req.body.id;
-    const additionalInformation = req.body.properties.additionalInformation;
 
     const connection = getServiceAccountDBConnection(sourceSystem);
 
@@ -135,23 +130,30 @@ export function queueForProcess(): RequestHandler {
       await connection.open();
 
       const submissionService = new SubmissionService(connection);
+      const validationService = new ValidationService(connection);
 
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
-        uuid: id,
-        source_transform_id: 1
-      });
+      // validate the dataset submission
+      if (!(await validationService.validateDatasetSubmission(dataset))) {
+        throw new HTTP400('Invalid dataset submission');
+      }
 
-      await submissionService.insertSubmissionStatusAndMessage(
-        response.submission_id,
-        SUBMISSION_STATUS_TYPE.PUBLISHED,
-        SUBMISSION_MESSAGE_TYPE.NOTICE,
-        additionalInformation
-      );
+      // insert the submission record
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(id);
+
+      // insert each submission feature record
+      await submissionService.insertSubmissionFeatureRecords(response.submission_id, dataset.features);
+
+      // await submissionService.insertSubmissionStatusAndMessage(
+      //   response.submission_id,
+      //   SUBMISSION_STATUS_TYPE.PUBLISHED,
+      //   SUBMISSION_MESSAGE_TYPE.NOTICE,
+      //   additionalInformation
+      // );
 
       await connection.commit();
       res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'queueForProcess', message: 'error', error });
+      defaultLog.error({ label: 'datasetIntake', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
