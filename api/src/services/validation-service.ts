@@ -1,5 +1,7 @@
 import traverse from 'json-schema-traverse';
+import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
+import { BioHubDataSubmission } from '../openapi/schemas/biohub-data-submission';
 import { IDatasetSubmission } from '../repositories/submission-repository';
 import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
 import { ICsvState } from '../utils/media/csv/csv-file';
@@ -25,43 +27,75 @@ export class ValidationService extends DBService {
    * @memberof ValidationService
    */
   async validateDatasetSubmission(dataset: IDatasetSubmission): Promise<boolean> {
-    const traverseCallBack = (dataset: any) => {
-      if (dataset.id === undefined) {
-        throw new Error('Invalid dataset submission: missing id');
-      }
-      if (dataset.type === undefined) {
-        throw new Error('Invalid dataset submission: missing type');
-      }
-      if (dataset.properties === undefined) {
-        throw new Error('Invalid dataset submission: missing properties');
+    const validateProperty = (data: any, property: string | number, type: string) => {
+      console.log('data', data);
+      console.log('property', property);
+      console.log('type', type);
+
+      const jsonData = data[0][property];
+      if (property === 'features' && jsonData === undefined) {
+        return;
       }
 
-      if (typeof dataset.id !== 'string') {
-        throw new Error('Invalid dataset submission: id must be a string');
-      }
-      if (typeof dataset.type !== 'string') {
-        throw new Error('Invalid dataset submission: type must be a string');
-      }
-      if (typeof dataset.properties !== 'object') {
-        throw new Error('Invalid dataset submission: properties must be an object');
-      }
+      console.log(`---Validation of ${jsonData} as ${type}---`);
 
-      if (dataset.features) {
-        if (!Array.isArray(dataset.features)) {
-          throw new Error('Invalid dataset submission: features must be an array');
+      // check if jsonData is an array
+      if (type === 'array') {
+        if (!Array.isArray(jsonData)) {
+          throw new Error(`Invalid dataset submission: ${jsonData} must be a ${type}`);
         }
-        dataset.features.forEach((feature: any) => {
-          traverseCallBack(feature);
+
+        jsonData.forEach((element: any) => {
+          this.validateDatasetSubmission(element);
         });
+
+        return;
+      }
+
+      // check if type of jsonData is the same as the type in the schema
+      if (typeof jsonData !== type) {
+        throw new Error(`Invalid dataset submission: ${jsonData} must be a ${type}`);
+      }
+
+      // check if jsonData is a valid enum value
+      // update this to use the enum values from the schema
+      if (property === 'type' && !['dataset', 'observation'].includes(jsonData)) {
+        throw new Error(`Invalid dataset submission: ${jsonData} must be a dataset`);
       }
     };
 
-    traverse(dataset, (data: any) => {
-      if (data.features === undefined) {
-        throw new Error('Invalid dataset submission: missing features');
+    const validationCallback = (
+      schema: traverse.SchemaObject,
+      json_pointer: string,
+      rootSchema: traverse.SchemaObject,
+      parentJsonPtr: string | undefined,
+      parentKeyword: string | undefined,
+      parentSchema: traverse.SchemaObject | undefined,
+      property: string | number | undefined
+    ) => {
+      // parent catches the root object
+      if (parentJsonPtr === undefined || parentKeyword === 'items') {
+        return;
       }
-      traverseCallBack(data);
-    });
+
+      // strip off the leading slash and properties
+      if (parentKeyword === 'properties') {
+        parentJsonPtr = parentJsonPtr.replace('/properties', '');
+      }
+
+      if (parentJsonPtr === 'features') {
+        parentJsonPtr += '.*';
+      }
+
+      const jsonData = JSONPath({ path: `$.${parentJsonPtr}`, json: dataset });
+      if (jsonData.length === 0 || jsonData[0] === undefined || !property) {
+        return;
+      }
+
+      validateProperty(jsonData, property, schema.type);
+    };
+
+    traverse(BioHubDataSubmission, validationCallback);
 
     return true;
   }

@@ -67,6 +67,7 @@ export class ArtifactService extends DBService {
   ): Promise<{ artifact_id: number }> {
     defaultLog.debug({ label: 'uploadAndPersistArtifact' });
 
+    // NOTE: Disabled for now, as we are not using the source transform record
     // Fetch the source transform record for this submission based on the source system user id
     // const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
     //   this.connection.systemUserId()

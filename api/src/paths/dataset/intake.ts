@@ -75,6 +75,10 @@ POST.apiDoc = {
                     title: 'Feature properties',
                     type: 'object',
                     properties: {}
+                  },
+                  features: {
+                    type: 'array',
+                    items: {}
                   }
                 },
                 additionalProperties: false
