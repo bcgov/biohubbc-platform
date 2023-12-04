@@ -27,17 +27,14 @@ export class ValidationService extends DBService {
    * @memberof ValidationService
    */
   async validateDatasetSubmission(dataset: IDatasetSubmission): Promise<boolean> {
+    // Validate given data[property] is of type [type]
     const validateProperty = (data: any, property: string | number, type: string) => {
-      console.log('data', data);
-      console.log('property', property);
-      console.log('type', type);
-
       const jsonData = data[0][property];
+
+      // check if property is 'features' and jsonData is undefined
       if (property === 'features' && jsonData === undefined) {
         return;
       }
-
-      console.log(`---Validation of ${jsonData} as ${type}---`);
 
       // check if jsonData is an array
       if (type === 'array') {
@@ -45,6 +42,7 @@ export class ValidationService extends DBService {
           throw new Error(`Invalid dataset submission: ${jsonData} must be a ${type}`);
         }
 
+        // recursively validate each feature in the array
         jsonData.forEach((element: any) => {
           this.validateDatasetSubmission(element);
         });
@@ -64,6 +62,7 @@ export class ValidationService extends DBService {
       }
     };
 
+    // callback function for json-schema-traverse
     const validationCallback = (
       schema: traverse.SchemaObject,
       json_pointer: string,
@@ -83,6 +82,7 @@ export class ValidationService extends DBService {
         parentJsonPtr = parentJsonPtr.replace('/properties', '');
       }
 
+      // if the parent is features, then we need to add a wildcard to the end of the json pointer
       if (parentJsonPtr === 'features') {
         parentJsonPtr += '.*';
       }

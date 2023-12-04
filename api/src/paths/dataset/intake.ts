@@ -63,7 +63,7 @@ POST.apiDoc = {
                 required: ['id', 'type', 'properties'],
                 properties: {
                   id: {
-                    title: 'Unique id of the observation',
+                    title: 'feature id',
                     type: 'string'
                   },
                   type: {
@@ -146,13 +146,6 @@ export function datasetIntake(): RequestHandler {
 
       // insert each submission feature record
       await submissionService.insertSubmissionFeatureRecords(response.submission_id, dataset.features);
-
-      // await submissionService.insertSubmissionStatusAndMessage(
-      //   response.submission_id,
-      //   SUBMISSION_STATUS_TYPE.PUBLISHED,
-      //   SUBMISSION_MESSAGE_TYPE.NOTICE,
-      //   additionalInformation
-      // );
 
       await connection.commit();
       res.status(200).json(response);

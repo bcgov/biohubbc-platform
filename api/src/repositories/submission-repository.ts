@@ -986,7 +986,6 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
-    console.log('datasetId', datasetId);
     return {
       header: simsHandlebarsTemplate_HEADER,
       details: simsHandlebarsTemplate_DETAILS
