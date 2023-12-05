@@ -58,30 +58,7 @@ POST.apiDoc = {
             features: {
               type: 'array',
               items: {
-                title: 'BioHub Data Submission Feature',
-                type: 'object',
-                required: ['id', 'type', 'properties'],
-                properties: {
-                  id: {
-                    title: 'feature id',
-                    type: 'string'
-                  },
-                  type: {
-                    title: 'Feature type',
-                    type: 'string',
-                    enum: ['observation']
-                  },
-                  properties: {
-                    title: 'Feature properties',
-                    type: 'object',
-                    properties: {}
-                  },
-                  features: {
-                    type: 'array',
-                    items: {}
-                  }
-                },
-                additionalProperties: false
+                $ref: '#/components/schemas/SubmissionFeature'
               },
               additionalProperties: false
             }

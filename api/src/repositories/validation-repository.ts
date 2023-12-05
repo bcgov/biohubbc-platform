@@ -10,6 +10,13 @@ export interface IStyleModel {
   something: any; //TODO
 }
 
+export interface IFeatureProperties {
+  name: string;
+  display_name: string;
+  description: string;
+  type: string;
+}
+
 /**
  *THIS REPO IS ALL HARD CODED DO NOT USE
  *
@@ -18,6 +25,46 @@ export interface IStyleModel {
  * @extends {BaseRepository}
  */
 export class ValidationRepository extends BaseRepository {
+  /**
+   * Get Feature properties for given feature type
+   *
+   * @param {string} featureType
+   * @return {*}  {Promise<IFeatureProperties[]>}
+   * @memberof ValidationRepository
+   */
+  async getFeatureValidationProperties(featureType: string): Promise<IFeatureProperties[]> {
+    const sqlStatement = SQL`
+      SELECT
+        fp.name,
+        fp.display_name,
+        fp.description,
+        fpt.name as type
+      FROM
+        feature_type_property ftp
+      LEFT JOIN
+        feature_property fp
+      ON
+        ftp.feature_property_id = fp.feature_property_id
+      LEFT JOIN
+        feature_property_type fpt
+      ON
+        fp.feature_property_type_id = fpt.feature_property_type_id
+      WHERE
+        feature_type_id = (select feature_type_id from feature_type ft where ft.name = ${featureType});
+    `;
+
+    const response = await this.connection.sql<IFeatureProperties>(sqlStatement);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Failed to get dataset validation properties', [
+        'ValidationRepository->getFeatureValidationProperties',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows;
+  }
+
   /**
    * Insert Style sheet into db
    *

@@ -1,9 +1,11 @@
-import traverse from 'json-schema-traverse';
-import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
-import { BioHubDataSubmission } from '../openapi/schemas/biohub-data-submission';
 import { IDatasetSubmission } from '../repositories/submission-repository';
-import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
+import {
+  IFeatureProperties,
+  IInsertStyleSchema,
+  IStyleModel,
+  ValidationRepository
+} from '../repositories/validation-repository';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { IMediaState } from '../utils/media/media-file';
@@ -12,11 +14,13 @@ import { DBService } from './db-service';
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
+  validationProperties: Map<string, IFeatureProperties[]>;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.validationRepository = new ValidationRepository(connection);
+    this.validationProperties = new Map<string, IFeatureProperties[]>();
   }
 
   /**
@@ -27,77 +31,95 @@ export class ValidationService extends DBService {
    * @memberof ValidationService
    */
   async validateDatasetSubmission(dataset: IDatasetSubmission): Promise<boolean> {
-    // Validate given data[property] is of type [type]
-    const validateProperty = (data: any, property: string | number, type: string) => {
-      const jsonData = data[0][property];
+    // validate dataset.type is 'dataset'
+    const datasetFeatureType = dataset.type;
 
-      // check if property is 'features' and jsonData is undefined
-      if (property === 'features' && jsonData === undefined) {
-        return;
+    // get dataset validation properties
+    const datasetValidationProperties = await this.getFeatureValidationProperties(datasetFeatureType);
+
+    // get features in dataset
+    const features = dataset.features;
+
+    try {
+      // validate dataset properties
+      await this.validateProperties(datasetValidationProperties, dataset.properties);
+
+      // validate features
+      for (const feature of features) {
+        const featureType = feature.type;
+
+        // get feature validation properties
+        const featureValidationProperties = await this.getFeatureValidationProperties(featureType);
+
+        // validate feature properties
+        await this.validateProperties(featureValidationProperties, feature.properties);
+      }
+    } catch (e) {
+      console.log(e);
+      return false;
+    }
+    return true;
+  }
+
+  async validateProperties(properties: IFeatureProperties[], dataProperties: any): Promise<boolean> {
+    const throwPropertyError = (property: IFeatureProperties) => {
+      throw new Error(`Property ${property.name} is not of type ${property.type}`);
+    };
+
+    for (const property of properties) {
+      const dataProperty = dataProperties[property.name];
+
+      if (!dataProperty) {
+        throw new Error(`Property ${property.name} not found in data`);
       }
 
-      // check if jsonData is an array
-      if (type === 'array') {
-        if (!Array.isArray(jsonData)) {
-          throw new Error(`Invalid dataset submission: ${jsonData} must be a ${type}`);
+      if (property.type === 'string') {
+        if (typeof dataProperty !== 'string') {
+          throwPropertyError(property);
+        }
+      } else if (property.type === 'number') {
+        if (typeof dataProperty !== 'number') {
+          throwPropertyError(property);
+        }
+      } else if (property.type === 'boolean') {
+        if (typeof dataProperty !== 'boolean') {
+          throwPropertyError(property);
+        }
+      } else if (property.type === 'object') {
+        if (typeof dataProperty !== 'object') {
+          throwPropertyError(property);
+        }
+      } else if (property.type === 'spatial') {
+        if (Array.isArray(dataProperty) === false) {
+          throwPropertyError(property);
+        }
+      } else if (property.type === 'datetime') {
+        if (typeof dataProperty !== 'string') {
+          throwPropertyError(property);
         }
 
-        // recursively validate each feature in the array
-        jsonData.forEach((element: any) => {
-          this.validateDatasetSubmission(element);
-        });
+        const date = new Date(dataProperty);
 
-        return;
+        if (date.toString() === 'Invalid Date') {
+          throw new Error(`Property ${property.name} is not a valid date`);
+        }
+      } else {
+        throw new Error(`Property ${property.name} has an invalid type`);
       }
-
-      // check if type of jsonData is the same as the type in the schema
-      if (typeof jsonData !== type) {
-        throw new Error(`Invalid dataset submission: ${jsonData} must be a ${type}`);
-      }
-
-      // check if jsonData is a valid enum value
-      // update this to use the enum values from the schema
-      if (property === 'type' && !['dataset', 'observation'].includes(jsonData)) {
-        throw new Error(`Invalid dataset submission: ${jsonData} must be a dataset`);
-      }
-    };
-
-    // callback function for json-schema-traverse
-    const validationCallback = (
-      schema: traverse.SchemaObject,
-      json_pointer: string,
-      rootSchema: traverse.SchemaObject,
-      parentJsonPtr: string | undefined,
-      parentKeyword: string | undefined,
-      parentSchema: traverse.SchemaObject | undefined,
-      property: string | number | undefined
-    ) => {
-      // parent catches the root object
-      if (parentJsonPtr === undefined || parentKeyword === 'items') {
-        return;
-      }
-
-      // strip off the leading slash and properties
-      if (parentKeyword === 'properties') {
-        parentJsonPtr = parentJsonPtr.replace('/properties', '');
-      }
-
-      // if the parent is features, then we need to add a wildcard to the end of the json pointer
-      if (parentJsonPtr === 'features') {
-        parentJsonPtr += '.*';
-      }
-
-      const jsonData = JSONPath({ path: `$.${parentJsonPtr}`, json: dataset });
-      if (jsonData.length === 0 || jsonData[0] === undefined || !property) {
-        return;
-      }
-
-      validateProperty(jsonData, property, schema.type);
-    };
-
-    traverse(BioHubDataSubmission, validationCallback);
+    }
 
     return true;
+  }
+
+  async getFeatureValidationProperties(featureType: string): Promise<IFeatureProperties[]> {
+    if (this.validationProperties.get(featureType) === undefined) {
+      this.validationProperties.set(
+        featureType,
+        await this.validationRepository.getFeatureValidationProperties(featureType)
+      );
+    }
+
+    return this.validationProperties.get(featureType) as IFeatureProperties[];
   }
 
   /**
