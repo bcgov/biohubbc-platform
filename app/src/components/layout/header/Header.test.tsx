@@ -25,7 +25,7 @@ describe('Header', () => {
     );
 
     expect(getByText('Home')).toBeVisible();
-    expect(getByText('Find Datasets')).toBeVisible();
+    expect(getByText('Datasets')).toBeVisible();
     expect(getByText('Map Search')).toBeVisible();
     expect(getByText('Manage Users')).toBeVisible();
   });
