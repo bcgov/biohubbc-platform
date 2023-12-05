@@ -1,7 +1,7 @@
 export const BioHubDataSubmission = {
   title: 'BioHub Data Submission',
   type: 'object',
-  required: ['id', 'type', 'features'],
+  required: ['id', 'type', 'properties', 'features'],
   properties: {
     id: {
       title: 'Unique id of the submission',
@@ -19,40 +19,27 @@ export const BioHubDataSubmission = {
     features: {
       type: 'array',
       items: {
-        $ref: '#/$defs/Feature'
-      }
-    }
-  },
-  $defs: {
-    Feature: {
-      title: 'BioHub Data Submission Feature',
-      type: 'object',
-      required: ['id', 'type', 'properties', 'features'],
-      properties: {
-        id: {
-          title: 'Unique id of the feature',
-          type: 'string'
-        },
-        type: {
-          title: 'Feature type',
-          type: 'string'
-        },
+        title: 'BioHub Data Submission Feature',
+        type: 'object',
+        required: ['id', 'type', 'properties', 'features'],
         properties: {
-          title: 'Feature properties',
-          type: 'object',
-          properties: {}
-        },
-        features: {
-          title: 'Feature child features',
-          type: 'array',
-          items: {
-            $ref: '#/$defs/Feature'
+          id: {
+            title: 'Unique id of the feature',
+            type: 'string'
+          },
+          type: {
+            title: 'Feature type',
+            type: 'string',
+            enum: ['observation']
+          },
+          properties: {
+            title: 'Feature properties',
+            type: 'object',
+            properties: {}
           }
         }
-      },
-      additionalProperties: false
-    },
-    additionalProperties: false
+      }
+    }
   },
   additionalProperties: false
 };

@@ -421,7 +421,7 @@ describe('db', () => {
       db.getServiceAccountDBConnection(SOURCE_SYSTEM['SIMS-SVC-4464']);
 
       expect(getDBConnectionStub).to.have.been.calledWith({
-        preferred_username: `service-account-${SOURCE_SYSTEM['SIMS-SVC-4464']}@${SYSTEM_IDENTITY_SOURCE.SYSTEM}`,
+        preferred_username: `service-account-${SOURCE_SYSTEM['SIMS-SVC-4464']}`,
         identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
       });
 

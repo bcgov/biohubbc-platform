@@ -6,7 +6,6 @@ import sinonChai from 'sinon-chai';
 import { HTTPError } from '../errors/http-error';
 import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
 import { SecurityRepository } from '../repositories/security-repository';
-import { ISourceTransformModel } from '../repositories/submission-repository';
 import * as file_utils from '../utils/file-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 import { ArtifactService } from './artifact-service';
@@ -95,9 +94,9 @@ describe('ArtifactService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 20 });
       const artifactService = new ArtifactService(mockDBConnection);
 
-      const transformRecordStub = sinon
-        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
-        .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
+      // const transformRecordStub = sinon
+      //   .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
+      //   .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
 
       // const getOrInsertSubmissionRecordStub =
       sinon
@@ -115,7 +114,7 @@ describe('ArtifactService', () => {
         await artifactService.uploadAndPersistArtifact(mockDataPackageId, mockArtifactMetadata, mockFileUuid, mockFile);
         expect.fail();
       } catch (actualError) {
-        expect(transformRecordStub).to.be.calledWith(20);
+        // expect(transformRecordStub).to.be.calledWith(20);
         expect((actualError as HTTPError).message).to.equal('Test upload failed');
         expect(insertRecordStub).to.not.be.called;
       }
@@ -125,9 +124,9 @@ describe('ArtifactService', () => {
       const mockDBConnection = getMockDBConnection({ systemUserId: () => 20 });
       const artifactService = new ArtifactService(mockDBConnection);
 
-      const transformRecordStub = sinon
-        .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
-        .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
+      // const transformRecordStub = sinon
+      //   .stub(SubmissionService.prototype, 'getSourceTransformRecordBySystemUserId')
+      //   .resolves({ source_transform_id: 60 } as unknown as ISourceTransformModel);
 
       const insertSubmissionRecordWithPotentialConflictStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionRecordWithPotentialConflict')
@@ -145,12 +144,9 @@ describe('ArtifactService', () => {
         await artifactService.uploadAndPersistArtifact(mockDataPackageId, mockArtifactMetadata, mockFileUuid, mockFile);
         expect.fail();
       } catch (actualError) {
-        expect(transformRecordStub).to.be.calledWith(20);
+        // expect(transformRecordStub).to.be.calledWith(20);
 
-        expect(insertSubmissionRecordWithPotentialConflictStub).to.be.calledWith({
-          source_transform_id: 60,
-          uuid: mockDataPackageId
-        });
+        expect(insertSubmissionRecordWithPotentialConflictStub).to.be.calledWith(mockDataPackageId);
         expect(getNextArtifactIdsStub).to.be.calledWith();
         expect(uploadStub).to.be.calledWith(
           mockFile,

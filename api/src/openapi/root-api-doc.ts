@@ -140,6 +140,34 @@ export const rootAPIDoc = {
             }
           }
         }
+      },
+      SubmissionFeature: {
+        title: 'BioHub Data Submission Feature',
+        type: 'object',
+        required: ['id', 'type', 'properties', 'features'],
+        properties: {
+          id: {
+            title: 'Unique id of the feature',
+            type: 'string'
+          },
+          type: {
+            title: 'Feature type',
+            type: 'string'
+          },
+          properties: {
+            title: 'Feature properties',
+            type: 'object',
+            properties: {}
+          },
+          features: {
+            title: 'Feature child features',
+            type: 'array',
+            items: {
+              $ref: '#/components/schemas/SubmissionFeature'
+            }
+          }
+        },
+        additionalProperties: false
       }
     }
   }
