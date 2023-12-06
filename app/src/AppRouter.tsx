@@ -5,6 +5,7 @@ import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
+import ManageSecurityRulesRouter from 'features/admin/security/ManageSecurityRulesRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import MapRouter from 'features/map/MapRouter';
@@ -81,6 +82,18 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
               validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
               fallback={<Redirect to="/forbidden" />}>
               <AdminUsersRouter />
+            </SystemRoleGuard>
+          </AuthenticatedRouteGuard>
+        </BaseLayout>
+      </Route>
+
+      <Route path="/admin/security">
+        <BaseLayout>
+          <AuthenticatedRouteGuard>
+            <SystemRoleGuard
+              validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
+              fallback={<Redirect to="/forbidden" />}>
+              <ManageSecurityRulesRouter />
             </SystemRoleGuard>
           </AuthenticatedRouteGuard>
         </BaseLayout>
