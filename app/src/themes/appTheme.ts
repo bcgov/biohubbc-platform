@@ -29,7 +29,7 @@ const appTheme = createTheme({
   },
   palette: {
     background: {
-      default: '#f7f8fa'
+      default: '#f5f5f5'
     },
     primary: {
       main: '#036'
