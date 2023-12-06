@@ -10,17 +10,18 @@ import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { IMediaState } from '../utils/media/media-file';
 import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
+import { GeoJSONFeatureZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
-  validationProperties: Map<string, IFeatureProperties[]>;
+  validationPropertiesCache: Map<string, IFeatureProperties[]>;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.validationRepository = new ValidationRepository(connection);
-    this.validationProperties = new Map<string, IFeatureProperties[]>();
+    this.validationPropertiesCache = new Map<string, IFeatureProperties[]>();
   }
 
   /**
@@ -54,14 +55,14 @@ export class ValidationService extends DBService {
         // validate feature properties
         await this.validateProperties(featureValidationProperties, feature.properties);
       }
-    } catch (e) {
-      console.log(e);
+    } catch (error) {
+      console.error(error);
       return false;
     }
     return true;
   }
 
-  async validateProperties(properties: IFeatureProperties[], dataProperties: any): Promise<boolean> {
+  validateProperties(properties: IFeatureProperties[], dataProperties: any): boolean {
     const throwPropertyError = (property: IFeatureProperties) => {
       throw new Error(`Property ${property.name} is not of type ${property.type}`);
     };
@@ -73,38 +74,48 @@ export class ValidationService extends DBService {
         throw new Error(`Property ${property.name} not found in data`);
       }
 
-      if (property.type === 'string') {
-        if (typeof dataProperty !== 'string') {
-          throwPropertyError(property);
+      switch (property.type) {
+        case 'string':
+          if (typeof dataProperty !== 'string') {
+            throwPropertyError(property);
+          }
+          break;
+        case 'number':
+          if (typeof dataProperty !== 'number') {
+            throwPropertyError(property);
+          }
+          break;
+        case 'boolean':
+          if (typeof dataProperty !== 'boolean') {
+            throwPropertyError(property);
+          }
+          break;
+        case 'object':
+          if (typeof dataProperty !== 'object') {
+            throwPropertyError(property);
+          }
+          break;
+        case 'spatial': {
+          const { success } = GeoJSONFeatureZodSchema.safeParse(dataProperty);
+          if (!success) {
+            throwPropertyError(property);
+          }
+          break;
         }
-      } else if (property.type === 'number') {
-        if (typeof dataProperty !== 'number') {
-          throwPropertyError(property);
-        }
-      } else if (property.type === 'boolean') {
-        if (typeof dataProperty !== 'boolean') {
-          throwPropertyError(property);
-        }
-      } else if (property.type === 'object') {
-        if (typeof dataProperty !== 'object') {
-          throwPropertyError(property);
-        }
-      } else if (property.type === 'spatial') {
-        if (Array.isArray(dataProperty) === false) {
-          throwPropertyError(property);
-        }
-      } else if (property.type === 'datetime') {
-        if (typeof dataProperty !== 'string') {
-          throwPropertyError(property);
-        }
+        case 'datetime': {
+          if (typeof dataProperty !== 'string') {
+            throwPropertyError(property);
+          }
 
-        const date = new Date(dataProperty);
+          const date = new Date(dataProperty);
 
-        if (date.toString() === 'Invalid Date') {
-          throw new Error(`Property ${property.name} is not a valid date`);
+          if (date.toString() === 'Invalid Date') {
+            throw new Error(`Property ${property.name} is not a valid date`);
+          }
+          break;
         }
-      } else {
-        throw new Error(`Property ${property.name} has an invalid type`);
+        default:
+          throw new Error(`Property ${property.name} has an invalid type`);
       }
     }
 
@@ -112,14 +123,15 @@ export class ValidationService extends DBService {
   }
 
   async getFeatureValidationProperties(featureType: string): Promise<IFeatureProperties[]> {
-    if (this.validationProperties.get(featureType) === undefined) {
-      this.validationProperties.set(
-        featureType,
-        await this.validationRepository.getFeatureValidationProperties(featureType)
-      );
+    let properties = this.validationPropertiesCache.get(featureType);
+
+    if (!properties) {
+      properties = await this.validationRepository.getFeatureValidationProperties(featureType);
+
+      this.validationPropertiesCache.set(featureType, properties);
     }
 
-    return this.validationProperties.get(featureType) as IFeatureProperties[];
+    return properties;
   }
 
   /**
