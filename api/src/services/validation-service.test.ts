@@ -109,6 +109,82 @@ describe.only('ValidationService', () => {
   });
 
   describe('validateDatasetSubmission', () => {
+    it('should return false if the dataset is invalid', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const getFeatureValidationPropertiesSpy = sinon.spy(
+        ValidationService.prototype,
+        'getFeatureValidationProperties'
+      );
+
+      const validatePropertiesStub = sinon.stub(ValidationService.prototype, 'validateProperties').returns(true);
+
+      const mockDatasetProperties = {
+        name: 'dataset name',
+        start_date: '2023-12-22'
+      };
+      const mockObservationProperties1 = {
+        count: 11,
+        sex: 'male',
+        geometry: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            coordinates: [-125.44339737241725, 49.36887682703687],
+            type: 'Point'
+          }
+        }
+      };
+      const mockObservationProperties2 = {
+        count: 22,
+        sex: 'female',
+        geometry: {
+          type: 'Feature'
+          // Invalid geometry
+        }
+      };
+      const mockDataset: IDatasetSubmission = {
+        id: '123',
+        type: 'dataset',
+        properties: mockDatasetProperties,
+        features: [
+          { id: '1', type: 'observation', properties: mockObservationProperties1 },
+          { id: '2', type: 'observation', properties: mockObservationProperties2 }
+        ]
+      };
+
+      const validationService = new ValidationService(mockDBConnection);
+
+      const mockDatasetValidationProperties = [
+        { name: 'name', display_name: '', description: '', type: 'string' },
+        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+      ];
+      const mockObservationValidationProperties = [
+        { name: 'count', display_name: '', description: '', type: 'number' },
+        { name: 'sex', display_name: '', description: '', type: 'string' },
+        { name: 'geometry', display_name: '', description: '', type: 'spatial' }
+      ];
+      // Set cache for dataset type
+      validationService.validationPropertiesCache.set('dataset', mockDatasetValidationProperties);
+      // Set cache for observation type
+      validationService.validationPropertiesCache.set('observation', mockObservationValidationProperties);
+
+      const response = await validationService.validateDatasetSubmission(mockDataset);
+
+      expect(response).to.be.true;
+      expect(getFeatureValidationPropertiesSpy).to.have.been.calledWith('dataset');
+      expect(getFeatureValidationPropertiesSpy).to.have.been.calledWith('observation');
+      expect(validatePropertiesStub).to.have.been.calledWith(mockDatasetValidationProperties, mockDatasetProperties);
+      expect(validatePropertiesStub).to.have.been.calledWith(
+        mockObservationValidationProperties,
+        mockObservationProperties1
+      );
+      expect(validatePropertiesStub).to.have.been.calledWith(
+        mockObservationValidationProperties,
+        mockObservationProperties2
+      );
+    });
+
     it('should return true if the dataset is valid', async () => {
       const mockDBConnection = getMockDBConnection();
 
