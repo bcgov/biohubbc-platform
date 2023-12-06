@@ -7,7 +7,7 @@ const appTheme = createTheme({
   typography: {
     fontFamily: 'BCSans',
     h1: {
-      fontSize: '2.25rem',
+      fontSize: '2rem',
       fontWeight: 700
     },
     h2: {
@@ -74,14 +74,39 @@ const appTheme = createTheme({
       }
     },
     MuiButton: {
+      defaultProps: {
+        disableElevation: true
+      },
       styleOverrides: {
         root: {
-          textTransform: 'none'
+          '&:focus': {
+            outline: '2px solid #3B99FC',
+            outlineOffset: '-1px'
+          }
+        },
+        startIcon: {
+          marginBottom: '1px'
         },
         sizeLarge: {
-          fontSize: '1rem',
-          fontWeight: 700
+          fontSize: '1rem'
+        },
+        containedPrimary: {
+          fontWeight: 700,
+          letterSpacing: '0.02rem'
+        },
+        containedError: {
+          fontWeight: 700,
+          letterSpacing: '0.02rem'
+        },
+        outlinedPrimary: {
+          fontWeight: 700,
+          letterSpacing: '0.02rem'
         }
+      }
+    },
+    MuiButtonBase: {
+      defaultProps: {
+        disableRipple: true
       }
     },
     MuiCardHeader: {
