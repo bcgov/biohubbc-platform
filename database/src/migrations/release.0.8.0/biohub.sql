@@ -67,20 +67,20 @@ COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire 
 --
 
 CREATE TABLE submission(
-    submission_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    uuid                   uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    publish_timestamp      timestamptz(6),
-    create_date            timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user            integer           NOT NULL,
-    update_date            timestamptz(6),
-    update_user            integer,
-    revision_count         integer           DEFAULT 0 NOT NULL,
+    submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    uuid                        uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    security_review_timestamp   timestamptz(6),
+    create_date                 timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                 integer           NOT NULL,
+    update_date                 timestamptz(6),
+    update_user                 integer,
+    revision_count              integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_pk PRIMARY KEY (submission_id)
 );
 
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
-COMMENT ON COLUMN submission.publish_timestamp IS 'The timestamp of when the submission was published. Null indicates the submission is not published.';
+COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.';
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.';
 COMMENT ON COLUMN submission.update_date IS 'The datetime the record was updated.';
