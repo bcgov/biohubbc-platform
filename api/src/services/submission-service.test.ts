@@ -50,10 +50,7 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict({
-        uuid: '',
-        source_transform_id: 1
-      });
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict('aaaa');
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });

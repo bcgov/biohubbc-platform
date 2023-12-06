@@ -490,10 +490,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict({
-        uuid: 'aaaa',
-        source_transform_id: 1
-      });
+      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict('aaaa');
 
       expect(response).to.eql({
         uuid: 'aaaa',
@@ -510,10 +507,7 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecordWithPotentialConflict({
-          uuid: 'bbbb',
-          source_transform_id: 3
-        });
+        await submissionRepository.insertSubmissionRecordWithPotentialConflict('aaaa');
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to get or insert submission record');
