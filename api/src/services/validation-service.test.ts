@@ -11,7 +11,7 @@ import { ValidationService } from './validation-service';
 
 chai.use(sinonChai);
 
-describe.only('ValidationService', () => {
+describe('ValidationService', () => {
   afterEach(() => {
     sinon.restore();
   });
