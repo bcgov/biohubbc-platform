@@ -136,6 +136,13 @@ const appTheme = createTheme({
         }
       }
     },
+    MuiDialogContent: {
+      styleOverrides: {
+        root: {
+          paddingTop: '8px'
+        }
+      }
+    },
     MuiDialogActions: {
       styleOverrides: {
         root: {
