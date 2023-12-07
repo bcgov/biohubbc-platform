@@ -30,9 +30,16 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const test = async (submissionId: number): Promise<any> => {
+    const { data } = await axios.post(`/api/dataset/search-idx?submissionId=${submissionId}`);
+
+    return data;
+  }
+
   return {
     listSubmissions,
-    getSignedUrl
+    getSignedUrl,
+    test
   };
 };
 

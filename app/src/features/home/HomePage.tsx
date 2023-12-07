@@ -2,6 +2,7 @@ import { Container, Paper, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import SearchComponent from 'features/search/SearchComponent';
 import { Formik, FormikProps } from 'formik';
+import { useApi } from 'hooks/useApi';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import { useRef } from 'react';
 import { useHistory } from 'react-router';
@@ -19,6 +20,8 @@ const HomePage = () => {
 
     history.push(`/search?keywords=${query}`);
   };
+
+  useApi().submissions.test(1)
 
   return (
     <Paper square elevation={0}>

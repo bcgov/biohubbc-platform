@@ -323,6 +323,18 @@ export class SubmissionRepository extends BaseRepository {
     return response.rows[0];
   }
 
+  // TODO add return type
+  async getFeatureRecordsBySubmissionId(submissionId: number): Promise<any[]> {
+    const queryBuilder = getKnex()
+      .select('*')
+      .from('submission_feature')
+      .where('submission_id', submissionId);
+
+    const response = await this.connection.knex(queryBuilder);
+
+    return response.rows;
+  }
+
   /**
    * Get feature type id by name.
    *
