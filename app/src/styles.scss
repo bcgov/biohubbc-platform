@@ -1,25 +1,5 @@
 @import 'styles/fonts.scss';
 
-body {
-  overflow-y: scroll;
-}
-
-fieldset {
-  border: none;
-  padding: 0;
-  min-width: 0;
-}
-
-legend.MuiTypography-root {
-  margin-bottom: 1rem;
-  font-weight: 700;
-}
-
-.MuiDialogActions-root {
-  button {
-    min-width: 6rem;
-  }
-}
 
 .sectionHeaderButton {
   & + button {

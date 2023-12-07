@@ -27,7 +27,7 @@ export default function SecurityRuleForm() {
   ]
 
   return (
-    <Stack gap={3}>
+    <Stack gap={4}>
       <Stack gap={3} component="fieldset">
         <Typography component="legend">Details</Typography>
         <FormControl fullWidth>
@@ -142,13 +142,28 @@ export default function SecurityRuleForm() {
 
       <Stack gap={3} component="fieldset">
         <Typography component="legend">Conditions</Typography>
-        <Stack gap={2}>
+        <Stack gap={3}>
 
           <List disablePadding
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 1
+              gap: 4,
+              '& li + li:before': {
+                content: '"- AND -"',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'absolute',
+                top: '-26px',
+                left: '16px',
+                px: 1,
+                height: '20px',
+                fontSize: '13px',
+                fontWeight: 700,
+                borderRadius: '12px',
+                color: 'text.secondary'
+              }
             }}
           >
 
@@ -158,15 +173,28 @@ export default function SecurityRuleForm() {
                 sx={{
                   width: '100%',
                   pr: 2,
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  background: grey[50]
                 }}
               >
                 <Stack flexDirection="row" gap={2}>
-                  <Box flex="0 0 auto" p={2} display="flex" alignItems="center" textAlign="center"
+                  <Box flex="0 0 auto" p={2}
                     sx={{ background: grey[100] }}
                     width={300}
                   >
-                    <TextField label="Property" value="Taxonomy" fullWidth />
+                    <FormControl fullWidth>
+                      <InputLabel id="conditionPropertyLabel1">Property</InputLabel>
+                      <Select
+                        labelId="conditionPropertyLabel1"
+                        id="conditionProperty"
+                        label="Property"
+                        value={3}
+                      >
+                        <MenuItem value={1}>Number</MenuItem>
+                        <MenuItem value={2}>Start Date</MenuItem>
+                        <MenuItem value={3}>Taxonomy</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Box>
                   <Stack flex="1 1 auto" flexDirection="row" gap={2} py={2}>
                     <TextField label="Is" fullWidth />
@@ -190,20 +218,34 @@ export default function SecurityRuleForm() {
                 sx={{
                   width: '100%',
                   pr: 2,
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  background: grey[50]
                 }}
               >
                 <Stack flexDirection="row" gap={2} width="100%">
-                  <Box flex="0 0 auto" p={2} display="flex" alignItems="center" textAlign="center"
+                  <Box flex="0 0 auto" p={2}
                     sx={{ background: grey[100] }}
                     width={300}
                   >
-                    <TextField label="Number" value="Number" fullWidth />
+                    <FormControl fullWidth>
+                      <InputLabel id="conditionPropertyLabel2">Property</InputLabel>
+                      <Select
+                        labelId="conditionPropertyLabel2"
+                        id="conditionProperty"
+                        label="Property"
+                        value={1}
+                      >
+                        <MenuItem disabled value={0}>Select a property</MenuItem>
+                        <MenuItem value={1}>Number</MenuItem>
+                        <MenuItem value={2}>Start Date</MenuItem>
+                        <MenuItem value={2}>Taxonomy</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Box>
                   <Stack flex="1 1 auto" flexDirection="row" gap={2} py={2}>
-                    <TextField label="Is equal" fullWidth />
-                    <TextField label="Is greater than" fullWidth />
-                    <TextField label="Is less than" fullWidth />
+                    <TextField label="Is equal" type="number" fullWidth />
+                    <TextField label="Is greater than" type="number" fullWidth />
+                    <TextField label="Is less than" type="number" fullWidth />
                   </Stack>
                   <IconButton
                     sx={{
@@ -223,24 +265,79 @@ export default function SecurityRuleForm() {
                 sx={{
                   width: '100%',
                   pr: 2,
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  background: grey[50]
                 }}
               >
                 <Stack flexDirection="row" gap={2} width="100%">
-                  <Box p={2} display="flex" alignItems="center" textAlign="center"
+                  <Box flex="0 0 auto" p={2}
                     sx={{ background: grey[100] }}
                     width={300}
                   >
-                    <TextField label="Property" fullWidth />
+                    <FormControl fullWidth>
+                    <InputLabel id="conditionPropertyLabel4">Property</InputLabel>
+                    <Select
+                      labelId="conditionPropertyLabel4"
+                      id="conditionProperty"
+                      label="Property"
+                      value={1}
+                    >
+                      <MenuItem disabled value={0}>Select a property</MenuItem>
+                      <MenuItem value={1}>Label</MenuItem>
+                      <MenuItem value={2}>Number</MenuItem>
+                      <MenuItem value={3}>Start Date</MenuItem>
+                      <MenuItem value={4}>Taxonomy</MenuItem>
+                    </Select>
+                  </FormControl>
                   </Box>
                   <Stack flex="1 1 auto" flexDirection="row" justifyContent="center" gap={2} py={2}>
-                    <Typography component="span" variant="body1" color="textSecondary"
-                      sx={{
-                        alignSelf: 'center'
-                      }}
+                    <TextField label="Contains" fullWidth />
+                  </Stack>
+                  <IconButton
+                    sx={{
+                      alignSelf: 'center',
+                      flex: '0 0 auto'
+                    }}
+                  >
+                    <Icon path={mdiClose} size={1}></Icon>
+                  </IconButton>
+                </Stack>
+              </Paper>
+            </ListItem>
+
+            <ListItem disablePadding disableGutters>
+              <Paper
+                variant="outlined"
+                sx={{
+                  width: '100%',
+                  pr: 2,
+                  overflow: 'hidden',
+                  background: grey[50]
+                }}
+              >
+                <Stack flexDirection="row" gap={2} width="100%">
+                  <Box flex="0 0 auto" p={2}
+                    sx={{ background: grey[100] }}
+                    width={300}
+                  >
+                    <FormControl fullWidth>
+                    <InputLabel id="conditionPropertyLabel4">Property</InputLabel>
+                    <Select
+                      labelId="conditionPropertyLabel4"
+                      id="conditionProperty"
+                      label="Property"
+                      value={0}
                     >
-                      Select a property
-                    </Typography>
+                      <MenuItem disabled value={0}>Select a property</MenuItem>
+                      <MenuItem value={1}>Label</MenuItem>
+                      <MenuItem value={2}>Number</MenuItem>
+                      <MenuItem value={3}>Start Date</MenuItem>
+                      <MenuItem value={4}>Taxonomy</MenuItem>
+                    </Select>
+                  </FormControl>
+                  </Box>
+                  <Stack flex="1 1 auto" flexDirection="row" justifyContent="center" gap={2} py={2}>
+
                   </Stack>
                   <IconButton
                     sx={{

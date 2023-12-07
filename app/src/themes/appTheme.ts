@@ -1,7 +1,7 @@
 import { grey } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
 import type {} from '@mui/x-data-grid/themeAugmentation';
-import 'styles.scss';
+import 'styles/fonts.scss';
 
 const appTheme = createTheme({
   breakpoints: {
@@ -49,6 +49,31 @@ const appTheme = createTheme({
     }
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        a: {
+          color: '#1a5a96',
+          '&:focus': {
+            outline: '2px solid #3B99FC',
+            outlineOffset: '-1px',
+            borderRadius: '4px'
+          }
+        },
+        fieldset: {
+          margin: 0,
+          padding: 0,
+          minWidth: 0,
+          border: 'none'
+        },
+        legend: {
+          '&.MuiTypography-root': {
+            marginBottom: '15px',
+            padding: 0,
+            fontWeight: 700
+          }
+        }
+      }
+    },
     MuiAlert: {
       styleOverrides: {
         root: {
