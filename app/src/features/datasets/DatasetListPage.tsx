@@ -7,15 +7,15 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
+import { FuseResult, RangeTuple } from 'fuse.js';
 import useDownloadJSON from 'hooks/useDownloadJSON';
 import React, { useState } from 'react';
-import DatasetSortMenu from './components/DatasetSortMenu';
-
+import DatasetFuzzySearch from './components/DatasetFuzzySearch';
 //Note the structure for this type is likely to change once API response is known
 export interface IDataset {
-  submission_id: number;
-  submission_title: string;
-  submission_message: string;
+  submission_feature_id: number;
+  name: string;
+  description: string;
   submission_date: Date;
   secure: boolean;
 }
@@ -23,19 +23,131 @@ export interface IDataset {
 //Temp placeholder dataset data
 const datasetData = [
   {
-    submission_id: 1, // assuming this will be submission_id
-    submission_title: 'Dataset Title A', // unknown what this value should link to
-    submission_message:
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    submission_feature_id: 1, // assuming this will be submission_feature_id
+    name: 'Dataset A', // unknown what this value should link to
+    description:
+      'testfuzzy Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribou incididunt ut labore et dolore magna aliqua.',
     submission_date: new Date(),
     secure: false
   },
   {
-    submission_id: 2,
-    submission_title: 'Dataset Title B',
-    submission_message:
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+    submission_feature_id: 2,
+    name: 'Dataset Beaar',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor bee incididunt ut labore et dolore magna aliqua.',
     submission_date: new Date(Date.now() - 86400000),
+    secure: true
+  },
+  {
+    submission_feature_id: 3,
+    name: 'Moose Datset',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor mooses incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000 * 300),
+    secure: true
+  },
+  {
+    submission_feature_id: 4,
+    name: 'Caribou Datazet',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribooo incididunt ut labore et dolore magna aliqua. quack',
+    submission_date: new Date(Date.now() - 86400000 * 1000),
+    secure: true
+  },
+  {
+    submission_feature_id: 5, // assuming this will be submission_feature_id
+    name: 'Dataset A', // unknown what this value should link to
+    description:
+      'testfuzzy Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribou incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(),
+    secure: false
+  },
+  {
+    submission_feature_id: 6,
+    name: 'Dataset Beaar',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor bee incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000),
+    secure: true
+  },
+  {
+    submission_feature_id: 7,
+    name: 'Moose Datset',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor mooses incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000 * 300),
+    secure: true
+  },
+  {
+    submission_feature_id: 8,
+    name: 'Caribou Datazet',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribooo incididunt ut labore et dolore magna aliqua. quack',
+    submission_date: new Date(Date.now() - 86400000 * 1000),
+    secure: true
+  },
+  {
+    submission_feature_id: 9, // assuming this will be submission_feature_id
+    name: 'Dataset A', // unknown what this value should link to
+    description:
+      'testfuzzy Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribou incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(),
+    secure: false
+  },
+  {
+    submission_feature_id: 10,
+    name: 'Dataset Beaar',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor bee incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000),
+    secure: true
+  },
+  {
+    submission_feature_id: 11,
+    name: 'Moose Datset',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor mooses incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000 * 300),
+    secure: true
+  },
+  {
+    submission_feature_id: 12,
+    name: 'Caribou Datazet',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribooo incididunt ut labore et dolore magna aliqua. quack',
+    submission_date: new Date(Date.now() - 86400000 * 1000),
+    secure: true
+  },
+  {
+    submission_feature_id: 13, // assuming this will be submission_feature_id
+    name: 'Dataset A', // unknown what this value should link to
+    description:
+      'testfuzzy Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribou incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(),
+    secure: false
+  },
+  {
+    submission_feature_id: 14,
+    name: 'Dataset Beaar',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor bee incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000),
+    secure: true
+  },
+  {
+    submission_feature_id: 15,
+    name: 'Moose Datset',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor mooses incididunt ut labore et dolore magna aliqua.',
+    submission_date: new Date(Date.now() - 86400000 * 300),
+    secure: true
+  },
+  {
+    submission_feature_id: 16,
+    name: 'Caribou Datazet',
+    description:
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor caribooo incididunt ut labore et dolore magna aliqua. quack',
+    submission_date: new Date(Date.now() - 86400000 * 1000),
     secure: true
   }
 ];
@@ -48,19 +160,41 @@ const datasetData = [
 const DatasetListPage = () => {
   const download = useDownloadJSON();
 
-  // Note: this will be populated by API once wired up
-  const [datasets, setDatasets] = useState<IDataset[]>(datasetData);
+  // For convienience and optimization. Generates the dataset as FuseResult
+  const originalFuzzyDatasets = datasetData.map((item, refIndex) => ({
+    item,
+    refIndex,
+    matches: []
+  }));
 
-  const handleDownload = (dataset: IDataset) => {
+  const [fuzzyDatasets, setFuzzyDatasets] = useState<FuseResult<IDataset>[]>(originalFuzzyDatasets);
+
+  const handleDownload = (dataset: FuseResult<IDataset>) => {
     // make request here for JSON data of dataset
     // pass to dowload
     const mockDownloadData = { a: 'b' };
-    download(mockDownloadData, `${dataset.submission_title.toLowerCase().replace(/ /g, '-')}-${dataset.submission_id}`);
+    download(
+      mockDownloadData,
+      `${dataset.item.name.toLowerCase().replace(/ /g, '-')}-${dataset.item.submission_feature_id}`
+    );
     console.log('download placeholder');
   };
 
   const handleRequestAccess = () => {
     console.log('request access placeholder');
+  };
+
+  const highlight = (value: string, indices: readonly RangeTuple[] = [], i = 1): string | JSX.Element => {
+    const pair = indices[indices.length - i];
+    return !pair ? (
+      value
+    ) : (
+      <>
+        {highlight(value.substring(0, pair[0]), indices, i + 1)}
+        <mark style={{ backgroundColor: '#3B99FC' }}>{value.substring(pair[0], pair[1] + 1)}</mark>
+        {value.substring(pair[1] + 1)}
+      </>
+    );
   };
 
   return (
@@ -72,50 +206,57 @@ const DatasetListPage = () => {
           py: 4
         }}>
         <Container maxWidth="xl">
-          <Typography variant="h1">Datasets</Typography>
+          <Typography variant="h1" mb={2}>
+            Datasets
+          </Typography>
+          <DatasetFuzzySearch
+            originalDatasets={datasetData}
+            originalFuzzyDatasets={originalFuzzyDatasets}
+            handleFuzzyDatasets={(dataset) => {
+              setFuzzyDatasets(dataset);
+            }}
+          />
         </Container>
       </Paper>
       <Container maxWidth="xl">
         <Box py={4} display="flex" alignItems="center" justifyContent="space-between">
-          {datasets.length > 0 ? <Typography fontWeight="bold">{`${datasets.length} records found`}</Typography> : null}
-          <DatasetSortMenu
-            data={datasets}
+          <Typography fontWeight="bold">{`${fuzzyDatasets?.length ?? 0} records found`}</Typography>
+          {/*<DatasetSortMenu
+            data={fuzzyDatasets}
             handleSortedData={(data: IDataset[]) => {
-              setDatasets(data);
+              setFuzzyDatasets(data);
             }}
-          />
+          />*/}
         </Box>
         <Stack spacing={2} mb={2}>
-          {datasets.map((dataset) => (
-            <Card elevation={0} key={dataset.submission_id}>
+          {fuzzyDatasets?.map((dataset) => (
+            <Card elevation={0} key={dataset.item.submission_feature_id}>
               <CardHeader
-                title={dataset.submission_title}
+                title={highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
                 subheader={
                   <Typography variant="body2" color="textSecondary">
-                    {dataset.submission_date.toDateString()}
+                    {dataset.item.submission_date.toDateString()}
                   </Typography>
                 }
                 action={
                   <Button
-                    variant={dataset.secure ? 'outlined' : 'contained'}
+                    variant={dataset.item.secure ? 'outlined' : 'contained'}
                     sx={{ ml: 'auto', minWidth: 150 }}
                     disableElevation
                     onClick={() => {
-                      dataset.secure ? handleRequestAccess() : handleDownload(dataset);
+                      dataset.item.secure ? handleRequestAccess() : handleDownload(dataset);
                     }}>
-                    {dataset.secure ? 'Request Access' : 'Download'}
+                    {dataset.item.secure ? 'Request Access' : 'Download'}
                   </Button>
                 }
               />
               <CardContent sx={{ pt: 0, display: 'flex', alignItems: 'center' }}>
                 <Typography variant="body1" color="textSecondary">
-                  {dataset.submission_message}
+                  {highlight(
+                    dataset.item.description,
+                    dataset?.matches?.find((match) => match.key === 'description')?.indices
+                  )}
                 </Typography>
-                {/* <Button
-                  href={`data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(dataset.data))}`}
-                  download="filename.json">
-                  Download Json
-                </Button> */}
               </CardContent>
             </Card>
           ))}

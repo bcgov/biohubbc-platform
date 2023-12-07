@@ -50,6 +50,7 @@
     "dompurify": "^2.4.0",
     "express": "~4.17.1",
     "formik": "~2.2.6",
+    "fuse.js": "^7.0.0",
     "handlebars": "^4.7.7",
     "jest-watch-typeahead": "^2.2.2",
     "jszip": "^3.10.1",

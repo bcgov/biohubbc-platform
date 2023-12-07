@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import useTheme from '@mui/system/useTheme';
 import sortBy from 'lodash-es/sortBy';
 import { useState } from 'react';
 import { IDataset } from '../DatasetListPage';
@@ -22,6 +23,8 @@ interface IDatasetSortMenu {
  * @returns {*}
  */
 const DatasetSortMenu = (props: IDatasetSortMenu) => {
+  const theme = useTheme();
+
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -48,15 +51,21 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
   };
 
   const sortMenuItem = (sortKey: keyof IDataset, itemName: string, sortBy: SortBy = 'asc') => {
-    const label = `Sort ${itemName} ${sortBy === 'asc' ? 'ascending' : 'descending'}`;
+    const label = `${itemName} ${sortBy === 'asc' ? 'ascending' : 'descending'}`;
     return (
       <MenuItem
         onClick={() => {
           setSelectedItem(label);
           handleSort(sortKey, sortBy);
         }}
-        selected={selectedItem === label}>
-        <Icon path={sortBy === 'asc' ? mdiSortAlphabeticalAscending : mdiSortAlphabeticalDescending} size={1} />
+        selected={selectedItem === label}
+        dense>
+        <Icon
+          color={theme.palette.text.secondary}
+          path={sortBy === 'asc' ? mdiSortAlphabeticalAscending : mdiSortAlphabeticalDescending}
+          size={1}
+          style={{ marginRight: theme.spacing(1) }}
+        />
         {label}
       </MenuItem>
     );
@@ -74,10 +83,10 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
         Sort By
       </Button>
       <Menu id="sort-menu" anchorEl={anchorEl} open={open} onClose={handleClose}>
-        {sortMenuItem('submission_title', 'title')}
-        {sortMenuItem('submission_title', 'title', 'desc')}
-        {sortMenuItem('submission_date', 'submission date')}
-        {sortMenuItem('submission_date', 'submission date', 'desc')}
+        {sortMenuItem('name', 'Title')}
+        {sortMenuItem('name', 'Title', 'desc')}
+        {sortMenuItem('submission_date', 'Date')}
+        {sortMenuItem('submission_date', 'Date', 'desc')}
       </Menu>
     </div>
   );
