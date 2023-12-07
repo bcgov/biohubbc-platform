@@ -4,6 +4,15 @@ import type {} from '@mui/x-data-grid/themeAugmentation';
 import 'styles.scss';
 
 const appTheme = createTheme({
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 960,
+      lg: 1440,
+      xl: 1720
+    }
+  },
   typography: {
     fontFamily: 'BCSans',
     h1: {
@@ -154,7 +163,7 @@ const appTheme = createTheme({
       styleOverrides: {
         root: ({ ownerState, theme }) => ({
           ...(ownerState && {
-            backgroundColor: theme.palette.grey[50]
+            backgroundColor: '#fff'
           })
         })
       }
