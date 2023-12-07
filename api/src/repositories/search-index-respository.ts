@@ -3,13 +3,17 @@ import { getLogger } from "../utils/logger";
 import { BaseRepository } from "./base-repository";
 import { getKnex } from "../database/db";
 import { ApiExecuteSQLError } from "../errors/api-error";
+import SQL from "sql-template-strings";
 
 const defaultLog = getLogger('repositories/search-index-repository');
 
-const Point = z.object({
+// TODO replace with pre-existing Zod types for geojson
+const Geometry = z.object({
   type: z.literal('Point'),
   coordinates: z.tuple([z.number(), z.number()]),
 });
+
+export type Geometry = z.infer<typeof Geometry>;
 
 const SearchableRecord = z.object({
   submission_feature_id: z.number(),
@@ -22,7 +26,7 @@ const SearchableRecord = z.object({
   revision_count: z.number(),
 });
 
-type InsertSearchableRecordKey = 'value' | 'feature_property_id'
+type InsertSearchableRecordKey = 'submission_feature_id' | 'value' | 'feature_property_id'
 
 export const DatetimeSearchableRecord = SearchableRecord.extend({
   search_datetime_id: z.date(),
@@ -36,7 +40,7 @@ export const NumberSearchableRecord = SearchableRecord.extend({
 
 export const SpatialSearchableRecord = SearchableRecord.extend({
   search_spatial_id: z.number(),
-  value: Point
+  value: Geometry
 });
 
 export const StringSearchableRecord = SearchableRecord.extend({
@@ -50,13 +54,22 @@ export type NumberSearchableRecord = z.infer<typeof NumberSearchableRecord>;
 export type SpatialSearchableRecord = z.infer<typeof SpatialSearchableRecord>;
 export type StringSearchableRecord = z.infer<typeof StringSearchableRecord>;
 
-type InsertDatetimeSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>
-type InsertNumberSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>
-type InsertSpatialSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>
-type InsertStringSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>
+export type InsertDatetimeSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>
+export type InsertNumberSearchableRecord = Pick<NumberSearchableRecord, InsertSearchableRecordKey>
+export type InsertSpatialSearchableRecord = Pick<SpatialSearchableRecord, InsertSearchableRecordKey>
+export type InsertStringSearchableRecord = Pick<StringSearchableRecord, InsertSearchableRecordKey>
 
+/**
+ * A class for creating searchable records
+ */
 export class SearchIndexRepository extends BaseRepository {
-
+  /**
+   * Inserts a searchable datetime record.
+   *
+   * @param {InsertDatetimeSearchableRecord[]} datetimeRecords
+   * @return {*}  {Promise<DatetimeSearchableRecord[]>}
+   * @memberof SearchIndexRepository
+   */
   async insertSearchableDatetimeRecords(datetimeRecords: InsertDatetimeSearchableRecord[]): Promise<DatetimeSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableDatetimeRecords' });
 
@@ -78,6 +91,13 @@ export class SearchIndexRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Inserts a searchable number record.
+   *
+   * @param {InsertNumberSearchableRecord[]} numberRecords
+   * @return {*}  {Promise<NumberSearchableRecord[]>}
+   * @memberof SearchIndexRepository
+   */
   async insertSearchableNumberRecords(numberRecords: InsertNumberSearchableRecord[]): Promise<NumberSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableNumberRecords' });
 
@@ -99,6 +119,13 @@ export class SearchIndexRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Inserts a searchable spatial record.
+   *
+   * @param {InsertSpatialSearchableRecord[]} spatialRecords
+   * @return {*}  {Promise<SpatialSearchableRecord[]>}
+   * @memberof SearchIndexRepository
+   */
   async insertSearchableSpatialRecords(spatialRecords: InsertSpatialSearchableRecord[]): Promise<SpatialSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableSpatialRecords' });
 
@@ -120,6 +147,13 @@ export class SearchIndexRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Inserts a searchable string record.
+   *
+   * @param {InsertStringSearchableRecord[]} stringRecords
+   * @return {*}  {Promise<StringSearchableRecord[]>}
+   * @memberof SearchIndexRepository
+   */
   async insertSearchableStringRecords(stringRecords: InsertStringSearchableRecord[]): Promise<StringSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableStringRecords' });
 
@@ -140,4 +174,29 @@ export class SearchIndexRepository extends BaseRepository {
 
     return response.rows;
   }
+
+  // TODO return type
+  async getFeaturePropertiesWithTypeNames(): Promise<any[]> {
+    const query = SQL`
+    SELECT
+      fp.name as property_name,
+      fpt.name as property_type,
+      fp.*
+    FROM
+      feature_property fp
+    LEFT JOIN 
+      feature_property_type fpt
+    ON
+      fp.feature_property_type_id = fpt.feature_property_type_id
+    WHERE
+      fp.record_end_date IS NULL
+    AND
+      fpt.record_end_date IS NULL
+    `;
+
+    const response = await this.connection.sql(query);
+
+    return response.rows;
+  }
+
 }
