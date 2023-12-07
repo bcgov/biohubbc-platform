@@ -4,15 +4,16 @@ import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import useTheme from '@mui/system/useTheme';
+import { FuseResult } from 'fuse.js';
+import { IDataset } from 'interfaces/useDatasetApi.interface';
 import sortBy from 'lodash-es/sortBy';
 import { useState } from 'react';
-import { IDataset } from '../DatasetListPage';
 
 type SortBy = 'asc' | 'desc';
 
 interface IDatasetSortMenu {
-  data: IDataset[];
-  handleSortedData: (data: IDataset[]) => void;
+  data: FuseResult<IDataset>[];
+  handleSortedFuzzyData: (data: FuseResult<IDataset>[]) => void;
 }
 
 /**
@@ -25,7 +26,6 @@ interface IDatasetSortMenu {
 const DatasetSortMenu = (props: IDatasetSortMenu) => {
   const theme = useTheme();
 
-  const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const open = Boolean(anchorEl);
@@ -41,12 +41,15 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
   /**
    * sorts datasets by property
    *
-   * @param {keyof IDataset} sortKey - property to sory datasets by
+   * @param {keyof IDataset} sortKey - property to sort datasets by
    * @param {SortBy} [sortDirection] - ascending or descending sort
    */
   const handleSort = (sortKey: keyof IDataset, sortDirection: SortBy) => {
-    const sortedData = sortDirection === 'asc' ? sortBy(props.data, sortKey) : sortBy(props.data, sortKey).reverse();
-    props.handleSortedData(sortedData);
+    const sortedData =
+      sortDirection === 'asc'
+        ? sortBy(props.data, (fuzzyDataset) => fuzzyDataset.item[sortKey])
+        : sortBy(props.data, (fuzzyDataset) => fuzzyDataset.item[sortKey]).reverse();
+    props.handleSortedFuzzyData(sortedData);
     handleClose();
   };
 
@@ -55,10 +58,8 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
     return (
       <MenuItem
         onClick={() => {
-          setSelectedItem(label);
           handleSort(sortKey, sortBy);
         }}
-        selected={selectedItem === label}
         dense>
         <Icon
           color={theme.palette.text.secondary}

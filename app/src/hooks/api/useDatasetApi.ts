@@ -1,9 +1,11 @@
 import { AxiosInstance } from 'axios';
 import {
   IArtifact,
+  IDataset,
   IDatasetForReview,
   IHandlebarsTemplates,
-  IListRelatedDatasetsResponse
+  IListRelatedDatasetsResponse,
+  SECURITY_APPLIED_STATUS
 } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
@@ -95,6 +97,34 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  // net-new requests for updated biohub schema //
+
+  /**
+   * Fetch list of all dataset submissions
+   * NOTE: mock implementation
+   * TODO: return real data once api endpoint created
+   *
+   * @async
+   * @returns {*} {Promise<IDataset[]>}
+   */
+  const getAllReviewedDatasets = async (): Promise<IDataset[]> => {
+    const keywords = ['moose', 'caribou', 'deer', 'bear', 'bat'];
+    const securityLevel = {
+      0: SECURITY_APPLIED_STATUS.SECURED,
+      1: SECURITY_APPLIED_STATUS.UNSECURED,
+      2: SECURITY_APPLIED_STATUS.SECURED,
+      3: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+      4: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
+    };
+    return keywords.map((keyword, idx) => ({
+      submission_feature_id: idx,
+      name: `Dataset - ${keyword}`,
+      description: `${keywords[idx] + 1 ?? 'test'} Lorem ipsum dolor sit amet, consectetur adipiscing elit. ${keyword}`,
+      submission_date: new Date(Date.now() - 86400000 * (300 * idx)),
+      security: securityLevel[idx]
+    }));
+  };
+
   return {
     listAllDatasets,
     listAllDatasetsForReview,
@@ -102,7 +132,8 @@ const useDatasetApi = (axios: AxiosInstance) => {
     getDatasetArtifacts,
     getArtifactSignedUrl,
     getHandleBarsTemplateByDatasetId,
-    getRelatedDatasets
+    getRelatedDatasets,
+    getAllReviewedDatasets
   };
 };
 

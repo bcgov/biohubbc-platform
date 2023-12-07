@@ -1,9 +1,10 @@
 import { SearchInput } from 'features/search/SearchComponent';
-import Fuse, { FuseResult } from 'fuse.js';
+import Fuse, { FuseResult, IFuseOptions } from 'fuse.js';
+import useDebounce from 'hooks/useDebounce';
+import { IDataset } from 'interfaces/useDatasetApi.interface';
 import { ChangeEvent, useState } from 'react';
-import { IDataset } from '../DatasetListPage';
 
-const fuseOptions = {
+const datasetFuseOptions: IFuseOptions<IDataset> = {
   // keys to search object array for
   // prioritizes shorter key names by default ie: title
   keys: [
@@ -17,8 +18,12 @@ const fuseOptions = {
   distance: 200,
   // calculates exact match with location and distance
   threshold: 0.5,
+  // only run the fuzzy search when more than 2 characters entered
   minMatchCharLength: 2,
-  includeMatches: true
+  // provides the match indices used for highlighting
+  includeMatches: true,
+  // extends the search to use logical query operators
+  useExtendedSearch: true
 };
 
 interface DatasetFuzzySearchProps {
@@ -27,6 +32,12 @@ interface DatasetFuzzySearchProps {
   handleFuzzyDatasets: (datasets: FuseResult<IDataset>[]) => void;
 }
 
+/**
+ * dataset fuzzy sort and search
+ *
+ * @param {DatasetFuzzySearchProps} props
+ * @returns {*}
+ */
 const DatasetFuzzySearch = (props: DatasetFuzzySearchProps) => {
   const [fuzzySearch, setFuzzySearch] = useState('');
 
@@ -36,21 +47,26 @@ const DatasetFuzzySearch = (props: DatasetFuzzySearchProps) => {
       return;
     }
 
-    const fuse = new Fuse(props.originalDatasets, fuseOptions);
-    const fuzzyDatasets = fuse.search(value);
+    const fuse = new Fuse(props.originalDatasets, datasetFuseOptions);
+    const searchValue = value.replaceAll(' ', ' | ');
+    const fuzzyDatasets = fuse.search(searchValue);
     props.handleFuzzyDatasets(fuzzyDatasets);
   };
+
+  const debounceFuzzySearch = useDebounce(() => {
+    handleFuzzy(fuzzySearch);
+  }, 350);
 
   const handleSearch = (e: ChangeEvent<any>) => {
     const value: string = e.target.value;
 
     setFuzzySearch(value);
 
-    handleFuzzy(value);
+    debounceFuzzySearch();
   };
 
   return (
-    <SearchInput placeholderText="Enter a dataset title or keyword" value={fuzzySearch} handleChange={handleSearch} />
+    <SearchInput placeholderText="Enter a dataset title or keywords" value={fuzzySearch} handleChange={handleSearch} />
   );
 };
 

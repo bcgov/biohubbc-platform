@@ -24,6 +24,7 @@ export interface IArtifact {
 export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
   UNSECURED = 'UNSECURED',
+  PARTIALLY_SECURED = 'PARTIALLY_SECURED',
   PENDING = 'PENDING'
 }
 
@@ -56,4 +57,13 @@ export interface IDatasetForReview {
   dataset_name: string;
   last_updated: string;
   keywords: string[];
+}
+
+// TODO: update this type to be correct for what API responds with.
+export interface IDataset {
+  submission_feature_id: number;
+  name: string;
+  description: string;
+  submission_date: Date;
+  security: SECURITY_APPLIED_STATUS;
 }
