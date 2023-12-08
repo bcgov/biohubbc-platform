@@ -541,9 +541,9 @@ export class SubmissionService extends DBService {
    *     {
    *       submission_id: number;
    *       uuid: string;
+   *       name: string;
+   *       description: string;
    *       create_date: string;
-   *       submission_feature_id: number;
-   *       data: Record<string, unknown>;
    *     }[]
    *   >}
    * @memberof SubmissionService
@@ -552,9 +552,9 @@ export class SubmissionService extends DBService {
     {
       submission_id: number;
       uuid: string;
+      name: string;
+      description: string;
       create_date: string;
-      submission_feature_id: number;
-      data: Record<string, unknown>;
     }[]
   > {
     return this.submissionRepository.getUnreviewedSubmissions();

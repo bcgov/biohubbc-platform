@@ -49,16 +49,16 @@ GET.apiDoc = {
                   type: 'string',
                   format: 'uuid'
                 },
-                submission_feature_id: {
-                  type: 'integer',
-                  minimum: 1
+                name: {
+                  type: 'string',
+                  maxLength: 200
+                },
+                description: {
+                  type: 'string',
+                  maxLength: 3000
                 },
                 create_date: {
                   type: 'string'
-                },
-                data: {
-                  type: 'object',
-                  properties: {}
                 }
               }
             }

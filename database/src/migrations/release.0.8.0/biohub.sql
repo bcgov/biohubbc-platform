@@ -31,6 +31,8 @@ CREATE TABLE submission(
     uuid                        uuid              DEFAULT public.gen_random_uuid() NOT NULL,
     security_review_timestamp   timestamptz(6),
     source_system               varchar(200)      NOT NULL,
+    name                        varchar(200)      NOT NULL,
+    description                 varchar(3000),
     create_date                 timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                 integer           NOT NULL,
     update_date                 timestamptz(6),
@@ -43,6 +45,8 @@ COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primar
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
 COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';
 COMMENT ON COLUMN submission.source_system IS 'The name of the source system from which the submission originated.';
+COMMENT ON COLUMN submission.name IS 'The name of the submission.';
+COMMENT ON COLUMN submission.description IS 'The description of the submission.';
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.';
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.';
 COMMENT ON COLUMN submission.update_date IS 'The datetime the record was updated.';

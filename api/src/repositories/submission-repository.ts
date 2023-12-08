@@ -1109,9 +1109,9 @@ export class SubmissionRepository extends BaseRepository {
    *     {
    *       submission_id: number;
    *       uuid: string;
+   *       name: string;
+   *       description: string;
    *       create_date: string;
-   *       submission_feature_id: number;
-   *       data: Record<string, unknown>;
    *     }[]
    *   >}
    * @memberof SubmissionRepository
@@ -1120,18 +1120,18 @@ export class SubmissionRepository extends BaseRepository {
     {
       submission_id: number;
       uuid: string;
+      name: string;
+      description: string;
       create_date: string;
-      submission_feature_id: number;
-      data: Record<string, unknown>;
     }[]
   > {
     const sqlStatement = SQL`
       SELECT 
         submission.submission_id, 
         submission.uuid, 
-        submission.create_date,
-        submission_feature.submission_feature_id, 
-        submission_feature.data
+        submission.name, 
+        submission.description, 
+        submission.create_date
       FROM 
         submission
       LEFT JOIN 
