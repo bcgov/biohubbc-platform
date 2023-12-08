@@ -1,4 +1,3 @@
-create trigger audit_artifact before insert or update or delete on biohub.artifact for each row execute procedure tr_audit_trigger();
 create trigger audit_submission before insert or update or delete on biohub.submission for each row execute procedure tr_audit_trigger();
 create trigger audit_system_user before insert or update or delete on biohub.system_user for each row execute procedure tr_audit_trigger();
 create trigger audit_system_constant before insert or update or delete on biohub.system_constant for each row execute procedure tr_audit_trigger();

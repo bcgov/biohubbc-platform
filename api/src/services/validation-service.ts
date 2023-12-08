@@ -10,7 +10,7 @@ import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { IMediaState } from '../utils/media/media-file';
 import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
-import { GeoJSONFeatureZodSchema } from '../zod-schema/geoJsonZodSchema';
+import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
 
 export class ValidationService extends DBService {
@@ -63,6 +63,8 @@ export class ValidationService extends DBService {
   }
 
   validateProperties(properties: IFeatureProperties[], dataProperties: any): boolean {
+    console.log('dataProperties', dataProperties);
+    console.log('properties', properties);
     const throwPropertyError = (property: IFeatureProperties) => {
       throw new Error(`Property ${property.name} is not of type ${property.type}`);
     };
@@ -96,7 +98,7 @@ export class ValidationService extends DBService {
           }
           break;
         case 'spatial': {
-          const { success } = GeoJSONFeatureZodSchema.safeParse(dataProperty);
+          const { success } = GeoJSONFeatureCollectionZodSchema.safeParse(dataProperty);
           if (!success) {
             throwPropertyError(property);
           }

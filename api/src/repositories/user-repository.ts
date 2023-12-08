@@ -9,11 +9,11 @@ export const SystemUser = z.object({
   user_identity_source_id: z.number(),
   user_identifier: z.string(),
   user_guid: z.string(),
-  record_effective_date: z.date(),
-  record_end_date: z.date().nullable(),
-  create_date: z.date(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
   create_user: z.number(),
-  update_date: z.date().nullable(),
+  update_date: z.string().nullable(),
   update_user: z.number().nullable(),
   revision_count: z.number()
 });

@@ -23,8 +23,8 @@ export const Artifact = ArtifactMetadata.extend({
   uuid: z.string().uuid(),
   key: z.string(),
   foi_reason: z.boolean().nullable().optional(),
-  security_review_timestamp: z.date().nullable().optional(),
-  create_date: z.date().optional()
+  security_review_timestamp: z.string().nullable().optional(),
+  create_date: z.string().optional()
 });
 
 export type Artifact = z.infer<typeof Artifact>;

@@ -18,7 +18,7 @@ const mockUseKeycloakWrapper = {
 
 const mockUseApi = {
   dataset: {
-    listAllDatasetsForReview: jest.fn()
+    getUnreviewedSubmissions: jest.fn()
   }
 };
 
@@ -46,7 +46,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders a page with no security reviews', async () => {
-    mockUseApi.dataset.listAllDatasetsForReview.mockResolvedValue([]);
+    mockUseApi.dataset.getUnreviewedSubmissions.mockResolvedValue([]);
 
     const { getByTestId } = renderContainer();
 
@@ -56,7 +56,7 @@ describe('DashboardPage', () => {
   });
 
   it('renders a page with a table of security reviews', async () => {
-    mockUseApi.dataset.listAllDatasetsForReview.mockResolvedValue([
+    mockUseApi.dataset.getUnreviewedSubmissions.mockResolvedValue([
       {
         dataset_id: 'UUID-1',
         artifacts_to_review: 6,

@@ -90,8 +90,8 @@ export interface ISubmissionRecordWithSpatial {
  */
 export interface ISubmissionModel {
   submission_id?: number;
-  source_transform_id: number;
   uuid: string;
+  security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
   update_date?: string | null;
@@ -203,6 +203,22 @@ export interface ISubmissionObservationRecord {
   update_user?: string;
   revision_count?: string;
 }
+
+export const SubmissionRecord = z.object({
+  submission_id: z.number(),
+  uuid: z.string(),
+  security_review_timestamp: z.string().nullable(),
+  source_system: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
 /**
  * A repository class for accessing submission data.
@@ -1081,5 +1097,57 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows[0];
+  }
+
+  /**
+   * Fetch a submission from uuid.
+   *
+   * @param {string} uuid
+   * @return {*}  {Promise<ISubmissionModel>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionByUUID(uuid: string): Promise<ISubmissionModel> {
+    const sqlStatement = SQL`
+        SELECT
+          submission_id,
+          uuid,
+          security_review_timestamp
+        FROM
+          submission
+        WHERE
+          uuid = ${uuid};
+      `;
+
+    const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission record', [
+        'SubmissionRepository->getSubmissionByUUID',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
+    const sqlStatement = SQL`
+      SELECT 
+        *
+      FROM 
+        submission
+      WHERE 
+        submission.security_review_timestamp is null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+
+    return response.rows;
   }
 }

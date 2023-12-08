@@ -113,9 +113,9 @@ const insertDatasetRecord = async (knex: Knex, options: { submission_id: number 
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -170,10 +170,10 @@ const insertObservationRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
 
   await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
 
@@ -204,7 +204,7 @@ const insertAnimalRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -217,13 +217,17 @@ const insertAnimalRecord = async (
 const insertSubmission = () => `
     INSERT INTO submission
     (
-        source_transform_id,
-        uuid
+        uuid,
+        name,
+        description,
+        source_system
     )
     values
     (
-        1,
-        public.gen_random_uuid()
+        public.gen_random_uuid(),
+        $$${faker.company.name()}$$,
+        $$${faker.lorem.words({ min: 5, max: 100 })}$$,
+        'SIMS'
     )
     RETURNING submission_id;
 `;
@@ -284,8 +288,8 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     );
 `;
 
-const insertSearchTaxonomy = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_taxonomy
+const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) => `
+    INSERT INTO search_string
     (
         submission_feature_id,
         feature_property_id,
@@ -294,7 +298,7 @@ const insertSearchTaxonomy = (options: { submission_feature_id: number }) => `
     values
     (
         ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'number'),
+        (select feature_property_id from feature_property where name = 'taxonomy'),
         $$${faker.number.int({ min: 10000, max: 99999 })}$$
     );
 `;

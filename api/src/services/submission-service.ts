@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  SubmissionRecord,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -532,5 +533,15 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
+  }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
+    return this.submissionRepository.getUnreviewedSubmissions();
   }
 }

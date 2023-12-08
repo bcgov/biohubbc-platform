@@ -24,6 +24,7 @@ export interface IArtifact {
 export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
   UNSECURED = 'UNSECURED',
+  PARTIALLY_SECURED = 'PARTIALLY_SECURED',
   PENDING = 'PENDING'
 }
 
@@ -56,4 +57,12 @@ export interface IDatasetForReview {
   dataset_name: string;
   last_updated: string;
   keywords: string[];
+}
+
+export interface IUnreviewedSubmission {
+  submission_id: number;
+  uuid: string;
+  name: string;
+  description: string;
+  create_date: string;
 }

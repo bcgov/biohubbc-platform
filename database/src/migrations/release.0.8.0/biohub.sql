@@ -1,44 +1,4 @@
 -- 
--- TABLE: artifact 
---
-
-CREATE TABLE artifact(
-    artifact_id                    integer           NOT NULL,
-    submission_id                  integer           NOT NULL,
-    uuid                           uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    file_name                      varchar(300)      NOT NULL,
-    file_type                      varchar(300)      NOT NULL,
-    title                          varchar(300),
-    description                    varchar(3000),
-    file_size                      integer,
-    key                            varchar(1000),
-    security_review_timestamp      timestamptz(6),
-    create_date                    timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user                    integer           NOT NULL,
-    update_date                    timestamptz(6),
-    update_user                    integer,
-    revision_count                 integer           DEFAULT 0 NOT NULL,
-    CONSTRAINT artifact_pk PRIMARY KEY (artifact_id)
-);
-
-COMMENT ON COLUMN artifact.artifact_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.';
-COMMENT ON COLUMN artifact.submission_id IS 'System generated surrogate primary key identifier.';
-COMMENT ON COLUMN artifact.uuid IS 'The universally unique identifier for the record.';
-COMMENT ON COLUMN artifact.file_name IS 'The name of the artifact.';
-COMMENT ON COLUMN artifact.file_type IS 'The artifact type. Artifact type examples include video, audio and field data.';
-COMMENT ON COLUMN artifact.title IS 'The title of the artifact.';
-COMMENT ON COLUMN artifact.description IS 'The description of the record.';
-COMMENT ON COLUMN artifact.file_size IS 'The size of the artifact in bytes.';
-COMMENT ON COLUMN artifact.key IS 'The identifying key to the file in the storage system.';
-COMMENT ON COLUMN artifact.security_review_timestamp IS 'The timestamp that the security review of the submission artifact was completed.';
-COMMENT ON COLUMN artifact.create_date IS 'The datetime the record was created.';
-COMMENT ON COLUMN artifact.create_user IS 'The id of the user who created the record as identified in the system user table.';
-COMMENT ON COLUMN artifact.update_date IS 'The datetime the record was updated.';
-COMMENT ON COLUMN artifact.update_user IS 'The id of the user who updated the record as identified in the system user table.';
-COMMENT ON COLUMN artifact.revision_count IS 'Revision count used for concurrency control.';
-COMMENT ON TABLE artifact IS 'A listing of historical data submission artifacts.';
-
--- 
 -- TABLE: audit_log 
 --
 
@@ -67,20 +27,26 @@ COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire 
 --
 
 CREATE TABLE submission(
-    submission_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    uuid                   uuid              DEFAULT public.gen_random_uuid() NOT NULL,
-    publish_timestamp      timestamptz(6),
-    create_date            timestamptz(6)    DEFAULT now() NOT NULL,
-    create_user            integer           NOT NULL,
-    update_date            timestamptz(6),
-    update_user            integer,
-    revision_count         integer           DEFAULT 0 NOT NULL,
+    submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+    uuid                        uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    security_review_timestamp   timestamptz(6),
+    source_system               varchar(200)      NOT NULL,
+    name                        varchar(200)      NOT NULL,
+    description                 varchar(3000),
+    create_date                 timestamptz(6)    DEFAULT now() NOT NULL,
+    create_user                 integer           NOT NULL,
+    update_date                 timestamptz(6),
+    update_user                 integer,
+    revision_count              integer           DEFAULT 0 NOT NULL,
     CONSTRAINT submission_pk PRIMARY KEY (submission_id)
 );
 
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
-COMMENT ON COLUMN submission.publish_timestamp IS 'The timestamp of when the submission was published. Null indicates the submission is not published.';
+COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';
+COMMENT ON COLUMN submission.source_system IS 'The name of the source system from which the submission originated.';
+COMMENT ON COLUMN submission.name IS 'The name of the submission.';
+COMMENT ON COLUMN submission.description IS 'The description of the submission.';
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.';
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.';
 COMMENT ON COLUMN submission.update_date IS 'The datetime the record was updated.';
@@ -304,12 +270,6 @@ COMMENT ON COLUMN user_identity_source.revision_count IS 'Revision count used fo
 COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. This source is traditionally the system that authenticates the user. Example sources could include IDIR, BCEID and DATABASE.';
 
 -- 
--- INDEX: "artifact_idx1" 
---
-
-CREATE INDEX artifact_idx1 ON artifact(submission_id);
-
--- 
 -- INDEX: submission_uk1 
 --
 
@@ -372,14 +332,6 @@ CREATE INDEX system_user_role_idx2 ON system_user_role(system_role_id);
 --
 
 CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null;
-
--- 
--- TABLE: artifact 
---
-
-ALTER TABLE artifact ADD CONSTRAINT artifact_fk1
-    FOREIGN KEY (submission_id)
-    REFERENCES submission(submission_id);
 
 -- 
 -- TABLE: submission_job_queue 
