@@ -1,9 +1,9 @@
 import { AxiosInstance } from 'axios';
 import {
   IArtifact,
-  IDatasetForReview,
   IHandlebarsTemplates,
-  IListRelatedDatasetsResponse
+  IListRelatedDatasetsResponse,
+  IUnreviewedSubmission
 } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
@@ -26,12 +26,12 @@ const useDatasetApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch all unsecure datasets for review.
+   * Fetch all submissions that have not completed security review.
    *
-   * @returns {*} {Promise<IDatasetForReview[]>}
+   * @return {*}  {Promise<IUnreviewedSubmission[]>}
    */
-  const listAllDatasetsForReview = async (): Promise<IDatasetForReview[]> => {
-    const { data } = await axios.get(`api/administrative/review/list`);
+  const getUnreviewedSubmissions = async (): Promise<IUnreviewedSubmission[]> => {
+    const { data } = await axios.get(`api/administrative/submission/unreviewed`);
 
     return data;
   };
@@ -97,7 +97,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
 
   return {
     listAllDatasets,
-    listAllDatasetsForReview,
+    getUnreviewedSubmissions,
     getDatasetEML,
     getDatasetArtifacts,
     getArtifactSignedUrl,

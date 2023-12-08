@@ -75,37 +75,8 @@ export async function up(knex: Knex): Promise<void> {
 
     ----------------------------------------------------------------------------------------
 
-    CREATE TABLE artifact_security(
-      artifact_security_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      artifact_id                      integer           NOT NULL,
-      security_rule_id                 integer           NOT NULL,
-      record_effective_date            date              NOT NULL,
-      record_end_date                  date,
-      create_date                      timestamptz(6)    DEFAULT now() NOT NULL,
-      create_user                      integer           NOT NULL,
-      update_date                      timestamptz(6),
-      update_user                      integer,
-      revision_count                   integer           DEFAULT 0 NOT NULL,
-      CONSTRAINT artifact_security_pk PRIMARY KEY (artifact_security_id)
-    );
-  
-    COMMENT ON COLUMN artifact_security.artifact_security_id      IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN artifact_security.artifact_id               IS 'Foreign key to the artifact table.';
-    COMMENT ON COLUMN artifact_security.security_rule_id          IS 'Foreign key to the security_rule table.';
-    COMMENT ON COLUMN artifact_security.record_effective_date     IS 'Record level effective date.';
-    COMMENT ON COLUMN artifact_security.record_end_date           IS 'Record level end date.';
-    COMMENT ON COLUMN artifact_security.create_date               IS 'The datetime the record was created.';
-    COMMENT ON COLUMN artifact_security.create_user               IS 'The id of the user who created the record as identified in the system user table.';
-    COMMENT ON COLUMN artifact_security.update_date               IS 'The datetime the record was updated.';
-    COMMENT ON COLUMN artifact_security.update_user               IS 'The id of the user who updated the record as identified in the system user table.';
-    COMMENT ON COLUMN artifact_security.revision_count            IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  artifact_security                           IS 'A join table between artifact and security_rule. Defines which security rules are applied to the an artifact.';
-  
-    ----------------------------------------------------------------------------------------
-
     CREATE TABLE security_string(
       security_string_id       integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -122,7 +93,6 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_string.security_string_id      IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN security_string.security_rule_id        IS 'Foreign key to the security_string table.';
     COMMENT ON COLUMN security_string.name                    IS 'The name of the security_string record.';
     COMMENT ON COLUMN security_string.description             IS 'The description of the security_string record.';
     COMMENT ON COLUMN security_string.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -139,7 +109,6 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_number(
       security_number_id       integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -156,7 +125,6 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_number.security_number_id      IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN security_number.security_rule_id        IS 'Foreign key to the security_number table.';
     COMMENT ON COLUMN security_number.name                    IS 'The name of the security_number record.';
     COMMENT ON COLUMN security_number.description             IS 'The description of the security_number record.';
     COMMENT ON COLUMN security_number.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -173,7 +141,6 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_datetime(
       security_datetime_id     integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -190,7 +157,6 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_datetime.security_datetime_id    IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN security_datetime.security_rule_id        IS 'Foreign key to the security_datetime table.';
     COMMENT ON COLUMN security_datetime.name                    IS 'The name of the security_datetime record.';
     COMMENT ON COLUMN security_datetime.description             IS 'The description of the security_datetime record.';
     COMMENT ON COLUMN security_datetime.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -207,7 +173,6 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_spatial(
       security_spatial_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -224,7 +189,6 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_spatial.security_spatial_id     IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN security_spatial.security_rule_id        IS 'Foreign key to the security_spatial table.';
     COMMENT ON COLUMN security_spatial.name                    IS 'The name of the security_spatial record.';
     COMMENT ON COLUMN security_spatial.description             IS 'The description of the security_spatial record.';
     COMMENT ON COLUMN security_spatial.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -266,40 +230,11 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX submission_feature_security_idx2 ON submission_feature_security(security_rule_id);
 
     ----------------------------------------------------------------------------------------
-    -- Create Indexes and Constraints for table: artifact_security
-    ----------------------------------------------------------------------------------------
-
-    -- Add unique end-date key constraint (don't allow 2 records with the same artifact_id, security_rule_id, and a NULL record_end_date)
-    CREATE UNIQUE INDEX artifact_security_nuk1 ON artifact_security(artifact_id, security_rule_id, (record_end_date is NULL)) where record_end_date is null;
-
-    -- Add foreign key constraint
-    ALTER TABLE artifact_security ADD CONSTRAINT artifact_security_fk1
-      FOREIGN KEY (artifact_id)
-      REFERENCES artifact(artifact_id);
-
-    ALTER TABLE artifact_security ADD CONSTRAINT artifact_security_fk2
-      FOREIGN KEY (security_rule_id)
-      REFERENCES security_rule(security_rule_id);
-
-    -- add indexes for foreign keys
-    CREATE INDEX artifact_security_idx1 ON artifact_security(artifact_id);
-
-    CREATE INDEX artifact_security_idx2 ON artifact_security(security_rule_id);
-
-    ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: security_string
     ----------------------------------------------------------------------------------------
 
     -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
     CREATE UNIQUE INDEX security_string_nuk1 ON security_string(name, (record_end_date is NULL)) where record_end_date is null;
-
-    -- Add foreign key constraint
-    ALTER TABLE security_string ADD CONSTRAINT security_string_fk1
-      FOREIGN KEY (security_rule_id)
-      REFERENCES security_rule(security_rule_id);
-
-    -- add indexes for foreign keys
-    CREATE INDEX security_string_idx1 ON security_string(security_rule_id);
 
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: security_number
@@ -308,14 +243,6 @@ export async function up(knex: Knex): Promise<void> {
     -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
     CREATE UNIQUE INDEX security_number_nuk1 ON security_number(name, (record_end_date is NULL)) where record_end_date is null;
 
-    -- Add foreign key constraint
-    ALTER TABLE security_number ADD CONSTRAINT security_number_fk1
-      FOREIGN KEY (security_rule_id)
-      REFERENCES security_rule(security_rule_id);
-
-    -- add indexes for foreign keys
-    CREATE INDEX security_number_idx1 ON security_number(security_rule_id);
-
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: security_datetime
     ----------------------------------------------------------------------------------------
@@ -323,28 +250,12 @@ export async function up(knex: Knex): Promise<void> {
     -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
     CREATE UNIQUE INDEX security_datetime_nuk1 ON security_datetime(name, (record_end_date is NULL)) where record_end_date is null;
 
-    -- Add foreign key constraint
-    ALTER TABLE security_datetime ADD CONSTRAINT security_datetime_fk1
-      FOREIGN KEY (security_rule_id)
-      REFERENCES security_rule(security_rule_id);
-
-    -- add indexes for foreign keys
-    CREATE INDEX security_datetime_idx1 ON security_datetime(security_rule_id);
-
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: security_spatial
     ----------------------------------------------------------------------------------------
 
     -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
     CREATE UNIQUE INDEX security_spatial_nuk1 ON security_spatial(name, (record_end_date is NULL)) where record_end_date is null;
-
-    -- Add foreign key constraint
-    ALTER TABLE security_spatial ADD CONSTRAINT security_spatial_fk1
-      FOREIGN KEY (security_rule_id)
-      REFERENCES security_rule(security_rule_id);
-
-    -- add indexes for foreign keys
-    CREATE INDEX security_spatial_idx1 ON security_spatial(security_rule_id);
 
     ----------------------------------------------------------------------------------------
     -- Create audit and journal triggers

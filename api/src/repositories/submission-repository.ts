@@ -1070,4 +1070,58 @@ export class SubmissionRepository extends BaseRepository {
 
     return response.rows[0];
   }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<
+   *     {
+   *       submission_id: number;
+   *       uuid: string;
+   *       create_date: string;
+   *       submission_feature_id: number;
+   *       data: Record<string, unknown>;
+   *     }[]
+   *   >}
+   * @memberof SubmissionRepository
+   */
+  async getUnreviewedSubmissions(): Promise<
+    {
+      submission_id: number;
+      uuid: string;
+      create_date: string;
+      submission_feature_id: number;
+      data: Record<string, unknown>;
+    }[]
+  > {
+    const sqlStatement = SQL`
+      SELECT 
+        submission.submission_id, 
+        submission.uuid, 
+        submission.create_date,
+        submission_feature.submission_feature_id, 
+        submission_feature.data
+      FROM 
+        submission
+      LEFT JOIN 
+        submission_feature 
+      ON 
+        submission_feature.submission_id = submission.submission_id
+      WHERE 
+        submission.security_review_timestamp is null
+      AND
+        submission_feature.feature_type_id = (
+          SELECT
+            feature_type_id
+          FROM
+            feature_type
+          WHERE
+            name = 'dataset'
+        );
+    `;
+
+    const response = await this.connection.sql(sqlStatement);
+
+    return response.rows;
+  }
 }

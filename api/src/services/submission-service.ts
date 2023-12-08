@@ -533,4 +533,30 @@ export class SubmissionService extends DBService {
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
   }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<
+   *     {
+   *       submission_id: number;
+   *       uuid: string;
+   *       create_date: string;
+   *       submission_feature_id: number;
+   *       data: Record<string, unknown>;
+   *     }[]
+   *   >}
+   * @memberof SubmissionService
+   */
+  async getUnreviewedSubmissions(): Promise<
+    {
+      submission_id: number;
+      uuid: string;
+      create_date: string;
+      submission_feature_id: number;
+      data: Record<string, unknown>;
+    }[]
+  > {
+    return this.submissionRepository.getUnreviewedSubmissions();
+  }
 }

@@ -4,17 +4,17 @@ import Chip from '@mui/material/Chip';
 import { DataGrid, GridColDef, GridRenderCellParams, GridTreeNodeWithRender } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IDatasetForReview } from 'interfaces/useDatasetApi.interface';
+import { IUnreviewedSubmission } from 'interfaces/useDatasetApi.interface';
 import React from 'react';
 import { ensureProtocol } from 'utils/Utils';
 
 const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
   const biohubApi = useApi();
-  const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.listAllDatasetsForReview());
+  const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
   unsecuredDatasetDataLoader.load();
 
-  const datasetList: IDatasetForReview[] = unsecuredDatasetDataLoader.data ?? [];
-  const columns: GridColDef<IDatasetForReview>[] = [
+  const datasetList: IUnreviewedSubmission[] = unsecuredDatasetDataLoader.data ?? [];
+  const columns: GridColDef<IUnreviewedSubmission>[] = [
     {
       field: 'artifacts_to_review',
       headerName: 'FILES TO REVIEW',
@@ -26,7 +26,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       headerName: 'TITLE',
       flex: 2,
       disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
+      renderCell: (params: GridRenderCellParams<IUnreviewedSubmission, any, any, GridTreeNodeWithRender>) => {
         return (
           <Link href={`${ensureProtocol(window.location.host)}/datasets/${params.row.dataset_id}/details`}>
             {params.row.dataset_name}
@@ -39,7 +39,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
       headerName: 'TYPE',
       flex: 1,
       disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
+      renderCell: (params: GridRenderCellParams<IUnreviewedSubmission, any, any, GridTreeNodeWithRender>) => {
         return params.row.keywords.map((item) => (
           <Chip
             key={params.row.dataset_id}
