@@ -705,7 +705,7 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getUnreviewedSubmissions', () => {
+  describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
       const mockSubmissionRecords: SubmissionRecord[] = [
         {
@@ -738,15 +738,61 @@ describe('SubmissionService', () => {
 
       const mockDBConnection = getMockDBConnection();
 
-      const getUnreviewedSubmissionsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getUnreviewedSubmissions')
+      const getUnreviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getUnreviewedSubmissionsForAdmins')
         .resolves(mockSubmissionRecords);
 
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const response = await submissionService.getUnreviewedSubmissions();
+      const response = await submissionService.getUnreviewedSubmissionsForAdmins();
 
-      expect(getUnreviewedSubmissionsStub).to.be.calledOnce;
+      expect(getUnreviewedSubmissionsForAdminsStub).to.be.calledOnce;
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getReviewedSubmissionsForAdmins', () => {
+    it('should return an array of submission records', async () => {
+      const mockSubmissionRecords: SubmissionRecord[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getReviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getReviewedSubmissionsForAdmins')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getReviewedSubmissionsForAdmins();
+
+      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
     });
   });
