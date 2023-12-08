@@ -9,6 +9,7 @@ import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import HomeRouter from 'features/home/HomeRouter';
 import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
+import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
 import BaseLayout from 'layouts/BaseLayout';
 import ContentLayout from 'layouts/ContentLayout';
 import LoginPage from 'pages/authentication/LoginPage';
@@ -39,6 +40,12 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
       <Route path="/datasets">
         <BaseLayout>
           <DatasetsRouter />
+        </BaseLayout>
+      </Route>
+
+      <Route path="/submissions">
+        <BaseLayout>
+          <SubmissionsRouter />
         </BaseLayout>
       </Route>
 

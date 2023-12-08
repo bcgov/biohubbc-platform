@@ -1,3 +1,5 @@
+import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
+
 export type IListSubmissionsResponse = Array<{
   submission_id: number;
   submission_status: string;
@@ -15,3 +17,14 @@ export type IListSubmissionsResponse = Array<{
   update_user: number | null;
   revision_count: number;
 }>;
+
+/** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
+
+export interface ISubmission {
+  submission_id: number;
+  submission_feature_id: number;
+  name: string;
+  description: string;
+  submission_date: Date;
+  security: SECURITY_APPLIED_STATUS;
+}
