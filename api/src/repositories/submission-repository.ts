@@ -204,6 +204,22 @@ export interface ISubmissionObservationRecord {
   revision_count?: string;
 }
 
+export const SubmissionRecord = z.object({
+  submission_id: z.number(),
+  uuid: z.string(),
+  security_review_timestamp: z.string().nullable(),
+  source_system: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+
 /**
  * A repository class for accessing submission data.
  *
@@ -1100,5 +1116,26 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
+    const sqlStatement = SQL`
+      SELECT 
+        *
+      FROM 
+        submission
+      WHERE 
+        submission.security_review_timestamp is null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+
+    return response.rows;
   }
 }

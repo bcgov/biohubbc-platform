@@ -1,71 +1,50 @@
-import { CircularProgress, Link, Typography } from '@mui/material';
+import { CircularProgress, Typography } from '@mui/material';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
-import { DataGrid, GridColDef, GridRenderCellParams, GridTreeNodeWithRender } from '@mui/x-data-grid';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IDatasetForReview } from 'interfaces/useDatasetApi.interface';
+import { IUnreviewedSubmission } from 'interfaces/useDatasetApi.interface';
 import React from 'react';
-import { ensureProtocol } from 'utils/Utils';
 
 const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
   const biohubApi = useApi();
-  const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.listAllDatasetsForReview());
+
+  const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
   unsecuredDatasetDataLoader.load();
 
-  const datasetList: IDatasetForReview[] = unsecuredDatasetDataLoader.data ?? [];
-  const columns: GridColDef<IDatasetForReview>[] = [
+  const datasetList: IUnreviewedSubmission[] = unsecuredDatasetDataLoader.data ?? [];
+  const columns: GridColDef<IUnreviewedSubmission>[] = [
     {
-      field: 'artifacts_to_review',
-      headerName: 'FILES TO REVIEW',
+      field: 'submission_id',
+      headerName: 'ID',
       flex: 1,
       disableColumnMenu: true
     },
     {
-      field: 'dataset_name',
-      headerName: 'TITLE',
-      flex: 2,
-      disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
-        return (
-          <Link href={`${ensureProtocol(window.location.host)}/datasets/${params.row.dataset_id}/details`}>
-            {params.row.dataset_name}
-          </Link>
-        );
-      }
-    },
-    {
-      field: 'dataset_type',
-      headerName: 'TYPE',
+      field: 'uuid',
+      headerName: 'UUID',
       flex: 1,
-      disableColumnMenu: true,
-      renderCell: (params: GridRenderCellParams<IDatasetForReview, any, any, GridTreeNodeWithRender>) => {
-        return params.row.keywords.map((item) => (
-          <Chip
-            key={params.row.dataset_id}
-            color="primary"
-            style={{ backgroundColor: '#d9eaf7', color: 'black', fontSize: '10px' }}
-            sx={{ textTransform: 'uppercase' }}
-            label={prepKeyword(item)}
-          />
-        ));
-      }
+      disableColumnMenu: true
     },
     {
-      field: 'last_updated',
-      headerName: 'LAST UPDATED',
+      field: 'name',
+      headerName: 'Name',
+      flex: 2,
+      disableColumnMenu: true
+    },
+    {
+      field: 'description',
+      headerName: 'Description',
+      flex: 2,
+      disableColumnMenu: true
+    },
+    {
+      field: 'create_date',
+      headerName: 'Date Created',
       flex: 1,
       disableColumnMenu: true
     }
   ];
-
-  const prepKeyword = (keyword: string): string => {
-    let prep = keyword.toUpperCase();
-    if (prep === 'PROJECT') {
-      prep = 'INVENTORY PROJECT';
-    }
-    return prep;
-  };
 
   return (
     <>
@@ -96,7 +75,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
         <DataGrid
           sx={{ borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
           data-testid="security-reviews-data-grid"
-          getRowId={(row) => row.dataset_id}
+          getRowId={(row) => row.submission_id}
           autoHeight
           rows={datasetList}
           columns={columns}

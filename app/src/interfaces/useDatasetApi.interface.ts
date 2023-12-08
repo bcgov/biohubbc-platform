@@ -58,3 +58,11 @@ export interface IDatasetForReview {
   last_updated: string;
   keywords: string[];
 }
+
+export interface IUnreviewedSubmission {
+  submission_id: number;
+  uuid: string;
+  name: string;
+  description: string;
+  create_date: string;
+}

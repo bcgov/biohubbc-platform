@@ -218,11 +218,15 @@ const insertSubmission = () => `
     INSERT INTO submission
     (
         uuid,
+        name,
+        description,
         source_system
     )
     values
     (
         public.gen_random_uuid(),
+        $$${faker.company.name()}$$,
+        $$${faker.lorem.words({ min: 5, max: 100 })}$$,
         'SIMS'
     )
     RETURNING submission_id;
