@@ -217,13 +217,11 @@ const insertAnimalRecord = async (
 const insertSubmission = () => `
     INSERT INTO submission
     (
-        source_transform_id,
-        uuid
+      uuid
     )
     values
     (
-        1,
-        public.gen_random_uuid()
+      public.gen_random_uuid()
     )
     RETURNING submission_id;
 `;

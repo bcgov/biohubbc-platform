@@ -90,8 +90,8 @@ export interface ISubmissionRecordWithSpatial {
  */
 export interface ISubmissionModel {
   submission_id?: number;
-  source_transform_id: number;
   uuid: string;
+  security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
   update_date?: string | null;
@@ -1067,6 +1067,37 @@ export class SubmissionRepository extends BaseRepository {
       .where('s.uuid', uuid)
       .groupBy(['s.submission_id', 's.uuid']);
     const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
+
+    return response.rows[0];
+  }
+
+  /**
+   * Fetch a submission from uuid.
+   *
+   * @param {string} uuid
+   * @return {*}  {Promise<ISubmissionModel>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionByUUID(uuid: string): Promise<ISubmissionModel> {
+    const sqlStatement = SQL`
+        SELECT
+          submission_id,
+          uuid,
+          security_review_timestamp
+        FROM
+          submission
+        WHERE
+          uuid = ${uuid};
+      `;
+
+    const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission record', [
+        'SubmissionRepository->getSubmissionByUUID',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
 
     return response.rows[0];
   }
