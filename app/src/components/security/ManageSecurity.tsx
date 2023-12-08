@@ -1,6 +1,8 @@
-import { mdiChevronDown, mdiChevronUp } from '@mdi/js';
+import { mdiChevronDown, mdiChevronUp, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import React from 'react';
 
 const ManageSecurity: React.FC = () => {
@@ -12,6 +14,7 @@ const ManageSecurity: React.FC = () => {
   const handleClose = () => {
     setAnchorEl(null);
   };
+
   return (
     <>
       <Button
@@ -19,12 +22,22 @@ const ManageSecurity: React.FC = () => {
         data-testid="manage-security"
         variant="outlined"
         onClick={handleClick}
-        endIcon={open ? <Icon path={mdiChevronUp} size={1}/> : <Icon path={mdiChevronDown} size={1}/>}>
+        endIcon={open ? <Icon path={mdiChevronUp} size={1} /> : <Icon path={mdiChevronDown} size={1} />}>
         Manage Security
       </Button>
       <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
-        <MenuItem>Secure Records</MenuItem>
-        <MenuItem>Unsecure Records</MenuItem>
+        <MenuItem>
+          <ListItemIcon>
+            <Icon path={mdiLock} size={1} />
+          </ListItemIcon>
+          <ListItemText>Secure Records</ListItemText>
+        </MenuItem>
+        <MenuItem>
+          <ListItemIcon>
+            <Icon path={mdiLockOpenVariantOutline} size={1} />
+          </ListItemIcon>
+          <ListItemText>Unsecure Records</ListItemText>
+        </MenuItem>
       </Menu>
     </>
   );
