@@ -139,8 +139,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                       Dashboard
                     </Link>
                   </SystemRoleGuard>
-                  <Link to="/datasets" id="datasets">
-                    Datasets
+                  <Link to="/submissions" id="submissions">
+                    Submissions
                   </Link>
                   <Link to="/map" id="menu_map">
                     Map Search

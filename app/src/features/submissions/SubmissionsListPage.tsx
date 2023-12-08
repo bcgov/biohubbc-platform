@@ -7,72 +7,45 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
-import { FuseResult, RangeTuple } from 'fuse.js';
+import SecureDataAccessRequestDialog from 'features/datasets/security/SecureDataAccessRequestDialog';
+import { SearchInput } from 'features/search/SearchComponent';
+import { FuseResult } from 'fuse.js';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDownloadJSON from 'hooks/useDownloadJSON';
-import { IDataset, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import React, { useMemo, useState } from 'react';
-import DatasetFuzzySearch from './components/DatasetFuzzySearch';
-import DatasetSortMenu from './components/DatasetSortMenu';
-import SecureDataAccessRequestDialog from './security/SecureDataAccessRequestDialog';
+import useFuzzySearch from 'hooks/useFuzzySearch';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import React, { useState } from 'react';
+import DatasetSortMenu from './components/SubmissionsListSortMenu';
+
 /**
- * Renders Datasets as cards with download and request access actions
+ * Renders reviewed Submissions as cards with download and request access actions
  *
  * @returns {*}
  */
-const DatasetListPage = () => {
+const SubmissionsListPage = () => {
   const biohubApi = useApi();
   const download = useDownloadJSON();
 
-  const datasetsLoader = useDataLoader(() => biohubApi.dataset.getAllReviewedDatasets());
-  datasetsLoader.load();
+  const submissionsLoader = useDataLoader(() => biohubApi.submissions.listReviewedSubmissions());
+  submissionsLoader.load();
 
   // this is what the page renders / mutates
   const [openRequestAccess, setOpenRequestAccess] = useState(false);
-  const [fuzzyDatasets, setFuzzyDatasets] = useState<FuseResult<IDataset>[]>([]);
+  const { fuzzyData, handleFuzzyData, handleSearch, searchValue, highlight } = useFuzzySearch<ISubmission>(
+    submissionsLoader.data,
+    { keys: ['name', 'description'] }
+  );
 
-  // original datasets as FuseResult format
-  const originalFuzzyDatasets: FuseResult<IDataset>[] = useMemo(() => {
-    const defaultFuzzyDatasets =
-      datasetsLoader.data?.map((item, refIndex) => ({
-        item,
-        refIndex,
-        matches: []
-      })) ?? [];
-
-    setFuzzyDatasets(defaultFuzzyDatasets);
-
-    return defaultFuzzyDatasets;
-  }, [datasetsLoader.data]);
-
-  const handleDownload = (dataset: FuseResult<IDataset>) => {
-    // make request here for JSON data of dataset
-    // pass to dowload
-    const mockDownloadData = { a: 'b' };
-    download(
-      mockDownloadData,
-      `${dataset.item.name.toLowerCase().replace(/ /g, '-')}-${dataset.item.submission_feature_id}`
-    );
+  const handleDownload = async (dataset: FuseResult<ISubmission>) => {
+    // make request here for JSON data of submission and children
+    const data = await biohubApi.submissions.getSubmissionDownloadPackage();
+    download(data, `${dataset.item.name.toLowerCase().replace(/ /g, '-')}-${dataset.item.submission_feature_id}`);
   };
 
   const handleRequestAccess = () => {
     setOpenRequestAccess(true);
-  };
-
-  // higlights the text using the indices from fuse
-  // ie: <>hello <mark>world!</mark></>
-  const highlight = (value: string, indices: readonly RangeTuple[] = [], i = 1): string | JSX.Element => {
-    const pair = indices[indices.length - i];
-    return !pair ? (
-      value
-    ) : (
-      <>
-        {highlight(value.substring(0, pair[0]), indices, i + 1)}
-        <mark style={{ backgroundColor: '#3B99FC' }}>{value.substring(pair[0], pair[1] + 1)}</mark>
-        {value.substring(pair[1] + 1)}
-      </>
-    );
   };
 
   return (
@@ -92,29 +65,31 @@ const DatasetListPage = () => {
           }}>
           <Container maxWidth="xl">
             <Typography variant="h1" mb={2}>
-              Datasets
+              Submissions
             </Typography>
-            <DatasetFuzzySearch
-              originalDatasets={datasetsLoader.data ?? []}
-              originalFuzzyDatasets={originalFuzzyDatasets}
-              handleFuzzyDatasets={(dataset) => {
-                setFuzzyDatasets(dataset);
-              }}
+            <SearchInput
+              placeholderText="Enter a submission title or keyword"
+              value={searchValue}
+              handleChange={handleSearch}
             />
           </Container>
         </Paper>
         <Container maxWidth="xl">
           <Box py={4} display="flex" alignItems="center" justifyContent="space-between">
-            <Typography fontWeight="bold">{`${fuzzyDatasets?.length ?? 0} records found`}</Typography>
+            <Typography fontWeight="bold">
+              {searchValue
+                ? `${fuzzyData.length} records found for "${searchValue}"`
+                : `${fuzzyData.length} records found`}
+            </Typography>
             <DatasetSortMenu
-              data={fuzzyDatasets}
+              data={fuzzyData}
               handleSortedFuzzyData={(data) => {
-                setFuzzyDatasets(data);
+                handleFuzzyData(data);
               }}
             />
           </Box>
           <Stack spacing={2} mb={2}>
-            {fuzzyDatasets?.map((dataset) => (
+            {fuzzyData?.map((dataset) => (
               <Card elevation={0} key={dataset.item.submission_feature_id}>
                 <CardHeader
                   title={highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
@@ -169,4 +144,4 @@ const DatasetListPage = () => {
   );
 };
 
-export default DatasetListPage;
+export default SubmissionsListPage;

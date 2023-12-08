@@ -5,25 +5,25 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import useTheme from '@mui/system/useTheme';
 import { FuseResult } from 'fuse.js';
-import { IDataset } from 'interfaces/useDatasetApi.interface';
+import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
 import sortBy from 'lodash-es/sortBy';
 import { useState } from 'react';
 
 type SortBy = 'asc' | 'desc';
 
-interface IDatasetSortMenu {
-  data: FuseResult<IDataset>[];
-  handleSortedFuzzyData: (data: FuseResult<IDataset>[]) => void;
+interface ISubmissionsListSortMenuProps {
+  data: FuseResult<ISubmission>[];
+  handleSortedFuzzyData: (data: FuseResult<ISubmission>[]) => void;
 }
 
 /**
- * Renders 'Sort By' button for DatasetsListPage
+ * Renders 'Sort By' button for SubmissionsListPage
  * Note: currently supports title and date sorting
  *
- * @param {IDatasetSortMenu} props
+ * @param {ISubmissionsListSortMenuProps} props
  * @returns {*}
  */
-const DatasetSortMenu = (props: IDatasetSortMenu) => {
+const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
   const theme = useTheme();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -44,7 +44,7 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
    * @param {keyof IDataset} sortKey - property to sort datasets by
    * @param {SortBy} [sortDirection] - ascending or descending sort
    */
-  const handleSort = (sortKey: keyof IDataset, sortDirection: SortBy) => {
+  const handleSort = (sortKey: keyof ISubmission, sortDirection: SortBy) => {
     const sortedData =
       sortDirection === 'asc'
         ? sortBy(props.data, (fuzzyDataset) => fuzzyDataset.item[sortKey])
@@ -53,7 +53,7 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
     handleClose();
   };
 
-  const sortMenuItem = (sortKey: keyof IDataset, itemName: string, sortBy: SortBy = 'asc') => {
+  const sortMenuItem = (sortKey: keyof ISubmission, itemName: string, sortBy: SortBy = 'asc') => {
     const label = `${itemName} ${sortBy === 'asc' ? 'ascending' : 'descending'}`;
     return (
       <MenuItem
@@ -93,4 +93,4 @@ const DatasetSortMenu = (props: IDatasetSortMenu) => {
   );
 };
 
-export default DatasetSortMenu;
+export default SubmissionsListSortMenu;

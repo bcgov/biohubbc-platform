@@ -58,12 +58,3 @@ export interface IDatasetForReview {
   last_updated: string;
   keywords: string[];
 }
-
-// TODO: update this type to be correct for what API responds with.
-export interface IDataset {
-  submission_feature_id: number;
-  name: string;
-  description: string;
-  submission_date: Date;
-  security: SECURITY_APPLIED_STATUS;
-}
