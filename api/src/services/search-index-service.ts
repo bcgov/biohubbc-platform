@@ -16,8 +16,8 @@ export class SearchIndexService extends DBService {
   }
 
   async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
-    const submissionService = new SubmissionRepository(this.connection);
-    const features = await submissionService.getFeatureRecordsBySubmissionId(submissionId);
+    const submissionRepository = new SubmissionRepository(this.connection);
+    const features = await submissionRepository.getFeatureRecordsBySubmissionId(submissionId);
 
     const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
     const numberRecords: InsertNumberSearchableRecord[] = [];
