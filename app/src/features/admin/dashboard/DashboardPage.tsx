@@ -1,6 +1,7 @@
 import { Typography } from '@mui/material';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
+import ManageSecurity from 'components/security/ManageSecurity';
 import DatasetsForReviewTable from './components/DatasetsForReviewTable';
 
 const DashboardPage = () => {
@@ -31,6 +32,7 @@ const DashboardPage = () => {
           }}>
           Pending Security Reviews
         </Typography>
+        <ManageSecurity />
         <Box
           sx={{
             p: 2
