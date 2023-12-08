@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  SubmissionRecord,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -537,26 +538,10 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {Promise<
-   *     {
-   *       submission_id: number;
-   *       uuid: string;
-   *       name: string;
-   *       description: string;
-   *       create_date: string;
-   *     }[]
-   *   >}
+   * @return {*}  {Promise<SubmissionRecord[]>}
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissions(): Promise<
-    {
-      submission_id: number;
-      uuid: string;
-      name: string;
-      description: string;
-      create_date: string;
-    }[]
-  > {
+  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
     return this.submissionRepository.getUnreviewedSubmissions();
   }
 }

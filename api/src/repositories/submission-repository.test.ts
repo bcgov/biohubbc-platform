@@ -9,6 +9,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import {
   ISourceTransformModel,
   ISpatialComponentCount,
+  SubmissionRecord,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -894,6 +895,53 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.getHandleBarsTemplateByDatasetId('uuid');
 
       expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getUnreviewedSubmissions', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockSubmissionRecords: SubmissionRecord[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1
+        }
+      ];
+
+      const mockResponse = { rowCount: 2, rows: mockSubmissionRecords } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getUnreviewedSubmissions();
+
+      expect(response).to.eql(mockSubmissionRecords);
     });
   });
 });
