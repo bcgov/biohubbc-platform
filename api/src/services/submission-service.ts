@@ -17,6 +17,7 @@ import {
   ISubmissionRecordWithSpatial,
   SubmissionRecord,
   SubmissionRepository,
+  SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
@@ -543,5 +544,15 @@ export class SubmissionService extends DBService {
    */
   async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
     return this.submissionRepository.getUnreviewedSubmissions();
+  }
+
+  /**
+   * Get all submissions (with security status) that have been reviewed.
+   *
+   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+    return this.submissionRepository.getReviewedSubmissionsWithSecurity();
   }
 }

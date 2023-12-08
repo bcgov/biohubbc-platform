@@ -220,6 +220,12 @@ export const SubmissionRecord = z.object({
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
+export const SubmissionWithSecurityRecord = SubmissionRecord.extend({
+  security: z.enum(['SECURE', 'UNSECURE', 'PARTIALLY_SECURE'])
+});
+
+export type SubmissionWithSecurityRecord = z.infer<typeof SubmissionWithSecurityRecord>;
+
 /**
  * A repository class for accessing submission data.
  *
@@ -1126,15 +1132,36 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
     const sqlStatement = SQL`
-      SELECT 
+      SELECT
         *
-      FROM 
+      FROM
         submission
-      WHERE 
+      WHERE
         submission.security_review_timestamp is null;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions that have been reviewed (with security status)
+   *
+   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission
+      WHERE
+        submission.security_review_timestamp is not null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionWithSecurityRecord);
 
     return response.rows;
   }
