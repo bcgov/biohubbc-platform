@@ -50,7 +50,6 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TABLE submission_feature_security(
       submission_feature_security_id   integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       submission_feature_id            integer           NOT NULL,
-      submission_id                    integer           NOT NULL,
       security_rule_id                 integer           NOT NULL,
       record_effective_date            date              NOT NULL,
       record_end_date                  date,
@@ -317,9 +316,8 @@ export async function up(knex: Knex): Promise<void> {
     create trigger audit_security_spatial before insert or update or delete on security_spatial for each row execute procedure tr_audit_trigger();
     create trigger journal_security_spatial after insert or update or delete on security_spatial for each row execute procedure tr_journal_trigger();
   `);
-  
-  
-  port async function down(knex: Knex): Promise<void> {
+}
+
+export async function down(knex: Knex): Promise<void> {
   await knex.raw(``);
-  
-  
+}
