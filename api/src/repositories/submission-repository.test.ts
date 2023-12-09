@@ -898,7 +898,7 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getUnreviewedSubmissions', () => {
+  describe('getUnreviewedSubmissionsForAdmins', () => {
     beforeEach(() => {
       sinon.restore();
     });
@@ -909,6 +909,53 @@ describe('SubmissionRepository', () => {
           submission_id: 1,
           uuid: '123-456-789',
           security_review_timestamp: null,
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: null,
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1
+        }
+      ];
+
+      const mockResponse = { rowCount: 2, rows: mockSubmissionRecords } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: async () => mockResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getUnreviewedSubmissionsForAdmins();
+
+      expect(response).to.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getReviewedSubmissionsForAdmins', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockSubmissionRecords: SubmissionRecord[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -939,7 +986,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getUnreviewedSubmissions();
+      const response = await submissionRepository.getReviewedSubmissionsForAdmins();
 
       expect(response).to.eql(mockSubmissionRecords);
     });

@@ -9,10 +9,10 @@ import React from 'react';
 const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
   const biohubApi = useApi();
 
-  const unsecuredDatasetDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
-  unsecuredDatasetDataLoader.load();
+  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
+  unreviewedSubmissionsDataLoader.load();
 
-  const datasetList: IUnreviewedSubmission[] = unsecuredDatasetDataLoader.data ?? [];
+  const datasetList: IUnreviewedSubmission[] = unreviewedSubmissionsDataLoader.data ?? [];
   const columns: GridColDef<IUnreviewedSubmission>[] = [
     {
       field: 'submission_id',
@@ -48,8 +48,8 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <>
-      {unsecuredDatasetDataLoader.isLoading && <CircularProgress className="pageProgress" size={40} />}
-      {datasetList.length === 0 && !unsecuredDatasetDataLoader.isLoading && (
+      {unreviewedSubmissionsDataLoader.isLoading && <CircularProgress className="pageProgress" size={40} />}
+      {datasetList.length === 0 && !unreviewedSubmissionsDataLoader.isLoading && (
         <Box
           sx={{
             p: 3,
@@ -71,7 +71,7 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
           </Typography>
         </Box>
       )}
-      {datasetList.length > 0 && !unsecuredDatasetDataLoader.isLoading && (
+      {datasetList.length > 0 && !unreviewedSubmissionsDataLoader.isLoading && (
         <DataGrid
           sx={{ borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
           data-testid="security-reviews-data-grid"

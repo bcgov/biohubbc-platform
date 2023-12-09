@@ -7,7 +7,7 @@ import { authorizeRequestHandler } from '../../../../request-handlers/security/a
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/unreviewed');
+const defaultLog = getLogger('paths/administrative/submission/reviewed');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -20,11 +20,11 @@ export const GET: Operation = [
       ]
     };
   }),
-  getUnreviewedSubmissionsForAdmins()
+  getReviewedSubmissionsForAdmins()
 ];
 
 GET.apiDoc = {
-  description: 'Get a list of submissions that need security review (are unreviewed).',
+  description: 'Get a list of submissions that have completed security review (are reviewed).',
   tags: ['admin'],
   security: [
     {
@@ -33,7 +33,7 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'List of submissions that need security review.',
+      description: 'List of submissions that have completed security review.',
       content: {
         'application/json': {
           schema: {
@@ -95,11 +95,11 @@ GET.apiDoc = {
 };
 
 /**
- * Get all unreviewed submissions.
+ * Get all reviewed submissions.
  *
  * @returns {RequestHandler}
  */
-export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
+export function getReviewedSubmissionsForAdmins(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
@@ -107,13 +107,13 @@ export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
       await connection.open();
 
       const service = new SubmissionService(connection);
-      const response = await service.getUnreviewedSubmissionsForAdmins();
+      const response = await service.getReviewedSubmissionsForAdmins();
 
       await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getUnreviewedSubmissions', message: 'error', error });
+      defaultLog.error({ label: 'getReviewedSubmissions', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

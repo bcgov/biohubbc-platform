@@ -541,7 +541,17 @@ export class SubmissionService extends DBService {
    * @return {*}  {Promise<SubmissionRecord[]>}
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
-    return this.submissionRepository.getUnreviewedSubmissions();
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+    return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get all submissions that have completed security review (are reviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+    return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
 }
