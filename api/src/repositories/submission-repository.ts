@@ -1174,12 +1174,20 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
     const sqlStatement = SQL`
-      SELECT
-        *
-      FROM
-        submission
-      WHERE
-        submission.security_review_timestamp is not null;
+      SELECT s.*,
+        CASE
+          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN 'UNSECURE'
+          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(s.submission_id) then 'SECURE'
+	        ELSE 'PARTIALLY_SECURE'
+        END as security
+      FROM submission s
+      LEFT JOIN submission_feature sf
+      ON sf.submission_id = s.submission_id
+      LEFT JOIN submission_feature_security sfs
+      ON sf.submission_feature_id = sfs.submission_feature_id
+      WHERE security_review_timestamp is not null
+      GROUP by s.submission_id
+      ORDER by s.submission_id
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionWithSecurityRecord);
