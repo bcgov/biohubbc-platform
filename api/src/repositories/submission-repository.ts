@@ -1130,7 +1130,7 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<SubmissionRecord[]>}
    * @memberof SubmissionRepository
    */
-  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
     const sqlStatement = SQL`
       SELECT
         *
@@ -1138,6 +1138,27 @@ export class SubmissionRepository extends BaseRepository {
         submission
       WHERE
         submission.security_review_timestamp is null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions that have completed security review (are reviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission
+      WHERE
+        submission.security_review_timestamp is not null;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecord);

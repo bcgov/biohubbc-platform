@@ -20,7 +20,7 @@ export const GET: Operation = [
       ]
     };
   }),
-  getUnreviewedSubmissions()
+  getUnreviewedSubmissionsForAdmins()
 ];
 
 GET.apiDoc = {
@@ -99,21 +99,22 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function getUnreviewedSubmissions(): RequestHandler {
+export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
     try {
       await connection.open();
 
-      await connection.commit();
-
       const service = new SubmissionService(connection);
-      const response = await service.getUnreviewedSubmissions();
+      const response = await service.getUnreviewedSubmissionsForAdmins();
+
+      await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'getUnreviewedSubmissions', message: 'error', error });
+      await connection.rollback();
       throw error;
     } finally {
       connection.release();
