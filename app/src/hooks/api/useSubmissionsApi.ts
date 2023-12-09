@@ -71,11 +71,23 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return { mockJson: 'mockValue' };
   };
 
+  /**
+   * Fetch submission data by submissionUUID.
+   *
+   * @param {string} submissionUUID
+   * @return {*}  {Promise<any>} //TODO: type
+   */
+  const getSubmission = async (submissionUUID: string): Promise<any> => {
+    const { data } = await axios.get(`api/submission/${submissionUUID}`);
+    return data;
+  };
+
   return {
     listSubmissions,
     getSignedUrl,
     listReviewedSubmissions,
-    getSubmissionDownloadPackage
+    getSubmissionDownloadPackage,
+    getSubmission
   };
 };
 

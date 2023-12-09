@@ -554,4 +554,47 @@ export class SubmissionService extends DBService {
   async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
+
+  /*
+   * Retrieves submission data from the submission table.
+   *
+   * @param {string} submissionUUID
+   * @return {*}  {Promise<any>} TODO: type
+   * @memberof DatasetService
+   */
+  async getSubmissionAndFeaturesBySubmissionUUID(submissionUUID: string): Promise<any> {
+    const submission = await this.submissionRepository.getSubmissionByUUID(submissionUUID);
+
+    if (!submission.submission_id) {
+      throw new Error(`No submission found for submission ${submissionUUID}`);
+    }
+
+    const features = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submission.submission_id);
+
+    const dataset = [];
+    const sampleSites = [];
+    const animals = [];
+    const observations = [];
+
+    for (const feature of features) {
+      const featureType = feature.feature_type;
+
+      switch (featureType) {
+        case 'dataset':
+          dataset.push(feature);
+          break;
+        case 'sample_site':
+          sampleSites.push(feature);
+          break;
+        case 'animal':
+          animals.push(feature);
+          break;
+        case 'observation':
+          observations.push(feature);
+          break;
+      }
+    }
+
+    return { submission, features: { dataset, sampleSites, animals, observations } };
+  }
 }

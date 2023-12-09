@@ -4,9 +4,6 @@ import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 import { makeStyles } from '@mui/styles';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
-import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useParams } from 'react-router';
 
 const useStyles = makeStyles((theme: Theme) => ({
   datasetTitleContainer: {
@@ -27,14 +24,14 @@ const useStyles = makeStyles((theme: Theme) => ({
 
 const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
-  const biohubApi = useApi();
-  const urlParams = useParams();
+  // const biohubApi = useApi();
+  // const urlParams = useParams();
   // const dialogContext = useContext(DialogContext);
   // const history = useHistory();
 
-  const datasetId = urlParams['id'];
+  // const datasetId = urlParams['id'];
 
-  const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDataset(datasetId));
+  // const datasetDataLoader = useDataLoader(() => biohubApi.dataset.getDataset(datasetId));
   // const templateDataLoader = useDataLoader(() => biohubApi.dataset.getHandleBarsTemplateByDatasetId(datasetId));
 
   // const fileDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
@@ -64,8 +61,8 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   //   };
   // });
 
-  datasetDataLoader.load();
-  console.log('datasetDataLoader.data', datasetDataLoader.data);
+  // datasetDataLoader.load();
+  // console.log('datasetDataLoader.data', datasetDataLoader.data);
   // // templateDataLoader.load();
 
   // const mapDataLoader = useDataLoader((searchBoundary: Feature, searchType: string[], searchZoom: number) =>
