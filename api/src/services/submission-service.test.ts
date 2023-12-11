@@ -16,7 +16,8 @@ import {
   SubmissionRepository,
   SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
-  SUBMISSION_STATUS_TYPE
+  SUBMISSION_STATUS_TYPE,
+  PatchSubmissionRecord
 } from '../repositories/submission-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -858,6 +859,40 @@ describe('SubmissionService', () => {
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('patchSubmissionRecord', () => {
+    it('should patch the submission record and return the updated record', async () => {
+      const submissionId = 1;
+
+      const patch: PatchSubmissionRecord = { security_reviewed: true };
+
+      const mockSubmissionRecord: SubmissionRecord = {
+        submission_id: 1,
+        uuid: '123-456-789',
+        security_review_timestamp: '2023-12-12',
+        source_system: 'SIMS',
+        name: 'name',
+        description: 'description',
+        create_date: '2023-12-12',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+      const mockDBConnection = getMockDBConnection();
+
+      const patchSubmissionRecordStub = sinon
+        .stub(SubmissionRepository.prototype, 'patchSubmissionRecord')
+        .resolves(mockSubmissionRecord);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.patchSubmissionRecord(submissionId, patch);
+
+      expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
+      expect(response).to.be.eql(mockSubmissionRecord);
     });
   });
 });

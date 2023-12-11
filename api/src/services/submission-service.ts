@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  PatchSubmissionRecord,
   SubmissionRecord,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
@@ -606,5 +607,17 @@ export class SubmissionService extends DBService {
     }
 
     return { submission, features: { dataset, sampleSites, animals, observations } };
+  }
+
+  /**
+   * Patch a submission record.
+   *
+   * @param {number} submissionId
+   * @param {PatchSubmissionRecord} patch
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionServiceF
+   */
+  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
+    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
   }
 }

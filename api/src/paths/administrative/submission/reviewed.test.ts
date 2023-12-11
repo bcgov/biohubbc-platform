@@ -2,15 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import * as db from '../../../../database/db';
-import { HTTPError } from '../../../../errors/http-error';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import { getReviewedSubmissionsForAdmins } from '../reviewed';
+import * as db from '../../../database/db';
+import { HTTPError } from '../../../errors/http-error';
+import { SubmissionService } from '../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { getReviewedSubmissionsForAdmins } from './reviewed';
 
 chai.use(sinonChai);
 
-describe('list', () => {
+describe('getReviewedSubmissionsForAdmins', () => {
   afterEach(() => {
     sinon.restore();
   });
