@@ -80,7 +80,7 @@ const DatasetsForReviewTable = () => {
                       }}>
                       <Stack flexDirection="row">
                         <dd hidden>Submitted on:</dd>
-                        <dt>{getFormattedDate(DATE_FORMAT.MediumDateFormat, submissionRecord.create_date)}</dt>
+                        <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
                       </Stack>
                     </Stack>
                     <Typography
