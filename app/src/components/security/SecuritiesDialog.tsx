@@ -1,7 +1,6 @@
 import EditDialog from 'components/dialog/EditDialog';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
-
 interface ISecuritiesDialogProps {
   isOpen: boolean;
   onClose: () => void;
