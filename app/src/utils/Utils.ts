@@ -337,3 +337,22 @@ export const getTitle = (pageName?: string) => {
 export const pluralize = (quantity: number, word: string, singularSuffix = '', pluralSuffix = 's') => {
   return `${word}${quantity === 1 ? singularSuffix : pluralSuffix}`;
 };
+
+/**
+ * Capitalizes the first letter of each word in the string.
+ *
+ * @example
+ * toTitleCase('my string') // 'My String'
+ * toTitleCase('my_string') // 'My_string'
+ * toTitleCase('single') // 'Single'
+ * toTitleCase('') // ''
+ *
+ * @param {string} str
+ * @return {*}
+ */
+export const toTitleCase = (str: string) => {
+  return str
+    .split(' ')
+    .map((item) => item[0].toUpperCase() + item.substring(1))
+    .join(' ');
+};

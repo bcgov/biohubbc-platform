@@ -14,11 +14,14 @@ const DashboardPage = () => {
           px: 3
         }}>
         <Container maxWidth="xl">
-          <Typography variant="h2" component="h1">Dashboard</Typography>
+          <Typography variant="h2" component="h1">
+            Dashboard
+          </Typography>
         </Container>
       </Paper>
 
-      <Container maxWidth="xl"
+      <Container
+        maxWidth="xl"
         sx={{
           p: 2
         }}>

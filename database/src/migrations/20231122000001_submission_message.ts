@@ -35,8 +35,8 @@ export async function up(knex: Knex): Promise<void> {
     );
   
     COMMENT ON COLUMN submission_message.submission_message_id         IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN submission_message.submission_message_type_id    IS 'Foreign key to the submission_message_type_id table.';
-    COMMENT ON COLUMN submission_message.submission_id                 IS 'Foreign key to the submission_feature table.';
+    COMMENT ON COLUMN submission_message.submission_message_type_id    IS 'Foreign key to the submission_message_type table.';
+    COMMENT ON COLUMN submission_message.submission_id                 IS 'Foreign key to the submission table.';
     COMMENT ON COLUMN submission_message.label                         IS 'The message label.';
     COMMENT ON COLUMN submission_message.message                       IS 'The message text.';
     COMMENT ON COLUMN submission_message.data                          IS 'The message data.';
@@ -86,7 +86,7 @@ export async function up(knex: Knex): Promise<void> {
       REFERENCES submission_message_type(submission_message_type_id);
 
     -- add indexes for foreign keys
-    CREATE INDEX submission_message_idx1 ON submission_message(submission_feature_id);  
+    CREATE INDEX submission_message_idx1 ON submission_message(submission_id);  
 
     -- add indexes for foreign keys
     CREATE INDEX submission_message_idx2 ON submission_message(submission_message_type_id);

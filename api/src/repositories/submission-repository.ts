@@ -77,21 +77,38 @@ export interface ISubmissionRecord {
   revision_count?: string;
 }
 
-export interface ISubmissionFeatureRecord {
-  submission_feature_id?: number;
-  submission_id: number;
-  feature_type_id: number;
-  data: any; // TODO: IFeatureSubmission;
-  feature_type?: string;
-  parent_submission_feature_id?: number;
-  record_effective_date?: string;
-  record_end_date?: string;
-  create_date?: string;
-  create_user?: string;
-  update_date?: string;
-  update_user?: string;
-  revision_count?: string;
-}
+export const SubmissionFeatureRecord = z.object({
+  submission_feature_id: z.number(),
+  submission_id: z.number(),
+  feature_type_id: z.number(),
+  data: z.object({}),
+  parent_submission_feature_id: z.number().nullable(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionFeatureRecord = z.infer<typeof SubmissionFeatureRecord>;
+
+export const FeatureTypeRecord = z.object({
+  feature_type_id: z.number(),
+  name: z.string(),
+  display_name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type FeatureTypeRecord = z.infer<typeof FeatureTypeRecord>;
 
 export interface ISubmissionRecordWithSpatial {
   id: string;
@@ -1166,20 +1183,35 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    * @memberof SubmissionRepository
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+  async getUnreviewedSubmissionsForAdmins(): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > {
     const sqlStatement = SQL`
       SELECT
-        *
+        submission.*,
+        submission_feature.feature_type_id,
+        (SELECT name FROM feature_type WHERE feature_type_id = submission_feature.feature_type_id) AS feature_type
       FROM
         submission
+      LEFT JOIN
+        submission_feature
+      ON
+        submission.submission_id = submission_feature.submission_id
       WHERE
-        submission.security_review_timestamp is null;
+        submission.security_review_timestamp IS NULL
+      AND
+        submission_feature.parent_submission_feature_id IS NULL;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+    const response = await this.connection.sql(
+      sqlStatement,
+      SubmissionRecord.extend({ feature_type_id: z.number(), feature_type: z.string() })
+    );
 
     return response.rows;
   }
@@ -1187,44 +1219,62 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that have completed security review (are reviewed).
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    * @memberof SubmissionRepository
    */
-  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+  async getReviewedSubmissionsForAdmins(): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > {
     const sqlStatement = SQL`
       SELECT
-        *
+        submission.*,
+        submission_feature.feature_type_id,
+        (SELECT name FROM feature_type WHERE feature_type_id = submission_feature.feature_type_id) AS feature_type
       FROM
         submission
+      LEFT JOIN
+        submission_feature
+      ON
+        submission.submission_id = submission_feature.submission_id
       WHERE
-        submission.security_review_timestamp is not null;
+        submission.security_review_timestamp IS NOT NULL
+      AND
+        submission_feature.parent_submission_feature_id IS NULL;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+    const response = await this.connection.sql(
+      sqlStatement,
+      SubmissionRecord.extend({ feature_type_id: z.number(), feature_type: z.string() })
+    );
+
     return response.rows;
   }
 
-  /*
+  /**
    * Fetch a submission from uuid.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionFeatureRecord[]>}
+   * @return {*}  {(Promise<(SubmissionFeatureRecord & { feature_type: string })[]>)}
    * @memberof SubmissionRepository
    */
-  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<ISubmissionFeatureRecord[]> {
+  async getSubmissionFeaturesBySubmissionId(
+    submissionId: number
+  ): Promise<(SubmissionFeatureRecord & { feature_type: string })[]> {
     const sqlStatement = SQL`
         SELECT
-          sf.submission_feature_id,
-          sf.submission_id,
+          sf.*,
           (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
-          sf.data,
-          sf.parent_submission_feature_id
         FROM
           submission_feature sf
         WHERE
           submission_id = ${submissionId};
       `;
-    const response = await this.connection.sql<ISubmissionFeatureRecord>(sqlStatement);
+    const response = await this.connection.sql(
+      sqlStatement,
+      SubmissionFeatureRecord.extend({ feature_type: z.string() })
+    );
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission feature record', [
@@ -1340,6 +1390,40 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     const response = await this.connection.knex(queryBuilder, SubmissionRecord);
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get the root submission feature record for a submission.
+   *
+   * Note: A 'root' submission feature is indicated by parent_submission_feature_id being null.
+   * Note: If more than one 'root' submission feature is found, returns the first one. Only one record is expected.
+   *
+   * @param {number} submissionId
+   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission_feature
+      WHERE
+        submission_id = ${submissionId}
+      and 
+        parent_submission_feature_id is null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get root submission feature record', [
+        'SubmissionRepository->getSubmissionRootFeature',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
 
     return response.rows[0];
   }

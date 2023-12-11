@@ -16,6 +16,7 @@ import {
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
   PatchSubmissionRecord,
+  SubmissionFeatureRecord,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRepository,
@@ -541,20 +542,28 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+  async getUnreviewedSubmissionsForAdmins(): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > {
     return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
   }
 
   /**
    * Get all submissions that have completed security review (are reviewed).
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    * @memberof SubmissionService
    */
-  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+  async getReviewedSubmissionsForAdmins(): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
 
@@ -649,5 +658,16 @@ export class SubmissionService extends DBService {
    */
   async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
     return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
+  }
+
+  /**
+   * Get the root submission feature record for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
+    return this.submissionRepository.getSubmissionRootFeature(submissionId);
   }
 }

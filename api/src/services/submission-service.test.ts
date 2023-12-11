@@ -710,7 +710,7 @@ describe('SubmissionService', () => {
 
   describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
+      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type: string })[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -722,7 +722,9 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         },
         {
           submission_id: 2,
@@ -735,7 +737,9 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         }
       ];
 
@@ -756,7 +760,7 @@ describe('SubmissionService', () => {
 
   describe('getReviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
+      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type: string })[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -768,7 +772,9 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         },
         {
           submission_id: 2,
@@ -781,7 +787,9 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         }
       ];
 

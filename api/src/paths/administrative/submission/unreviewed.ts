@@ -83,6 +83,13 @@ GET.apiDoc = {
                 revision_count: {
                   type: 'integer',
                   minimum: 0
+                },
+                feature_type_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                feature_type: {
+                  type: 'string'
                 }
               }
             }

@@ -28,9 +28,13 @@ const useDatasetApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have not completed security review.
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    */
-  const getUnreviewedSubmissions = async (): Promise<SubmissionRecord[]> => {
+  const getUnreviewedSubmissions = async (): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > => {
     const { data } = await axios.get(`api/administrative/submission/unreviewed`);
 
     return data;
@@ -39,9 +43,13 @@ const useDatasetApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review.
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    */
-  const getReviewedSubmissions = async (): Promise<SubmissionRecord[]> => {
+  const getReviewedSubmissions = async (): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > => {
     const { data } = await axios.get(`api/administrative/submission/reviewed`);
 
     return data;
