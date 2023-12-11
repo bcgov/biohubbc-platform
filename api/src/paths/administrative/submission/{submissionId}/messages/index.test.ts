@@ -2,15 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getReviewedSubmissionsForAdmins } from '.';
-import * as db from '../../../../database/db';
-import { HTTPError } from '../../../../errors/http-error';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { createSubmissionMessages } from '.';
+import * as db from '../../../../../database/db';
+import { HTTPError } from '../../../../../errors/http-error';
+import { SubmissionService } from '../../../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
-describe('list', () => {
+describe('createSubmissionMessages', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -26,7 +26,7 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getReviewedSubmissionsForAdmins();
+    const requestHandler = createSubmissionMessages();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -45,17 +45,34 @@ describe('list', () => {
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
+    const submissionId = 1;
+    const messages = [
+      {
+        submission_message_type_id: 2,
+        label: 'label',
+        message: 'message',
+        data: {
+          dataField: 'dataField'
+        }
+      }
+    ];
+
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getReviewedSubmissionsForAdminsStub = sinon
-      .stub(SubmissionService.prototype, 'getReviewedSubmissionsForAdmins')
-      .resolves([]);
+    mockReq.params = {
+      submissionId: String(submissionId)
+    };
+    mockReq.body = {
+      messages
+    };
 
-    const requestHandler = getReviewedSubmissionsForAdmins();
+    const createMessagesStub = sinon.stub(SubmissionService.prototype, 'createMessages').resolves();
+
+    const requestHandler = createSubmissionMessages();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getReviewedSubmissionsForAdminsStub).to.have.been.calledOnce;
+    expect(createMessagesStub).to.have.been.calledOnceWith(submissionId, messages);
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql([]);
   });

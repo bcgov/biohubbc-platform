@@ -236,6 +236,22 @@ export const SubmissionRecord = z.object({
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
+export const SubmissionMessageRecord = z.object({
+  submission_message_id: z.number(),
+  submission_message_type_id: z.number(),
+  submission_id: z.number(),
+  label: z.string(),
+  message: z.string(),
+  data: z.object({}).nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
+
 /**
  * A repository class for accessing submission data.
  *
@@ -1205,5 +1221,56 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows;
+  }
+
+  /**
+   * Get all messages for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission_message
+      WHERE
+        submission_id = ${submissionId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionMessageRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Creates submission message records.
+   *
+   * @param {(Pick<
+   *       SubmissionMessageRecord,
+   *       'submission_id' | 'submission_message_type_id' | 'label' | 'message' | 'data'
+   *     >[])} messages
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async createMessages(
+    messages: Pick<
+      SubmissionMessageRecord,
+      'submission_id' | 'submission_message_type_id' | 'label' | 'message' | 'data'
+    >[]
+  ): Promise<void> {
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder().insert(messages);
+
+    const response = await this.connection.knex(queryBuilder);
+
+    if (response.rowCount !== messages.length) {
+      throw new ApiExecuteSQLError('Failed to create submission messages', [
+        'SubmissionRepository->createMessages',
+        `rowCount was ${response.rowCount}, expected rowCount === ${messages.length}`
+      ]);
+    }
   }
 }

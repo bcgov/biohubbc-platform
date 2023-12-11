@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -596,5 +597,34 @@ export class SubmissionService extends DBService {
     }
 
     return { submission, features: { dataset, sampleSites, animals, observations } };
+  }
+
+  /**
+   * Get all messages for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
+    return this.submissionRepository.getMessages(submissionId);
+  }
+
+  /**
+   * Creates submission message records for a submission.
+   *
+   * @param {number} submissionId
+   * @param {(Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[])} messages
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionService
+   */
+  async createMessages(
+    submissionId: number,
+    messages: Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[]
+  ): Promise<void> {
+    // Add submission_id to message object
+    const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
+
+    return this.submissionRepository.createMessages(messagesToInsert);
   }
 }

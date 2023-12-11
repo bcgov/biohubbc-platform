@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getUnreviewedSubmissions } from '.';
+import { getUnreviewedSubmissionsForAdmins } from '.';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { SubmissionService } from '../../../../services/submission-service';
@@ -26,7 +26,7 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getUnreviewedSubmissions();
+    const requestHandler = getUnreviewedSubmissionsForAdmins();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -47,15 +47,15 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getUnreviewedSubmissionsStub = sinon
-      .stub(SubmissionService.prototype, 'getUnreviewedSubmissions')
+    const getUnreviewedSubmissionsForAdminsStub = sinon
+      .stub(SubmissionService.prototype, 'getUnreviewedSubmissionsForAdmins')
       .resolves([]);
 
-    const requestHandler = getUnreviewedSubmissions();
+    const requestHandler = getUnreviewedSubmissionsForAdmins();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getUnreviewedSubmissionsStub).to.have.been.calledOnce;
+    expect(getUnreviewedSubmissionsForAdminsStub).to.have.been.calledOnce;
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql([]);
   });

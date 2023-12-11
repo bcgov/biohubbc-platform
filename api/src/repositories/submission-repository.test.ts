@@ -991,4 +991,41 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql(mockSubmissionRecords);
     });
   });
+
+  describe('createMessages', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should create messages and return void', async () => {
+      const mockMessages = [
+        {
+          submission_id: 1,
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_id: 2,
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ];
+
+      const mockQueryResponse = { rowCount: 2, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.createMessages(mockMessages);
+
+      expect(response).to.be.undefined;
+    });
+  });
 });

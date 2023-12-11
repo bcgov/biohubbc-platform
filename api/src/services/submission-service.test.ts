@@ -796,4 +796,59 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql(mockSubmissionRecords);
     });
   });
+
+  describe('createMessages', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should create messages and return void', async () => {
+      const submissionId = 1;
+
+      const mockMessages = [
+        {
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const createMessagesStub = sinon.stub(SubmissionRepository.prototype, 'createMessages').resolves(undefined);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.createMessages(submissionId, mockMessages);
+
+      expect(createMessagesStub).to.have.been.calledOnceWith([
+        {
+          submission_id: submissionId,
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_id: submissionId,
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ]);
+      expect(response).to.be.undefined;
+    });
+  });
 });
