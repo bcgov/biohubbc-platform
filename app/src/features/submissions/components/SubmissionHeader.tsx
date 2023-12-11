@@ -75,7 +75,7 @@ const SubmissionHeader = () => {
                 <>
                   <Icon path={mdiLockOpen} size={0.75} color="#f44336" />
                   <Typography component="span" color="textSecondary" sx={{ mr: 1 }}>
-                    PENDING REVIEW
+                    PENDING REVIEW | SUBMITTED: {submission?.create_date}
                   </Typography>
                 </>
               )}

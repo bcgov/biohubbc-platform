@@ -23,13 +23,13 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
     {
       field: 'uuid',
       headerName: 'UUID',
-      flex: 1,
+      flex: 2,
       disableColumnMenu: true
     },
     {
       field: 'name',
       headerName: 'Name',
-      flex: 2,
+      flex: 1,
       disableColumnMenu: true
     },
     {

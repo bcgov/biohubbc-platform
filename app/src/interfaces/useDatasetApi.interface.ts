@@ -70,6 +70,7 @@ export interface ISubmission {
   submission_id: number;
   uuid: string;
   security_review_timestamp: string;
+  create_date: string;
 }
 
 export interface IFeature {

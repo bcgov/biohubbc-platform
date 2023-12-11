@@ -40,7 +40,7 @@ GET.apiDoc = {
             properties: {
               submission: {
                 type: 'object',
-                required: ['submission_id', 'uuid', 'security_review_timestamp'],
+                required: ['submission_id', 'uuid', 'security_review_timestamp', 'create_date'],
                 properties: {
                   submission_id: {
                     type: 'number'
@@ -53,6 +53,10 @@ GET.apiDoc = {
                     type: 'string',
                     format: 'date-time',
                     nullable: true
+                  },
+                  create_date: {
+                    type: 'string',
+                    format: 'date-time'
                   }
                 }
               },

@@ -1122,7 +1122,8 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           submission_id,
           uuid,
-          security_review_timestamp
+          security_review_timestamp,
+          create_date
         FROM
           submission
         WHERE
