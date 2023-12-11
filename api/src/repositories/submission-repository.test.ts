@@ -10,6 +10,7 @@ import { SECURITY_APPLIED_STATUS } from './security-repository';
 import {
   ISourceTransformModel,
   ISpatialComponentCount,
+  PatchSubmissionRecord,
   SubmissionRecord,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
@@ -1091,6 +1092,78 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.createMessages(mockMessages);
 
       expect(response).to.be.undefined;
+    });
+  });
+
+  describe('patchSubmissionRecord', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    describe('if the patch results in changes to the record', () => {
+      it('should patch the record and return the updated record', async () => {
+        const submissionId = 1;
+
+        const patch: PatchSubmissionRecord = { security_reviewed: true };
+
+        const mockSubmissionRecord: SubmissionRecord = {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        };
+
+        // rowCount = 1 indicating one row was updated
+        const mockResponse = { rowCount: 1, rows: [mockSubmissionRecord] } as unknown as Promise<QueryResult<any>>;
+
+        const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+        const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+        const response = await submissionRepository.patchSubmissionRecord(submissionId, patch);
+
+        expect(response).to.eql(mockSubmissionRecord);
+      });
+    });
+
+    describe('if the patch results in no changes to the recordF', () => {
+      it('should patch the record (having no effect) and return the unchanged record', async () => {
+        const submissionId = 1;
+
+        const patch: PatchSubmissionRecord = { security_reviewed: false };
+
+        const mockSubmissionRecord: SubmissionRecord = {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        };
+
+        // rowCount = 0 indicating no rows were updated
+        const mockResponse = { rowCount: 0, rows: [mockSubmissionRecord] } as unknown as Promise<QueryResult<any>>;
+
+        const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+        const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+        const response = await submissionRepository.patchSubmissionRecord(submissionId, patch);
+
+        expect(response).to.eql(mockSubmissionRecord);
+      });
     });
   });
 });

@@ -2,15 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getUnreviewedSubmissionsForAdmins } from '.';
-import * as db from '../../../../database/db';
-import { HTTPError } from '../../../../errors/http-error';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import * as db from '../../../database/db';
+import { HTTPError } from '../../../errors/http-error';
+import { SubmissionService } from '../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { getReviewedSubmissionsForAdmins } from './reviewed';
 
 chai.use(sinonChai);
 
-describe('list', () => {
+describe('getReviewedSubmissionsForAdmins', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -26,7 +26,7 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getUnreviewedSubmissionsForAdmins();
+    const requestHandler = getReviewedSubmissionsForAdmins();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -36,7 +36,7 @@ describe('list', () => {
     }
   });
 
-  it('should return an array of unreviewed submission objects', async () => {
+  it('should return an array of Reviewed submission objects', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
@@ -47,15 +47,15 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getUnreviewedSubmissionsForAdminsStub = sinon
-      .stub(SubmissionService.prototype, 'getUnreviewedSubmissionsForAdmins')
+    const getReviewedSubmissionsStub = sinon
+      .stub(SubmissionService.prototype, 'getReviewedSubmissionsForAdmins')
       .resolves([]);
 
-    const requestHandler = getUnreviewedSubmissionsForAdmins();
+    const requestHandler = getReviewedSubmissionsForAdmins();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getUnreviewedSubmissionsForAdminsStub).to.have.been.calledOnce;
+    expect(getReviewedSubmissionsStub).to.have.been.calledOnce;
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql([]);
   });

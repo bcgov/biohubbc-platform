@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  PatchSubmissionRecord,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRepository,
@@ -636,5 +637,17 @@ export class SubmissionService extends DBService {
     const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
 
     return this.submissionRepository.createMessages(messagesToInsert);
+  }
+
+  /**
+   * Patch a submission record.
+   *
+   * @param {number} submissionId
+   * @param {PatchSubmissionRecord} patch
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionServiceF
+   */
+  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
+    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
   }
 }

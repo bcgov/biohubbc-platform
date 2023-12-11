@@ -2,15 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { createSubmissionMessages } from '.';
-import * as db from '../../../../../database/db';
-import { HTTPError } from '../../../../../errors/http-error';
-import { SubmissionService } from '../../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
+import { patchSubmissionRecord } from '.';
+import * as db from '../../../../database/db';
+import { HTTPError } from '../../../../errors/http-error';
+import { SubmissionService } from '../../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
-describe('createSubmissionMessages', () => {
+describe('patchSubmissionRecord', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -26,7 +26,7 @@ describe('createSubmissionMessages', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = createSubmissionMessages();
+    const requestHandler = patchSubmissionRecord();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -36,7 +36,7 @@ describe('createSubmissionMessages', () => {
     }
   });
 
-  it('should return an array of Reviewed submission objects', async () => {
+  it('should return the patched submission record', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
@@ -46,16 +46,20 @@ describe('createSubmissionMessages', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     const submissionId = 1;
-    const messages = [
-      {
-        submission_message_type_id: 2,
-        label: 'label',
-        message: 'message',
-        data: {
-          dataField: 'dataField'
-        }
-      }
-    ];
+
+    const mockSubmissionRecord = {
+      submission_id: 3,
+      uuid: '999-456-123',
+      security_review_timestamp: '2023-12-12',
+      source_system: 'SIMS',
+      name: 'name',
+      description: 'description',
+      create_date: '2023-12-12',
+      create_user: 1,
+      update_date: '2023-12-12',
+      update_user: 1,
+      revision_count: 1
+    };
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -63,17 +67,19 @@ describe('createSubmissionMessages', () => {
       submissionId: String(submissionId)
     };
     mockReq.body = {
-      messages
+      security_reviewed: true
     };
 
-    const createMessagesStub = sinon.stub(SubmissionService.prototype, 'createMessages').resolves(undefined);
+    const getReviewedSubmissionsStub = sinon
+      .stub(SubmissionService.prototype, 'patchSubmissionRecord')
+      .resolves(mockSubmissionRecord);
 
-    const requestHandler = createSubmissionMessages();
+    const requestHandler = patchSubmissionRecord();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(createMessagesStub).to.have.been.calledOnceWith(submissionId, messages);
+    expect(getReviewedSubmissionsStub).to.have.been.calledOnceWith(submissionId, { security_reviewed: true });
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.be.undefined;
+    expect(mockRes.jsonValue).to.eql(mockSubmissionRecord);
   });
 });

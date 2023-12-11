@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { IUnreviewedSubmission } from 'interfaces/useDatasetApi.interface';
+import { SubmissionRecord } from 'interfaces/useDatasetApi.interface';
 import React from 'react';
 
 const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
@@ -12,8 +12,8 @@ const DatasetsForReviewTable: React.FC<React.PropsWithChildren> = () => {
   const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
   unreviewedSubmissionsDataLoader.load();
 
-  const datasetList: IUnreviewedSubmission[] = unreviewedSubmissionsDataLoader.data ?? [];
-  const columns: GridColDef<IUnreviewedSubmission>[] = [
+  const datasetList: SubmissionRecord[] = unreviewedSubmissionsDataLoader.data ?? [];
+  const columns: GridColDef<SubmissionRecord>[] = [
     {
       field: 'submission_id',
       headerName: 'ID',

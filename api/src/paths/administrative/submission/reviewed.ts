@@ -1,11 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/reviewed');
 
@@ -113,7 +113,7 @@ export function getReviewedSubmissionsForAdmins(): RequestHandler {
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getReviewedSubmissionsForAdmins', message: 'error', error });
+      defaultLog.error({ label: 'getReviewedSubmissions', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

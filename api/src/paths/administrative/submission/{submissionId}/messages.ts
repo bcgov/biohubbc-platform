@@ -1,12 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../../constants/roles';
-import { getDBConnection } from '../../../../../database/db';
-import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { SubmissionMessageRecord } from '../../../../../repositories/submission-repository';
-import { authorizeRequestHandler } from '../../../../../request-handlers/security/authorization';
-import { SubmissionService } from '../../../../../services/submission-service';
-import { getLogger } from '../../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../../constants/roles';
+import { getDBConnection } from '../../../../database/db';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { SubmissionMessageRecord } from '../../../../repositories/submission-repository';
+import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../../services/submission-service';
+import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/submission/reviewed');
 
