@@ -16,6 +16,21 @@ export const PersecutionAndHarmSecurity = z.object({
 
 export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecurity>;
 
+export const SecurityRuleRecord = z.object({
+  security_rule_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
+
 export const SecurityReason = z.object({
   id: z.number(),
   type_id: z.number()
@@ -228,5 +243,12 @@ export class SecurityRepository extends BaseRepository {
     const results = (response.rowCount && response.rows) || [];
 
     return results;
+  }
+
+  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
+    defaultLog.debug({ label: 'getSecurityRules' });
+    const sql = SQL`SELECT * FROM security_rule WHERE record_end_date IS NULL;`;
+    const response = await this.connection.sql(sql, SecurityRuleRecord);
+    return response.rows;
   }
 }

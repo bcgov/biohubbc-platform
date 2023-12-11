@@ -69,7 +69,7 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
 
       <Redirect exact from="/admin" to="/admin/dashboard" />
 
-      <Route exact path="/admin/dashboard">
+      <Route path="/admin/dashboard">
         <BaseLayout>
           <AuthenticatedRouteGuard>
             <SystemRoleGuard

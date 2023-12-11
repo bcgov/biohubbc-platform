@@ -6,7 +6,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
-import { Artifact } from '../../../../repositories/artifact-repository';
 import { SECURITY_APPLIED_STATUS } from '../../../../repositories/security-repository';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
@@ -219,7 +218,7 @@ describe('getArtifactsByDatasetId', () => {
     const artifactServiceStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
       { artifact_id: 1, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') },
       { artifact_id: 2, security_review_timestamp: new Date('1970-01-01T00:00:00.000Z') }
-    ] as Artifact[]);
+    ] as any[]);
 
     const isSystemUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 

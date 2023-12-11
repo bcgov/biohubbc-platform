@@ -76,6 +76,22 @@ export interface ISubmissionRecord {
   revision_count?: string;
 }
 
+export interface ISubmissionFeatureRecord {
+  submission_feature_id?: number;
+  submission_id: number;
+  feature_type_id: number;
+  data: any; // TODO: IFeatureSubmission;
+  feature_type?: string;
+  parent_submission_feature_id?: number;
+  record_effective_date?: string;
+  record_end_date?: string;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
 export interface ISubmissionRecordWithSpatial {
   id: string;
   source: Record<string, unknown>;
@@ -1162,6 +1178,37 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+    return response.rows;
+  }
+
+  /*
+   * Fetch a submission from uuid.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionFeatureRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<ISubmissionFeatureRecord[]> {
+    const sqlStatement = SQL`
+        SELECT
+          sf.submission_feature_id,
+          sf.submission_id,
+          (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
+          sf.data,
+          sf.parent_submission_feature_id
+        FROM
+          submission_feature sf
+        WHERE
+          submission_id = ${submissionId};
+      `;
+    const response = await this.connection.sql<ISubmissionFeatureRecord>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission feature record', [
+        'SubmissionRepository->getSubmissionFeaturesBySubmissionId',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
 
     return response.rows;
   }
