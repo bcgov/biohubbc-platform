@@ -6,17 +6,32 @@ import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
-import { useState } from 'react';
+import { ISecurityRule } from 'hooks/api/useSecurityApi';
+import { useApi } from 'hooks/useApi';
+import { useEffect, useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
 import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
-  const { handleSubmit, values, setFieldValue, errors, setErrors } = useFormikContext<any>();
+  const { handleSubmit, values, errors } = useFormikContext<any>();
   const [selectedRules, setSelectedRules] = useState<any[]>([]);
+  const [rules, setRules] = useState<ISecurityRule[]>([]);
   const [searchText, setSearchText] = useState('');
 
+  const api = useApi();
+  console.log(values);
+  useEffect(() => {
+    const fetchData = async () => {
+      const data = await api.security.getActiveSecurityRules();
+      setRules(data);
+      setSelectedRules([]);
+    };
+
+    fetchData();
+  }, []);
+
   return (
-    <form onSubmit={() => {}}>
+    <form onSubmit={handleSubmit}>
       <Box component="fieldset">
         <Typography component="legend">Manage Team Members</Typography>
         <Typography
@@ -44,7 +59,7 @@ const SecurityRuleForm = () => {
             data-testid={'autocomplete-user-role-search'}
             filterSelectedOptions
             noOptionsText="No records found"
-            options={[]}
+            options={rules}
             // filterOptions={(options, state) => {
             //   const searchFilter = createFilterOptions<ISystemUser>({ ignoreCase: true });
             //   const unselectedOptions = options.filter(
@@ -52,7 +67,7 @@ const SecurityRuleForm = () => {
             //   );
             //   return searchFilter(unselectedOptions, state);
             // }}
-            // getOptionLabel={(option) => option.display_name}
+            getOptionLabel={(option) => option.name}
             inputValue={searchText}
             onInputChange={(_, value, reason) => {
               if (reason === 'reset') {
@@ -61,15 +76,15 @@ const SecurityRuleForm = () => {
                 setSearchText(value);
               }
             }}
-            onChange={(_, option) => {
-              if (option) {
-              }
-            }}
+            // onChange={(_, option) => {
+            //   if (option) {
+            //   }
+            // }}
             renderInput={(params) => (
               <TextField
                 {...params}
                 variant="outlined"
-                placeholder={'Find team members'}
+                placeholder={'Find Security Rules'}
                 fullWidth
                 InputProps={{
                   ...params.InputProps,
@@ -84,7 +99,7 @@ const SecurityRuleForm = () => {
             renderOption={(renderProps, renderOption) => {
               return (
                 <Box component="li" {...renderProps}>
-                  <SecurityRuleCard title={''} subtitle={''} />
+                  <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
                 </Box>
               );
             }}

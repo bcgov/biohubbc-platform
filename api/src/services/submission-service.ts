@@ -18,6 +18,7 @@ import {
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRepository,
+  SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
@@ -556,6 +557,15 @@ export class SubmissionService extends DBService {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
 
+  /**
+   * Get all submissions (with security status) that have been reviewed.
+   *
+   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+    return this.submissionRepository.getReviewedSubmissionsWithSecurity();
+  }
   /*
    * Retrieves submission data from the submission table.
    *

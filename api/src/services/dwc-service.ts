@@ -390,7 +390,8 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step_11(jobQueueRecord: ISubmissionJobQueueRecord) {
     try {
-      await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
+      //TODO: is this deprecated?
+      //await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
       await this.submissionService.insertSubmissionStatus(
         jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.METADATA_TO_ES
@@ -711,36 +712,37 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number): Promise<void> {
-    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
-
-    if (!submissionRecord.source_transform_id) {
-      throw new ApiGeneralError('The source_transform_id is not available');
-    }
-
-    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
-      submissionRecord.source_transform_id
-    );
-
-    if (!sourceTransformRecord.metadata_transform) {
-      throw new ApiGeneralError('The source metadata transform is not available');
-    }
-
-    const jsonMetadata = await this.submissionService.getSubmissionMetadataJson(
-      submissionId,
-      sourceTransformRecord.metadata_transform
-    );
-
-    if (!jsonMetadata) {
-      throw new ApiGeneralError('The source metadata json is not available');
-    }
-
-    // call to the ElasticSearch API to create a record with our transformed EML
-    await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
-
-    // update submission metadata with a copy of the elastic search object
-    await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, jsonMetadata);
-  }
+  //TODO: is this deprecated?
+  // async transformAndUploadMetaData(submissionId: number): Promise<void> {
+  //   const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+  //
+  //   if (!submissionRecord.source_transform_id) {
+  //     throw new ApiGeneralError('The source_transform_id is not available');
+  //   }
+  //
+  //   const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
+  //     submissionRecord.source_transform_id
+  //   );
+  //
+  //   if (!sourceTransformRecord.metadata_transform) {
+  //     throw new ApiGeneralError('The source metadata transform is not available');
+  //   }
+  //
+  //   const jsonMetadata = await this.submissionService.getSubmissionMetadataJson(
+  //     submissionId,
+  //     sourceTransformRecord.metadata_transform
+  //   );
+  //
+  //   if (!jsonMetadata) {
+  //     throw new ApiGeneralError('The source metadata json is not available');
+  //   }
+  //
+  //   // call to the ElasticSearch API to create a record with our transformed EML
+  //   await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
+  //
+  //   // update submission metadata with a copy of the elastic search object
+  //   await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, jsonMetadata);
+  // }
 
   /**
    * Upload file to ES

@@ -5,6 +5,7 @@ import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+import { SECURITY_APPLIED_STATUS } from './security-repository';
 import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 export interface IHandlebarsTemplates {
@@ -235,6 +236,12 @@ export const SubmissionRecord = z.object({
 });
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+
+export const SubmissionWithSecurityRecord = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
+});
+
+export type SubmissionWithSecurityRecord = z.infer<typeof SubmissionWithSecurityRecord>;
 
 export const SubmissionMessageRecord = z.object({
   submission_message_id: z.number(),
@@ -1219,6 +1226,35 @@ export class SubmissionRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount != 0'
       ]);
     }
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions that have been reviewed (with security status)
+   *
+   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+    const sqlStatement = SQL`
+      SELECT s.*,
+        CASE
+          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN '${SECURITY_APPLIED_STATUS.UNSECURED}'
+          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) then '${SECURITY_APPLIED_STATUS.SECURED}'
+	        ELSE '${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}'
+        END as security
+      FROM submission s
+      LEFT JOIN submission_feature sf
+      ON sf.submission_id = s.submission_id
+      LEFT JOIN submission_feature_security sfs
+      ON sf.submission_feature_id = sfs.submission_feature_id
+      WHERE security_review_timestamp is not null
+      GROUP by s.submission_id
+      ORDER by s.submission_id
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionWithSecurityRecord);
 
     return response.rows;
   }

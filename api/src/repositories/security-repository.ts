@@ -49,6 +49,7 @@ export type ArtifactPersecution = z.infer<typeof ArtifactPersecution>;
 export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
   UNSECURED = 'UNSECURED',
+  PARTIALLY_SECURED = 'PARTIALLY SECURED',
   PENDING = 'PENDING'
 }
 
@@ -184,11 +185,11 @@ export class SecurityRepository extends BaseRepository {
     defaultLog.debug({ label: 'deleteSecurityRulesForArtifactUUID' });
 
     const sql = SQL`
-      DELETE 
-      FROM artifact_persecution 
+      DELETE
+      FROM artifact_persecution
       WHERE artifact_id IN (
-        SELECT a.artifact_id 
-        FROM artifact a 
+        SELECT a.artifact_id
+        FROM artifact a
         WHERE a.uuid = ${artifactUUID}
       );
     `;
