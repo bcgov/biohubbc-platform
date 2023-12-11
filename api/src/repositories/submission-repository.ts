@@ -5,6 +5,7 @@ import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+import { SECURITY_APPLIED_STATUS } from './security-repository';
 import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 export interface IHandlebarsTemplates {
@@ -237,7 +238,7 @@ export const SubmissionRecord = z.object({
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
 export const SubmissionWithSecurityRecord = SubmissionRecord.extend({
-  security: z.enum(['SECURE', 'UNSECURE', 'PARTIALLY_SECURE'])
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
 });
 
 export type SubmissionWithSecurityRecord = z.infer<typeof SubmissionWithSecurityRecord>;
@@ -1223,9 +1224,9 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       SELECT s.*,
         CASE
-          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN 'UNSECURE'
-          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(s.submission_id) then 'SECURE'
-	        ELSE 'PARTIALLY_SECURE'
+          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN '${SECURITY_APPLIED_STATUS.UNSECURED}'
+          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) then '${SECURITY_APPLIED_STATUS.SECURED}'
+	        ELSE '${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}'
         END as security
       FROM submission s
       LEFT JOIN submission_feature sf
