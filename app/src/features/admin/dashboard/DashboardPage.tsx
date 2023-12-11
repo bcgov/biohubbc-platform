@@ -1,7 +1,6 @@
-import { Typography } from '@mui/material';
-import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
-import ManageSecurity from 'components/security/ManageSecurity';
+import Typography from '@mui/material/Typography';
 import DatasetsForReviewTable from './components/DatasetsForReviewTable';
 
 const DashboardPage = () => {
@@ -14,32 +13,17 @@ const DashboardPage = () => {
           py: 4,
           px: 3
         }}>
-        <Typography variant="h1">Dashboard</Typography>
+        <Container maxWidth="xl">
+          <Typography variant="h2" component="h1">Dashboard</Typography>
+        </Container>
       </Paper>
-      <Paper
-        square
-        elevation={0}
+
+      <Container maxWidth="xl"
         sx={{
-          m: 3,
-          borderRadius: 2
+          p: 2
         }}>
-        <Typography
-          variant="h3"
-          sx={{
-            p: 3,
-            borderBottom: '1pt solid #dadada',
-            mb: 1
-          }}>
-          Pending Security Reviews
-        </Typography>
-        <ManageSecurity />
-        <Box
-          sx={{
-            p: 2
-          }}>
-          <DatasetsForReviewTable />
-        </Box>
-      </Paper>
+        <DatasetsForReviewTable />
+      </Container>
     </>
   );
 };

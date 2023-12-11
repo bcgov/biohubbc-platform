@@ -27,29 +27,6 @@ legend.MuiTypography-root {
   }
 }
 
-dd {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.ddInline {
-  dd {
-    position: relative;
-    display: inline-block;
-    &:after {
-      content: ', ';
-      display: inline-block;
-      margin-right: 0.25rem;
-    }
-  }
-
-  dd:last-child {
-    &:after {
-      display: none;
-    }
-  }
-}
-
 .listNoBullets {
   padding: 0;
   list-style-type: none;
