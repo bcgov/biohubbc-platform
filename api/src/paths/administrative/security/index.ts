@@ -19,35 +19,15 @@ export const GET: Operation = [
       ]
     };
   }),
-  () => {}
+  getActiveSecurityRules()
 ];
 
 GET.apiDoc = {
-  description: 'Get all observations for the survey.',
-  tags: ['observation'],
+  description: 'Get all active security rules.',
+  tags: ['security'],
   security: [
     {
       Bearer: []
-    }
-  ],
-  parameters: [
-    {
-      in: 'path',
-      name: 'projectId',
-      schema: {
-        type: 'number',
-        minimum: 1
-      },
-      required: true
-    },
-    {
-      in: 'path',
-      name: 'surveyId',
-      schema: {
-        type: 'number',
-        minimum: 1
-      },
-      required: true
     }
   ],
   responses: {
@@ -73,7 +53,8 @@ GET.apiDoc = {
                   type: 'string'
                 },
                 record_end_date: {
-                  type: 'string'
+                  type: 'string',
+                  nullable: true
                 },
                 create_date: {
                   type: 'string'
@@ -82,13 +63,15 @@ GET.apiDoc = {
                   type: 'number'
                 },
                 update_date: {
-                  type: 'string'
+                  type: 'string',
+                  nullable: true
                 },
                 update_user: {
-                  type: 'number'
+                  type: 'number',
+                  nullable: true
                 },
                 revision_count: {
-                  type: 'string'
+                  type: 'number'
                 }
               }
             }
@@ -120,7 +103,12 @@ export function getActiveSecurityRules(): RequestHandler {
     const service = new SecurityService(connection);
 
     try {
+      await connection.open();
+
       const data = await service.getActiveSecurityRules();
+
+      await connection.commit();
+
       return res.status(200).json(data);
     } catch (error) {
       defaultLog.error({ label: 'getActiveSecurityRules', message: 'error', error });
