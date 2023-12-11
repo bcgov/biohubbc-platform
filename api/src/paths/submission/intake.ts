@@ -10,7 +10,11 @@ import { ValidationService } from '../../services/validation-service';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('paths/dataset/intake');
+const defaultLog = getLogger('paths/submission/intake');
+
+/*
+TODO: UPDATED PATH TO SUBMISSION/INTAKE NEED TO UPDATE SIMS TO USE THIS PATH
+*/
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -23,12 +27,12 @@ export const POST: Operation = [
       ]
     };
   }),
-  datasetIntake()
+  submissionIntake()
 ];
 
 POST.apiDoc = {
-  description: 'Submit dataset to BioHub',
-  tags: ['dataset'],
+  description: 'Submit submission to BioHub',
+  tags: ['submission'],
   security: [
     {
       Bearer: []
@@ -48,7 +52,7 @@ POST.apiDoc = {
             },
             type: {
               type: 'string',
-              enum: ['dataset']
+              enum: ['submission']
             },
             properties: {
               title: 'Dataset properties',
@@ -89,7 +93,7 @@ POST.apiDoc = {
   }
 };
 
-export function datasetIntake(): RequestHandler {
+export function submissionIntake(): RequestHandler {
   return async (req, res) => {
     const sourceSystem = getKeycloakSource(req['keycloak_token']);
 
@@ -99,7 +103,7 @@ export function datasetIntake(): RequestHandler {
       ]);
     }
 
-    const dataset = {
+    const submission = {
       ...req.body,
       properties: { ...req.body.properties, additionalInformation: req.body.properties.additionalInformation }
     };
@@ -113,21 +117,21 @@ export function datasetIntake(): RequestHandler {
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
 
-      // validate the dataset submission
-      if (!(await validationService.validateDatasetSubmission(dataset))) {
-        throw new HTTP400('Invalid dataset submission');
+      // validate the submission submission
+      if (!(await validationService.validateDatasetSubmission(submission))) {
+        throw new HTTP400('Invalid submission submission');
       }
 
       // insert the submission record
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict(id);
 
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(response.submission_id, dataset.features);
+      await submissionService.insertSubmissionFeatureRecords(response.submission_id, submission.features);
 
       await connection.commit();
       res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'datasetIntake', message: 'error', error });
+      defaultLog.error({ label: 'submissionIntake', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

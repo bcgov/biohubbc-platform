@@ -66,3 +66,25 @@ export interface IUnreviewedSubmission {
   description: string;
   create_date: string;
 }
+export interface ISubmission {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string;
+}
+
+export interface IFeature {
+  submission_feature_id: number;
+  submission_id: number;
+  feature_type: string;
+  data: any;
+  parent_submission_feature_id: number | null;
+}
+export interface IGetSubmissionResponse {
+  submission: ISubmission;
+  features: {
+    dataset: IFeature[];
+    sampleSites: IFeature[];
+    animals: IFeature[];
+    observations: IFeature[];
+  };
+}
