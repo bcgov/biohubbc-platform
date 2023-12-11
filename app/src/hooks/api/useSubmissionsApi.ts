@@ -33,7 +33,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
 
   // Triggers a request to index the given submission
   const test = async (submissionId: number): Promise<any> => {
-    const { data } = await axios.post(`/api/dataset/search-idx?submissionId=${submissionId}`);
+    const { data } = await axios.post(`/api/submission/search-idx?submissionId=${submissionId}`);
 
     return data;
   }

@@ -78,7 +78,7 @@ export interface ISubmissionRecord {
 }
 
 export interface ISubmissionFeatureRecord {
-  submission_feature_id?: number;
+  submission_feature_id: number;
   submission_id: number;
   feature_type_id: number;
   data: any; // TODO: IFeatureSubmission;
@@ -362,17 +362,17 @@ export class SubmissionRepository extends BaseRepository {
     return response.rows[0];
   }
 
-  // TODO add return type
-  async getFeatureRecordsBySubmissionId(submissionId: number): Promise<any[]> {
-    const queryBuilder = getKnex()
-      .select('*')
-      .from('submission_feature')
-      .where('submission_id', submissionId);
+  // TODO probably safe to remove? Duplicate of getSubmissionFeaturesBySubmissionId()
+  // async getFeatureRecordsBySubmissionId(submissionId: number): Promise<any[]> {
+  //   const queryBuilder = getKnex()
+  //     .select('*')
+  //     .from('submission_feature')
+  //     .where('submission_id', submissionId);
 
-    const response = await this.connection.knex(queryBuilder);
+  //   const response = await this.connection.knex(queryBuilder);
 
-    return response.rows;
-  }
+  //   return response.rows;
+  // }
 
   /**
    * Get feature type id by name.
