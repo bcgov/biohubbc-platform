@@ -4,11 +4,14 @@ import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import React, { useState } from 'react';
+import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
 
 const ManageSecurity = () => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [isUnsecureDialogOpen, setIsUnsecuredDialogOpen] = useState(false);
+  const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
+
   const open = Boolean(anchorEl);
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -19,6 +22,7 @@ const ManageSecurity = () => {
 
   return (
     <>
+      <SecuritiesDialog isOpen={isSecuritiesDialogOpen} onClose={() => setIsSecuritiesDialogOpen(false)} />
       <UnsecureDialog isOpen={isUnsecureDialogOpen} onClose={() => setIsUnsecuredDialogOpen(false)} />
       <Button
         color="primary"
@@ -29,7 +33,7 @@ const ManageSecurity = () => {
         Manage Security
       </Button>
       <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
-        <MenuItem>
+        <MenuItem onClick={() => setIsSecuritiesDialogOpen(true)}>
           <ListItemIcon>
             <Icon path={mdiLock} size={1} />
           </ListItemIcon>

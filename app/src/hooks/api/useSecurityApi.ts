@@ -1,6 +1,19 @@
 import { AxiosInstance } from 'axios';
 import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 
+export interface ISecurityRule {
+  security_rule_id: number;
+  name: string;
+  description: string;
+  record_effective_date: string;
+  record_end_date: string;
+  create_date: string;
+  create_user: number;
+  update_date: string;
+  update_user: number;
+  revision_count: number;
+}
+
 /**
  * Returns a set of supported api methods for working with security.
  *
@@ -53,10 +66,16 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getActiveSecurityRules = async (): Promise<ISecurityRule[]> => {
+    const { data } = await axios.get('api/administrative/security');
+    return data;
+  };
+
   return {
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
-    applySecurityReasonsToArtifacts
+    applySecurityReasonsToArtifacts,
+    getActiveSecurityRules
   };
 };
 

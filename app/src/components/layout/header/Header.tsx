@@ -151,8 +151,10 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     </Link>
                   </SystemRoleGuard>
                   <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                    <Link to="/datasets/2b06a3b1-21b9-4d37-8dd5-28930c84bbdc" id="admin_dataset_test_button">
-                      Submission 1
+                    <Link
+                      to="/admin/dashboard/submissions/4a14ece3-222b-4beb-a541-a2ef8b2d1309"
+                      id="admin_submission_test_button">
+                      Submission test page
                     </Link>
                   </SystemRoleGuard>
                 </Box>

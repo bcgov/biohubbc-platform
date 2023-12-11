@@ -1,39 +1,21 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getLogger } from '../../../../utils/logger';
+import { getAPIUserDBConnection } from '../../database/db';
+import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { SubmissionService } from '../../services/submission-service';
+import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/unreviewed');
+const defaultLog = getLogger('paths/submission');
 
-export const GET: Operation = [
-  authorizeRequestHandler(() => {
-    return {
-      and: [
-        {
-          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR],
-          discriminator: 'SystemRole'
-        }
-      ]
-    };
-  }),
-  getUnreviewedSubmissions()
-];
+export const GET: Operation = [getReviewedSubmissionsWithSecurity()];
 
 GET.apiDoc = {
-  description: 'Get a list of submissions that need security review (are unreviewed).',
-  tags: ['admin'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
+  description: 'Get a list of reviewed submissions',
+  tags: ['submisssion', 'reviewed'],
+  security: [],
   responses: {
     200: {
-      description: 'List of submissions that need security review.',
+      description: 'List of reviewed submissions',
       content: {
         'application/json': {
           schema: {
@@ -95,25 +77,26 @@ GET.apiDoc = {
 };
 
 /**
- * Get all unreviewed submissions.
+ * Get all reviewed submissions (with security status).
  *
  * @returns {RequestHandler}
  */
-export function getUnreviewedSubmissions(): RequestHandler {
-  return async (req, res) => {
-    const connection = getDBConnection(req['keycloak_token']);
+export function getReviewedSubmissionsWithSecurity(): RequestHandler {
+  return async (_req, res) => {
+    const connection = getAPIUserDBConnection();
 
     try {
       await connection.open();
 
-      await connection.commit();
-
       const service = new SubmissionService(connection);
-      const response = await service.getUnreviewedSubmissions();
+      const response = await service.getReviewedSubmissionsWithSecurity();
+
+      await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getUnreviewedSubmissions', message: 'error', error });
+      await connection.rollback();
+      defaultLog.error({ label: 'getReviewedSubmissionsWithSecurity', message: 'error', error });
       throw error;
     } finally {
       connection.release();

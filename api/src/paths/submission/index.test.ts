@@ -2,11 +2,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getUnreviewedSubmissions } from '.';
-import * as db from '../../../../database/db';
-import { HTTPError } from '../../../../errors/http-error';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { getReviewedSubmissionsWithSecurity } from '.';
+import * as db from '../../database/db';
+import { HTTPError } from '../../errors/http-error';
+import { SubmissionService } from '../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 
 chai.use(sinonChai);
 
@@ -26,7 +26,7 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getUnreviewedSubmissions();
+    const requestHandler = getReviewedSubmissionsWithSecurity();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -36,7 +36,7 @@ describe('list', () => {
     }
   });
 
-  it('should return an array of unreviewed submission objects', async () => {
+  it('should return an array of Reviewed submission (with security flag) objects', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
@@ -47,15 +47,15 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getUnreviewedSubmissionsStub = sinon
-      .stub(SubmissionService.prototype, 'getUnreviewedSubmissions')
+    const getReviewedSubmissionsStub = sinon
+      .stub(SubmissionService.prototype, 'getReviewedSubmissionsWithSecurity')
       .resolves([]);
 
-    const requestHandler = getUnreviewedSubmissions();
+    const requestHandler = getReviewedSubmissionsWithSecurity();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getUnreviewedSubmissionsStub).to.have.been.calledOnce;
+    expect(getReviewedSubmissionsStub).to.have.been.calledOnce;
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql([]);
   });

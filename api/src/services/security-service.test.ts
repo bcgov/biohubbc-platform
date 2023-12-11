@@ -274,7 +274,7 @@ describe('SecurityService', () => {
         .resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -311,7 +311,7 @@ describe('SecurityService', () => {
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -344,7 +344,7 @@ describe('SecurityService', () => {
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -377,7 +377,7 @@ describe('SecurityService', () => {
         .resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -485,7 +485,7 @@ describe('SecurityService', () => {
 
       const getArtifactByIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
         key: 'secured-string',
-        security_review_timestamp: new Date()
+        security_review_timestamp: 'date'
       } as Artifact);
 
       const result = await securityService.isArtifactPendingReview(1000);

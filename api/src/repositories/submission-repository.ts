@@ -5,6 +5,7 @@ import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+import { SECURITY_APPLIED_STATUS } from './security-repository';
 import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 export interface IHandlebarsTemplates {
@@ -69,6 +70,22 @@ export interface ISubmissionRecord {
   submission_id?: number;
   source_transform_id: number;
   uuid: string;
+  create_date?: string;
+  create_user?: string;
+  update_date?: string;
+  update_user?: string;
+  revision_count?: string;
+}
+
+export interface ISubmissionFeatureRecord {
+  submission_feature_id?: number;
+  submission_id: number;
+  feature_type_id: number;
+  data: any; // TODO: IFeatureSubmission;
+  feature_type?: string;
+  parent_submission_feature_id?: number;
+  record_effective_date?: string;
+  record_end_date?: string;
   create_date?: string;
   create_user?: string;
   update_date?: string;
@@ -219,6 +236,12 @@ export const SubmissionRecord = z.object({
 });
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+
+export const SubmissionWithSecurityRecord = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
+});
+
+export type SubmissionWithSecurityRecord = z.infer<typeof SubmissionWithSecurityRecord>;
 
 /**
  * A repository class for accessing submission data.
@@ -1136,17 +1159,98 @@ export class SubmissionRepository extends BaseRepository {
    * @return {*}  {Promise<SubmissionRecord[]>}
    * @memberof SubmissionRepository
    */
-  async getUnreviewedSubmissions(): Promise<SubmissionRecord[]> {
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
     const sqlStatement = SQL`
-      SELECT 
+      SELECT
         *
-      FROM 
+      FROM
         submission
-      WHERE 
+      WHERE
         submission.security_review_timestamp is null;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions that have completed security review (are reviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission
+      WHERE
+        submission.security_review_timestamp is not null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
+    return response.rows;
+  }
+
+  /*
+   * Fetch a submission from uuid.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<ISubmissionFeatureRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<ISubmissionFeatureRecord[]> {
+    const sqlStatement = SQL`
+        SELECT
+          sf.submission_feature_id,
+          sf.submission_id,
+          (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
+          sf.data,
+          sf.parent_submission_feature_id
+        FROM
+          submission_feature sf
+        WHERE
+          submission_id = ${submissionId};
+      `;
+    const response = await this.connection.sql<ISubmissionFeatureRecord>(sqlStatement);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission feature record', [
+        'SubmissionRepository->getSubmissionFeaturesBySubmissionId',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions that have been reviewed (with security status)
+   *
+   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+    const sqlStatement = SQL`
+      SELECT s.*,
+        CASE
+          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN '${SECURITY_APPLIED_STATUS.UNSECURED}'
+          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) then '${SECURITY_APPLIED_STATUS.SECURED}'
+	        ELSE '${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}'
+        END as security
+      FROM submission s
+      LEFT JOIN submission_feature sf
+      ON sf.submission_id = s.submission_id
+      LEFT JOIN submission_feature_security sfs
+      ON sf.submission_feature_id = sfs.submission_feature_id
+      WHERE security_review_timestamp is not null
+      GROUP by s.submission_id
+      ORDER by s.submission_id
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionWithSecurityRecord);
 
     return response.rows;
   }

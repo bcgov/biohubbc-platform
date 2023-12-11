@@ -4,6 +4,7 @@ import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
   SecurityRepository,
+  SecurityRuleRecord,
   SECURITY_APPLIED_STATUS
 } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
@@ -323,5 +324,9 @@ export class SecurityService extends DBService {
     const isPendingReview = artifactSecurityRules.includes(true);
 
     return isPendingReview;
+  }
+
+  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
+    return this.securityRepository.getActiveSecurityRules();
   }
 }
