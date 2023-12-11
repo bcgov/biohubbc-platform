@@ -76,10 +76,10 @@ const SecurityRuleForm = () => {
                 setSearchText(value);
               }
             }}
-            onChange={(_, option) => {
-              if (option) {
-              }
-            }}
+            // onChange={(_, option) => {
+            //   if (option) {
+            //   }
+            // }}
             renderInput={(params) => (
               <TextField
                 {...params}
