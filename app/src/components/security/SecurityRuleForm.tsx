@@ -3,18 +3,17 @@ import Icon from '@mdi/react';
 import { Alert, AlertTitle, IconButton, Paper, Typography } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
-import Collapse from '@mui/material/Collapse';
 import TextField from '@mui/material/TextField';
-import { useFormikContext } from 'formik';
+import { FieldArray, FieldArrayRenderProps, useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useEffect, useState } from 'react';
-import { TransitionGroup } from 'react-transition-group';
 import { alphabetizeObjects } from 'utils/Utils';
+import { ISecurityRuleFormProps } from './SecuritiesDialog';
 import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
-  const { handleSubmit, errors } = useFormikContext<any>();
+  const { handleSubmit, errors, values } = useFormikContext<ISecurityRuleFormProps>();
   const [selectedRules, setSelectedRules] = useState<ISecurityRule[]>([]);
   const [rules, setRules] = useState<ISecurityRule[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -30,12 +29,7 @@ const SecurityRuleForm = () => {
   }, []);
 
   const handleAdd = (rule: ISecurityRule) => {
-    console.log('HANDLE ADD NEW RULE');
     setSelectedRules([...selectedRules, rule]);
-  };
-
-  const handleRemove = (idToRemove: number) => {
-    console.log(`Please remove: ${idToRemove}`);
   };
 
   return (
@@ -116,12 +110,12 @@ const SecurityRuleForm = () => {
         </Box>
         <Box>
           <Box mt={3}>
-            <TransitionGroup>
-              {/* This should probably be the formik array props? */}
-              {selectedRules.map((rule: ISecurityRule, index: number) => {
-                return (
-                  <Collapse>
+            <FieldArray name="rules">
+              {(helpers: FieldArrayRenderProps) =>
+                values.rules.map((rule: ISecurityRule, index: number) => {
+                  return (
                     <Paper
+                      key={rule.security_rule_id}
                       variant="outlined"
                       sx={{
                         display: 'flex',
@@ -131,14 +125,14 @@ const SecurityRuleForm = () => {
                         mb: 1
                       }}>
                       <SecurityRuleCard key={rule.security_rule_id} title={rule.name} subtitle={rule.description} />
-                      <IconButton onClick={() => handleRemove(rule.security_rule_id)}>
+                      <IconButton onClick={() => helpers.remove(index)}>
                         <Icon path={mdiClose} size={1} />
                       </IconButton>
                     </Paper>
-                  </Collapse>
-                );
-              })}
-            </TransitionGroup>
+                  );
+                })
+              }
+            </FieldArray>
           </Box>
         </Box>
       </Box>

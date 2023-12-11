@@ -1,4 +1,5 @@
 import EditDialog from 'components/dialog/EditDialog';
+import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
@@ -6,9 +7,15 @@ interface ISecuritiesDialogProps {
   onClose: () => void;
 }
 
-const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
-  const SecurityRuleYupSchema = yup.array(yup.number());
+export const SecurityRuleYupSchema = yup.object().shape({
+  rules: yup.array(yup.number())
+});
 
+export interface ISecurityRuleFormProps {
+  rules: ISecurityRule[];
+}
+
+const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   return (
     <>
       <EditDialog
@@ -19,7 +26,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         onSave={() => console.log('SAVE SOME SECURITY RULES SON')}
         component={{
           element: <SecurityRuleForm />,
-          initialValues: [],
+          initialValues: { rules: [] },
           validationSchema: SecurityRuleYupSchema
         }}
       />
