@@ -25,18 +25,26 @@ export class SearchIndexService extends DBService {
     const stringRecords: InsertStringSearchableRecord[] = [];
 
     const featurePropertyTypeNames = await this.searchIndexRepository.getFeaturePropertiesWithTypeNames();
-    
-    const propertyTypeMap = Object.fromEntries(featurePropertyTypeNames.map((propertyType) => {
+
+    const featurePropertyTypeMap = Object.fromEntries(featurePropertyTypeNames.map((propertyType) => {
       const { property_name, ...rest } = propertyType;
       return [property_name, rest];
     }))
+
+    defaultLog.debug({ featurePropertyTypeMap })
     
     features.forEach((feature) => {
       const { submission_feature_id } = feature;
       Object
         .entries(feature.data.properties)
-        .forEach(([property_name, value]) => {
-          const { property_type,  feature_property_id } = propertyTypeMap[property_name];
+        .forEach(([property_name, value]) => {          
+          const featureProperty = featurePropertyTypeMap[property_name];
+          if (!featureProperty) {
+            return;
+          }
+
+          const { property_type,  feature_property_id } = featureProperty;
+
           switch (property_type) {
             case 'datetime':
               datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as Date });
@@ -57,6 +65,18 @@ export class SearchIndexService extends DBService {
         })
       });
 
-    defaultLog.debug({ label: 'indexFeaturesBySubmissionId', datetimeRecords, numberRecords, spatialRecords, stringRecords });
+    
+    if (datetimeRecords.length) {
+      this.searchIndexRepository.insertSearchableDatetimeRecords(datetimeRecords);
+    }
+    if (numberRecords.length) {
+      this.searchIndexRepository.insertSearchableNumberRecords(numberRecords);
+    }
+    if (spatialRecords.length) {
+      this.searchIndexRepository.insertSearchableSpatialRecords(spatialRecords);
+    }
+    if (stringRecords.length) {
+      this.searchIndexRepository.insertSearchableStringRecords(stringRecords);
+    }
   }
 }
