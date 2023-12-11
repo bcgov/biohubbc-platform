@@ -66,7 +66,7 @@ describe('createSubmissionMessages', () => {
       messages
     };
 
-    const createMessagesStub = sinon.stub(SubmissionService.prototype, 'createMessages').resolves();
+    const createMessagesStub = sinon.stub(SubmissionService.prototype, 'createMessages').resolves(undefined);
 
     const requestHandler = createSubmissionMessages();
 
@@ -74,6 +74,6 @@ describe('createSubmissionMessages', () => {
 
     expect(createMessagesStub).to.have.been.calledOnceWith(submissionId, messages);
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql([]);
+    expect(mockRes.jsonValue).to.be.undefined;
   });
 });
