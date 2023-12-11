@@ -1,7 +1,7 @@
-import { mdiMagnify } from '@mdi/js';
+import { mdiClose, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, AlertTitle, Typography } from '@mui/material';
-import Autocomplete from '@mui/material/Autocomplete';
+import { Alert, AlertTitle, IconButton, Paper, Typography } from '@mui/material';
+import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Collapse from '@mui/material/Collapse';
 import TextField from '@mui/material/TextField';
@@ -10,25 +10,33 @@ import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useEffect, useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
+import { alphabetizeObjects } from 'utils/Utils';
 import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
-  const { handleSubmit, values, errors } = useFormikContext<any>();
-  const [selectedRules, setSelectedRules] = useState<any[]>([]);
+  const { handleSubmit, errors } = useFormikContext<any>();
+  const [selectedRules, setSelectedRules] = useState<ISecurityRule[]>([]);
   const [rules, setRules] = useState<ISecurityRule[]>([]);
   const [searchText, setSearchText] = useState('');
 
   const api = useApi();
-  console.log(values);
   useEffect(() => {
     const fetchData = async () => {
       const data = await api.security.getActiveSecurityRules();
       setRules(data);
-      setSelectedRules([]);
     };
 
     fetchData();
   }, []);
+
+  const handleAdd = (rule: ISecurityRule) => {
+    console.log('HANDLE ADD NEW RULE');
+    setSelectedRules([...selectedRules, rule]);
+  };
+
+  const handleRemove = (idToRemove: number) => {
+    console.log(`Please remove: ${idToRemove}`);
+  };
 
   return (
     <form onSubmit={handleSubmit}>
@@ -55,18 +63,18 @@ const SecurityRuleForm = () => {
         )}
         <Box mt={3}>
           <Autocomplete
-            id={'autocomplete-user-role-search'}
-            data-testid={'autocomplete-user-role-search'}
+            id={'autocomplete-security-rule-search'}
+            data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             noOptionsText="No records found"
-            options={rules}
-            // filterOptions={(options, state) => {
-            //   const searchFilter = createFilterOptions<ISystemUser>({ ignoreCase: true });
-            //   const unselectedOptions = options.filter(
-            //     (item) => !selectedUsers.some((existing) => existing.system_user_id === item.system_user_id)
-            //   );
-            //   return searchFilter(unselectedOptions, state);
-            // }}
+            options={alphabetizeObjects(rules, 'name')}
+            filterOptions={(options, state) => {
+              const searchFilter = createFilterOptions<ISecurityRule>({ ignoreCase: true });
+              const unselectedOptions = options.filter(
+                (item) => !selectedRules.some((existing) => existing.security_rule_id === item.security_rule_id)
+              );
+              return searchFilter(unselectedOptions, state);
+            }}
             getOptionLabel={(option) => option.name}
             inputValue={searchText}
             onInputChange={(_, value, reason) => {
@@ -76,10 +84,11 @@ const SecurityRuleForm = () => {
                 setSearchText(value);
               }
             }}
-            // onChange={(_, option) => {
-            //   if (option) {
-            //   }
-            // }}
+            onChange={(_, option) => {
+              if (option) {
+                handleAdd(option);
+              }
+            }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -106,29 +115,26 @@ const SecurityRuleForm = () => {
           />
         </Box>
         <Box>
-          <Box
-            sx={{
-              '& .userRoleItemContainer + .userRoleItemContainer': {
-                mt: 1
-              }
-            }}>
+          <Box mt={3}>
             <TransitionGroup>
-              {selectedRules.map((rule: any, index: number) => {
-                // const error = rowItemError(index);
+              {/* This should probably be the formik array props? */}
+              {selectedRules.map((rule: ISecurityRule, index: number) => {
                 return (
                   <Collapse>
-                    {/* <UserRoleSelector
-                      index={index}
-                      user={user}
-                      roles={props.roles}
-                      error={error}
-                      selectedRole={getSelectedRole(index)}
-                      handleAdd={handleAddUserRole}
-                      handleRemove={handleRemoveUser}
-                      key={user.system_user_id}
-                      label={'Select a Role'}
-                    /> */}
-                    <></>
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        p: 1,
+                        mb: 1
+                      }}>
+                      <SecurityRuleCard key={rule.security_rule_id} title={rule.name} subtitle={rule.description} />
+                      <IconButton onClick={() => handleRemove(rule.security_rule_id)}>
+                        <Icon path={mdiClose} size={1} />
+                      </IconButton>
+                    </Paper>
                   </Collapse>
                 );
               })}
