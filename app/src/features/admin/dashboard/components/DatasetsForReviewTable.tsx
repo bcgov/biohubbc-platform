@@ -1,5 +1,4 @@
-import { Divider, Skeleton } from '@mui/material';
-import Box from '@mui/material/Box';
+import { Box, Divider, Paper, Skeleton } from '@mui/material';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -9,6 +8,8 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { getFormattedDate, toTitleCase } from 'utils/Utils';
 import Chip from '@mui/material/Chip';
+import { mdiTextBoxCheckOutline } from '@mdi/js';
+import Icon from '@mdi/react';
 
 const DatasetsForReviewTable = () => {
   const biohubApi = useApi();
@@ -21,7 +22,7 @@ const DatasetsForReviewTable = () => {
 
   if (unreviewedSubmissionsDataLoader.isLoading) {
     return (
-      <Card>
+      <Card elevation={0}>
         <Stack flex="1 1 auto" gap={1} p={2}>
           <Stack flexDirection="row" alignItems="flex-start" gap={2}>
             <Stack flex="1 1 auto" flexDirection="row" gap={1} justifyContent="space-between">
@@ -63,26 +64,31 @@ const DatasetsForReviewTable = () => {
 
   if (submissionRecords.length === 0) {
     return (
-      <Box
-        sx={{
-          p: 3,
-          m: 1,
-          display: 'flex',
-          flexFlow: 'column',
-          alignItems: 'center',
-          position: 'relative',
-          border: '1pt solid #dadada',
-          borderRadius: '4px'
+      <Stack 
+        alignItems="center"
+        justifyContent="center"
+        p={3}
+        component={Paper}
+        elevation={0}
+        minHeight={168}
+      >
+        <Box sx={{
+          '& svg': {
+            color: 'text.secondary'
+          }
         }}>
+          <Icon path={mdiTextBoxCheckOutline} size={2} />
+        </Box>
         <Typography
           data-testid="no-security-reviews"
           component="strong"
-          color="textSecondary"
           variant="body1"
-          fontWeight={'bold'}>
-          No Pending Security Reviews
+          color="textSecondary"
+          fontWeight={700}>
+          No pending security reviews
         </Typography>
-      </Box>
+
+      </Stack>
     );
   }
 
@@ -90,7 +96,7 @@ const DatasetsForReviewTable = () => {
     <Stack gap={2}>
       {submissionRecords.map((submissionRecord) => {
         return (
-          <Card>
+          <Card elevation={0}>
             <Stack flex="1 1 auto" gap={1} p={2}>
 
               <Stack flexDirection="row" alignItems="flex-start" gap={2}>
