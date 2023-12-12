@@ -28,8 +28,21 @@ export const SecurityRuleRecord = z.object({
   update_user: z.number().nullable(),
   revision_count: z.number()
 });
-
 export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
+
+export const SubmissionFeatureSecurityRecord = z.object({
+  submission_feature_security_id: z.number(),
+  submission_feature_id: z.number(),
+  security_rule_id: z.number(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+export type SubmissionFeatureSecurityRecord = z.infer<typeof SubmissionFeatureSecurityRecord>;
 
 export const SecurityReason = z.object({
   id: z.number(),
@@ -255,15 +268,22 @@ export class SecurityRepository extends BaseRepository {
     return response.rows;
   }
 
-  async applySecurityRulesToSubmissionFeatures(submissions: number[], rules: number[]): Promise<any> {
-    // const final = submissions.flatMap((item) => {
-    //   return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
-    // });
-    // const insertSQL = SQL`INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) VALUES ${final.join(
-    //   ', '
-    // )};`;
-    // const insertSQL = SQL`INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date, create_date, create_user) VALUES (1, 14, NOW(), NOW(), 1);`;
-    // const response = await this.connection.sql(insertSQL);
-    // console.log(response);
+  async applySecurityRulesToSubmissionFeatures(
+    submissions: number[],
+    rules: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    const final = submissions.flatMap((item) => {
+      return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
+    });
+
+    const insertSQL = SQL`
+    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
+    VALUES `;
+    insertSQL.append(final.join(', '));
+    insertSQL.append(`
+    RETURNING *;`);
+
+    const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
   }
 }

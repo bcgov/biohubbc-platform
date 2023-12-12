@@ -62,10 +62,19 @@ POST.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              submissions: {
-                type: 'number'
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                submission_feature_security_id: {
+                  type: 'number'
+                },
+                submission_feature_id: {
+                  type: 'number'
+                },
+                security_rule_id: {
+                  type: 'number'
+                }
               }
             }
           }
