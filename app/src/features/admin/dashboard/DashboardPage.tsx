@@ -1,45 +1,74 @@
-import { Typography } from '@mui/material';
 import Box from '@mui/material/Box';
+import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
+import Typography from '@mui/material/Typography';
 import ManageSecurity from 'components/security/ManageSecurity';
-import DatasetsForReviewTable from './components/DatasetsForReviewTable';
+import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
+import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
+import { useState } from 'react';
 
 const DashboardPage = () => {
+  const [activeTab, setActiveTab] = useState<'pending' | 'complete'>('pending');
+
   return (
     <>
-      <Paper
-        square
-        elevation={0}
+      <Paper square elevation={0}>
+        <Container
+          maxWidth="xl"
+          sx={{
+            py: 4,
+            pb: 0
+          }}>
+          <Typography variant="h2" component="h1" sx={{ ml: '-2px' }}>
+            Submissions
+          </Typography>
+
+          <Tabs
+            value={activeTab}
+            onChange={(_, value) => setActiveTab(value)}
+            aria-label="basic tabs example"
+            sx={{
+              mt: 1.5,
+              mx: -2
+            }}>
+            <Tab
+              value="pending"
+              label="Pending Review"
+              id="submission-pending-tab"
+              aria-controls="submission-pending-tabpanel"
+            />
+            <Tab
+              value="complete"
+              label="Completed"
+              id="submission-complete-tab"
+              aria-controls="submission-complete-tabpanel"
+            />
+          </Tabs>
+        </Container>
+      </Paper>
+      <ManageSecurity submissions={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]} />
+      <Container
+        maxWidth="xl"
         sx={{
           py: 4,
           px: 3
         }}>
-        <Typography variant="h1">Dashboard</Typography>
-      </Paper>
-      <Paper
-        square
-        elevation={0}
-        sx={{
-          m: 3,
-          borderRadius: 2
-        }}>
-        <Typography
-          variant="h3"
-          sx={{
-            p: 3,
-            borderBottom: '1pt solid #dadada',
-            mb: 1
-          }}>
-          Pending Security Reviews
-        </Typography>
-        <ManageSecurity submissions={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]} />
-        <Box
-          sx={{
-            p: 2
-          }}>
-          <DatasetsForReviewTable />
-        </Box>
-      </Paper>
+        {activeTab === 'pending' && (
+          <Box id="submission-pending-tabpanel" aria-labelledby="submission-pending-tab">
+            <UnreviewedSubmissionsTable />
+          </Box>
+        )}
+        {activeTab === 'complete' && (
+          <Box
+            hidden={activeTab !== 'complete'}
+            id="submission-complete-tabpanel"
+            aria-labelledby="submission-complete-tab">
+            <ReviewedSubmissionsTable />
+          </Box>
+        )}
+      </Container>
     </>
   );
 };

@@ -127,12 +127,17 @@ describe('ValidationService', () => {
         count: 11,
         sex: 'male',
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
       const mockObservationProperties2 = {
@@ -203,24 +208,34 @@ describe('ValidationService', () => {
         count: 11,
         sex: 'male',
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
       const mockObservationProperties2 = {
         count: 22,
         sex: 'female',
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
       const mockDataset: IDatasetSubmission = {
@@ -285,12 +300,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
 
@@ -321,12 +341,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -358,12 +383,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -395,12 +425,17 @@ describe('ValidationService', () => {
         published: 'true',
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -432,12 +467,17 @@ describe('ValidationService', () => {
         published: true,
         permit: [],
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -499,12 +539,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: {}
       };
@@ -536,12 +581,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: 'not a valid date'
       };
@@ -573,12 +623,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };

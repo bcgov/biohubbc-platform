@@ -2,15 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { patchSubmissionRecord } from '.';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
-import { getReviewedSubmissionsForAdmins } from '../reviewed';
 
 chai.use(sinonChai);
 
-describe('list', () => {
+describe('patchSubmissionRecord', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -26,7 +26,7 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getReviewedSubmissionsForAdmins();
+    const requestHandler = patchSubmissionRecord();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -36,7 +36,7 @@ describe('list', () => {
     }
   });
 
-  it('should return an array of Reviewed submission objects', async () => {
+  it('should return the patched submission record', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
@@ -45,18 +45,42 @@ describe('list', () => {
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
+    const submissionId = 1;
+
+    const mockSubmissionRecord = {
+      submission_id: 3,
+      uuid: '999-456-123',
+      security_review_timestamp: '2023-12-12',
+      submitted_timestamp: '2023-12-12',
+      source_system: 'SIMS',
+      name: 'name',
+      description: 'description',
+      create_date: '2023-12-12',
+      create_user: 1,
+      update_date: '2023-12-12',
+      update_user: 1,
+      revision_count: 1
+    };
+
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getReviewedSubmissionsStub = sinon
-      .stub(SubmissionService.prototype, 'getReviewedSubmissionsForAdmins')
-      .resolves([]);
+    mockReq.params = {
+      submissionId: String(submissionId)
+    };
+    mockReq.body = {
+      security_reviewed: true
+    };
 
-    const requestHandler = getReviewedSubmissionsForAdmins();
+    const getReviewedSubmissionsStub = sinon
+      .stub(SubmissionService.prototype, 'patchSubmissionRecord')
+      .resolves(mockSubmissionRecord);
+
+    const requestHandler = patchSubmissionRecord();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getReviewedSubmissionsStub).to.have.been.calledOnce;
+    expect(getReviewedSubmissionsStub).to.have.been.calledOnceWith(submissionId, { security_reviewed: true });
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql([]);
+    expect(mockRes.jsonValue).to.eql(mockSubmissionRecord);
   });
 });
