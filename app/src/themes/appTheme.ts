@@ -265,7 +265,7 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           fontWeight: 700
-        },
+        }
       }
     },
     MuiTabs: {
