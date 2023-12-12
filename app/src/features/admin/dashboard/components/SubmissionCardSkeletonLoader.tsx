@@ -8,7 +8,7 @@ const SubmissionCardSkeletonLoader = () => {
     <>
     <Box pb={4}>
       <Typography variant="h4" component="h2">
-        <Skeleton height={22} width={150} sx={{ transform: 'none' }}></Skeleton>
+        <Skeleton height={22} width={150}></Skeleton>
       </Typography>
     </Box>
     <Card elevation={0}>
