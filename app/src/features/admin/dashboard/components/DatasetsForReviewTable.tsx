@@ -81,11 +81,17 @@ const DatasetsForReviewTable = () => {
         </Box>
         <Typography
           data-testid="no-security-reviews"
-          component="strong"
-          variant="body1"
-          color="textSecondary"
-          fontWeight={700}>
-          No pending security reviews
+          component="h2"
+          variant="h4"
+          fontWeight={700}
+          sx={{
+            mb: 1
+          }}  
+        >
+          No security reviews required
+        </Typography>
+        <Typography variant='body2' color="textSecondary">
+          No submissions currently require security reviews.
         </Typography>
 
       </Stack>
