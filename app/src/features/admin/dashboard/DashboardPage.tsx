@@ -20,11 +20,16 @@ const DashboardPage = () => {
             py: 4,
             pb: 0
           }}>
-          <Typography variant="h2" component="h1">
-            Dashboard
+          <Typography variant="h2" component="h1" sx={{ml: '-2px'}}>
+            Submissions
           </Typography>
 
-          <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)} aria-label="basic tabs example">
+          <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)} aria-label="basic tabs example"
+            sx={{
+              mt: 1.5,
+              mx: -2,
+            }}
+          >
             <Tab
               value="pending"
               label="Pending Review"
@@ -44,7 +49,8 @@ const DashboardPage = () => {
       <Container
         maxWidth="xl"
         sx={{
-          p: 3
+          py: 4,
+          px: 3
         }}>
         {activeTab === 'pending' && (
           <Box id="submission-pending-tabpanel" aria-labelledby="submission-pending-tab">

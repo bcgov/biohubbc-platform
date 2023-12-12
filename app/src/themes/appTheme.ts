@@ -260,6 +260,21 @@ const appTheme = createTheme({
           backgroundColor: 'red'
         }
       }
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
+        },
+      }
+    },
+    MuiTabs: {
+      styleOverrides: {
+        indicator: {
+          borderLeft: '16px solid #fff',
+          borderRight: '16px solid #fff'
+        }
+      }
     }
   }
 });
