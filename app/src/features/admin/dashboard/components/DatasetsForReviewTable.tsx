@@ -1,14 +1,14 @@
-import { CircularProgress, Divider } from '@mui/material';
+import { Divider, Skeleton } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { getFormattedDate, toTitleCase } from 'utils/Utils';
+import Chip from '@mui/material/Chip';
 
 const DatasetsForReviewTable = () => {
   const biohubApi = useApi();
@@ -20,7 +20,45 @@ const DatasetsForReviewTable = () => {
   const submissionRecords = unreviewedSubmissionsDataLoader.data || [];
 
   if (unreviewedSubmissionsDataLoader.isLoading) {
-    return <CircularProgress className="pageProgress" size={40} />;
+    return (
+      <Card>
+        <Stack flex="1 1 auto" gap={1} p={2}>
+          <Stack flexDirection="row" alignItems="flex-start" gap={2}>
+            <Stack flex="1 1 auto" flexDirection="row" gap={1} justifyContent="space-between">
+              <Typography
+                component="h3"
+                variant="h4"
+                sx={{
+                  flex: '1 1 auto',
+                  maxWidth: 800
+                }}>
+                <Skeleton height={20} sx={{ transform: 'none' }}></Skeleton>
+              </Typography>
+              <Skeleton width={60}></Skeleton>
+            </Stack>
+          </Stack>
+          <Typography
+            variant="body1"
+            sx={{
+              mb: 0.5,
+              maxWidth: 800,
+            }}>
+            <Skeleton></Skeleton>
+            <Skeleton width="50%"></Skeleton>
+          </Typography>
+          <Divider flexItem></Divider>
+
+          <Stack flexDirection="row" alignItems="center" justifyContent="space-between" gap={2}>
+            <Stack flexDirection="row" gap={2}>
+              <Skeleton width={100} />
+              <Skeleton width={100} />
+            </Stack>
+            <Skeleton variant="rectangular" width={112} height={36} />
+          </Stack>
+
+        </Stack>
+      </Card>
+    );
   }
 
   if (submissionRecords.length === 0) {
@@ -53,80 +91,70 @@ const DatasetsForReviewTable = () => {
       {submissionRecords.map((submissionRecord) => {
         return (
           <Card>
-            <Stack
-              component={CardContent}
-              flexDirection={{ sm: 'column', md: 'row' }}
-              alignItems={{ sm: 'flex-start', md: 'center' }}
-              gap={2}
-              sx={{
-                px: 3
-              }}>
-              <Stack flex="1 1 auto" gap={2}>
-                <Stack flexDirection="row" alignItems="flex-start" gap={2}>
-                  <Stack flex="1 1 auto" gap={1.5}>
-                    <Stack
-                      component="dl"
-                      flexDirection="row"
-                      alignItems="center"
-                      sx={{
-                        typography: 'body2',
-                        whiteSpace: 'nowrap',
-                        '& dd': {
-                          color: 'text.secondary'
-                        },
-                        '& dt': {
-                          color: 'text.secondary'
-                        }
-                      }}>
-                      <Stack flexDirection="row">
-                        <dd hidden>Submitted on:</dd>
-                        <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
-                      </Stack>
-                    </Stack>
-                    <Typography
-                      component="h3"
-                      variant="h4"
-                      sx={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: '2',
-                        WebkitBoxOrient: 'vertical',
-                        maxWidth: 800,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>
-                      {submissionRecord.name}
-                    </Typography>
-                  </Stack>
-                </Stack>
+            <Stack flex="1 1 auto" gap={1} p={2}>
 
+              <Stack flexDirection="row" alignItems="flex-start" gap={2}>
                 <Typography
-                  variant="body1"
-                  color="textSecondary"
+                  component="h3"
+                  variant="h4"
                   sx={{
+                    flex: '1 1 auto',
                     display: '-webkit-box',
                     WebkitLineClamp: '2',
                     WebkitBoxOrient: 'vertical',
-                    mt: -0.65,
-                    maxWidth: 800,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
                   }}>
-                  {submissionRecord.description}
+                  {submissionRecord.name}
                 </Typography>
+                <Chip
+                  color="default"
+                  size="small"
+                  label={toTitleCase(submissionRecord.feature_type)}
+                  sx={{
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    typography: 'caption',
+                    fontWeight: 700
+                  }}
+                />
+              </Stack>
 
+              <Typography
+                variant="body1"
+                color="textSecondary"
+                sx={{
+                  display: '-webkit-box',
+                  mb: 0.5,
+                  WebkitLineClamp: '2',
+                  WebkitBoxOrient: 'vertical',
+                  maxWidth: 800,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                {submissionRecord.description}
+              </Typography>
+
+              <Divider flexItem></Divider>
+
+              <Stack
+                flexDirection="row"
+                justifyContent="space-between"
+                alignItems="center"
+              >
                 <Stack
                   component="dl"
-                  flexDirection={{ xs: 'column', md: 'row' }}
+                  flexDirection={{ xs: 'column', sm: 'row' }}
                   alignItems={{ xs: 'flex-start', md: 'center' }}
                   justifyContent="flex-start"
-                  gap={{ md: 3 }}
+                  gap={{ sm: 0, md: 2 }}
                   divider={<Divider orientation="vertical" flexItem />}
                   sx={{
                     typography: 'body2',
                     whiteSpace: 'nowrap',
                     '& dd': {
                       color: 'text.secondary',
-                      width: { xs: 60, md: 'auto' }
+                      width: { xs: 80, md: 'auto' }
                     },
                     '& dt': {
                       ml: 1,
@@ -134,20 +162,14 @@ const DatasetsForReviewTable = () => {
                     }
                   }}>
                   <Stack flexDirection="row">
-                    <dd>Type:</dd>
-                    <dt>{toTitleCase(submissionRecord.feature_type)}</dt>
+                    <dd>Submitted:</dd>
+                    <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
                   </Stack>
                   <Stack flexDirection="row">
                     <dd>Source:</dd>
                     <dt>{submissionRecord.source_system}</dt>
                   </Stack>
                 </Stack>
-              </Stack>
-
-              <Stack
-                minWidth={{ xs: 'auto', md: 300 }}
-                alignItems={{ xs: 'flex-start', md: 'center' }}
-                mt={{ xs: 1, md: 0 }}>
                 <Button
                   variant="contained"
                   color="primary"
@@ -161,6 +183,7 @@ const DatasetsForReviewTable = () => {
                   Review
                 </Button>
               </Stack>
+
             </Stack>
           </Card>
         );

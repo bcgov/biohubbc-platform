@@ -7,19 +7,19 @@ const appTheme = createTheme({
   typography: {
     fontFamily: 'BCSans',
     h1: {
-      fontSize: '2.25rem',
-      fontWeight: 700
-    },
-    h2: {
       fontSize: '1.875rem',
       fontWeight: 700
     },
+    h2: {
+      fontSize: '1.75rem',
+      fontWeight: 700
+    },
     h3: {
-      fontSize: '1.5rem',
+      fontSize: '1.25rem',
       fontWeight: 700
     },
     h4: {
-      fontSize: '1.25rem',
+      fontSize: '1.125rem',
       fontWeight: 700
     },
     h5: {
