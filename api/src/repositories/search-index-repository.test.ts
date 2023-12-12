@@ -1,0 +1,7 @@
+
+
+describe('SearchIndexRepository', () => {
+  describe('getFeaturePropertiesWithTypeNames', () => {
+    //
+  })
+})
