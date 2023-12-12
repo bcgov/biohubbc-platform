@@ -7,7 +7,11 @@ import React, { useState } from 'react';
 import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
 
-const ManageSecurity = () => {
+interface IManageSecurityProps {
+  submissions: string[]; // uuid for each submission to apply security to
+}
+
+const ManageSecurity = (props: IManageSecurityProps) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [isUnsecureDialogOpen, setIsUnsecuredDialogOpen] = useState(false);
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
@@ -22,8 +26,16 @@ const ManageSecurity = () => {
 
   return (
     <>
-      <SecuritiesDialog isOpen={isSecuritiesDialogOpen} onClose={() => setIsSecuritiesDialogOpen(false)} />
-      <UnsecureDialog isOpen={isUnsecureDialogOpen} onClose={() => setIsUnsecuredDialogOpen(false)} />
+      <SecuritiesDialog
+        submissions={props.submissions}
+        isOpen={isSecuritiesDialogOpen}
+        onClose={() => setIsSecuritiesDialogOpen(false)}
+      />
+      <UnsecureDialog
+        submissions={props.submissions}
+        isOpen={isUnsecureDialogOpen}
+        onClose={() => setIsUnsecuredDialogOpen(false)}
+      />
       <Button
         color="primary"
         data-testid="manage-security"

@@ -4,6 +4,7 @@ import { useApi } from 'hooks/useApi';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
+  submissions: string[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -21,6 +22,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
     const api = useApi();
 
     const response = await api.security.applySecurityRulesToSubmissions([], []);
+    console.log(response);
   };
 
   return (

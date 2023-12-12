@@ -32,7 +32,7 @@ const DashboardPage = () => {
           }}>
           Pending Security Reviews
         </Typography>
-        <ManageSecurity />
+        <ManageSecurity submissions={[]} />
         <Box
           sx={{
             p: 2
