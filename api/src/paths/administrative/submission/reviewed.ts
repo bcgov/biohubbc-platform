@@ -40,6 +40,22 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
+              required: [
+                'submission_id',
+                'uuid',
+                'security_review_timestamp',
+                'submitted_timestamp',
+                'source_system',
+                'name',
+                'description',
+                'create_date',
+                'create_user',
+                'update_date',
+                'update_user',
+                'revision_count',
+                'feature_type_id',
+                'feature_type'
+              ],
               properties: {
                 submission_id: {
                   type: 'integer',

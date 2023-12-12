@@ -67,6 +67,20 @@ PATCH.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
+            required: [
+              'submission_id',
+              'uuid',
+              'security_review_timestamp',
+              'submitted_timestamp',
+              'source_system',
+              'name',
+              'description',
+              'create_date',
+              'create_user',
+              'update_date',
+              'update_user',
+              'revision_count'
+            ],
             properties: {
               submission_id: {
                 type: 'integer',
@@ -79,6 +93,9 @@ PATCH.apiDoc = {
               security_review_timestamp: {
                 type: 'string',
                 nullable: true
+              },
+              submitted_timestamp: {
+                type: 'string'
               },
               source_system: {
                 type: 'string'

@@ -242,6 +242,7 @@ export const SubmissionRecord = z.object({
   submission_id: z.number(),
   uuid: z.string(),
   security_review_timestamp: z.string().nullable(),
+  submitted_timestamp: z.string(),
   source_system: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -1192,26 +1193,33 @@ export class SubmissionRepository extends BaseRepository {
     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
   > {
     const sqlStatement = SQL`
-      SELECT
-        DISTINCT ON (submission.uuid) submission.*,
-        submission_feature.feature_type_id,
-        feature_type.name as feature_type
-      FROM
-        submission
-      INNER JOIN
-        submission_feature
-      ON
-        submission.submission_id = submission_feature.submission_id
-      INNER JOIN
-        feature_type
-      ON
-        feature_type.feature_type_id = submission_feature.feature_type_id
-      WHERE
-        submission.security_review_timestamp IS NULL
-      AND
-        submission_feature.parent_submission_feature_id IS NULL
-      ORDER BY
-        submission.uuid, submission.submission_id DESC;
+      WITH w_unique_submissions as (
+        SELECT
+          DISTINCT ON (submission.uuid) submission.*,
+          submission_feature.feature_type_id,
+          feature_type.name as feature_type
+        FROM
+          submission
+        INNER JOIN
+          submission_feature
+        ON
+          submission.submission_id = submission_feature.submission_id
+        INNER JOIN
+          feature_type
+        ON
+          feature_type.feature_type_id = submission_feature.feature_type_id
+        WHERE
+          submission.security_review_timestamp IS NULL
+        AND
+          submission_feature.parent_submission_feature_id IS NULL
+        ORDER BY
+          submission.uuid, submission.submission_id DESC;
+      )
+      SELECT 
+        *
+      FROM 
+        w_unique_submissions 
+      ORDER BY submitted_timestamp DESC;
     `;
 
     const response = await this.connection.sql(
@@ -1234,26 +1242,33 @@ export class SubmissionRepository extends BaseRepository {
     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
   > {
     const sqlStatement = SQL`
-      SELECT
-        DISTINCT ON (submission.uuid) submission.*,
-        submission_feature.feature_type_id,
-        feature_type.name as feature_type
-      FROM
-        submission
-      INNER JOIN
-        submission_feature
-      ON
-        submission.submission_id = submission_feature.submission_id
-      INNER JOIN
-        feature_type
-      ON
-        feature_type.feature_type_id = submission_feature.feature_type_id
-      WHERE
-        submission.security_review_timestamp IS NOT NULL
-      AND
-        submission_feature.parent_submission_feature_id IS NULL
-      ORDER BY
-        submission.uuid, submission.submission_id DESC;
+      WITH w_unique_submissions as (
+        SELECT
+          DISTINCT ON (submission.uuid) submission.*,
+          submission_feature.feature_type_id,
+          feature_type.name as feature_type
+        FROM
+          submission
+        INNER JOIN
+          submission_feature
+        ON
+          submission.submission_id = submission_feature.submission_id
+        INNER JOIN
+          feature_type
+        ON
+          feature_type.feature_type_id = submission_feature.feature_type_id
+        WHERE
+          submission.security_review_timestamp IS NOT NULL
+        AND
+          submission_feature.parent_submission_feature_id IS NULL
+        ORDER BY
+          submission.uuid, submission.submission_id DESC;
+      )
+      SELECT 
+        *
+      FROM 
+        w_unique_submissions 
+      ORDER BY submitted_timestamp DESC;
     `;
 
     const response = await this.connection.sql(

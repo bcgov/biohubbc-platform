@@ -138,13 +138,13 @@ const ReviewedSubmissionsTable = () => {
                     variant="contained"
                     color="primary"
                     onClick={() => {
-                      // TODO wire up review button. Take user to admin submission page: SIMSBIOHUB-404
+                      // TODO wire up review button. Take user to the submission view page.
                     }}
                     sx={{
                       flex: '0 0 auto',
                       minWidth: '7rem'
                     }}>
-                    Review
+                    View
                   </Button>
                 </Stack>
               </Stack>
