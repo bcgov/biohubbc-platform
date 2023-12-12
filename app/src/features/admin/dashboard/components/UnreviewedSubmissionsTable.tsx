@@ -28,34 +28,34 @@ const UnreviewedSubmissionsTable = () => {
   if (submissionRecords.length === 0) {
     return (
       <>
-      <Box pb={4}>
-        <Typography variant="h4" component="h2">
-          No records found
-        </Typography>
-      </Box>
-      <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
-        <Box
-          sx={{
-            '& svg': {
-              color: 'text.secondary'
-            }
-          }}>
-          <Icon path={mdiTextBoxCheckOutline} size={2} />
+        <Box pb={4}>
+          <Typography variant="h4" component="h2">
+            No records found
+          </Typography>
         </Box>
-        <Typography
-          data-testid="no-security-reviews"
-          component="h2"
-          variant="h4"
-          fontWeight={700}
-          sx={{
-            mb: 1
-          }}>
-          No security reviews required
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          No submissions currently require security reviews.
-        </Typography>
-      </Stack>
+        <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
+          <Box
+            sx={{
+              '& svg': {
+                color: 'text.secondary'
+              }
+            }}>
+            <Icon path={mdiTextBoxCheckOutline} size={2} />
+          </Box>
+          <Typography
+            data-testid="no-security-reviews"
+            component="h2"
+            variant="h4"
+            fontWeight={700}
+            sx={{
+              mb: 1
+            }}>
+            No security reviews required
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            No submissions currently require security reviews.
+          </Typography>
+        </Stack>
       </>
     );
   }

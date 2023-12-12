@@ -62,8 +62,8 @@ const ReviewedSubmissionsTable = () => {
 
   return (
     <>
-      <Box pt={1} pb={3}>
-        <Typography variant="h5">{`${submissionRecords.length} ${p(
+      <Box pb={4}>
+        <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
         )} found`}</Typography>

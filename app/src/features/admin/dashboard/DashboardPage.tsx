@@ -20,16 +20,18 @@ const DashboardPage = () => {
             py: 4,
             pb: 0
           }}>
-          <Typography variant="h2" component="h1" sx={{ml: '-2px'}}>
+          <Typography variant="h2" component="h1" sx={{ ml: '-2px' }}>
             Submissions
           </Typography>
 
-          <Tabs value={activeTab} onChange={(_, value) => setActiveTab(value)} aria-label="basic tabs example"
+          <Tabs
+            value={activeTab}
+            onChange={(_, value) => setActiveTab(value)}
+            aria-label="basic tabs example"
             sx={{
               mt: 1.5,
-              mx: -2,
-            }}
-          >
+              mx: -2
+            }}>
             <Tab
               value="pending"
               label="Pending Review"

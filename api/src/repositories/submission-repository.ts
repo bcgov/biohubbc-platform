@@ -1213,7 +1213,7 @@ export class SubmissionRepository extends BaseRepository {
         AND
           submission_feature.parent_submission_feature_id IS NULL
         ORDER BY
-          submission.uuid, submission.submission_id DESC;
+          submission.uuid, submission.submission_id DESC
       )
       SELECT 
         *
@@ -1262,7 +1262,7 @@ export class SubmissionRepository extends BaseRepository {
         AND
           submission_feature.parent_submission_feature_id IS NULL
         ORDER BY
-          submission.uuid, submission.submission_id DESC;
+          submission.uuid, submission.submission_id DESC
       )
       SELECT 
         *
