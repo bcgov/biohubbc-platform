@@ -82,7 +82,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return 1;
   };
 
-  const applySecurityRulesToSubmissions = async (submissions: number[], rules: number[]): Promise<any> => {
+  const applySecurityRulesToSubmissions = async (submissions: number[], rules: number[]): Promise<any[]> => {
     console.log(submissions, rules);
     const { data } = await axios.post('api/administrative/security/apply', {
       submissions,

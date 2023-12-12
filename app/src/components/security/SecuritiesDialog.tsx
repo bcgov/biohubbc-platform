@@ -1,6 +1,10 @@
+import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
+import { ApplySecurityRulesI18N } from 'constants/i18n';
+import { DialogContext } from 'contexts/dialogContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
+import { useContext } from 'react';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
@@ -18,14 +22,39 @@ export interface ISecurityRuleFormProps {
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
+  const dialogContext = useContext(DialogContext);
   const api = useApi();
 
   const handleSubmit = async (rules: ISecurityRule[]) => {
-    const response = await api.security.applySecurityRulesToSubmissions(
-      props.submissions,
-      rules.map((item) => item.security_rule_id)
-    );
-    console.log(response);
+    try {
+      await api.security.applySecurityRulesToSubmissions(
+        props.submissions,
+        rules.map((item) => item.security_rule_id)
+      );
+
+      dialogContext.setSnackbar({
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            {ApplySecurityRulesI18N.applySecuritySuccess(props.submissions.length)}
+          </Typography>
+        ),
+        open: true
+      });
+
+      props.onClose();
+    } catch (error) {
+      // Close yes-no dialog
+      dialogContext.setYesNoDialog({ open: false });
+
+      // Show error dialog
+      dialogContext.setErrorDialog({
+        onOk: () => dialogContext.setErrorDialog({ open: false }),
+        onClose: () => dialogContext.setErrorDialog({ open: false }),
+        dialogTitle: ApplySecurityRulesI18N.applySecurityRulesErrorTitle,
+        dialogText: ApplySecurityRulesI18N.applySecurityRulesErrorText,
+        open: true
+      });
+    }
   };
 
   return (
