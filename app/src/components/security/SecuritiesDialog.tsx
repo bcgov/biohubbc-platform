@@ -1,5 +1,6 @@
 import EditDialog from 'components/dialog/EditDialog';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
+import { useApi } from 'hooks/useApi';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
@@ -16,6 +17,12 @@ export interface ISecurityRuleFormProps {
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
+  const handleSubmit = async (rules: ISecurityRule[]) => {
+    const api = useApi();
+
+    const response = await api.security.applySecurityRulesToSubmissions([], []);
+  };
+
   return (
     <>
       <EditDialog
@@ -23,7 +30,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         open={props.isOpen}
         dialogSaveButtonLabel="APPLY"
         onCancel={props.onClose}
-        onSave={() => console.log('SAVE SOME SECURITY RULES SON')}
+        onSave={(values) => handleSubmit(values.rules)}
         component={{
           element: <SecurityRuleForm />,
           initialValues: { rules: [] },
