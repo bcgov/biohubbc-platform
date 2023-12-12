@@ -29,25 +29,22 @@ const SecurityRuleForm = () => {
   return (
     <form onSubmit={handleSubmit}>
       <Box component="fieldset">
-        <Typography component="legend">Manage Team Members</Typography>
+        <Typography component="legend">Manage Security Rules</Typography>
         <Typography
           variant="body1"
           color="textSecondary"
           sx={{
             maxWidth: '72ch'
           }}>
-          A minimum of one team member must be assigned the coordinator role.
+          A minimum of one security rule must be selected.
         </Typography>
-        {errors?.['participants'] && !values.rules.length && (
+        {errors?.['rules'] && !values.rules.length && (
           <Box mt={3}>
             <Alert severity="error" variant="standard">
               <AlertTitle>No Rules Selected</AlertTitle>
-              At least one team member needs to be added to this project.
+              At least one security rule needs to be selected.
             </Alert>
           </Box>
-        )}
-        {errors?.['participants'] && values.rules.length > 0 && (
-          <Box mt={3}>{/* <AlertBar severity="error" variant="standard" title={''} text={''} /> */}</Box>
         )}
         <FieldArray name="rules">
           {(helpers: FieldArrayRenderProps) => (

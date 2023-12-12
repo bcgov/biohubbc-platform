@@ -8,7 +8,7 @@ interface ISecuritiesDialogProps {
 }
 
 export const SecurityRuleYupSchema = yup.object().shape({
-  rules: yup.array(yup.number())
+  rules: yup.array(yup.object()).min(1)
 });
 
 export interface ISecurityRuleFormProps {
