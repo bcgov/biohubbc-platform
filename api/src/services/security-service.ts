@@ -326,6 +326,10 @@ export class SecurityService extends DBService {
     return isPendingReview;
   }
 
+  async applySecurityRulesToSubmissionFeatures(submissions: number[], rules: number[]): Promise<any> {
+    return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissions, rules);
+  }
+
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     return this.securityRepository.getActiveSecurityRules();
   }

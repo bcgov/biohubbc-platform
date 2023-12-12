@@ -252,7 +252,18 @@ export class SecurityRepository extends BaseRepository {
       SELECT * FROM security_rule WHERE record_end_date IS NULL;
     `;
     const response = await this.connection.sql(sql, SecurityRuleRecord);
-    console.log(response.rows);
     return response.rows;
+  }
+
+  async applySecurityRulesToSubmissionFeatures(submissions: number[], rules: number[]): Promise<any> {
+    // const final = submissions.flatMap((item) => {
+    //   return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
+    // });
+    // const insertSQL = SQL`INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) VALUES ${final.join(
+    //   ', '
+    // )};`;
+    // const insertSQL = SQL`INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date, create_date, create_user) VALUES (1, 14, NOW(), NOW(), 1);`;
+    // const response = await this.connection.sql(insertSQL);
+    // console.log(response);
   }
 }

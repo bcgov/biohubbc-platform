@@ -2,7 +2,7 @@ import { Alert, AlertTitle, Typography } from '@mui/material';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 
 interface IUnsecureDialogProps {
-  submissions: string[];
+  submissions: number[];
   isOpen: boolean;
   onClose: () => void;
 }

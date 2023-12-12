@@ -4,7 +4,7 @@ import { useApi } from 'hooks/useApi';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
-  submissions: string[];
+  submissions: number[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -18,10 +18,13 @@ export interface ISecurityRuleFormProps {
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
-  const handleSubmit = async (rules: ISecurityRule[]) => {
-    const api = useApi();
+  const api = useApi();
 
-    const response = await api.security.applySecurityRulesToSubmissions([], []);
+  const handleSubmit = async (rules: ISecurityRule[]) => {
+    const response = await api.security.applySecurityRulesToSubmissions(
+      props.submissions,
+      rules.map((item) => item.security_rule_id)
+    );
     console.log(response);
   };
 

@@ -8,7 +8,7 @@ import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
 
 interface IManageSecurityProps {
-  submissions: string[]; // uuid for each submission to apply security to
+  submissions: number[];
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
