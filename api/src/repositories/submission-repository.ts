@@ -1193,19 +1193,25 @@ export class SubmissionRepository extends BaseRepository {
   > {
     const sqlStatement = SQL`
       SELECT
-        submission.*,
+        DISTINCT ON (submission.uuid) submission.*,
         submission_feature.feature_type_id,
-        (SELECT name FROM feature_type WHERE feature_type_id = submission_feature.feature_type_id) AS feature_type
+        feature_type.name as feature_type
       FROM
         submission
-      LEFT JOIN
+      INNER JOIN
         submission_feature
       ON
         submission.submission_id = submission_feature.submission_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
       WHERE
         submission.security_review_timestamp IS NULL
       AND
-        submission_feature.parent_submission_feature_id IS NULL;
+        submission_feature.parent_submission_feature_id IS NULL
+      ORDER BY
+        submission.uuid, submission.submission_id DESC;
     `;
 
     const response = await this.connection.sql(
@@ -1229,19 +1235,25 @@ export class SubmissionRepository extends BaseRepository {
   > {
     const sqlStatement = SQL`
       SELECT
-        submission.*,
+        DISTINCT ON (submission.uuid) submission.*,
         submission_feature.feature_type_id,
-        (SELECT name FROM feature_type WHERE feature_type_id = submission_feature.feature_type_id) AS feature_type
+        feature_type.name as feature_type
       FROM
         submission
-      LEFT JOIN
+      INNER JOIN
         submission_feature
       ON
         submission.submission_id = submission_feature.submission_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
       WHERE
         submission.security_review_timestamp IS NOT NULL
       AND
-        submission_feature.parent_submission_feature_id IS NULL;
+        submission_feature.parent_submission_feature_id IS NULL
+      ORDER BY
+        submission.uuid, submission.submission_id DESC;
     `;
 
     const response = await this.connection.sql(

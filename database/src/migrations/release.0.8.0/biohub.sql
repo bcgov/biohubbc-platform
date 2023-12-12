@@ -270,12 +270,6 @@ COMMENT ON COLUMN user_identity_source.revision_count IS 'Revision count used fo
 COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. This source is traditionally the system that authenticates the user. Example sources could include IDIR, BCEID and DATABASE.';
 
 -- 
--- INDEX: submission_uk1 
---
-
-CREATE UNIQUE INDEX submission_uk1 ON submission(uuid);
-
--- 
 -- INDEX: "submission_job_queue_idx1" 
 --
 
