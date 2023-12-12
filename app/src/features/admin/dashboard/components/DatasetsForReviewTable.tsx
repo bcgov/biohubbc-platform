@@ -43,11 +43,10 @@ const DatasetsForReviewTable = () => {
           fontWeight={700}
           sx={{
             mb: 1
-          }}  
-        >
+          }}>
           No security reviews required
         </Typography>
-        <Typography variant='body2' color="textSecondary">
+        <Typography variant="body2" color="textSecondary">
           No submissions currently require security reviews.
         </Typography>
       </Stack>
