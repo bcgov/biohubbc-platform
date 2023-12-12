@@ -5,8 +5,8 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
+import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { useState } from 'react';
-import DatasetsForReviewTable from './components/DatasetsForReviewTable';
 
 const DashboardPage = () => {
   const [activeTab, setActiveTab] = useState<'pending' | 'complete'>('pending');
@@ -48,7 +48,7 @@ const DashboardPage = () => {
         }}>
         {activeTab === 'pending' && (
           <Box id="submission-pending-tabpanel" aria-labelledby="submission-pending-tab">
-            <DatasetsForReviewTable />
+            <UnreviewedSubmissionsTable />
           </Box>
         )}
         {activeTab === 'complete' && (

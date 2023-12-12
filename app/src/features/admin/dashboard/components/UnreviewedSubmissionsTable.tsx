@@ -12,7 +12,7 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { getFormattedDate, pluralize as p, toTitleCase } from 'utils/Utils';
 
-const DatasetsForReviewTable = () => {
+const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
   const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
@@ -161,4 +161,4 @@ const DatasetsForReviewTable = () => {
   );
 };
 
-export default DatasetsForReviewTable;
+export default UnreviewedSubmissionsTable;
