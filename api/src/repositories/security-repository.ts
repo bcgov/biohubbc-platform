@@ -21,7 +21,7 @@ export const SecurityRuleRecord = z.object({
   name: z.string(),
   description: z.string(),
   record_effective_date: z.string(),
-  record_end_date: z.string(),
+  record_end_date: z.string().nullable(),
   create_date: z.string(),
   create_user: z.number(),
   update_date: z.string().nullable(),
@@ -248,8 +248,11 @@ export class SecurityRepository extends BaseRepository {
 
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     defaultLog.debug({ label: 'getSecurityRules' });
-    const sql = SQL`SELECT * FROM security_rule WHERE record_end_date IS NULL;`;
+    const sql = SQL`
+      SELECT * FROM security_rule WHERE record_end_date IS NULL;
+    `;
     const response = await this.connection.sql(sql, SecurityRuleRecord);
+    console.log(response.rows);
     return response.rows;
   }
 }

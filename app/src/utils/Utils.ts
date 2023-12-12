@@ -2,6 +2,7 @@ import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
 import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
+import _ from 'lodash';
 import moment from 'moment';
 
 /**
@@ -339,20 +340,12 @@ export const pluralize = (quantity: number, word: string, singularSuffix = '', p
 };
 
 /**
- * Capitalizes the first letter of each word in the string.
+ * For a given property, alphabetize an array of objects
  *
- * @example
- * toTitleCase('my string') // 'My String'
- * toTitleCase('my_string') // 'My_string'
- * toTitleCase('single') // 'Single'
- * toTitleCase('') // ''
- *
- * @param {string} str
- * @return {*}
+ * @param {T[]} data an array of objects to be alphabetize
+ * @param {string} property a key property to alphabetize the data array on
+ * @returns {any[]} Returns an alphabetized array of objects
  */
-export const toTitleCase = (str: string) => {
-  return str
-    .split(' ')
-    .map((item) => item[0].toUpperCase() + item.substring(1))
-    .join(' ');
+export const alphabetizeObjects = <T extends { [key: string]: any }>(data: T[], property: string) => {
+  return _.sortBy(data, property);
 };

@@ -10,7 +10,7 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionCardSkeletonLoader from 'features/admin/dashboard/components/SubmissionCardSkeletonLoader';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { getFormattedDate, pluralize as p, toTitleCase } from 'utils/Utils';
+import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
@@ -90,7 +90,7 @@ const UnreviewedSubmissionsTable = () => {
                   <Chip
                     color="default"
                     size="small"
-                    label={toTitleCase(submissionRecord.feature_type)}
+                    label={submissionRecord.feature_type}
                     sx={{
                       borderRadius: '4px',
                       textTransform: 'uppercase',

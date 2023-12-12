@@ -24,7 +24,7 @@ export async function seed(knex: Knex): Promise<void> {
   }
 }
 
-const insertSecurityRuleRecord = async (knex: Knex): Promise<number> => {
+export const insertSecurityRuleRecord = async (knex: Knex): Promise<number> => {
   const response = await knex.raw(insertSecurityRule());
   return response.rows[0].security_rule_id;
 };

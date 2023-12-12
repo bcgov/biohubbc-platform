@@ -85,14 +85,14 @@ const insertRecord = async (knex: Knex) => {
   }
 };
 
-const insertSubmissionRecord = async (knex: Knex): Promise<number> => {
-  const response = await knex.raw(`${insertSubmission()}`);
+export const insertSubmissionRecord = async (knex: Knex, includeSecurityReview = false): Promise<number> => {
+  const response = await knex.raw(`${insertSubmission(includeSecurityReview)}`);
   const submission_id = response.rows[0].submission_id;
 
   return submission_id;
 };
 
-const insertDatasetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
+export const insertDatasetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
@@ -125,7 +125,7 @@ const insertDatasetRecord = async (knex: Knex, options: { submission_id: number 
   return submission_feature_id;
 };
 
-const insertSampleSiteRecord = async (
+export const insertSampleSiteRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
@@ -146,7 +146,7 @@ const insertSampleSiteRecord = async (
   return submission_feature_id;
 };
 
-const insertObservationRecord = async (
+export const insertObservationRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
@@ -214,12 +214,15 @@ const insertAnimalRecord = async (
   return submission_feature_id;
 };
 
-const insertSubmission = () => `
+export const insertSubmission = (includeSecurityReview: boolean) => {
+  const securityReviewTimestamp = includeSecurityReview ? `$$${faker.date.past().toISOString()}$$` : null;
+  return `
     INSERT INTO submission
     (
         uuid,
         name,
         description,
+        security_review_timestamp,
         source_system
     )
     values
@@ -227,10 +230,12 @@ const insertSubmission = () => `
         public.gen_random_uuid(),
         $$${faker.company.name()}$$,
         $$${faker.lorem.words({ min: 5, max: 100 })}$$,
+        ${securityReviewTimestamp},
         'SIMS'
     )
     RETURNING submission_id;
 `;
+};
 
 const insertSubmissionFeature = (options: {
   submission_id: number;
