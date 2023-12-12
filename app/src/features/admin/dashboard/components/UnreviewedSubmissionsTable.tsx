@@ -27,6 +27,12 @@ const UnreviewedSubmissionsTable = () => {
 
   if (submissionRecords.length === 0) {
     return (
+      <>
+      <Box pb={4}>
+        <Typography variant="h4" component="h2">
+          No records found
+        </Typography>
+      </Box>
       <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
         <Box
           sx={{
@@ -50,13 +56,14 @@ const UnreviewedSubmissionsTable = () => {
           No submissions currently require security reviews.
         </Typography>
       </Stack>
+      </>
     );
   }
 
   return (
     <>
-      <Box pt={1} pb={3}>
-        <Typography variant="h5">{`${submissionRecords.length} ${p(
+      <Box pb={4}>
+        <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
         )} found`}</Typography>

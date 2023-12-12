@@ -1,10 +1,16 @@
-import { Divider, Skeleton } from '@mui/material';
+import { Box, Divider, Skeleton } from '@mui/material';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 const SubmissionCardSkeletonLoader = () => {
   return (
+    <>
+    <Box pb={4}>
+      <Typography variant="h4" component="h2">
+        <Skeleton height={22} width={150}></Skeleton>
+      </Typography>
+    </Box>
     <Card elevation={0}>
       <Stack flex="1 1 auto" gap={1} p={2}>
         <Stack flexDirection="row" alignItems="flex-start" gap={2}>
@@ -41,6 +47,7 @@ const SubmissionCardSkeletonLoader = () => {
         </Stack>
       </Stack>
     </Card>
+    </>
   );
 };
 

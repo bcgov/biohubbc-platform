@@ -1,4 +1,4 @@
-import { mdiTextBoxCheckOutline } from '@mdi/js';
+import { mdiTextBoxSearchOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Box, Divider, Paper } from '@mui/material';
 import Button from '@mui/material/Button';
@@ -27,24 +27,36 @@ const ReviewedSubmissionsTable = () => {
 
   if (submissionRecords.length === 0) {
     return (
-      <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
-        <Box
-          sx={{
-            '& svg': {
-              color: 'text.secondary'
-            }
-          }}>
-          <Icon path={mdiTextBoxCheckOutline} size={2} />
+      <>
+        <Box pb={4}>
+          <Typography variant="h4" component="h2">
+            No records found
+          </Typography>
         </Box>
-        <Typography
-          data-testid="no-security-reviews"
-          component="strong"
-          variant="body1"
-          color="textSecondary"
-          fontWeight={700}>
-          No completed security reviews
-        </Typography>
-      </Stack>
+        <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
+          <Box
+            sx={{
+              '& svg': {
+                color: 'text.secondary'
+              }
+            }}>
+            <Icon path={mdiTextBoxSearchOutline} size={2} />
+          </Box>
+          <Typography
+            data-testid="no-security-reviews"
+            component="h2"
+            variant="h4"
+            fontWeight={700}
+            sx={{
+              mb: 1
+            }}>
+            No completed security reviews
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            No submissions have completed security review.
+          </Typography>
+        </Stack>
+      </>
     );
   }
 
