@@ -12,16 +12,16 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { getFormattedDate, pluralize as p, toTitleCase } from 'utils/Utils';
 
-const DatasetsForReviewTable = () => {
+const ReviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
+  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getReviewedSubmissions());
 
-  unreviewedSubmissionsDataLoader.load();
+  reviewedSubmissionsDataLoader.load();
 
-  const submissionRecords = unreviewedSubmissionsDataLoader.data || [];
+  const submissionRecords = reviewedSubmissionsDataLoader.data || [];
 
-  if (unreviewedSubmissionsDataLoader.isLoading) {
+  if (reviewedSubmissionsDataLoader.isLoading) {
     return <SubmissionCardSkeletonLoader />;
   }
 
@@ -42,7 +42,7 @@ const DatasetsForReviewTable = () => {
           variant="body1"
           color="textSecondary"
           fontWeight={700}>
-          No pending security reviews
+          No completed security reviews
         </Typography>
       </Stack>
     );
@@ -156,4 +156,4 @@ const DatasetsForReviewTable = () => {
   );
 };
 
-export default DatasetsForReviewTable;
+export default ReviewedSubmissionsTable;
