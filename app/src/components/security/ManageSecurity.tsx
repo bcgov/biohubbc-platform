@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiChevronUp, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
+import { mdiChevronDown, mdiChevronUp, mdiCog, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -41,6 +41,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
         data-testid="manage-security"
         variant="outlined"
         onClick={handleClick}
+        startIcon={<Icon path={mdiCog} size={1} />}
         endIcon={open ? <Icon path={mdiChevronUp} size={1} /> : <Icon path={mdiChevronDown} size={1} />}>
         Manage Security
       </Button>

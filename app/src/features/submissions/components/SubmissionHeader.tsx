@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiCog, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
+import { mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
@@ -10,6 +10,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import BaseHeader from 'components/layout/header/BaseHeader';
+import ManageSecurity from 'components/security/ManageSecurity';
 import { SubmissionContext } from 'contexts/submissionContext';
 import moment from 'moment';
 import React, { useContext, useState } from 'react';
@@ -81,19 +82,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
         buttonJSX={
           <>
             <Stack flexDirection="row" alignItems="center" gap={1}>
-              <Button
-                id="submission_settings_button"
-                aria-label="Submission Settings"
-                aria-controls="submissionSettingsMenu"
-                aria-haspopup="true"
-                variant="outlined"
-                color="primary"
-                data-testid="settings-submission-button"
-                startIcon={<Icon path={mdiCog} size={1} />}
-                endIcon={<Icon path={mdiChevronDown} size={1} />}
-                onClick={(event: React.MouseEvent<HTMLButtonElement>) => setMenuAnchorEl(event.currentTarget)}>
-                MANAGE SECURITY
-              </Button>
+              <ManageSecurity submissions={[]} />
 
               <Button variant="contained" color="primary" onClick={() => props.openCompleteReviewDialog(true)}>
                 COMPLETE REVIEW
