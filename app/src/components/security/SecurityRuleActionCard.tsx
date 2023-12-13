@@ -4,7 +4,6 @@ import { IconButton, Paper } from '@mui/material';
 import SecurityRuleCard from './SecurityRuleCard';
 
 interface ISecurityRuleActionCardProps {
-  index: number;
   remove: (id: number) => void;
   security_rule_id: number;
   name: string;
@@ -23,7 +22,7 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
         mb: 1
       }}>
       <SecurityRuleCard key={props.security_rule_id} title={props.name} subtitle={props.description} />
-      <IconButton onClick={() => props.remove(props.index)}>
+      <IconButton onClick={() => props.remove(props.security_rule_id)}>
         <Icon path={mdiClose} size={1} />
       </IconButton>
     </Paper>

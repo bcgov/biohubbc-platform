@@ -4,7 +4,7 @@ import { Alert, AlertTitle, Typography } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import { FieldArray, FieldArrayRenderProps, useFormikContext } from 'formik';
+import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -26,6 +26,18 @@ const SecurityRuleForm = () => {
     // so setting the field value back to the forms initial values forces a re render
     setFieldValue('rules', []);
   }, [rules]);
+
+  const handleAdd = (selected: ISecurityRule) => {
+    setFieldValue(`rules[${values.rules.length}]`, selected);
+  };
+  const handleRemove = (idToRemove: number) => {
+    const formData = values.rules;
+    const filteredData = formData.filter((item) => item.security_rule_id !== idToRemove);
+    setFieldValue('rules', filteredData);
+  };
+
+  console.log('Form Values', values.rules);
+
   return (
     <form onSubmit={handleSubmit}>
       <Box component="fieldset">
@@ -46,72 +58,66 @@ const SecurityRuleForm = () => {
             </Alert>
           </Box>
         )}
-        <FieldArray name="rules">
-          {(helpers: FieldArrayRenderProps) => (
-            <>
-              <Box mt={3}>
-                <Autocomplete
-                  id={'autocomplete-security-rule-search'}
-                  data-testid={'autocomplete-security-rule-search'}
-                  filterSelectedOptions
-                  clearOnBlur
-                  noOptionsText="No records found"
-                  options={alphabetizeObjects(rules, 'name')}
-                  filterOptions={(options, state) => {
-                    const searchFilter = createFilterOptions<ISecurityRule>({ ignoreCase: true });
-                    const unselectedOptions = options.filter(
-                      (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
-                    );
-                    return searchFilter(unselectedOptions, state);
-                  }}
-                  getOptionLabel={(option) => option.name}
-                  isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
-                  onChange={(_, option) => {
-                    if (option) {
-                      helpers.push(option);
-                    }
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      variant="outlined"
-                      placeholder={'Find Security Rules'}
-                      fullWidth
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: (
-                          <Box mx={1} mt="6px">
-                            <Icon path={mdiMagnify} size={1}></Icon>
-                          </Box>
-                        )
-                      }}
-                    />
-                  )}
-                  renderOption={(renderProps, renderOption) => {
-                    return (
-                      <Box component="li" {...renderProps}>
-                        <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
-                      </Box>
-                    );
-                  }}
-                />
-              </Box>
-              <Box mt={3}>
-                {values.rules.map((rule: ISecurityRule, index: number) => {
-                  return (
-                    <SecurityRuleActionCard
-                      index={index}
-                      security_rule_id={rule.security_rule_id}
-                      name={rule.name}
-                      description={rule.description}
-                      remove={helpers.remove}
-                    />
-                  );
-                })}
-              </Box>
-            </>
-          )}
-        </FieldArray>
+        <Box mt={3}>
+          <Autocomplete
+            id={'autocomplete-security-rule-search'}
+            data-testid={'autocomplete-security-rule-search'}
+            filterSelectedOptions
+            clearOnBlur
+            noOptionsText="No records found"
+            options={alphabetizeObjects(rules, 'name')}
+            filterOptions={(options, state) => {
+              const searchFilter = createFilterOptions<ISecurityRule>({ ignoreCase: true });
+              const unselectedOptions = options.filter(
+                (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
+              );
+              return searchFilter(unselectedOptions, state);
+            }}
+            getOptionLabel={(option) => option.name}
+            isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
+            onChange={(_, option) => {
+              if (option) {
+                handleAdd(option);
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                variant="outlined"
+                placeholder={'Find Security Rules'}
+                fullWidth
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <Box mx={1} mt="6px">
+                      <Icon path={mdiMagnify} size={1}></Icon>
+                    </Box>
+                  )
+                }}
+              />
+            )}
+            renderOption={(renderProps, renderOption) => {
+              return (
+                <Box component="li" {...renderProps}>
+                  <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
+                </Box>
+              );
+            }}
+          />
+        </Box>
+        <Box mt={3}>
+          {values.rules.map((rule: ISecurityRule, index: number) => {
+            return (
+              <SecurityRuleActionCard
+                key={rule.security_rule_id}
+                security_rule_id={rule.security_rule_id}
+                name={rule.name}
+                description={rule.description}
+                remove={handleRemove}
+              />
+            );
+          })}
+        </Box>
       </Box>
     </form>
   );
