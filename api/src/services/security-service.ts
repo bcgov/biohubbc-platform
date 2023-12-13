@@ -5,7 +5,8 @@ import {
   PersecutionAndHarmSecurity,
   SecurityRepository,
   SecurityRuleRecord,
-  SECURITY_APPLIED_STATUS
+  SECURITY_APPLIED_STATUS,
+  SubmissionFeatureSecurityRecord
 } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -324,6 +325,17 @@ export class SecurityService extends DBService {
     const isPendingReview = artifactSecurityRules.includes(true);
 
     return isPendingReview;
+  }
+
+  async applySecurityRulesToSubmissionFeatures(
+    submissions: number[],
+    rules: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissions, rules);
+  }
+
+  async removeSecurityRulesFromSubmissionFeatures(submissions: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissions);
   }
 
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {

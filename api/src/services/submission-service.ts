@@ -15,6 +15,9 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  PatchSubmissionRecord,
+  SubmissionFeatureRecord,
+  SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
@@ -539,20 +542,28 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+  async getUnreviewedSubmissionsForAdmins(): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > {
     return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
   }
 
   /**
    * Get all submissions that have completed security review (are reviewed).
    *
-   * @return {*}  {Promise<SubmissionRecord[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    * @memberof SubmissionService
    */
-  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecord[]> {
+  async getReviewedSubmissionsForAdmins(): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
 
@@ -606,5 +617,57 @@ export class SubmissionService extends DBService {
     }
 
     return { submission, features: { dataset, sampleSites, animals, observations } };
+  }
+
+  /**
+   * Get all messages for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
+    return this.submissionRepository.getMessages(submissionId);
+  }
+
+  /**
+   * Creates submission message records for a submission.
+   *
+   * @param {number} submissionId
+   * @param {(Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[])} messages
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionService
+   */
+  async createMessages(
+    submissionId: number,
+    messages: Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[]
+  ): Promise<void> {
+    // Add submission_id to message object
+    const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
+
+    return this.submissionRepository.createMessages(messagesToInsert);
+  }
+
+  /**
+   * Patch a submission record.
+   *
+   * @param {number} submissionId
+   * @param {PatchSubmissionRecord} patch
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionServiceF
+   */
+  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
+    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
+  }
+
+  /**
+   * Get the root submission feature record for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
+    return this.submissionRepository.getSubmissionRootFeature(submissionId);
   }
 }

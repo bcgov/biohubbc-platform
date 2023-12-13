@@ -1,68 +1,80 @@
-import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import { makeStyles } from '@mui/styles';
-import { ActionToolbar } from 'components/toolbar/ActionToolbars';
+import { SubmissionContext } from 'contexts/submissionContext';
+import { useContext, useState } from 'react';
+import CompleteReviewDialog from './components/CompleteReviewDialog';
+import ManageSecurityReasonsDialog from './components/ManageSecurityReasonsDialog';
+import SubmissionDataGrid from './components/SubmissionDataGrid';
 import SubmissionHeader from './components/SubmissionHeader';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  datasetTitleContainer: {
-    paddingBottom: theme.spacing(5),
-    background: '#f7f8fa',
-    '& h1': {
-      marginTop: '-4px'
-    }
-  },
-  datasetDetailsLabel: {
-    borderBottom: '1pt solid #dadada'
-  },
-  datasetDetailsContainer: {},
-  datasetMapContainer: {
-    minHeight: '400px'
-  }
-}));
+const AdminSubmissionPage = () => {
+  const submissionContext = useContext(SubmissionContext);
 
-const AdminSubmissionPage: React.FC<React.PropsWithChildren> = () => {
-  const classes = useStyles();
+  const submissionDataLoader = submissionContext.submissionDataLoader;
+  const features = submissionDataLoader.data?.features;
+
+  const dataset = features?.dataset;
+  const sampleSites = features?.sampleSites;
+  const animals = features?.animals;
+  const observations = features?.observations;
+
+  const [openSecurityReasonsDialog, setOpenSecurityReasonsDialog] = useState(false);
+  const [openCompleteReviewDialog, setOpenCompleteReviewDialog] = useState(false);
+
+  const submitSecurity = async (values: any) => {
+    console.log('values', values);
+  };
 
   return (
     <Box>
-      <SubmissionHeader />
+      <CompleteReviewDialog
+        open={openCompleteReviewDialog}
+        onClose={() => setOpenCompleteReviewDialog(false)}
+        onSubmit={async (values) => {
+          setOpenCompleteReviewDialog(false);
+          submitSecurity(values);
+        }}
+        submissionSuccessDialogTitle="Submission Completed"
+        submissionSuccessDialogText="Submission has been completed successfully."
+        noSubmissionDataDialogTitle="No Submission Data"
+        noSubmissionDataDialogText="No submission data found."
+      />
+      <ManageSecurityReasonsDialog
+        open={openSecurityReasonsDialog}
+        onClose={() => setOpenSecurityReasonsDialog(false)}
+        onSubmit={async (values) => {
+          setOpenSecurityReasonsDialog(false);
+          submitSecurity(values);
+        }}
+        submissionSuccessDialogTitle="Submission Security Review Submitted"
+        submissionSuccessDialogText="Submission security review has been submitted successfully."
+        noSubmissionDataDialogTitle="No Submission Data"
+        noSubmissionDataDialogText="No submission data found."
+      />
+      {/* <UnsecureRecordsDialog /> TODO: create unsecure dialog */}
+      <SubmissionHeader
+        openSecureRecordsDialog={(open: boolean) => {
+          setOpenSecurityReasonsDialog(open);
+        }}
+        openCompleteReviewDialog={(open: boolean) => {
+          setOpenCompleteReviewDialog(open);
+        }}
+        openUnsecureRecordsDialog={(open: boolean) => {
+          setOpenSecurityReasonsDialog(open);
+        }}
+      />
       <Container maxWidth="xl">
-        <Box py={3}>
-          <Paper elevation={0}>
-            <ActionToolbar
-              className={classes.datasetDetailsLabel}
-              label="ADMIN DATASET DETAILS"
-              labelProps={{ variant: 'h4' }}
-            />
-            <Box display="flex">
-              <Box flex="1 1 auto" className={classes.datasetDetailsContainer}>
-                {/* <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} /> */}
-              </Box>
-              <Box data-testid="MapContainer" p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
-                {/* <MapContainer
-                  mapId="boundary_map"
-                  bounds={mapBoundary}
-                  scrollWheelZoom={false}
-                  fullScreenControl={true}
-                  markerLayers={markerLayers}
-                  staticLayers={staticLayers}
-                  zoomControlEnabled={true}
-                  doubleClickZoomEnabled={false}
-                  draggingEnabled={true}
-                  layerControlEnabled={false}
-                /> */}
-              </Box>
-            </Box>
-          </Paper>
-          <Box mt={3}>
-            <Paper elevation={0}>{/* <DatasetArtifacts datasetId={datasetId} /> */}</Paper>
-          </Box>
-          <Box mt={3}>
-            <Paper elevation={0}>{/* <RelatedDatasets datasetId={datasetId} /> */}</Paper>
-          </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={dataset || []} title="DATASET FEATURES" />
+        </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={sampleSites || []} title="SAMPLE SITE FEATURES" />
+        </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={animals || []} title="ANIMAL FEATURES" />
+        </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={observations || []} title="OBSERVATIONS FEATURES" />
         </Box>
       </Container>
     </Box>

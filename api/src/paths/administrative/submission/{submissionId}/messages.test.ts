@@ -2,15 +2,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getUnreviewedSubmissionsForAdmins } from '.';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
+import { createSubmissionMessages } from './messages';
 
 chai.use(sinonChai);
 
-describe('list', () => {
+describe('createSubmissionMessages', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -26,7 +26,7 @@ describe('list', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const requestHandler = getUnreviewedSubmissionsForAdmins();
+    const requestHandler = createSubmissionMessages();
 
     try {
       await requestHandler(mockReq, mockRes, mockNext);
@@ -36,7 +36,7 @@ describe('list', () => {
     }
   });
 
-  it('should return an array of unreviewed submission objects', async () => {
+  it('should return an array of Reviewed submission objects', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
@@ -45,18 +45,35 @@ describe('list', () => {
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
+    const submissionId = 1;
+    const messages = [
+      {
+        submission_message_type_id: 2,
+        label: 'label',
+        message: 'message',
+        data: {
+          dataField: 'dataField'
+        }
+      }
+    ];
+
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
-    const getUnreviewedSubmissionsStub = sinon
-      .stub(SubmissionService.prototype, 'getUnreviewedSubmissionsForAdmins')
-      .resolves([]);
+    mockReq.params = {
+      submissionId: String(submissionId)
+    };
+    mockReq.body = {
+      messages
+    };
 
-    const requestHandler = getUnreviewedSubmissionsForAdmins();
+    const createMessagesStub = sinon.stub(SubmissionService.prototype, 'createMessages').resolves(undefined);
+
+    const requestHandler = createSubmissionMessages();
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getUnreviewedSubmissionsStub).to.have.been.calledOnce;
+    expect(createMessagesStub).to.have.been.calledOnceWith(submissionId, messages);
     expect(mockRes.statusValue).to.equal(200);
-    expect(mockRes.jsonValue).to.eql([]);
+    expect(mockRes.jsonValue).to.be.undefined;
   });
 });

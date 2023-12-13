@@ -3,7 +3,7 @@ import {
   IArtifact,
   IHandlebarsTemplates,
   IListRelatedDatasetsResponse,
-  IUnreviewedSubmission
+  SubmissionRecord
 } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
@@ -28,10 +28,29 @@ const useDatasetApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have not completed security review.
    *
-   * @return {*}  {Promise<IUnreviewedSubmission[]>}
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
    */
-  const getUnreviewedSubmissions = async (): Promise<IUnreviewedSubmission[]> => {
+  const getUnreviewedSubmissions = async (): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > => {
     const { data } = await axios.get(`api/administrative/submission/unreviewed`);
+
+    return data;
+  };
+
+  /**
+   * Fetch all submissions that have completed security review.
+   *
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
+   */
+  const getReviewedSubmissions = async (): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > => {
+    const { data } = await axios.get(`api/administrative/submission/reviewed`);
 
     return data;
   };
@@ -111,6 +130,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
   return {
     listAllDatasets,
     getUnreviewedSubmissions,
+    getReviewedSubmissions,
     getDatasetEML,
     getDataset,
     getDatasetArtifacts,

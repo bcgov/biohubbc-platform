@@ -12,6 +12,7 @@ import {
   ISubmissionJobQueueRecord,
   ISubmissionModel,
   ISubmissionObservationRecord,
+  PatchSubmissionRecord,
   SubmissionRecord,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
@@ -709,11 +710,12 @@ describe('SubmissionService', () => {
 
   describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
+      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type: string })[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
           security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -721,12 +723,15 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         },
         {
           submission_id: 2,
           uuid: '789-456-123',
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -734,7 +739,9 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         }
       ];
 
@@ -755,11 +762,12 @@ describe('SubmissionService', () => {
 
   describe('getReviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: SubmissionRecord[] = [
+      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type: string })[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
           security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -767,12 +775,15 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         },
         {
           submission_id: 2,
           uuid: '789-456-123',
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -780,7 +791,9 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          feature_type_id: 1,
+          feature_type: 'dataset'
         }
       ];
 
@@ -807,6 +820,7 @@ describe('SubmissionService', () => {
           uuid: '123-456-789',
           security: SECURITY_APPLIED_STATUS.SECURED,
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -821,6 +835,7 @@ describe('SubmissionService', () => {
           uuid: '789-456-123',
           security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -835,6 +850,7 @@ describe('SubmissionService', () => {
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           uuid: '999-456-123',
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -858,6 +874,96 @@ describe('SubmissionService', () => {
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('createMessages', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should create messages and return void', async () => {
+      const submissionId = 1;
+
+      const mockMessages = [
+        {
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const createMessagesStub = sinon.stub(SubmissionRepository.prototype, 'createMessages').resolves(undefined);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.createMessages(submissionId, mockMessages);
+
+      expect(createMessagesStub).to.have.been.calledOnceWith([
+        {
+          submission_id: submissionId,
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_id: submissionId,
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ]);
+      expect(response).to.be.undefined;
+    });
+  });
+
+  describe('patchSubmissionRecord', () => {
+    it('should patch the submission record and return the updated record', async () => {
+      const submissionId = 1;
+
+      const patch: PatchSubmissionRecord = { security_reviewed: true };
+
+      const mockSubmissionRecord: SubmissionRecord = {
+        submission_id: 1,
+        uuid: '123-456-789',
+        security_review_timestamp: '2023-12-12',
+        submitted_timestamp: '2023-12-12',
+        source_system: 'SIMS',
+        name: 'name',
+        description: 'description',
+        create_date: '2023-12-12',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+      const mockDBConnection = getMockDBConnection();
+
+      const patchSubmissionRecordStub = sinon
+        .stub(SubmissionRepository.prototype, 'patchSubmissionRecord')
+        .resolves(mockSubmissionRecord);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.patchSubmissionRecord(submissionId, patch);
+
+      expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
+      expect(response).to.be.eql(mockSubmissionRecord);
     });
   });
 });

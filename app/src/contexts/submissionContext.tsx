@@ -1,6 +1,6 @@
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { IGetSubmissionResponse } from 'interfaces/useDatasetApi.interface';
+import { IGetSubmissionResponse } from 'interfaces/useSubmissionsApi.interface';
 import React, { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 

@@ -10,6 +10,7 @@ import { SECURITY_APPLIED_STATUS } from './security-repository';
 import {
   ISourceTransformModel,
   ISpatialComponentCount,
+  PatchSubmissionRecord,
   SubmissionRecord,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
@@ -911,6 +912,7 @@ describe('SubmissionRepository', () => {
           submission_id: 1,
           uuid: '123-456-789',
           security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -924,6 +926,7 @@ describe('SubmissionRepository', () => {
           submission_id: 2,
           uuid: '789-456-123',
           security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -958,6 +961,7 @@ describe('SubmissionRepository', () => {
           submission_id: 1,
           uuid: '123-456-789',
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -971,6 +975,7 @@ describe('SubmissionRepository', () => {
           submission_id: 2,
           uuid: '789-456-123',
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1006,6 +1011,7 @@ describe('SubmissionRepository', () => {
           uuid: '123-456-789',
           security: SECURITY_APPLIED_STATUS.SECURED,
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1020,6 +1026,7 @@ describe('SubmissionRepository', () => {
           uuid: '789-456-123',
           security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1034,6 +1041,7 @@ describe('SubmissionRepository', () => {
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           uuid: '999-456-123',
           security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1054,6 +1062,117 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.getReviewedSubmissionsForAdmins();
 
       expect(response).to.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('createMessages', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should create messages and return void', async () => {
+      const mockMessages = [
+        {
+          submission_id: 1,
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_id: 2,
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ];
+
+      const mockQueryResponse = { rowCount: 2, rows: [] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.createMessages(mockMessages);
+
+      expect(response).to.be.undefined;
+    });
+  });
+
+  describe('patchSubmissionRecord', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    describe('if the patch results in changes to the record', () => {
+      it('should patch the record and return the updated record', async () => {
+        const submissionId = 1;
+
+        const patch: PatchSubmissionRecord = { security_reviewed: true };
+
+        const mockSubmissionRecord: SubmissionRecord = {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        };
+
+        // rowCount = 1 indicating one row was updated
+        const mockResponse = { rowCount: 1, rows: [mockSubmissionRecord] } as unknown as Promise<QueryResult<any>>;
+
+        const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+        const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+        const response = await submissionRepository.patchSubmissionRecord(submissionId, patch);
+
+        expect(response).to.eql(mockSubmissionRecord);
+      });
+    });
+
+    describe('if the patch results in no changes to the recordF', () => {
+      it('should patch the record (having no effect) and return the unchanged record', async () => {
+        const submissionId = 1;
+
+        const patch: PatchSubmissionRecord = { security_reviewed: false };
+
+        const mockSubmissionRecord: SubmissionRecord = {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        };
+
+        // rowCount = 0 indicating no rows were updated
+        const mockResponse = { rowCount: 0, rows: [mockSubmissionRecord] } as unknown as Promise<QueryResult<any>>;
+
+        const mockDBConnection = getMockDBConnection({ knex: async () => mockResponse });
+
+        const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+        const response = await submissionRepository.patchSubmissionRecord(submissionId, patch);
+
+        expect(response).to.eql(mockSubmissionRecord);
+      });
     });
   });
 });

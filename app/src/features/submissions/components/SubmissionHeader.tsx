@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiCog, mdiLock, mdiLockOpen, mdiPencil } from '@mdi/js';
+import { mdiChevronDown, mdiCog, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
@@ -11,17 +11,22 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import BaseHeader from 'components/layout/header/BaseHeader';
 import { SubmissionContext } from 'contexts/submissionContext';
+import moment from 'moment';
 import React, { useContext, useState } from 'react';
-import { useHistory } from 'react-router';
 import { Link as RouterLink } from 'react-router-dom';
+
+export interface ISubmissionHeaderProps {
+  openSecureRecordsDialog: (open: boolean) => void;
+  openCompleteReviewDialog: (open: boolean) => void;
+  openUnsecureRecordsDialog: (open: boolean) => void;
+}
 
 /**
  * Submission header for a single-submission view.
  *
  * @return {*}
  */
-const SubmissionHeader = () => {
-  const history = useHistory();
+const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   const submissionContext = useContext(SubmissionContext);
 
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -29,18 +34,13 @@ const SubmissionHeader = () => {
   const submissionUUID = submissionContext.submissionUUID;
   const submissionDataLoader = submissionContext.submissionDataLoader;
 
-  const submissionData = submissionDataLoader.data;
-  console.log('submissionData', submissionData);
-
   if (!submissionDataLoader.data) {
     return <CircularProgress className="pageProgress" size={40} />;
   }
 
   const submission = submissionDataLoader.data?.submission;
   const features = submissionDataLoader.data?.features;
-  console.log('features', features);
-  const dataset = features?.dataset[0];
-  console.log('dataset', dataset);
+  const dataset = features.dataset[0];
 
   return (
     <>
@@ -48,13 +48,8 @@ const SubmissionHeader = () => {
         title={dataset?.data.name}
         breadCrumb={
           <Breadcrumbs>
-            <Link
-              component={RouterLink}
-              variant="body2"
-              underline="hover"
-              to={`/admin/dashboard/submissions`}
-              aria-current="page">
-              SUBMISSION DASHBOARD
+            <Link component={RouterLink} variant="body2" underline="hover" to={`/admin/dashboard`} aria-current="page">
+              DASHBOARD
             </Link>
             <Typography variant="body2" component="span">
               {dataset?.data.name} | {submissionUUID}
@@ -66,16 +61,17 @@ const SubmissionHeader = () => {
             <Stack flexDirection="row" alignItems="center">
               {submission?.security_review_timestamp ? (
                 <>
-                  <Icon path={mdiLock} size={0.75} color="#4caf50" />
+                  <Icon path={mdiLock} size={1} />
                   <Typography component="span" color="textSecondary" sx={{ mr: 1 }}>
                     SECURED: {submission?.security_review_timestamp}
                   </Typography>
                 </>
               ) : (
                 <>
-                  <Icon path={mdiLockOpen} size={0.75} color="#f44336" />
+                  <Icon path={mdiLockOpenVariantOutline} size={1} />
                   <Typography component="span" color="textSecondary" sx={{ mr: 1 }}>
-                    PENDING REVIEW
+                    PENDING REVIEW | SUBMITTED:{' '}
+                    {submission?.create_date ? moment(submission?.create_date).format('YYYY-MM-DD') : 'N/A'}
                   </Typography>
                 </>
               )}
@@ -99,7 +95,7 @@ const SubmissionHeader = () => {
                 MANAGE SECURITY
               </Button>
 
-              <Button variant="contained" color="primary">
+              <Button variant="contained" color="primary" onClick={() => props.openCompleteReviewDialog(true)}>
                 COMPLETE REVIEW
               </Button>
             </Stack>
@@ -120,11 +116,17 @@ const SubmissionHeader = () => {
               anchorEl={menuAnchorEl}
               open={Boolean(menuAnchorEl)}
               onClose={() => setMenuAnchorEl(null)}>
-              <MenuItem onClick={() => history.push('edit')}>
+              <MenuItem onClick={() => props.openSecureRecordsDialog(true)}>
                 <ListItemIcon>
-                  <Icon path={mdiPencil} size={1} />
+                  <Icon path={mdiLock} size={1} />
                 </ListItemIcon>
-                <Typography variant="inherit">MANAGE SECURITY</Typography>
+                <Typography variant="inherit">Secure Records</Typography>
+              </MenuItem>
+              <MenuItem onClick={() => props.openUnsecureRecordsDialog(true)}>
+                <ListItemIcon>
+                  <Icon path={mdiLockOpenVariantOutline} size={1} />
+                </ListItemIcon>
+                <Typography variant="inherit">Unsecure Records</Typography>
               </MenuItem>
             </Menu>
           </>

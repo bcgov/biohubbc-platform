@@ -7,19 +7,19 @@ const appTheme = createTheme({
   typography: {
     fontFamily: 'BCSans',
     h1: {
-      fontSize: '2.25rem',
-      fontWeight: 700
-    },
-    h2: {
       fontSize: '1.875rem',
       fontWeight: 700
     },
+    h2: {
+      fontSize: '1.75rem',
+      fontWeight: 700
+    },
     h3: {
-      fontSize: '1.5rem',
+      fontSize: '1.25rem',
       fontWeight: 700
     },
     h4: {
-      fontSize: '1.25rem',
+      fontSize: '1.125rem',
       fontWeight: 700
     },
     h5: {
@@ -29,7 +29,7 @@ const appTheme = createTheme({
   },
   palette: {
     background: {
-      default: '#f7f8fa'
+      default: '#f5f5f5'
     },
     primary: {
       main: '#036'
@@ -40,6 +40,40 @@ const appTheme = createTheme({
     }
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        a: {
+          color: '#1a5a96',
+          '&:focus': {
+            outline: '2px solid #3B99FC',
+            outlineOffset: '-1px',
+            borderRadius: '4px'
+          }
+        },
+        dl: {
+          margin: 0
+        },
+        dd: {
+          margin: 0
+        },
+        dt: {
+          margin: 0
+        },
+        fieldset: {
+          margin: 0,
+          padding: 0,
+          minWidth: 0,
+          border: 'none'
+        },
+        legend: {
+          '&.MuiTypography-root': {
+            marginBottom: '15px',
+            padding: 0,
+            fontWeight: 700
+          }
+        }
+      }
+    },
     MuiAlert: {
       styleOverrides: {
         root: {
@@ -74,14 +108,39 @@ const appTheme = createTheme({
       }
     },
     MuiButton: {
+      defaultProps: {
+        disableElevation: true
+      },
       styleOverrides: {
         root: {
-          textTransform: 'none'
+          '&:focus': {
+            outline: '2px solid #3B99FC',
+            outlineOffset: '-1px'
+          }
+        },
+        startIcon: {
+          marginBottom: '1px'
         },
         sizeLarge: {
-          fontSize: '1rem',
-          fontWeight: 700
+          fontSize: '1rem'
+        },
+        containedPrimary: {
+          fontWeight: 700,
+          letterSpacing: '0.02rem'
+        },
+        containedError: {
+          fontWeight: 700,
+          letterSpacing: '0.02rem'
+        },
+        outlinedPrimary: {
+          fontWeight: 700,
+          letterSpacing: '0.02rem'
         }
+      }
+    },
+    MuiButtonBase: {
+      defaultProps: {
+        disableRipple: true
       }
     },
     MuiCardHeader: {
@@ -199,6 +258,21 @@ const appTheme = createTheme({
         },
         colorSecondary: {
           backgroundColor: 'red'
+        }
+      }
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
+        }
+      }
+    },
+    MuiTabs: {
+      styleOverrides: {
+        indicator: {
+          borderLeft: '16px solid #fff',
+          borderRight: '16px solid #fff'
         }
       }
     }
