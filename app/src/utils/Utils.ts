@@ -2,6 +2,7 @@ import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
 import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
+import _ from 'lodash';
 import moment from 'moment';
 
 /**
@@ -336,4 +337,15 @@ export const getTitle = (pageName?: string) => {
  */
 export const pluralize = (quantity: number, word: string, singularSuffix = '', pluralSuffix = 's') => {
   return `${word}${quantity === 1 ? singularSuffix : pluralSuffix}`;
+};
+
+/**
+ * For a given property, alphabetize an array of objects
+ *
+ * @param {T[]} data an array of objects to be alphabetize
+ * @param {string} property a key property to alphabetize the data array on
+ * @returns {any[]} Returns an alphabetized array of objects
+ */
+export const alphabetizeObjects = <T extends { [key: string]: any }>(data: T[], property: string) => {
+  return _.sortBy(data, property);
 };

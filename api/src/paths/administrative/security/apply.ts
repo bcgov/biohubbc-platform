@@ -8,7 +8,7 @@ import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/security');
 
-export const GET: Operation = [
+export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
@@ -19,20 +19,46 @@ export const GET: Operation = [
       ]
     };
   }),
-  getActiveSecurityRules()
+  applySecurityRulesToSubmissionFeatures()
 ];
 
-GET.apiDoc = {
-  description: 'Get all active security rules.',
+POST.apiDoc = {
+  description: 'Apply Security to submission features',
   tags: ['security'],
   security: [
     {
       Bearer: []
     }
   ],
+  requestBody: {
+    description: 'Administrative Activity post request object.',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            submissions: {
+              type: 'array',
+              items: {
+                type: 'number'
+              },
+              minItems: 1
+            },
+            rules: {
+              type: 'array',
+              items: {
+                type: 'number'
+              },
+              minItems: 1
+            }
+          }
+        }
+      }
+    }
+  },
   responses: {
     200: {
-      description: 'Security Rules.',
+      description: 'Features.',
       content: {
         'application/json': {
           schema: {
@@ -40,37 +66,13 @@ GET.apiDoc = {
             items: {
               type: 'object',
               properties: {
+                submission_feature_security_id: {
+                  type: 'number'
+                },
+                submission_feature_id: {
+                  type: 'number'
+                },
                 security_rule_id: {
-                  type: 'number'
-                },
-                name: {
-                  type: 'string'
-                },
-                description: {
-                  type: 'string'
-                },
-                record_effective_date: {
-                  type: 'string'
-                },
-                record_end_date: {
-                  type: 'string',
-                  nullable: true
-                },
-                create_date: {
-                  type: 'string'
-                },
-                create_user: {
-                  type: 'number'
-                },
-                update_date: {
-                  type: 'string',
-                  nullable: true
-                },
-                update_user: {
-                  type: 'number',
-                  nullable: true
-                },
-                revision_count: {
                   type: 'number'
                 }
               }
@@ -97,7 +99,7 @@ GET.apiDoc = {
   }
 };
 
-export function getActiveSecurityRules(): RequestHandler {
+export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
@@ -105,13 +107,13 @@ export function getActiveSecurityRules(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.getActiveSecurityRules();
+      const data = await service.applySecurityRulesToSubmissionFeatures(req.body.submissions, req.body.rules);
 
       await connection.commit();
 
       return res.status(200).json(data);
     } catch (error) {
-      defaultLog.error({ label: 'getActiveSecurityRules', message: 'error', error });
+      defaultLog.error({ label: 'applySecurityRulesToSubmissionFeatures', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

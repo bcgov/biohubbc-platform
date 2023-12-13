@@ -24,8 +24,12 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  applySecurityRulesErrorTitle: 'Error Securing Documents',
-  applySecurityRulesErrorText: 'Failed to apply security to the selected documents. Please try again.',
-  unapplySecurityRulesErrorTitle: 'Error Unsecuring Documents',
-  unapplySecurityRulesErrorText: 'Failed to unsecure the selected documents. Please try again.'
+  applySecuritySuccess: (submissions: number) => `Successfully applied security rules to: ${submissions} features.`,
+
+  applySecurityRulesErrorTitle: 'Error Applying Security',
+  applySecurityRulesErrorText:
+    'An error occurred while applying security to features, please try again. If the problem persists, please contact your system administrator',
+  unapplySecurityRulesErrorTitle: 'Error Unsecuring Features',
+  unapplySecurityRulesErrorText:
+    'Failed to unsecure the selected features, please try again. If the problem persists, please contact your system administrator'
 };

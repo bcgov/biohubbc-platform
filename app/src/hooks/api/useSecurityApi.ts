@@ -71,11 +71,33 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const addSecurityRule = async (newRule: {
+    name: string;
+    description: string;
+    record_effective_date: string;
+    record_end_date?: string;
+  }): Promise<number> => {
+    await axios.post('api/administrative/security', {});
+    // new item id
+    return 1;
+  };
+
+  const applySecurityRulesToSubmissions = async (submissions: number[], rules: number[]): Promise<any[]> => {
+    console.log(submissions, rules);
+    const { data } = await axios.post('api/administrative/security/apply', {
+      submissions,
+      rules
+    });
+    return data;
+  };
+
   return {
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
-    getActiveSecurityRules
+    getActiveSecurityRules,
+    addSecurityRule,
+    applySecurityRulesToSubmissions
   };
 };
 

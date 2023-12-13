@@ -30,6 +30,7 @@ CREATE TABLE submission(
     submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     uuid                        uuid              DEFAULT public.gen_random_uuid() NOT NULL,
     security_review_timestamp   timestamptz(6),
+    submitted_timestamp         timestamptz(6)    DEFAULT now() NOT NULL,
     source_system               varchar(200)      NOT NULL,
     name                        varchar(200)      NOT NULL,
     description                 varchar(3000),
@@ -44,6 +45,7 @@ CREATE TABLE submission(
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
 COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';
+COMMENT ON COLUMN submission.submitted_timestamp IS 'The timestamp of when the submission was received by BioHub from the source system.';
 COMMENT ON COLUMN submission.source_system IS 'The name of the source system from which the submission originated.';
 COMMENT ON COLUMN submission.name IS 'The name of the submission.';
 COMMENT ON COLUMN submission.description IS 'The description of the submission.';
@@ -268,12 +270,6 @@ COMMENT ON COLUMN user_identity_source.update_date IS 'The datetime the record w
 COMMENT ON COLUMN user_identity_source.update_user IS 'The id of the user who updated the record as identified in the system user table.';
 COMMENT ON COLUMN user_identity_source.revision_count IS 'Revision count used for concurrency control.';
 COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. This source is traditionally the system that authenticates the user. Example sources could include IDIR, BCEID and DATABASE.';
-
--- 
--- INDEX: submission_uk1 
---
-
-CREATE UNIQUE INDEX submission_uk1 ON submission(uuid);
 
 -- 
 -- INDEX: "submission_job_queue_idx1" 

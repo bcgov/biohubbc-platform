@@ -59,10 +59,38 @@ export interface IDatasetForReview {
   keywords: string[];
 }
 
-export interface IUnreviewedSubmission {
+export type SubmissionRecord = {
   submission_id: number;
   uuid: string;
+  security_review_timestamp: string | null;
+  source_system: string;
   name: string;
   description: string;
   create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+};
+export interface ISubmission {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string;
+}
+
+export interface IFeature {
+  submission_feature_id: number;
+  submission_id: number;
+  feature_type: string;
+  data: any;
+  parent_submission_feature_id: number | null;
+}
+export interface IGetSubmissionResponse {
+  submission: ISubmission;
+  features: {
+    dataset: IFeature[];
+    sampleSites: IFeature[];
+    animals: IFeature[];
+    observations: IFeature[];
+  };
 }

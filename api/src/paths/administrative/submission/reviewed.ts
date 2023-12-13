@@ -1,13 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SubmissionService } from '../../../../services/submission-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/submission/unreviewed');
+const defaultLog = getLogger('paths/administrative/submission/reviewed');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -20,11 +20,11 @@ export const GET: Operation = [
       ]
     };
   }),
-  getUnreviewedSubmissionsForAdmins()
+  getReviewedSubmissionsForAdmins()
 ];
 
 GET.apiDoc = {
-  description: 'Get a list of submissions that need security review (are unreviewed).',
+  description: 'Get a list of submissions that have completed security review (are reviewed).',
   tags: ['admin'],
   security: [
     {
@@ -33,13 +33,29 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'List of submissions that need security review.',
+      description: 'List of submissions that have completed security review.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
             items: {
               type: 'object',
+              required: [
+                'submission_id',
+                'uuid',
+                'security_review_timestamp',
+                'submitted_timestamp',
+                'source_system',
+                'name',
+                'description',
+                'create_date',
+                'create_user',
+                'update_date',
+                'update_user',
+                'revision_count',
+                'feature_type_id',
+                'feature_type'
+              ],
               properties: {
                 submission_id: {
                   type: 'integer',
@@ -83,6 +99,13 @@ GET.apiDoc = {
                 revision_count: {
                   type: 'integer',
                   minimum: 0
+                },
+                feature_type_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                feature_type: {
+                  type: 'string'
                 }
               }
             }
@@ -95,11 +118,11 @@ GET.apiDoc = {
 };
 
 /**
- * Get all unreviewed submissions.
+ * Get all reviewed submissions.
  *
  * @returns {RequestHandler}
  */
-export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
+export function getReviewedSubmissionsForAdmins(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
 
@@ -107,13 +130,13 @@ export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
       await connection.open();
 
       const service = new SubmissionService(connection);
-      const response = await service.getUnreviewedSubmissionsForAdmins();
+      const response = await service.getReviewedSubmissionsForAdmins();
 
       await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getUnreviewedSubmissions', message: 'error', error });
+      defaultLog.error({ label: 'getReviewedSubmissions', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
