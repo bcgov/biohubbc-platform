@@ -8,9 +8,9 @@ import SQL from "sql-template-strings";
 const defaultLog = getLogger('repositories/search-index-repository');
 
 const FeaturePropertyRecord = z.object({
-  name: z.string(),
   feature_property_id: z.number(),
   feature_property_type_id: z.number(),
+  name: z.string(),
   display_name: z.string(),
   description: z.string(),
   parent_feature_property_id: z.number().nullable(),
@@ -24,6 +24,13 @@ const FeaturePropertyRecord = z.object({
 });
 
 export type FeaturePropertyRecord = z.infer<typeof FeaturePropertyRecord>;
+
+const FeaturePropertyRecordWithPropertyTypeName = FeaturePropertyRecord.extend({
+  feature_property_type_name: z.string()
+});
+
+export type FeaturePropertyRecordWithPropertyTypeName = z.infer<typeof FeaturePropertyRecordWithPropertyTypeName>;
+
 
 // TODO replace with pre-existing Zod types for geojson
 const Geometry = z.object({
@@ -193,12 +200,17 @@ export class SearchIndexRepository extends BaseRepository {
     return response.rows;
   }
 
-  // TODO return type
-  async getFeaturePropertiesWithTypeNames(): Promise<any[]> {
+  /**
+   * Retrieves all feature properties, with each property's type name (e.g. string, datetime, number) joined
+   * to it.
+   *
+   * @return {*}  {Promise<FeaturePropertyRecordWithPropertyTypeName[]>}
+   * @memberof SearchIndexRepository
+   */
+  async getFeaturePropertiesWithTypeNames(): Promise<FeaturePropertyRecordWithPropertyTypeName[]> {
     const query = SQL`
     SELECT
-      fp.name as property_name,
-      fpt.name as property_type,
+      fpt.name as feature_property_type_name,
       fp.*
     FROM
       feature_property fp
@@ -212,7 +224,7 @@ export class SearchIndexRepository extends BaseRepository {
       fpt.record_end_date IS NULL
     `;
 
-    const response = await this.connection.sql(query);
+    const response = await this.connection.sql(query, FeaturePropertyRecordWithPropertyTypeName);
 
     return response.rows;
   }

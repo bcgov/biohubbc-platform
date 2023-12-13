@@ -1,5 +1,5 @@
 import { IDBConnection } from "../database/db";
-import { Geometry, InsertDatetimeSearchableRecord, InsertNumberSearchableRecord, InsertSpatialSearchableRecord, InsertStringSearchableRecord, SearchIndexRepository } from "../repositories/search-index-respository";
+import { FeaturePropertyRecord, FeaturePropertyRecordWithPropertyTypeName, Geometry, InsertDatetimeSearchableRecord, InsertNumberSearchableRecord, InsertSpatialSearchableRecord, InsertStringSearchableRecord, SearchIndexRepository } from "../repositories/search-index-respository";
 import { SubmissionRepository } from "../repositories/submission-repository";
 import { getLogger } from "../utils/logger";
 import { DBService } from "./db-service";
@@ -15,37 +15,44 @@ export class SearchIndexService extends DBService {
     this.searchIndexRepository = new SearchIndexRepository(connection);
   }
 
+  /**
+   * Creates search indexes for datetime, number, spatial and string properties belonging to
+   * all features found for the given submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof SearchIndexService
+   */
   async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
-    const submissionRepository = new SubmissionRepository(this.connection);
-    const features = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+    defaultLog.debug({ label: 'indexFeaturesBySubmissionId' });
 
     const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
     const numberRecords: InsertNumberSearchableRecord[] = [];
     const spatialRecords: InsertSpatialSearchableRecord[] = [];
     const stringRecords: InsertStringSearchableRecord[] = [];
 
-    const featurePropertyTypeNames = await this.searchIndexRepository.getFeaturePropertiesWithTypeNames();
+    const submissionRepository = new SubmissionRepository(this.connection);  
+    const features = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
-    const featurePropertyTypeMap = Object.fromEntries(featurePropertyTypeNames.map((propertyType) => {
-      const { property_name, ...rest } = propertyType;
-      return [property_name, rest];
+    const featurePropertyTypeNames: FeaturePropertyRecordWithPropertyTypeName[] = await this.searchIndexRepository.getFeaturePropertiesWithTypeNames();
+    const featurePropertyTypeMap: Record<string, FeaturePropertyRecord> = Object.fromEntries(featurePropertyTypeNames.map((propertyType) => {
+      const { feature_property_type_name, ...rest } = propertyType;
+      return [feature_property_type_name, rest];
     }))
 
-    defaultLog.debug({ featurePropertyTypeMap })
-    
     features.forEach((feature) => {
       const { submission_feature_id } = feature;
       Object
         .entries(feature.data.properties)
-        .forEach(([property_name, value]) => {          
-          const featureProperty = featurePropertyTypeMap[property_name];
+        .forEach(([feature_property_name, value]) => {          
+          const featureProperty = featurePropertyTypeMap[feature_property_name];
           if (!featureProperty) {
             return;
           }
 
-          const { property_type,  feature_property_id } = featureProperty;
+          const { name,  feature_property_id } = featureProperty;
 
-          switch (property_type) {
+          switch (name) {
             case 'datetime':
               datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as Date });
               break;
@@ -65,7 +72,6 @@ export class SearchIndexService extends DBService {
         })
       });
 
-    
     if (datetimeRecords.length) {
       this.searchIndexRepository.insertSearchableDatetimeRecords(datetimeRecords);
     }

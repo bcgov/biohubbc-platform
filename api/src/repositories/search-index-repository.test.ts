@@ -4,7 +4,7 @@ describe('SearchIndexRepository', () => {
   describe('getFeaturePropertiesWithTypeNames', () => {
     const response = [
       {
-        property_name: 'count',
+        feature_property_type_name: 'count',
         property_type: 'number',
         feature_property_id: 8,
         feature_property_type_id: 2,
@@ -21,7 +21,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'date_range',
+        feature_property_type_name: 'date_range',
         property_type: 'object',
         feature_property_id: 4,
         feature_property_type_id: 6,
@@ -38,7 +38,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'description',
+        feature_property_type_name: 'description',
         property_type: 'string',
         feature_property_id: 2,
         feature_property_type_id: 1,
@@ -55,7 +55,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'end_date',
+        feature_property_type_name: 'end_date',
         property_type: 'datetime',
         feature_property_id: 6,
         feature_property_type_id: 3,
@@ -72,7 +72,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'geometry',
+        feature_property_type_name: 'geometry',
         property_type: 'spatial',
         feature_property_id: 7,
         feature_property_type_id: 4,
@@ -89,7 +89,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'latitude',
+        feature_property_type_name: 'latitude',
         property_type: 'number',
         feature_property_id: 9,
         feature_property_type_id: 2,
@@ -106,7 +106,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'longitude',
+        feature_property_type_name: 'longitude',
         property_type: 'number',
         feature_property_id: 10,
         feature_property_type_id: 2,
@@ -123,7 +123,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'name',
+        feature_property_type_name: 'name',
         property_type: 'string',
         feature_property_id: 1,
         feature_property_type_id: 1,
@@ -140,7 +140,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 's3_key',
+        feature_property_type_name: 's3_key',
         property_type: 'string',
         feature_property_id: 21,
         feature_property_type_id: 1,
@@ -157,7 +157,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'start_date',
+        feature_property_type_name: 'start_date',
         property_type: 'datetime',
         feature_property_id: 5,
         feature_property_type_id: 3,
@@ -174,7 +174,7 @@ describe('SearchIndexRepository', () => {
         revision_count: 0
       },
       {
-        property_name: 'taxonomy',
+        feature_property_type_name: 'taxonomy',
         property_type: 'number',
         feature_property_id: 3,
         feature_property_type_id: 2,
