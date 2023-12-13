@@ -83,12 +83,31 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSubmissionFeatureRules = async () => {};
+
+  const applySubmissionFeatureRules = async (
+    submissionUUID: string,
+    features: number[],
+    rules: number[],
+    override = false
+  ) => {
+    console.log(submissionUUID);
+    const { data } = await axios.post(`api/administrative/security/apply`, {
+      override,
+      features,
+      rules
+    });
+    return data;
+  };
+
   return {
     listSubmissions,
     getSignedUrl,
     listReviewedSubmissions,
     getSubmissionDownloadPackage,
-    getSubmission
+    getSubmission,
+    applySubmissionFeatureRules,
+    getSubmissionFeatureRules
   };
 };
 

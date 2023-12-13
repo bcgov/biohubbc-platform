@@ -16,6 +16,10 @@ const ManageSecurity = (props: IManageSecurityProps) => {
   const [isUnsecureDialogOpen, setIsUnsecuredDialogOpen] = useState(false);
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
 
+  // this needs to go fetch all the security rules for the given features
+  // const securityRuleDataLoader = useDataLoader(() => {
+  //   return useApi().security.getActiveSecurityRules();
+  // });
   const open = Boolean(anchorEl);
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);

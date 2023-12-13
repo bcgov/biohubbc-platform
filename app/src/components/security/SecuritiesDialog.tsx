@@ -5,8 +5,10 @@ import { DialogContext } from 'contexts/dialogContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useContext } from 'react';
+import { useParams } from 'react-router';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
+
 interface ISecuritiesDialogProps {
   features: number[];
   isOpen: boolean;
@@ -24,10 +26,11 @@ export interface ISecurityRuleFormProps {
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useContext(DialogContext);
   const api = useApi();
-
+  const { submission_uuid } = useParams<{ submission_uuid: string }>();
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
-      await api.security.applySecurityRulesToSubmissions(
+      await api.submissions.applySubmissionFeatureRules(
+        submission_uuid,
         props.features,
         rules.map((item) => item.security_rule_id)
       );

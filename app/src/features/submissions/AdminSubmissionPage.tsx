@@ -33,12 +33,22 @@ const AdminSubmissionPage = () => {
     setSelectedFeatures({ ...selectedFeatures });
   };
 
-  const flattenSelectedFeatures = (): number[] => {
-    let total: number[] = [];
-    for (const item in selectedFeatures) {
-      total = [...selectedFeatures[item], ...total];
+  // code for collecting individually selected items
+  // const flattenSelectedFeatures = (): number[] => {
+  //   let total: number[] = [];
+  //   for (const item in selectedFeatures) {
+  //     total = [...selectedFeatures[item], ...total];
+  //   }
+  //   return total;
+  // };
+
+  const getAllSubmissionFeatureIds = (): number[] => {
+    const ids = [];
+    for (const key in features) {
+      ids.push(features[key]);
     }
-    return total;
+
+    return ids.flat().map((item) => item.submission_feature_id);
   };
 
   return (
@@ -59,7 +69,7 @@ const AdminSubmissionPage = () => {
         openCompleteReviewDialog={(open: boolean) => {
           setOpenCompleteReviewDialog(open);
         }}
-        selectedFeatures={flattenSelectedFeatures()}
+        selectedFeatures={features ? getAllSubmissionFeatureIds() : []}
       />
       <Container maxWidth="xl">
         <Box py={2}>

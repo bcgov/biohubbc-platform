@@ -23,7 +23,8 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Apply Security to submission features',
+  description:
+    'Applies security rules to a list of submission features. A flag can also be passed to make application of security rules override existing ones or add new ones to the existing list of security rules per submission feature.',
   tags: ['security'],
   security: [
     {
@@ -31,13 +32,17 @@ POST.apiDoc = {
     }
   ],
   requestBody: {
-    description: 'Apply security object',
+    description: 'Payload of submission features and rules to apply.',
     content: {
       'application/json': {
         schema: {
           type: 'object',
           properties: {
-            submissions: {
+            override: {
+              type: 'boolean',
+              nullable: true
+            },
+            features: {
               type: 'array',
               items: {
                 type: 'number'
@@ -107,7 +112,7 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.applySecurityRulesToSubmissionFeatures(req.body.submissions, req.body.rules);
+      const data = await service.applySecurityRulesToSubmissionFeatures(req.body.features, req.body.rules);
 
       await connection.commit();
 
