@@ -4,8 +4,8 @@ import { SOURCE_SYSTEM } from '../../constants/database';
 import { getAPIUserDBConnection, getDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { getLogger } from '../../utils/logger';
 import { SearchIndexService } from '../../services/search-index-service';
+import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/dataset/search-index');
 
@@ -60,7 +60,6 @@ POST.apiDoc = {
 
 export function indexSubmission(): RequestHandler {
   return async (req, res) => {
-    
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     const submissionId = Number(req.query.submissionId);
@@ -69,9 +68,9 @@ export function indexSubmission(): RequestHandler {
       await connection.open();
 
       const searchIndexService = new SearchIndexService(connection);
-      
+
       // Index the submission record
-      const response = await searchIndexService.indexFeaturesBySubmissionId(submissionId)
+      const response = await searchIndexService.indexFeaturesBySubmissionId(submissionId);
 
       await connection.commit();
       res.status(200).json(response);

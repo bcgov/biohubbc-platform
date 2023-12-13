@@ -2,14 +2,14 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { getMockDBConnection } from '../__mocks__/db';
-import { SearchIndexService } from './search-index-service';
 import { SearchIndexRepository } from '../repositories/search-index-respository';
 import { SubmissionRepository } from '../repositories/submission-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { SearchIndexService } from './search-index-service';
 
 chai.use(sinonChai);
 
-describe.only('SearchIndexService', () => {
+describe('SearchIndexService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -20,25 +20,13 @@ describe.only('SearchIndexService', () => {
 
       const searchIndexService = new SearchIndexService(mockDBConnection);
 
-      // TODO probably not needed... only the properties of the JSON blob gte parsed out (and not the id or type)
-      // const mockFeatureTypes = [
-      //   {
-      //     feature_type_id: 1,
-      //     name: 'dataset'
-      //   },
-      //   {
-      //     feature_type_id: 2,
-      //     name: 'observation'
-      //   }
-      // ]
-
       const getSubmissionFeaturesStub = sinon
         .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId')
         .resolves([
           {
             submission_feature_id: 11111,
             submission_id: 1, // Mock submission
-            feature_type_id: 1, // dataset, observation, whatever.
+            feature_type_id: 1, // dataset, observation, etc.
             data: {
               id: 100,
               type: 'some_random_thing',
@@ -57,7 +45,7 @@ describe.only('SearchIndexService', () => {
           {
             submission_feature_id: 22222,
             submission_id: 1, // Mock submission
-            feature_type_id: 1, // dataset, observation, whatever.
+            feature_type_id: 1, // dataset, observation, etc.
             data: {
               id: 200,
               type: 'another_random_thing',
@@ -73,200 +61,197 @@ describe.only('SearchIndexService', () => {
               }
             }
           }
-        ])
-
-      const insertSearchableStringStub = sinon
-        .stub(SearchIndexRepository.prototype, 'insertSearchableStringRecords')
-
-      const insertSearchableDatetimeStub = sinon
-        .stub(SearchIndexRepository.prototype, 'insertSearchableDatetimeRecords')
-
-      const insertSearchableSpatialStub = sinon
-        .stub(SearchIndexRepository.prototype, 'insertSearchableSpatialRecords')
-
-      const insertSearchableNumberStub = sinon
-        .stub(SearchIndexRepository.prototype, 'insertSearchableNumberRecords')
-
-      /*const getFeaturePropertiesWithTypeNamesStub = */ // TODO remove?
-      sinon.stub(SearchIndexRepository.prototype, 'getFeaturePropertiesWithTypeNames')
-        .resolves([
-          {
-            feature_property_type_name: 'number',
-            feature_property_id: 8,
-            feature_property_type_id: 2,
-            name: 'count',
-            display_name: 'Count',
-            description: 'The count of the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'object',
-            feature_property_id: 4,
-            feature_property_type_id: 6,
-            name: 'date_range',
-            display_name: 'Date Range',
-            description: 'A date range',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'string',
-            feature_property_id: 2,
-            feature_property_type_id: 1,
-            name: 'description',
-            display_name: 'Description',
-            description: 'The description of the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'datetime',
-            feature_property_id: 6,
-            feature_property_type_id: 3,
-            name: 'end_date',
-            display_name: 'End Date',
-            description: 'The end date of the record',
-            parent_feature_property_id: 4,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'spatial',
-            feature_property_id: 7,
-            feature_property_type_id: 4,
-            name: 'geometry',
-            display_name: 'Geometry',
-            description: 'The location of the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'number',
-            feature_property_id: 9,
-            feature_property_type_id: 2,
-            name: 'latitude',
-            display_name: 'Latitude',
-            description: 'The latitude of the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'number',
-            feature_property_id: 10,
-            feature_property_type_id: 2,
-            name: 'longitude',
-            display_name: 'Longitude',
-            description: 'The longitude of the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'string',
-            feature_property_id: 1,
-            feature_property_type_id: 1,
-            name: 'name',
-            display_name: 'Name',
-            description: 'The name of the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'string',
-            feature_property_id: 21,
-            feature_property_type_id: 1,
-            name: 's3_key',
-            display_name: 'Key',
-            description: 'The S3 storage key for an artifact',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 15:40:29.486362-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'datetime',
-            feature_property_id: 5,
-            feature_property_type_id: 3,
-            name: 'start_date',
-            display_name: 'Start Date',
-            description: 'The start date of the record',
-            parent_feature_property_id: 4,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          },
-          {
-            feature_property_type_name: 'number',
-            feature_property_id: 3,
-            feature_property_type_id: 2,
-            name: 'taxonomy',
-            display_name: 'Taxonomy Id',
-            description: 'The taxonomy Id associated to the record',
-            parent_feature_property_id: null,
-            record_effective_date: '2023-12-08',
-            record_end_date: null,
-            create_date: '2023-12-08 14:37:41.315999-08',
-            create_user: 1,
-            update_date: null,
-            update_user: null,
-            revision_count: 0
-          }
         ]);
+
+      const insertSearchableStringStub = sinon.stub(SearchIndexRepository.prototype, 'insertSearchableStringRecords');
+
+      const insertSearchableDatetimeStub = sinon.stub(
+        SearchIndexRepository.prototype,
+        'insertSearchableDatetimeRecords'
+      );
+
+      const insertSearchableSpatialStub = sinon.stub(SearchIndexRepository.prototype, 'insertSearchableSpatialRecords');
+
+      const insertSearchableNumberStub = sinon.stub(SearchIndexRepository.prototype, 'insertSearchableNumberRecords');
+
+      sinon.stub(SearchIndexRepository.prototype, 'getFeaturePropertiesWithTypeNames').resolves([
+        {
+          feature_property_type_name: 'number',
+          feature_property_id: 8,
+          feature_property_type_id: 2,
+          name: 'count',
+          display_name: 'Count',
+          description: 'The count of the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'object',
+          feature_property_id: 4,
+          feature_property_type_id: 6,
+          name: 'date_range',
+          display_name: 'Date Range',
+          description: 'A date range',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'string',
+          feature_property_id: 2,
+          feature_property_type_id: 1,
+          name: 'description',
+          display_name: 'Description',
+          description: 'The description of the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'datetime',
+          feature_property_id: 6,
+          feature_property_type_id: 3,
+          name: 'end_date',
+          display_name: 'End Date',
+          description: 'The end date of the record',
+          parent_feature_property_id: 4,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'spatial',
+          feature_property_id: 7,
+          feature_property_type_id: 4,
+          name: 'geometry',
+          display_name: 'Geometry',
+          description: 'The location of the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'number',
+          feature_property_id: 9,
+          feature_property_type_id: 2,
+          name: 'latitude',
+          display_name: 'Latitude',
+          description: 'The latitude of the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'number',
+          feature_property_id: 10,
+          feature_property_type_id: 2,
+          name: 'longitude',
+          display_name: 'Longitude',
+          description: 'The longitude of the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'string',
+          feature_property_id: 1,
+          feature_property_type_id: 1,
+          name: 'name',
+          display_name: 'Name',
+          description: 'The name of the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'string',
+          feature_property_id: 21,
+          feature_property_type_id: 1,
+          name: 's3_key',
+          display_name: 'Key',
+          description: 'The S3 storage key for an artifact',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 15:40:29.486362-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'datetime',
+          feature_property_id: 5,
+          feature_property_type_id: 3,
+          name: 'start_date',
+          display_name: 'Start Date',
+          description: 'The start date of the record',
+          parent_feature_property_id: 4,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        },
+        {
+          feature_property_type_name: 'number',
+          feature_property_id: 3,
+          feature_property_type_id: 2,
+          name: 'taxonomy',
+          display_name: 'Taxonomy Id',
+          description: 'The taxonomy Id associated to the record',
+          parent_feature_property_id: null,
+          record_effective_date: '2023-12-08',
+          record_end_date: null,
+          create_date: '2023-12-08 14:37:41.315999-08',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        }
+      ]);
 
       // Act
       await searchIndexService.indexFeaturesBySubmissionId(777);
@@ -365,7 +350,6 @@ describe.only('SearchIndexService', () => {
           value: 22
         }
       ]);
-
     });
   });
 });

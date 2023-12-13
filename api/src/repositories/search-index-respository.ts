@@ -1,9 +1,9 @@
-import { z } from "zod";
-import { getLogger } from "../utils/logger";
-import { BaseRepository } from "./base-repository";
-import { getKnex } from "../database/db";
-import { ApiExecuteSQLError } from "../errors/api-error";
-import SQL from "sql-template-strings";
+import SQL from 'sql-template-strings';
+import { z } from 'zod';
+import { getKnex } from '../database/db';
+import { ApiExecuteSQLError } from '../errors/api-error';
+import { getLogger } from '../utils/logger';
+import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/search-index-repository');
 
@@ -31,11 +31,10 @@ const FeaturePropertyRecordWithPropertyTypeName = FeaturePropertyRecord.extend({
 
 export type FeaturePropertyRecordWithPropertyTypeName = z.infer<typeof FeaturePropertyRecordWithPropertyTypeName>;
 
-
 // TODO replace with pre-existing Zod types for geojson
 const Geometry = z.object({
   type: z.literal('Point'),
-  coordinates: z.tuple([z.number(), z.number()]),
+  coordinates: z.tuple([z.number(), z.number()])
 });
 
 export type Geometry = z.infer<typeof Geometry>;
@@ -48,10 +47,10 @@ const SearchableRecord = z.object({
   create_user: z.number(),
   update_date: z.date().nullable(),
   update_user: z.date().nullable(),
-  revision_count: z.number(),
+  revision_count: z.number()
 });
 
-type InsertSearchableRecordKey = 'submission_feature_id' | 'value' | 'feature_property_id'
+type InsertSearchableRecordKey = 'submission_feature_id' | 'value' | 'feature_property_id';
 
 export const DatetimeSearchableRecord = SearchableRecord.extend({
   search_datetime_id: z.date(),
@@ -79,10 +78,10 @@ export type NumberSearchableRecord = z.infer<typeof NumberSearchableRecord>;
 export type SpatialSearchableRecord = z.infer<typeof SpatialSearchableRecord>;
 export type StringSearchableRecord = z.infer<typeof StringSearchableRecord>;
 
-export type InsertDatetimeSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>
-export type InsertNumberSearchableRecord = Pick<NumberSearchableRecord, InsertSearchableRecordKey>
-export type InsertSpatialSearchableRecord = Pick<SpatialSearchableRecord, InsertSearchableRecordKey>
-export type InsertStringSearchableRecord = Pick<StringSearchableRecord, InsertSearchableRecordKey>
+export type InsertDatetimeSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>;
+export type InsertNumberSearchableRecord = Pick<NumberSearchableRecord, InsertSearchableRecordKey>;
+export type InsertSpatialSearchableRecord = Pick<SpatialSearchableRecord, InsertSearchableRecordKey>;
+export type InsertStringSearchableRecord = Pick<StringSearchableRecord, InsertSearchableRecordKey>;
 
 /**
  * A class for creating searchable records
@@ -95,14 +94,12 @@ export class SearchIndexRepository extends BaseRepository {
    * @return {*}  {Promise<DatetimeSearchableRecord[]>}
    * @memberof SearchIndexRepository
    */
-  async insertSearchableDatetimeRecords(datetimeRecords: InsertDatetimeSearchableRecord[]): Promise<DatetimeSearchableRecord[]> {
+  async insertSearchableDatetimeRecords(
+    datetimeRecords: InsertDatetimeSearchableRecord[]
+  ): Promise<DatetimeSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableDatetimeRecords' });
 
-    const queryBuilder = getKnex()
-      .queryBuilder()
-      .insert(datetimeRecords)
-      .into('search_datetime')
-      .returning('*')
+    const queryBuilder = getKnex().queryBuilder().insert(datetimeRecords).into('search_datetime').returning('*');
 
     const response = await this.connection.knex<DatetimeSearchableRecord>(queryBuilder);
 
@@ -123,14 +120,12 @@ export class SearchIndexRepository extends BaseRepository {
    * @return {*}  {Promise<NumberSearchableRecord[]>}
    * @memberof SearchIndexRepository
    */
-  async insertSearchableNumberRecords(numberRecords: InsertNumberSearchableRecord[]): Promise<NumberSearchableRecord[]> {
+  async insertSearchableNumberRecords(
+    numberRecords: InsertNumberSearchableRecord[]
+  ): Promise<NumberSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableNumberRecords' });
 
-    const queryBuilder = getKnex()
-      .queryBuilder()
-      .insert(numberRecords)
-      .into('search_number')
-      .returning('*')
+    const queryBuilder = getKnex().queryBuilder().insert(numberRecords).into('search_number').returning('*');
 
     const response = await this.connection.knex<NumberSearchableRecord>(queryBuilder);
 
@@ -151,14 +146,12 @@ export class SearchIndexRepository extends BaseRepository {
    * @return {*}  {Promise<SpatialSearchableRecord[]>}
    * @memberof SearchIndexRepository
    */
-  async insertSearchableSpatialRecords(spatialRecords: InsertSpatialSearchableRecord[]): Promise<SpatialSearchableRecord[]> {
+  async insertSearchableSpatialRecords(
+    spatialRecords: InsertSpatialSearchableRecord[]
+  ): Promise<SpatialSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableSpatialRecords' });
 
-    const queryBuilder = getKnex()
-      .queryBuilder()
-      .insert(spatialRecords)
-      .into('search_spatial')
-      .returning('*')
+    const queryBuilder = getKnex().queryBuilder().insert(spatialRecords).into('search_spatial').returning('*');
 
     const response = await this.connection.knex<SpatialSearchableRecord>(queryBuilder);
 
@@ -179,14 +172,12 @@ export class SearchIndexRepository extends BaseRepository {
    * @return {*}  {Promise<StringSearchableRecord[]>}
    * @memberof SearchIndexRepository
    */
-  async insertSearchableStringRecords(stringRecords: InsertStringSearchableRecord[]): Promise<StringSearchableRecord[]> {
+  async insertSearchableStringRecords(
+    stringRecords: InsertStringSearchableRecord[]
+  ): Promise<StringSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableStringRecords' });
 
-    const queryBuilder = getKnex()
-      .queryBuilder()
-      .insert(stringRecords)
-      .into('search_string')
-      .returning('*')
+    const queryBuilder = getKnex().queryBuilder().insert(stringRecords).into('search_string').returning('*');
 
     const response = await this.connection.knex<StringSearchableRecord>(queryBuilder);
 
@@ -228,5 +219,4 @@ export class SearchIndexRepository extends BaseRepository {
 
     return response.rows;
   }
-
 }

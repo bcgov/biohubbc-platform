@@ -31,13 +31,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  // Triggers a request to index the given submission
-  const test = async (submissionId: number): Promise<any> => {
-    const { data } = await axios.post(`/api/submission/search-idx?submissionId=${submissionId}`);
-
-    return data;
-  }
-
   /** NET-NEW FRONTEND REQUESTS FOR UPDATED SCHEMA **/
 
   /**
@@ -94,8 +87,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getSignedUrl,
     listReviewedSubmissions,
     getSubmissionDownloadPackage,
-    getSubmission,
-    test
+    getSubmission
   };
 };
 

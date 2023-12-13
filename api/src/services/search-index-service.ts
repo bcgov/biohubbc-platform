@@ -1,4 +1,4 @@
-import { IDBConnection } from "../database/db";
+import { IDBConnection } from '../database/db';
 import {
   FeaturePropertyRecordWithPropertyTypeName,
   Geometry,
@@ -7,10 +7,10 @@ import {
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
   SearchIndexRepository
-} from "../repositories/search-index-respository";
-import { SubmissionRepository } from "../repositories/submission-repository";
-import { getLogger } from "../utils/logger";
-import { DBService } from "./db-service";
+} from '../repositories/search-index-respository';
+import { SubmissionRepository } from '../repositories/submission-repository';
+import { getLogger } from '../utils/logger';
+import { DBService } from './db-service';
 
 const defaultLog = getLogger('services/search-index-service');
 
@@ -42,42 +42,43 @@ export class SearchIndexService extends DBService {
     const submissionRepository = new SubmissionRepository(this.connection);
     const features = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
-    const featurePropertyTypeNames: FeaturePropertyRecordWithPropertyTypeName[] = await this.searchIndexRepository.getFeaturePropertiesWithTypeNames();
-    const featurePropertyTypeMap: Record<string, FeaturePropertyRecordWithPropertyTypeName> = Object.fromEntries(featurePropertyTypeNames.map((propertyType) => {
-      const { name } = propertyType;
-      return [name, propertyType];
-    }))
+    const featurePropertyTypeNames: FeaturePropertyRecordWithPropertyTypeName[] =
+      await this.searchIndexRepository.getFeaturePropertiesWithTypeNames();
+    const featurePropertyTypeMap: Record<string, FeaturePropertyRecordWithPropertyTypeName> = Object.fromEntries(
+      featurePropertyTypeNames.map((propertyType) => {
+        const { name } = propertyType;
+        return [name, propertyType];
+      })
+    );
 
     features.forEach((feature) => {
       const { submission_feature_id } = feature;
-      Object
-        .entries(feature.data.properties)
-        .forEach(([feature_property_name, value]) => {
-          const featureProperty = featurePropertyTypeMap[feature_property_name];
-          if (!featureProperty) {
-            return;
-          }
+      Object.entries(feature.data.properties).forEach(([feature_property_name, value]) => {
+        const featureProperty = featurePropertyTypeMap[feature_property_name];
+        if (!featureProperty) {
+          return;
+        }
 
-          const { feature_property_type_name, feature_property_id } = featureProperty;
+        const { feature_property_type_name, feature_property_id } = featureProperty;
 
-          switch (feature_property_type_name) {
-            case 'datetime':
-              datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as Date });
-              break;
+        switch (feature_property_type_name) {
+          case 'datetime':
+            datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as Date });
+            break;
 
-            case 'number':
-              numberRecords.push({ submission_feature_id, feature_property_id, value: value as number });
-              break;
+          case 'number':
+            numberRecords.push({ submission_feature_id, feature_property_id, value: value as number });
+            break;
 
-            case 'spatial':
-              spatialRecords.push({ submission_feature_id, feature_property_id, value: value as Geometry });
-              break;
+          case 'spatial':
+            spatialRecords.push({ submission_feature_id, feature_property_id, value: value as Geometry });
+            break;
 
-            case 'string':
-              stringRecords.push({ submission_feature_id, feature_property_id, value: value as string });
-              break;
-          }
-        })
+          case 'string':
+            stringRecords.push({ submission_feature_id, feature_property_id, value: value as string });
+            break;
+        }
+      });
     });
 
     if (datetimeRecords.length) {

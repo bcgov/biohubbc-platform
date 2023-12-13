@@ -1,8 +1,8 @@
-import { QueryResult } from "pg";
-import { FeaturePropertyRecordWithPropertyTypeName, SearchIndexRepository } from "./search-index-respository";
-import { getMockDBConnection } from "../__mocks__/db";
-import { expect } from "chai";
-import Sinon from "sinon";
+import { expect } from 'chai';
+import { QueryResult } from 'pg';
+import Sinon from 'sinon';
+import { getMockDBConnection } from '../__mocks__/db';
+import { FeaturePropertyRecordWithPropertyTypeName, SearchIndexRepository } from './search-index-respository';
 
 describe('SearchIndexRepository', () => {
   afterEach(() => {
@@ -10,7 +10,6 @@ describe('SearchIndexRepository', () => {
   });
 
   describe('getFeaturePropertiesWithTypeNames', () => {
-
     it('returns an array of FeaturePropertyRecordWithPropertyTypeName', async () => {
       const rows: FeaturePropertyRecordWithPropertyTypeName[] = [
         {
@@ -386,4 +385,4 @@ describe('SearchIndexRepository', () => {
       ]);
     });
   });
-})
+});
