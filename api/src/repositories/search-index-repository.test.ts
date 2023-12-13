@@ -9,7 +9,7 @@ describe('SearchIndexRepository', () => {
     Sinon.restore();
   });
 
-  describe.only('getFeaturePropertiesWithTypeNames', () => {
+  describe('getFeaturePropertiesWithTypeNames', () => {
 
     it('returns an array of FeaturePropertyRecordWithPropertyTypeName', async () => {
       const rows: FeaturePropertyRecordWithPropertyTypeName[] = [
