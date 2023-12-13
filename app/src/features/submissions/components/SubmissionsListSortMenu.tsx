@@ -77,10 +77,10 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
       <Button
         id="sort-button"
         onClick={handleClick}
-        variant="contained"
+        variant="outlined"
         disableElevation
         size="small"
-        endIcon={<Icon path={mdiChevronDown} size={1} />}>
+        endIcon={<Icon path={mdiChevronDown} size={0.75} />}>
         Sort By
       </Button>
       <Menu id="sort-menu" anchorEl={anchorEl} open={open} onClose={handleClose}>
