@@ -34,12 +34,14 @@ export interface ISubmissionFeature {
   uuid: string;
   security_review_timestamp: string;
   create_date: string;
+  create_user: string;
 }
 export interface IFeature {
   submission_feature_id: number;
   submission_id: number;
   feature_type: string;
   data: any;
+  submission_feature_security_ids: number[];
   parent_submission_feature_id: number | null;
 }
 export interface IGetSubmissionResponse {

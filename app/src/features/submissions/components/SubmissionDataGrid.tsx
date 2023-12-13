@@ -25,6 +25,12 @@ export interface ISubmissionDataGridProps {
   submissionFeatures: IFeature[];
 }
 
+/**
+ * SubmissionDataGrid component for displaying submission data.
+ *
+ * @param {ISubmissionDataGridProps} props
+ * @return {*}
+ */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
   const { submissionFeatures, title } = props;
@@ -85,6 +91,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
         label={`${title} (${submissionFeatures.length})`}
         labelProps={{ variant: 'h4' }}
       />
+
       <Box display="flex" width={1}>
         <DataGrid
           sx={{ flexGrow: 1, borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}

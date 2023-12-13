@@ -94,6 +94,13 @@ export const SubmissionFeatureRecord = z.object({
 
 export type SubmissionFeatureRecord = z.infer<typeof SubmissionFeatureRecord>;
 
+export const SubmissionRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
+  feature_type: z.string(),
+  submission_feature_security_ids: z.array(z.number()).nullable()
+});
+
+export type SubmissionRecordWithTypeAndSecurity = z.infer<typeof SubmissionRecordWithTypeAndSecurity>;
+
 export const FeatureTypeRecord = z.object({
   feature_type_id: z.number(),
   name: z.string(),
@@ -1154,23 +1161,24 @@ export class SubmissionRepository extends BaseRepository {
    * Fetch a submission from uuid.
    *
    * @param {string} uuid
-   * @return {*}  {Promise<ISubmissionModel>}
+   * @return {*}  {(Promise<ISubmissionModel & { create_user: string }>)}
    * @memberof SubmissionRepository
    */
-  async getSubmissionByUUID(uuid: string): Promise<ISubmissionModel> {
+  async getSubmissionByUUID(uuid: string): Promise<ISubmissionModel & { create_user: string }> {
     const sqlStatement = SQL`
         SELECT
-          submission_id,
-          uuid,
-          security_review_timestamp,
-          create_date
+          s.submission_id,
+          s.uuid,
+          s.security_review_timestamp,
+          s.create_date,
+          (SELECT su.user_identifier FROM system_user su WHERE su.system_user_id = s.create_user) as create_user
         FROM
-          submission
+          submission s
         WHERE
           uuid = ${uuid};
       `;
 
-    const response = await this.connection.sql<ISubmissionModel>(sqlStatement);
+    const response = await this.connection.sql<ISubmissionModel & { create_user: string }>(sqlStatement);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission record', [
@@ -1283,29 +1291,23 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Fetch a submission from uuid.
    *
+   *
    * @param {number} submissionId
-   * @return {*}  {(Promise<(SubmissionFeatureRecord & { feature_type: string })[]>)}
+   * @return {*}  {Promise<SubmissionRecordWithTypeAndSecurity[]>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionFeaturesBySubmissionId(
-    submissionId: number
-  ): Promise<(SubmissionFeatureRecord & { feature_type: string })[]> {
+  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<SubmissionRecordWithTypeAndSecurity[]> {
     const sqlStatement = SQL`
         SELECT
           sf.*,
           (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
-          sf.data,
-          sf.parent_submission_feature_id,
           (SELECT sfs.submission_feature_security_id FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) AS submission_feature_security_ids
         FROM
           submission_feature sf
         WHERE
           submission_id = ${submissionId};
       `;
-    const response = await this.connection.sql(
-      sqlStatement,
-      SubmissionFeatureRecord.extend({ feature_type: z.string() })
-    );
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithTypeAndSecurity);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission feature record', [

@@ -7,6 +7,11 @@ import ManageSecurityReasonsDialog from './components/ManageSecurityReasonsDialo
 import SubmissionDataGrid from './components/SubmissionDataGrid';
 import SubmissionHeader from './components/SubmissionHeader';
 
+/**
+ * AdminSubmissionPage component for reviewing submissions.
+ *
+ * @return {*}
+ */
 const AdminSubmissionPage = () => {
   const submissionContext = useContext(SubmissionContext);
 

@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { IListSubmissionsResponse, ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import { IGetSubmissionResponse, IListSubmissionsResponse, ISubmission } from 'interfaces/useSubmissionsApi.interface';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -75,11 +75,10 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * Fetch submission data by submissionUUID.
    *
    * @param {string} submissionUUID
-   * @return {*}  {Promise<any>} //TODO: type
+   * @return {*}  {Promise<IGetSubmissionResponse>}
    */
-  const getSubmission = async (submissionUUID: string): Promise<any> => {
+  const getSubmission = async (submissionUUID: string): Promise<IGetSubmissionResponse> => {
     const { data } = await axios.get(`api/submission/${submissionUUID}`);
-    console.log('data', data);
     return data;
   };
 

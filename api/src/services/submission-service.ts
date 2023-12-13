@@ -19,6 +19,7 @@ import {
   SubmissionFeatureRecord,
   SubmissionMessageRecord,
   SubmissionRecord,
+  SubmissionRecordWithTypeAndSecurity,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
@@ -576,14 +577,32 @@ export class SubmissionService extends DBService {
   async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
     return this.submissionRepository.getReviewedSubmissionsWithSecurity();
   }
+
   /*
    * Retrieves submission data from the submission table.
    *
+   *
    * @param {string} submissionUUID
-   * @return {*}  {Promise<any>} TODO: type
-   * @memberof DatasetService
+   * @return {*}  {(Promise<{
+   *     submission: ISubmissionModel & { create_user: string };
+   *     features: {
+   *       dataset: SubmissionRecordWithTypeAndSecurity[];
+   *       sampleSites: SubmissionRecordWithTypeAndSecurity[];
+   *       animals: SubmissionRecordWithTypeAndSecurity[];
+   *       observations: SubmissionRecordWithTypeAndSecurity[];
+   *     };
+   *   }>)}
+   * @memberof SubmissionService
    */
-  async getSubmissionAndFeaturesBySubmissionUUID(submissionUUID: string): Promise<any> {
+  async getSubmissionAndFeaturesBySubmissionUUID(submissionUUID: string): Promise<{
+    submission: ISubmissionModel & { create_user: string };
+    features: {
+      dataset: SubmissionRecordWithTypeAndSecurity[];
+      sampleSites: SubmissionRecordWithTypeAndSecurity[];
+      animals: SubmissionRecordWithTypeAndSecurity[];
+      observations: SubmissionRecordWithTypeAndSecurity[];
+    };
+  }> {
     const submission = await this.submissionRepository.getSubmissionByUUID(submissionUUID);
 
     if (!submission.submission_id) {
