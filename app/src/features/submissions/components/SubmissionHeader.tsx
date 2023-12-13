@@ -81,7 +81,6 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
 
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
 
-  const submissionUUID = submissionContext.submissionUUID;
   const submissionDataLoader = submissionContext.submissionDataLoader;
 
   if (!submissionDataLoader.data) {
@@ -104,53 +103,59 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
               DASHBOARD
             </Link>
             <Typography variant="body2" component="span">
-              {dataset?.data.name} | {submissionUUID}
+              {dataset?.data.name}
             </Typography>
           </Breadcrumbs>
         }
         subTitle={
           <Stack flexDirection="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
             <Stack flexDirection="row" alignItems="center">
-              <>
-                {secure === SECURITY_APPLIED_STATUS.SECURED && (
-                  <>
-                    <Icon path={mdiLock} size={1} />
-                    <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
-                      SECURED ·
-                    </Typography>
-                  </>
-                )}
-                {secure === SECURITY_APPLIED_STATUS.UNSECURED && (
-                  <>
-                    <Icon path={mdiLockOpenVariantOutline} size={1} />
-                    <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
-                      UNSECURED ·
-                    </Typography>
-                  </>
-                )}
-                {secure === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED && (
-                  <>
-                    <Icon path={mdiLockAlertOutline} size={1} />
-                    <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
-                      PARTIALLY SECURED ·
-                    </Typography>
-                  </>
-                )}
-                {submission?.security_review_timestamp ? (
-                  <>
-                    <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
-                      PUBLISHED: {moment(submission?.security_review_timestamp).format('YYYY-MM-DD')}
-                    </Typography>
-                  </>
-                ) : (
-                  <>
-                    <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
-                      PENDING REVIEW · SUBMITTED: {moment(submission?.create_date).format('YYYY-MM-DD')} by{' '}
-                      {submission?.create_user}
-                    </Typography>
-                  </>
-                )}
-              </>
+              {submission?.security_review_timestamp ? (
+                <>
+                  {secure === SECURITY_APPLIED_STATUS.SECURED && (
+                    <>
+                      <Icon path={mdiLock} size={1} />
+                      <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
+                        SECURED ·
+                      </Typography>
+                    </>
+                  )}
+                  {secure === SECURITY_APPLIED_STATUS.UNSECURED && (
+                    <>
+                      <Icon path={mdiLockOpenVariantOutline} size={1} />
+                      <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
+                        UNSECURED ·
+                      </Typography>
+                    </>
+                  )}
+                  {secure === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED && (
+                    <>
+                      <Icon path={mdiLockAlertOutline} size={1} />
+                      <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
+                        PARTIALLY SECURED ·
+                      </Typography>
+                    </>
+                  )}
+                  <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
+                    PUBLISHED: {moment(submission?.security_review_timestamp).format('YYYY-MM-DD')}
+                  </Typography>
+                </>
+              ) : (
+                <>
+                  {secure === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED && (
+                    <>
+                      <Icon path={mdiLockAlertOutline} size={1} />
+                      <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
+                        PARTIALLY SECURED ·
+                      </Typography>
+                    </>
+                  )}
+                  <Typography component="span" color="textSecondary" sx={{ ml: 1 }}>
+                    PENDING REVIEW · SUBMITTED: {moment(submission?.create_date).format('YYYY-MM-DD')} by{' '}
+                    {submission?.create_user}
+                  </Typography>
+                </>
+              )}
             </Stack>
           </Stack>
         }

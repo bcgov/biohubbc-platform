@@ -81,7 +81,7 @@ export const SubmissionFeatureRecord = z.object({
   submission_feature_id: z.number(),
   submission_id: z.number(),
   feature_type_id: z.number(),
-  data: z.object({}),
+  data: z.record(z.any()),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),

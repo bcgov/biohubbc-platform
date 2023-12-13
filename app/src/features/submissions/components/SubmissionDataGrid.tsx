@@ -51,7 +51,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => (params.row.data[fieldName] ? params.row.data[fieldName] : null),
       renderCell: (params: GridRenderCellParams) => {
-        return <pre>{params.value}</pre>;
+        return <pre>{String(params.value)}</pre>;
       }
     };
   });
