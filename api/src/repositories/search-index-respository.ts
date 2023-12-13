@@ -7,6 +7,24 @@ import SQL from "sql-template-strings";
 
 const defaultLog = getLogger('repositories/search-index-repository');
 
+const FeaturePropertyRecord = z.object({
+  name: z.string(),
+  feature_property_id: z.number(),
+  feature_property_type_id: z.number(),
+  display_name: z.string(),
+  description: z.string(),
+  parent_feature_property_id: z.number().nullable(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.string().nullable(),
+  revision_count: z.number()
+});
+
+export type FeaturePropertyRecord = z.infer<typeof FeaturePropertyRecord>;
+
 // TODO replace with pre-existing Zod types for geojson
 const Geometry = z.object({
   type: z.literal('Point'),
