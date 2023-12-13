@@ -15,7 +15,6 @@ const UnsecureDialog = (props: IUnsecureDialogProps) => {
   const dialogContext = useContext(DialogContext);
 
   const handleRemove = async () => {
-    console.log('PLEASE REMOVE THE SECURITY');
     try {
       await api.security.removeSecurityRulesToSubmissions(props.submissions);
       dialogContext.setSnackbar({
@@ -38,6 +37,8 @@ const UnsecureDialog = (props: IUnsecureDialogProps) => {
         dialogText: ApplySecurityRulesI18N.unapplySecurityRulesErrorText,
         open: true
       });
+    } finally {
+      props.onClose();
     }
   };
 
