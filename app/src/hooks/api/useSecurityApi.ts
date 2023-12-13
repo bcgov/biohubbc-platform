@@ -83,10 +83,16 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   const applySecurityRulesToSubmissions = async (submissions: number[], rules: number[]): Promise<any[]> => {
-    console.log(submissions, rules);
     const { data } = await axios.post('api/administrative/security/apply', {
       submissions,
       rules
+    });
+    return data;
+  };
+
+  const removeSecurityRulesToSubmissions = async (submissions: number[]): Promise<any[]> => {
+    const { data } = await axios.post('api/administrative/security/remove', {
+      submissions
     });
     return data;
   };
@@ -97,7 +103,8 @@ const useSecurityApi = (axios: AxiosInstance) => {
     applySecurityReasonsToArtifacts,
     getActiveSecurityRules,
     addSecurityRule,
-    applySecurityRulesToSubmissions
+    applySecurityRulesToSubmissions,
+    removeSecurityRulesToSubmissions
   };
 };
 

@@ -286,4 +286,14 @@ export class SecurityRepository extends BaseRepository {
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
   }
+
+  async removeSecurityRulesFromSubmissionFeatures(submission: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    const deleteSQL = SQL`
+      DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
+
+    deleteSQL.append(submission.join(', '));
+    deleteSQL.append(`) RETURNING *;`);
+    const response = await this.connection.sql(deleteSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
 }
