@@ -1,168 +1,80 @@
-import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import { makeStyles } from '@mui/styles';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { SubmissionContext } from 'contexts/submissionContext';
-import { IFeature } from 'interfaces/useDatasetApi.interface';
-import { useContext } from 'react';
+import { useContext, useState } from 'react';
+import CompleteReviewDialog from './components/CompleteReviewDialog';
+import ManageSecurityReasonsDialog from './components/ManageSecurityReasonsDialog';
+import SubmissionDataGrid from './components/SubmissionDataGrid';
 import SubmissionHeader from './components/SubmissionHeader';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  datasetTitleContainer: {
-    paddingBottom: theme.spacing(5),
-    background: '#f7f8fa',
-    '& h1': {
-      marginTop: '-4px'
-    }
-  },
-  datasetDetailsLabel: {
-    borderBottom: '1pt solid #dadada'
-  },
-  datasetDetailsContainer: {},
-  datasetMapContainer: {
-    minHeight: '400px'
-  }
-}));
-
 const AdminSubmissionPage: React.FC<React.PropsWithChildren> = () => {
-  const classes = useStyles();
   const submissionContext = useContext(SubmissionContext);
 
   const submissionDataLoader = submissionContext.submissionDataLoader;
-  const submissionFeatures:
-    | {
-        dataset: IFeature[];
-        sampleSites: IFeature[];
-        animals: IFeature[];
-        observations: IFeature[];
-      }
-    | undefined = submissionDataLoader.data?.features;
+  const features = submissionDataLoader.data?.features;
 
-  const sampleSites = submissionFeatures?.sampleSites;
-  const animals = submissionFeatures?.animals;
-  const observations = submissionFeatures?.observations;
+  const dataset = features?.dataset;
+  const sampleSites = features?.sampleSites;
+  const animals = features?.animals;
+  const observations = features?.observations;
 
-  const columns: GridColDef[] = [
-    {
-      field: 'submission_feature_id',
-      headerName: 'ID',
-      flex: 1,
-      disableColumnMenu: true
-    },
-    {
-      field: 'feature_type',
-      headerName: 'Type',
-      flex: 2,
-      disableColumnMenu: true
-    },
-    {
-      field: 'data',
-      headerName: 'Data',
-      flex: 2,
-      disableColumnMenu: true,
-      renderCell: (params) => {
-        return <pre>{JSON.stringify(params.value, null, 2)}</pre>;
-      }
-    },
-    {
-      field: 'parent_submission_feature_id',
-      headerName: 'Parent ID',
-      flex: 1,
-      disableColumnMenu: true
-    }
-  ];
+  const [openSecurityReasonsDialog, setOpenSecurityReasonsDialog] = useState(false);
+  const [openCompleteReviewDialog, setOpenCompleteReviewDialog] = useState(false);
+
+  const submitSecurity = async (values: any) => {
+    console.log('values', values);
+  };
 
   return (
     <Box>
-      <SubmissionHeader />
+      <CompleteReviewDialog
+        open={openCompleteReviewDialog}
+        onClose={() => setOpenCompleteReviewDialog(false)}
+        onSubmit={async (values) => {
+          setOpenCompleteReviewDialog(false);
+          submitSecurity(values);
+        }}
+        submissionSuccessDialogTitle="Submission Completed"
+        submissionSuccessDialogText="Submission has been completed successfully."
+        noSubmissionDataDialogTitle="No Submission Data"
+        noSubmissionDataDialogText="No submission data found."
+      />
+      <ManageSecurityReasonsDialog
+        open={openSecurityReasonsDialog}
+        onClose={() => setOpenSecurityReasonsDialog(false)}
+        onSubmit={async (values) => {
+          setOpenSecurityReasonsDialog(false);
+          submitSecurity(values);
+        }}
+        submissionSuccessDialogTitle="Submission Security Review Submitted"
+        submissionSuccessDialogText="Submission security review has been submitted successfully."
+        noSubmissionDataDialogTitle="No Submission Data"
+        noSubmissionDataDialogText="No submission data found."
+      />
+      {/* <UnsecureRecordsDialog /> TODO: create unsecure dialog */}
+      <SubmissionHeader
+        openSecureRecordsDialog={(open: boolean) => {
+          setOpenSecurityReasonsDialog(open);
+        }}
+        openCompleteReviewDialog={(open: boolean) => {
+          setOpenCompleteReviewDialog(open);
+        }}
+        openUnsecureRecordsDialog={(open: boolean) => {
+          setOpenSecurityReasonsDialog(open);
+        }}
+      />
       <Container maxWidth="xl">
-        <Box py={3}>
-          <Paper elevation={0}>
-            <ActionToolbar
-              className={classes.datasetDetailsLabel}
-              label="ADMIN DATASET DETAILS"
-              labelProps={{ variant: 'h4' }}
-            />
-            <Box display="flex">
-              {sampleSites && (
-                <DataGrid
-                  sx={{ borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
-                  data-testid="security-reviews-data-grid"
-                  getRowId={(row) => row.submission_feature_id}
-                  autoHeight
-                  rows={sampleSites}
-                  columns={columns}
-                  pageSizeOptions={[5]}
-                  disableRowSelectionOnClick
-                  disableColumnSelector
-                  disableColumnMenu
-                  sortingOrder={['asc', 'desc']}
-                  initialState={{
-                    sorting: { sortModel: [{ field: 'last_updated', sort: 'desc' }] },
-                    pagination: {
-                      paginationModel: {
-                        pageSize: 5
-                      }
-                    }
-                  }}
-                />
-              )}
-            </Box>
-
-            <Box display="flex">
-              {animals && (
-                <DataGrid
-                  sx={{ borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
-                  data-testid="security-reviews-data-grid"
-                  getRowId={(row) => row.submission_feature_id}
-                  autoHeight
-                  rows={animals}
-                  columns={columns}
-                  pageSizeOptions={[5]}
-                  disableRowSelectionOnClick
-                  disableColumnSelector
-                  disableColumnMenu
-                  sortingOrder={['asc', 'desc']}
-                  initialState={{
-                    sorting: { sortModel: [{ field: 'last_updated', sort: 'desc' }] },
-                    pagination: {
-                      paginationModel: {
-                        pageSize: 5
-                      }
-                    }
-                  }}
-                />
-              )}
-            </Box>
-            <Box display="flex">
-              {observations && (
-                <DataGrid
-                  sx={{ borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
-                  data-testid="security-reviews-data-grid"
-                  getRowId={(row) => row.submission_feature_id}
-                  autoHeight
-                  rows={observations}
-                  columns={columns}
-                  pageSizeOptions={[5]}
-                  disableRowSelectionOnClick
-                  disableColumnSelector
-                  disableColumnMenu
-                  sortingOrder={['asc', 'desc']}
-                  initialState={{
-                    sorting: { sortModel: [{ field: 'last_updated', sort: 'desc' }] },
-                    pagination: {
-                      paginationModel: {
-                        pageSize: 5
-                      }
-                    }
-                  }}
-                />
-              )}
-            </Box>
-          </Paper>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={dataset || []} title="DATASET FEATURES" />
+        </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={sampleSites || []} title="SAMPLE SITE FEATURES" />
+        </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={animals || []} title="ANIMAL FEATURES" />
+        </Box>
+        <Box py={2}>
+          <SubmissionDataGrid submissionFeatures={observations || []} title="OBSERVATIONS FEATURES" />
         </Box>
       </Container>
     </Box>
