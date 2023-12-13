@@ -21,7 +21,6 @@ const AdminSubmissionPage = () => {
   const animals = features?.animals;
   const observations = features?.observations;
 
-  const [openSecurityReasonsDialog, setOpenSecurityReasonsDialog] = useState(false);
   const [openCompleteReviewDialog, setOpenCompleteReviewDialog] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<ISelectedFeatureType>({});
 
@@ -42,7 +41,6 @@ const AdminSubmissionPage = () => {
     return total;
   };
 
-  console.log(openSecurityReasonsDialog);
   return (
     <Box>
       <CompleteReviewDialog
