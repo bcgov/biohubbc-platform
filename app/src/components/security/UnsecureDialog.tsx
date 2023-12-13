@@ -1,5 +1,9 @@
 import { Alert, AlertTitle, Typography } from '@mui/material';
 import YesNoDialog from 'components/dialog/YesNoDialog';
+import { ApplySecurityRulesI18N } from 'constants/i18n';
+import { DialogContext } from 'contexts/dialogContext';
+import { useApi } from 'hooks/useApi';
+import { useContext } from 'react';
 
 interface IUnsecureDialogProps {
   submissions: number[];
@@ -7,12 +11,40 @@ interface IUnsecureDialogProps {
   onClose: () => void;
 }
 const UnsecureDialog = (props: IUnsecureDialogProps) => {
+  const api = useApi();
+  const dialogContext = useContext(DialogContext);
+
+  const handleRemove = async () => {
+    console.log('PLEASE REMOVE THE SECURITY');
+    try {
+      await api.security.removeSecurityRulesToSubmissions(props.submissions);
+      dialogContext.setSnackbar({
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            {ApplySecurityRulesI18N.unApplySecurityRulesSuccess(props.submissions.length)}
+          </Typography>
+        ),
+        open: true
+      });
+    } catch (error) {
+      // Close yes-no dialog
+      dialogContext.setYesNoDialog({ open: false });
+
+      // Show error dialog
+      dialogContext.setErrorDialog({
+        onOk: () => dialogContext.setErrorDialog({ open: false }),
+        onClose: () => dialogContext.setErrorDialog({ open: false }),
+        dialogTitle: ApplySecurityRulesI18N.unapplySecurityRulesErrorTitle,
+        dialogText: ApplySecurityRulesI18N.unapplySecurityRulesErrorText,
+        open: true
+      });
+    }
+  };
+
   return (
     <YesNoDialog
       open={props.isOpen}
-      onYes={() => {
-        console.log('Unsecure these fools');
-      }}
+      onYes={() => handleRemove()}
       onNo={props.onClose}
       onClose={() => {}}
       dialogTitle="Unsecure Records?"

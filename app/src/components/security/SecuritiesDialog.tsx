@@ -64,7 +64,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         open={props.isOpen}
         dialogSaveButtonLabel="APPLY"
         onCancel={props.onClose}
-        onSave={(values) => handleSubmit(values.rules)}
+        onSave={(values: ISecurityRuleFormProps) => handleSubmit(values.rules)}
         component={{
           element: <SecurityRuleForm />,
           initialValues: { rules: [] },

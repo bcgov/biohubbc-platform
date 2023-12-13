@@ -24,11 +24,13 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  applySecuritySuccess: (submissions: number) => `Successfully applied security rules to: ${submissions} features.`,
+  applySecuritySuccess: (submissionCount: number) =>
+    `Successfully applied security rules to: ${submissionCount} features.`,
 
   applySecurityRulesErrorTitle: 'Error Applying Security',
   applySecurityRulesErrorText:
     'An error occurred while applying security to features, please try again. If the problem persists, please contact your system administrator',
+  unApplySecurityRulesSuccess: (submissionCount: number) => `Successfully unsecured: ${submissionCount} features`,
   unapplySecurityRulesErrorTitle: 'Error Unsecuring Features',
   unapplySecurityRulesErrorText:
     'Failed to unsecure the selected features, please try again. If the problem persists, please contact your system administrator'
