@@ -1,6 +1,6 @@
-import { mdiClose, mdiMagnify } from '@mdi/js';
+import { mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, AlertTitle, IconButton, Paper, Typography } from '@mui/material';
+import { Alert, AlertTitle, Typography } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -10,6 +10,7 @@ import { useApi } from 'hooks/useApi';
 import { useEffect, useState } from 'react';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
+import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
@@ -99,21 +100,13 @@ const SecurityRuleForm = () => {
               <Box mt={3}>
                 {values.rules.map((rule: ISecurityRule, index: number) => {
                   return (
-                    <Paper
-                      key={rule.security_rule_id}
-                      variant="outlined"
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        p: 1,
-                        mb: 1
-                      }}>
-                      <SecurityRuleCard key={rule.security_rule_id} title={rule.name} subtitle={rule.description} />
-                      <IconButton onClick={() => helpers.remove(index)}>
-                        <Icon path={mdiClose} size={1} />
-                      </IconButton>
-                    </Paper>
+                    <SecurityRuleActionCard
+                      index={index}
+                      security_rule_id={rule.security_rule_id}
+                      name={rule.name}
+                      description={rule.description}
+                      remove={helpers.remove}
+                    />
                   );
                 })}
               </Box>
