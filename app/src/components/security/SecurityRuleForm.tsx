@@ -7,26 +7,25 @@ import TextField from '@mui/material/TextField';
 import { FieldArray, FieldArrayRenderProps, useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
-import { useEffect, useState } from 'react';
+import useDataLoader from 'hooks/useDataLoader';
+import { useEffect } from 'react';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
-  const { handleSubmit, errors, values } = useFormikContext<ISecurityRuleFormProps>();
-  const [rules, setRules] = useState<ISecurityRule[]>([]);
-
+  const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormProps>();
   const api = useApi();
+  const rulesDataLoader = useDataLoader(() => api.security.getActiveSecurityRules());
+  rulesDataLoader.load();
+
+  const rules = rulesDataLoader.data || [];
   useEffect(() => {
-    const fetchData = async () => {
-      const data = await api.security.getActiveSecurityRules();
-      setRules(data);
-    };
-
-    fetchData();
-  }, []);
-
+    // FieldArray doesn't re render when the dataloader returns with data so the autocomplete will not have options
+    // so setting the field value back to the forms initial values forces a re render
+    setFieldValue('rules', []);
+  }, [rules]);
   return (
     <form onSubmit={handleSubmit}>
       <Box component="fieldset">
