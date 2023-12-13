@@ -40,12 +40,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         ),
         open: true
       });
-
-      props.onClose();
     } catch (error) {
-      // Close yes-no dialog
-      dialogContext.setYesNoDialog({ open: false });
-
       // Show error dialog
       dialogContext.setErrorDialog({
         onOk: () => dialogContext.setErrorDialog({ open: false }),
@@ -54,6 +49,8 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         dialogText: ApplySecurityRulesI18N.applySecurityRulesErrorText,
         open: true
       });
+    } finally {
+      props.onClose();
     }
   };
 
@@ -64,7 +61,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         open={props.isOpen}
         dialogSaveButtonLabel="APPLY"
         onCancel={props.onClose}
-        onSave={(values) => handleSubmit(values.rules)}
+        onSave={(values: ISecurityRuleFormProps) => handleSubmit(values.rules)}
         component={{
           element: <SecurityRuleForm />,
           initialValues: { rules: [] },

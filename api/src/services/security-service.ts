@@ -334,6 +334,10 @@ export class SecurityService extends DBService {
     return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissions, rules);
   }
 
+  async removeSecurityRulesFromSubmissionFeatures(submissions: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissions);
+  }
+
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     return this.securityRepository.getActiveSecurityRules();
   }
