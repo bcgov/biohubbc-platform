@@ -8,7 +8,7 @@ import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
@@ -23,12 +23,6 @@ const SecurityRuleForm = () => {
   rulesDataLoader.load();
 
   const rules = rulesDataLoader.data || [];
-  useEffect(() => {
-    // FieldArray doesn't re render when the dataloader returns with data so the autocomplete will not have options
-    // so setting the field value back to the forms initial values forces a re render
-    setFieldValue('rules', []);
-  }, [rules]);
-
   const handleAdd = (selected: ISecurityRule) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
   };
@@ -66,6 +60,7 @@ const SecurityRuleForm = () => {
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
+            loading={rulesDataLoader.isLoading}
             noOptionsText="No records found"
             options={alphabetizeObjects(rules, 'name')}
             filterOptions={(options, state) => {
