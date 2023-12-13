@@ -8,7 +8,7 @@ import { useContext } from 'react';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 interface ISecuritiesDialogProps {
-  submissions: number[];
+  features: number[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -28,14 +28,14 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
       await api.security.applySecurityRulesToSubmissions(
-        props.submissions,
+        props.features,
         rules.map((item) => item.security_rule_id)
       );
 
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(props.submissions.length)}
+            {ApplySecurityRulesI18N.applySecuritySuccess(props.features.length)}
           </Typography>
         ),
         open: true

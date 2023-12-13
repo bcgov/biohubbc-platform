@@ -12,7 +12,7 @@ import {
 } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { IFeature } from 'interfaces/useSubmissionsApi.interface';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const useStyles = makeStyles(() => ({
   datasetDetailsLabel: {
@@ -23,13 +23,18 @@ const useStyles = makeStyles(() => ({
 export interface ISubmissionDataGridProps {
   title: string;
   submissionFeatures: IFeature[];
+  onRowSelection: (feature_ids: number[]) => void;
 }
 
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
-  const { submissionFeatures, title } = props;
+  const { submissionFeatures, title, onRowSelection } = props;
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
+
+  useEffect(() => {
+    onRowSelection(rowSelectionModel as number[]);
+  }, [rowSelectionModel]);
 
   const fieldNames = submissionFeatures
     .map((feature) => Object.keys(feature.data))
@@ -97,7 +102,9 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           checkboxSelection
           editMode="row"
           rowSelectionModel={rowSelectionModel}
-          onRowSelectionModelChange={setRowSelectionModel}
+          onRowSelectionModelChange={(model) => {
+            setRowSelectionModel(model);
+          }}
           disableRowSelectionOnClick
           disableColumnSelector
           disableColumnMenu

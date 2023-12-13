@@ -3,9 +3,12 @@ import Container from '@mui/material/Container';
 import { SubmissionContext } from 'contexts/submissionContext';
 import { useContext, useState } from 'react';
 import CompleteReviewDialog from './components/CompleteReviewDialog';
-import ManageSecurityReasonsDialog from './components/ManageSecurityReasonsDialog';
 import SubmissionDataGrid from './components/SubmissionDataGrid';
 import SubmissionHeader from './components/SubmissionHeader';
+
+interface ISelectedFeatureType {
+  [key: string]: number[];
+}
 
 const AdminSubmissionPage = () => {
   const submissionContext = useContext(SubmissionContext);
@@ -20,11 +23,26 @@ const AdminSubmissionPage = () => {
 
   const [openSecurityReasonsDialog, setOpenSecurityReasonsDialog] = useState(false);
   const [openCompleteReviewDialog, setOpenCompleteReviewDialog] = useState(false);
+  const [selectedFeatures, setSelectedFeatures] = useState<ISelectedFeatureType>({});
 
   const submitSecurity = async (values: any) => {
     console.log('values', values);
   };
 
+  const handleRowSelection = (type: string, ids: number[]) => {
+    selectedFeatures[type] = ids;
+    setSelectedFeatures({ ...selectedFeatures });
+  };
+
+  const flattenSelectedFeatures = (): number[] => {
+    let total: number[] = [];
+    for (const item in selectedFeatures) {
+      total = [...selectedFeatures[item], ...total];
+    }
+    return total;
+  };
+
+  console.log(openSecurityReasonsDialog);
   return (
     <Box>
       <CompleteReviewDialog
@@ -39,42 +57,48 @@ const AdminSubmissionPage = () => {
         noSubmissionDataDialogTitle="No Submission Data"
         noSubmissionDataDialogText="No submission data found."
       />
-      <ManageSecurityReasonsDialog
-        open={openSecurityReasonsDialog}
-        onClose={() => setOpenSecurityReasonsDialog(false)}
-        onSubmit={async (values) => {
-          setOpenSecurityReasonsDialog(false);
-          submitSecurity(values);
-        }}
-        submissionSuccessDialogTitle="Submission Security Review Submitted"
-        submissionSuccessDialogText="Submission security review has been submitted successfully."
-        noSubmissionDataDialogTitle="No Submission Data"
-        noSubmissionDataDialogText="No submission data found."
-      />
-      {/* <UnsecureRecordsDialog /> TODO: create unsecure dialog */}
       <SubmissionHeader
-        openSecureRecordsDialog={(open: boolean) => {
-          setOpenSecurityReasonsDialog(open);
-        }}
         openCompleteReviewDialog={(open: boolean) => {
           setOpenCompleteReviewDialog(open);
         }}
-        openUnsecureRecordsDialog={(open: boolean) => {
-          setOpenSecurityReasonsDialog(open);
-        }}
+        selectedFeatures={flattenSelectedFeatures()}
       />
       <Container maxWidth="xl">
         <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={dataset || []} title="DATASET FEATURES" />
+          <SubmissionDataGrid
+            submissionFeatures={dataset || []}
+            title="DATASET FEATURES"
+            onRowSelection={(ids) => {
+              handleRowSelection('dataset', ids);
+            }}
+          />
         </Box>
         <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={sampleSites || []} title="SAMPLE SITE FEATURES" />
+          <SubmissionDataGrid
+            submissionFeatures={sampleSites || []}
+            title="SAMPLE SITE FEATURES"
+            onRowSelection={(ids) => {
+              handleRowSelection('sample-sites', ids);
+            }}
+          />
         </Box>
         <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={animals || []} title="ANIMAL FEATURES" />
+          <SubmissionDataGrid
+            submissionFeatures={animals || []}
+            title="ANIMAL FEATURES"
+            onRowSelection={(ids) => {
+              handleRowSelection('animals', ids);
+            }}
+          />
         </Box>
         <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={observations || []} title="OBSERVATIONS FEATURES" />
+          <SubmissionDataGrid
+            submissionFeatures={observations || []}
+            title="OBSERVATIONS FEATURES"
+            onRowSelection={(ids) => {
+              handleRowSelection('observations', ids);
+            }}
+          />
         </Box>
       </Container>
     </Box>

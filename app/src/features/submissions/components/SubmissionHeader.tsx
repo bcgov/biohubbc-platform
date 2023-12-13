@@ -4,22 +4,18 @@ import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Link from '@mui/material/Link';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import BaseHeader from 'components/layout/header/BaseHeader';
 import ManageSecurity from 'components/security/ManageSecurity';
 import { SubmissionContext } from 'contexts/submissionContext';
 import moment from 'moment';
-import React, { useContext, useState } from 'react';
+import { useContext } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 export interface ISubmissionHeaderProps {
-  openSecureRecordsDialog: (open: boolean) => void;
   openCompleteReviewDialog: (open: boolean) => void;
-  openUnsecureRecordsDialog: (open: boolean) => void;
+  selectedFeatures: number[];
 }
 
 /**
@@ -29,8 +25,6 @@ export interface ISubmissionHeaderProps {
  */
 const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   const submissionContext = useContext(SubmissionContext);
-
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
 
   const submissionUUID = submissionContext.submissionUUID;
   const submissionDataLoader = submissionContext.submissionDataLoader;
@@ -82,42 +76,12 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
         buttonJSX={
           <>
             <Stack flexDirection="row" alignItems="center" gap={1}>
-              <ManageSecurity submissions={[]} />
+              <ManageSecurity features={props.selectedFeatures} />
 
               <Button variant="contained" color="primary" onClick={() => props.openCompleteReviewDialog(true)}>
                 COMPLETE REVIEW
               </Button>
             </Stack>
-
-            <Menu
-              id="submissionSettingsMenu"
-              aria-labelledby="submission_settings_button"
-              style={{ marginTop: '8px' }}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right'
-              }}
-              transformOrigin={{
-                vertical: 'top',
-                horizontal: 'right'
-              }}
-              keepMounted
-              anchorEl={menuAnchorEl}
-              open={Boolean(menuAnchorEl)}
-              onClose={() => setMenuAnchorEl(null)}>
-              <MenuItem onClick={() => props.openSecureRecordsDialog(true)}>
-                <ListItemIcon>
-                  <Icon path={mdiLock} size={1} />
-                </ListItemIcon>
-                <Typography variant="inherit">Secure Records</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => props.openUnsecureRecordsDialog(true)}>
-                <ListItemIcon>
-                  <Icon path={mdiLockOpenVariantOutline} size={1} />
-                </ListItemIcon>
-                <Typography variant="inherit">Unsecure Records</Typography>
-              </MenuItem>
-            </Menu>
           </>
         }
       />
