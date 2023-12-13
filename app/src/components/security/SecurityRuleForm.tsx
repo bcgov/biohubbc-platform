@@ -8,7 +8,7 @@ import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
@@ -16,6 +16,8 @@ import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
   const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormProps>();
+  const [searchText, setSearchText] = useState('');
+
   const api = useApi();
   const rulesDataLoader = useDataLoader(() => api.security.getActiveSecurityRules());
   rulesDataLoader.load();
@@ -75,6 +77,14 @@ const SecurityRuleForm = () => {
             }}
             getOptionLabel={(option) => option.name}
             isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
+            inputValue={searchText}
+            onInputChange={(_, value, reason) => {
+              if (reason === 'reset') {
+                setSearchText('');
+              } else {
+                setSearchText(value);
+              }
+            }}
             onChange={(_, option) => {
               if (option) {
                 handleAdd(option);
