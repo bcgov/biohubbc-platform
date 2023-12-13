@@ -7,7 +7,7 @@ import ManageSecurityReasonsDialog from './components/ManageSecurityReasonsDialo
 import SubmissionDataGrid from './components/SubmissionDataGrid';
 import SubmissionHeader from './components/SubmissionHeader';
 
-const AdminSubmissionPage: React.FC<React.PropsWithChildren> = () => {
+const AdminSubmissionPage = () => {
   const submissionContext = useContext(SubmissionContext);
 
   const submissionDataLoader = submissionContext.submissionDataLoader;
