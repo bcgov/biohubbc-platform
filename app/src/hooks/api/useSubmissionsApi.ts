@@ -79,6 +79,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    */
   const getSubmission = async (submissionUUID: string): Promise<any> => {
     const { data } = await axios.get(`api/submission/${submissionUUID}`);
+    console.log('data', data);
     return data;
   };
 

@@ -1162,7 +1162,8 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           submission_id,
           uuid,
-          security_review_timestamp
+          security_review_timestamp,
+          create_date
         FROM
           submission
         WHERE
@@ -1215,10 +1216,10 @@ export class SubmissionRepository extends BaseRepository {
         ORDER BY
           submission.uuid, submission.submission_id DESC
       )
-      SELECT 
+      SELECT
         *
-      FROM 
-        w_unique_submissions 
+      FROM
+        w_unique_submissions
       ORDER BY submitted_timestamp DESC;
     `;
 
@@ -1264,10 +1265,10 @@ export class SubmissionRepository extends BaseRepository {
         ORDER BY
           submission.uuid, submission.submission_id DESC
       )
-      SELECT 
+      SELECT
         *
-      FROM 
-        w_unique_submissions 
+      FROM
+        w_unique_submissions
       ORDER BY submitted_timestamp DESC;
     `;
 
@@ -1293,6 +1294,9 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           sf.*,
           (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
+          sf.data,
+          sf.parent_submission_feature_id,
+          (SELECT sfs.submission_feature_security_id FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) AS submission_feature_security_ids
         FROM
           submission_feature sf
         WHERE
@@ -1439,7 +1443,7 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature
       WHERE
         submission_id = ${submissionId}
-      and 
+      and
         parent_submission_feature_id is null;
     `;
 

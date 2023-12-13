@@ -10,6 +10,7 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionCardSkeletonLoader from 'features/admin/dashboard/components/SubmissionCardSkeletonLoader';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
 const UnreviewedSubmissionsTable = () => {
@@ -147,11 +148,10 @@ const UnreviewedSubmissionsTable = () => {
                     </Stack>
                   </Stack>
                   <Button
+                    component={RouterLink}
                     variant="contained"
                     color="primary"
-                    onClick={() => {
-                      // TODO wire up review button. Take user to admin submission page: SIMSBIOHUB-404
-                    }}
+                    to={`/admin/dashboard/submissions/${submissionRecord.uuid}`}
                     sx={{
                       flex: '0 0 auto',
                       minWidth: '7rem'
