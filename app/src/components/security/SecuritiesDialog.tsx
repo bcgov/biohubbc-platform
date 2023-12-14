@@ -4,8 +4,7 @@ import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { DialogContext } from 'contexts/dialogContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useContext, useEffect } from 'react';
+import { useContext } from 'react';
 import { useParams } from 'react-router';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
@@ -27,11 +26,6 @@ export interface ISecurityRuleFormProps {
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useContext(DialogContext);
   const api = useApi();
-
-  const appliedRulesDataLoader = useDataLoader(() => api.security.getSecurityRulesForSubmissions(props.features));
-  appliedRulesDataLoader.load();
-
-  useEffect(() => {}, []);
 
   const { submission_uuid } = useParams<{ submission_uuid: string }>();
   const handleSubmit = async (rules: ISecurityRule[]) => {

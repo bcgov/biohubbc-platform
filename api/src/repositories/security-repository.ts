@@ -306,7 +306,7 @@ export class SecurityRepository extends BaseRepository {
 
   async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
     const sql = SQL`
-      SELECT * FROM submission_feature_securityWHERE submission_feature_id IN (`;
+      SELECT * FROM submission_feature_security WHERE submission_feature_id IN (`;
 
     sql.append(features.join(', '));
     sql.append(`);`);

@@ -3,7 +3,8 @@ import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import React, { useState } from 'react';
+import { SubmissionContext } from 'contexts/submissionContext';
+import React, { useContext, useEffect, useState } from 'react';
 import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
 
@@ -17,6 +18,12 @@ const ManageSecurity = (props: IManageSecurityProps) => {
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
 
   const open = Boolean(anchorEl);
+  const submissionContext = useContext(SubmissionContext);
+
+  useEffect(() => {
+    submissionContext.submissionFeatureRulesDataLoader.load(props.features);
+  }, []);
+
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
   };

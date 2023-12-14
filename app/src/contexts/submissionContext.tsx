@@ -1,3 +1,4 @@
+import { ISecurityRule, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
 import { IGetSubmissionResponse } from 'interfaces/useSubmissionsApi.interface';
@@ -12,6 +13,11 @@ export interface ISubmissionContext {
    * @memberof ISubmissionContext
    */
   submissionDataLoader: DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>;
+
+  submissionFeatureRulesDataLoader: DataLoader<[features: number[]], any[], unknown>;
+
+  securityRulesDataLoader: DataLoader<[], ISecurityRule[], unknown>;
+
   /**
    * The submission UUID
    *
@@ -23,12 +29,16 @@ export interface ISubmissionContext {
 
 export const SubmissionContext = React.createContext<ISubmissionContext>({
   submissionDataLoader: {} as DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>,
+  submissionFeatureRulesDataLoader: {} as DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>,
+  securityRulesDataLoader: {} as DataLoader<[], ISecurityRule[], unknown>,
   submissionUUID: ''
 });
 
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const biohubApi = useApi();
   const submissionDataLoader = useDataLoader(biohubApi.submissions.getSubmission);
+  const submissionFeatureRulesDataLoader = useDataLoader(biohubApi.security.getSecurityRulesForSubmissions);
+  const securityRulesDataLoader = useDataLoader(biohubApi.security.getActiveSecurityRules);
 
   const urlParams: Record<string, string | number | undefined> = useParams();
 
@@ -41,6 +51,7 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   const submissionUUID = urlParams['submission_uuid'] as string;
 
   submissionDataLoader.load(submissionUUID);
+  securityRulesDataLoader.load();
 
   /**
    * Refreshes the current submission object whenever the current submission UUID changes from the currently loaded submission.
@@ -56,6 +67,8 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   const surveyContext: ISubmissionContext = useMemo(() => {
     return {
       submissionDataLoader,
+      submissionFeatureRulesDataLoader,
+      securityRulesDataLoader,
       submissionUUID
     };
   }, [submissionDataLoader, submissionUUID]);

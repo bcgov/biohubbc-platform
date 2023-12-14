@@ -1,14 +1,13 @@
-import { mdiMagnify } from '@mdi/js';
+import { mdiClose, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, AlertTitle, Typography } from '@mui/material';
+import { Alert, AlertTitle, IconButton, Typography } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
+import { SubmissionContext } from 'contexts/submissionContext';
 import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
-import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
@@ -17,12 +16,12 @@ import SecurityRuleCard from './SecurityRuleCard';
 const SecurityRuleForm = () => {
   const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormProps>();
   const [searchText, setSearchText] = useState('');
+  const [showSecuredBanner, setShowSecuredBanner] = useState(false);
 
-  const api = useApi();
-  const rulesDataLoader = useDataLoader(() => api.security.getActiveSecurityRules());
-  rulesDataLoader.load();
+  const submissionContext = useContext(SubmissionContext);
+  submissionContext.securityRulesDataLoader.load();
 
-  const rules = rulesDataLoader.data || [];
+  const rules = submissionContext.securityRulesDataLoader.data || [];
   const handleAdd = (selected: ISecurityRule) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
   };
@@ -32,9 +31,10 @@ const SecurityRuleForm = () => {
     setFieldValue('rules', filteredData);
   };
 
-  // ok need fetch all that crap
-  // then I need loop through it all
-  // roller skates version, just show that these features have security..
+  useEffect(() => {
+    setShowSecuredBanner(Boolean(submissionContext.submissionFeatureRulesDataLoader.data?.length));
+  }, [submissionContext.submissionFeatureRulesDataLoader.isLoading]);
+
   return (
     <form onSubmit={handleSubmit}>
       <Box component="fieldset">
@@ -47,6 +47,21 @@ const SecurityRuleForm = () => {
           }}>
           A minimum of one security rule must be selected.
         </Typography>
+        {showSecuredBanner && (
+          <Box mt={3}>
+            <Alert
+              severity="info"
+              variant="standard"
+              action={
+                <IconButton size="small" onClick={() => setShowSecuredBanner(false)}>
+                  <Icon path={mdiClose} size={1} />
+                </IconButton>
+              }>
+              <AlertTitle>Security Applied</AlertTitle>
+              The selected features already have security applied to them.
+            </Alert>
+          </Box>
+        )}
         {errors?.['rules'] && !values.rules.length && (
           <Box mt={3}>
             <Alert severity="error" variant="standard">
@@ -61,7 +76,7 @@ const SecurityRuleForm = () => {
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
-            loading={rulesDataLoader.isLoading}
+            loading={submissionContext.securityRulesDataLoader.isLoading}
             noOptionsText="No records found"
             options={alphabetizeObjects(rules, 'name')}
             filterOptions={(options, state) => {

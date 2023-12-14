@@ -333,7 +333,6 @@ export class SecurityService extends DBService {
     override = false
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     if (override) {
-      console.log('WE ARE OVERRIDING THIS');
       // we want to override any security rules present and can achieve this by remove everything first
       await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
     }

@@ -1296,7 +1296,7 @@ export class SubmissionRepository extends BaseRepository {
           (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
           sf.data,
           sf.parent_submission_feature_id,
-          (SELECT sfs.submission_feature_security_id FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) AS submission_feature_security_ids
+          (SELECT array_agg(sfs.submission_feature_security_id) FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) AS submission_feature_security_ids
         FROM
           submission_feature sf
         WHERE
