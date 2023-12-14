@@ -17,7 +17,7 @@ const AdminDashboardRouter: React.FC<React.PropsWithChildren> = () => {
         <DashboardPage />
       </RouteWithTitle>
 
-      <RouteWithTitle exact path="/admin/dashboard/submissions/:submission_uuid" title={getTitle('Submission Review')}>
+      <RouteWithTitle exact path="/admin/dashboard/submissions/:submission_id" title={getTitle('Submission Review')}>
         <SubmissionContextProvider>
           <AdminSubmissionPage />
         </SubmissionContextProvider>

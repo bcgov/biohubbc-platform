@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
-import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { IListSubmissionsResponse, ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import { SECURITY_APPLIED_STATUS, SubmissionRecord } from 'interfaces/useDatasetApi.interface';
+import { IGetSubmissionResponse, IListSubmissionsResponse, ISubmission } from 'interfaces/useSubmissionsApi.interface';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -72,14 +72,57 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch submission data by submissionUUID.
+   * Fetch submission data by submission id.
    *
-   * @param {string} submissionUUID
-   * @return {*}  {Promise<any>} //TODO: type
+   * @param {number} submissionId
+   * @return {*}  {Promise<IGetSubmissionResponse>}
    */
-  const getSubmission = async (submissionUUID: string): Promise<any> => {
-    const { data } = await axios.get(`api/submission/${submissionUUID}`);
-    console.log('data', data);
+  const getSubmission = async (submissionId: number): Promise<IGetSubmissionResponse> => {
+    const { data } = await axios.get(`api/submission/${submissionId}`);
+
+    return data;
+  };
+
+  /**
+   * Fetch all submissions that have not completed security review.
+   *
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
+   */
+  const getUnreviewedSubmissions = async (): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > => {
+    const { data } = await axios.get(`api/administrative/submission/unreviewed`);
+
+    return data;
+  };
+
+  /**
+   * Fetch all submissions that have completed security review.
+   *
+   * @return {*}  {(Promise<
+   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *   >)}
+   */
+  const getReviewedSubmissions = async (): Promise<
+    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+  > => {
+    const { data } = await axios.get(`api/administrative/submission/reviewed`);
+
+    return data;
+  };
+
+  /**
+   * Update (patch) a submission record.
+   *
+   * @param {number} submissionId
+   * @param {{ security_reviewed: boolean }} patch
+   * @return {*}
+   */
+  const updateSubmissionRecord = async (submissionId: number, patch: { security_reviewed: boolean }) => {
+    const { data } = await axios.patch(`api/administrative/submission/${submissionId}`, { patch });
+
     return data;
   };
 
@@ -88,7 +131,10 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getSignedUrl,
     listReviewedSubmissions,
     getSubmissionDownloadPackage,
-    getSubmission
+    getSubmission,
+    getUnreviewedSubmissions,
+    getReviewedSubmissions,
+    updateSubmissionRecord
   };
 };
 

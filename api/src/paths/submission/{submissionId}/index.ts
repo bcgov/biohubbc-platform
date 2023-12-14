@@ -5,12 +5,12 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/{submissionUUID}}');
+const defaultLog = getLogger('paths/submission/{submissionId}');
 
 export const GET: Operation = [getSubmissionInformation()];
 
 GET.apiDoc = {
-  description: 'retrieves submission data from the submission table',
+  description: 'Retrieves a submission record from the submission table',
   tags: ['eml'],
   security: [
     {
@@ -19,19 +19,19 @@ GET.apiDoc = {
   ],
   parameters: [
     {
-      description: 'submission uuid',
+      description: 'Submission ID.',
       in: 'path',
-      name: 'submissionUUID',
+      name: 'submissionId',
       schema: {
-        type: 'string',
-        format: 'uuid'
+        type: 'integer',
+        minimum: 1
       },
       required: true
     }
   ],
   responses: {
     200: {
-      description: 'Dataset metadata response object.',
+      description: 'A submission record and all child submission feature records.',
       content: {
         'application/json': {
           schema: {
@@ -40,10 +40,24 @@ GET.apiDoc = {
             properties: {
               submission: {
                 type: 'object',
-                required: ['submission_id', 'uuid', 'security_review_timestamp', 'create_date'],
+                required: [
+                  'submission_id',
+                  'uuid',
+                  'security_review_timestamp',
+                  'submitted_timestamp',
+                  'source_system',
+                  'name',
+                  'description',
+                  'create_date',
+                  'create_user',
+                  'update_date',
+                  'update_user',
+                  'revision_count'
+                ],
                 properties: {
                   submission_id: {
-                    type: 'number'
+                    type: 'integer',
+                    minimum: 1
                   },
                   uuid: {
                     type: 'string',
@@ -51,12 +65,45 @@ GET.apiDoc = {
                   },
                   security_review_timestamp: {
                     type: 'string',
-                    format: 'date-time',
                     nullable: true
                   },
-                  create_date: {
+                  source_system: {
+                    type: 'string'
+                  },
+                  name: {
                     type: 'string',
-                    format: 'date-time'
+                    maxLength: 200
+                  },
+                  description: {
+                    type: 'string',
+                    maxLength: 3000
+                  },
+                  create_date: {
+                    type: 'string'
+                  },
+                  create_user: {
+                    type: 'integer',
+                    minimum: 1
+                  },
+                  update_date: {
+                    type: 'string',
+                    nullable: true
+                  },
+                  update_user: {
+                    type: 'integer',
+                    minimum: 1,
+                    nullable: true
+                  },
+                  revision_count: {
+                    type: 'integer',
+                    minimum: 0
+                  },
+                  feature_type_id: {
+                    type: 'integer',
+                    minimum: 1
+                  },
+                  feature_type: {
+                    type: 'string'
                   }
                 }
               },
@@ -99,7 +146,7 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves submission data from the submission table.
+ * Retrieves a submission record and all child submission feature records.
  *
  * @returns {RequestHandler}
  */
@@ -107,14 +154,14 @@ export function getSubmissionInformation(): RequestHandler {
   return async (req, res) => {
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
-    const submissionUUID = String(req.params.submissionUUID);
+    const submissionId = Number(req.params.submissionId);
 
     try {
       await connection.open();
 
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.getSubmissionAndFeaturesBySubmissionUUID(submissionUUID);
+      const result = await submissionService.getSubmissionAndFeaturesBySubmissionId(submissionId);
 
       await connection.commit();
 

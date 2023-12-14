@@ -1,4 +1,4 @@
-import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS, SubmissionRecordWithSecurity } from './useDatasetApi.interface';
 
 export type IListSubmissionsResponse = Array<{
   submission_id: number;
@@ -29,12 +29,6 @@ export interface ISubmission {
   security: SECURITY_APPLIED_STATUS;
 }
 
-export interface ISubmissionFeature {
-  submission_id: number;
-  uuid: string;
-  security_review_timestamp: string;
-  create_date: string;
-}
 export interface IFeature {
   submission_feature_id: number;
   submission_id: number;
@@ -43,7 +37,7 @@ export interface IFeature {
   parent_submission_feature_id: number | null;
 }
 export interface IGetSubmissionResponse {
-  submission: ISubmissionFeature;
+  submission: SubmissionRecordWithSecurity;
   features: {
     dataset: IFeature[];
     sampleSites: IFeature[];

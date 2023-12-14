@@ -2,6 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { getAPIUserDBConnection } from '../../database/db';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { SECURITY_APPLIED_STATUS } from '../../repositories/security-repository';
 import { SubmissionService } from '../../services/submission-service';
 import { getLogger } from '../../utils/logger';
 
@@ -81,6 +82,14 @@ GET.apiDoc = {
                 revision_count: {
                   type: 'integer',
                   minimum: 0
+                },
+                security: {
+                  type: 'string',
+                  enum: [
+                    SECURITY_APPLIED_STATUS.SECURED,
+                    SECURITY_APPLIED_STATUS.UNSECURED,
+                    SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
+                  ]
                 }
               }
             }
