@@ -136,7 +136,7 @@ export function getReviewedSubmissionsForAdmins(): RequestHandler {
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getReviewedSubmissions', message: 'error', error });
+      defaultLog.error({ label: 'getReviewedSubmissionsForAdmins', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

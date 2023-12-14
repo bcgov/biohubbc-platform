@@ -139,7 +139,7 @@ export function getUnreviewedSubmissionsForAdmins(): RequestHandler {
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getUnreviewedSubmissions', message: 'error', error });
+      defaultLog.error({ label: 'getUnreviewedSubmissionsForAdmins', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

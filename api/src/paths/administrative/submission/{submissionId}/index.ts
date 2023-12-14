@@ -148,7 +148,7 @@ export function patchSubmissionRecord(): RequestHandler {
 
     const submissionId = Number(req.params.submissionId);
 
-    const patch = req.body as PatchSubmissionRecord;
+    const patch = req.body.patch as PatchSubmissionRecord;
 
     try {
       await connection.open();

@@ -20,6 +20,29 @@ export type IListSubmissionsResponse = Array<{
 
 /** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
 
+export type SubmissionRecord = {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string | null;
+  source_system: string;
+  name: string;
+  description: string;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+};
+
+export type SubmissionRecordWithSecurity = SubmissionRecord & {
+  security: SECURITY_APPLIED_STATUS;
+};
+
+export type SubmissionRecordWithRootFeature = SubmissionRecord & {
+  feature_type_id: number;
+  feature_type: string;
+};
+
 export interface ISubmission {
   submission_id: number;
   submission_feature_id: number;
@@ -45,7 +68,7 @@ export interface IFeature {
   parent_submission_feature_id: number | null;
 }
 export interface IGetSubmissionResponse {
-  submission: ISubmissionFeature;
+  submission: SubmissionRecordWithSecurity;
   features: {
     dataset: IFeature[];
     sampleSites: IFeature[];

@@ -569,6 +569,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get a submission record by id (with security status).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionWithSecurityRecord>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionWithSecurityRecord> {
+    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+  }
+
+  /**
    * Get all submissions (with security status) that have been reviewed.
    *
    * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
@@ -581,20 +592,15 @@ export class SubmissionService extends DBService {
   /*
    * Retrieves submission data from the submission table.
    *
-   *
-   * @param {string} submissionUUID
+   * @param {number} submissionId
    * @return {*}  {(Promise<{
    *     submission: ISubmissionModel & { create_user: string };
    *     features: {
    *       dataset: SubmissionRecordWithTypeAndSecurity[];
    *       sampleSites: SubmissionRecordWithTypeAndSecurity[];
    *       animals: SubmissionRecordWithTypeAndSecurity[];
-   *       observations: SubmissionRecordWithTypeAndSecurity[];
-   *     };
-   *   }>)}
-   * @memberof SubmissionService
    */
-  async getSubmissionAndFeaturesBySubmissionUUID(submissionUUID: string): Promise<{
+  async getSubmissionAndFeaturesBySubmissionId(submissionId: number): Promise<{
     submission: ISubmissionModel & { create_user: string };
     features: {
       dataset: SubmissionRecordWithTypeAndSecurity[];
@@ -603,13 +609,9 @@ export class SubmissionService extends DBService {
       observations: SubmissionRecordWithTypeAndSecurity[];
     };
   }> {
-    const submission = await this.submissionRepository.getSubmissionByUUID(submissionUUID);
+    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
 
-    if (!submission.submission_id) {
-      throw new Error(`No submission found for submission ${submissionUUID}`);
-    }
-
-    const features = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submission.submission_id);
+    const features = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
     const dataset = [];
     const sampleSites = [];

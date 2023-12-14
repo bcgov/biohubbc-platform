@@ -15,7 +15,7 @@ import { getFormattedDate, pluralize as p } from 'utils/Utils';
 const ReviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getReviewedSubmissions());
+  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getReviewedSubmissions());
 
   reviewedSubmissionsDataLoader.load();
 
@@ -71,7 +71,7 @@ const ReviewedSubmissionsTable = () => {
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           return (
-            <Card elevation={0}>
+            <Card elevation={0} key={submissionRecord.submission_id}>
               <Stack flex="1 1 auto" gap={1} p={2}>
                 <Stack flexDirection="row" alignItems="flex-start" gap={2}>
                   <Typography
