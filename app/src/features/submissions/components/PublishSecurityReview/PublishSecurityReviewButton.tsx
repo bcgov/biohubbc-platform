@@ -1,7 +1,7 @@
 import Button from '@mui/material/Button';
 import CompleteSecurityReviewDialog from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewDialog';
 import RemoveSecurityReviewDialog from 'features/submissions/components/PublishSecurityReview/RemoveSecurityReviewDialog';
-import { SubmissionRecordWithSecurity } from 'interfaces/useDatasetApi.interface';
+import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
 
 export interface IPublishSecurityReviewButtonProps {

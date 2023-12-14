@@ -1,6 +1,11 @@
 import { AxiosInstance } from 'axios';
-import { SECURITY_APPLIED_STATUS, SubmissionRecord } from 'interfaces/useDatasetApi.interface';
-import { IGetSubmissionResponse, IListSubmissionsResponse, ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import {
+  IGetSubmissionResponse,
+  IListSubmissionsResponse,
+  ISubmission,
+  SubmissionRecordWithRootFeature
+} from 'interfaces/useSubmissionsApi.interface';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -86,13 +91,9 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have not completed security review.
    *
-   * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
-   *   >)}
+   * @return {*}  {Promise<SubmissionRecordWithRootFeature[]>}
    */
-  const getUnreviewedSubmissions = async (): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
-  > => {
+  const getUnreviewedSubmissions = async (): Promise<SubmissionRecordWithRootFeature[]> => {
     const { data } = await axios.get(`api/administrative/submission/unreviewed`);
 
     return data;
@@ -101,13 +102,9 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review.
    *
-   * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
-   *   >)}
+   * @return {*}  {Promise<SubmissionRecordWithRootFeature[]>}
    */
-  const getReviewedSubmissions = async (): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
-  > => {
+  const getReviewedSubmissions = async (): Promise<SubmissionRecordWithRootFeature[]> => {
     const { data } = await axios.get(`api/administrative/submission/reviewed`);
 
     return data;

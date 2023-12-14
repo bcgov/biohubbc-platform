@@ -3,7 +3,8 @@ import Icon from '@mdi/react';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import { Box } from '@mui/system';
-import { SECURITY_APPLIED_STATUS, SubmissionRecordWithSecurity } from 'interfaces/useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 
 export interface ICompleteSecurityReviewStatusMessageProps {
   submission: SubmissionRecordWithSecurity;

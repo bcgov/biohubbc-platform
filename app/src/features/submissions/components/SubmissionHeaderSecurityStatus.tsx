@@ -2,7 +2,8 @@ import { mdiClipboardTextOutline, mdiLock, mdiLockAlertOutline, mdiLockOpenVaria
 import Icon from '@mdi/react';
 import Typography from '@mui/material/Typography';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { SECURITY_APPLIED_STATUS, SubmissionRecordWithSecurity } from 'interfaces/useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
+import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { getFormattedDate } from 'utils/Utils';
 
 export interface ISubmissionHeaderSecurityStatusProps {

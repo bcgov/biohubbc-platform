@@ -8,7 +8,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import useTheme from '@mui/material/styles/useTheme';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import CompleteSecurityReviewStatusMessage from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewStatusMessage';
-import { SubmissionRecordWithSecurity } from 'interfaces/useDatasetApi.interface';
+import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 
 export interface ICompleteSecurityReviewDialogProps {
   submission: SubmissionRecordWithSecurity;

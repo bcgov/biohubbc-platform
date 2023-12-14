@@ -1,4 +1,4 @@
-import { SECURITY_APPLIED_STATUS, SubmissionRecordWithSecurity } from './useDatasetApi.interface';
+import { SECURITY_APPLIED_STATUS } from './useDatasetApi.interface';
 
 export type IListSubmissionsResponse = Array<{
   submission_id: number;
@@ -19,6 +19,29 @@ export type IListSubmissionsResponse = Array<{
 }>;
 
 /** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
+
+export type SubmissionRecord = {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string | null;
+  source_system: string;
+  name: string;
+  description: string;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+};
+
+export type SubmissionRecordWithSecurity = SubmissionRecord & {
+  security: SECURITY_APPLIED_STATUS;
+};
+
+export type SubmissionRecordWithRootFeature = SubmissionRecord & {
+  feature_type_id: number;
+  feature_type: string;
+};
 
 export interface ISubmission {
   submission_id: number;

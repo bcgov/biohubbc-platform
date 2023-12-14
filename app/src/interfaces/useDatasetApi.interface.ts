@@ -59,35 +59,6 @@ export interface IDatasetForReview {
   keywords: string[];
 }
 
-export type SubmissionRecord = {
-  submission_id: number;
-  uuid: string;
-  security_review_timestamp: string | null;
-  source_system: string;
-  name: string;
-  description: string;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
-};
-
-export type SubmissionRecordWithSecurity = {
-  submission_id: number;
-  uuid: string;
-  security_review_timestamp: string | null;
-  source_system: string;
-  name: string;
-  description: string;
-  create_date: string;
-  create_user: number;
-  update_date: string | null;
-  update_user: number | null;
-  revision_count: number;
-  security: SECURITY_APPLIED_STATUS;
-};
-
 export interface ISubmission {
   submission_id: number;
   uuid: string;
