@@ -97,6 +97,13 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSecurityRulesForSubmissions = async (submissions: number[]): Promise<any[]> => {
+    const { data } = await axios.post('api/administrative/security/fetch', {
+      submissions
+    });
+    return data;
+  };
+
   return {
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
@@ -104,7 +111,8 @@ const useSecurityApi = (axios: AxiosInstance) => {
     getActiveSecurityRules,
     addSecurityRule,
     applySecurityRulesToSubmissions,
-    removeSecurityRulesToSubmissions
+    removeSecurityRulesToSubmissions,
+    getSecurityRulesForSubmissions
   };
 };
 

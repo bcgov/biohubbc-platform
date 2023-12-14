@@ -269,7 +269,7 @@ export class SecurityRepository extends BaseRepository {
   }
 
   async applySecurityRulesToSubmissionFeatures(
-    submissions: number[],
+    features: number[],
     rules: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     if (!rules.length) {
@@ -277,7 +277,7 @@ export class SecurityRepository extends BaseRepository {
       return [];
     }
 
-    const final = submissions.flatMap((item) => {
+    const final = features.flatMap((item) => {
       return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
     });
 
@@ -294,13 +294,24 @@ export class SecurityRepository extends BaseRepository {
     return response.rows;
   }
 
-  async removeSecurityRulesFromSubmissionFeatures(submission: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
     const deleteSQL = SQL`
       DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
 
-    deleteSQL.append(submission.join(', '));
+    deleteSQL.append(features.join(', '));
     deleteSQL.append(`) RETURNING *;`);
     const response = await this.connection.sql(deleteSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    const sql = SQL`
+      SELECT * FROM submission_feature_securityWHERE submission_feature_id IN (`;
+
+    sql.append(features.join(', '));
+    sql.append(`);`);
+
+    const response = await this.connection.sql(sql, SubmissionFeatureSecurityRecord);
     return response.rows;
   }
 }

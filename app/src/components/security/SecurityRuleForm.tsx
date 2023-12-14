@@ -32,8 +32,9 @@ const SecurityRuleForm = () => {
     setFieldValue('rules', filteredData);
   };
 
-  console.log('Form Values', values.rules);
-
+  // ok need fetch all that crap
+  // then I need loop through it all
+  // roller skates version, just show that these features have security..
   return (
     <form onSubmit={handleSubmit}>
       <Box component="fieldset">
