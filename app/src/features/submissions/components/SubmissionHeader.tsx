@@ -15,54 +15,6 @@ export interface ISubmissionHeaderProps {
 }
 
 /**
- * Checks if security has been applied to all features in a submission.
- *
- * @param {IGetSubmissionResponse} submission
- * @return {*}  {SECURITY_APPLIED_STATUS}
- */
-export const checkSubmissionSecurity = (submission: IGetSubmissionResponse): SECURITY_APPLIED_STATUS => {
-  let securityCount = 0;
-  let featureCount = 0;
-
-  submission.features?.observations.forEach((observation: IFeature) => {
-    if (
-      observation.data?.submission_feature_security_ids &&
-      observation.data?.submission_feature_security_ids.length > 0
-    ) {
-      securityCount += 1;
-    }
-    featureCount += 1;
-  });
-
-  submission.features?.animals.forEach((animal: IFeature) => {
-    if (animal.data?.submission_feature_security_ids && animal.data?.submission_feature_security_ids.length > 0) {
-      securityCount += 1;
-    }
-    featureCount += 1;
-  });
-
-  submission.features?.sampleSites.forEach((sampleSite: IFeature) => {
-    if (
-      sampleSite.data?.submission_feature_security_ids &&
-      sampleSite.data?.submission_feature_security_ids.length > 0
-    ) {
-      securityCount += 1;
-    }
-    featureCount += 1;
-  });
-
-  if (securityCount === 0) {
-    return SECURITY_APPLIED_STATUS.UNSECURED;
-  }
-
-  if (securityCount === featureCount) {
-    return SECURITY_APPLIED_STATUS.SECURED;
-  }
-
-  return SECURITY_APPLIED_STATUS.PARTIALLY_SECURED;
-};
-
-/**
  * Submission header for admin single-submission view.
  *
  * @return {*}
@@ -72,14 +24,11 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
 
   const api = useApi();
 
-  const submissionUUID = submissionContext.submissionDataLoader.data?.submission.uuid;
   const submissionDataLoader = submissionContext.submissionDataLoader;
 
   if (!submissionDataLoader.data) {
     return <CircularProgress className="pageProgress" size={40} />;
   }
-
-  const secure = checkSubmissionSecurity(submissionDataLoader.data);
 
   const submission = submissionDataLoader.data?.submission;
   const features = submissionDataLoader.data?.features;

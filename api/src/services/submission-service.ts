@@ -589,19 +589,23 @@ export class SubmissionService extends DBService {
     return this.submissionRepository.getReviewedSubmissionsWithSecurity();
   }
 
-  /*
+  /**
    * Retrieves submission data from the submission table.
    *
    * @param {number} submissionId
-   * @return {*}  {(Promise<{
-   *     submission: ISubmissionModel & { create_user: string };
+   * @return {*}  {Promise<{
+   *     submission: SubmissionWithSecurityRecord;
    *     features: {
    *       dataset: SubmissionRecordWithTypeAndSecurity[];
    *       sampleSites: SubmissionRecordWithTypeAndSecurity[];
    *       animals: SubmissionRecordWithTypeAndSecurity[];
+   *       observations: SubmissionRecordWithTypeAndSecurity[];
+   *     };
+   *   }>}
+   * @memberof SubmissionService
    */
   async getSubmissionAndFeaturesBySubmissionId(submissionId: number): Promise<{
-    submission: ISubmissionModel & { create_user: string };
+    submission: SubmissionWithSecurityRecord;
     features: {
       dataset: SubmissionRecordWithTypeAndSecurity[];
       sampleSites: SubmissionRecordWithTypeAndSecurity[];
