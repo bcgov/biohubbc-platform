@@ -118,7 +118,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * @return {*}
    */
   const updateSubmissionRecord = async (submissionId: number, patch: { security_reviewed: boolean }) => {
-    const { data } = await axios.patch(`api/administrative/submission/${submissionId}`, { patch });
+    const { data } = await axios.patch(`api/administrative/submission/${submissionId}`, patch);
 
     return data;
   };
