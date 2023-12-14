@@ -53,8 +53,7 @@ POST.apiDoc = {
               type: 'array',
               items: {
                 type: 'number'
-              },
-              minItems: 1
+              }
             }
           }
         }
@@ -112,7 +111,11 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.applySecurityRulesToSubmissionFeatures(req.body.features, req.body.rules);
+      const data = await service.applySecurityRulesToSubmissionFeatures(
+        req.body.features,
+        req.body.rules,
+        Boolean(req.body.override)
+      );
 
       await connection.commit();
 

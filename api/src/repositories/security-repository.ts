@@ -272,6 +272,11 @@ export class SecurityRepository extends BaseRepository {
     submissions: number[],
     rules: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!rules.length) {
+      // no rules to apply, leave early
+      return [];
+    }
+
     const final = submissions.flatMap((item) => {
       return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
     });
@@ -281,6 +286,8 @@ export class SecurityRepository extends BaseRepository {
     VALUES `;
     insertSQL.append(final.join(', '));
     insertSQL.append(`
+    ON CONFLICT (submission_feature_id, security_rule_id)
+    DO NOTHING
     RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);

@@ -328,14 +328,25 @@ export class SecurityService extends DBService {
   }
 
   async applySecurityRulesToSubmissionFeatures(
-    submissions: number[],
-    rules: number[]
+    features: number[],
+    rules: number[],
+    override = false
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissions, rules);
+    if (override) {
+      console.log('WE ARE OVERRIDING THIS');
+      // we want to override any security rules present and can achieve this by remove everything first
+      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
+    }
+
+    return this.securityRepository.applySecurityRulesToSubmissionFeatures(features, rules);
   }
 
   async removeSecurityRulesFromSubmissionFeatures(submissions: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
     return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissions);
+  }
+
+  async getSecurityRulesForSubmissionFeatures(): Promise<any[]> {
+    return [];
   }
 
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
