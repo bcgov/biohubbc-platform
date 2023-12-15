@@ -36,7 +36,7 @@ describe('patchSubmissionRecord', () => {
     }
   });
 
-  it.only('should return the patched submission record', async () => {
+  it('should return the patched submission record', async () => {
     const dbConnectionObj = getMockDBConnection({
       commit: sinon.stub(),
       rollback: sinon.stub(),
