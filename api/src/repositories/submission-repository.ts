@@ -1281,7 +1281,10 @@ export class SubmissionRepository extends BaseRepository {
       GROUP BY 
         submission_feature.submission_feature_id,
         feature_type.name,
-        feature_type.display_name;
+        feature_type.display_name,
+        feature_type.sort
+      ORDER BY
+        feature_type.sort ASC;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecordWithTypeAndSecurity);

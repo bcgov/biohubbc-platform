@@ -88,7 +88,8 @@ GET.apiDoc = {
                   enum: [
                     SECURITY_APPLIED_STATUS.SECURED,
                     SECURITY_APPLIED_STATUS.UNSECURED,
-                    SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
+                    SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+                    SECURITY_APPLIED_STATUS.PENDING
                   ]
                 }
               }
