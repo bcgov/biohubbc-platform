@@ -40,7 +40,7 @@ export type SubmissionRecordWithSecurity = SubmissionRecord & {
 
 export type SubmissionRecordWithRootFeature = SubmissionRecord & {
   feature_type_id: number;
-  feature_type: string;
+  feature_type_name: string;
 };
 
 export interface ISubmission {
@@ -59,20 +59,28 @@ export interface ISubmissionFeature {
   create_date: string;
   create_user: string;
 }
-export interface IFeature {
+export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   submission_id: number;
-  feature_type: string;
-  data: any;
+  feature_type_id: number;
+  data: Record<string, any>;
+  parent_submission_feature_id: number;
+  record_effective_date: string;
+  record_end_date: string | null;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+  feature_type_name: string;
+  feature_type_display_name: string;
   submission_feature_security_ids: number[];
-  parent_submission_feature_id: number | null;
-}
+};
 export interface IGetSubmissionResponse {
   submission: SubmissionRecordWithSecurity;
-  features: {
-    dataset: IFeature[];
-    sampleSites: IFeature[];
-    animals: IFeature[];
-    observations: IFeature[];
-  };
+  submissionFeatures: {
+    feature_type_name: string;
+    feature_type_display_name: string;
+    features: SubmissionFeatureRecordWithTypeAndSecurity[];
+  }[];
 }

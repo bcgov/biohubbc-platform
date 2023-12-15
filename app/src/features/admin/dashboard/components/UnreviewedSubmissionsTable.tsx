@@ -91,7 +91,7 @@ const UnreviewedSubmissionsTable = () => {
                   <Chip
                     color="default"
                     size="small"
-                    label={submissionRecord.feature_type}
+                    label={submissionRecord.feature_type_name}
                     sx={{
                       borderRadius: '4px',
                       textTransform: 'uppercase',

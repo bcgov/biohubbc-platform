@@ -17,9 +17,9 @@ import {
   ISubmissionRecordWithSpatial,
   PatchSubmissionRecord,
   SubmissionFeatureRecord,
+  SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
   SubmissionRecord,
-  SubmissionRecordWithTypeAndSecurity,
   SubmissionRepository,
   SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
@@ -544,12 +544,12 @@ export class SubmissionService extends DBService {
    * Get all submissions that are pending security review (are unreviewed).
    *
    * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *     (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
    *   >)}
    * @memberof SubmissionService
    */
   async getUnreviewedSubmissionsForAdmins(): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+    (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
   > {
     return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
   }
@@ -558,12 +558,12 @@ export class SubmissionService extends DBService {
    * Get all submissions that have completed security review (are reviewed).
    *
    * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *     (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
    *   >)}
    * @memberof SubmissionService
    */
   async getReviewedSubmissionsForAdmins(): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+    (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
   > {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
@@ -595,53 +595,47 @@ export class SubmissionService extends DBService {
    * @param {number} submissionId
    * @return {*}  {Promise<{
    *     submission: SubmissionWithSecurityRecord;
-   *     features: {
-   *       dataset: SubmissionRecordWithTypeAndSecurity[];
-   *       sampleSites: SubmissionRecordWithTypeAndSecurity[];
-   *       animals: SubmissionRecordWithTypeAndSecurity[];
-   *       observations: SubmissionRecordWithTypeAndSecurity[];
-   *     };
+   *     submissionFeatures: {
+   *       feature_type_name: string;
+   *       feature_type_display_name: string;
+   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
+   *     }[];
    *   }>}
    * @memberof SubmissionService
    */
   async getSubmissionAndFeaturesBySubmissionId(submissionId: number): Promise<{
     submission: SubmissionWithSecurityRecord;
-    features: {
-      dataset: SubmissionRecordWithTypeAndSecurity[];
-      sampleSites: SubmissionRecordWithTypeAndSecurity[];
-      animals: SubmissionRecordWithTypeAndSecurity[];
-      observations: SubmissionRecordWithTypeAndSecurity[];
-    };
+    submissionFeatures: {
+      feature_type_name: string;
+      feature_type_display_name: string;
+      features: SubmissionFeatureRecordWithTypeAndSecurity[];
+    }[];
   }> {
     const submission = await this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
 
-    const features = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
-    const dataset = [];
-    const sampleSites = [];
-    const animals = [];
-    const observations = [];
+    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
 
-    for (const feature of features) {
-      const featureType = feature.feature_type;
+    for (const feature of uncategorizedFeatures) {
+      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
 
-      switch (featureType) {
-        case 'dataset':
-          dataset.push(feature);
-          break;
-        case 'sample_site':
-          sampleSites.push(feature);
-          break;
-        case 'animal':
-          animals.push(feature);
-          break;
-        case 'observation':
-          observations.push(feature);
-          break;
+      if (featureCategoryArray) {
+        // Append to existing array of matching feature type
+        categorizedFeatures[feature.feature_type_name] = featureCategoryArray.concat(feature);
+      } else {
+        // Create new array for feature type
+        categorizedFeatures[feature.feature_type_name] = [feature];
       }
     }
 
-    return { submission, features: { dataset, sampleSites, animals, observations } };
+    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
+      feature_type_name: featureType,
+      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
+      features: submissionFeatures
+    }));
+
+    return { submission, submissionFeatures };
   }
 
   /**

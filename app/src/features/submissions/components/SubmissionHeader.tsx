@@ -31,8 +31,6 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   }
 
   const submission = submissionDataLoader.data?.submission;
-  const features = submissionDataLoader.data?.features;
-  const dataset = features.dataset[0];
 
   const onSecurityReviewComplete = async () => {
     await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: true });
@@ -47,14 +45,14 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   return (
     <>
       <BaseHeader
-        title={dataset?.data.name}
+        title={submission.name}
         breadCrumb={
           <Breadcrumbs>
             <Link component={RouterLink} variant="body2" underline="hover" to={`/admin/dashboard`} aria-current="page">
               Dashboard
             </Link>
             <Typography variant="body2" component="span">
-              {dataset?.data.name}
+              {submission.name}
             </Typography>
           </Breadcrumbs>
         }

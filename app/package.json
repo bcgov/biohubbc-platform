@@ -39,6 +39,7 @@
     "@mui/x-data-grid": "^6.0.2",
     "@react-keycloak/web": "^3.4.0",
     "@react-leaflet/core": "~2.1.0",
+    "@tanstack/react-query": "^5.13.4",
     "@tmcw/togeojson": "~4.2.0",
     "@turf/bbox": "~6.3.0",
     "@turf/boolean-equal": "~6.3.0",

@@ -37,7 +37,7 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['submission', 'features'],
+            required: ['submission', 'submissionFeatures'],
             properties: {
               submission: {
                 type: 'object',
@@ -53,7 +53,8 @@ GET.apiDoc = {
                   'create_user',
                   'update_date',
                   'update_user',
-                  'revision_count'
+                  'revision_count',
+                  'security'
                 ],
                 properties: {
                   submission_id: {
@@ -110,31 +111,103 @@ GET.apiDoc = {
                   }
                 }
               },
-              features: {
-                required: ['dataset', 'sampleSites', 'animals', 'observations'],
-                properties: {
-                  dataset: {
-                    type: 'array',
-                    items: {
-                      $ref: '#/components/schemas/feature'
-                    }
-                  },
-                  sampleSites: {
-                    type: 'array',
-                    items: {
-                      $ref: '#/components/schemas/feature'
-                    }
-                  },
-                  animals: {
-                    type: 'array',
-                    items: {
-                      $ref: '#/components/schemas/feature'
-                    }
-                  },
-                  observations: {
-                    type: 'array',
-                    items: {
-                      $ref: '#/components/schemas/feature'
+              submissionFeatures: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['feature_type_name', 'feature_type_display_name', 'features'],
+                  properties: {
+                    feature_type_name: {
+                      type: 'string'
+                    },
+                    feature_type_display_name: {
+                      type: 'string'
+                    },
+                    features: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        required: [
+                          'submission_feature_id',
+                          'submission_id',
+                          'feature_type_id',
+                          'data',
+                          'parent_submission_feature_id',
+                          'record_effective_date',
+                          'record_end_date',
+                          'create_date',
+                          'create_user',
+                          'update_date',
+                          'update_user',
+                          'revision_count',
+                          'feature_type_name',
+                          'feature_type_display_name',
+                          'submission_feature_security_ids'
+                        ],
+                        properties: {
+                          submission_feature_id: {
+                            type: 'integer',
+                            minimum: 1
+                          },
+                          submission_id: {
+                            type: 'integer',
+                            minimum: 1
+                          },
+                          feature_type_id: {
+                            type: 'integer',
+                            minimum: 1
+                          },
+                          data: {
+                            type: 'object',
+                            properties: {}
+                          },
+                          parent_submission_feature_id: {
+                            type: 'integer',
+                            minimum: 1,
+                            nullable: true
+                          },
+                          record_effective_date: {
+                            type: 'string'
+                          },
+                          record_end_date: {
+                            type: 'string',
+                            nullable: true
+                          },
+                          create_date: {
+                            type: 'string'
+                          },
+                          create_user: {
+                            type: 'integer',
+                            minimum: 1
+                          },
+                          update_date: {
+                            type: 'string',
+                            nullable: true
+                          },
+                          update_user: {
+                            type: 'integer',
+                            minimum: 1,
+                            nullable: true
+                          },
+                          revision_count: {
+                            type: 'integer',
+                            minimum: 0
+                          },
+                          feature_type_name: {
+                            type: 'string'
+                          },
+                          feature_type_display_name: {
+                            type: 'string'
+                          },
+                          submission_feature_security_ids: {
+                            type: 'array',
+                            items: {
+                              type: 'integer',
+                              minimum: 1
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }

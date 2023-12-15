@@ -94,12 +94,13 @@ export const SubmissionFeatureRecord = z.object({
 
 export type SubmissionFeatureRecord = z.infer<typeof SubmissionFeatureRecord>;
 
-export const SubmissionRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
-  feature_type: z.string(),
-  submission_feature_security_ids: z.array(z.number()).nullable()
+export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
+  feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  submission_feature_security_ids: z.array(z.number())
 });
 
-export type SubmissionRecordWithTypeAndSecurity = z.infer<typeof SubmissionRecordWithTypeAndSecurity>;
+export type SubmissionFeatureRecordWithTypeAndSecurity = z.infer<typeof SubmissionFeatureRecordWithTypeAndSecurity>;
 
 export const FeatureTypeRecord = z.object({
   feature_type_id: z.number(),
@@ -270,7 +271,7 @@ export type SubmissionWithSecurityRecord = z.infer<typeof SubmissionWithSecurity
 
 export const SubmissionRecordWithRootFeatureType = SubmissionRecord.extend({
   feature_type_id: z.number(),
-  feature_type: z.string()
+  feature_type_name: z.string()
 });
 
 export type SubmissionRecordWithRootFeatureType = z.infer<typeof SubmissionRecordWithRootFeatureType>;
@@ -1176,7 +1177,7 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           DISTINCT ON (submission.uuid) submission.*,
           submission_feature.feature_type_id,
-          feature_type.name as feature_type
+          feature_type.name as feature_type_name
         FROM
           submission
         INNER JOIN
@@ -1218,7 +1219,7 @@ export class SubmissionRepository extends BaseRepository {
         SELECT
           DISTINCT ON (submission.uuid) submission.*,
           submission_feature.feature_type_id,
-          feature_type.name as feature_type
+          feature_type.name as feature_type_name
         FROM
           submission
         INNER JOIN
@@ -1253,21 +1254,37 @@ export class SubmissionRepository extends BaseRepository {
    *
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionRecordWithTypeAndSecurity[]>}
+   * @return {*}  {Promise<SubmissionFeatureRecordWithTypeAndSecurity[]>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<SubmissionRecordWithTypeAndSecurity[]> {
+  async getSubmissionFeaturesBySubmissionId(
+    submissionId: number
+  ): Promise<SubmissionFeatureRecordWithTypeAndSecurity[]> {
     const sqlStatement = SQL`
-        SELECT
-          sf.*,
-          (SELECT name FROM feature_type WHERE feature_type_id = sf.feature_type_id) AS feature_type,
-          (SELECT sfs.submission_feature_security_id FROM submission_feature_security sfs WHERE sfs.submission_feature_id = sf.submission_feature_id) AS submission_feature_security_ids
-        FROM
-          submission_feature sf
-        WHERE
-          submission_id = ${submissionId};
-      `;
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithTypeAndSecurity);
+      SELECT
+        submission_feature.*,
+        feature_type.name as feature_type_name,
+        feature_type.display_name as feature_type_display_name,
+        array_remove(array_agg(submission_feature_security.submission_feature_security_id), NULL) AS submission_feature_security_ids
+      FROM
+        submission_feature
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+       LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
+      WHERE
+        submission_id = ${submissionId}
+      GROUP BY 
+        submission_feature.submission_feature_id,
+        feature_type.name,
+        feature_type.display_name;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecordWithTypeAndSecurity);
 
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission feature record', [

@@ -13,29 +13,23 @@ const AdminSubmissionPage = () => {
   const submissionContext = useSubmissionContext();
 
   const submissionDataLoader = submissionContext.submissionDataLoader;
-  const features = submissionDataLoader.data?.features;
 
-  const dataset = features?.dataset;
-  const sampleSites = features?.sampleSites;
-  const animals = features?.animals;
-  const observations = features?.observations;
+  const submissionFeatures = submissionDataLoader.data?.submissionFeatures || [];
 
   return (
     <Box>
       <SubmissionHeader selectedFeatures={[]} />
       <Container maxWidth="xl">
-        <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={dataset || []} title="DATASET FEATURES" />
-        </Box>
-        <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={sampleSites || []} title="SAMPLE SITE FEATURES" />
-        </Box>
-        <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={animals || []} title="ANIMAL FEATURES" />
-        </Box>
-        <Box py={2}>
-          <SubmissionDataGrid submissionFeatures={observations || []} title="OBSERVATIONS FEATURES" />
-        </Box>
+        {submissionFeatures.map((submissionFeature) => {
+          return (
+            <Box py={2} key={submissionFeature.feature_type_name}>
+              <SubmissionDataGrid
+                feature_type_display_name={submissionFeature.feature_type_display_name}
+                submissionFeatures={submissionFeature.features || []}
+              />
+            </Box>
+          );
+        })}
       </Container>
     </Box>
   );
