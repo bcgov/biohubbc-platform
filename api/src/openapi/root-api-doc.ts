@@ -185,6 +185,13 @@ export const rootAPIDoc = {
           data: {
             type: 'object'
           },
+          submission_feature_security_ids: {
+            nullable: true,
+            type: 'array',
+            items: {
+              type: 'number'
+            }
+          },
           parent_submission_feature_id: {
             type: 'number',
             nullable: true

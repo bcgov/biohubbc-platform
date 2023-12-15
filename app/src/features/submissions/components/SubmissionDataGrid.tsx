@@ -11,7 +11,7 @@ import {
   GridValueGetterParams
 } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
-import { IFeature } from 'interfaces/useSubmissionsApi.interface';
+import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
 
 const useStyles = makeStyles(() => ({
@@ -21,13 +21,19 @@ const useStyles = makeStyles(() => ({
 }));
 
 export interface ISubmissionDataGridProps {
-  title: string;
-  submissionFeatures: IFeature[];
+  feature_type_display_name: string;
+  submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
 
+/**
+ * SubmissionDataGrid component for displaying submission data.
+ *
+ * @param {ISubmissionDataGridProps} props
+ * @return {*}
+ */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
-  const { submissionFeatures, title } = props;
+  const { feature_type_display_name, submissionFeatures } = props;
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
@@ -45,7 +51,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => (params.row.data[fieldName] ? params.row.data[fieldName] : null),
       renderCell: (params: GridRenderCellParams) => {
-        return <pre>{params.value}</pre>;
+        return <pre>{String(params.value)}</pre>;
       }
     };
   });
@@ -82,9 +88,10 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     <Paper elevation={0}>
       <ActionToolbar
         className={classes.datasetDetailsLabel}
-        label={`${title} (${submissionFeatures.length})`}
+        label={`${feature_type_display_name} (${submissionFeatures.length})`}
         labelProps={{ variant: 'h4' }}
       />
+
       <Box display="flex" width={1}>
         <DataGrid
           sx={{ flexGrow: 1, borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}

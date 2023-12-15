@@ -60,7 +60,7 @@ describe('getReviewedSubmissionsForAdmins', () => {
         update_user: null,
         revision_count: 0,
         feature_type_id: 1,
-        feature_type: 'dataset'
+        feature_type_name: 'dataset'
       },
       {
         submission_id: 2,
@@ -76,7 +76,7 @@ describe('getReviewedSubmissionsForAdmins', () => {
         update_user: 1,
         revision_count: 1,
         feature_type_id: 1,
-        feature_type: 'dataset'
+        feature_type_name: 'dataset'
       }
     ];
 

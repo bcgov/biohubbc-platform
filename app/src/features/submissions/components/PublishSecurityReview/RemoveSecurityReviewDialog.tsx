@@ -1,0 +1,49 @@
+import { LoadingButton } from '@mui/lab';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import useTheme from '@mui/material/styles/useTheme';
+import useMediaQuery from '@mui/material/useMediaQuery';
+
+export interface IRemoveSecurityReviewDialogProps {
+  open: boolean;
+  onRemove: () => void;
+  onCancel: () => void;
+}
+
+const RemoveSecurityReviewDialog = (props: IRemoveSecurityReviewDialogProps) => {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const { open, onRemove, onCancel } = props;
+
+  return (
+    <Dialog
+      fullScreen={fullScreen}
+      maxWidth="xl"
+      open={open}
+      aria-labelledby="remove-security-review-dialog-title"
+      aria-describedby="remove-security-review-dialog-description">
+      <DialogTitle id="remove-security-review-dialog-title">Remove Review</DialogTitle>
+
+      <DialogContent>
+        <DialogContentText id="remove-security-review-dialog-description">
+          Removing the security review will make all records of this submission unavailable to users of Biohub.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <LoadingButton onClick={async () => onRemove()} color="primary" variant="contained">
+          Remove Review
+        </LoadingButton>
+        <Button onClick={() => onCancel()} color="primary" variant="outlined">
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+export default RemoveSecurityReviewDialog;

@@ -710,7 +710,7 @@ describe('SubmissionService', () => {
 
   describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type: string })[] = [
+      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -725,7 +725,7 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_id: 1,
-          feature_type: 'dataset'
+          feature_type_name: 'dataset'
         },
         {
           submission_id: 2,
@@ -741,7 +741,7 @@ describe('SubmissionService', () => {
           update_user: 1,
           revision_count: 1,
           feature_type_id: 1,
-          feature_type: 'dataset'
+          feature_type_name: 'dataset'
         }
       ];
 
@@ -762,7 +762,7 @@ describe('SubmissionService', () => {
 
   describe('getReviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type: string })[] = [
+      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -777,7 +777,7 @@ describe('SubmissionService', () => {
           update_user: null,
           revision_count: 0,
           feature_type_id: 1,
-          feature_type: 'dataset'
+          feature_type_name: 'dataset'
         },
         {
           submission_id: 2,
@@ -793,7 +793,7 @@ describe('SubmissionService', () => {
           update_user: 1,
           revision_count: 1,
           feature_type_id: 1,
-          feature_type: 'dataset'
+          feature_type_name: 'dataset'
         }
       ];
 

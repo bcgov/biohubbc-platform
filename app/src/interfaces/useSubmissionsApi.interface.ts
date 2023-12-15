@@ -20,6 +20,29 @@ export type IListSubmissionsResponse = Array<{
 
 /** NET-NEW INTERFACES FOR UPDATED SCHEMA **/
 
+export type SubmissionRecord = {
+  submission_id: number;
+  uuid: string;
+  security_review_timestamp: string | null;
+  source_system: string;
+  name: string;
+  description: string;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+};
+
+export type SubmissionRecordWithSecurity = SubmissionRecord & {
+  security: SECURITY_APPLIED_STATUS;
+};
+
+export type SubmissionRecordWithRootFeature = SubmissionRecord & {
+  feature_type_id: number;
+  feature_type_name: string;
+};
+
 export interface ISubmission {
   submission_id: number;
   submission_feature_id: number;
@@ -34,20 +57,30 @@ export interface ISubmissionFeature {
   uuid: string;
   security_review_timestamp: string;
   create_date: string;
+  create_user: string;
 }
-export interface IFeature {
+export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   submission_id: number;
-  feature_type: string;
-  data: any;
-  parent_submission_feature_id: number | null;
-}
+  feature_type_id: number;
+  data: Record<string, any>;
+  parent_submission_feature_id: number;
+  record_effective_date: string;
+  record_end_date: string | null;
+  create_date: string;
+  create_user: number;
+  update_date: string | null;
+  update_user: number | null;
+  revision_count: number;
+  feature_type_name: string;
+  feature_type_display_name: string;
+  submission_feature_security_ids: number[];
+};
 export interface IGetSubmissionResponse {
-  submission: ISubmissionFeature;
-  features: {
-    dataset: IFeature[];
-    sampleSites: IFeature[];
-    animals: IFeature[];
-    observations: IFeature[];
-  };
+  submission: SubmissionRecordWithSecurity;
+  submissionFeatures: {
+    feature_type_name: string;
+    feature_type_display_name: string;
+    features: SubmissionFeatureRecordWithTypeAndSecurity[];
+  }[];
 }

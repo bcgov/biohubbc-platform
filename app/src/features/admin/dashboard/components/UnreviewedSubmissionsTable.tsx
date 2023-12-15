@@ -16,7 +16,7 @@ import { getFormattedDate, pluralize as p } from 'utils/Utils';
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
+  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getUnreviewedSubmissions());
 
   unreviewedSubmissionsDataLoader.load();
 
@@ -72,7 +72,7 @@ const UnreviewedSubmissionsTable = () => {
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           return (
-            <Card elevation={0}>
+            <Card elevation={0} key={submissionRecord.submission_id}>
               <Stack flex="1 1 auto" gap={1} p={2}>
                 <Stack flexDirection="row" alignItems="flex-start" gap={2}>
                   <Typography
@@ -91,7 +91,7 @@ const UnreviewedSubmissionsTable = () => {
                   <Chip
                     color="default"
                     size="small"
-                    label={submissionRecord.feature_type}
+                    label={submissionRecord.feature_type_name}
                     sx={{
                       borderRadius: '4px',
                       textTransform: 'uppercase',
@@ -151,7 +151,7 @@ const UnreviewedSubmissionsTable = () => {
                     component={RouterLink}
                     variant="contained"
                     color="primary"
-                    to={`/admin/dashboard/submissions/${submissionRecord.uuid}`}
+                    to={`/admin/dashboard/submissions/${submissionRecord.submission_id}`}
                     sx={{
                       flex: '0 0 auto',
                       minWidth: '7rem'

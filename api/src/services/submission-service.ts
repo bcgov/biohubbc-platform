@@ -17,6 +17,7 @@ import {
   ISubmissionRecordWithSpatial,
   PatchSubmissionRecord,
   SubmissionFeatureRecord,
+  SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRepository,
@@ -543,12 +544,12 @@ export class SubmissionService extends DBService {
    * Get all submissions that are pending security review (are unreviewed).
    *
    * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *     (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
    *   >)}
    * @memberof SubmissionService
    */
   async getUnreviewedSubmissionsForAdmins(): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+    (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
   > {
     return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
   }
@@ -557,14 +558,25 @@ export class SubmissionService extends DBService {
    * Get all submissions that have completed security review (are reviewed).
    *
    * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+   *     (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
    *   >)}
    * @memberof SubmissionService
    */
   async getReviewedSubmissionsForAdmins(): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type: string })[]
+    (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
   > {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get a submission record by id (with security status).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionWithSecurityRecord>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionWithSecurityRecord> {
+    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
   }
 
   /**
@@ -576,47 +588,54 @@ export class SubmissionService extends DBService {
   async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
     return this.submissionRepository.getReviewedSubmissionsWithSecurity();
   }
-  /*
+
+  /**
    * Retrieves submission data from the submission table.
    *
-   * @param {string} submissionUUID
-   * @return {*}  {Promise<any>} TODO: type
-   * @memberof DatasetService
+   * @param {number} submissionId
+   * @return {*}  {Promise<{
+   *     submission: SubmissionWithSecurityRecord;
+   *     submissionFeatures: {
+   *       feature_type_name: string;
+   *       feature_type_display_name: string;
+   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
+   *     }[];
+   *   }>}
+   * @memberof SubmissionService
    */
-  async getSubmissionAndFeaturesBySubmissionUUID(submissionUUID: string): Promise<any> {
-    const submission = await this.submissionRepository.getSubmissionByUUID(submissionUUID);
+  async getSubmissionAndFeaturesBySubmissionId(submissionId: number): Promise<{
+    submission: SubmissionWithSecurityRecord;
+    submissionFeatures: {
+      feature_type_name: string;
+      feature_type_display_name: string;
+      features: SubmissionFeatureRecordWithTypeAndSecurity[];
+    }[];
+  }> {
+    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
 
-    if (!submission.submission_id) {
-      throw new Error(`No submission found for submission ${submissionUUID}`);
-    }
+    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
-    const features = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submission.submission_id);
+    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
 
-    const dataset = [];
-    const sampleSites = [];
-    const animals = [];
-    const observations = [];
+    for (const feature of uncategorizedFeatures) {
+      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
 
-    for (const feature of features) {
-      const featureType = feature.feature_type;
-
-      switch (featureType) {
-        case 'dataset':
-          dataset.push(feature);
-          break;
-        case 'sample_site':
-          sampleSites.push(feature);
-          break;
-        case 'animal':
-          animals.push(feature);
-          break;
-        case 'observation':
-          observations.push(feature);
-          break;
+      if (featureCategoryArray) {
+        // Append to existing array of matching feature type
+        categorizedFeatures[feature.feature_type_name] = featureCategoryArray.concat(feature);
+      } else {
+        // Create new array for feature type
+        categorizedFeatures[feature.feature_type_name] = [feature];
       }
     }
 
-    return { submission, features: { dataset, sampleSites, animals, observations } };
+    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
+      feature_type_name: featureType,
+      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
+      features: submissionFeatures
+    }));
+
+    return { submission, submissionFeatures };
   }
 
   /**
