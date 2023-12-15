@@ -4,6 +4,7 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import BaseHeader from 'components/layout/header/BaseHeader';
+import ManageSecurity from 'components/security/ManageSecurity';
 import PublishSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewButton';
 import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
@@ -21,7 +22,6 @@ export interface ISubmissionHeaderProps {
  */
 const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   const submissionContext = useSubmissionContext();
-
   const api = useApi();
 
   const submissionDataLoader = submissionContext.submissionDataLoader;
@@ -63,7 +63,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
         }
         buttonJSX={
           <Stack flexDirection="row" alignItems="center" gap={1}>
-            {/* <ManageSecurity features={props.selectedFeatures} /> */}
+            <ManageSecurity features={props.selectedFeatures} />
 
             <PublishSecurityReviewButton
               submission={submission}

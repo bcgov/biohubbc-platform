@@ -2,13 +2,15 @@ import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { DialogContext } from 'contexts/dialogContext';
+import { SubmissionContext } from 'contexts/submissionContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
+
 interface ISecuritiesDialogProps {
-  submissions: number[];
+  features: number[];
   isOpen: boolean;
   onClose: () => void;
 }
@@ -23,19 +25,24 @@ export interface ISecurityRuleFormProps {
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useContext(DialogContext);
+  const submissionContext = useContext(SubmissionContext);
   const api = useApi();
+
+  useEffect(() => {
+    submissionContext?.submissionFeatureRulesDataLoader.refresh(props.features);
+  }, [props.isOpen]);
 
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
-      await api.security.applySecurityRulesToSubmissions(
-        props.submissions,
+      await api.submissions.applySubmissionFeatureRules(
+        props.features,
         rules.map((item) => item.security_rule_id)
       );
 
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(props.submissions.length)}
+            {ApplySecurityRulesI18N.applySecuritySuccess(props.features.length)}
           </Typography>
         ),
         open: true

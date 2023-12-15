@@ -33,7 +33,7 @@ export interface ISubmissionDataGridProps {
  */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
-  const { feature_type_display_name, submissionFeatures } = props;
+  const { submissionFeatures, feature_type_display_name } = props;
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
@@ -104,7 +104,9 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           checkboxSelection
           editMode="row"
           rowSelectionModel={rowSelectionModel}
-          onRowSelectionModelChange={setRowSelectionModel}
+          onRowSelectionModelChange={(model) => {
+            setRowSelectionModel(model);
+          }}
           disableRowSelectionOnClick
           disableColumnSelector
           disableColumnMenu

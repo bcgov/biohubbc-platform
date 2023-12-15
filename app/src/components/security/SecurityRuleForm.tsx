@@ -1,30 +1,39 @@
 import { mdiClose, mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, AlertTitle, IconButton, Paper, Typography } from '@mui/material';
+import { Alert, AlertTitle, IconButton, Typography } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import { FieldArray, FieldArrayRenderProps, useFormikContext } from 'formik';
+import { SubmissionContext } from 'contexts/submissionContext';
+import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
-import { useApi } from 'hooks/useApi';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
+import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 
 const SecurityRuleForm = () => {
-  const { handleSubmit, errors, values } = useFormikContext<ISecurityRuleFormProps>();
-  const [rules, setRules] = useState<ISecurityRule[]>([]);
+  const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormProps>();
+  const [searchText, setSearchText] = useState('');
+  const [showSecuredBanner, setShowSecuredBanner] = useState(false);
 
-  const api = useApi();
+  const submissionContext = useContext(SubmissionContext);
+  submissionContext?.securityRulesDataLoader.load();
+
+  const rules = submissionContext?.securityRulesDataLoader.data || [];
+  const handleAdd = (selected: ISecurityRule) => {
+    setFieldValue(`rules[${values.rules.length}]`, selected);
+  };
+  const handleRemove = (idToRemove: number) => {
+    const formData = values.rules;
+    const filteredData = formData.filter((item) => item.security_rule_id !== idToRemove);
+    setFieldValue('rules', filteredData);
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      const data = await api.security.getActiveSecurityRules();
-      setRules(data);
-    };
-
-    fetchData();
-  }, []);
+    setShowSecuredBanner(Boolean(submissionContext?.submissionFeatureRulesDataLoader.data?.length));
+  }, [submissionContext?.submissionFeatureRulesDataLoader.isLoading]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -38,6 +47,21 @@ const SecurityRuleForm = () => {
           }}>
           A minimum of one security rule must be selected.
         </Typography>
+        {showSecuredBanner && (
+          <Box mt={3}>
+            <Alert
+              severity="info"
+              variant="standard"
+              action={
+                <IconButton size="small" onClick={() => setShowSecuredBanner(false)}>
+                  <Icon path={mdiClose} size={1} />
+                </IconButton>
+              }>
+              <AlertTitle>Security Applied</AlertTitle>
+              The selected features already have security applied to them.
+            </Alert>
+          </Box>
+        )}
         {errors?.['rules'] && !values.rules.length && (
           <Box mt={3}>
             <Alert severity="error" variant="standard">
@@ -46,80 +70,75 @@ const SecurityRuleForm = () => {
             </Alert>
           </Box>
         )}
-        <FieldArray name="rules">
-          {(helpers: FieldArrayRenderProps) => (
-            <>
-              <Box mt={3}>
-                <Autocomplete
-                  id={'autocomplete-security-rule-search'}
-                  data-testid={'autocomplete-security-rule-search'}
-                  filterSelectedOptions
-                  clearOnBlur
-                  noOptionsText="No records found"
-                  options={alphabetizeObjects(rules, 'name')}
-                  filterOptions={(options, state) => {
-                    const searchFilter = createFilterOptions<ISecurityRule>({ ignoreCase: true });
-                    const unselectedOptions = options.filter(
-                      (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
-                    );
-                    return searchFilter(unselectedOptions, state);
-                  }}
-                  getOptionLabel={(option) => option.name}
-                  isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
-                  onChange={(_, option) => {
-                    if (option) {
-                      helpers.push(option);
-                    }
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      variant="outlined"
-                      placeholder={'Find Security Rules'}
-                      fullWidth
-                      InputProps={{
-                        ...params.InputProps,
-                        startAdornment: (
-                          <Box mx={1} mt="6px">
-                            <Icon path={mdiMagnify} size={1}></Icon>
-                          </Box>
-                        )
-                      }}
-                    />
-                  )}
-                  renderOption={(renderProps, renderOption) => {
-                    return (
-                      <Box component="li" {...renderProps}>
-                        <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
-                      </Box>
-                    );
-                  }}
-                />
-              </Box>
-              <Box mt={3}>
-                {values.rules.map((rule: ISecurityRule, index: number) => {
-                  return (
-                    <Paper
-                      key={rule.security_rule_id}
-                      variant="outlined"
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        p: 1,
-                        mb: 1
-                      }}>
-                      <SecurityRuleCard key={rule.security_rule_id} title={rule.name} subtitle={rule.description} />
-                      <IconButton onClick={() => helpers.remove(index)}>
-                        <Icon path={mdiClose} size={1} />
-                      </IconButton>
-                    </Paper>
-                  );
-                })}
-              </Box>
-            </>
-          )}
-        </FieldArray>
+        <Box mt={3}>
+          <Autocomplete
+            id={'autocomplete-security-rule-search'}
+            data-testid={'autocomplete-security-rule-search'}
+            filterSelectedOptions
+            clearOnBlur
+            loading={submissionContext?.securityRulesDataLoader.isLoading}
+            noOptionsText="No records found"
+            options={alphabetizeObjects(rules, 'name')}
+            filterOptions={(options, state) => {
+              const searchFilter = createFilterOptions<ISecurityRule>({ ignoreCase: true });
+              const unselectedOptions = options.filter(
+                (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
+              );
+              return searchFilter(unselectedOptions, state);
+            }}
+            getOptionLabel={(option) => option.name}
+            isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
+            inputValue={searchText}
+            onInputChange={(_, value, reason) => {
+              if (reason === 'reset') {
+                setSearchText('');
+              } else {
+                setSearchText(value);
+              }
+            }}
+            onChange={(_, option) => {
+              if (option) {
+                handleAdd(option);
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                variant="outlined"
+                placeholder={'Find Security Rules'}
+                fullWidth
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <Box mx={1} mt="6px">
+                      <Icon path={mdiMagnify} size={1}></Icon>
+                    </Box>
+                  )
+                }}
+              />
+            )}
+            renderOption={(renderProps, renderOption) => {
+              return (
+                <Box component="li" {...renderProps}>
+                  <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
+                </Box>
+              );
+            }}
+          />
+        </Box>
+        <Box mt={3}>
+          {values.rules.map((rule: ISecurityRule, index: number) => {
+            return (
+              <SecurityRuleActionCard
+                key={rule.security_rule_id}
+                security_rule_id={rule.security_rule_id}
+                name={rule.name}
+                description={rule.description}
+                remove={handleRemove}
+              />
+            );
+          })}
+        </Box>
       </Box>
     </form>
   );

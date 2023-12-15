@@ -1,3 +1,4 @@
+import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
 import { IGetSubmissionResponse } from 'interfaces/useSubmissionsApi.interface';
@@ -12,6 +13,11 @@ export interface ISubmissionContext {
    * @memberof ISubmissionContext
    */
   submissionDataLoader: DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>;
+
+  submissionFeatureRulesDataLoader: DataLoader<[features: number[]], any[], unknown>;
+
+  securityRulesDataLoader: DataLoader<[], ISecurityRule[], unknown>;
+
   /**
    * The submission id.
    *
@@ -27,6 +33,8 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   const biohubApi = useApi();
 
   const submissionDataLoader = useDataLoader(biohubApi.submissions.getSubmission);
+  const submissionFeatureRulesDataLoader = useDataLoader(biohubApi.security.getSecurityRulesForSubmissions);
+  const securityRulesDataLoader = useDataLoader(biohubApi.security.getActiveSecurityRules);
 
   const urlParams = useParams();
 
@@ -38,6 +46,7 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
     );
   }
 
+  securityRulesDataLoader.load();
   submissionDataLoader.load(submissionId);
 
   /**
@@ -54,6 +63,8 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   const submissionContext: ISubmissionContext = useMemo(() => {
     return {
       submissionDataLoader,
+      submissionFeatureRulesDataLoader,
+      securityRulesDataLoader,
       submissionId
     };
   }, [submissionDataLoader, submissionId]);

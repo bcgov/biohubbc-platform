@@ -13,12 +13,30 @@ const AdminSubmissionPage = () => {
   const submissionContext = useSubmissionContext();
 
   const submissionDataLoader = submissionContext.submissionDataLoader;
-
   const submissionFeatures = submissionDataLoader.data?.submissionFeatures || [];
+
+  // code for collecting individually selected items
+  // const flattenSelectedFeatures = (): number[] => {
+  //   let total: number[] = [];
+  //   for (const item in selectedFeatures) {
+  //     total = [...selectedFeatures[item], ...total];
+  //   }
+  //   return total;
+  // };
+
+  // so this will need to change.
+  const getAllSubmissionFeatureIds = (): number[] => {
+    const ids = [];
+    for (const key in submissionFeatures) {
+      ids.push(submissionFeatures[key].features);
+    }
+
+    return ids.flat().map((item) => item.submission_feature_id);
+  };
 
   return (
     <Box>
-      <SubmissionHeader selectedFeatures={[]} />
+      <SubmissionHeader selectedFeatures={getAllSubmissionFeatureIds()} />
       <Container maxWidth="xl">
         {submissionFeatures.map((submissionFeature) => {
           return (
