@@ -259,6 +259,12 @@ export class SecurityRepository extends BaseRepository {
     return results;
   }
 
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRepository
+   */
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     defaultLog.debug({ label: 'getSecurityRules' });
     const sql = SQL`
@@ -268,11 +274,17 @@ export class SecurityRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRepository
+   */
   async applySecurityRulesToSubmissionFeatures(
     features: number[],
     rules: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!rules.length) {
+    if (!rules.length || !features.length) {
       // no rules to apply, leave early
       return [];
     }
@@ -294,7 +306,18 @@ export class SecurityRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Removes all security rules for a given set of submission features
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
   async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!features.length) {
+      // no features, return early
+      return [];
+    }
     const deleteSQL = SQL`
       DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
 
@@ -304,7 +327,18 @@ export class SecurityRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Gets Submission Feature Security Records for a given set of submission features
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
   async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!features.length) {
+      // no features, return early
+      return [];
+    }
     const sql = SQL`
       SELECT * FROM submission_feature_security WHERE submission_feature_id IN (`;
 
