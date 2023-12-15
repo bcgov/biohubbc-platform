@@ -2,9 +2,10 @@ import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { DialogContext } from 'contexts/dialogContext';
+import { SubmissionContext } from 'contexts/submissionContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { useParams } from 'react-router';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
@@ -25,9 +26,14 @@ export interface ISecurityRuleFormProps {
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useContext(DialogContext);
+  const submissionContext = useContext(SubmissionContext);
   const api = useApi();
-
   const { submission_uuid } = useParams<{ submission_uuid: string }>();
+
+  useEffect(() => {
+    submissionContext.submissionFeatureRulesDataLoader.refresh(props.features);
+  }, [props.isOpen]);
+
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
       await api.submissions.applySubmissionFeatureRules(
