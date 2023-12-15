@@ -1,6 +1,11 @@
 import { AxiosInstance } from 'axios';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { IListSubmissionsResponse, ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import {
+  IGetSubmissionResponse,
+  IListSubmissionsResponse,
+  ISubmission,
+  SubmissionRecordWithRootFeature
+} from 'interfaces/useSubmissionsApi.interface';
 
 /**
  * Returns a set of supported CRUD api methods submissions.
@@ -72,26 +77,55 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch submission data by submissionUUID.
+   * Fetch submission data by submission id.
    *
-   * @param {string} submissionUUID
-   * @return {*}  {Promise<any>} //TODO: type
+   * @param {number} submissionId
+   * @return {*}  {Promise<IGetSubmissionResponse>}
    */
-  const getSubmission = async (submissionUUID: string): Promise<any> => {
-    const { data } = await axios.get(`api/submission/${submissionUUID}`);
-    console.log('data', data);
+  const getSubmission = async (submissionId: number): Promise<IGetSubmissionResponse> => {
+    const { data } = await axios.get(`api/submission/${submissionId}`);
+
+    return data;
+  };
+
+  /**
+   * Fetch all submissions that have not completed security review.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithRootFeature[]>}
+   */
+  const getUnreviewedSubmissions = async (): Promise<SubmissionRecordWithRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/unreviewed`);
+
+    return data;
+  };
+
+  /**
+   * Fetch all submissions that have completed security review.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithRootFeature[]>}
+   */
+  const getReviewedSubmissions = async (): Promise<SubmissionRecordWithRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/reviewed`);
+
+    return data;
+  };
+
+  /**
+   * Update (patch) a submission record.
+   *
+   * @param {number} submissionId
+   * @param {{ security_reviewed: boolean }} patch
+   * @return {*}
+   */
+  const updateSubmissionRecord = async (submissionId: number, patch: { security_reviewed: boolean }) => {
+    const { data } = await axios.patch(`api/administrative/submission/${submissionId}`, patch);
+
     return data;
   };
 
   const getSubmissionFeatureRules = async () => {};
 
-  const applySubmissionFeatureRules = async (
-    submissionUUID: string,
-    features: number[],
-    rules: number[],
-    override = false
-  ) => {
-    console.log(submissionUUID);
+  const applySubmissionFeatureRules = async (features: number[], rules: number[], override = false) => {
     const { data } = await axios.post(`api/administrative/security/apply`, {
       override,
       features,
@@ -107,7 +141,10 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getSubmissionDownloadPackage,
     getSubmission,
     applySubmissionFeatureRules,
-    getSubmissionFeatureRules
+    getSubmissionFeatureRules,
+    getUnreviewedSubmissions,
+    getReviewedSubmissions,
+    updateSubmissionRecord
   };
 };
 

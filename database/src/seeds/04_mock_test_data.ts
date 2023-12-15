@@ -97,7 +97,16 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: null,
-      feature_type: 'dataset'
+      feature_type: 'dataset',
+      data: {
+        name: faker.lorem.words(3),
+        start_date: faker.date.past().toISOString(),
+        end_date: faker.date.future().toISOString(),
+        geometry: random.point(
+          1, // number of features in feature collection
+          [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
+        )['features'][0]['geometry']
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -133,7 +142,15 @@ export const insertSampleSiteRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'sample_site'
+      feature_type: 'sample_site',
+      data: {
+        name: faker.lorem.words(3),
+        description: faker.lorem.words({ min: 5, max: 100 }),
+        geometry: random.point(
+          1, // number of features in feature collection
+          [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
+        )['features'][0]['geometry']
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -154,7 +171,15 @@ export const insertObservationRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'observation'
+      feature_type: 'observation',
+      data: {
+        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        geometry: random.point(
+          1, // number of features in feature collection
+          [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
+        )['features'][0]['geometry'],
+        count: faker.number.int({ min: 0, max: 100 })
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -188,7 +213,14 @@ const insertAnimalRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'animal'
+      feature_type: 'animal',
+      data: {
+        species: faker.lorem.words(3),
+        count: faker.number.int({ min: 0, max: 100 }),
+        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        start_date: faker.date.past().toISOString(),
+        end_date: faker.date.future().toISOString()
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -241,6 +273,7 @@ const insertSubmissionFeature = (options: {
   submission_id: number;
   parent_submission_feature_id: number | null;
   feature_type: 'dataset' | 'sample_site' | 'observation' | 'animal';
+  data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
     (
@@ -255,9 +288,7 @@ const insertSubmissionFeature = (options: {
         ${options.submission_id},
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
-        '{
-          "name": "${faker.lorem.words(3)}"
-        }',
+        ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
         now()
     )
     RETURNING submission_feature_id;

@@ -1,4 +1,4 @@
-import { ISecurityRule, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
+import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
 import { IGetSubmissionResponse } from 'interfaces/useSubmissionsApi.interface';
@@ -9,69 +9,71 @@ export interface ISubmissionContext {
   /**
    * The Data Loader used to load submission data
    *
-   * @type {DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>}
+   * @type {DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>}
    * @memberof ISubmissionContext
    */
-  submissionDataLoader: DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>;
+  submissionDataLoader: DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>;
 
   submissionFeatureRulesDataLoader: DataLoader<[features: number[]], any[], unknown>;
 
   securityRulesDataLoader: DataLoader<[], ISecurityRule[], unknown>;
 
   /**
-   * The submission UUID
+   * The submission id.
    *
-   * @type {string}
+   * @type {number}
    * @memberof ISubmissionContext
    */
-  submissionUUID: string;
+  submissionId: number;
 }
 
-export const SubmissionContext = React.createContext<ISubmissionContext>({
-  submissionDataLoader: {} as DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>,
-  submissionFeatureRulesDataLoader: {} as DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>,
-  securityRulesDataLoader: {} as DataLoader<[], ISecurityRule[], unknown>,
-  submissionUUID: ''
-});
+// export const SubmissionContext = React.createContext<ISubmissionContext>({
+//   submissionDataLoader: {} as DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>,
+//   submissionFeatureRulesDataLoader: {} as DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>,
+//   securityRulesDataLoader: {} as DataLoader<[], ISecurityRule[], unknown>,
+//   submissionId: 0
+// });
+export const SubmissionContext = React.createContext<ISubmissionContext | undefined>(undefined);
 
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const biohubApi = useApi();
+
   const submissionDataLoader = useDataLoader(biohubApi.submissions.getSubmission);
   const submissionFeatureRulesDataLoader = useDataLoader(biohubApi.security.getSecurityRulesForSubmissions);
   const securityRulesDataLoader = useDataLoader(biohubApi.security.getActiveSecurityRules);
 
-  const urlParams: Record<string, string | number | undefined> = useParams();
+  const urlParams = useParams();
 
-  if (!urlParams['submission_uuid']) {
+  const submissionId = Number(urlParams['submission_id']);
+
+  if (!submissionId) {
     throw new Error(
-      "The submission UUID found in SubmissionContextProvider was invalid. Does your current React route provide an 'id' parameter?"
+      "The submission ID found in SubmissionContextProvider was invalid. Does your current React route provide a 'submission_id' parameter?"
     );
   }
 
-  const submissionUUID = urlParams['submission_uuid'] as string;
-
-  submissionDataLoader.load(submissionUUID);
   securityRulesDataLoader.load();
+  submissionDataLoader.load(submissionId);
 
   /**
-   * Refreshes the current submission object whenever the current submission UUID changes from the currently loaded submission.
+   * Refreshes the current submission object whenever the current submission id changes from the currently loaded submission.
    */
   useEffect(() => {
-    if (submissionUUID && submissionUUID !== submissionDataLoader.data?.submission.uuid) {
-      submissionDataLoader.refresh(submissionUUID);
+    if (submissionId && submissionId !== submissionDataLoader.data?.submission.submission_id) {
+      submissionDataLoader.refresh(submissionId);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionUUID]);
+  }, [submissionId]);
 
-  const surveyContext: ISubmissionContext = useMemo(() => {
+  const submissionContext: ISubmissionContext = useMemo(() => {
     return {
       submissionDataLoader,
       submissionFeatureRulesDataLoader,
       securityRulesDataLoader,
-      submissionUUID
+      submissionId
     };
-  }, [submissionDataLoader, submissionUUID]);
+  }, [submissionDataLoader, submissionId]);
 
-  return <SubmissionContext.Provider value={surveyContext}>{props.children}</SubmissionContext.Provider>;
+  return <SubmissionContext.Provider value={submissionContext}>{props.children}</SubmissionContext.Provider>;
 };
