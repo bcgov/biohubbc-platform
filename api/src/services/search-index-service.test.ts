@@ -40,7 +40,18 @@ describe('SearchIndexService', () => {
                 latitude: 11,
                 longitude: 11
               }
-            }
+            },
+            parent_submission_feature_id: null,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: null,
+            update_user: null,
+            revision_count: 1,
+            feature_type_name: '',
+            feature_type_display_name: '',
+            submission_feature_security_ids: []
           },
           {
             submission_feature_id: 22222,
@@ -59,7 +70,18 @@ describe('SearchIndexService', () => {
                 latitude: 22,
                 longitude: 22
               }
-            }
+            },
+            parent_submission_feature_id: null,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: null,
+            update_user: null,
+            revision_count: 1,
+            feature_type_name: '',
+            feature_type_display_name: '',
+            submission_feature_security_ids: []
           }
         ]);
 
