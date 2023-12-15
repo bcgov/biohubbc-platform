@@ -77,6 +77,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_string(
       security_string_id       integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -93,6 +94,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_string.security_string_id      IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN security_string.security_rule_id        IS 'Foreign key to the security_string table.';
     COMMENT ON COLUMN security_string.name                    IS 'The name of the security_string record.';
     COMMENT ON COLUMN security_string.description             IS 'The description of the security_string record.';
     COMMENT ON COLUMN security_string.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -109,6 +111,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_number(
       security_number_id       integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -125,6 +128,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_number.security_number_id      IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN security_number.security_rule_id        IS 'Foreign key to the security_number table.';
     COMMENT ON COLUMN security_number.name                    IS 'The name of the security_number record.';
     COMMENT ON COLUMN security_number.description             IS 'The description of the security_number record.';
     COMMENT ON COLUMN security_number.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -141,6 +145,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_datetime(
       security_datetime_id     integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -157,6 +162,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_datetime.security_datetime_id    IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN security_datetime.security_rule_id        IS 'Foreign key to the security_datetime table.';
     COMMENT ON COLUMN security_datetime.name                    IS 'The name of the security_datetime record.';
     COMMENT ON COLUMN security_datetime.description             IS 'The description of the security_datetime record.';
     COMMENT ON COLUMN security_datetime.feature_property_id     IS 'Foreign key to the feature_property table.';
@@ -173,6 +179,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE security_spatial(
       security_spatial_id      integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      security_rule_id         integer           NOT NULL,
       name                     varchar(100)      NOT NULL,
       description              varchar(500),
       feature_property_id      integer           NOT NULL,
@@ -189,6 +196,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_spatial.security_spatial_id     IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN security_spatial.security_rule_id        IS 'Foreign key to the security_spatial table.';
     COMMENT ON COLUMN security_spatial.name                    IS 'The name of the security_spatial record.';
     COMMENT ON COLUMN security_spatial.description             IS 'The description of the security_spatial record.';
     COMMENT ON COLUMN security_spatial.feature_property_id     IS 'Foreign key to the feature_property table.';
