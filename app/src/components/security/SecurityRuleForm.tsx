@@ -19,9 +19,9 @@ const SecurityRuleForm = () => {
   const [showSecuredBanner, setShowSecuredBanner] = useState(false);
 
   const submissionContext = useContext(SubmissionContext);
-  submissionContext.securityRulesDataLoader.load();
+  submissionContext?.securityRulesDataLoader.load();
 
-  const rules = submissionContext.securityRulesDataLoader.data || [];
+  const rules = submissionContext?.securityRulesDataLoader.data || [];
   const handleAdd = (selected: ISecurityRule) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
   };
@@ -32,8 +32,8 @@ const SecurityRuleForm = () => {
   };
 
   useEffect(() => {
-    setShowSecuredBanner(Boolean(submissionContext.submissionFeatureRulesDataLoader.data?.length));
-  }, [submissionContext.submissionFeatureRulesDataLoader.isLoading]);
+    setShowSecuredBanner(Boolean(submissionContext?.submissionFeatureRulesDataLoader.data?.length));
+  }, [submissionContext?.submissionFeatureRulesDataLoader.isLoading]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -76,7 +76,7 @@ const SecurityRuleForm = () => {
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
-            loading={submissionContext.securityRulesDataLoader.isLoading}
+            loading={submissionContext?.securityRulesDataLoader.isLoading}
             noOptionsText="No records found"
             options={alphabetizeObjects(rules, 'name')}
             filterOptions={(options, state) => {

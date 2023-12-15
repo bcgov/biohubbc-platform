@@ -6,7 +6,6 @@ import { SubmissionContext } from 'contexts/submissionContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useContext, useEffect } from 'react';
-import { useParams } from 'react-router';
 import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 
@@ -28,16 +27,14 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useContext(DialogContext);
   const submissionContext = useContext(SubmissionContext);
   const api = useApi();
-  const { submission_uuid } = useParams<{ submission_uuid: string }>();
 
   useEffect(() => {
-    submissionContext.submissionFeatureRulesDataLoader.refresh(props.features);
+    submissionContext?.submissionFeatureRulesDataLoader.refresh(props.features);
   }, [props.isOpen]);
 
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
       await api.submissions.applySubmissionFeatureRules(
-        submission_uuid,
         props.features,
         rules.map((item) => item.security_rule_id)
       );

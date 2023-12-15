@@ -4,7 +4,6 @@ import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { DialogContext } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
 import { useContext } from 'react';
-import { useParams } from 'react-router';
 
 interface IUnsecureDialogProps {
   features: number[];
@@ -14,10 +13,10 @@ interface IUnsecureDialogProps {
 const UnsecureDialog = (props: IUnsecureDialogProps) => {
   const api = useApi();
   const dialogContext = useContext(DialogContext);
-  const { submission_uuid } = useParams<{ submission_uuid: string }>();
+
   const handleRemove = async () => {
     try {
-      await api.submissions.applySubmissionFeatureRules(submission_uuid, props.features, [], true);
+      await api.submissions.applySubmissionFeatureRules(props.features, [], true);
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">

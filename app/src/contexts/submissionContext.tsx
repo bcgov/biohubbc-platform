@@ -27,12 +27,6 @@ export interface ISubmissionContext {
   submissionId: number;
 }
 
-// export const SubmissionContext = React.createContext<ISubmissionContext>({
-//   submissionDataLoader: {} as DataLoader<[submissionUUID: string], IGetSubmissionResponse, unknown>,
-//   submissionFeatureRulesDataLoader: {} as DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>,
-//   securityRulesDataLoader: {} as DataLoader<[], ISecurityRule[], unknown>,
-//   submissionId: 0
-// });
 export const SubmissionContext = React.createContext<ISubmissionContext | undefined>(undefined);
 
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {

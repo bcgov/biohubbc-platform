@@ -12,7 +12,7 @@ import {
 } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 const useStyles = makeStyles(() => ({
   datasetDetailsLabel: {
@@ -21,8 +21,6 @@ const useStyles = makeStyles(() => ({
 }));
 
 export interface ISubmissionDataGridProps {
-  title: string;
-  onRowSelection: (feature_ids: number[]) => void;
   feature_type_display_name: string;
   submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
@@ -35,13 +33,9 @@ export interface ISubmissionDataGridProps {
  */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
-  const { submissionFeatures, feature_type_display_name, onRowSelection } = props;
+  const { submissionFeatures, feature_type_display_name } = props;
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
-
-  useEffect(() => {
-    onRowSelection(rowSelectionModel as number[]);
-  }, [rowSelectionModel]);
 
   const fieldNames = submissionFeatures
     .map((feature) => Object.keys(feature.data))

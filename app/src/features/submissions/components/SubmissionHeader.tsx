@@ -4,15 +4,13 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import BaseHeader from 'components/layout/header/BaseHeader';
+import ManageSecurity from 'components/security/ManageSecurity';
 import PublishSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewButton';
 import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
 import { useSubmissionContext } from 'hooks/useSubmissionContext';
 import { Link as RouterLink } from 'react-router-dom';
 
-export interface ISubmissionHeaderProps {
-  openCompleteReviewDialog: (open: boolean) => void;
-}
 export interface ISubmissionHeaderProps {
   selectedFeatures: number[];
 }
@@ -65,7 +63,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
         }
         buttonJSX={
           <Stack flexDirection="row" alignItems="center" gap={1}>
-            {/* <ManageSecurity features={props.selectedFeatures} /> */}
+            <ManageSecurity features={props.selectedFeatures} />
 
             <PublishSecurityReviewButton
               submission={submission}
