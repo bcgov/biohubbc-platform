@@ -11,6 +11,7 @@ import {
   GridValueGetterParams
 } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
+import { useCodesContext } from 'hooks/useContext';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
 
@@ -34,6 +35,9 @@ export interface ISubmissionDataGridProps {
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
   const { submissionFeatures, feature_type_display_name } = props;
+
+  const codesContext = useCodesContext();
+  console.log('codesContext', codesContext.codesDataLoader.data?.feature_type_with_properties);
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 

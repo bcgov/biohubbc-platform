@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
-import { useSubmissionContext } from 'hooks/useSubmissionContext';
+import { useSubmissionContext } from 'hooks/useContext';
 import SubmissionDataGrid from './components/SubmissionDataGrid';
 
 /**
