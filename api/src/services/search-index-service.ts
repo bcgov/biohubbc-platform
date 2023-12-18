@@ -53,7 +53,7 @@ export class SearchIndexService extends DBService {
 
     features.forEach((feature) => {
       const { submission_feature_id } = feature;
-      Object.entries(feature.data.properties).forEach(([feature_property_name, value]) => {
+      Object.entries(feature.data).forEach(([feature_property_name, value]) => {
         const featureProperty = featurePropertyTypeMap[feature_property_name];
         if (!featureProperty) {
           return;
@@ -81,17 +81,21 @@ export class SearchIndexService extends DBService {
       });
     });
 
+    const promises = [];
+
     if (datetimeRecords.length) {
-      this.searchIndexRepository.insertSearchableDatetimeRecords(datetimeRecords);
+      promises.push(this.searchIndexRepository.insertSearchableDatetimeRecords(datetimeRecords));
     }
     if (numberRecords.length) {
-      this.searchIndexRepository.insertSearchableNumberRecords(numberRecords);
+      promises.push(this.searchIndexRepository.insertSearchableNumberRecords(numberRecords));
     }
     if (spatialRecords.length) {
-      this.searchIndexRepository.insertSearchableSpatialRecords(spatialRecords);
+      promises.push(this.searchIndexRepository.insertSearchableSpatialRecords(spatialRecords));
     }
     if (stringRecords.length) {
-      this.searchIndexRepository.insertSearchableStringRecords(stringRecords);
+      promises.push(this.searchIndexRepository.insertSearchableStringRecords(stringRecords));
     }
+
+    await Promise.all(promises);
   }
 }
