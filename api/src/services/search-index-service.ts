@@ -81,7 +81,7 @@ export class SearchIndexService extends DBService {
       });
     });
 
-    const promises = [];
+    const promises: Promise<any>[] = [];
 
     if (datetimeRecords.length) {
       promises.push(this.searchIndexRepository.insertSearchableDatetimeRecords(datetimeRecords));
