@@ -39,7 +39,7 @@ const AdminSubmissionPage = () => {
     <>
       <SubmissionHeader selectedFeatures={getAllSubmissionFeatureIds()} />
       <Container maxWidth="xl">
-        <Stack gap={1} sx={{py: 4}}>
+        <Stack gap={3} sx={{py: 4}}>
           {submissionFeatures.map((submissionFeature) => {
             return (
               <Box key={submissionFeature.feature_type_name}>
