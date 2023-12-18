@@ -1,7 +1,12 @@
-import { Box, Divider, Skeleton } from '@mui/material';
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import CardHeader from '@mui/material/CardHeader';
+import CardContent from '@mui/material/CardContent';
+import CardActions from '@mui/material/CardActions';
+import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import grey from '@mui/material/colors/grey';
 
 const SubmissionCardSkeletonLoader = () => {
   return (
@@ -12,40 +17,58 @@ const SubmissionCardSkeletonLoader = () => {
         </Typography>
       </Box>
       <Card elevation={0}>
-        <Stack flex="1 1 auto" gap={1} p={2}>
-          <Stack flexDirection="row" alignItems="flex-start" gap={2}>
-            <Stack flex="1 1 auto" flexDirection="row" gap={1} justifyContent="space-between">
-              <Typography
-                component="h3"
-                variant="h4"
-                sx={{
-                  flex: '1 1 auto',
-                  maxWidth: 800
-                }}>
-                <Skeleton height={20} sx={{ transform: 'none' }}></Skeleton>
-              </Typography>
-              <Skeleton width={60}></Skeleton>
-            </Stack>
-          </Stack>
+        <CardHeader
+          title={
+            <Typography variant="h4">
+              <Skeleton sx={{ maxWidth: 800, transform: 'scale(1, 0.8)' }}></Skeleton>
+            </Typography>
+          }
+          action={
+            <Skeleton width={70}></Skeleton>
+          }
+          sx={{
+            pb: 1,
+            '& .MuiCardHeader-action': {
+              margin: 0
+            }
+          }}
+        >
+        </CardHeader>
+        <CardContent
+          sx={{
+            pt: 0
+          }}
+        >
           <Typography
             variant="body1"
+            color="textSecondary"
             sx={{
-              mb: 0.5,
-              maxWidth: 800
+              maxWidth: 800,
             }}>
-            <Skeleton></Skeleton>
-            <Skeleton width="50%"></Skeleton>
+            <Skeleton sx={{ maxWidth: 400 }}></Skeleton>
           </Typography>
-          <Divider flexItem></Divider>
-
-          <Stack flexDirection="row" alignItems="center" justifyContent="space-between" gap={2}>
-            <Stack flexDirection="row" gap={2}>
-              <Skeleton width={100} />
-              <Skeleton width={100} />
-            </Stack>
-            <Skeleton variant="rectangular" width={112} height={36} />
+        </CardContent>
+        <CardActions
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderTop: '1px solid' + grey[200]
+          }}
+        >
+          <Stack
+            flexDirection="row"
+            alignItems="center"
+            justifyContent="space-between"
+            width="100%"
+          >
+            <Skeleton width={150}></Skeleton>
+            <Skeleton variant="rectangular" height={36} width={100}
+              sx={{
+                borderRadius: '4px'
+              }}
+            ></Skeleton>
           </Stack>
-        </Stack>
+        </CardActions>
       </Card>
     </>
   );

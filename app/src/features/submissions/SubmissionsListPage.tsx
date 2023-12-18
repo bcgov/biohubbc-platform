@@ -106,7 +106,7 @@ const SubmissionsListPage = () => {
             <Stack gap={2}>
               
               {/* TODO: Need Skeleton Loader */}
-              <Card elevation={0}>
+              <Card elevation={0} hidden>
                 <CardHeader
                   title={
                     <Typography variant="h4">
@@ -165,7 +165,15 @@ const SubmissionsListPage = () => {
                 <Card elevation={0} key={dataset.item.submission_feature_id}>
                   <CardHeader
                     title={
-                      <Typography variant="h4">
+                      <Typography variant="h4" component="h3"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: '2',
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}
+                      >
                         {highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
                       </Typography>
                     }
@@ -221,6 +229,7 @@ const SubmissionsListPage = () => {
                       width="100%"
                       flexDirection={{xs: 'column', sm: 'row'}}
                       flexWrap="wrap"
+                      gap={1}
                       justifyContent="space-between">
                       <Stack
                         flex="1 1 auto"
