@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiChevronUp, mdiCog, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
+import { mdiChevronDown, mdiChevronUp, mdiLock, mdiLockOpenOutline, mdiSecurity } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -42,20 +42,31 @@ const ManageSecurity = (props: IManageSecurityProps) => {
         data-testid="manage-security"
         variant="outlined"
         onClick={handleClick}
-        startIcon={<Icon path={mdiCog} size={1} />}
-        endIcon={open ? <Icon path={mdiChevronUp} size={1} /> : <Icon path={mdiChevronDown} size={1} />}>
+        startIcon={<Icon path={mdiSecurity} size={0.75} />}
+        endIcon={open ? <Icon path={mdiChevronUp} size={0.75} /> : <Icon path={mdiChevronDown} size={0.75} />}>
         Manage Security
       </Button>
-      <Menu open={open} anchorEl={anchorEl} onClose={handleClose}>
+      <Menu
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right'
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right'
+        }}>
         <MenuItem onClick={() => setIsSecuritiesDialogOpen(true)}>
           <ListItemIcon>
-            <Icon path={mdiLock} size={1} />
+            <Icon path={mdiLock} size={0.75} />
           </ListItemIcon>
           <ListItemText>Secure Records</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => setIsUnsecuredDialogOpen(true)}>
           <ListItemIcon>
-            <Icon path={mdiLockOpenVariantOutline} size={1} />
+            <Icon path={mdiLockOpenOutline} size={0.75} />
           </ListItemIcon>
           <ListItemText>Unsecure Records</ListItemText>
         </MenuItem>

@@ -26,24 +26,22 @@ const CompleteSecurityReviewDialog = (props: ICompleteSecurityReviewDialogProps)
   return (
     <Dialog
       fullScreen={fullScreen}
-      maxWidth="xl"
+      maxWidth="md"
       open={open}
       aria-labelledby="complete-security-review-dialog-title"
       aria-describedby="complete-security-review-dialog-description">
-      <DialogTitle id="complete-security-review-dialog-title">Complete Review</DialogTitle>
+      <DialogTitle id="complete-security-review-dialog-title">Publish Submission</DialogTitle>
 
       <DialogContent>
         <DialogContentText id="complete-security-review-dialog-description">
-          Completing the security review will make all records of this submission available to the users of BioHub.
-          Records with no security rules will be accessible by all users. Records with one or more security rules will
-          be restricted pending approval by a BioHub Administrator.
+          Publishing this submission will make it viewable. Access to records for this submission will be restricted
+          depending what security rules have been applied.
         </DialogContentText>
-
         <CompleteSecurityReviewStatusMessage submission={submission} />
       </DialogContent>
       <DialogActions>
         <LoadingButton onClick={async () => onComplete()} color="primary" variant="contained">
-          Complete
+          Publish
         </LoadingButton>
         <Button onClick={() => onCancel()} color="primary" variant="outlined">
           Cancel

@@ -1,7 +1,6 @@
-import { mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
+import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Paper } from '@mui/material';
-import { makeStyles } from '@mui/styles';
+import { Divider, Paper, Toolbar } from '@mui/material';
 import { Box } from '@mui/system';
 import {
   DataGrid,
@@ -10,16 +9,10 @@ import {
   GridRowSelectionModel,
   GridValueGetterParams
 } from '@mui/x-data-grid';
-import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { useCodesContext } from 'hooks/useContext';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
-
-const useStyles = makeStyles(() => ({
-  datasetDetailsLabel: {
-    borderBottom: '1pt solid #dadada'
-  }
-}));
+import Typography from '@mui/material/Typography';
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
@@ -33,7 +26,6 @@ export interface ISubmissionDataGridProps {
  * @return {*}
  */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
-  const classes = useStyles();
   const { submissionFeatures, feature_type_display_name } = props;
 
   const codesContext = useCodesContext();
@@ -51,11 +43,10 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     return {
       field: fieldName,
       headerName: fieldName,
-      flex: 2,
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => (params.row.data[fieldName] ? params.row.data[fieldName] : null),
       renderCell: (params: GridRenderCellParams) => {
-        return <pre>{String(params.value)}</pre>;
+        return <div>{String(params.value)}</div>;
       }
     };
   });
@@ -63,42 +54,50 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const columns: GridColDef[] = [
     {
       field: 'submission_feature_security_id',
-      headerName: 'Security',
-      flex: 1,
+      headerName: 'Secure',
+      headerAlign: 'center',
+      align: 'center',
       disableColumnMenu: true,
       renderCell: (params) => {
         if (params.value > 0) {
           return <Icon path={mdiLock} size={1} />;
         }
-        return <Icon path={mdiLockOpenVariantOutline} size={1} />;
-      }
+        return <Icon path={mdiLockOpenOutline} size={1} />;
+      },
+      width: 120
     },
     {
       field: 'submission_feature_id',
       headerName: 'ID',
-      flex: 1,
-      disableColumnMenu: true
+      align: 'right',
+      headerAlign: 'right',
+      disableColumnMenu: true,
+      width: 75
     },
     ...fieldColumns,
     {
       field: 'parent_submission_feature_id',
       headerName: 'Parent ID',
-      flex: 1,
+      align: 'right',
+      headerAlign: 'right',
       disableColumnMenu: true
     }
   ];
 
   return (
     <Paper elevation={0}>
-      <ActionToolbar
-        className={classes.datasetDetailsLabel}
-        label={`${feature_type_display_name} (${submissionFeatures.length})`}
-        labelProps={{ variant: 'h4' }}
-      />
+      <Toolbar>
+        <Typography component="h2" variant="h4">
+          {feature_type_display_name}
+          <Typography component="span" fontSize="inherit" fontWeight="inherit" color="textSecondary" sx={{ml: 0.5}}>
+            ({submissionFeatures.length})
+          </Typography>
+        </Typography>
+      </Toolbar>
 
-      <Box display="flex" width={1}>
+      <Box px={3}>
+        <Divider flexItem></Divider>
         <DataGrid
-          sx={{ flexGrow: 1, borderTop: '1pt solid #dadada', borderBottom: '1pt solid #dadada' }}
           data-testid="submission-reviews-data-grid"
           getRowId={(row) => row.submission_feature_id}
           autoHeight
@@ -122,6 +121,13 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
                 pageSize: 10
               }
             }
+          }}
+          sx={{
+            '& .MuiDataGrid-columnHeaderTitle': {
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              color: 'text.secondary'
+            },
           }}
         />
       </Box>

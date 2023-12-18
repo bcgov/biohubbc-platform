@@ -1,6 +1,7 @@
 import { mdiClose } from '@mdi/js';
 import Icon from '@mdi/react';
-import { IconButton, Paper } from '@mui/material';
+import { Card, IconButton } from '@mui/material';
+import grey from '@mui/material/colors/grey';
 import SecurityRuleCard from './SecurityRuleCard';
 
 interface ISecurityRuleActionCardProps {
@@ -12,20 +13,22 @@ interface ISecurityRuleActionCardProps {
 
 const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
   return (
-    <Paper
+    <Card
       variant="outlined"
       sx={{
         display: 'flex',
+        px: 2,
+        py: 1.5,
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        p: 1,
-        mb: 1
+        background: grey[100]
       }}>
       <SecurityRuleCard key={props.security_rule_id} title={props.name} subtitle={props.description} />
-      <IconButton onClick={() => props.remove(props.security_rule_id)}>
+      <IconButton onClick={() => props.remove(props.security_rule_id)} aria-label="Remove security rule">
         <Icon path={mdiClose} size={1} />
       </IconButton>
-    </Paper>
+    </Card>
   );
 };
 export default SecurityRuleActionCard;

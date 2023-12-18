@@ -1,17 +1,17 @@
 import { mdiTextBoxCheckOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
-import CardHeader from '@mui/material/CardHeader';
-import CardContent from '@mui/material/CardContent';
 import CardActions from '@mui/material/CardActions';
+import CardContent from '@mui/material/CardContent';
+import CardHeader from '@mui/material/CardHeader';
+import Chip from '@mui/material/Chip';
+import grey from '@mui/material/colors/grey';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography';
-import grey from '@mui/material/colors/grey';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionCardSkeletonLoader from 'features/admin/dashboard/components/SubmissionCardSkeletonLoader';
 import { useApi } from 'hooks/useApi';
@@ -81,15 +81,16 @@ const UnreviewedSubmissionsTable = () => {
             <Card elevation={0} key={submissionRecord.submission_id}>
               <CardHeader
                 title={
-                  <Typography variant="h4" component="h3"
+                  <Typography
+                    variant="h4"
+                    component="h3"
                     sx={{
                       display: '-webkit-box',
                       WebkitLineClamp: '2',
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
-                    }}
-                  >
+                    }}>
                     {submissionRecord.name}
                   </Typography>
                 }
@@ -110,14 +111,11 @@ const UnreviewedSubmissionsTable = () => {
                   '& .MuiCardHeader-action': {
                     margin: 0
                   }
-                }}
-              >
-              </CardHeader>
+                }}></CardHeader>
               <CardContent
                 sx={{
                   pt: 0
-                }}
-              >
+                }}>
                 <Typography
                   variant="body1"
                   color="textSecondary"
@@ -137,30 +135,28 @@ const UnreviewedSubmissionsTable = () => {
                   px: 2,
                   py: 1.5,
                   borderTop: '1px solid' + grey[200]
-                }}
-              >
+                }}>
                 <Stack
                   width="100%"
                   flexDirection={{ xs: 'column', sm: 'row' }}
                   flexWrap="wrap"
                   gap={1}
-                  justifyContent="space-between"
-                >
+                  justifyContent="space-between">
                   <Stack
                     flex="1 1 auto"
                     flexDirection={{ xs: 'column', sm: 'row' }}
                     gap={{ xs: 0, sm: 1 }}
                     my={1}
                     component="dl"
-                    divider={<Divider flexItem orientation='vertical'></Divider>}
+                    divider={<Divider flexItem orientation="vertical"></Divider>}
                     sx={{
                       typography: 'body2',
                       whiteSpace: 'nowrap',
                       '& dd': {
-                        color: 'text.secondary',
+                        color: 'text.secondary'
                       },
                       '& dt': {
-                        ml: 1,
+                        ml: 1
                       }
                     }}>
                     <Stack flexDirection="row">
@@ -186,7 +182,6 @@ const UnreviewedSubmissionsTable = () => {
                     </Button>
                   </Stack>
                 </Stack>
-
               </CardActions>
             </Card>
           );

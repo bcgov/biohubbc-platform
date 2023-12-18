@@ -1,15 +1,11 @@
-
 import CircularProgress from '@mui/material/CircularProgress';
-
 import Stack from '@mui/material/Stack';
-
 import BaseHeader from 'components/layout/header/BaseHeader';
 import ManageSecurity from 'components/security/ManageSecurity';
 import PublishSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewButton';
 import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
 import { useSubmissionContext } from 'hooks/useContext';
-
 
 export interface ISubmissionHeaderProps {
   selectedFeatures: number[];

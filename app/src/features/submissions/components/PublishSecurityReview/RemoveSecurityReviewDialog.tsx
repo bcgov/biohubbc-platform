@@ -23,20 +23,20 @@ const RemoveSecurityReviewDialog = (props: IRemoveSecurityReviewDialogProps) => 
   return (
     <Dialog
       fullScreen={fullScreen}
-      maxWidth="xl"
+      maxWidth="md"
       open={open}
       aria-labelledby="remove-security-review-dialog-title"
       aria-describedby="remove-security-review-dialog-description">
-      <DialogTitle id="remove-security-review-dialog-title">Remove Review</DialogTitle>
+      <DialogTitle id="remove-security-review-dialog-title">Unpublish submission?</DialogTitle>
 
       <DialogContent>
         <DialogContentText id="remove-security-review-dialog-description">
-          Removing the security review will make all records of this submission unavailable to users of Biohub.
+          This submission will no longer be available to users. Are you sure you want to proceed?
         </DialogContentText>
       </DialogContent>
       <DialogActions>
         <LoadingButton onClick={async () => onRemove()} color="primary" variant="contained">
-          Remove Review
+          Unpublish
         </LoadingButton>
         <Button onClick={() => onCancel()} color="primary" variant="outlined">
           Cancel

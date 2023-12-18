@@ -17,19 +17,23 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
 
   if (submission.security === SECURITY_APPLIED_STATUS.UNSECURED) {
     return (
-      <Stack flexDirection="row" alignItems="center" gap={1.5}
+      <Stack
+        flexDirection="row"
+        alignItems="center"
+        gap={1.5}
         divider={<Divider flexItem orientation="vertical" />}
         sx={{
           textTransform: 'uppercase'
-        }}
-      >
-         <Stack flexDirection="row" alignItems="center" gap={1}
+        }}>
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          gap={1}
           sx={{
             '& svg': {
               color: 'text.secondary'
             }
-          }}
-        >
+          }}>
           <Icon path={mdiLockOpenOutline} size={0.75} />
           <Typography component="span" variant="body2">
             Unsecured
@@ -49,19 +53,24 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
 
   if (submission.security === SECURITY_APPLIED_STATUS.SECURED) {
     return (
-      <Stack flexDirection="row" alignItems="center" gap={1.5}
+      <Stack
+        flexDirection="row"
+        alignItems="center"
+        gap={1.5}
         divider={<Divider flexItem orientation="vertical" />}
         sx={{
           textTransform: 'uppercase'
-        }}
-      >
-         <Stack flexDirection="row" alignItems="center" gap={1}
+        }}>
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          gap={1}
           sx={{
             '& svg': {
               color: 'text.secondary'
             }
           }}
-        >
+          title="All records have been secured">
           <Icon path={mdiLock} size={0.75} />
           <Typography component="span" variant="body2">
             Secured
@@ -81,19 +90,24 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
 
   if (submission.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) {
     return (
-      <Stack flexDirection="row" alignItems="center" gap={1.5}
+      <Stack
+        flexDirection="row"
+        alignItems="center"
+        gap={1.5}
         divider={<Divider flexItem orientation="vertical" />}
         sx={{
           textTransform: 'uppercase'
-        }}
-      >
-        <Stack flexDirection="row" alignItems="center" gap={1}
+        }}>
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          gap={1}
           sx={{
             '& svg': {
               color: 'text.secondary'
             }
           }}
-        >
+          title="Some records have been secured">
           <Icon path={mdiLockAlertOutline} size={0.75} />
           <Typography component="span" variant="body2">
             Partially Secured
@@ -108,25 +122,29 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
             {getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.security_review_timestamp as string)}
           </Typography>
         </Stack>
-
       </Stack>
     );
   }
 
   return (
-    <Stack flexDirection="row" alignItems="center" gap={1.5}
+    <Stack
+      flexDirection="row"
+      alignItems="center"
+      gap={1.5}
       divider={<Divider flexItem orientation="vertical" />}
       sx={{
         textTransform: 'uppercase'
       }}
-    >
-      <Stack flexDirection="row" alignItems="center" gap={1}
+      title="Open access to all records">
+      <Stack
+        flexDirection="row"
+        alignItems="center"
+        gap={1}
         sx={{
           '& svg': {
             color: 'text.secondary'
           }
-        }}
-      >
+        }}>
         <Icon path={mdiClockOutline} size={0.75} />
         <Typography component="span" variant="body2">
           Pending Review

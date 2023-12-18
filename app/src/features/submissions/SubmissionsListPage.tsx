@@ -1,10 +1,19 @@
+import { mdiCommentOutline, mdiTrayArrowDown } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
+import CardActions from '@mui/material/CardActions';
+import CardContent from '@mui/material/CardContent';
+import CardHeader from '@mui/material/CardHeader';
+import Chip from '@mui/material/Chip';
+import grey from '@mui/material/colors/grey';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SecureDataAccessRequestDialog from 'features/datasets/security/SecureDataAccessRequestDialog';
 import { SearchInput } from 'features/search/SearchComponent';
 import { FuseResult } from 'fuse.js';
@@ -15,17 +24,8 @@ import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
-import DatasetSortMenu from './components/SubmissionsListSortMenu';
-import Chip from '@mui/material/Chip';
-import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { getFormattedDate } from 'utils/Utils';
-import { mdiCommentOutline, mdiTrayArrowDown } from '@mdi/js';
-import Icon from '@mdi/react';
-import CardHeader from '@mui/material/CardHeader';
-import CardContent from '@mui/material/CardContent';
-import CardActions from '@mui/material/CardActions';
-import grey from '@mui/material/colors/grey';
-import Skeleton from '@mui/material/Skeleton';
+import DatasetSortMenu from './components/SubmissionsListSortMenu';
 
 /**
  * Renders reviewed Submissions as cards with download and request access actions
@@ -86,9 +86,7 @@ const SubmissionsListPage = () => {
           </Container>
         </Paper>
         <Container maxWidth="xl">
-
           <Box py={4}>
-
             <Stack mb={4} flexDirection="row" alignItems="center" justifyContent="space-between">
               <Typography variant="h4" component="h2">
                 {searchValue
@@ -104,82 +102,73 @@ const SubmissionsListPage = () => {
             </Stack>
 
             <Stack gap={2}>
-              
               {/* TODO: Need Skeleton Loader */}
               <Card elevation={0} hidden>
                 <CardHeader
                   title={
                     <Typography variant="h4">
-                      <Skeleton sx={{maxWidth: 800, transform: 'scale(1, 0.8)'}}></Skeleton>
+                      <Skeleton sx={{ maxWidth: 800, transform: 'scale(1, 0.8)' }}></Skeleton>
                     </Typography>
                   }
-                  action={
-                    <Skeleton width={70}></Skeleton>
-                  }
+                  action={<Skeleton width={70}></Skeleton>}
                   sx={{
                     pb: 1,
                     '& .MuiCardHeader-action': {
                       margin: 0
                     }
-                  }}
-                >
-                </CardHeader>
+                  }}></CardHeader>
                 <CardContent
                   sx={{
                     pt: 0
-                  }}
-                >
+                  }}>
                   <Typography
                     variant="body1"
                     color="textSecondary"
                     sx={{
-                      maxWidth: 800,
+                      maxWidth: 800
                     }}>
-                      <Skeleton sx={{maxWidth: 400}}></Skeleton>
+                    <Skeleton sx={{ maxWidth: 400 }}></Skeleton>
                   </Typography>
                 </CardContent>
                 <CardActions
-                    sx={{
-                      px: 2,
-                      py: 1.5,
-                      borderTop: '1px solid' + grey[200]
-                    }}
-                  >
-                  <Stack 
-                    flexDirection="row"
-                    alignItems="center" 
-                    justifyContent="space-between" 
-                    width="100%"
-                  >
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    borderTop: '1px solid' + grey[200]
+                  }}>
+                  <Stack flexDirection="row" alignItems="center" justifyContent="space-between" width="100%">
                     <Skeleton width={150}></Skeleton>
-                    <Skeleton variant="rectangular" height={36} width={100}
+                    <Skeleton
+                      variant="rectangular"
+                      height={36}
+                      width={100}
                       sx={{
                         borderRadius: '4px'
-                      }}
-                    ></Skeleton>
+                      }}></Skeleton>
                   </Stack>
                 </CardActions>
               </Card>
-              
+
               {fuzzyData?.map((dataset) => (
                 <Card elevation={0} key={dataset.item.submission_feature_id}>
                   <CardHeader
                     title={
-                      <Typography variant="h4" component="h3"
+                      <Typography
+                        variant="h4"
+                        component="h3"
                         sx={{
                           display: '-webkit-box',
                           WebkitLineClamp: '2',
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
-                        }}
-                      >
+                        }}>
                         {highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
                       </Typography>
                     }
                     action={
-                      <Chip 
-                        label='Dataset' 
+                      <Chip
+                        label="Dataset"
                         size="small"
                         sx={{
                           my: '-2px',
@@ -194,14 +183,11 @@ const SubmissionsListPage = () => {
                       '& .MuiCardHeader-action': {
                         margin: 0
                       }
-                    }}
-                  >
-                  </CardHeader>
+                    }}></CardHeader>
                   <CardContent
                     sx={{
                       pt: 0
-                    }}
-                  >
+                    }}>
                     <Typography
                       variant="body1"
                       color="textSecondary"
@@ -224,11 +210,10 @@ const SubmissionsListPage = () => {
                       px: 2,
                       py: 1.5,
                       borderTop: '1px solid' + grey[200]
-                    }}
-                  >
+                    }}>
                     <Stack
                       width="100%"
-                      flexDirection={{xs: 'column', sm: 'row'}}
+                      flexDirection={{ xs: 'column', sm: 'row' }}
                       flexWrap="wrap"
                       gap={1}
                       justifyContent="space-between">
@@ -240,51 +225,52 @@ const SubmissionsListPage = () => {
                           typography: 'body2',
                           whiteSpace: 'nowrap',
                           '& dd': {
-                            color: 'text.secondary',
+                            color: 'text.secondary'
                           },
                           '& dt': {
-                            ml: 1,
+                            ml: 1
                           }
                         }}>
                         <Stack flexDirection="row">
                           <dd>Published:</dd>
-                          <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, dataset.item.submission_date.toDateString())}</dt>
+                          <dt>
+                            {getFormattedDate(DATE_FORMAT.ShortDateFormat, dataset.item.submission_date.toDateString())}
+                          </dt>
                         </Stack>
                       </Stack>
                       <Stack flexDirection="row" alignItems="center" gap={1} flexWrap="nowrap">
                         {(dataset.item.security === SECURITY_APPLIED_STATUS.SECURED ||
                           dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
-                            <Button
-                              variant={'contained'}
-                              disableElevation
-                              startIcon={<Icon path={mdiCommentOutline} size={0.75} />}
-                              sx={{
-                                fontWeight: 700
-                              }}
-                              onClick={() => {
-                                handleRequestAccess();
-                              }}>
-                              Request Access
-                            </Button>
-                          )}
+                          <Button
+                            variant={'contained'}
+                            disableElevation
+                            startIcon={<Icon path={mdiCommentOutline} size={0.75} />}
+                            sx={{
+                              fontWeight: 700
+                            }}
+                            onClick={() => {
+                              handleRequestAccess();
+                            }}>
+                            Request Access
+                          </Button>
+                        )}
                         {(dataset.item.security === SECURITY_APPLIED_STATUS.UNSECURED ||
                           dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
-                            <Button
-                              variant="contained"
-                              startIcon={<Icon path={mdiTrayArrowDown} size={0.75} />}
-                              onClick={() => {
-                                handleDownload(dataset);
-                              }}>
-                              Download
-                            </Button>
-                          )}
+                          <Button
+                            variant="contained"
+                            startIcon={<Icon path={mdiTrayArrowDown} size={0.75} />}
+                            onClick={() => {
+                              handleDownload(dataset);
+                            }}>
+                            Download
+                          </Button>
+                        )}
                       </Stack>
                     </Stack>
                   </CardActions>
                 </Card>
               ))}
             </Stack>
-
           </Box>
         </Container>
       </Box>

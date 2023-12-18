@@ -16,7 +16,6 @@ const SubmissionsRouter = () => {
       <RouteWithTitle exact path="/" title={getTitle('Submissions')}>
         <DatasetListPage />
       </RouteWithTitle>
-
     </Switch>
   );
 };
