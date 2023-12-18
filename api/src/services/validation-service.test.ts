@@ -187,7 +187,7 @@ describe('ValidationService', () => {
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockSubmissionFeatures);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
       expect(response).to.be.false;
     });
 
