@@ -34,8 +34,7 @@ const CompleteSecurityReviewDialog = (props: ICompleteSecurityReviewDialogProps)
 
       <DialogContent>
         <DialogContentText id="complete-security-review-dialog-description">
-          Publishing this submission will make it viewable. Access to records for this submission will be restricted
-          depending what security rules have been applied.
+          Access to information and data from this submission will be restricted if any security has been applied.
         </DialogContentText>
         <CompleteSecurityReviewStatusMessage submission={submission} />
       </DialogContent>
