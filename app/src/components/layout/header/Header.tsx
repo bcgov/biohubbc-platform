@@ -136,15 +136,9 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   </Link>
                   <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                     <Link to="/admin/dashboard" id="menu_admin_dashboard">
-                      Dashboard
+                      Submissions
                     </Link>
                   </SystemRoleGuard>
-                  <Link to="/submissions" id="submissions">
-                    Submissions
-                  </Link>
-                  <Link to="/map" id="menu_map">
-                    Map Search
-                  </Link>
                   <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                     <Link to="/admin/users" id="menu_admin_users">
                       Manage Users
