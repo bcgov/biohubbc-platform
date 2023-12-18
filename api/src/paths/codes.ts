@@ -19,25 +19,8 @@ GET.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['feature_types', 'feature_type_with_properties'],
+            required: ['feature_type_with_properties'],
             properties: {
-              feature_types: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['id', 'name'],
-                  properties: {
-                    id: {
-                      type: 'number',
-                      description: 'The code id.'
-                    },
-                    name: {
-                      type: 'string',
-                      description: 'The code name.'
-                    }
-                  }
-                }
-              },
               feature_type_with_properties: {
                 type: 'array',
                 items: {
@@ -62,7 +45,7 @@ GET.apiDoc = {
                       type: 'array',
                       items: {
                         type: 'object',
-                        required: ['id', 'name', 'type'],
+                        required: ['id', 'name', 'display_name', 'type'],
                         properties: {
                           id: {
                             type: 'number',
@@ -71,6 +54,10 @@ GET.apiDoc = {
                           name: {
                             type: 'string',
                             description: 'The code name.'
+                          },
+                          display_name: {
+                            type: 'string',
+                            description: 'The code display name.'
                           },
                           type: {
                             type: 'string',

@@ -38,23 +38,20 @@ const AdminSubmissionPage = () => {
   return (
     <>
       <SubmissionHeader selectedFeatures={getAllSubmissionFeatureIds()} />
-      <Container maxWidth="xl"
-        sx={{
-          py: 4
-        }}
-      >
-        <Stack gap={3}>
+      <Container maxWidth="xl">
+        <Stack gap={1}>
           {submissionFeatures.map((submissionFeature) => {
             return (
-              <Box key={submissionFeature.feature_type_name}>
+              <Box py={2} key={submissionFeature.feature_type_name}>
                 <SubmissionDataGrid
                   feature_type_display_name={submissionFeature.feature_type_display_name}
+                  feature_type_name={submissionFeature.feature_type_name}
                   submissionFeatures={submissionFeature.features || []}
                 />
               </Box>
             );
           })}
-        </Stack>
+        </Stack>      
       </Container>
     </>
   );

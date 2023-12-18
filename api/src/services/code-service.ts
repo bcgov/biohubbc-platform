@@ -22,13 +22,9 @@ export class CodeService extends DBService {
   async getAllCodeSets(): Promise<IAllCodeSets> {
     defaultLog.debug({ message: 'getAllCodeSets' });
 
-    const [feature_types, feature_type_with_properties] = await Promise.all([
-      await this.codeRepository.getFeatureTypes(),
-      await this.getFeatureTypeProperties()
-    ]);
+    const [feature_type_with_properties] = await Promise.all([await this.getFeatureTypeProperties()]);
 
     return {
-      feature_types,
       feature_type_with_properties
     };
   }
@@ -36,10 +32,10 @@ export class CodeService extends DBService {
   /**
    * Function that fetches all feature type properties.
    *
-   * @return {*}  {Promise<any>}
+   * @return {*}  {Promise<IAllCodeSets['feature_type_with_properties']>}
    * @memberof CodeService
    */
-  async getFeatureTypeProperties(): Promise<any> {
+  async getFeatureTypeProperties(): Promise<IAllCodeSets['feature_type_with_properties']> {
     defaultLog.debug({ message: 'getFeatureTypes' });
 
     const feature_types = await this.codeRepository.getFeatureTypes();
