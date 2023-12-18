@@ -14,6 +14,12 @@ export interface ISecurityRule {
   revision_count: number;
 }
 
+export interface ISubmissionFeatureSecurityRecord {
+  submission_feature_security_id: number;
+  submission_feature_id: number;
+  security_rule_id: number;
+}
+
 /**
  * Returns a set of supported api methods for working with security.
  *
@@ -82,11 +88,24 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return 1;
   };
 
-  const applySecurityRulesToSubmissions = async (submissions: number[], rules: number[]): Promise<any[]> => {
-    console.log(submissions, rules);
+  const applySecurityRulesToSubmissions = async (features: number[], rules: number[]): Promise<any[]> => {
     const { data } = await axios.post('api/administrative/security/apply', {
-      submissions,
+      features,
       rules
+    });
+    return data;
+  };
+
+  const removeSecurityRulesToSubmissions = async (features: number[]): Promise<any[]> => {
+    const { data } = await axios.post('api/administrative/security/remove', {
+      features
+    });
+    return data;
+  };
+
+  const getSecurityRulesForSubmissions = async (features: number[]): Promise<ISubmissionFeatureSecurityRecord[]> => {
+    const { data } = await axios.post('api/administrative/security/fetch', {
+      features
     });
     return data;
   };
@@ -97,7 +116,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
     applySecurityReasonsToArtifacts,
     getActiveSecurityRules,
     addSecurityRule,
-    applySecurityRulesToSubmissions
+    applySecurityRulesToSubmissions,
+    removeSecurityRulesToSubmissions,
+    getSecurityRulesForSubmissions
   };
 };
 

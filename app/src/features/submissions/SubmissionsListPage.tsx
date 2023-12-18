@@ -14,7 +14,7 @@ import useDownloadJSON from 'hooks/useDownloadJSON';
 import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import DatasetSortMenu from './components/SubmissionsListSortMenu';
 import Chip from '@mui/material/Chip';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';

@@ -1,69 +1,53 @@
-import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import { makeStyles } from '@mui/styles';
-import { ActionToolbar } from 'components/toolbar/ActionToolbars';
-import SubmissionHeader from './components/SubmissionHeader';
+import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
+import { useSubmissionContext } from 'hooks/useContext';
+import SubmissionDataGrid from './components/SubmissionDataGrid';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  datasetTitleContainer: {
-    paddingBottom: theme.spacing(5),
-    background: '#f7f8fa',
-    '& h1': {
-      marginTop: '-4px'
+/**
+ * AdminSubmissionPage component for reviewing submissions.
+ *
+ * @return {*}
+ */
+const AdminSubmissionPage = () => {
+  const submissionContext = useSubmissionContext();
+
+  const submissionDataLoader = submissionContext.submissionDataLoader;
+  const submissionFeatures = submissionDataLoader.data?.submissionFeatures || [];
+
+  // code for collecting individually selected items
+  // const flattenSelectedFeatures = (): number[] => {
+  //   let total: number[] = [];
+  //   for (const item in selectedFeatures) {
+  //     total = [...selectedFeatures[item], ...total];
+  //   }
+  //   return total;
+  // };
+
+  // so this will need to change.
+  const getAllSubmissionFeatureIds = (): number[] => {
+    const ids = [];
+    for (const key in submissionFeatures) {
+      ids.push(submissionFeatures[key].features);
     }
-  },
-  datasetDetailsLabel: {
-    borderBottom: '1pt solid #dadada'
-  },
-  datasetDetailsContainer: {},
-  datasetMapContainer: {
-    minHeight: '400px'
-  }
-}));
 
-const AdminSubmissionPage: React.FC<React.PropsWithChildren> = () => {
-  const classes = useStyles();
+    return ids.flat().map((item) => item.submission_feature_id);
+  };
 
   return (
     <Box>
-      <SubmissionHeader />
+      <SubmissionHeader selectedFeatures={getAllSubmissionFeatureIds()} />
       <Container maxWidth="xl">
-        <Box py={3}>
-          <Paper elevation={0}>
-            <ActionToolbar
-              className={classes.datasetDetailsLabel}
-              label="ADMIN DATASET DETAILS"
-              labelProps={{ variant: 'h4' }}
-            />
-            <Box display="flex">
-              <Box flex="1 1 auto" className={classes.datasetDetailsContainer}>
-                {/* <RenderWithHandlebars datasetEML={datasetDataLoader} rawTemplate={templateDataLoader.data.details} /> */}
-              </Box>
-              <Box data-testid="MapContainer" p={3} flex="0 0 500px" className={classes.datasetMapContainer}>
-                {/* <MapContainer
-                  mapId="boundary_map"
-                  bounds={mapBoundary}
-                  scrollWheelZoom={false}
-                  fullScreenControl={true}
-                  markerLayers={markerLayers}
-                  staticLayers={staticLayers}
-                  zoomControlEnabled={true}
-                  doubleClickZoomEnabled={false}
-                  draggingEnabled={true}
-                  layerControlEnabled={false}
-                /> */}
-              </Box>
+        {submissionFeatures.map((submissionFeature) => {
+          return (
+            <Box py={2} key={submissionFeature.feature_type_name}>
+              <SubmissionDataGrid
+                feature_type_display_name={submissionFeature.feature_type_display_name}
+                submissionFeatures={submissionFeature.features || []}
+              />
             </Box>
-          </Paper>
-          <Box mt={3}>
-            <Paper elevation={0}>{/* <DatasetArtifacts datasetId={datasetId} /> */}</Paper>
-          </Box>
-          <Box mt={3}>
-            <Paper elevation={0}>{/* <RelatedDatasets datasetId={datasetId} /> */}</Paper>
-          </Box>
-        </Box>
+          );
+        })}
       </Container>
     </Box>
   );

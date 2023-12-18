@@ -223,6 +223,10 @@ export async function up(knex: Knex): Promise<void> {
     -- Add unique end-date key constraint (don't allow 2 records with the same submission_feature_id, security_rule_id, and a NULL record_end_date)
     CREATE UNIQUE INDEX submission_feature_security_nuk1 ON submission_feature_security(submission_feature_id, security_rule_id, (record_end_date is NULL)) where record_end_date is null;
 
+    -- Add unique constraint on submission_feature_id and security_rule_id to allow for UPSERT actions (INSERT on duplicate) to be taken on the table
+    ALTER TABLE submission_feature_security ADD CONSTRAINT submission_feature_security_uk1
+      UNIQUE (submission_feature_id, security_rule_id);
+
     -- Add foreign key constraint
     ALTER TABLE submission_feature_security ADD CONSTRAINT submission_feature_security_fk1
       FOREIGN KEY (submission_feature_id)

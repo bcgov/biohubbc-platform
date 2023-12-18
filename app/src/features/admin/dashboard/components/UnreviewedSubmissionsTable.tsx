@@ -10,12 +10,13 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionCardSkeletonLoader from 'features/admin/dashboard/components/SubmissionCardSkeletonLoader';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.dataset.getUnreviewedSubmissions());
+  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getUnreviewedSubmissions());
 
   unreviewedSubmissionsDataLoader.load();
 
@@ -71,7 +72,7 @@ const UnreviewedSubmissionsTable = () => {
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           return (
-            <Card elevation={0}>
+            <Card elevation={0} key={submissionRecord.submission_id}>
               <Stack flex="1 1 auto" gap={1} p={2}>
                 <Stack flexDirection="row" alignItems="flex-start" gap={2}>
                   <Typography
@@ -90,7 +91,7 @@ const UnreviewedSubmissionsTable = () => {
                   <Chip
                     color="default"
                     size="small"
-                    label={submissionRecord.feature_type}
+                    label={submissionRecord.feature_type_name}
                     sx={{
                       borderRadius: '4px',
                       textTransform: 'uppercase',
@@ -147,11 +148,10 @@ const UnreviewedSubmissionsTable = () => {
                     </Stack>
                   </Stack>
                   <Button
+                    component={RouterLink}
                     variant="contained"
                     color="primary"
-                    onClick={() => {
-                      // TODO wire up review button. Take user to admin submission page: SIMSBIOHUB-404
-                    }}
+                    to={`/admin/dashboard/submissions/${submissionRecord.submission_id}`}
                     sx={{
                       flex: '0 0 auto',
                       minWidth: '7rem'

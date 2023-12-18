@@ -259,6 +259,12 @@ export class SecurityRepository extends BaseRepository {
     return results;
   }
 
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRepository
+   */
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     defaultLog.debug({ label: 'getSecurityRules' });
     const sql = SQL`
@@ -268,11 +274,22 @@ export class SecurityRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRepository
+   */
   async applySecurityRulesToSubmissionFeatures(
-    submissions: number[],
+    features: number[],
     rules: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    const final = submissions.flatMap((item) => {
+    if (!rules.length || !features.length) {
+      // no rules to apply, leave early
+      return [];
+    }
+
+    const final = features.flatMap((item) => {
       return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
     });
 
@@ -281,9 +298,54 @@ export class SecurityRepository extends BaseRepository {
     VALUES `;
     insertSQL.append(final.join(', '));
     insertSQL.append(`
+    ON CONFLICT (submission_feature_id, security_rule_id)
+    DO NOTHING
     RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Removes all security rules for a given set of submission features
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!features.length) {
+      // no features, return early
+      return [];
+    }
+    const deleteSQL = SQL`
+      DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
+
+    deleteSQL.append(features.join(', '));
+    deleteSQL.append(`) RETURNING *;`);
+    const response = await this.connection.sql(deleteSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Gets Submission Feature Security Records for a given set of submission features
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!features.length) {
+      // no features, return early
+      return [];
+    }
+    const sql = SQL`
+      SELECT * FROM submission_feature_security WHERE submission_feature_id IN (`;
+
+    sql.append(features.join(', '));
+    sql.append(`);`);
+
+    const response = await this.connection.sql(sql, SubmissionFeatureSecurityRecord);
     return response.rows;
   }
 }

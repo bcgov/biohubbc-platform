@@ -54,7 +54,7 @@ GET.apiDoc = {
                 'update_user',
                 'revision_count',
                 'feature_type_id',
-                'feature_type'
+                'feature_type_name'
               ],
               properties: {
                 submission_id: {
@@ -104,7 +104,7 @@ GET.apiDoc = {
                   type: 'integer',
                   minimum: 1
                 },
-                feature_type: {
+                feature_type_name: {
                   type: 'string'
                 }
               }
@@ -136,7 +136,7 @@ export function getReviewedSubmissionsForAdmins(): RequestHandler {
 
       return res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getReviewedSubmissions', message: 'error', error });
+      defaultLog.error({ label: 'getReviewedSubmissionsForAdmins', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

@@ -1,4 +1,4 @@
-import { mdiChevronDown, mdiChevronUp, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
+import { mdiChevronDown, mdiChevronUp, mdiCog, mdiLock, mdiLockOpenVariantOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -8,7 +8,7 @@ import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
 
 interface IManageSecurityProps {
-  submissions: number[];
+  features: number[];
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
@@ -17,6 +17,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
 
   const open = Boolean(anchorEl);
+
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
   };
@@ -27,12 +28,12 @@ const ManageSecurity = (props: IManageSecurityProps) => {
   return (
     <>
       <SecuritiesDialog
-        submissions={props.submissions}
+        features={props.features}
         isOpen={isSecuritiesDialogOpen}
         onClose={() => setIsSecuritiesDialogOpen(false)}
       />
       <UnsecureDialog
-        submissions={props.submissions}
+        features={props.features}
         isOpen={isUnsecureDialogOpen}
         onClose={() => setIsUnsecuredDialogOpen(false)}
       />
@@ -41,6 +42,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
         data-testid="manage-security"
         variant="outlined"
         onClick={handleClick}
+        startIcon={<Icon path={mdiCog} size={1} />}
         endIcon={open ? <Icon path={mdiChevronUp} size={1} /> : <Icon path={mdiChevronDown} size={1} />}>
         Manage Security
       </Button>

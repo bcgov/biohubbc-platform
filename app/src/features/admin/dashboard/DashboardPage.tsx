@@ -4,7 +4,6 @@ import Paper from '@mui/material/Paper';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
-import ManageSecurity from 'components/security/ManageSecurity';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
 import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { useState } from 'react';
@@ -48,7 +47,6 @@ const DashboardPage = () => {
           </Tabs>
         </Container>
       </Paper>
-      <ManageSecurity submissions={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]} />
       <Container
         maxWidth="xl"
         sx={{

@@ -6,7 +6,7 @@ import { authorizeRequestHandler } from '../../../request-handlers/security/auth
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/security/apply');
+const defaultLog = getLogger('paths/administrative/security/remove');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -19,12 +19,11 @@ export const POST: Operation = [
       ]
     };
   }),
-  applySecurityRulesToSubmissionFeatures()
+  removeSecurityRulesFromSubmissionFeatures()
 ];
 
 POST.apiDoc = {
-  description:
-    'Applies security rules to a list of submission features. A flag can also be passed to make application of security rules override existing ones or add new ones to the existing list of security rules per submission feature.',
+  description: 'Remove Security for given submission features',
   tags: ['security'],
   security: [
     {
@@ -32,28 +31,18 @@ POST.apiDoc = {
     }
   ],
   requestBody: {
-    description: 'Payload of submission features and rules to apply.',
+    description: 'Unsecure object.',
     content: {
       'application/json': {
         schema: {
           type: 'object',
           properties: {
-            override: {
-              type: 'boolean',
-              nullable: true
-            },
-            features: {
+            submissions: {
               type: 'array',
               items: {
                 type: 'number'
               },
               minItems: 1
-            },
-            rules: {
-              type: 'array',
-              items: {
-                type: 'number'
-              }
             }
           }
         }
@@ -103,7 +92,7 @@ POST.apiDoc = {
   }
 };
 
-export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
+export function removeSecurityRulesFromSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
@@ -111,17 +100,13 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.applySecurityRulesToSubmissionFeatures(
-        req.body.features,
-        req.body.rules,
-        Boolean(req.body.override)
-      );
+      const data = await service.removeSecurityRulesFromSubmissionFeatures(req.body.submissions);
 
       await connection.commit();
 
       return res.status(200).json(data);
     } catch (error) {
-      defaultLog.error({ label: 'applySecurityRulesToSubmissionFeatures', message: 'error', error });
+      defaultLog.error({ label: 'removeSecurityRulesFromSubmissionFeatures', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

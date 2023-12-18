@@ -327,13 +327,58 @@ export class SecurityService extends DBService {
     return isPendingReview;
   }
 
+  /**
+   * Applies all given security rules to the given set of submission feature ids.
+   * This process is additive unless the override flag is set to `true`.
+   * If the override is set to `true` all security rules for the given set of features will be removed.
+   * Then the new security rules will be applied as normal.
+   *
+   * @param {number[]} features
+   * @param {number[]} rules
+   * @param {boolean}
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityService
+   */
   async applySecurityRulesToSubmissionFeatures(
-    submissions: number[],
-    rules: number[]
+    features: number[],
+    rules: number[],
+    override = false
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissions, rules);
+    if (override) {
+      // we want to override any security rules present and can achieve this by remove everything first
+      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
+    }
+
+    return this.securityRepository.applySecurityRulesToSubmissionFeatures(features, rules);
   }
 
+  /**
+   * Removes all security rules for the given set of submission feature ids
+   *
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityService
+   */
+  async removeSecurityRulesFromSubmissionFeatures(submissions: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissions);
+  }
+
+  /**
+   * Gets Submission Feature Security Records for a given set of submission feature ids
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
+  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.getSecurityRulesForSubmissionFeatures(features);
+  }
+
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     return this.securityRepository.getActiveSecurityRules();
   }
