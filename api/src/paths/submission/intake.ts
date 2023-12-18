@@ -126,7 +126,7 @@ export function submissionIntake(): RequestHandler {
 
       // validate the submission
       if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
-        throw new HTTP400('Invalid submission submission');
+        throw new HTTP400('Invalid submission');
       }
 
       // insert the submission record

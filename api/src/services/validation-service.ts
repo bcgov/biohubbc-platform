@@ -7,12 +7,15 @@ import {
   IStyleModel,
   ValidationRepository
 } from '../repositories/validation-repository';
+import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { IMediaState } from '../utils/media/media-file';
 import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
+
+const defaultLog = getLogger('services/validation-service');
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
@@ -53,12 +56,23 @@ export class ValidationService extends DBService {
       for (const path of cleanFeaturePaths) {
         // Fetch a submissionFeature object
         const node: ISubmissionFeature[] = JSONPath({ path: path, resultType: 'value', json: submissionFeatures });
+
+        if (!node?.length) {
+          continue;
+        }
+
         // We expect the 'path' to resolve an array of 1 item
         const nodeWithoutFeatures = { ...node[0], features: [] };
+
         // Validate the submissioNFeature object
-        await this.validateSubmissionFeature(nodeWithoutFeatures);
+        await this.validateSubmissionFeature(nodeWithoutFeatures).catch((error) => {
+          defaultLog.error({ label: 'validateSubmissionFeature', message: 'error', error });
+          // Submission feature is invalid
+          return false;
+        });
       }
-    } catch {
+    } catch (error) {
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
       // Not all submission features are valid
       return false;
     }
@@ -88,8 +102,8 @@ export class ValidationService extends DBService {
    * @memberof ValidationService
    */
   validateProperties(properties: IFeatureProperties[], dataProperties: any): boolean {
-    console.log('dataProperties', dataProperties);
-    console.log('properties', properties);
+    defaultLog.debug({ label: 'validateProperties', message: 'params', properties, dataProperties });
+
     const throwPropertyError = (property: IFeatureProperties) => {
       throw new Error(`Property ${property.name} is not of type ${property.type}`);
     };
