@@ -43,6 +43,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     return {
       field: fieldName,
       headerName: fieldName,
+      flex: 2,
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => (params.row.data[fieldName] ? params.row.data[fieldName] : null),
       renderCell: (params: GridRenderCellParams) => {
@@ -55,31 +56,31 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     {
       field: 'submission_feature_security_id',
       headerName: 'Secure',
-      headerAlign: 'center',
-      align: 'center',
+      flex: 0,
       disableColumnMenu: true,
+      width: 100,
       renderCell: (params) => {
         if (params.value > 0) {
           return <Icon path={mdiLock} size={1} />;
         }
         return <Icon path={mdiLockOpenOutline} size={1} />;
-      },
-      width: 120
+      }
     },
     {
       field: 'submission_feature_id',
       headerName: 'ID',
-      align: 'right',
-      headerAlign: 'right',
+      flex: 0,
       disableColumnMenu: true,
-      width: 75
+      width: 100,
     },
     ...fieldColumns,
     {
       field: 'parent_submission_feature_id',
       headerName: 'Parent ID',
+      flex: 0,
       align: 'right',
       headerAlign: 'right',
+      width: 120,
       disableColumnMenu: true
     }
   ];
