@@ -42,6 +42,9 @@ const appTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        body: {
+          overflowY: 'scroll'
+        },
         a: {
           color: '#1a5a96',
           '&:focus': {

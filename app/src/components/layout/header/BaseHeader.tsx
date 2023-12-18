@@ -27,7 +27,7 @@ const BaseHeader = (props: IBaseHeader) => {
       sx={{
         position: 'sticky',
         top: 0,
-        zIndex: 1002,
+        zIndex: 1101,
         py: 3,
         borderBottomStyle: 'solid',
         borderBottomWidth: '1px',

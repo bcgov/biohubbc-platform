@@ -1,4 +1,4 @@
-import { Redirect, Route, Switch } from 'react-router';
+import { Switch } from 'react-router';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
 import DatasetListPage from './SubmissionsListPage';

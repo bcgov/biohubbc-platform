@@ -102,7 +102,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <>
-      <AppBar position="sticky" elevation={0}>
+      <AppBar elevation={0} position="relative">
         <Box className={classes.govHeader}>
           <Toolbar className={classes.govHeaderToolbar}>
             <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
