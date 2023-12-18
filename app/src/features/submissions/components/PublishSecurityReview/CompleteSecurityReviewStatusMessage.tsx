@@ -39,7 +39,7 @@ const CompleteSecurityReviewStatusMessage = (props: ICompleteSecurityReviewStatu
   return (
     <Box mt={3}>
       <Alert severity="error" icon={<Icon path={mdiAlertCircleOutline} size={1} />}>
-        <AlertTitle>Open access to all records</AlertTitle>
+        <AlertTitle>No security applied</AlertTitle>
         All users will have unrestricted access to records that have been included in this submission.
       </Alert>
     </Box>

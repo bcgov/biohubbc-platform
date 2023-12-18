@@ -34,9 +34,16 @@ const CompleteSecurityReviewDialog = (props: ICompleteSecurityReviewDialogProps)
 
       <DialogContent>
         <DialogContentText id="complete-security-review-dialog-description">
-          Access to information and data from this submission will be restricted if any security has been applied.
+          Publishing will provide open access to any unsecured records included in this submission. Secured records will remain unavailable.
         </DialogContentText>
         <CompleteSecurityReviewStatusMessage submission={submission} />
+        <DialogContentText
+          sx={{
+            mt: 3
+          }}
+        >
+          Are you sure you want to publish this submission? 
+        </DialogContentText>
       </DialogContent>
       <DialogActions>
         <LoadingButton onClick={async () => onComplete()} color="primary" variant="contained">
