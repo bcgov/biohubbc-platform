@@ -5,9 +5,9 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   IDatasetsForReview,
-  IFeatureSubmission,
   IHandlebarsTemplates,
   ISourceTransformModel,
+  ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
   ISubmissionModel,
@@ -61,24 +61,30 @@ export class SubmissionService extends DBService {
    * in the database.
    *
    * @param {string} uuid
+   * @param {string} name
+   * @param {string} sourceSystem
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecordWithPotentialConflict(uuid: string): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(uuid);
+  async insertSubmissionRecordWithPotentialConflict(
+    uuid: string,
+    name: string,
+    sourceSystem: string
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(uuid, name, sourceSystem);
   }
 
   /**
    * insert submission feature record
    *
    * @param {number} submissionId
-   * @param {IFeatureSubmission[]} submissionFeature
+   * @param {ISubmissionFeature[]} submissionFeature
    * @return {*}  {Promise<{ submission_feature_id: number }[]>}
    * @memberof SubmissionService
    */
   async insertSubmissionFeatureRecords(
     submissionId: number,
-    submissionFeature: IFeatureSubmission[]
+    submissionFeature: ISubmissionFeature[]
   ): Promise<{ submission_feature_id: number }[]> {
     const promise = submissionFeature.map(async (feature) => {
       const featureTypeId = await this.submissionRepository.getFeatureTypeIdByName(feature.type);
@@ -86,7 +92,7 @@ export class SubmissionService extends DBService {
       return this.submissionRepository.insertSubmissionFeatureRecord(
         submissionId,
         featureTypeId.feature_type_id,
-        feature
+        feature.properties
       );
     });
 

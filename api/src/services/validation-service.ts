@@ -1,5 +1,6 @@
+import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
-import { IDatasetSubmission } from '../repositories/submission-repository';
+import { ISubmissionFeature } from '../repositories/submission-repository';
 import {
   IFeatureProperties,
   IInsertStyleSchema,
@@ -25,43 +26,67 @@ export class ValidationService extends DBService {
   }
 
   /**
-   * Validate dataset submission
+   * Validate submission features.
    *
-   * @param {IDatasetSubmission} dataset
+   * @param {ISubmissionFeature[]} submissionFeatures
    * @return {*}  {Promise<boolean>}
    * @memberof ValidationService
    */
-  async validateDatasetSubmission(dataset: IDatasetSubmission): Promise<boolean> {
-    // validate dataset.type is 'dataset'
-    const datasetFeatureType = dataset.type;
+  async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
+    // Generate an array of all paths to all elements which contain a 'features' property
+    const allFeaturesPaths: string[] = JSONPath({
+      path: '$..[?(@.features)]',
+      flatten: true,
+      resultType: 'path',
+      json: submissionFeatures
+    });
 
-    // get dataset validation properties
-    const datasetValidationProperties = await this.getFeatureValidationProperties(datasetFeatureType);
-
-    // get features in dataset
-    const features = dataset.features;
+    // TODO Change name of submission 'features' field??
+    // Remove paths which actually point to GeoJson features, and not submission features. This step is only necessary
+    // because the submission 'features' field collides with the GeoJSON 'features' field. Could be solved by picking a
+    // different name for submission 'features'.
+    const cleanFeaturePaths = allFeaturesPaths.filter((path) => {
+      return /\[\d+\]$/.test(path);
+    });
 
     try {
-      // validate dataset properties
-      await this.validateProperties(datasetValidationProperties, dataset.properties);
-
-      // validate features
-      for (const feature of features) {
-        const featureType = feature.type;
-
-        // get feature validation properties
-        const featureValidationProperties = await this.getFeatureValidationProperties(featureType);
-
-        // validate feature properties
-        await this.validateProperties(featureValidationProperties, feature.properties);
+      for (const path of cleanFeaturePaths) {
+        // Fetch a submissionFeature object
+        const node: ISubmissionFeature[] = JSONPath({ path: path, resultType: 'value', json: submissionFeatures });
+        // We expect the 'path' to resolve an array of 1 item
+        const nodeWithoutFeatures = { ...node[0], features: [] };
+        // Validate the submissioNFeature object
+        await this.validateSubmissionFeature(nodeWithoutFeatures);
       }
-    } catch (error) {
-      console.error(error);
+    } catch {
+      // Not all submission features are valid
       return false;
     }
+
+    // All submission features are valid
     return true;
   }
 
+  /**
+   * Validate a submission feature (not including its child features).
+   *
+   * @param {ISubmissionFeature} submissionFeature
+   * @return {*}  {Promise<boolean>}
+   * @memberof ValidationService
+   */
+  async validateSubmissionFeature(submissionFeature: ISubmissionFeature): Promise<boolean> {
+    const validationProperties = await this.getFeatureValidationProperties(submissionFeature.type);
+    return this.validateProperties(validationProperties, submissionFeature.properties);
+  }
+
+  /**
+   * Validate the properties of a submission feature.
+   *
+   * @param {IFeatureProperties[]} properties
+   * @param {*} dataProperties
+   * @return {*}  {boolean} `true` if the submission feature is valid, `false` otherwise.
+   * @memberof ValidationService
+   */
   validateProperties(properties: IFeatureProperties[], dataProperties: any): boolean {
     console.log('dataProperties', dataProperties);
     console.log('properties', properties);
