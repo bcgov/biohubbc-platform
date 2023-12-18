@@ -1,7 +1,7 @@
 import { Redirect, Route, Switch } from 'react-router';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
-import DatasetListPage from './SubmissionsListPage';
+import SubmissionsListPage from './SubmissionsListPage';
 
 /**
  * Router for all `/submissions/*` pages.
@@ -14,7 +14,7 @@ const SubmissionsRouter = () => {
       {/* <Redirect exact from="/datasets/:id" to="/submissions/:id/details" /> */}
 
       <RouteWithTitle exact path="/submissions" title={getTitle('Submissions')}>
-        <DatasetListPage />
+        <SubmissionsListPage />
       </RouteWithTitle>
 
       {/*  Catch any unknown routes, and re-direct to the not found page */}

@@ -11,6 +11,8 @@ import {
   GridValueGetterParams
 } from '@mui/x-data-grid';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
+import { useCodesContext } from 'hooks/useContext';
+import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
 
@@ -22,6 +24,7 @@ const useStyles = makeStyles(() => ({
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
+  feature_type_name: string;
   submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
 
@@ -33,23 +36,24 @@ export interface ISubmissionDataGridProps {
  */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const classes = useStyles();
-  const { submissionFeatures, feature_type_display_name } = props;
+  const codesContext = useCodesContext();
+  const { submissionFeatures, feature_type_display_name, feature_type_name } = props;
+
+  const featureTypesWithProperties = codesContext.codesDataLoader.data?.feature_type_with_properties;
+
+  const featureTypeWithProperties =
+    featureTypesWithProperties?.find((item) => item.feature_type['name'] === feature_type_name)
+      ?.feature_type_properties || [];
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
-  const fieldNames = submissionFeatures
-    .map((feature) => Object.keys(feature.data))
-    .reduce((acc, keys) => [...acc, ...keys], []);
-
-  const uniqueFieldNames = [...new Set(fieldNames)];
-
-  const fieldColumns = uniqueFieldNames.map((fieldName) => {
+  const fieldColumns = featureTypeWithProperties.map((featureType: IFeatureTypeProperties) => {
     return {
-      field: fieldName,
-      headerName: fieldName,
+      field: featureType.name,
+      headerName: featureType.display_name,
       flex: 2,
       disableColumnMenu: true,
-      valueGetter: (params: GridValueGetterParams) => (params.row.data[fieldName] ? params.row.data[fieldName] : null),
+      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
       renderCell: (params: GridRenderCellParams) => {
         return <pre>{String(params.value)}</pre>;
       }

@@ -8,7 +8,7 @@ import ManageSecurity from 'components/security/ManageSecurity';
 import PublishSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewButton';
 import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
-import { useSubmissionContext } from 'hooks/useSubmissionContext';
+import { useSubmissionContext } from 'hooks/useContext';
 import { Link as RouterLink } from 'react-router-dom';
 
 export interface ISubmissionHeaderProps {

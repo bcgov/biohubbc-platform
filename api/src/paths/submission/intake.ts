@@ -14,10 +14,6 @@ import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/intake');
 
-/*
-TODO: UPDATED PATH TO SUBMISSION/INTAKE NEED TO UPDATE SIMS TO USE THIS PATH
-*/
-
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
