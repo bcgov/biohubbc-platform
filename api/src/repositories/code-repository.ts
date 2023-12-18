@@ -14,11 +14,12 @@ export const CodeSet = <T extends z.ZodRawShape>(zodSchema?: T) => {
 };
 
 export const IAllCodeSets = z.object({
-  feature_types: CodeSet(),
   feature_type_with_properties: z.array(
     z.object({
       feature_type: CodeSet(),
-      feature_type_properties: z.array(CodeSet(z.object({ id: z.number(), name: z.string(), type: z.string() }).shape))
+      feature_type_properties: z.array(
+        CodeSet(z.object({ id: z.number(), name: z.string(), display_name: z.string(), type: z.string() }).shape)
+      )
     })
   )
 });
@@ -59,17 +60,19 @@ export class CodeRepository extends BaseRepository {
     SELECT
       ftp.feature_type_property_id as id,
       fp.name as name,
-      (
-        SELECT fpt.name
-        FROM feature_property_type fpt
-        WHERE fpt.feature_property_type_id = fp.feature_property_type_id
-      ) as type
+      fp.display_name as display_name,
+      fpt.name as type
     FROM
       feature_type_property ftp
-    LEFT JOIN
+    INNER JOIN
       feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+    INNER JOIN
+      feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
     WHERE
-      ftp.feature_type_id = ${featureTypeId};
+      ftp.feature_type_id = ${featureTypeId}
+    ORDER BY
+      ftp.sort
+    ASC;
     `;
     const response = await this.connection.sql(sql);
     return response.rows;

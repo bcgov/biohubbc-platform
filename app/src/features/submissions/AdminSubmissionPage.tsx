@@ -43,6 +43,7 @@ const AdminSubmissionPage = () => {
             <Box py={2} key={submissionFeature.feature_type_name}>
               <SubmissionDataGrid
                 feature_type_display_name={submissionFeature.feature_type_display_name}
+                feature_type_name={submissionFeature.feature_type_name}
                 submissionFeatures={submissionFeature.features || []}
               />
             </Box>

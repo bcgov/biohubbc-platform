@@ -14,6 +14,13 @@ export interface ICode {
  */
 export type CodeSet<T extends ICode = ICode> = T[];
 
+export interface IFeatureTypeProperties extends CodeSet {
+  id: number;
+  name: string;
+  display_name: string;
+  type: string;
+}
+
 /**
  * Get all codes response object.
  *
@@ -21,13 +28,11 @@ export type CodeSet<T extends ICode = ICode> = T[];
  * @interface IGetAllCodeSetsResponse
  */
 export interface IGetAllCodeSetsResponse {
-  feature_types: CodeSet;
   feature_type_with_properties: {
-    feature_type: CodeSet;
-    feature_type_properties: CodeSet<{
+    feature_type: CodeSet<{
       id: number;
       name: string;
-      type: string;
-    }>[];
-  };
+    }>;
+    feature_type_properties: IFeatureTypeProperties[];
+  }[];
 }
