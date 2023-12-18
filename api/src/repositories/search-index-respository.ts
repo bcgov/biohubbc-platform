@@ -101,7 +101,7 @@ export class SearchIndexRepository extends BaseRepository {
 
     const queryBuilder = getKnex().queryBuilder().insert(datetimeRecords).into('search_datetime').returning('*');
 
-    const response = await this.connection.knex<DatetimeSearchableRecord>(queryBuilder);
+    const response = await this.connection.knex(queryBuilder, DatetimeSearchableRecord);
 
     if (response.rowCount !== datetimeRecords.length) {
       throw new ApiExecuteSQLError('Failed to insert searchable datetime records', [
@@ -127,7 +127,7 @@ export class SearchIndexRepository extends BaseRepository {
 
     const queryBuilder = getKnex().queryBuilder().insert(numberRecords).into('search_number').returning('*');
 
-    const response = await this.connection.knex<NumberSearchableRecord>(queryBuilder);
+    const response = await this.connection.knex(queryBuilder, NumberSearchableRecord);
 
     if (response.rowCount !== numberRecords.length) {
       throw new ApiExecuteSQLError('Failed to insert searchable number records', [
@@ -153,7 +153,7 @@ export class SearchIndexRepository extends BaseRepository {
 
     const queryBuilder = getKnex().queryBuilder().insert(spatialRecords).into('search_spatial').returning('*');
 
-    const response = await this.connection.knex<SpatialSearchableRecord>(queryBuilder);
+    const response = await this.connection.knex(queryBuilder, SpatialSearchableRecord);
 
     if (response.rowCount !== spatialRecords.length) {
       throw new ApiExecuteSQLError('Failed to insert searchable spatial records', [
@@ -179,7 +179,7 @@ export class SearchIndexRepository extends BaseRepository {
 
     const queryBuilder = getKnex().queryBuilder().insert(stringRecords).into('search_string').returning('*');
 
-    const response = await this.connection.knex<StringSearchableRecord>(queryBuilder);
+    const response = await this.connection.knex(queryBuilder, StringSearchableRecord);
 
     if (response.rowCount !== stringRecords.length) {
       throw new ApiExecuteSQLError('Failed to insert searchable string records', [
