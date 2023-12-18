@@ -99,7 +99,8 @@ const ReviewedSubmissionsTable = () => {
                     sx={{
                       my: '-2px',
                       fontSize: '12px',
-                      borderRadius: '4px'
+                      borderRadius: '4px',
+                      textTransform: 'uppercase'
                     }}
                   />
                 }
