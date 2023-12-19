@@ -102,7 +102,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
 
   return (
     <>
-      <AppBar position="sticky" elevation={0}>
+      <AppBar elevation={0} position="relative">
         <Box className={classes.govHeader}>
           <Toolbar className={classes.govHeaderToolbar}>
             <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
@@ -136,15 +136,9 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   </Link>
                   <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                     <Link to="/admin/dashboard" id="menu_admin_dashboard">
-                      Dashboard
+                      Submissions
                     </Link>
                   </SystemRoleGuard>
-                  <Link to="/submissions" id="submissions">
-                    Submissions
-                  </Link>
-                  <Link to="/map" id="menu_map">
-                    Map Search
-                  </Link>
                   <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                     <Link to="/admin/users" id="menu_admin_users">
                       Manage Users

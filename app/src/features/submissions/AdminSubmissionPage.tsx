@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
+import Stack from '@mui/material/Stack';
 import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
 import { useSubmissionContext } from 'hooks/useContext';
 import SubmissionDataGrid from './components/SubmissionDataGrid';
@@ -35,22 +36,24 @@ const AdminSubmissionPage = () => {
   };
 
   return (
-    <Box>
+    <>
       <SubmissionHeader selectedFeatures={getAllSubmissionFeatureIds()} />
       <Container maxWidth="xl">
-        {submissionFeatures.map((submissionFeature) => {
-          return (
-            <Box py={2} key={submissionFeature.feature_type_name}>
-              <SubmissionDataGrid
-                feature_type_display_name={submissionFeature.feature_type_display_name}
-                feature_type_name={submissionFeature.feature_type_name}
-                submissionFeatures={submissionFeature.features || []}
-              />
-            </Box>
-          );
-        })}
+        <Stack gap={3} sx={{ py: 4 }}>
+          {submissionFeatures.map((submissionFeature) => {
+            return (
+              <Box key={submissionFeature.feature_type_name}>
+                <SubmissionDataGrid
+                  feature_type_display_name={submissionFeature.feature_type_display_name}
+                  feature_type_name={submissionFeature.feature_type_name}
+                  submissionFeatures={submissionFeature.features || []}
+                />
+              </Box>
+            );
+          })}
+        </Stack>
       </Container>
-    </Box>
+    </>
   );
 };
 

@@ -75,7 +75,7 @@ export interface IEditDialogProps<T> {
 export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildren<IEditDialogProps<T>>) => {
   const theme = useTheme();
 
-  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const fullScreen = useMediaQuery(theme.breakpoints.down('lg'));
 
   if (!props.open) {
     return <></>;
@@ -93,8 +93,8 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       }}>
       {(formikProps) => (
         <Dialog
-          fullScreen={fullScreen}
           fullWidth
+          fullScreen={fullScreen}
           maxWidth="md"
           open={props.open}
           aria-labelledby="edit-dialog-title"

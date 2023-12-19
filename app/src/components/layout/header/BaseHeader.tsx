@@ -27,8 +27,8 @@ const BaseHeader = (props: IBaseHeader) => {
       sx={{
         position: 'sticky',
         top: 0,
-        zIndex: 1002,
-        py: 3,
+        zIndex: 1101,
+        py: 4,
         borderBottomStyle: 'solid',
         borderBottomWidth: '1px',
         borderBottomColor: grey[300]
@@ -42,9 +42,9 @@ const BaseHeader = (props: IBaseHeader) => {
           gap={3}>
           <Box>
             <Typography
-              component="h1"
-              variant="h2"
+              variant="h1"
               sx={{
+                mt: '-4px',
                 ml: '-2px',
                 display: '-webkit-box',
                 WebkitLineClamp: '2',
