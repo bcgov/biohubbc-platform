@@ -228,11 +228,9 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     textTransform: 'none'
                   }
                 }}>
-                <UnAuthGuard>
-                  <RouterLink to="/" id="menu_home">
-                    Home
-                  </RouterLink>
-                </UnAuthGuard>
+                <RouterLink to="/" id="menu_home">
+                  Home
+                </RouterLink>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <RouterLink to="/admin/dashboard" id="menu_dashboard">
                     Submissions
