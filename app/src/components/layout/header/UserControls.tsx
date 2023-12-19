@@ -7,6 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { getFormattedIdentitySource } from 'utils/Utils';
+import { useMemo } from 'react';
 
 // Authenticated view
 export const LoggedInUser = () => {
@@ -75,13 +76,16 @@ export const LoggedInUser = () => {
 
 // Unauthenticated public view
 export const PublicViewUser = () => {
+  const { keycloakWrapper } = useAuthStateContext()
+  const loginUrl = useMemo(() => keycloakWrapper?.getLoginUrl(), [keycloakWrapper]);
+
   return (
     <>
       <Button
         component="a"
         color="inherit"
         variant="text"
-        href="/logout"
+        href={loginUrl}
         disableElevation
         startIcon={<Icon path={mdiLoginVariant} size={1} />}
         data-testid="menu_log_in"
