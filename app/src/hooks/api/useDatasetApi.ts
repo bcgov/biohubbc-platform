@@ -40,7 +40,6 @@ const useDatasetApi = (axios: AxiosInstance) => {
    */
   const getDataset = async (datasetUUID: string): Promise<any> => {
     const { data } = await axios.get(`api/dataset/${datasetUUID}`);
-    console.log('data', data);
 
     return data;
   };
