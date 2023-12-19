@@ -235,15 +235,9 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     to="/admin/dashboard"
                     id="menu_dashboard_sm"
                     onClick={hideMobileMenu}>
-                    Dashboard
+                    Submissions
                   </MenuItem>
                 </SystemRoleGuard>
-                <MenuItem component={RouterLink} to="/submissions" id="menu_submissions_sm">
-                  Submissions
-                </MenuItem>
-                <MenuItem component={RouterLink} to="/map" id="menu_map_sm">
-                  Map Search
-                </MenuItem>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <MenuItem id="menu_admin_users_sm" component={RouterLink} to="/admin/users" onClick={hideMobileMenu}>
                     Manage Users
@@ -308,15 +302,9 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 </UnAuthGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <RouterLink to="/admin/dashboard" id="menu_dashboard">
-                    Dashboard
+                    Submissions
                   </RouterLink>
                 </SystemRoleGuard>
-                <RouterLink to="/submissions" id="menu_submissions">
-                  Submissions
-                </RouterLink>
-                <RouterLink to="/map" id="menu_map">
-                  Map Search
-                </RouterLink>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <RouterLink to="/admin/users" id="menu_admin_users">
                     Manage Users
@@ -365,100 +353,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
       </Dialog>
     </>
   );
-
-  /*
-  return (
-    <>
-      <AppBar elevation={0} position="relative">
-        <Box className={classes.govHeader}>
-          <Toolbar className={classes.govHeaderToolbar}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
-              <Box display="flex" alignItems="center">
-                <RouterLink to="/" className={classes.brand} aria-label="Go to Home Page">
-                  <picture>
-                    <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
-                    <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
-                    <img src={headerImageSmall} alt={'Government of British Columbia'} />
-                  </picture>
-                  <span>
-                    <strong>BioHub</strong>
-                    <BetaLabel />
-                  </span>
-                </Link>
-                <Box
-                  ml={4}
-                  sx={{
-                    '& a': {
-                      p: 2,
-                      color: 'bcgovblue.contrastText',
-                      fontWeight: 700,
-                      textDecoration: 'none'
-                    },
-                    '& a:hover': {
-                      textDecoration: 'underline'
-                    }
-                  }}>
-                  <Link to="/" id="menu_home">
-                    Home
-                  </Link>
-                  <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                    <Link to="/admin/dashboard" id="menu_admin_dashboard">
-                      Submissions
-                    </Link>
-                  </SystemRoleGuard>
-                  <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                    <Link to="/admin/users" id="menu_admin_users">
-                      Manage Users
-                    </Link>
-                  </SystemRoleGuard>
-                </Box>
-              </Box>
-              <Box display="flex" alignItems="center">
-                <IconButton
-                  aria-label="Need help?"
-                  onClick={showSupportDialog}
-                  sx={{
-                    color: 'bcgovblue.contrastText'
-                  }}>
-                  <Icon path={mdiHelpCircle} size={1} />
-                </IconButton>
-                <Box>
-                  <UnAuthGuard>
-                    <NotLoggedInUserControls />
-                  </UnAuthGuard>
-                  <AuthGuard>
-                    <LoggedInUserControls />
-                  </AuthGuard>
-                </Box>
-              </Box>
-            </Box>
-          </Toolbar>
-        </Box>
-      </AppBar>
-
-      <Dialog open={openSupportDialog}>
-        <DialogTitle>Need Help?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" gutterBottom>
-            For technical support or questions about this application, please contact:&nbsp;
-            <Link
-              href="mailto:biohub@gov.bc.ca?subject=BioHub - Secure Document Access Request"
-              underline="always">
-              biohub@gov.bc.ca
-            </Link>
-            .
-          </Typography>
-          <Typography variant="body1">A support representative will respond to your request shortly.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button variant="contained" color="primary" onClick={hideSupportDialog}>
-            OK
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
-  */
 };
 
 export default Header;
