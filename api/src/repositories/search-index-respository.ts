@@ -4,6 +4,9 @@ import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
+import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
+import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
+import { Feature } from 'geojson';
 
 const defaultLog = getLogger('repositories/search-index-repository');
 
@@ -31,57 +34,80 @@ const FeaturePropertyRecordWithPropertyTypeName = FeaturePropertyRecord.extend({
 
 export type FeaturePropertyRecordWithPropertyTypeName = z.infer<typeof FeaturePropertyRecordWithPropertyTypeName>;
 
-// TODO replace with pre-existing Zod types for geojson
-const Geometry = z.object({
-  type: z.literal('Point'),
-  coordinates: z.tuple([z.number(), z.number()])
-});
-
-export type Geometry = z.infer<typeof Geometry>;
-
+/**
+ * Represents a record in one of the search tables.
+ */
 const SearchableRecord = z.object({
   submission_feature_id: z.number(),
   feature_property_id: z.number(),
   value: z.unknown(),
-  create_date: z.date(),
+  create_date: z.string(),
   create_user: z.number(),
-  update_date: z.date().nullable(),
-  update_user: z.date().nullable(),
+  update_date: z.string().nullable(),
+  update_user: z.string().nullable(),
   revision_count: z.number()
 });
 
-type InsertSearchableRecordKey = 'submission_feature_id' | 'value' | 'feature_property_id';
+export type SearchableRecord = z.infer<typeof SearchableRecord>;
 
+const InsertSearchableRecordKeys = {
+  'submission_feature_id': true,
+  'feature_property_id': true,
+  'value': true
+} as const;
+
+/**
+ * Represents a record in the datetime search table.
+ */
 export const DatetimeSearchableRecord = SearchableRecord.extend({
-  search_datetime_id: z.date(),
-  value: z.date()
+  search_datetime_id: z.number(),
+  value: z.string()
 });
 
+/**
+ * Represents a record in the number search table.
+ */
 export const NumberSearchableRecord = SearchableRecord.extend({
   search_number_id: z.number(),
   value: z.number()
 });
 
-export const SpatialSearchableRecord = SearchableRecord.extend({
-  search_spatial_id: z.number(),
-  value: Geometry
-});
-
+/**
+ * Represents a record in the string search table.
+ */
 export const StringSearchableRecord = SearchableRecord.extend({
   search_string_id: z.number(),
   value: z.string()
 });
 
-export type SearchableRecord = z.infer<typeof SearchableRecord>;
+/**
+ * Represents a record in the spatial search table.
+ * 
+ * Because values from a type `geometry` column are not useful, we elect to never
+ * return them (`z.never()`).
+ */
+export const SpatialSearchableRecord = SearchableRecord.extend({
+  search_spatial_id: z.number(),
+  value: z.never() // Geometry represented as a string
+});
+
+export const InsertDatetimeSearchableRecord = DatetimeSearchableRecord.pick(InsertSearchableRecordKeys);
+export const InsertNumberSearchableRecord = NumberSearchableRecord.pick(InsertSearchableRecordKeys);
+export const InsertStringSearchableRecord = StringSearchableRecord.pick(InsertSearchableRecordKeys);
+export const InsertSpatialSearchableRecord = SpatialSearchableRecord.pick(InsertSearchableRecordKeys)
+  .extend({
+    value: GeoJSONFeatureCollectionZodSchema
+  });
+
 export type DatetimeSearchableRecord = z.infer<typeof DatetimeSearchableRecord>;
 export type NumberSearchableRecord = z.infer<typeof NumberSearchableRecord>;
-export type SpatialSearchableRecord = z.infer<typeof SpatialSearchableRecord>;
 export type StringSearchableRecord = z.infer<typeof StringSearchableRecord>;
+export type SpatialSearchableRecord = z.infer<typeof SpatialSearchableRecord>;
 
-export type InsertDatetimeSearchableRecord = Pick<DatetimeSearchableRecord, InsertSearchableRecordKey>;
-export type InsertNumberSearchableRecord = Pick<NumberSearchableRecord, InsertSearchableRecordKey>;
-export type InsertSpatialSearchableRecord = Pick<SpatialSearchableRecord, InsertSearchableRecordKey>;
-export type InsertStringSearchableRecord = Pick<StringSearchableRecord, InsertSearchableRecordKey>;
+export type InsertDatetimeSearchableRecord = z.infer<typeof InsertDatetimeSearchableRecord>;
+export type InsertNumberSearchableRecord = z.infer<typeof InsertNumberSearchableRecord>;
+export type InsertStringSearchableRecord = z.infer<typeof InsertStringSearchableRecord>;
+export type InsertSpatialSearchableRecord = z.infer<typeof InsertSpatialSearchableRecord>;
 
 /**
  * A class for creating searchable records
@@ -151,9 +177,36 @@ export class SearchIndexRepository extends BaseRepository {
   ): Promise<SpatialSearchableRecord[]> {
     defaultLog.debug({ label: 'insertSearchableSpatialRecords' });
 
-    const queryBuilder = getKnex().queryBuilder().insert(spatialRecords).into('search_spatial').returning('*');
+    const query = SQL`
+      INSERT INTO
+        search_spatial
+      (
+        submission_feature_id,
+        feature_property_id,
+        value
+      )
+        VALUES
+    `;
 
-    const response = await this.connection.knex(queryBuilder, SpatialSearchableRecord);
+    spatialRecords.forEach((spatialRecord, index) => {
+      const {
+        submission_feature_id,
+        feature_property_id,
+        value
+      } = spatialRecord;
+
+      query.append(SQL`(
+        ${submission_feature_id},
+        ${feature_property_id},`);
+      query.append(generateGeometryCollectionSQL(value.features as Feature[]));
+      query.append(SQL`)`);
+      
+      if (index < spatialRecords.length - 1) {
+        query.append(SQL`,`);
+      }
+    });
+
+    const response = await this.connection.sql(query, SpatialSearchableRecord);
 
     if (response.rowCount !== spatialRecords.length) {
       throw new ApiExecuteSQLError('Failed to insert searchable spatial records', [

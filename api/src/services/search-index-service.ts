@@ -1,7 +1,7 @@
+import { FeatureCollection } from 'geojson';
 import { IDBConnection } from '../database/db';
 import {
   FeaturePropertyRecordWithPropertyTypeName,
-  Geometry,
   InsertDatetimeSearchableRecord,
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
@@ -63,7 +63,7 @@ export class SearchIndexService extends DBService {
 
         switch (feature_property_type_name) {
           case 'datetime':
-            datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as Date });
+            datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as string });
             break;
 
           case 'number':
@@ -71,7 +71,7 @@ export class SearchIndexService extends DBService {
             break;
 
           case 'spatial':
-            spatialRecords.push({ submission_feature_id, feature_property_id, value: value as Geometry });
+            spatialRecords.push({ submission_feature_id, feature_property_id, value: value as FeatureCollection });
             break;
 
           case 'string':
