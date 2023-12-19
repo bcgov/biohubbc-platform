@@ -36,24 +36,16 @@ export class ValidationService extends DBService {
    * @memberof ValidationService
    */
   async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
-    // Generate an array of all paths to all elements which contain a 'features' property
+    // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
     const allFeaturesPaths: string[] = JSONPath({
-      path: '$..[?(@.features)]',
+      path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
       flatten: true,
       resultType: 'path',
       json: submissionFeatures
     });
 
-    // TODO Change name of submission 'features' field??
-    // Remove paths which actually point to GeoJson features, and not submission features. This step is only necessary
-    // because the submission 'features' field collides with the GeoJSON 'features' field. Could be solved by picking a
-    // different name for submission 'features'.
-    const cleanFeaturePaths = allFeaturesPaths.filter((path) => {
-      return /\[\d+\]$/.test(path);
-    });
-
     try {
-      for (const path of cleanFeaturePaths) {
+      for (const path of allFeaturesPaths) {
         // Fetch a submissionFeature object
         const node: ISubmissionFeature[] = JSONPath({ path: path, resultType: 'value', json: submissionFeatures });
 
