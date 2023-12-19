@@ -17,10 +17,8 @@ const CompleteSecurityReviewStatusMessage = (props: ICompleteSecurityReviewStatu
     return (
       <Box mt={3}>
         <Alert severity="info" icon={<Icon path={mdiLock} size={1} />}>
-          <AlertTitle>
-            <strong>{'All records secured'}</strong>
-          </AlertTitle>
-          {'Access to secured records will be restricted pending approval by a BioHub Administrator.'}
+          <AlertTitle>All records secured</AlertTitle>
+          Access to all records will be restricted pending approval by a BioHub Administrator.
         </Alert>
       </Box>
     );
@@ -30,12 +28,9 @@ const CompleteSecurityReviewStatusMessage = (props: ICompleteSecurityReviewStatu
     return (
       <Box mt={3}>
         <Alert severity="info" icon={<Icon path={mdiLockAlertOutline} size={1} />}>
-          <AlertTitle>
-            <strong>{'Some records are secured'}</strong>
-          </AlertTitle>
-          {
-            'Users can access unsecured records. Access to secured records will be restricted pending approval by a BioHub Administrator.'
-          }
+          <AlertTitle>Some records have been secured</AlertTitle>
+          Users can only access unsecured records. Access to secured records will be restricted pending approval by a
+          BioHub Administrator.'
         </Alert>
       </Box>
     );
@@ -44,10 +39,8 @@ const CompleteSecurityReviewStatusMessage = (props: ICompleteSecurityReviewStatu
   return (
     <Box mt={3}>
       <Alert severity="error" icon={<Icon path={mdiAlertCircleOutline} size={1} />}>
-        <AlertTitle>
-          <strong>{'Open access to all records'}</strong>
-        </AlertTitle>
-        {'Users can access all records.'}
+        <AlertTitle>No security applied</AlertTitle>
+        All users will have unrestricted access to records that have been included in this submission.
       </Alert>
     </Box>
   );

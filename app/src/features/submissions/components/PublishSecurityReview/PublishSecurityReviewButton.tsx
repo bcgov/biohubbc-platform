@@ -33,8 +33,9 @@ const PublishSecurityReviewButton = (props: IPublishSecurityReviewButtonProps) =
             color="primary"
             onClick={() => {
               setIsRemoveReviewDialogOpen(true);
-            }}>
-            Remove Review
+            }}
+            aria-label="Unpublish submission">
+            Unpublish
           </Button>
         </>
       )) || (
@@ -53,8 +54,9 @@ const PublishSecurityReviewButton = (props: IPublishSecurityReviewButtonProps) =
             color="primary"
             onClick={() => {
               setIsCompleteReviewDialogOpen(true);
-            }}>
-            Complete Review
+            }}
+            aria-label="Publish submission">
+            Publish
           </Button>
         </>
       )}

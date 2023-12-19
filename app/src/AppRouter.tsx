@@ -6,12 +6,9 @@ import NotFoundPage from 'features/404/NotFoundPage';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
-import HomeRouter from 'features/home/HomeRouter';
-import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
 import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
 import BaseLayout from 'layouts/BaseLayout';
-import ContentLayout from 'layouts/ContentLayout';
 import LoginPage from 'pages/authentication/LoginPage';
 import LogOutPage from 'pages/authentication/LogOutPage';
 import { Redirect, Route, Switch, useLocation } from 'react-router-dom';
@@ -27,7 +24,7 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
 
       <Route exact path="/">
         <BaseLayout>
-          <HomeRouter />
+          <SubmissionsRouter />
         </BaseLayout>
       </Route>
 
@@ -41,18 +38,6 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
         <BaseLayout>
           <DatasetsRouter />
         </BaseLayout>
-      </Route>
-
-      <Route path="/submissions">
-        <BaseLayout>
-          <SubmissionsRouter />
-        </BaseLayout>
-      </Route>
-
-      <Route path="/map">
-        <ContentLayout>
-          <MapRouter />
-        </ContentLayout>
       </Route>
 
       <RouteWithTitle path="/page-not-found" title={getTitle('Page Not Found')}>

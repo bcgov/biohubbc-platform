@@ -48,18 +48,14 @@ const UnsecureDialog = (props: IUnsecureDialogProps) => {
       onYes={() => handleRemove()}
       onNo={props.onClose}
       onClose={() => {}}
-      dialogTitle="Unsecure Records?"
+      dialogTitle="Unsecure all records?"
+      dialogText="Are you sure you want to unsecure all records in this submission?"
       dialogContent={
         <Alert severity="error" sx={{ marginTop: 4 }}>
-          <AlertTitle color="black">
-            <strong>Open access to all records</strong>
-          </AlertTitle>
-          <Typography color={'black'}>
-            Users will be able to access and download all records included in this dataset
-          </Typography>
+          <AlertTitle>Open access to all records</AlertTitle>
+          All users will have unrestricted access to records that have been included in this submission.
         </Alert>
       }
-      dialogText="Are you sure you want to unsecure this dataset?"
       yesButtonProps={{ color: 'error' }}
       yesButtonLabel="UNSECURE"
       noButtonLabel="CANCEL"

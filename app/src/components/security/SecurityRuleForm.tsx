@@ -1,6 +1,6 @@
-import { mdiClose, mdiMagnify } from '@mdi/js';
+import { mdiMagnify } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Alert, AlertTitle, IconButton, Typography } from '@mui/material';
+import { Alert, AlertTitle, Collapse, ListItem, Stack, Typography } from '@mui/material';
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -8,6 +8,7 @@ import { SubmissionContext } from 'contexts/submissionContext';
 import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useContext, useEffect, useState } from 'react';
+import { TransitionGroup } from 'react-transition-group';
 import { alphabetizeObjects } from 'utils/Utils';
 import { ISecurityRuleFormProps } from './SecuritiesDialog';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
@@ -38,27 +39,19 @@ const SecurityRuleForm = () => {
   return (
     <form onSubmit={handleSubmit}>
       <Box component="fieldset">
-        <Typography component="legend">Manage Security Rules</Typography>
         <Typography
           variant="body1"
           color="textSecondary"
           sx={{
             maxWidth: '72ch'
           }}>
-          A minimum of one security rule must be selected.
+          Specify reasons why this information should be secured.
         </Typography>
         {showSecuredBanner && (
           <Box mt={3}>
-            <Alert
-              severity="info"
-              variant="standard"
-              action={
-                <IconButton size="small" onClick={() => setShowSecuredBanner(false)}>
-                  <Icon path={mdiClose} size={1} />
-                </IconButton>
-              }>
+            <Alert severity="info" variant="standard">
               <AlertTitle>Security Applied</AlertTitle>
-              The selected features already have security applied to them.
+              Some security rules have already been applied to this submission.
             </Alert>
           </Box>
         )}
@@ -105,7 +98,7 @@ const SecurityRuleForm = () => {
               <TextField
                 {...params}
                 variant="outlined"
-                placeholder={'Find Security Rules'}
+                placeholder={'Find security reasons'}
                 fullWidth
                 InputProps={{
                   ...params.InputProps,
@@ -119,26 +112,33 @@ const SecurityRuleForm = () => {
             )}
             renderOption={(renderProps, renderOption) => {
               return (
-                <Box component="li" {...renderProps}>
+                <ListItem
+                  divider
+                  sx={{
+                    px: 2,
+                    py: '12px !important'
+                  }}
+                  {...renderProps}>
                   <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
-                </Box>
+                </ListItem>
               );
             }}
           />
         </Box>
-        <Box mt={3}>
+        <Stack component={TransitionGroup} gap={1} mt={1}>
           {values.rules.map((rule: ISecurityRule, index: number) => {
             return (
-              <SecurityRuleActionCard
-                key={rule.security_rule_id}
-                security_rule_id={rule.security_rule_id}
-                name={rule.name}
-                description={rule.description}
-                remove={handleRemove}
-              />
+              <Collapse key={rule.security_rule_id}>
+                <SecurityRuleActionCard
+                  security_rule_id={rule.security_rule_id}
+                  name={rule.name}
+                  description={rule.description}
+                  remove={handleRemove}
+                />
+              </Collapse>
             );
           })}
-        </Box>
+        </Stack>
       </Box>
     </form>
   );

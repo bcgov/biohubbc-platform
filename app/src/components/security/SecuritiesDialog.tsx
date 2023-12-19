@@ -62,20 +62,18 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   };
 
   return (
-    <>
-      <EditDialog
-        dialogTitle="Manage Security Reasons"
-        open={props.isOpen}
-        dialogSaveButtonLabel="APPLY"
-        onCancel={props.onClose}
-        onSave={(values: ISecurityRuleFormProps) => handleSubmit(values.rules)}
-        component={{
-          element: <SecurityRuleForm />,
-          initialValues: { rules: [] },
-          validationSchema: SecurityRuleYupSchema
-        }}
-      />
-    </>
+    <EditDialog
+      dialogTitle="Secure Records"
+      open={props.isOpen}
+      dialogSaveButtonLabel="APPLY"
+      onCancel={props.onClose}
+      onSave={(values: ISecurityRuleFormProps) => handleSubmit(values.rules)}
+      component={{
+        element: <SecurityRuleForm />,
+        initialValues: { rules: [] },
+        validationSchema: SecurityRuleYupSchema
+      }}
+    />
   );
 };
 
