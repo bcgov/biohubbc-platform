@@ -26,7 +26,6 @@ describe('Header', () => {
 
     expect(getByText('Home')).toBeVisible();
     expect(getByText('Submissions')).toBeVisible();
-    expect(getByText('Map Search')).toBeVisible();
     expect(getByText('Manage Users')).toBeVisible();
   });
 
