@@ -52,12 +52,10 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
             sx={{
               overflow: 'hidden',
               textOverflow: 'ellipsis'
-            }}
-          >
+            }}>
             {String(params.value)}
           </Box>
-        )
-        ;
+        );
       }
     };
   });
@@ -79,11 +77,13 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           );
         }
         return (
-          <Stack flexDirection="row" alignItems="center" gap={1}
+          <Stack
+            flexDirection="row"
+            alignItems="center"
+            gap={1}
             sx={{
               color: 'text.secondary'
-            }}
-          >
+            }}>
             <Icon path={mdiLockOpenOutline} size={0.75} />
             <span>UNSECURED</span>
           </Stack>
@@ -102,9 +102,9 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       headerName: 'Parent ID',
       flex: 0,
       disableColumnMenu: true,
-      width: 120,
+      width: 120
     },
-    ...fieldColumns,
+    ...fieldColumns
   ];
 
   return (
