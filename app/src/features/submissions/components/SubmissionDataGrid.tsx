@@ -47,7 +47,17 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
       renderCell: (params: GridRenderCellParams) => {
-        return <div>{String(params.value)}</div>;
+        return (
+          <Box
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {String(params.value)}
+          </Box>
+        )
+        ;
       }
     };
   });
