@@ -18,10 +18,10 @@ const ManageSecurity = (props: IManageSecurityProps) => {
 
   const open = Boolean(anchorEl);
 
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
   };
-  const handleClose = () => {
+  const handleMenuClose = () => {
     setAnchorEl(null);
   };
 
@@ -30,18 +30,24 @@ const ManageSecurity = (props: IManageSecurityProps) => {
       <SecuritiesDialog
         features={props.features}
         isOpen={isSecuritiesDialogOpen}
-        onClose={() => setIsSecuritiesDialogOpen(false)}
+        onClose={() => {
+          setIsSecuritiesDialogOpen(false);
+          handleMenuClose();
+        }}
       />
       <UnsecureDialog
         features={props.features}
         isOpen={isUnsecureDialogOpen}
-        onClose={() => setIsUnsecuredDialogOpen(false)}
+        onClose={() => {
+          setIsUnsecuredDialogOpen(false);
+          handleMenuClose();
+        }}
       />
       <Button
         color="primary"
         data-testid="manage-security"
         variant="outlined"
-        onClick={handleClick}
+        onClick={handleMenuClick}
         startIcon={<Icon path={mdiSecurity} size={0.75} />}
         endIcon={open ? <Icon path={mdiChevronUp} size={0.75} /> : <Icon path={mdiChevronDown} size={0.75} />}>
         Manage Security
@@ -49,7 +55,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
       <Menu
         open={open}
         anchorEl={anchorEl}
-        onClose={handleClose}
+        onClose={handleMenuClose}
         anchorOrigin={{
           vertical: 'bottom',
           horizontal: 'right'
