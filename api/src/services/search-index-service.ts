@@ -63,6 +63,11 @@ export class SearchIndexService extends DBService {
 
         switch (feature_property_type_name) {
           case 'datetime':
+            if (!value) {
+              // Datetime value is null or undefined, since the submission system accepts null dates (e.g. `{ end_date: null }`)
+              return;
+            }
+
             datetimeRecords.push({ submission_feature_id, feature_property_id, value: value as string });
             break;
 
