@@ -1,6 +1,6 @@
 import { mdiMenu } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Menu, MenuItem, /*Theme*/ } from '@mui/material';
+import { Menu, MenuItem } from '@mui/material';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -10,7 +10,6 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-// import { makeStyles } from '@mui/styles';
 import headerImageLarge from 'assets/images/gov-bc-logo-horiz.png';
 import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
 import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'components/security/Guards';
@@ -18,72 +17,6 @@ import { SYSTEM_ROLE } from 'constants/roles';
 import { Link as RouterLink } from 'react-router-dom';
 import { useState } from 'react';
 import { LoggedInUser, PublicViewUser } from './UserControls';
-
-/*
-const useStyles = makeStyles((theme: Theme) => ({
-  govHeader: {},
-  govHeaderToolbar: {
-    height: '80px',
-    backgroundColor: theme.palette.bcgovblue.main
-  },
-  brand: {
-    display: 'flex',
-    flex: '0 0 auto',
-    alignItems: 'center',
-    overflow: 'hidden',
-    color: 'inherit',
-    textDecoration: 'none',
-    fontSize: '1.75rem',
-    '& img': {
-      marginTop: '-2px',
-      verticalAlign: 'middle'
-    },
-    '& picture': {
-      marginRight: '1.25rem'
-    },
-    '&:hover': {
-      textDecoration: 'none'
-    },
-    '&:focus': {
-      outlineOffset: '6px'
-    }
-  },
-  '@media (max-width: 1000px)': {
-    brand: {
-      fontSize: '1rem',
-      '& picture': {
-        marginRight: '1rem'
-      }
-    },
-    wrapText: {
-      display: 'block'
-    }
-  },
-  mainNav: {
-    backgroundColor: '#38598a'
-  },
-  mainNavToolbar: {
-    '& a': {
-      display: 'block',
-      padding: theme.spacing(2),
-      color: 'inherit',
-      fontSize: '1rem',
-      textDecoration: 'none'
-    },
-    '& a:hover': {
-      textDecoration: 'underline'
-    },
-    '& a:first-child': {
-      marginLeft: theme.spacing(-2)
-    }
-  },
-  '.MuiDialogContent-root': {
-    '& p + p': {
-      marginTop: theme.spacing(2)
-    }
-  }
-}));
-*/
 
 const Header: React.FC<React.PropsWithChildren> = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
