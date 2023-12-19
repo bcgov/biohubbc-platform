@@ -1,6 +1,6 @@
 import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Divider, Paper, Toolbar } from '@mui/material';
+import { Divider, Paper, Stack, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { Box } from '@mui/system';
 import {
@@ -43,7 +43,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     return {
       field: featureType.name,
       headerName: featureType.display_name,
-      flex: 2,
+      flex: 1,
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
       renderCell: (params: GridRenderCellParams) => {
@@ -55,15 +55,29 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const columns: GridColDef[] = [
     {
       field: 'submission_feature_security_id',
-      headerName: 'Secure',
+      headerName: 'Security',
       flex: 0,
       disableColumnMenu: true,
-      width: 100,
+      width: 130,
       renderCell: (params) => {
         if (params.value > 0) {
-          return <Icon path={mdiLock} size={1} />;
+          return (
+            <Stack flexDirection="row" alignItems="center" gap={1}>
+              <Icon path={mdiLock} size={0.75} />
+              <span>SECURED</span>
+            </Stack>
+          );
         }
-        return <Icon path={mdiLockOpenOutline} size={1} />;
+        return (
+          <Stack flexDirection="row" alignItems="center" gap={1}
+            sx={{
+              color: 'text.secondary'
+            }}
+          >
+            <Icon path={mdiLockOpenOutline} size={0.75} />
+            <span>UNSECURED</span>
+          </Stack>
+        );
       }
     },
     {
@@ -71,18 +85,16 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       headerName: 'ID',
       flex: 0,
       disableColumnMenu: true,
-      width: 100
+      width: 85
     },
-    ...fieldColumns,
     {
       field: 'parent_submission_feature_id',
       headerName: 'Parent ID',
       flex: 0,
-      align: 'right',
-      headerAlign: 'right',
       width: 120,
       disableColumnMenu: true
-    }
+    },
+    ...fieldColumns,
   ];
 
   return (
@@ -105,7 +117,6 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           rows={submissionFeatures}
           columns={columns}
           pageSizeOptions={[5]}
-          checkboxSelection
           editMode="row"
           rowSelectionModel={rowSelectionModel}
           onRowSelectionModelChange={(model) => {

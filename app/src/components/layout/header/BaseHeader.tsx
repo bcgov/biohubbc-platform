@@ -42,9 +42,9 @@ const BaseHeader = (props: IBaseHeader) => {
           gap={3}>
           <Box>
             <Typography
-              component="h1"
-              variant="h2"
+              variant="h1"
               sx={{
+                mt: '-4px',
                 ml: '-2px',
                 display: '-webkit-box',
                 WebkitLineClamp: '2',

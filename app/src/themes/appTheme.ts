@@ -194,7 +194,7 @@ const appTheme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          fontSize: '0.9rem'
+          fontSize: '0.875rem'
         },
         head: {
           fontSize: '0.875rem',
@@ -206,7 +206,7 @@ const appTheme = createTheme({
     MuiDataGrid: {
       styleOverrides: {
         root: {
-          fontSize: '0.9rem',
+          fontSize: '0.875rem',
           borderWidth: 0,
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
