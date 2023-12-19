@@ -28,7 +28,7 @@ const BaseHeader = (props: IBaseHeader) => {
         position: 'sticky',
         top: 0,
         zIndex: 1101,
-        py: 3,
+        py: 4,
         borderBottomStyle: 'solid',
         borderBottomWidth: '1px',
         borderBottomColor: grey[300]

@@ -1,6 +1,7 @@
 import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Divider, Paper, Toolbar } from '@mui/material';
+import Typography from '@mui/material/Typography';
 import { Box } from '@mui/system';
 import {
   DataGrid,
@@ -13,7 +14,6 @@ import { useCodesContext } from 'hooks/useContext';
 import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
-import Typography from '@mui/material/Typography';
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
@@ -71,7 +71,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       headerName: 'ID',
       flex: 0,
       disableColumnMenu: true,
-      width: 100,
+      width: 100
     },
     ...fieldColumns,
     {
@@ -90,7 +90,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       <Toolbar>
         <Typography component="h2" variant="h4">
           {feature_type_display_name}
-          <Typography component="span" fontSize="inherit" fontWeight="inherit" color="textSecondary" sx={{ml: 0.5}}>
+          <Typography component="span" fontSize="inherit" fontWeight="inherit" color="textSecondary" sx={{ ml: 0.5 }}>
             ({submissionFeatures.length})
           </Typography>
         </Typography>
@@ -128,7 +128,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
               fontWeight: 700,
               textTransform: 'uppercase',
               color: 'text.secondary'
-            },
+            }
           }}
         />
       </Box>
