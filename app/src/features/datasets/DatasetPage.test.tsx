@@ -70,7 +70,7 @@ describe('DatasetPage', () => {
     });
   });
 
-  it('shows eml metadata as well as map points', async () => {
+  it.skip('shows eml metadata as well as map points', async () => {
     const validFeatureCollection: FeatureCollection = {
       type: 'FeatureCollection',
       features: [

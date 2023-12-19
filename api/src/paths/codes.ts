@@ -5,7 +5,7 @@ import { HTTP500 } from '../errors/http-error';
 import { CodeService } from '../services/code-service';
 import { getLogger } from '../utils/logger';
 
-const defaultLog = getLogger('paths/code');
+const defaultLog = getLogger('paths/codes');
 
 export const GET: Operation = [getAllCodes()];
 

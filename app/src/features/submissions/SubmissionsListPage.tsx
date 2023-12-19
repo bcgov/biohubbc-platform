@@ -1,12 +1,19 @@
+import { mdiCommentOutline, mdiTrayArrowDown } from '@mdi/js';
+import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
+import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
+import Chip from '@mui/material/Chip';
+import grey from '@mui/material/colors/grey';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
+import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
+import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SecureDataAccessRequestDialog from 'features/datasets/security/SecureDataAccessRequestDialog';
 import { SearchInput } from 'features/search/SearchComponent';
 import { FuseResult } from 'fuse.js';
@@ -17,6 +24,7 @@ import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
+import { getFormattedDate } from 'utils/Utils';
 import DatasetSortMenu from './components/SubmissionsListSortMenu';
 
 /**
@@ -64,8 +72,11 @@ const SubmissionsListPage = () => {
             py: 4
           }}>
           <Container maxWidth="xl">
-            <Typography variant="h1" mb={2}>
-              Submissions
+            <Typography mb={1} variant="h1">
+              BioHub BC
+            </Typography>
+            <Typography mb={3} variant="body1" color="textSecondary">
+              Open access to British Columbia's terrestrial, aquatic species and habitat inventory data.
             </Typography>
             <SearchInput
               placeholderText="Enter a submission title or keyword"
@@ -75,69 +86,192 @@ const SubmissionsListPage = () => {
           </Container>
         </Paper>
         <Container maxWidth="xl">
-          <Box py={4} display="flex" alignItems="center" justifyContent="space-between">
-            <Typography fontWeight="bold">
-              {searchValue
-                ? `${fuzzyData.length} records found for "${searchValue}"`
-                : `${fuzzyData.length} records found`}
-            </Typography>
-            <DatasetSortMenu
-              data={fuzzyData}
-              handleSortedFuzzyData={(data) => {
-                handleFuzzyData(data);
-              }}
-            />
-          </Box>
-          <Stack spacing={2} mb={2}>
-            {fuzzyData?.map((dataset) => (
-              <Card elevation={0} key={dataset.item.submission_feature_id}>
+          <Box py={4}>
+            <Stack mb={4} flexDirection="row" alignItems="center" justifyContent="space-between">
+              <Typography variant="h4" component="h2">
+                {searchValue
+                  ? `${fuzzyData.length} records found for "${searchValue}"`
+                  : `${fuzzyData.length} records found`}
+              </Typography>
+              <DatasetSortMenu
+                data={fuzzyData}
+                handleSortedFuzzyData={(data) => {
+                  handleFuzzyData(data);
+                }}
+              />
+            </Stack>
+
+            <Stack gap={2}>
+              {/* TODO: Need Skeleton Loader */}
+              <Card elevation={0} hidden>
                 <CardHeader
-                  title={highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
-                  subheader={
-                    <Typography variant="body2" color="textSecondary">
-                      {dataset.item.submission_date.toDateString()}
+                  title={
+                    <Typography variant="h4">
+                      <Skeleton sx={{ maxWidth: 800, transform: 'scale(1, 0.8)' }}></Skeleton>
                     </Typography>
                   }
-                  action={
-                    <>
-                      {(dataset.item.security === SECURITY_APPLIED_STATUS.SECURED ||
-                        dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
-                        <Button
-                          variant={'outlined'}
-                          sx={{ ml: 'auto', minWidth: 150 }}
-                          disableElevation
-                          onClick={() => {
-                            handleRequestAccess();
-                          }}>
-                          Request Access
-                        </Button>
-                      )}
-                      {(dataset.item.security === SECURITY_APPLIED_STATUS.UNSECURED ||
-                        dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
-                        <Button
-                          variant="contained"
-                          sx={{ ml: 1, minWidth: 150 }}
-                          disableElevation
-                          onClick={() => {
-                            handleDownload(dataset);
-                          }}>
-                          Download
-                        </Button>
-                      )}
-                    </>
-                  }
-                />
-                <CardContent sx={{ pt: 0, display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body1" color="textSecondary">
-                    {highlight(
-                      dataset.item.description,
-                      dataset?.matches?.find((match) => match.key === 'description')?.indices
-                    )}
+                  action={<Skeleton width={70}></Skeleton>}
+                  sx={{
+                    pb: 1,
+                    '& .MuiCardHeader-action': {
+                      margin: 0
+                    }
+                  }}></CardHeader>
+                <CardContent
+                  sx={{
+                    pt: 0
+                  }}>
+                  <Typography
+                    variant="body1"
+                    color="textSecondary"
+                    sx={{
+                      maxWidth: 800
+                    }}>
+                    <Skeleton sx={{ maxWidth: 400 }}></Skeleton>
                   </Typography>
                 </CardContent>
+                <CardActions
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    borderTop: '1px solid' + grey[200]
+                  }}>
+                  <Stack flexDirection="row" alignItems="center" justifyContent="space-between" width="100%">
+                    <Skeleton width={150}></Skeleton>
+                    <Skeleton
+                      variant="rectangular"
+                      height={36}
+                      width={100}
+                      sx={{
+                        borderRadius: '4px'
+                      }}></Skeleton>
+                  </Stack>
+                </CardActions>
               </Card>
-            ))}
-          </Stack>
+
+              {fuzzyData?.map((dataset) => (
+                <Card elevation={0} key={dataset.item.submission_feature_id}>
+                  <CardHeader
+                    title={
+                      <Typography
+                        variant="h4"
+                        component="h3"
+                        sx={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: '2',
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                        {highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
+                      </Typography>
+                    }
+                    action={
+                      <Chip
+                        label="Dataset"
+                        size="small"
+                        sx={{
+                          my: '-2px',
+                          fontSize: '12px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase'
+                        }}
+                      />
+                    }
+                    sx={{
+                      pb: 1,
+                      '& .MuiCardHeader-action': {
+                        margin: 0
+                      }
+                    }}></CardHeader>
+                  <CardContent
+                    sx={{
+                      pt: 0
+                    }}>
+                    <Typography
+                      variant="body1"
+                      color="textSecondary"
+                      sx={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: '2',
+                        WebkitBoxOrient: 'vertical',
+                        maxWidth: 800,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                      {highlight(
+                        dataset.item.description,
+                        dataset?.matches?.find((match) => match.key === 'description')?.indices
+                      )}
+                    </Typography>
+                  </CardContent>
+                  <CardActions
+                    sx={{
+                      px: 2,
+                      py: 1.5,
+                      borderTop: '1px solid' + grey[200]
+                    }}>
+                    <Stack
+                      width="100%"
+                      flexDirection={{ xs: 'column', sm: 'row' }}
+                      flexWrap="wrap"
+                      gap={1}
+                      justifyContent="space-between">
+                      <Stack
+                        flex="1 1 auto"
+                        my={1}
+                        component="dl"
+                        sx={{
+                          typography: 'body2',
+                          whiteSpace: 'nowrap',
+                          '& dd': {
+                            color: 'text.secondary'
+                          },
+                          '& dt': {
+                            ml: 1
+                          }
+                        }}>
+                        <Stack flexDirection="row">
+                          <dd>Published:</dd>
+                          <dt>
+                            {getFormattedDate(DATE_FORMAT.ShortDateFormat, dataset.item.submission_date.toDateString())}
+                          </dt>
+                        </Stack>
+                      </Stack>
+                      <Stack flexDirection="row" alignItems="center" gap={1} flexWrap="nowrap">
+                        {(dataset.item.security === SECURITY_APPLIED_STATUS.SECURED ||
+                          dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
+                          <Button
+                            variant={'contained'}
+                            disableElevation
+                            startIcon={<Icon path={mdiCommentOutline} size={0.75} />}
+                            sx={{
+                              fontWeight: 700
+                            }}
+                            onClick={() => {
+                              handleRequestAccess();
+                            }}>
+                            Request Access
+                          </Button>
+                        )}
+                        {(dataset.item.security === SECURITY_APPLIED_STATUS.UNSECURED ||
+                          dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
+                          <Button
+                            variant="contained"
+                            startIcon={<Icon path={mdiTrayArrowDown} size={0.75} />}
+                            onClick={() => {
+                              handleDownload(dataset);
+                            }}>
+                            Download
+                          </Button>
+                        )}
+                      </Stack>
+                    </Stack>
+                  </CardActions>
+                </Card>
+              ))}
+            </Stack>
+          </Box>
         </Container>
       </Box>
     </>
