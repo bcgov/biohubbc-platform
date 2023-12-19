@@ -68,7 +68,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       headerName: 'Security',
       flex: 0,
       disableColumnMenu: true,
-      width: 130,
+      width: 160,
       renderCell: (params) => {
         if (params.value > 0) {
           return (
@@ -95,14 +95,14 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       headerName: 'ID',
       flex: 0,
       disableColumnMenu: true,
-      width: 85
+      width: 100
     },
     {
       field: 'parent_submission_feature_id',
       headerName: 'Parent ID',
       flex: 0,
+      disableColumnMenu: true,
       width: 120,
-      disableColumnMenu: true
     },
     ...fieldColumns,
   ];
