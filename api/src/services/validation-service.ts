@@ -1,17 +1,21 @@
+import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
-import { IDatasetSubmission } from '../repositories/submission-repository';
+import { ISubmissionFeature } from '../repositories/submission-repository';
 import {
   IFeatureProperties,
   IInsertStyleSchema,
   IStyleModel,
   ValidationRepository
 } from '../repositories/validation-repository';
+import { getLogger } from '../utils/logger';
 import { ICsvState } from '../utils/media/csv/csv-file';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import { IMediaState } from '../utils/media/media-file';
 import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
+
+const defaultLog = getLogger('services/validation-service');
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
@@ -25,46 +29,73 @@ export class ValidationService extends DBService {
   }
 
   /**
-   * Validate dataset submission
+   * Validate submission features.
    *
-   * @param {IDatasetSubmission} dataset
+   * @param {ISubmissionFeature[]} submissionFeatures
    * @return {*}  {Promise<boolean>}
    * @memberof ValidationService
    */
-  async validateDatasetSubmission(dataset: IDatasetSubmission): Promise<boolean> {
-    // validate dataset.type is 'dataset'
-    const datasetFeatureType = dataset.type;
-
-    // get dataset validation properties
-    const datasetValidationProperties = await this.getFeatureValidationProperties(datasetFeatureType);
-
-    // get features in dataset
-    const features = dataset.features;
+  async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
+    // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
+    const allFeaturesPaths: string[] = JSONPath({
+      path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
+      flatten: true,
+      resultType: 'path',
+      json: submissionFeatures
+    });
 
     try {
-      // validate dataset properties
-      await this.validateProperties(datasetValidationProperties, dataset.properties);
+      for (const path of allFeaturesPaths) {
+        // Fetch a submissionFeature object
+        const node: ISubmissionFeature[] = JSONPath({ path: path, resultType: 'value', json: submissionFeatures });
 
-      // validate features
-      for (const feature of features) {
-        const featureType = feature.type;
+        if (!node?.length) {
+          continue;
+        }
 
-        // get feature validation properties
-        const featureValidationProperties = await this.getFeatureValidationProperties(featureType);
+        // We expect the 'path' to resolve an array of 1 item
+        const nodeWithoutFeatures = { ...node[0], features: [] };
 
-        // validate feature properties
-        await this.validateProperties(featureValidationProperties, feature.properties);
+        // Validate the submissioNFeature object
+        await this.validateSubmissionFeature(nodeWithoutFeatures).catch((error) => {
+          defaultLog.error({ label: 'validateSubmissionFeature', message: 'error', error });
+          // Submission feature is invalid
+          return false;
+        });
       }
     } catch (error) {
-      console.log(error);
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
+      // Not all submission features are valid
       return false;
     }
+
+    // All submission features are valid
     return true;
   }
 
+  /**
+   * Validate a submission feature (not including its child features).
+   *
+   * @param {ISubmissionFeature} submissionFeature
+   * @return {*}  {Promise<boolean>}
+   * @memberof ValidationService
+   */
+  async validateSubmissionFeature(submissionFeature: ISubmissionFeature): Promise<boolean> {
+    const validationProperties = await this.getFeatureValidationProperties(submissionFeature.type);
+    return this.validateProperties(validationProperties, submissionFeature.properties);
+  }
+
+  /**
+   * Validate the properties of a submission feature.
+   *
+   * @param {IFeatureProperties[]} properties
+   * @param {*} dataProperties
+   * @return {*}  {boolean} `true` if the submission feature is valid, `false` otherwise.
+   * @memberof ValidationService
+   */
   validateProperties(properties: IFeatureProperties[], dataProperties: any): boolean {
-    console.log('dataProperties', dataProperties);
-    console.log('properties', properties);
+    defaultLog.debug({ label: 'validateProperties', message: 'params', properties, dataProperties });
+
     const throwPropertyError = (property: IFeatureProperties) => {
       throw new Error(`Property ${property.name} is not of type ${property.type}`);
     };

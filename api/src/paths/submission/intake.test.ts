@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
+import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
@@ -51,8 +52,8 @@ describe('intake', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const validateDatasetSubmissionStub = sinon
-        .stub(ValidationService.prototype, 'validateDatasetSubmission')
+      const validateSubmissionFeaturesStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeatures')
         .resolves(false);
 
       const requestHandler = intake.submissionIntake();
@@ -71,9 +72,9 @@ describe('intake', () => {
 
         expect.fail();
       } catch (error) {
-        expect(validateDatasetSubmissionStub).to.have.been.calledOnce;
+        expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
         expect((error as HTTPError).status).to.equal(400);
-        expect((error as HTTPError).message).to.equal('Invalid submission submission');
+        expect((error as HTTPError).message).to.equal('Invalid submission');
       }
     });
 
@@ -83,8 +84,8 @@ describe('intake', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const validateDatasetSubmissionStub = sinon
-        .stub(ValidationService.prototype, 'validateDatasetSubmission')
+      const validateSubmissionFeaturesStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeatures')
         .resolves(true);
 
       const insertSubmissionRecordWithPotentialConflictStub = sinon
@@ -93,6 +94,10 @@ describe('intake', () => {
 
       const insertSubmissionFeatureRecordsStub = sinon
         .stub(SubmissionService.prototype, 'insertSubmissionFeatureRecords')
+        .resolves();
+
+      const indexFeaturesBySubmissionIdStub = sinon
+        .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
         .resolves();
 
       const requestHandler = intake.submissionIntake();
@@ -108,9 +113,10 @@ describe('intake', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(validateDatasetSubmissionStub).to.have.been.calledOnce;
+      expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
       expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnce;
       expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnce;
+      expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({ submission_id: 1 });
     });
