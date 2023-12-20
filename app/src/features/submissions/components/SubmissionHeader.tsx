@@ -5,7 +5,7 @@ import ManageSecurity from 'components/security/ManageSecurity';
 import PublishSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewButton';
 import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
-import { useSubmissionContext } from 'hooks/useContext';
+import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 
 export interface ISubmissionHeaderProps {
   selectedFeatures: number[];
@@ -18,6 +18,7 @@ export interface ISubmissionHeaderProps {
  */
 const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   const submissionContext = useSubmissionContext();
+  const dialogContext = useDialogContext();
   const api = useApi();
 
   const submissionDataLoader = submissionContext.submissionDataLoader;
@@ -30,11 +31,19 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
 
   const onSecurityReviewComplete = async () => {
     await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: true });
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: 'Submission Published'
+    });
     submissionContext.submissionDataLoader.refresh(submissionContext.submissionId);
   };
 
   const onSecurityReviewRemove = async () => {
     await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: false });
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: 'Submission Unpublished'
+    });
     submissionContext.submissionDataLoader.refresh(submissionContext.submissionId);
   };
 

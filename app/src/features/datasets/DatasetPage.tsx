@@ -26,7 +26,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   const classes = useStyles();
   // const biohubApi = useApi();
   // const urlParams = useParams();
-  // const dialogContext = useContext(DialogContext);
+  // const dialogContext = useDialogContext();
   // const history = useHistory();
 
   // const datasetId = urlParams['id'];

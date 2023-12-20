@@ -9,9 +9,9 @@ import useTheme from '@mui/material/styles/useTheme';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import ComponentDialog from 'components/dialog/ComponentDialog';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
-import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
-import { PropsWithChildren, useContext, useRef, useState } from 'react';
+import { useDialogContext } from 'hooks/useContext';
+import { PropsWithChildren, useRef, useState } from 'react';
 import yup from 'utils/YupSchema';
 
 /**
@@ -71,7 +71,7 @@ const manageSecurityReasonsFormSchema = yup.object().shape({
 const ManageSecurityReasonsDialog = (props: PropsWithChildren<IManageSecurityReasonsProps>) => {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const defaultErrorDialogProps = {
     onClose: () => {
