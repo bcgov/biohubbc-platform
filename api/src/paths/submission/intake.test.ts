@@ -9,6 +9,7 @@ import { ValidationService } from '../../services/validation-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as intake from './intake';
+import { SearchIndexService } from '../../services/search-index-service';
 
 chai.use(sinonChai);
 
@@ -95,6 +96,10 @@ describe('intake', () => {
         .stub(SubmissionService.prototype, 'insertSubmissionFeatureRecords')
         .resolves();
 
+      const indexFeaturesBySubmissionIdStub = sinon
+        .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
+        .resolves();
+
       const requestHandler = intake.submissionIntake();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -111,6 +116,7 @@ describe('intake', () => {
       expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
       expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnce;
       expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnce;
+      expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({ submission_id: 1 });
     });
