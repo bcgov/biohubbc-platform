@@ -30,6 +30,7 @@ CREATE TABLE submission(
     submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     uuid                        uuid              DEFAULT public.gen_random_uuid() NOT NULL,
     security_review_timestamp   timestamptz(6),
+    publish_timestamp           timestamptz(6),
     submitted_timestamp         timestamptz(6)    DEFAULT now() NOT NULL,
     source_system               varchar(200)      NOT NULL,
     name                        varchar(200)      NOT NULL,
@@ -45,6 +46,7 @@ CREATE TABLE submission(
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
 COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
 COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';
+COMMENT ON COLUMN submission.publish_timestamp IS 'The timestamp of when the submission is published (made public). Null indicates the submission is not publicly visible.';
 COMMENT ON COLUMN submission.submitted_timestamp IS 'The timestamp of when the submission was received by BioHub from the source system.';
 COMMENT ON COLUMN submission.source_system IS 'The name of the source system from which the submission originated.';
 COMMENT ON COLUMN submission.name IS 'The name of the submission.';
