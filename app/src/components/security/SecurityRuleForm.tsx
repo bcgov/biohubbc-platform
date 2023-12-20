@@ -6,9 +6,7 @@ import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
-import { useApi } from 'hooks/useApi';
 import { useSubmissionContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import { useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
 import { alphabetizeObjects } from 'utils/Utils';
@@ -29,18 +27,13 @@ export const SecurityRuleFormYupSchema = yup.object().shape({
 });
 
 const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
-  const api = useApi();
-  const submissionContext = useSubmissionContext();
-
-  const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormikProps>();
+  const { handleSubmit, errors, values, setFieldValue, initialValues } = useFormikContext<ISecurityRuleFormikProps>();
   const [searchText, setSearchText] = useState('');
 
+  const submissionContext = useSubmissionContext();
   const securityRules = submissionContext.securityRulesDataLoader.data || [];
 
-  const submissionFeatureRulesDataLoader = useDataLoader(api.security.getSecurityRulesForSubmissions);
-  submissionFeatureRulesDataLoader.load(props.features);
-
-  const showSecuredBanner = Boolean(submissionFeatureRulesDataLoader.data?.length);
+  const hasOneOrMoreRulesPreviouslyApplied = Boolean(initialValues.rules.length);
 
   const handleAdd = (selected: ISecurityRule) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
@@ -63,7 +56,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
           }}>
           Specify reasons why this information should be secured.
         </Typography>
-        {showSecuredBanner && (
+        {hasOneOrMoreRulesPreviouslyApplied && (
           <Box mt={3}>
             <Alert severity="info" variant="standard">
               <AlertTitle>Security Applied</AlertTitle>
