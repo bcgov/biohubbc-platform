@@ -481,26 +481,20 @@ describe('SubmissionRepository', () => {
     it('should insert or retrieve a submission successfully', async () => {
       const mockQueryResponse = {
         rowCount: 1,
-        rows: [
-          {
-            uuid: 'aaaa',
-            source_transform_id: 1,
-            submission_id: 20
-          }
-        ]
+        rows: [{ submission_id: 20 }]
       } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: async () => mockQueryResponse });
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict('aaaa');
+      const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict(
+        '123-456-789',
+        'submission name',
+        'source system'
+      );
 
-      expect(response).to.eql({
-        uuid: 'aaaa',
-        source_transform_id: 1,
-        submission_id: 20
-      });
+      expect(response).to.eql({ submission_id: 20 });
     });
 
     it('should throw an error', async () => {
@@ -511,7 +505,11 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       try {
-        await submissionRepository.insertSubmissionRecordWithPotentialConflict('aaaa');
+        await submissionRepository.insertSubmissionRecordWithPotentialConflict(
+          '123-456-789',
+          'submission name',
+          'source system'
+        );
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiExecuteSQLError).message).to.equal('Failed to get or insert submission record');
@@ -1065,9 +1063,61 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('getMessages', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should get messages', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ message: 'message' }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getMessages(1);
+
+      expect(response).to.eql([{ message: 'message' }]);
+    });
+  });
+
   describe('createMessages', () => {
     beforeEach(() => {
       sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockMessages = [
+        {
+          submission_id: 1,
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_id: 2,
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ];
+
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.createMessages(mockMessages);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to create submission messages');
+      }
     });
 
     it('should create messages and return void', async () => {
@@ -1173,6 +1223,253 @@ describe('SubmissionRepository', () => {
 
         expect(response).to.eql(mockSubmissionRecord);
       });
+    });
+  });
+
+  describe('insertSubmissionFeatureRecord', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const feature = {
+        id: '',
+        type: '',
+        properties: {}
+      };
+      try {
+        await submissionRepository.insertSubmissionFeatureRecord(1, 1, feature);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const feature = {
+        id: '',
+        type: '',
+        properties: {}
+      };
+
+      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 1, feature);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getFeatureTypeIdByName', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getFeatureTypeIdByName('name');
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get feature type record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        feature_type_id: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getFeatureTypeIdByName('name');
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getSubmissionFeaturesBySubmissionId', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionFeaturesBySubmissionId(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission feature record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        feature_type_name: 'name',
+        feature_type_display_name: 'display',
+        submission_feature_security_ids: [1]
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionFeaturesBySubmissionId(1);
+
+      expect(response).to.eql([mockResponse]);
+    });
+  });
+
+  describe('getSubmissionRecordBySubmissionIdWithSecurity', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal(
+          'Failed to get submission record with security status'
+        );
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        feature_type_name: 'name',
+        feature_type_display_name: 'display',
+        submission_feature_security_ids: [1]
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1);
+
+      expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getReviewedSubmissionsWithSecurity', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        submission_id: 1,
+        uuid: 'string',
+        security_review_timestamp: null,
+        submitted_timestamp: 'string',
+        source_system: 'string',
+        name: 'string',
+        description: null,
+        create_date: 'string',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1,
+        security: SECURITY_APPLIED_STATUS.SECURED
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getReviewedSubmissionsWithSecurity();
+
+      expect(response).to.eql([mockResponse]);
+    });
+  });
+
+  describe('getSubmissionRootFeature', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionRootFeature(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get root submission feature record');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        submission_id: 1,
+        uuid: 'string',
+        security_review_timestamp: null,
+        submitted_timestamp: 'string',
+        source_system: 'string',
+        name: 'string',
+        description: null,
+        create_date: 'string',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionRootFeature(1);
+
+      expect(response).to.eql(mockResponse);
     });
   });
 });

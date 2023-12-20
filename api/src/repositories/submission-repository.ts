@@ -20,17 +20,11 @@ export interface IDatasetsForReview {
   keywords: string[];
 }
 
-export interface IFeatureSubmission {
+export interface ISubmissionFeature {
   id: string;
   type: string;
   properties: object;
-}
-
-export interface IDatasetSubmission {
-  id: string;
-  type: string;
-  properties: object;
-  features: IFeatureSubmission[];
+  features: ISubmissionFeature[];
 }
 
 export const DatasetMetadata = z.object({
@@ -282,7 +276,7 @@ export const SubmissionMessageRecord = z.object({
   submission_id: z.number(),
   label: z.string(),
   message: z.string(),
-  data: z.object({}).nullable(),
+  data: z.record(z.string(), z.any()).nullable(),
   create_date: z.string(),
   create_user: z.number(),
   update_date: z.string().nullable(),
@@ -339,26 +333,31 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission record, returning the record having the matching UUID if it already exists.
-   *
-   * Because `ON CONFLICT ... DO NOTHING` fails to yield the submission_id, the query simply updates the
-   * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
-   * and infer that the query ran successfully.
+   * Insert a new submission record.
    *
    * @param {string} uuid
+   * @param {string} name
+   * @param {string} sourceSystem
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecordWithPotentialConflict(uuid: string): Promise<{ submission_id: number }> {
+  async insertSubmissionRecordWithPotentialConflict(
+    uuid: string,
+    name: string,
+    sourceSystem: string
+  ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
-        publish_timestamp
+        submitted_timestamp,
+        name,
+        source_system
       ) VALUES (
         ${uuid},
-        now()
+        now(),
+        ${name},
+        ${sourceSystem}
       )
-      ON CONFLICT (uuid) DO UPDATE SET publish_timestamp = now()
       RETURNING
         submission_id;
     `;
@@ -379,7 +378,7 @@ export class SubmissionRepository extends BaseRepository {
    * Insert a new submission feature record.
    *
    * @param {number} submissionId
-   * @param {IFeatureSubmission} feature
+   * @param {ISubmissionFeature} feature
    * @param {number} featureTypeId
    * @return {*}  {Promise<{ submission_feature_id: number }>}
    * @memberof SubmissionRepository
@@ -387,7 +386,7 @@ export class SubmissionRepository extends BaseRepository {
   async insertSubmissionFeatureRecord(
     submissionId: number,
     featureTypeId: number,
-    feature: IFeatureSubmission
+    feature: ISubmissionFeature['properties']
   ): Promise<{ submission_feature_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (

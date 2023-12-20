@@ -8,7 +8,9 @@ import useDataLoader from './useDataLoader';
 export enum SYSTEM_IDENTITY_SOURCE {
   BCEID_BUSINESS = 'BCEIDBUSINESS',
   BCEID_BASIC = 'BCEIDBASIC',
-  IDIR = 'IDIR'
+  IDIR = 'IDIR',
+  DATABASE = 'DATABASE',
+  UNVERIFIED = 'UNVERIFIED'
 }
 
 export interface IUserInfo {

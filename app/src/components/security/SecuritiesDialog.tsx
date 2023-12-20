@@ -1,13 +1,10 @@
 import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { DialogContext } from 'contexts/dialogContext';
-import { SubmissionContext } from 'contexts/submissionContext';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
-import { useContext, useEffect } from 'react';
-import yup from 'utils/YupSchema';
-import SecurityRuleForm from './SecurityRuleForm';
+import { useDialogContext } from 'hooks/useContext';
+import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
   features: number[];
@@ -15,22 +12,9 @@ interface ISecuritiesDialogProps {
   onClose: () => void;
 }
 
-export const SecurityRuleYupSchema = yup.object().shape({
-  rules: yup.array(yup.object()).min(1)
-});
-
-export interface ISecurityRuleFormProps {
-  rules: ISecurityRule[];
-}
-
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
-  const dialogContext = useContext(DialogContext);
-  const submissionContext = useContext(SubmissionContext);
+  const dialogContext = useDialogContext();
   const api = useApi();
-
-  useEffect(() => {
-    submissionContext?.submissionFeatureRulesDataLoader.refresh(props.features);
-  }, [props.isOpen]);
 
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
@@ -67,11 +51,11 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       open={props.isOpen}
       dialogSaveButtonLabel="APPLY"
       onCancel={props.onClose}
-      onSave={(values: ISecurityRuleFormProps) => handleSubmit(values.rules)}
+      onSave={(values: ISecurityRuleFormikProps) => handleSubmit(values.rules)}
       component={{
-        element: <SecurityRuleForm />,
+        element: <SecurityRuleForm features={props.features} />,
         initialValues: { rules: [] },
-        validationSchema: SecurityRuleYupSchema
+        validationSchema: SecurityRuleFormYupSchema
       }}
     />
   );

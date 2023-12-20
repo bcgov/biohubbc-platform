@@ -1,80 +1,102 @@
 import { mdiAccountCircle, mdiLoginVariant } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Link from '@mui/material/Link';
-import { makeStyles } from '@mui/styles';
-import { AuthStateContext } from 'contexts/authStateContext';
+import Divider from '@mui/material/Divider';
+import MenuItem from '@mui/material/MenuItem';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
-import { useContext, useMemo } from 'react';
+import { useMemo } from 'react';
+import { getFormattedIdentitySource } from 'utils/Utils';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  userInfo: {
-    borderRight: '1px solid #ffffff'
-  }
-}));
-
-export const LoggedInUserControls = () => {
-  const classes = useStyles();
-  const { keycloakWrapper } = useContext(AuthStateContext);
+// Authenticated view
+export const LoggedInUser = () => {
+  const { keycloakWrapper } = useAuthStateContext();
 
   const identitySource = keycloakWrapper?.getIdentitySource() || '';
   const userIdentifier = keycloakWrapper?.getUserIdentifier() || '';
-
-  let accountTypeDisplayName = '';
-
-  switch (identitySource) {
-    case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
-      accountTypeDisplayName = 'BCeID';
-      break;
-    case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
-      accountTypeDisplayName = 'BCeID';
-      break;
-    case SYSTEM_IDENTITY_SOURCE.IDIR:
-      accountTypeDisplayName = 'IDIR';
-      break;
-  }
-
-  const loggedInUserDisplayName = accountTypeDisplayName
-    ? `${accountTypeDisplayName} / ${userIdentifier}`
-    : userIdentifier;
+  const formattedUsername = [getFormattedIdentitySource(identitySource as SYSTEM_IDENTITY_SOURCE), userIdentifier]
+    .filter(Boolean)
+    .join('/');
 
   return (
-    <Box display="flex" alignItems="center" pl={2}>
-      <Box className={classes.userInfo} display="flex" flexDirection="row" alignItems="center" mr={2} pr={2}>
-        <Icon path={mdiAccountCircle} size={1} />
-        <Box component="span" ml={1}>
-          {loggedInUserDisplayName}
-        </Box>
-      </Box>
-      <Link
-        href="/logout"
-        data-testid="menu_log_out"
+    <>
+      <Box
+        display={{ xs: 'none', lg: 'flex' }}
+        alignItems="center"
         sx={{
-          color: 'bcgovblue.contrastText'
+          fontSize: '16px',
+          fontWeight: 700
+        }}>
+        <Box
+          display="flex"
+          alignItems="center"
+          sx={{
+            padding: '6px 14px',
+            lineHeight: '1.75'
+          }}>
+          <Icon path={mdiAccountCircle} size={1} />
+          <Box ml={1}>{formattedUsername}</Box>
+        </Box>
+        <Divider
+          orientation="vertical"
+          sx={{
+            marginRight: '6px',
+            height: '20px',
+            borderColor: '#fff'
+          }}
+        />
+        <Button
+          component="a"
+          variant="text"
+          href="/logout"
+          data-testid="menu_log_out"
+          sx={{
+            color: 'inherit',
+            fontSize: '16px',
+            fontWeight: 700,
+            textTransform: 'none'
+          }}>
+          Log Out
+        </Button>
+      </Box>
+      <MenuItem
+        component="a"
+        color="#1a5a96"
+        href="/logout"
+        data-testid="collapsed_menu_log_out"
+        sx={{
+          display: { xs: 'block', lg: 'none' }
         }}>
         Log out
-      </Link>
-    </Box>
+      </MenuItem>
+    </>
   );
 };
 
-export const NotLoggedInUserControls = () => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
+// Unauthenticated public view
+export const PublicViewUser = () => {
+  const { keycloakWrapper } = useAuthStateContext();
   const loginUrl = useMemo(() => keycloakWrapper?.getLoginUrl(), [keycloakWrapper]);
 
   return (
-    <Button
-      href={loginUrl}
-      size="large"
-      type="submit"
-      variant="contained"
-      color="bcgovblue"
-      disableElevation
-      startIcon={<Icon path={mdiLoginVariant} size={1.12} />}
-      data-testid="login">
-      Log In
-    </Button>
+    <>
+      <Button
+        component="a"
+        color="inherit"
+        variant="text"
+        href={loginUrl}
+        disableElevation
+        startIcon={<Icon path={mdiLoginVariant} size={1} />}
+        data-testid="menu_log_in"
+        sx={{
+          p: 1,
+          fontSize: '16px',
+          fontWeight: 700,
+          textTransform: 'none'
+        }}>
+        Log In
+      </Button>
+    </>
   );
 };

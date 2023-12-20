@@ -1,6 +1,7 @@
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
 import { Feature, Polygon } from 'geojson';
+import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { LatLngBounds } from 'leaflet';
 import _ from 'lodash';
 import moment from 'moment';
@@ -348,4 +349,31 @@ export const pluralize = (quantity: number, word: string, singularSuffix = '', p
  */
 export const alphabetizeObjects = <T extends { [key: string]: any }>(data: T[], property: string) => {
   return _.sortBy(data, property);
+};
+
+/**
+ * Returns a human-readible identity source string.
+ *
+ * @example getFormattedIdentitySource("BCEIDBUSINESS"); // => "BCeID Business"
+ *
+ * @param {SYSTEM_IDENTITY_SOURCE} identitySource The identity source
+ * @returns {*} {string} the string representing the identity source
+ */
+export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURCE): string | null => {
+  switch (identitySource) {
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+      return 'BCeID Basic';
+
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+      return 'BCeID Business';
+
+    case SYSTEM_IDENTITY_SOURCE.IDIR:
+      return 'IDIR';
+
+    case SYSTEM_IDENTITY_SOURCE.DATABASE:
+      return 'System';
+
+    default:
+      return null;
+  }
 };

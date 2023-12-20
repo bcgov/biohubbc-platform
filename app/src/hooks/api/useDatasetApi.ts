@@ -33,6 +33,18 @@ const useDatasetApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Fetch dataset data by datasetUUID.
+   *
+   * @param {string} datasetUUID
+   * @return {*}  {Promise<any>}
+   */
+  const getDataset = async (datasetUUID: string): Promise<any> => {
+    const { data } = await axios.get(`api/dataset/${datasetUUID}`);
+
+    return data;
+  };
+
+  /**
    * Fetch dataset artifacts by datasetId.
    *
    * @param {string} datasetId
@@ -82,6 +94,7 @@ const useDatasetApi = (axios: AxiosInstance) => {
   return {
     listAllDatasets,
     getDatasetEML,
+    getDataset,
     getDatasetArtifacts,
     getArtifactSignedUrl,
     getHandleBarsTemplateByDatasetId,

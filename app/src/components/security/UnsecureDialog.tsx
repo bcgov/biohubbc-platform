@@ -1,9 +1,8 @@
 import { Alert, AlertTitle, Typography } from '@mui/material';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { DialogContext } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
-import { useContext } from 'react';
+import { useDialogContext } from 'hooks/useContext';
 
 interface IUnsecureDialogProps {
   features: number[];
@@ -12,7 +11,7 @@ interface IUnsecureDialogProps {
 }
 const UnsecureDialog = (props: IUnsecureDialogProps) => {
   const api = useApi();
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const handleRemove = async () => {
     try {

@@ -10,6 +10,7 @@ import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
+  ISubmissionMetadataRecord,
   ISubmissionModel,
   ISubmissionObservationRecord,
   PatchSubmissionRecord,
@@ -54,10 +55,42 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict('aaaa');
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
+        '123-456-789',
+        'submission name',
+        'source systemF'
+      );
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('insertSubmissionFeatureRecords', () => {
+    it('should return submission_id on insert', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const getFeatureTypeIdByNameStub = sinon
+        .stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName')
+        .resolves({ feature_type_id: 1 });
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .resolves({ submission_feature_id: 1 });
+
+      const response = await submissionService.insertSubmissionFeatureRecords(1, [
+        {
+          id: '1',
+          type: 'string',
+          properties: {},
+          features: []
+        }
+      ]);
+
+      expect(repo).to.be.calledOnce;
+      expect(getFeatureTypeIdByNameStub).to.be.calledOnce;
+      expect(response).to.be.eql([{ submission_feature_id: 1 }]);
     });
   });
 
@@ -509,6 +542,26 @@ describe('SubmissionService', () => {
     });
   });
 
+  describe('insertSubmissionMetadataRecord', () => {
+    it('should return a submission observation record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionMetadataRecord').resolves({
+        submission_metadata_id: 1
+      });
+
+      const response = await submissionService.insertSubmissionMetadataRecord({
+        submission_id: 1
+      } as unknown as ISubmissionMetadataRecord);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({
+        submission_metadata_id: 1
+      });
+    });
+  });
+
   describe('insertSubmissionObservationRecord', () => {
     it('should return a submission observation record', async () => {
       const mockDBConnection = getMockDBConnection();
@@ -809,6 +862,38 @@ describe('SubmissionService', () => {
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getSubmissionRecordBySubmissionIdWithSecurity', () => {
+    it('should return a submission observation record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const mockResponse = {
+        submission_id: 1,
+        uuid: 'string',
+        security_review_timestamp: null,
+        submitted_timestamp: 'string',
+        source_system: 'string',
+        name: 'string',
+        description: null,
+        create_date: 'string',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1,
+        security: SECURITY_APPLIED_STATUS.SECURED
+      };
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionIdWithSecurity')
+        .resolves(mockResponse);
+
+      const response = await submissionService.getSubmissionRecordBySubmissionIdWithSecurity(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(mockResponse);
     });
   });
 

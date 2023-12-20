@@ -4,7 +4,9 @@ import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
 import { getKeycloakSource } from '../../utils/keycloak-utils';
@@ -40,26 +42,28 @@ POST.apiDoc = {
         schema: {
           title: 'BioHub Data Submission',
           type: 'object',
-          required: ['id', 'type', 'properties', 'features'],
+          required: ['id', 'name', 'description', 'features'],
           properties: {
             id: {
               title: 'Unique id of the submission',
               type: 'string'
             },
-            type: {
+            name: {
+              title: 'The name of the submission. Should not include sensitive information.',
               type: 'string',
-              enum: ['submission']
+              maxLength: 200
             },
-            properties: {
-              title: 'Dataset properties',
-              type: 'object',
-              properties: {}
+            description: {
+              title: 'A description of the submission. Should not include sensitive information.',
+              type: 'string',
+              maxLength: 3000
             },
             features: {
               type: 'array',
               items: {
                 $ref: '#/components/schemas/SubmissionFeature'
               },
+              maxItems: 1,
               additionalProperties: false
             }
           },
@@ -100,10 +104,12 @@ export function submissionIntake(): RequestHandler {
     }
 
     const submission = {
-      ...req.body,
-      properties: { ...req.body.properties, additionalInformation: req.body.properties.additionalInformation }
+      id: req.body.id,
+      name: req.body.name,
+      description: req.body.description
     };
-    const id = req.body.id;
+
+    const submissionFeatures: ISubmissionFeature[] = req.body.features;
 
     const connection = getServiceAccountDBConnection(sourceSystem);
 
@@ -112,19 +118,28 @@ export function submissionIntake(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
+      const searchIndexService = new SearchIndexService(connection);
 
-      // validate the submission submission
-      if (!(await validationService.validateDatasetSubmission(submission))) {
-        throw new HTTP400('Invalid submission submission');
+      // validate the submission
+      if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
+        throw new HTTP400('Invalid submission');
       }
 
       // insert the submission record
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(id);
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
+        submission.id,
+        submission.name,
+        submission.description
+      );
 
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(response.submission_id, submission.features);
+      await submissionService.insertSubmissionFeatureRecords(response.submission_id, submissionFeatures);
+
+      // Index the submission feature record properties
+      await searchIndexService.indexFeaturesBySubmissionId(response.submission_id);
 
       await connection.commit();
+
       res.status(200).json(response);
     } catch (error) {
       defaultLog.error({ label: 'submissionIntake', message: 'error', error });
