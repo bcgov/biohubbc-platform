@@ -13,12 +13,13 @@ import YesNoDialog from 'components/dialog/YesNoDialog';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SYSTEM_ROLE } from 'constants/roles';
-import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
+import { ISnackbarProps } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { downloadFile, getFormattedDate, getFormattedFileSize, pluralize as p } from 'utils/Utils';
 import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
@@ -69,7 +70,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
 
   const keycloakWrapper = useKeycloakWrapper();
   const biohubApi = useApi();
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();

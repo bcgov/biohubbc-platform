@@ -7,17 +7,19 @@ import { useParams } from 'react-router';
 
 export interface ISubmissionContext {
   /**
-   * The Data Loader used to load submission data
+   * The Data Loader used to load submission data.
    *
    * @type {DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>}
    * @memberof ISubmissionContext
    */
   submissionDataLoader: DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>;
-
-  submissionFeatureRulesDataLoader: DataLoader<[features: number[]], any[], unknown>;
-
+  /**
+   * The Data Loader used to load security rules data.
+   *
+   * @type {DataLoader<[], ISecurityRule[], unknown>}
+   * @memberof ISubmissionContext
+   */
   securityRulesDataLoader: DataLoader<[], ISecurityRule[], unknown>;
-
   /**
    * The submission id.
    *
@@ -30,11 +32,10 @@ export interface ISubmissionContext {
 export const SubmissionContext = React.createContext<ISubmissionContext | undefined>(undefined);
 
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
-  const biohubApi = useApi();
+  const api = useApi();
 
-  const submissionDataLoader = useDataLoader(biohubApi.submissions.getSubmission);
-  const submissionFeatureRulesDataLoader = useDataLoader(biohubApi.security.getSecurityRulesForSubmissions);
-  const securityRulesDataLoader = useDataLoader(biohubApi.security.getActiveSecurityRules);
+  const submissionDataLoader = useDataLoader(api.submissions.getSubmission);
+  const securityRulesDataLoader = useDataLoader(api.security.getActiveSecurityRules);
 
   const urlParams = useParams();
 
@@ -63,11 +64,10 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   const submissionContext: ISubmissionContext = useMemo(() => {
     return {
       submissionDataLoader,
-      submissionFeatureRulesDataLoader,
       securityRulesDataLoader,
       submissionId
     };
-  }, [submissionDataLoader, submissionId]);
+  }, [securityRulesDataLoader, submissionDataLoader, submissionId]);
 
   return <SubmissionContext.Provider value={submissionContext}>{props.children}</SubmissionContext.Provider>;
 };

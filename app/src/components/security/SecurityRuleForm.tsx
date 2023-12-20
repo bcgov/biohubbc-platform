@@ -4,37 +4,53 @@ import { Alert, AlertTitle, Collapse, ListItem, Stack, Typography } from '@mui/m
 import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import { SubmissionContext } from 'contexts/submissionContext';
 import { useFormikContext } from 'formik';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
-import { useContext, useEffect, useState } from 'react';
+import { useApi } from 'hooks/useApi';
+import { useSubmissionContext } from 'hooks/useContext';
+import useDataLoader from 'hooks/useDataLoader';
+import { useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
 import { alphabetizeObjects } from 'utils/Utils';
-import { ISecurityRuleFormProps } from './SecuritiesDialog';
+import yup from 'utils/YupSchema';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 
-const SecurityRuleForm = () => {
-  const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormProps>();
+export interface ISecurityRuleFormProps {
+  features: number[];
+}
+
+export interface ISecurityRuleFormikProps {
+  rules: ISecurityRule[];
+}
+
+export const SecurityRuleFormYupSchema = yup.object().shape({
+  rules: yup.array(yup.object()).min(1)
+});
+
+const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
+  const api = useApi();
+  const submissionContext = useSubmissionContext();
+
+  const { handleSubmit, errors, values, setFieldValue } = useFormikContext<ISecurityRuleFormikProps>();
   const [searchText, setSearchText] = useState('');
-  const [showSecuredBanner, setShowSecuredBanner] = useState(false);
 
-  const submissionContext = useContext(SubmissionContext);
-  submissionContext?.securityRulesDataLoader.load();
+  const securityRules = submissionContext.securityRulesDataLoader.data || [];
 
-  const rules = submissionContext?.securityRulesDataLoader.data || [];
+  const submissionFeatureRulesDataLoader = useDataLoader(api.security.getSecurityRulesForSubmissions);
+  submissionFeatureRulesDataLoader.load(props.features);
+
+  const showSecuredBanner = Boolean(submissionFeatureRulesDataLoader.data?.length);
+
   const handleAdd = (selected: ISecurityRule) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
   };
+
   const handleRemove = (idToRemove: number) => {
     const formData = values.rules;
     const filteredData = formData.filter((item) => item.security_rule_id !== idToRemove);
     setFieldValue('rules', filteredData);
   };
-
-  useEffect(() => {
-    setShowSecuredBanner(Boolean(submissionContext?.submissionFeatureRulesDataLoader.data?.length));
-  }, [submissionContext?.submissionFeatureRulesDataLoader.isLoading]);
 
   return (
     <form onSubmit={handleSubmit}>
@@ -69,11 +85,13 @@ const SecurityRuleForm = () => {
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
-            loading={submissionContext?.securityRulesDataLoader.isLoading}
+            loading={submissionContext.securityRulesDataLoader.isLoading}
             noOptionsText="No records found"
-            options={alphabetizeObjects(rules, 'name')}
+            options={alphabetizeObjects(securityRules, 'name')}
             filterOptions={(options, state) => {
-              const searchFilter = createFilterOptions<ISecurityRule>({ ignoreCase: true });
+              const searchFilter = createFilterOptions<ISecurityRule>({
+                ignoreCase: true
+              });
               const unselectedOptions = options.filter(
                 (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
               );

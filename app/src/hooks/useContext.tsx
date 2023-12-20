@@ -1,4 +1,5 @@
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
+import { DialogContext, IDialogContext } from 'contexts/dialogContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
 
@@ -30,6 +31,18 @@ export const useCodesContext = (): ICodesContext => {
   if (!context) {
     throw Error(
       'CodesContext is undefined, please verify you are calling useCodesContext() as child of an <CodesContextProvider> component.'
+    );
+  }
+
+  return context;
+};
+
+export const useDialogContext = (): IDialogContext => {
+  const context = useContext(DialogContext);
+
+  if (!context) {
+    throw Error(
+      'DialogContext2 is undefined, please verify you are calling useDialogContext() as child of an <DialogContextProvider2> component.'
     );
   }
 

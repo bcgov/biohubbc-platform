@@ -17,13 +17,14 @@ import { makeStyles } from '@mui/styles';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { AddSystemUserI18N, DeleteSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
-import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
+import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
 import { IGetUserResponse } from 'interfaces/useUserApi.interface';
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
@@ -68,7 +69,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
 
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [page, setPage] = useState(0);
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
 
