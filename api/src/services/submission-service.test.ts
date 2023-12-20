@@ -83,7 +83,8 @@ describe('SubmissionService', () => {
         {
           id: '1',
           type: 'string',
-          properties: {}
+          properties: {},
+          features: []
         }
       ]);
 

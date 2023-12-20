@@ -51,8 +51,8 @@ describe('intake', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const validateDatasetSubmissionStub = sinon
-        .stub(ValidationService.prototype, 'validateDatasetSubmission')
+      const validateSubmissionFeaturesStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeatures')
         .resolves(false);
 
       const requestHandler = intake.submissionIntake();
@@ -71,7 +71,7 @@ describe('intake', () => {
 
         expect.fail();
       } catch (error) {
-        expect(validateDatasetSubmissionStub).to.have.been.calledOnce;
+        expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
         expect((error as HTTPError).status).to.equal(400);
         expect((error as HTTPError).message).to.equal('Invalid submission submission');
       }
@@ -83,8 +83,8 @@ describe('intake', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
       sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
 
-      const validateDatasetSubmissionStub = sinon
-        .stub(ValidationService.prototype, 'validateDatasetSubmission')
+      const validateSubmissionFeaturesStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeatures')
         .resolves(true);
 
       const insertSubmissionRecordWithPotentialConflictStub = sinon
@@ -108,7 +108,7 @@ describe('intake', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(validateDatasetSubmissionStub).to.have.been.calledOnce;
+      expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
       expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnce;
       expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
