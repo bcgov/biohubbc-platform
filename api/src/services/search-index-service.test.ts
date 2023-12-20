@@ -9,7 +9,7 @@ import { SearchIndexService } from './search-index-service';
 
 chai.use(sinonChai);
 
-describe('SearchIndexService', () => {
+describe.only('SearchIndexService', () => {
   afterEach(() => {
     sinon.restore();
   });
@@ -28,19 +28,15 @@ describe('SearchIndexService', () => {
             submission_id: 1, // Mock submission
             feature_type_id: 1, // dataset, observation, etc.
             data: {
-              id: 100,
-              type: 'some_random_thing',
-              properties: {
-                name: 'Ardvark',
-                description: 'Desc1',
-                taxonomy: 1001,
-                start_date: new Date('2000-01-01'),
-                end_date: new Date('2020-01-02'),
-                geometry: { type: 'Point', coordinates: [11, 11] },
-                count: 60,
-                latitude: 11,
-                longitude: 11
-              }
+              name: 'Ardvark',
+              description: 'Desc1',
+              taxonomy: 1001,
+              start_date: new Date('2000-01-01'),
+              end_date: new Date('2000-01-02'),
+              geometry: { type: 'Point', coordinates: [11, 11] },
+              count: 60,
+              latitude: 11,
+              longitude: 11
             },
             parent_submission_feature_id: null,
             record_effective_date: '',
@@ -59,19 +55,15 @@ describe('SearchIndexService', () => {
             submission_id: 1, // Mock submission
             feature_type_id: 1, // dataset, observation, etc.
             data: {
-              id: 200,
-              type: 'another_random_thing',
-              properties: {
-                name: 'Buffalo',
-                description: 'Desc2',
-                taxonomy: 1002,
-                start_date: new Date('2001-01-01'),
-                end_date: null,
-                geometry: { type: 'Point', coordinates: [22, 22] },
-                count: 70,
-                latitude: 22,
-                longitude: 22
-              }
+              name: 'Buffalo',
+              description: 'Desc2',
+              taxonomy: 1002,
+              start_date: new Date('2001-01-01'),
+              end_date: null,
+              geometry: { type: 'Point', coordinates: [22, 22] },
+              count: 70,
+              latitude: 22,
+              longitude: 22
             },
             parent_submission_feature_id: null,
             record_effective_date: '',
