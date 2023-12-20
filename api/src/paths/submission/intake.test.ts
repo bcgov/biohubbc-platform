@@ -73,7 +73,7 @@ describe('intake', () => {
       } catch (error) {
         expect(validateSubmissionFeaturesStub).to.have.been.calledOnce;
         expect((error as HTTPError).status).to.equal(400);
-        expect((error as HTTPError).message).to.equal('Invalid submission submission');
+        expect((error as HTTPError).message).to.equal('Invalid submission');
       }
     });
 
