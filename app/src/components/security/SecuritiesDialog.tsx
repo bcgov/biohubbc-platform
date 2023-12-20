@@ -4,8 +4,8 @@ import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
-import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 import useDataLoader from 'hooks/useDataLoader';
+import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
   features: number[];
@@ -24,19 +24,23 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const securityRules = submissionContext.securityRulesDataLoader.data || [];
 
   const initialAppliedSecurityRules: ISecurityRule[] = !submissionFeatureRulesDataLoader.data?.length
-  ? []
-  : securityRules.filter((securityRule) => {
-      return submissionFeatureRulesDataLoader.data?.some((securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id)
-  });
+    ? []
+    : securityRules.filter((securityRule) => {
+        return submissionFeatureRulesDataLoader.data?.some(
+          (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
+        );
+      });
 
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
-      await api.submissions.applySubmissionFeatureRules(
-        props.features,
-        rules.map((item) => item.security_rule_id)
-      ).then(() => {
-        submissionFeatureRulesDataLoader.refresh(props.features)
-      })
+      await api.submissions
+        .applySubmissionFeatureRules(
+          props.features,
+          rules.map((item) => item.security_rule_id)
+        )
+        .then(() => {
+          submissionFeatureRulesDataLoader.refresh(props.features);
+        });
 
       dialogContext.setSnackbar({
         snackbarMessage: (
