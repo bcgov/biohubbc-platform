@@ -1,10 +1,11 @@
 import { AxiosInstance } from 'axios';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import {
-  IGetSubmissionResponse,
+  IGetSubmissionFeatureResponse,
   IListSubmissionsResponse,
   ISubmission,
-  SubmissionRecordWithRootFeature
+  SubmissionRecordWithRootFeature,
+  SubmissionRecordWithSecurity
 } from 'interfaces/useSubmissionsApi.interface';
 
 /**
@@ -77,12 +78,24 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch submission data by submission id.
+   * Fetch submission features
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<IGetSubmissionResponse>}
+   * @return {*}  {Promise<IGetSubmissionFeatureResponse>}
    */
-  const getSubmission = async (submissionId: number): Promise<IGetSubmissionResponse> => {
+  const getSubmissionFeatures = async (submissionId: number): Promise<IGetSubmissionFeatureResponse[]> => {
+    const { data } = await axios.get(`api/submission/${submissionId}/features`);
+
+    return data;
+  };
+
+  /**
+   * Fetch submission record with security data by submission id.
+   *
+   * @param {number} submissionId
+   * @return {*}
+   */
+  const getSubmissionRecordWithSecurity = async (submissionId: number): Promise<SubmissionRecordWithSecurity> => {
     const { data } = await axios.get(`api/submission/${submissionId}`);
 
     return data;
@@ -139,7 +152,8 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getSignedUrl,
     listReviewedSubmissions,
     getSubmissionDownloadPackage,
-    getSubmission,
+    getSubmissionFeatures,
+    getSubmissionRecordWithSecurity,
     applySubmissionFeatureRules,
     getSubmissionFeatureRules,
     getUnreviewedSubmissions,

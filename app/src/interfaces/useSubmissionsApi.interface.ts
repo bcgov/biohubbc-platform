@@ -27,6 +27,7 @@ export type SubmissionRecord = {
   source_system: string;
   name: string;
   description: string;
+  publish_timestamp: string | null;
   create_date: string;
   create_user: number;
   update_date: string | null;
@@ -76,11 +77,8 @@ export type SubmissionFeatureRecordWithTypeAndSecurity = {
   feature_type_display_name: string;
   submission_feature_security_ids: number[];
 };
-export interface IGetSubmissionResponse {
-  submission: SubmissionRecordWithSecurity;
-  submissionFeatures: {
-    feature_type_name: string;
-    feature_type_display_name: string;
-    features: SubmissionFeatureRecordWithTypeAndSecurity[];
-  }[];
+export interface IGetSubmissionFeatureResponse {
+  feature_type_name: string;
+  feature_type_display_name: string;
+  features: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
