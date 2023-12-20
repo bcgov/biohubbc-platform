@@ -49,11 +49,18 @@ PATCH.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          description: 'Patch operations to perform on the submission record. At least one operation must be provided.',
+          anyOf: [{ required: ['security_reviewed'] }, { required: ['published'] }],
           properties: {
             security_reviewed: {
               type: 'boolean',
               description:
                 'Set or unset the security_review_timestamp of the record, indicating whether or not the submission record has completed security review.'
+            },
+            published: {
+              type: 'boolean',
+              description:
+                'Set or unset the publish_timestamp of the record, indicating whether or not the submission record has been published for public consumption.'
             }
           }
         }
