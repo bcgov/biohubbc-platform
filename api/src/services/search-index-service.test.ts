@@ -35,6 +35,7 @@ describe('SearchIndexService', () => {
                 description: 'Desc1',
                 taxonomy: 1001,
                 start_date: new Date('2000-01-01'),
+                end_date: new Date('2020-01-02'),
                 geometry: { type: 'Point', coordinates: [11, 11] },
                 count: 60,
                 latitude: 11,
@@ -65,6 +66,7 @@ describe('SearchIndexService', () => {
                 description: 'Desc2',
                 taxonomy: 1002,
                 start_date: new Date('2001-01-01'),
+                end_date: null,
                 geometry: { type: 'Point', coordinates: [22, 22] },
                 count: 70,
                 latitude: 22,
@@ -309,6 +311,11 @@ describe('SearchIndexService', () => {
           submission_feature_id: 11111,
           feature_property_id: 5, // Start Date
           value: new Date('2000-01-01')
+        },
+        {
+          submission_feature_id: 11111,
+          feature_property_id: 6, // End Date
+          value: new Date('2000-01-02')
         },
         {
           submission_feature_id: 22222,
