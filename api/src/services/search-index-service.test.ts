@@ -9,7 +9,7 @@ import { SearchIndexService } from './search-index-service';
 
 chai.use(sinonChai);
 
-describe.only('SearchIndexService', () => {
+describe('SearchIndexService', () => {
   afterEach(() => {
     sinon.restore();
   });
