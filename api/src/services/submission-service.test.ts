@@ -15,8 +15,8 @@ import {
   ISubmissionObservationRecord,
   PatchSubmissionRecord,
   SubmissionRecord,
+  SubmissionRecordWithSecurity,
   SubmissionRepository,
-  SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
@@ -772,6 +772,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -788,6 +789,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -824,6 +826,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -840,6 +843,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -878,6 +882,7 @@ describe('SubmissionService', () => {
         source_system: 'string',
         name: 'string',
         description: null,
+        publish_timestamp: '2023-12-12',
         create_date: 'string',
         create_user: 1,
         update_date: null,
@@ -899,7 +904,7 @@ describe('SubmissionService', () => {
 
   describe('getReviewedSubmissionsWithSecurity', () => {
     it('should return an array of submission records with security property', async () => {
-      const mockSubmissionRecords: SubmissionWithSecurityRecord[] = [
+      const mockSubmissionRecords: SubmissionRecordWithSecurity[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -909,6 +914,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -924,6 +930,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -939,6 +946,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -1031,6 +1039,7 @@ describe('SubmissionService', () => {
         source_system: 'SIMS',
         name: 'name',
         description: 'description',
+        publish_timestamp: '2023-12-12',
         create_date: '2023-12-12',
         create_user: 1,
         update_date: null,

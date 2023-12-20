@@ -12,8 +12,8 @@ import {
   ISpatialComponentCount,
   PatchSubmissionRecord,
   SubmissionRecord,
+  SubmissionRecordWithSecurity,
   SubmissionRepository,
-  SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from './submission-repository';
@@ -914,6 +914,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -928,6 +929,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -963,6 +965,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -977,6 +980,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -1003,7 +1007,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockSubmissionRecords: SubmissionWithSecurityRecord[] = [
+      const mockSubmissionRecords: SubmissionRecordWithSecurity[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -1013,6 +1017,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -1029,6 +1034,8 @@ describe('SubmissionRepository', () => {
           name: 'name',
           description: 'description',
           create_date: '2023-12-12',
+          publish_timestamp: '2023-12-12',
+
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
@@ -1044,6 +1051,7 @@ describe('SubmissionRepository', () => {
           name: 'name',
           description: 'description',
           create_date: '2023-12-12',
+          publish_timestamp: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
@@ -1171,6 +1179,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -1205,6 +1214,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
