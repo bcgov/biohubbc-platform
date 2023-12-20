@@ -4,10 +4,10 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
-import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { getFormattedIdentitySource } from 'utils/Utils';
+import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { useMemo } from 'react';
+import { getFormattedIdentitySource } from 'utils/Utils';
 
 // Authenticated view
 export const LoggedInUser = () => {
@@ -76,7 +76,7 @@ export const LoggedInUser = () => {
 
 // Unauthenticated public view
 export const PublicViewUser = () => {
-  const { keycloakWrapper } = useAuthStateContext()
+  const { keycloakWrapper } = useAuthStateContext();
   const loginUrl = useMemo(() => keycloakWrapper?.getLoginUrl(), [keycloakWrapper]);
 
   return (

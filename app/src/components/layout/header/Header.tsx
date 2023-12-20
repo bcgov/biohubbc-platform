@@ -7,16 +7,16 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import Toolbar from '@mui/material/Toolbar';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import headerImageLarge from 'assets/images/gov-bc-logo-horiz.png';
 import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
 import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'components/security/Guards';
 import { SYSTEM_ROLE } from 'constants/roles';
-import { Link as RouterLink } from 'react-router-dom';
 import { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { LoggedInUser, PublicViewUser } from './UserControls';
 
 const Header: React.FC<React.PropsWithChildren> = () => {
@@ -89,7 +89,6 @@ const Header: React.FC<React.PropsWithChildren> = () => {
       </Box>
     );
   };
-
 
   return (
     <>

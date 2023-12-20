@@ -1,5 +1,6 @@
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { IConfig } from 'contexts/configContext';
+import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
   downloadFile,
@@ -18,7 +19,6 @@ import {
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
-import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 
 describe('ensureProtocol', () => {
   it('upgrades the URL if string begins with `http://`', async () => {

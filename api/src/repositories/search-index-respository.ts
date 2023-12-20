@@ -1,12 +1,12 @@
+import { Feature } from 'geojson';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
-import { BaseRepository } from './base-repository';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
-import { Feature } from 'geojson';
+import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/search-index-repository');
 
@@ -51,9 +51,9 @@ const SearchableRecord = z.object({
 export type SearchableRecord = z.infer<typeof SearchableRecord>;
 
 const InsertSearchableRecordKeys = {
-  'submission_feature_id': true,
-  'feature_property_id': true,
-  'value': true
+  submission_feature_id: true,
+  feature_property_id: true,
+  value: true
 } as const;
 
 /**
@@ -82,7 +82,7 @@ export const StringSearchableRecord = SearchableRecord.extend({
 
 /**
  * Represents a record in the spatial search table.
- * 
+ *
  * Because values from a type `geometry` column are not useful, we elect to never
  * return them (`z.never()`).
  */
@@ -94,10 +94,9 @@ export const SpatialSearchableRecord = SearchableRecord.extend({
 export const InsertDatetimeSearchableRecord = DatetimeSearchableRecord.pick(InsertSearchableRecordKeys);
 export const InsertNumberSearchableRecord = NumberSearchableRecord.pick(InsertSearchableRecordKeys);
 export const InsertStringSearchableRecord = StringSearchableRecord.pick(InsertSearchableRecordKeys);
-export const InsertSpatialSearchableRecord = SpatialSearchableRecord.pick(InsertSearchableRecordKeys)
-  .extend({
-    value: GeoJSONFeatureCollectionZodSchema
-  });
+export const InsertSpatialSearchableRecord = SpatialSearchableRecord.pick(InsertSearchableRecordKeys).extend({
+  value: GeoJSONFeatureCollectionZodSchema
+});
 
 export type DatetimeSearchableRecord = z.infer<typeof DatetimeSearchableRecord>;
 export type NumberSearchableRecord = z.infer<typeof NumberSearchableRecord>;
@@ -189,18 +188,14 @@ export class SearchIndexRepository extends BaseRepository {
     `;
 
     spatialRecords.forEach((spatialRecord, index) => {
-      const {
-        submission_feature_id,
-        feature_property_id,
-        value
-      } = spatialRecord;
+      const { submission_feature_id, feature_property_id, value } = spatialRecord;
 
       query.append(SQL`(
         ${submission_feature_id},
         ${feature_property_id},`);
       query.append(generateGeometryCollectionSQL(value.features as Feature[]));
       query.append(SQL`)`);
-      
+
       if (index < spatialRecords.length - 1) {
         query.append(SQL`,`);
       }
