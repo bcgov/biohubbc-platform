@@ -9,6 +9,7 @@ import {
   getFormattedDate,
   getFormattedDateRangeString,
   getFormattedFileSize,
+  getFormattedIdentitySource,
   getLogOutUrl,
   isObject,
   jsonParseObjectProperties,
@@ -17,6 +18,7 @@ import {
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
+import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 
 describe('ensureProtocol', () => {
   it('upgrades the URL if string begins with `http://`', async () => {
@@ -438,5 +440,43 @@ describe('pluralize', () => {
   it('does not pluralize a word with a custom suffix and single quantity', () => {
     const response = pluralize(1, 'berr', 'y', 'ies');
     expect(response).toEqual('berry');
+  });
+});
+
+describe('getFormattedIdentitySource', () => {
+  it('returns BCeID Basic', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.BCEID_BASIC);
+
+    expect(result).toEqual('BCeID Basic');
+  });
+
+  it('returns BCeID Business', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS);
+
+    expect(result).toEqual('BCeID Business');
+  });
+
+  it('returns IDIR', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.IDIR);
+
+    expect(result).toEqual('IDIR');
+  });
+
+  it('returns IDIR', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.DATABASE);
+
+    expect(result).toEqual('System');
+  });
+
+  it('returns null for unknown identity source', () => {
+    const result = getFormattedIdentitySource('__default_test_string' as SYSTEM_IDENTITY_SOURCE);
+
+    expect(result).toEqual(null);
+  });
+
+  it('returns null for null identity source', () => {
+    const result = getFormattedIdentitySource(null as unknown as SYSTEM_IDENTITY_SOURCE);
+
+    expect(result).toEqual(null);
   });
 });
