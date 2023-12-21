@@ -1,5 +1,5 @@
-import { SystemRoleGuard } from 'components/security/Guards';
-import { AuthenticatedRouteGuard } from 'components/security/RouteGuards';
+import { SystemRoleGuard } from 'guards/Guards';
+import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import { SYSTEM_ROLE } from 'constants/roles';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';

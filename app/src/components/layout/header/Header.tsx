@@ -13,7 +13,7 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import headerImageLarge from 'assets/images/gov-bc-logo-horiz.png';
 import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
-import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'components/security/Guards';
+import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'guards/Guards';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
