@@ -6,7 +6,7 @@ import { useDialogContext } from 'hooks/useContext';
 
 interface IUnsecureDialogProps {
   features: number[];
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 }
 const UnsecureDialog = (props: IUnsecureDialogProps) => {
@@ -15,7 +15,7 @@ const UnsecureDialog = (props: IUnsecureDialogProps) => {
 
   const handleRemove = async () => {
     try {
-      await api.submissions.applySubmissionFeatureRules(props.features, [], true);
+      await api.security.removeSecurityRulesFromSubmissionFeatures(props.features);
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
@@ -43,7 +43,7 @@ const UnsecureDialog = (props: IUnsecureDialogProps) => {
 
   return (
     <YesNoDialog
-      open={props.isOpen}
+      open={props.open}
       onYes={() => handleRemove()}
       onNo={props.onClose}
       onClose={() => {}}

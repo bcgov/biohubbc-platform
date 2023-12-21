@@ -30,7 +30,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
     <>
       <SecuritiesDialog
         features={props.features}
-        isOpen={isSecuritiesDialogOpen}
+        open={isSecuritiesDialogOpen}
         onClose={() => {
           props.onClose();
           setIsSecuritiesDialogOpen(false);
@@ -39,7 +39,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
       />
       <UnsecureDialog
         features={props.features}
-        isOpen={isUnsecureDialogOpen}
+        open={isUnsecureDialogOpen}
         onClose={() => {
           props.onClose();
           setIsUnsecuredDialogOpen(false);

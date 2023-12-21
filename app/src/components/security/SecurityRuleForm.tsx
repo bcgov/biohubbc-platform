@@ -23,17 +23,19 @@ export interface ISecurityRuleFormikProps {
 }
 
 export const SecurityRuleFormYupSchema = yup.object().shape({
-  rules: yup.array(yup.object()).min(1)
+  rules: yup.array(yup.object())
 });
 
 const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
-  const { handleSubmit, errors, values, setFieldValue, initialValues } = useFormikContext<ISecurityRuleFormikProps>();
+  const { handleSubmit, values, setFieldValue } = useFormikContext<ISecurityRuleFormikProps>();
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
-  const securityRules = submissionContext.securityRulesDataLoader.data || [];
 
-  const hasOneOrMoreRulesPreviouslyApplied = Boolean(initialValues.rules.length);
+  // List of all potential security rules
+  const securityRules = submissionContext.allSecurityRulesStaticListDataLoader.data || [];
+
+  const hasNoSecuritySelected = !values.rules.length;
 
   const handleAdd = (selected: ISecurityRuleAndCategory) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
@@ -56,29 +58,13 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
           }}>
           Specify reasons why this information should be secured.
         </Typography>
-        {hasOneOrMoreRulesPreviouslyApplied && (
-          <Box mt={3}>
-            <Alert severity="info" variant="standard">
-              <AlertTitle>Security Applied</AlertTitle>
-              Some security rules have already been applied to this submission.
-            </Alert>
-          </Box>
-        )}
-        {errors?.['rules'] && !values.rules.length && (
-          <Box mt={3}>
-            <Alert severity="error" variant="standard">
-              <AlertTitle>No Rules Selected</AlertTitle>
-              At least one security rule needs to be selected.
-            </Alert>
-          </Box>
-        )}
         <Box mt={3}>
           <Autocomplete
             id={'autocomplete-security-rule-search'}
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
-            loading={submissionContext.securityRulesDataLoader.isLoading}
+            loading={submissionContext.allSecurityRulesStaticListDataLoader.isLoading}
             noOptionsText="No records found"
             options={alphabetizeObjects(securityRules, 'name')}
             filterOptions={(options, state) => {
@@ -155,6 +141,12 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             );
           })}
         </Stack>
+        {hasNoSecuritySelected && (
+          <Alert severity="error" sx={{ marginTop: 1 }}>
+            <AlertTitle>Open access to all records</AlertTitle>
+            All users will have unrestricted access to records that have been included in this submission.
+          </Alert>
+        )}
       </Box>
     </form>
   );
