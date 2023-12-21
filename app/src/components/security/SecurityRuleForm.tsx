@@ -31,7 +31,9 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
-  const securityRules = submissionContext.securityRulesDataLoader.data || [];
+
+  // List of all potential security rules
+  const securityRules = submissionContext.allSecurityRulesStaticListDataLoader.data || [];
 
   const hasNoSecuritySelected = !values.rules.length;
 
@@ -62,7 +64,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
-            loading={submissionContext.securityRulesDataLoader.isLoading}
+            loading={submissionContext.allSecurityRulesStaticListDataLoader.isLoading}
             noOptionsText="No records found"
             options={alphabetizeObjects(securityRules, 'name')}
             filterOptions={(options, state) => {

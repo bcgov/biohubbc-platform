@@ -107,25 +107,51 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return 1;
   };
 
-  const applySecurityRulesToSubmissions = async (features: number[], rules: number[]): Promise<any[]> => {
+  /**
+   * Applies all of the given security rule IDs to all of the given submission feature IDs. If the
+   * `override` parameter is supplied as `true`, then all rules for these submission features will
+   * be replaced with the incoming set. Otherwise, the union of the existing rules and supplied
+   * rules will be applied to these features (deafult behaviour).
+   *
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} ruleIds
+   * @return {*}  {Promise<any[]>}
+   */
+  const applySecurityRulesToSubmissionFeatures = async (submissionFeatureIds: number[], ruleIds: number[], override = false): Promise<any[]> => {
     const { data } = await axios.post('api/administrative/security/apply', {
-      features,
-      rules
+      override,
+      features: submissionFeatureIds,
+      rules: ruleIds
     });
+
     return data;
   };
 
-  const removeSecurityRulesToSubmissions = async (features: number[]): Promise<any[]> => {
+  /**
+   * Removes all of the security rules for the given submission feature IDs, rendering them unsecure.
+   *
+   * @param {number[]} submissionFeatureIds
+   * @return {*}  {Promise<any[]>}
+   */
+  const removeSecurityRulesToSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
     const { data } = await axios.post('api/administrative/security/remove', {
-      features
+      features: submissionFeatureIds
     });
+
     return data;
   };
 
-  const getSecurityRulesForSubmissions = async (features: number[]): Promise<ISubmissionFeatureSecurityRecord[]> => {
+  /**
+   * Retrieves the list of all security rule IDs associated with the list of given submission feature IDs
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
+   */
+  const getSecurityRulesForSubmissionFeatures = async (features: number[]): Promise<ISubmissionFeatureSecurityRecord[]> => {
     const { data } = await axios.post('api/administrative/security/fetch', {
       features
     });
+
     return data;
   };
 
@@ -135,9 +161,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
     applySecurityReasonsToArtifacts,
     getActiveSecurityRules,
     addSecurityRule,
-    applySecurityRulesToSubmissions,
-    removeSecurityRulesToSubmissions,
-    getSecurityRulesForSubmissions,
+    applySecurityRulesToSubmissionFeatures,
+    removeSecurityRulesToSubmissionFeatures,
+    getSecurityRulesForSubmissionFeatures,
     getActiveSecurityRulesAndCategories
   };
 };

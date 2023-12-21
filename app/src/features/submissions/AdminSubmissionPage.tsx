@@ -4,6 +4,7 @@ import Stack from '@mui/material/Stack';
 import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
 import { useSubmissionContext } from 'hooks/useContext';
 import SubmissionDataGrid from './components/SubmissionDataGrid';
+import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
 
 /**
  * AdminSubmissionPage component for reviewing submissions.
@@ -13,31 +14,26 @@ import SubmissionDataGrid from './components/SubmissionDataGrid';
 const AdminSubmissionPage = () => {
   const submissionContext = useSubmissionContext();
 
-  const submissionFeaturesDataLoader = submissionContext.submissionFeaturesDataLoader;
-  const submissionFeatures = submissionFeaturesDataLoader.data || [];
+  const { submissionFeatureGroupsDataLoader } = submissionContext;
+  const submissionFeatureGroups = submissionFeatureGroupsDataLoader.data || [];
 
-  // so this will need to change.
-  const getAllSubmissionFeatureIds = (): number[] => {
-    const ids = [];
-    for (const key in submissionFeatures) {
-      ids.push(submissionFeatures[key].features);
-    }
-
-    return ids.flat().map((item) => item.submission_feature_id);
-  };
+  const allSubmissionFeatureIds = submissionFeatureGroups
+      .reduce((acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
+        return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
+      }, []);
 
   return (
     <>
-      <SubmissionHeader selectedFeatures={getAllSubmissionFeatureIds()} />
+      <SubmissionHeader selectedFeatures={allSubmissionFeatureIds} />
       <Container maxWidth="xl">
         <Stack gap={3} sx={{ py: 4 }}>
-          {submissionFeatures.map((submissionFeature) => {
+          {submissionFeatureGroups.map((submissionFeatureGroup) => {
             return (
-              <Box key={submissionFeature.feature_type_name}>
+              <Box key={submissionFeatureGroup.feature_type_name}>
                 <SubmissionDataGrid
-                  feature_type_display_name={submissionFeature.feature_type_display_name}
-                  feature_type_name={submissionFeature.feature_type_name}
-                  submissionFeatures={submissionFeature.features || []}
+                  feature_type_display_name={submissionFeatureGroup.feature_type_display_name}
+                  feature_type_name={submissionFeatureGroup.feature_type_name}
+                  submissionFeatures={submissionFeatureGroup.features || []}
                 />
               </Box>
             );
