@@ -8,11 +8,8 @@ interface ISecurityRuleCardProps {
 const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
   return (
     <Box>
-      <Typography
-        variant="body2"
-        color="textSecondary"
-      >
-        {props.category}Persection and Harm
+      <Typography variant="body2" color="textSecondary">
+        {props.category}
       </Typography>
       <Typography
         variant="body1"
