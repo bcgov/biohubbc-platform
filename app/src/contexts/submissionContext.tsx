@@ -1,7 +1,7 @@
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { IGetSubmissionResponse } from 'interfaces/useSubmissionsApi.interface';
+import { IGetSubmissionFeatureResponse, SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import React, { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 
@@ -9,10 +9,17 @@ export interface ISubmissionContext {
   /**
    * The Data Loader used to load submission data.
    *
-   * @type {DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>}
+   * @type {DataLoader<[submissionId: number], SubmissionRecordWithSecurity, unknown>}
    * @memberof ISubmissionContext
    */
-  submissionDataLoader: DataLoader<[submissionId: number], IGetSubmissionResponse, unknown>;
+  submissionRecordDataLoader: DataLoader<[submissionId: number], SubmissionRecordWithSecurity, unknown>;
+  /**
+   * The Data Loader used to load submission features data.
+   *
+   * @type {DataLoader<[submissionId: number], IGetSubmissionFeatureResponse[], unknown>}
+   * @memberof ISubmissionContext
+   */
+  submissionFeaturesDataLoader: DataLoader<[submissionId: number], IGetSubmissionFeatureResponse[], unknown>;
   /**
    * The Data Loader used to load security rules data.
    *
@@ -34,8 +41,9 @@ export const SubmissionContext = React.createContext<ISubmissionContext | undefi
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const api = useApi();
 
-  const submissionDataLoader = useDataLoader(api.submissions.getSubmission);
   const securityRulesDataLoader = useDataLoader(api.security.getActiveSecurityRulesAndCategories);
+  const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
+  const submissionFeaturesDataLoader = useDataLoader(api.submissions.getSubmissionFeatures);
 
   const urlParams = useParams();
 
@@ -48,14 +56,16 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   }
 
   securityRulesDataLoader.load();
-  submissionDataLoader.load(submissionId);
+  submissionRecordDataLoader.load(submissionId);
+  submissionFeaturesDataLoader.load(submissionId);
 
   /**
    * Refreshes the current submission object whenever the current submission id changes from the currently loaded submission.
    */
   useEffect(() => {
-    if (submissionId && submissionId !== submissionDataLoader.data?.submission.submission_id) {
-      submissionDataLoader.refresh(submissionId);
+    if (submissionId && submissionId !== submissionRecordDataLoader.data?.submission_id) {
+      submissionRecordDataLoader.refresh(submissionId);
+      submissionFeaturesDataLoader.refresh(submissionId);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,11 +73,12 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
 
   const submissionContext: ISubmissionContext = useMemo(() => {
     return {
-      submissionDataLoader,
+      submissionRecordDataLoader,
+      submissionFeaturesDataLoader,
       securityRulesDataLoader,
       submissionId
     };
-  }, [securityRulesDataLoader, submissionDataLoader, submissionId]);
+  }, [submissionRecordDataLoader, securityRulesDataLoader, submissionFeaturesDataLoader, submissionId]);
 
   return <SubmissionContext.Provider value={submissionContext}>{props.children}</SubmissionContext.Provider>;
 };

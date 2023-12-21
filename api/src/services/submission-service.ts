@@ -20,8 +20,8 @@ import {
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
   SubmissionRecord,
+  SubmissionRecordWithSecurity,
   SubmissionRepository,
-  SubmissionWithSecurityRecord,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
@@ -578,47 +578,43 @@ export class SubmissionService extends DBService {
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionWithSecurityRecord>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
    * @memberof SubmissionService
    */
-  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionWithSecurityRecord> {
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
     return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
   }
 
   /**
    * Get all submissions (with security status) that have been reviewed.
    *
-   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurity[]>}
    * @memberof SubmissionService
    */
-  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionRecordWithSecurity[]> {
     return this.submissionRepository.getReviewedSubmissionsWithSecurity();
   }
 
   /**
-   * Retrieves submission data from the submission table.
+   * Retrieves submission features with type and name.
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<{
-   *     submission: SubmissionWithSecurityRecord;
-   *     submissionFeatures: {
+   * @return {*}  {Promise<
+   *     {
    *       feature_type_name: string;
    *       feature_type_display_name: string;
    *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
-   *     }[];
-   *   }>}
+   *     }[]
+   *   >}
    * @memberof SubmissionService
    */
-  async getSubmissionAndFeaturesBySubmissionId(submissionId: number): Promise<{
-    submission: SubmissionWithSecurityRecord;
-    submissionFeatures: {
+  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
+    {
       feature_type_name: string;
       feature_type_display_name: string;
       features: SubmissionFeatureRecordWithTypeAndSecurity[];
-    }[];
-  }> {
-    const submission = await this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
-
+    }[]
+  > {
     const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
     const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
@@ -641,7 +637,7 @@ export class SubmissionService extends DBService {
       features: submissionFeatures
     }));
 
-    return { submission, submissionFeatures };
+    return submissionFeatures;
   }
 
   /**
