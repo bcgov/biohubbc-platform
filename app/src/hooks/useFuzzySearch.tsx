@@ -15,11 +15,11 @@ interface IUseFuzzyOptions<T> extends IFuseOptions<T> {
  * 4. highlighting with matched indices
  *
  * @template T - object of some type
- * @param {T[] | undefined} data - dataset to fuzzy find against
- * @param {IUseFuzzyOptions<T>} options - fuse options + additional customizations
+ * @param {T[]} [data] - dataset to fuzzy find against
+ * @param {IUseFuzzyOptions<T>} [options={}] - fuse options + additional customizations
  * @returns {*}
  */
-const useFuzzySearch = <T,>(data: T[] | undefined, options: IUseFuzzyOptions<T>) => {
+const useFuzzySearch = <T,>(data?: T[], options: IUseFuzzyOptions<T> = {}) => {
   const { highlightColour, debounceDelayMs, ...customOptions } = options;
   const defaultFuzzyOptions: IFuseOptions<T> = {
     // keys to search object array for

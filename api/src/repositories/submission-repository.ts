@@ -1342,8 +1342,8 @@ export class SubmissionRepository extends BaseRepository {
         END as security
       FROM
         submission
-      LEFT
-        JOIN submission_feature
+      INNER JOIN
+        submission_feature
       ON
         submission_feature.submission_id = submission.submission_id
       LEFT JOIN
@@ -1388,7 +1388,7 @@ export class SubmissionRepository extends BaseRepository {
         END as security
       FROM 
         submission
-      LEFT JOIN 
+      INNER JOIN 
         submission_feature
       ON 
         submission_feature.submission_id = submission.submission_id

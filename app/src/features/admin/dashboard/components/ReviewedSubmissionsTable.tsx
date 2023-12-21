@@ -12,8 +12,9 @@ import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import RecordsFoundSkeletonLoader from 'components/skeleton/submission-card/RecordsFoundSkeletonLoader';
+import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/SubmissionCardSkeletonLoader';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import SubmissionCardSkeletonLoader from 'features/admin/dashboard/components/SubmissionCardSkeletonLoader';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { Link as RouterLink } from 'react-router-dom';
@@ -29,7 +30,12 @@ const ReviewedSubmissionsTable = () => {
   const submissionRecords = reviewedSubmissionsDataLoader.data || [];
 
   if (reviewedSubmissionsDataLoader.isLoading) {
-    return <SubmissionCardSkeletonLoader />;
+    return (
+      <>
+        <RecordsFoundSkeletonLoader />
+        <SubmissionCardSkeletonLoader />
+      </>
+    );
   }
 
   if (submissionRecords.length === 0) {

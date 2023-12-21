@@ -1,7 +1,7 @@
 import { Switch } from 'react-router';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
-import SubmissionsListPage from './SubmissionsListPage';
+import SubmissionsListPage from './list/SubmissionsListPage';
 
 /**
  * Router for all `/submissions/*` pages.
