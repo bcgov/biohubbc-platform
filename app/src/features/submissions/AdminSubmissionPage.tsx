@@ -13,17 +13,8 @@ import SubmissionDataGrid from './components/SubmissionDataGrid';
 const AdminSubmissionPage = () => {
   const submissionContext = useSubmissionContext();
 
-  const submissionDataLoader = submissionContext.submissionDataLoader;
-  const submissionFeatures = submissionDataLoader.data?.submissionFeatures || [];
-
-  // code for collecting individually selected items
-  // const flattenSelectedFeatures = (): number[] => {
-  //   let total: number[] = [];
-  //   for (const item in selectedFeatures) {
-  //     total = [...selectedFeatures[item], ...total];
-  //   }
-  //   return total;
-  // };
+  const submissionFeaturesDataLoader = submissionContext.submissionFeaturesDataLoader;
+  const submissionFeatures = submissionFeaturesDataLoader.data || [];
 
   // so this will need to change.
   const getAllSubmissionFeatureIds = (): number[] => {
