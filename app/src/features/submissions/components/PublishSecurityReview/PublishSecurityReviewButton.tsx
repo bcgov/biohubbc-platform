@@ -1,61 +1,63 @@
 import Button from '@mui/material/Button';
-import CompleteSecurityReviewDialog from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewDialog';
-import RemoveSecurityReviewDialog from 'features/submissions/components/PublishSecurityReview/RemoveSecurityReviewDialog';
+import PublishSecurityReviewDialog from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewDialog';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
+import UnPublishReviewDialog from './UnPublishReviewDialog';
 
 export interface IPublishSecurityReviewButtonProps {
   submission: SubmissionRecordWithSecurity;
   onComplete: () => Promise<void>;
-  onRemove: () => Promise<void>;
+  onUnpublish: () => Promise<void>;
 }
 
 const PublishSecurityReviewButton = (props: IPublishSecurityReviewButtonProps) => {
-  const [isCompleteReviewDialogOpen, setIsCompleteReviewDialogOpen] = useState(false);
-  const [isRemoveReviewDialogOpen, setIsRemoveReviewDialogOpen] = useState(false);
+  const [isCompletePublishDialogOpen, setIsCompletePublishDialogOpen] = useState(false);
+  const [isUnPublishDialogOpen, setIsUnPublishDialogOpen] = useState(false);
 
-  const { submission, onComplete, onRemove } = props;
+  const { submission, onComplete, onUnpublish } = props;
 
   return (
     <>
-      {(submission.security_review_timestamp && (
+      {(submission.publish_timestamp && (
         <>
-          <RemoveSecurityReviewDialog
-            open={isRemoveReviewDialogOpen}
+          <UnPublishReviewDialog
+            open={isUnPublishDialogOpen}
             onRemove={() => {
-              onRemove();
-              setIsRemoveReviewDialogOpen(false);
+              onUnpublish();
+              setIsUnPublishDialogOpen(false);
             }}
-            onCancel={() => setIsRemoveReviewDialogOpen(false)}
+            onCancel={() => setIsUnPublishDialogOpen(false)}
           />
           <Button
             variant="outlined"
             color="primary"
+            disabled={submission.security_review_timestamp === null}
             onClick={() => {
-              setIsRemoveReviewDialogOpen(true);
+              setIsUnPublishDialogOpen(true);
             }}
-            aria-label="Unpublish submission">
-            Unpublish
+            aria-label="Complete Review">
+            UnPublish
           </Button>
         </>
       )) || (
         <>
-          <CompleteSecurityReviewDialog
-            open={isCompleteReviewDialogOpen}
+          <PublishSecurityReviewDialog
+            open={isCompletePublishDialogOpen}
             submission={submission}
             onComplete={() => {
               onComplete();
-              setIsCompleteReviewDialogOpen(false);
+              setIsCompletePublishDialogOpen(false);
             }}
-            onCancel={() => setIsCompleteReviewDialogOpen(false)}
+            onCancel={() => setIsCompletePublishDialogOpen(false)}
           />
           <Button
             variant="contained"
             color="primary"
+            disabled={submission.security_review_timestamp === null}
             onClick={() => {
-              setIsCompleteReviewDialogOpen(true);
+              setIsCompletePublishDialogOpen(true);
             }}
-            aria-label="Publish submission">
+            aria-label="Complete Review">
             Publish
           </Button>
         </>

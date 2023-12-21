@@ -8,13 +8,13 @@ import DialogTitle from '@mui/material/DialogTitle';
 import useTheme from '@mui/material/styles/useTheme';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
-export interface IRemoveSecurityReviewDialogProps {
+export interface IUnPublishReviewDialogProps {
   open: boolean;
   onRemove: () => void;
   onCancel: () => void;
 }
 
-const RemoveSecurityReviewDialog = (props: IRemoveSecurityReviewDialogProps) => {
+const UnPublishReviewDialog = (props: IUnPublishReviewDialogProps) => {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -27,7 +27,7 @@ const RemoveSecurityReviewDialog = (props: IRemoveSecurityReviewDialogProps) => 
       open={open}
       aria-labelledby="remove-security-review-dialog-title"
       aria-describedby="remove-security-review-dialog-description">
-      <DialogTitle id="remove-security-review-dialog-title">Remove Security Review</DialogTitle>
+      <DialogTitle id="remove-security-review-dialog-title">Unpublish submission?</DialogTitle>
 
       <DialogContent>
         <DialogContentText id="remove-security-review-dialog-description">
@@ -36,7 +36,7 @@ const RemoveSecurityReviewDialog = (props: IRemoveSecurityReviewDialogProps) => 
       </DialogContent>
       <DialogActions>
         <LoadingButton onClick={async () => onRemove()} color="primary" variant="contained">
-          Reopen Review
+          Unpublish
         </LoadingButton>
         <Button onClick={() => onCancel()} color="primary" variant="outlined">
           Cancel
@@ -46,4 +46,4 @@ const RemoveSecurityReviewDialog = (props: IRemoveSecurityReviewDialogProps) => 
   );
 };
 
-export default RemoveSecurityReviewDialog;
+export default UnPublishReviewDialog;
