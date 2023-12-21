@@ -3,20 +3,16 @@ import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
 import { Router } from 'react-router-dom';
 import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
-import { render } from 'test-helpers/test-utils';
+import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
 import Header from './Header';
 
 const history = createMemoryHistory();
 
 describe('Header', () => {
-  it('renders correctly with IDIR system admin role', () => {
-    const mockHasSystemRole = jest.fn();
-
-    mockHasSystemRole.mockReturnValueOnce(true); // Return true when the `Manage Users` secure link is parsed
-
+  it('renders correctly with system admin role (IDIR)', () => {
     const authState = getMockAuthState({ base: SystemAdminAuthState });
 
-    const { getByText } = render(
+    const { getByTestId } = render(
       <AuthStateContext.Provider value={authState}>
         <Router history={history}>
           <Header />
@@ -24,15 +20,50 @@ describe('Header', () => {
       </AuthStateContext.Provider>
     );
 
-    expect(getByText('Home')).toBeVisible();
-    expect(getByText('Submissions')).toBeVisible();
-    expect(getByText('Manage Users')).toBeVisible();
+    expect(getByTestId('submissions-header-item')).toBeVisible();
+    expect(getByTestId('manage-users-header-item')).toBeVisible();
+  });
+
+  it('renders correctly with system admin role (BCeID Business)', () => {
+    const authState = getMockAuthState({
+      base: SystemAdminAuthState,
+      overrides: { biohubUserWrapper: { identitySource: SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS } }
+    });
+
+    const { getByTestId } = render(
+      <AuthStateContext.Provider value={authState}>
+        <Router history={history}>
+          <Header />
+        </Router>
+      </AuthStateContext.Provider>
+    );
+
+    expect(getByTestId('submissions-header-item')).toBeVisible();
+    expect(getByTestId('manage-users-header-item')).toBeVisible();
+  });
+
+  it('renders correctly with system admin role (BCeID Basic)', () => {
+    const authState = getMockAuthState({
+      base: SystemAdminAuthState,
+      overrides: { biohubUserWrapper: { identitySource: SYSTEM_IDENTITY_SOURCE.BCEID_BASIC } }
+    });
+
+    const { getByTestId } = render(
+      <AuthStateContext.Provider value={authState}>
+        <Router history={history}>
+          <Header />
+        </Router>
+      </AuthStateContext.Provider>
+    );
+
+    expect(getByTestId('submissions-header-item')).toBeVisible();
+    expect(getByTestId('manage-users-header-item')).toBeVisible();
   });
 
   it('renders the username and logout button', () => {
     const authState = getMockAuthState({
       base: SystemAdminAuthState,
-      overrides: { biohubUserWrapper: { identitySource: SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS } }
+      overrides: { biohubUserWrapper: { identitySource: SYSTEM_IDENTITY_SOURCE.BCEID_BASIC } }
     });
 
     const { getByTestId, getByText } = render(
@@ -45,22 +76,66 @@ describe('Header', () => {
 
     expect(getByTestId('menu_log_out')).toBeVisible();
 
-    expect(getByText('BCeID Business/testusername')).toBeVisible();
+    expect(getByText('BCeID Basic/admin-username')).toBeVisible();
   });
 
-  describe('Log Out', () => {
-    it('redirects to the `/logout` page', async () => {
-      const authState = getMockAuthState({ base: SystemUserAuthState });
+  describe('Log out', () => {
+    describe('expanded menu button', () => {
+      it('calls logout', async () => {
+        const signoutRedirectStub = jest.fn();
 
-      const { getByTestId } = render(
-        <AuthStateContext.Provider value={authState}>
-          <Router history={history}>
-            <Header />
-          </Router>
-        </AuthStateContext.Provider>
-      );
+        const authState = getMockAuthState({
+          base: SystemUserAuthState,
+          overrides: { auth: { signoutRedirect: signoutRedirectStub } }
+        });
 
-      expect(getByTestId('menu_log_out')).toHaveAttribute('href', '/logout');
+        const { getByTestId } = render(
+          <AuthStateContext.Provider value={authState}>
+            <Router history={history}>
+              <Header />
+            </Router>
+          </AuthStateContext.Provider>
+        );
+
+        const logoutButton = getByTestId('menu_log_out');
+
+        expect(logoutButton).toBeInTheDocument();
+
+        fireEvent.click(logoutButton);
+
+        await waitFor(() => {
+          expect(signoutRedirectStub).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe('collapsed menu button', () => {
+      it('calls logout', async () => {
+        const signoutRedirectStub = jest.fn();
+
+        const authState = getMockAuthState({
+          base: SystemUserAuthState,
+          overrides: { auth: { signoutRedirect: signoutRedirectStub } }
+        });
+
+        const { getByTestId } = render(
+          <AuthStateContext.Provider value={authState}>
+            <Router history={history}>
+              <Header />
+            </Router>
+          </AuthStateContext.Provider>
+        );
+
+        const logoutButton = getByTestId('collapsed_menu_log_out');
+
+        expect(logoutButton).toBeInTheDocument();
+
+        fireEvent.click(logoutButton);
+
+        await waitFor(() => {
+          expect(signoutRedirectStub).toHaveBeenCalledTimes(1);
+        });
+      });
     });
   });
 });
