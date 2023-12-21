@@ -10,7 +10,7 @@ interface ISecuritiesDialogProps {
   features: number[];
   open: boolean;
   onClose: () => void;
-  // onSubmit: () => void; // TODO needed?
+  // onSubmit: () => void; // TODO need some way to trigger a refresh of all applied security rules...
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
