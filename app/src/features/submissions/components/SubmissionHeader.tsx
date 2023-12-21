@@ -40,11 +40,23 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
     submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
+  const onSecurityReviewRemove = async () => {
+    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+      security_reviewed: false,
+      published: false
+    });
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: 'Submission Security Review Reopened'
+    });
+    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+  };
+
   const onSecurityReviewPublish = async () => {
-    // await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
-    //   security_reviewed: true,
-    //   publish: true
-    // });
+    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+      security_reviewed: true,
+      published: true
+    });
     dialogContext.setSnackbar({
       open: true,
       snackbarMessage: 'Submission Published'
@@ -52,8 +64,10 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
     submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
-  const onSecurityReviewRemove = async () => {
-    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: false });
+  const onSecurityReviewUnPublish = async () => {
+    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+      published: false
+    });
     dialogContext.setSnackbar({
       open: true,
       snackbarMessage: 'Submission Unpublished'
@@ -73,7 +87,10 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
         <Stack flexDirection="row" alignItems="center" gap={1}>
           <ManageSecurity
             features={props.selectedFeatures}
-            onClose={() => submissionRecordDataLoader.refresh(submissionContext.submissionId)}
+            onClose={() => {
+              submissionRecordDataLoader.refresh(submissionContext.submissionId);
+              submissionContext.submissionFeaturesDataLoader.refresh(submissionContext.submissionId);
+            }}
           />
 
           <CompleteSecurityReviewButton
@@ -81,8 +98,12 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
             onComplete={onSecurityReviewComplete}
             onRemove={onSecurityReviewRemove}
           />
-          <Icon path={mdiArrowRight} size={0.75} />
-          <PublishSecurityReviewButton submission={submission} onComplete={onSecurityReviewPublish} />
+          {submission.publish_timestamp == null && <Icon path={mdiArrowRight} size={0.75} />}
+          <PublishSecurityReviewButton
+            submission={submission}
+            onComplete={onSecurityReviewPublish}
+            onUnpublish={onSecurityReviewUnPublish}
+          />
         </Stack>
       }
     />

@@ -15,115 +15,53 @@ export interface ISubmissionHeaderSecurityStatusProps {
 const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusProps) => {
   const { submission } = props;
 
-  if (submission.security === SECURITY_APPLIED_STATUS.UNSECURED) {
-    return (
-      <Stack
-        flexDirection="row"
-        alignItems="center"
-        gap={1.5}
-        divider={<Divider flexItem orientation="vertical" />}
-        sx={{
-          textTransform: 'uppercase'
-        }}>
-        <Stack
-          flexDirection="row"
-          alignItems="center"
-          gap={1}
-          sx={{
-            '& svg': {
-              color: 'text.secondary'
-            }
-          }}>
+  let securityStatus = <></>;
+
+  switch (submission.security) {
+    case SECURITY_APPLIED_STATUS.UNSECURED: {
+      securityStatus = (
+        <>
           <Icon path={mdiLockOpenOutline} size={0.75} />
           <Typography component="span" variant="body2">
             Unsecured
           </Typography>
-        </Stack>
-        <Stack flexDirection="row" alignItems="center" gap={1}>
-          <Typography component="span" variant="body2" color="textSecondary">
-            Published:
-          </Typography>
-          <Typography component="span" variant="body2">
-            {getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.security_review_timestamp as string)}
-          </Typography>
-        </Stack>
-      </Stack>
-    );
-  }
-
-  if (submission.security === SECURITY_APPLIED_STATUS.SECURED) {
-    return (
-      <Stack
-        flexDirection="row"
-        alignItems="center"
-        gap={1.5}
-        divider={<Divider flexItem orientation="vertical" />}
-        sx={{
-          textTransform: 'uppercase'
-        }}>
-        <Stack
-          flexDirection="row"
-          alignItems="center"
-          gap={1}
-          sx={{
-            '& svg': {
-              color: 'text.secondary'
-            }
-          }}
-          title="All records have been secured">
+        </>
+      );
+      break;
+    }
+    case SECURITY_APPLIED_STATUS.SECURED: {
+      securityStatus = (
+        <>
           <Icon path={mdiLock} size={0.75} />
           <Typography component="span" variant="body2">
             Secured
           </Typography>
-        </Stack>
-        <Stack flexDirection="row" alignItems="center" gap={1}>
-          <Typography component="span" variant="body2" color="textSecondary">
-            Published:
-          </Typography>
-          <Typography component="span" variant="body2">
-            {getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.security_review_timestamp as string)}
-          </Typography>
-        </Stack>
-      </Stack>
-    );
-  }
-
-  if (submission.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) {
-    return (
-      <Stack
-        flexDirection="row"
-        alignItems="center"
-        gap={1.5}
-        divider={<Divider flexItem orientation="vertical" />}
-        sx={{
-          textTransform: 'uppercase'
-        }}>
-        <Stack
-          flexDirection="row"
-          alignItems="center"
-          gap={1}
-          sx={{
-            '& svg': {
-              color: 'text.secondary'
-            }
-          }}
-          title="Some records have been secured">
+        </>
+      );
+      break;
+    }
+    case SECURITY_APPLIED_STATUS.PARTIALLY_SECURED: {
+      securityStatus = (
+        <>
           <Icon path={mdiLockAlertOutline} size={0.75} />
           <Typography component="span" variant="body2">
             Partially Secured
           </Typography>
-        </Stack>
-
-        <Stack flexDirection="row" alignItems="center" gap={1}>
-          <Typography component="span" variant="body2" color="textSecondary">
-            Published:
-          </Typography>
+        </>
+      );
+      break;
+    }
+    default: {
+      securityStatus = (
+        <>
+          <Icon path={mdiClockOutline} size={0.75} />
           <Typography component="span" variant="body2">
-            {getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.security_review_timestamp as string)}
+            Pending Review
           </Typography>
-        </Stack>
-      </Stack>
-    );
+        </>
+      );
+      break;
+    }
   }
 
   return (
@@ -145,11 +83,35 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
             color: 'text.secondary'
           }
         }}>
-        <Icon path={mdiClockOutline} size={0.75} />
-        <Typography component="span" variant="body2">
-          Pending Review
-        </Typography>
+        {securityStatus}
       </Stack>
+
+      {submission.publish_timestamp ? (
+        <Stack flexDirection="row" alignItems="center" gap={1}>
+          <Typography component="span" variant="body2" color="textSecondary">
+            Published:
+          </Typography>
+          <Typography component="span" variant="body2">
+            {getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.publish_timestamp as string)}
+          </Typography>
+        </Stack>
+      ) : submission.security_review_timestamp ? (
+        <Stack flexDirection="row" alignItems="center" gap={1}>
+          <Typography component="span" variant="body2" color="textSecondary">
+            Completed Review:
+          </Typography>
+          <Typography component="span" variant="body2">
+            {getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.security_review_timestamp as string)}
+          </Typography>
+        </Stack>
+      ) : (
+        <Stack flexDirection="row" alignItems="center" gap={1}>
+          <Typography component="span" variant="body2" color="textSecondary">
+            Pending Security Review
+          </Typography>
+        </Stack>
+      )}
+
       <Stack flexDirection="row" alignItems="center" gap={1}>
         <Typography component="span" variant="body2" color="textSecondary">
           Submitted:

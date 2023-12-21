@@ -1313,7 +1313,6 @@ export class SubmissionRepository extends BaseRepository {
       SELECT
         submission.*,
         CASE
-          WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
