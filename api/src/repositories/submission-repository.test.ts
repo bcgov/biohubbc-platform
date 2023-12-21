@@ -1,4 +1,5 @@
 import chai, { expect } from 'chai';
+import { Knex } from 'knex';
 import { describe } from 'mocha';
 import { QueryResult } from 'pg';
 import sinon from 'sinon';
@@ -1165,6 +1166,138 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
+    describe('generates the correct sql for each combination of patch parameters', () => {
+      const setReviewNow = 'CASE WHEN security_review_timestamp IS NULL THEN NOW() ELSE security_review_timestamp END';
+      const setReviewNull =
+        'CASE WHEN security_review_timestamp IS NOT NULL THEN NULL ELSE security_review_timestamp END';
+      const setPublishNow = 'CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END';
+      const setPublishNull = 'CASE WHEN publish_timestamp IS NOT NULL THEN NULL ELSE publish_timestamp END';
+
+      const mockResponse = { rowCount: 1, rows: [{}] } as unknown as Promise<QueryResult<any>>;
+
+      const knexStub: sinon.SinonStub = sinon.stub().resolves(mockResponse);
+
+      const mockDBConnection = getMockDBConnection({ knex: knexStub });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      beforeEach(() => {
+        knexStub.resetHistory();
+      });
+
+      it('{ security_reviewed: true }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: true };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setReviewNow);
+      });
+
+      it('{ security_reviewed: false }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: false };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setReviewNull);
+      });
+
+      it('{ security_reviewed: true, published: undefined }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: true, published: undefined };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setReviewNow);
+      });
+
+      it('{ security_reviewed: false, published: undefined }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: false, published: undefined };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setReviewNull);
+      });
+
+      it('{ published: true }', async () => {
+        const patch: PatchSubmissionRecord = { published: true };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setPublishNow);
+      });
+
+      it('{ published: false }', async () => {
+        const patch: PatchSubmissionRecord = { published: false };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setPublishNull);
+      });
+
+      it('{ security_reviewed: undefined, published: true }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: undefined, published: true };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setPublishNow);
+      });
+
+      it('{ security_reviewed: undefined, published: false }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: undefined, published: false };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setPublishNull);
+      });
+
+      it('{ security_reviewed: true, published: true }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: true, published: true };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setReviewNow);
+        expect(sqlString).to.include(setPublishNow);
+      });
+
+      it('{ security_reviewed: false, published: false }', async () => {
+        const patch: PatchSubmissionRecord = { security_reviewed: false, published: false };
+
+        await submissionRepository.patchSubmissionRecord(1, patch);
+
+        const queryBuilder = knexStub.getCall(0).firstArg as Knex.QueryBuilder;
+        const sqlString = queryBuilder.toSQL().toNative().sql;
+
+        expect(sqlString).to.include(setReviewNull);
+        expect(sqlString).to.include(setPublishNull);
+      });
+    });
+
     describe('if the patch results in changes to the record', () => {
       it('should patch the record and return the updated record', async () => {
         const submissionId = 1;
@@ -1200,7 +1333,7 @@ describe('SubmissionRepository', () => {
       });
     });
 
-    describe('if the patch results in no changes to the recordF', () => {
+    describe('if the patch results in no changes to the record', () => {
       it('should patch the record (having no effect) and return the unchanged record', async () => {
         const submissionId = 1;
 

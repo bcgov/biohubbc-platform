@@ -30,7 +30,6 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   }
 
   const submission = submissionRecordDataLoader.data;
-  console.log('submission', submission);
 
   const onSecurityReviewComplete = async () => {
     await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: true });
