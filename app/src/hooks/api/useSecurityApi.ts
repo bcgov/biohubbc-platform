@@ -4,6 +4,7 @@ import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'inte
 export interface ISecurityRule {
   security_rule_id: number;
   name: string;
+  category: string;
   description: string;
   record_effective_date: string;
   record_end_date: string;

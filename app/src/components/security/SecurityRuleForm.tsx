@@ -130,7 +130,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
                     py: '12px !important'
                   }}
                   {...renderProps}>
-                  <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
+                  <SecurityRuleCard title={renderOption.name} category={renderOption.category} subtitle={renderOption.description} />
                 </ListItem>
               );
             }}
@@ -143,6 +143,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
                 <SecurityRuleActionCard
                   security_rule_id={rule.security_rule_id}
                   name={rule.name}
+                  category={rule.category}
                   description={rule.description}
                   remove={handleRemove}
                 />
