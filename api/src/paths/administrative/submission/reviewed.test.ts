@@ -4,6 +4,8 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
+import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
+import { SubmissionRecordWithSecurityAndRootFeatureType } from '../../../repositories/submission-repository';
 import { SubmissionService } from '../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import { getReviewedSubmissionsForAdmins } from './reviewed';
@@ -45,7 +47,7 @@ describe('getReviewedSubmissionsForAdmins', () => {
 
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-    const mockResponse = [
+    const mockResponse: SubmissionRecordWithSecurityAndRootFeatureType[] = [
       {
         submission_id: 1,
         uuid: '123-456-789',
@@ -60,8 +62,9 @@ describe('getReviewedSubmissionsForAdmins', () => {
         update_date: null,
         update_user: null,
         revision_count: 0,
-        feature_type_id: 1,
-        feature_type_name: 'dataset'
+        security: SECURITY_APPLIED_STATUS.SECURED,
+        root_feature_type_id: 1,
+        root_feature_type_name: 'dataset'
       },
       {
         submission_id: 2,
@@ -77,8 +80,9 @@ describe('getReviewedSubmissionsForAdmins', () => {
         update_date: '2023-12-12',
         update_user: 1,
         revision_count: 1,
-        feature_type_id: 1,
-        feature_type_name: 'dataset'
+        security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+        root_feature_type_id: 1,
+        root_feature_type_name: 'dataset'
       }
     ];
 

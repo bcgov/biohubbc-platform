@@ -265,12 +265,24 @@ export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
 
 export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
 
-export const SubmissionRecordWithRootFeatureType = SubmissionRecord.extend({
-  feature_type_id: z.number(),
-  feature_type_name: z.string()
+export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  root_feature_type_id: z.number(),
+  root_feature_type_name: z.string()
 });
 
-export type SubmissionRecordWithRootFeatureType = z.infer<typeof SubmissionRecordWithRootFeatureType>;
+export type SubmissionRecordWithSecurityAndRootFeatureType = z.infer<
+  typeof SubmissionRecordWithSecurityAndRootFeatureType
+>;
+
+export const SubmissionRecordPublished = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  root_feature_type_id: z.number(),
+  root_feature_type_name: z.string(),
+  root_feature_type_display_name: z.string()
+});
+
+export type SubmissionRecordPublished = z.infer<typeof SubmissionRecordPublished>;
 
 export const SubmissionMessageRecord = z.object({
   submission_message_id: z.number(),
@@ -1170,16 +1182,17 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {Promise<SubmissionRecordWithRootFeatureType[]>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithRootFeatureType[]> {
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
           DISTINCT ON (submission.uuid) submission.*,
-          submission_feature.feature_type_id,
-          feature_type.name as feature_type_name
+          submission_feature.feature_type_id as root_feature_type_id,
+          feature_type.name as root_feature_type_name,
+          ${SECURITY_APPLIED_STATUS.PENDING} as security
         FROM
           submission
         INNER JOIN
@@ -1204,7 +1217,7 @@ export class SubmissionRepository extends BaseRepository {
       ORDER BY submitted_timestamp DESC;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithRootFeatureType);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
 
     return response.rows;
   }
@@ -1212,16 +1225,22 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that have completed security review (are reviewed).
    *
-   * @return {*}  {Promise<SubmissionRecordWithRootFeatureType[]>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
-  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithRootFeatureType[]> {
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
           DISTINCT ON (submission.uuid) submission.*,
-          submission_feature.feature_type_id,
-          feature_type.name as feature_type_name
+          submission_feature.feature_type_id as root_feature_type_id,
+          feature_type.name as root_feature_type_name,
+          CASE
+            WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+            WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+            WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+            ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+          END as security
         FROM
           submission
         INNER JOIN
@@ -1232,6 +1251,10 @@ export class SubmissionRepository extends BaseRepository {
           feature_type
         ON
           feature_type.feature_type_id = submission_feature.feature_type_id
+        LEFT JOIN 
+          submission_feature_security
+        ON 
+          submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
         WHERE
           submission.security_review_timestamp IS NOT NULL
         AND
@@ -1246,7 +1269,7 @@ export class SubmissionRepository extends BaseRepository {
       ORDER BY submitted_timestamp DESC;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithRootFeatureType);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
 
     return response.rows;
   }
@@ -1347,30 +1370,53 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get all submissions that have been reviewed (with security status)
+   * Get all published submissions.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurity[]>}
+   * @return {*}  {Promise<SubmissionRecordPublished[]>}
    * @memberof SubmissionRepository
    */
-  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionRecordWithSecurity[]> {
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
     const sqlStatement = SQL`
-      SELECT s.*,
+      SELECT
+        submission.*,
+        feature_type.feature_type_id as root_feature_type_id,
+        feature_type.name as root_feature_type_name,
+        feature_type.display_name as root_feature_type_display_name,
         CASE
-          WHEN COUNT(sfs.submission_feature_security_id) = 0 THEN '${SECURITY_APPLIED_STATUS.UNSECURED}'
-          WHEN COUNT(sfs.submission_feature_security_id) = COUNT(sf.submission_feature_id) then '${SECURITY_APPLIED_STATUS.SECURED}'
-	        ELSE '${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}'
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+	      ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END as security
-      FROM submission s
-      LEFT JOIN submission_feature sf
-      ON sf.submission_id = s.submission_id
-      LEFT JOIN submission_feature_security sfs
-      ON sf.submission_feature_id = sfs.submission_feature_id
-      WHERE security_review_timestamp is not null
-      GROUP by s.submission_id
-      ORDER by s.submission_id
+      FROM 
+        submission
+      LEFT JOIN 
+        submission_feature
+      ON 
+        submission_feature.submission_id = submission.submission_id
+      LEFT JOIN
+        submission_feature_security
+      ON 
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      WHERE
+        submission_feature.parent_submission_feature_id IS NULL
+      AND
+        submission.security_review_timestamp IS NOT NULL
+      AND 
+        submission.publish_timestamp IS NOT NULL
+      GROUP BY 
+        submission.submission_id,
+        feature_type.feature_type_id,
+        feature_type.name,
+        feature_type.display_name
+      ORDER BY 
+        submission.publish_timestamp ASC;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublished);
 
     return response.rows;
   }

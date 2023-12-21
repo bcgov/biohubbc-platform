@@ -5,15 +5,15 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import useTheme from '@mui/system/useTheme';
 import { FuseResult } from 'fuse.js';
-import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
 import sortBy from 'lodash-es/sortBy';
 import { useState } from 'react';
 
 type SortBy = 'asc' | 'desc';
 
 interface ISubmissionsListSortMenuProps {
-  data: FuseResult<ISubmission>[];
-  handleSortedFuzzyData: (data: FuseResult<ISubmission>[]) => void;
+  data: FuseResult<SubmissionRecordPublished>[];
+  handleSortedFuzzyData: (data: FuseResult<SubmissionRecordPublished>[]) => void;
 }
 
 /**
@@ -44,7 +44,7 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
    * @param {keyof IDataset} sortKey - property to sort datasets by
    * @param {SortBy} [sortDirection] - ascending or descending sort
    */
-  const handleSort = (sortKey: keyof ISubmission, sortDirection: SortBy) => {
+  const handleSort = (sortKey: keyof SubmissionRecordPublished, sortDirection: SortBy) => {
     const sortedData =
       sortDirection === 'asc'
         ? sortBy(props.data, (fuzzyDataset) => fuzzyDataset.item[sortKey])
@@ -53,7 +53,7 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
     handleClose();
   };
 
-  const sortMenuItem = (sortKey: keyof ISubmission, itemName: string, sortBy: SortBy = 'asc') => {
+  const sortMenuItem = (sortKey: keyof SubmissionRecordPublished, itemName: string, sortBy: SortBy = 'asc') => {
     const label = `${itemName} ${sortBy === 'asc' ? 'ascending' : 'descending'}`;
     return (
       <MenuItem
@@ -86,8 +86,8 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
       <Menu id="sort-menu" anchorEl={anchorEl} open={open} onClose={handleClose}>
         {sortMenuItem('name', 'Title')}
         {sortMenuItem('name', 'Title', 'desc')}
-        {sortMenuItem('submission_date', 'Date')}
-        {sortMenuItem('submission_date', 'Date', 'desc')}
+        {sortMenuItem('submitted_timestamp', 'Date')}
+        {sortMenuItem('submitted_timestamp', 'Date', 'desc')}
       </Menu>
     </div>
   );

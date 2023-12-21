@@ -24,10 +24,11 @@ export type SubmissionRecord = {
   submission_id: number;
   uuid: string;
   security_review_timestamp: string | null;
+  publish_timestamp: string | null;
+  submitted_timestamp: string;
   source_system: string;
   name: string;
   description: string;
-  publish_timestamp: string | null;
   create_date: string;
   create_user: number;
   update_date: string | null;
@@ -39,19 +40,18 @@ export type SubmissionRecordWithSecurity = SubmissionRecord & {
   security: SECURITY_APPLIED_STATUS;
 };
 
-export type SubmissionRecordWithRootFeature = SubmissionRecord & {
-  feature_type_id: number;
-  feature_type_name: string;
+export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
+  security: SECURITY_APPLIED_STATUS;
+  root_feature_type_id: number;
+  root_feature_type_name: string;
 };
 
-export interface ISubmission {
-  submission_id: number;
-  submission_feature_id: number;
-  name: string;
-  description: string;
-  submission_date: Date;
+export type SubmissionRecordPublished = SubmissionRecord & {
   security: SECURITY_APPLIED_STATUS;
-}
+  root_feature_type_id: number;
+  root_feature_type_name: string;
+  root_feature_type_display_name: string;
+};
 
 export interface ISubmissionFeature {
   submission_id: number;

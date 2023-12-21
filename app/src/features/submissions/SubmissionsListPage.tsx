@@ -22,10 +22,10 @@ import useDataLoader from 'hooks/useDataLoader';
 import useDownloadJSON from 'hooks/useDownloadJSON';
 import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { ISubmission } from 'interfaces/useSubmissionsApi.interface';
+import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
 import { getFormattedDate } from 'utils/Utils';
-import DatasetSortMenu from './components/SubmissionsListSortMenu';
+import SubmissionsListSortMenu from './components/SubmissionsListSortMenu';
 
 /**
  * Renders reviewed Submissions as cards with download and request access actions
@@ -36,20 +36,20 @@ const SubmissionsListPage = () => {
   const biohubApi = useApi();
   const download = useDownloadJSON();
 
-  const submissionsLoader = useDataLoader(() => biohubApi.submissions.listReviewedSubmissions());
-  submissionsLoader.load();
+  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getPublishedSubmissions());
+  reviewedSubmissionsDataLoader.load();
 
   // this is what the page renders / mutates
   const [openRequestAccess, setOpenRequestAccess] = useState(false);
-  const { fuzzyData, handleFuzzyData, handleSearch, searchValue, highlight } = useFuzzySearch<ISubmission>(
-    submissionsLoader.data,
-    { keys: ['name', 'description'] }
-  );
+  const { fuzzyData, handleFuzzyData, handleSearch, searchValue, highlight } =
+    useFuzzySearch<SubmissionRecordPublished>(reviewedSubmissionsDataLoader.data, {
+      keys: ['name', 'description']
+    });
 
-  const handleDownload = async (dataset: FuseResult<ISubmission>) => {
+  const handleDownload = async (submission: FuseResult<SubmissionRecordPublished>) => {
     // make request here for JSON data of submission and children
     const data = await biohubApi.submissions.getSubmissionDownloadPackage();
-    download(data, `${dataset.item.name.toLowerCase().replace(/ /g, '-')}-${dataset.item.submission_feature_id}`);
+    download(data, `${submission.item.name.toLowerCase().replace(/ /g, '-')}-${submission.item.submission_id}`);
   };
 
   const handleRequestAccess = () => {
@@ -93,7 +93,7 @@ const SubmissionsListPage = () => {
                   ? `${fuzzyData.length} records found for "${searchValue}"`
                   : `${fuzzyData.length} records found`}
               </Typography>
-              <DatasetSortMenu
+              <SubmissionsListSortMenu
                 data={fuzzyData}
                 handleSortedFuzzyData={(data) => {
                   handleFuzzyData(data);
@@ -149,8 +149,8 @@ const SubmissionsListPage = () => {
                 </CardActions>
               </Card>
 
-              {fuzzyData?.map((dataset) => (
-                <Card elevation={0} key={dataset.item.submission_feature_id}>
+              {fuzzyData?.map((submission) => (
+                <Card elevation={0} key={submission.item.submission_id}>
                   <CardHeader
                     title={
                       <Typography
@@ -163,12 +163,15 @@ const SubmissionsListPage = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
                         }}>
-                        {highlight(dataset.item.name, dataset?.matches?.find((match) => match.key === 'name')?.indices)}
+                        {highlight(
+                          submission.item.name,
+                          submission?.matches?.find((match) => match.key === 'name')?.indices
+                        )}
                       </Typography>
                     }
                     action={
                       <Chip
-                        label="Dataset"
+                        label={submission.item.root_feature_type_display_name}
                         size="small"
                         sx={{
                           my: '-2px',
@@ -200,8 +203,8 @@ const SubmissionsListPage = () => {
                         textOverflow: 'ellipsis'
                       }}>
                       {highlight(
-                        dataset.item.description,
-                        dataset?.matches?.find((match) => match.key === 'description')?.indices
+                        submission.item.description,
+                        submission?.matches?.find((match) => match.key === 'description')?.indices
                       )}
                     </Typography>
                   </CardContent>
@@ -234,13 +237,15 @@ const SubmissionsListPage = () => {
                         <Stack flexDirection="row">
                           <dd>Published:</dd>
                           <dt>
-                            {getFormattedDate(DATE_FORMAT.ShortDateFormat, dataset.item.submission_date.toDateString())}
+                            {submission.item.publish_timestamp
+                              ? getFormattedDate(DATE_FORMAT.ShortDateFormat, submission.item.publish_timestamp)
+                              : 'Unpublished'}
                           </dt>
                         </Stack>
                       </Stack>
                       <Stack flexDirection="row" alignItems="center" gap={1} flexWrap="nowrap">
-                        {(dataset.item.security === SECURITY_APPLIED_STATUS.SECURED ||
-                          dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
+                        {(submission.item.security === SECURITY_APPLIED_STATUS.SECURED ||
+                          submission.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
                           <Button
                             variant={'contained'}
                             disableElevation
@@ -254,13 +259,13 @@ const SubmissionsListPage = () => {
                             Request Access
                           </Button>
                         )}
-                        {(dataset.item.security === SECURITY_APPLIED_STATUS.UNSECURED ||
-                          dataset.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
+                        {(submission.item.security === SECURITY_APPLIED_STATUS.UNSECURED ||
+                          submission.item.security === SECURITY_APPLIED_STATUS.PARTIALLY_SECURED) && (
                           <Button
                             variant="contained"
                             startIcon={<Icon path={mdiTrayArrowDown} size={0.75} />}
                             onClick={() => {
-                              handleDownload(dataset);
+                              handleDownload(submission);
                             }}>
                             Download
                           </Button>

@@ -3,6 +3,7 @@ import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection } from '../../../database/db';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { SubmissionService } from '../../../services/submission-service';
 import { getLogger } from '../../../utils/logger';
@@ -53,8 +54,9 @@ GET.apiDoc = {
                 'update_date',
                 'update_user',
                 'revision_count',
-                'feature_type_id',
-                'feature_type_name'
+                'security',
+                'root_feature_type_id',
+                'root_feature_type_name'
               ],
               properties: {
                 submission_id: {
@@ -100,11 +102,20 @@ GET.apiDoc = {
                   type: 'integer',
                   minimum: 0
                 },
-                feature_type_id: {
+                security: {
+                  type: 'string',
+                  enum: [
+                    SECURITY_APPLIED_STATUS.PENDING,
+                    SECURITY_APPLIED_STATUS.UNSECURED,
+                    SECURITY_APPLIED_STATUS.SECURED,
+                    SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
+                  ]
+                },
+                root_feature_type_id: {
                   type: 'integer',
                   minimum: 1
                 },
-                feature_type_name: {
+                root_feature_type_name: {
                   type: 'string'
                 }
               }
