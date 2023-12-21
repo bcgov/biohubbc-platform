@@ -89,7 +89,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
             features={props.selectedFeatures}
             onClose={() => {
               submissionRecordDataLoader.refresh(submissionContext.submissionId);
-              submissionContext.submissionFeaturesDataLoader.refresh(submissionContext.submissionId);
+              submissionContext.submissionFeatureGroupsDataLoader.refresh(submissionContext.submissionId);
             }}
           />
 
