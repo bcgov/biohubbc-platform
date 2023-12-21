@@ -36,7 +36,8 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       await api.submissions
         .applySubmissionFeatureRules(
           props.features,
-          rules.map((item) => item.security_rule_id)
+          rules.map((item) => item.security_rule_id),
+          true // Replace rules on submit
         )
         .then(() => {
           submissionFeatureRulesDataLoader.refresh(props.features);
