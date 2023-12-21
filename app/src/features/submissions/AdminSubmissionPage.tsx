@@ -3,8 +3,8 @@ import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
 import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
 import { useSubmissionContext } from 'hooks/useContext';
-import SubmissionDataGrid from './components/SubmissionDataGrid';
 import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
+import SubmissionDataGrid from './components/SubmissionDataGrid';
 
 /**
  * AdminSubmissionPage component for reviewing submissions.
@@ -17,10 +17,12 @@ const AdminSubmissionPage = () => {
   const { submissionFeatureGroupsDataLoader } = submissionContext;
   const submissionFeatureGroups = submissionFeatureGroupsDataLoader.data || [];
 
-  const allSubmissionFeatureIds = submissionFeatureGroups
-      .reduce((acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
-        return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
-      }, []);
+  const allSubmissionFeatureIds = submissionFeatureGroups.reduce(
+    (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
+      return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
+    },
+    []
+  );
 
   return (
     <>

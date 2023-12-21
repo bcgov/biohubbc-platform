@@ -1,7 +1,10 @@
 import { ISecurityRuleAndCategory, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
-import { IGetSubmissionGroupedFeatureResponse, SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
+import {
+  IGetSubmissionGroupedFeatureResponse,
+  SubmissionRecordWithSecurity
+} from 'interfaces/useSubmissionsApi.interface';
 import React, { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router';
 
@@ -19,7 +22,11 @@ export interface ISubmissionContext {
    * @type {DataLoader<[submissionId: number], IGetSubmissionGroupedFeatureResponse[], unknown>}
    * @memberof ISubmissionContext
    */
-  submissionFeatureGroupsDataLoader: DataLoader<[submissionId: number], IGetSubmissionGroupedFeatureResponse[], unknown>;
+  submissionFeatureGroupsDataLoader: DataLoader<
+    [submissionId: number],
+    IGetSubmissionGroupedFeatureResponse[],
+    unknown
+  >;
   /**
    * The Data Loader used to load the list of all security rules that may be applied
    * to a given submission.
@@ -35,7 +42,11 @@ export interface ISubmissionContext {
    * @type {DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>}
    * @memberof ISubmissionContext
    */
-  submissionFeaturesAppliedRulesDataLoader: DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>
+  submissionFeaturesAppliedRulesDataLoader: DataLoader<
+    [features: number[]],
+    ISubmissionFeatureSecurityRecord[],
+    unknown
+  >;
   /**
    * The submission id.
    *
@@ -96,10 +107,12 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
       return;
     }
 
-    const featureIds = submissionFeatureGroupsDataLoader.data
-      .reduce((acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
+    const featureIds = submissionFeatureGroupsDataLoader.data.reduce(
+      (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
         return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
-      }, []);
+      },
+      []
+    );
 
     submissionFeaturesAppliedRulesDataLoader.refresh(featureIds);
     // eslint-disable-next-line react-hooks/exhaustive-deps

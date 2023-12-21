@@ -117,7 +117,11 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @param {number[]} ruleIds
    * @return {*}  {Promise<any[]>}
    */
-  const applySecurityRulesToSubmissionFeatures = async (submissionFeatureIds: number[], ruleIds: number[], override = false): Promise<any[]> => {
+  const applySecurityRulesToSubmissionFeatures = async (
+    submissionFeatureIds: number[],
+    ruleIds: number[],
+    override = false
+  ): Promise<any[]> => {
     const { data } = await axios.post('api/administrative/security/apply', {
       override,
       features: submissionFeatureIds,
@@ -147,7 +151,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @param {number[]} features
    * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
    */
-  const getSecurityRulesForSubmissionFeatures = async (features: number[]): Promise<ISubmissionFeatureSecurityRecord[]> => {
+  const getSecurityRulesForSubmissionFeatures = async (
+    features: number[]
+  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
     const { data } = await axios.post('api/administrative/security/fetch', {
       features
     });

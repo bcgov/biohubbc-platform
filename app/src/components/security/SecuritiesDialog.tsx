@@ -20,7 +20,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const submissionContext = useSubmissionContext();
   const { allSecurityRulesStaticListDataLoader, submissionFeaturesAppliedRulesDataLoader } = submissionContext;
   const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
-  const appliedSecurityRecords = submissionFeaturesAppliedRulesDataLoader.data || []
+  const appliedSecurityRecords = submissionFeaturesAppliedRulesDataLoader.data || [];
 
   const initialAppliedSecurityRules: ISecurityRuleAndCategory[] = !appliedSecurityRecords.length
     ? []
@@ -32,12 +32,11 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
 
   const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
     try {
-      await api.security
-        .applySecurityRulesToSubmissionFeatures(
-          props.features,
-          rules.map((item) => item.security_rule_id),
-          true // Override will replace all rules on submit
-        );
+      await api.security.applySecurityRulesToSubmissionFeatures(
+        props.features,
+        rules.map((item) => item.security_rule_id),
+        true // Override will replace all rules on submit
+      );
 
       dialogContext.setSnackbar({
         snackbarMessage: (
