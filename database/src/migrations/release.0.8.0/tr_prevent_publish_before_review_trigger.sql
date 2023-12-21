@@ -5,7 +5,7 @@ SECURITY definer
 AS $$
 BEGIN
     IF NEW.publish_timestamp IS NOT NULL AND NEW.security_review_timestamp IS NULL THEN
-        RAISE EXCEPTION 'Cannot set publish_date without setting review_date first';
+        RAISE EXCEPTION 'Invalid state: security_review_timestamp cannot be null while publish_timestamp is set.';
     END IF;
     RETURN NEW;
 END;

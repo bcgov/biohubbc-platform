@@ -1,4 +1,4 @@
-import { ISecurityRule } from 'hooks/api/useSecurityApi';
+import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import useDataLoader, { DataLoader } from 'hooks/useDataLoader';
 import { IGetSubmissionFeatureResponse, SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
@@ -26,7 +26,7 @@ export interface ISubmissionContext {
    * @type {DataLoader<[], ISecurityRule[], unknown>}
    * @memberof ISubmissionContext
    */
-  securityRulesDataLoader: DataLoader<[], ISecurityRule[], unknown>;
+  securityRulesDataLoader: DataLoader<[], ISecurityRuleAndCategory[], unknown>;
   /**
    * The submission id.
    *
@@ -41,9 +41,9 @@ export const SubmissionContext = React.createContext<ISubmissionContext | undefi
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const api = useApi();
 
+  const securityRulesDataLoader = useDataLoader(api.security.getActiveSecurityRulesAndCategories);
   const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
   const submissionFeaturesDataLoader = useDataLoader(api.submissions.getSubmissionFeatures);
-  const securityRulesDataLoader = useDataLoader(api.security.getActiveSecurityRules);
 
   const urlParams = useParams();
 

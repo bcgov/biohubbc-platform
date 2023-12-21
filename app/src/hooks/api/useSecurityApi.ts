@@ -4,6 +4,7 @@ import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'inte
 export interface ISecurityRule {
   security_rule_id: number;
   name: string;
+  category: string;
   description: string;
   record_effective_date: string;
   record_end_date: string;
@@ -12,6 +13,19 @@ export interface ISecurityRule {
   update_date: string;
   update_user: number;
   revision_count: number;
+}
+
+export interface ISecurityRuleAndCategory {
+  security_rule_id: number;
+  name: string;
+  description: string;
+  record_effective_date: string;
+  record_end_date: string;
+  security_category_id: number;
+  category_name: string;
+  category_description: string;
+  category_record_effective_date: string;
+  category_record_end_date: string;
 }
 
 export interface ISubmissionFeatureSecurityRecord {
@@ -77,6 +91,11 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getActiveSecurityRulesAndCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
+    const { data } = await axios.get('api/administrative/security/category/fetch');
+    return data;
+  };
+
   const addSecurityRule = async (newRule: {
     name: string;
     description: string;
@@ -118,7 +137,8 @@ const useSecurityApi = (axios: AxiosInstance) => {
     addSecurityRule,
     applySecurityRulesToSubmissions,
     removeSecurityRulesToSubmissions,
-    getSecurityRulesForSubmissions
+    getSecurityRulesForSubmissions,
+    getActiveSecurityRulesAndCategories
   };
 };
 

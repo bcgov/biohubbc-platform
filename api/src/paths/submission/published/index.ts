@@ -1,22 +1,21 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection } from '../../database/db';
-import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
-import { SECURITY_APPLIED_STATUS } from '../../repositories/security-repository';
-import { SubmissionService } from '../../services/submission-service';
-import { getLogger } from '../../utils/logger';
+import { getAPIUserDBConnection } from '../../../database/db';
+import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
+import { SECURITY_APPLIED_STATUS } from '../../../repositories/security-repository';
+import { SubmissionService } from '../../../services/submission-service';
+import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission');
 
-export const GET: Operation = [getReviewedSubmissionsWithSecurity()];
+export const GET: Operation = [getPublishedSubmissions()];
 
 GET.apiDoc = {
-  description: 'Get a list of reviewed submissions',
-  tags: ['submisssion', 'reviewed'],
-  security: [],
+  description: 'Get a list of published submissions',
+  tags: ['submission', 'reviewed'],
   responses: {
     200: {
-      description: 'List of reviewed submissions',
+      description: 'List of published submissions',
       content: {
         'application/json': {
           schema: {
@@ -35,7 +34,11 @@ GET.apiDoc = {
                 'create_user',
                 'update_date',
                 'update_user',
-                'revision_count'
+                'revision_count',
+                'security',
+                'root_feature_type_id',
+                'root_feature_type_name',
+                'root_feature_type_display_name'
               ],
               properties: {
                 submission_id: {
@@ -91,6 +94,16 @@ GET.apiDoc = {
                     SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
                     SECURITY_APPLIED_STATUS.PENDING
                   ]
+                },
+                root_feature_type_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                root_feature_type_name: {
+                  type: 'string'
+                },
+                root_feature_type_display_name: {
+                  type: 'string'
                 }
               }
             }
@@ -103,11 +116,11 @@ GET.apiDoc = {
 };
 
 /**
- * Get all reviewed submissions (with security status).
+ * Get all published submissions.
  *
  * @returns {RequestHandler}
  */
-export function getReviewedSubmissionsWithSecurity(): RequestHandler {
+export function getPublishedSubmissions(): RequestHandler {
   return async (_req, res) => {
     const connection = getAPIUserDBConnection();
 
@@ -115,14 +128,14 @@ export function getReviewedSubmissionsWithSecurity(): RequestHandler {
       await connection.open();
 
       const service = new SubmissionService(connection);
-      const response = await service.getReviewedSubmissionsWithSecurity();
+      const response = await service.getPublishedSubmissions();
 
       await connection.commit();
 
       return res.status(200).json(response);
     } catch (error) {
       await connection.rollback();
-      defaultLog.error({ label: 'getReviewedSubmissionsWithSecurity', message: 'error', error });
+      defaultLog.error({ label: 'getPublishedSubmissions', message: 'error', error });
       throw error;
     } finally {
       connection.release();

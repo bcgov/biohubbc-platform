@@ -15,7 +15,8 @@ import {
   ISubmissionObservationRecord,
   PatchSubmissionRecord,
   SubmissionRecord,
-  SubmissionRecordWithSecurity,
+  SubmissionRecordPublished,
+  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -763,7 +764,7 @@ describe('SubmissionService', () => {
 
   describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[] = [
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -778,8 +779,9 @@ describe('SubmissionService', () => {
           update_date: null,
           update_user: null,
           revision_count: 0,
-          feature_type_id: 1,
-          feature_type_name: 'dataset'
+          security: SECURITY_APPLIED_STATUS.PENDING,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
         },
         {
           submission_id: 2,
@@ -795,8 +797,9 @@ describe('SubmissionService', () => {
           update_date: '2023-12-12',
           update_user: 1,
           revision_count: 1,
-          feature_type_id: 1,
-          feature_type_name: 'dataset'
+          security: SECURITY_APPLIED_STATUS.PENDING,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
         }
       ];
 
@@ -817,7 +820,7 @@ describe('SubmissionService', () => {
 
   describe('getReviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
-      const mockSubmissionRecords: (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[] = [
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -832,8 +835,9 @@ describe('SubmissionService', () => {
           update_date: null,
           update_user: null,
           revision_count: 0,
-          feature_type_id: 1,
-          feature_type_name: 'dataset'
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
         },
         {
           submission_id: 2,
@@ -849,8 +853,9 @@ describe('SubmissionService', () => {
           update_date: '2023-12-12',
           update_user: 1,
           revision_count: 1,
-          feature_type_id: 1,
-          feature_type_name: 'dataset'
+          security: SECURITY_APPLIED_STATUS.SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
         }
       ];
 
@@ -902,13 +907,12 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getReviewedSubmissionsWithSecurity', () => {
+  describe('getPublishedSubmissions', () => {
     it('should return an array of submission records with security property', async () => {
-      const mockSubmissionRecords: SubmissionRecordWithSecurity[] = [
+      const mockSubmissionRecords: SubmissionRecordPublished[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
-          security: SECURITY_APPLIED_STATUS.SECURED,
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -919,12 +923,15 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'type',
+          root_feature_type_display_name: 'Type'
         },
         {
           submission_id: 2,
           uuid: '789-456-123',
-          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -935,11 +942,14 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'type',
+          root_feature_type_display_name: 'Type'
         },
         {
           submission_id: 3,
-          security: SECURITY_APPLIED_STATUS.UNSECURED,
           uuid: '999-456-123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
@@ -951,19 +961,23 @@ describe('SubmissionService', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'type',
+          root_feature_type_display_name: 'Type'
         }
       ];
 
       const mockDBConnection = getMockDBConnection();
 
       const getReviewedSubmissionsForAdminsStub = sinon
-        .stub(SubmissionRepository.prototype, 'getReviewedSubmissionsWithSecurity')
+        .stub(SubmissionRepository.prototype, 'getPublishedSubmissions')
         .resolves(mockSubmissionRecords);
 
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const response = await submissionService.getReviewedSubmissionsWithSecurity();
+      const response = await submissionService.getPublishedSubmissions();
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);

@@ -13,6 +13,7 @@ import {
   ISpatialComponentCount,
   PatchSubmissionRecord,
   SubmissionRecord,
+  SubmissionRecordPublished,
   SubmissionRecordWithSecurity,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -1534,16 +1535,17 @@ describe('SubmissionRepository', () => {
     });
   });
 
-  describe('getReviewedSubmissionsWithSecurity', () => {
+  describe('getPublishedSubmissions', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse = {
+      const mockResponse: SubmissionRecordPublished = {
         submission_id: 1,
         uuid: 'string',
         security_review_timestamp: null,
+        publish_timestamp: 'string',
         submitted_timestamp: 'string',
         source_system: 'string',
         name: 'string',
@@ -1553,7 +1555,10 @@ describe('SubmissionRepository', () => {
         update_date: null,
         update_user: null,
         revision_count: 1,
-        security: SECURITY_APPLIED_STATUS.SECURED
+        security: SECURITY_APPLIED_STATUS.SECURED,
+        root_feature_type_id: 1,
+        root_feature_type_name: 'type',
+        root_feature_type_display_name: 'Type'
       };
 
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
@@ -1562,7 +1567,7 @@ describe('SubmissionRepository', () => {
 
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
-      const response = await submissionRepository.getReviewedSubmissionsWithSecurity();
+      const response = await submissionRepository.getPublishedSubmissions();
 
       expect(response).to.eql([mockResponse]);
     });

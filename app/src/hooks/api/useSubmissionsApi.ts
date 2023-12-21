@@ -1,11 +1,10 @@
 import { AxiosInstance } from 'axios';
-import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import {
   IGetSubmissionFeatureResponse,
   IListSubmissionsResponse,
-  ISubmission,
-  SubmissionRecordWithRootFeature,
-  SubmissionRecordWithSecurity
+  SubmissionRecordPublished,
+  SubmissionRecordWithSecurity,
+  SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
 
 /**
@@ -38,33 +37,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /** NET-NEW FRONTEND REQUESTS FOR UPDATED SCHEMA **/
-
-  /**
-   * Fetch list of all reviewed submissions
-   * NOTE: mock implementation
-   * TODO: return real data once api endpoint created
-   *
-   * @async
-   * @returns {*} {Promise<ISubmission[]>}
-   */
-  const listReviewedSubmissions = async (): Promise<ISubmission[]> => {
-    const keywords = ['moose', 'caribou', 'deer', 'bear', 'bat'];
-    const securityLevel = {
-      0: SECURITY_APPLIED_STATUS.SECURED,
-      1: SECURITY_APPLIED_STATUS.UNSECURED,
-      2: SECURITY_APPLIED_STATUS.SECURED,
-      3: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
-      4: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
-    };
-    return keywords.map((keyword, idx) => ({
-      submission_id: idx + 1,
-      submission_feature_id: idx,
-      name: `Dataset - ${keyword}`,
-      description: `${keywords[idx] + 1 ?? 'test'} Lorem ipsum dolor sit amet, consectetur adipiscing elit. ${keyword}`,
-      submission_date: new Date(Date.now() - 86400000 * (300 * idx)),
-      security: securityLevel[idx]
-    }));
-  };
 
   /**
    * repackages and retrieves json data from self and each child under submission
@@ -104,9 +76,9 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have not completed security review.
    *
-   * @return {*}  {Promise<SubmissionRecordWithRootFeature[]>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getUnreviewedSubmissions = async (): Promise<SubmissionRecordWithRootFeature[]> => {
+  const getUnreviewedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
     const { data } = await axios.get(`api/administrative/submission/unreviewed`);
 
     return data;
@@ -115,9 +87,9 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Fetch all submissions that have completed security review.
    *
-   * @return {*}  {Promise<SubmissionRecordWithRootFeature[]>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
    */
-  const getReviewedSubmissions = async (): Promise<SubmissionRecordWithRootFeature[]> => {
+  const getReviewedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
     const { data } = await axios.get(`api/administrative/submission/reviewed`);
 
     return data;
@@ -150,18 +122,29 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Fetch all published submission records.
+   *
+   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   */
+  const getPublishedSubmissions = async (): Promise<SubmissionRecordPublished[]> => {
+    const { data } = await axios.get(`api/submission/published`);
+
+    return data;
+  };
+
   return {
     listSubmissions,
     getSignedUrl,
-    listReviewedSubmissions,
     getSubmissionDownloadPackage,
     getSubmissionFeatures,
     getSubmissionRecordWithSecurity,
     applySubmissionFeatureRules,
     getSubmissionFeatureRules,
-    getUnreviewedSubmissions,
-    getReviewedSubmissions,
-    updateSubmissionRecord
+    getUnreviewedSubmissionsForAdmins,
+    getReviewedSubmissionsForAdmins,
+    updateSubmissionRecord,
+    getPublishedSubmissions
   };
 };
 
