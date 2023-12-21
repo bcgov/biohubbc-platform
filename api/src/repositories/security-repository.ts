@@ -30,6 +30,34 @@ export const SecurityRuleRecord = z.object({
 });
 export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
 
+export const SecurityCategoryRecord = z.object({
+  security_category_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+export type SecurityCategoryRecord = z.infer<typeof SecurityCategoryRecord>;
+
+export const SecurityRuleAndCategory = z.object({
+  security_rule_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  security_category_id: z.number(),
+  category_name: z.string(),
+  category_description: z.string(),
+  category_record_effective_date: z.string(),
+  category_record_end_date: z.string().nullable()
+});
+export type SecurityRuleAndCategory = z.infer<typeof SecurityRuleAndCategory>;
+
 export const SubmissionFeatureSecurityRecord = z.object({
   submission_feature_security_id: z.number(),
   submission_feature_id: z.number(),
@@ -48,7 +76,6 @@ export const SecurityReason = z.object({
   id: z.number(),
   type_id: z.number()
 });
-
 export type SecurityReason = z.infer<typeof SecurityReason>;
 
 export const ArtifactPersecution = z.object({
@@ -260,13 +287,56 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
+   * Get all active security categories
+   *
+   * @return {*}  {Promise<SecurityCategoryRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
+    defaultLog.debug({ label: 'getActiveSecurityCategories' });
+    const sql = SQL`
+      SELECT * FROM security_category WHERE record_end_date IS NULL;
+    `;
+    const response = await this.connection.sql(sql, SecurityCategoryRecord);
+    return response.rows;
+  }
+
+  /**
+   * Get active security rules with associated categories
+   *
+   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
+   * @memberof SecurityRepository
+   */
+  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
+    defaultLog.debug({ label: 'getActiveRulesAndCategories' });
+    const sql = SQL`
+      SELECT 
+        sr.security_rule_id,
+        sr.name,
+        sr.description,
+        sr.record_effective_date,
+        sr.record_end_date,
+        sc.security_category_id,
+        sc.name as category_name,
+        sc.description as category_description,
+        sc.record_effective_date as category_record_effective_date,
+        sc.record_end_date as category_record_end_date
+      FROM security_rule sr, security_category sc 
+      WHERE sr.security_category_id = sc.security_category_id
+      AND sr.record_end_date IS NULL;
+    `;
+    const response = await this.connection.sql(sql, SecurityRuleAndCategory);
+    return response.rows;
+  }
+
+  /**
    * Gets a list of all active security rules
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityRepository
    */
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
-    defaultLog.debug({ label: 'getSecurityRules' });
+    defaultLog.debug({ label: 'getActiveSecurityRules' });
     const sql = SQL`
       SELECT * FROM security_rule WHERE record_end_date IS NULL;
     `;

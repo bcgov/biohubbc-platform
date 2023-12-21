@@ -5,7 +5,7 @@ import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
-import { ISecurityRule } from 'hooks/api/useSecurityApi';
+import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
@@ -19,7 +19,7 @@ export interface ISecurityRuleFormProps {
 }
 
 export interface ISecurityRuleFormikProps {
-  rules: ISecurityRule[];
+  rules: ISecurityRuleAndCategory[];
 }
 
 export const SecurityRuleFormYupSchema = yup.object().shape({
@@ -35,7 +35,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
 
   const hasOneOrMoreRulesPreviouslyApplied = Boolean(initialValues.rules.length);
 
-  const handleAdd = (selected: ISecurityRule) => {
+  const handleAdd = (selected: ISecurityRuleAndCategory) => {
     setFieldValue(`rules[${values.rules.length}]`, selected);
   };
 
@@ -82,7 +82,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             noOptionsText="No records found"
             options={alphabetizeObjects(securityRules, 'name')}
             filterOptions={(options, state) => {
-              const searchFilter = createFilterOptions<ISecurityRule>({
+              const searchFilter = createFilterOptions<ISecurityRuleAndCategory>({
                 ignoreCase: true
               });
               const unselectedOptions = options.filter(
@@ -130,19 +130,24 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
                     py: '12px !important'
                   }}
                   {...renderProps}>
-                  <SecurityRuleCard title={renderOption.name} subtitle={renderOption.description} />
+                  <SecurityRuleCard
+                    title={renderOption.name}
+                    category={renderOption.category_name}
+                    subtitle={renderOption.description}
+                  />
                 </ListItem>
               );
             }}
           />
         </Box>
         <Stack component={TransitionGroup} gap={1} mt={1}>
-          {values.rules.map((rule: ISecurityRule, index: number) => {
+          {values.rules.map((rule: ISecurityRuleAndCategory) => {
             return (
               <Collapse key={rule.security_rule_id}>
                 <SecurityRuleActionCard
                   security_rule_id={rule.security_rule_id}
                   name={rule.name}
+                  category={rule.category_name}
                   description={rule.description}
                   remove={handleRemove}
                 />
