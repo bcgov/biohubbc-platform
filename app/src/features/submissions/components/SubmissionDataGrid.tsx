@@ -111,7 +111,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     <Paper elevation={0}>
       <Toolbar>
         <Typography component="h2" variant="h4">
-          {feature_type_display_name}
+          {`${feature_type_display_name} Records`}
           <Typography component="span" fontSize="inherit" fontWeight="inherit" color="textSecondary" sx={{ ml: 0.5 }}>
             ({submissionFeatures.length})
           </Typography>
