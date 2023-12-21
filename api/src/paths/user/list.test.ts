@@ -3,6 +3,7 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
+import { SystemUserExtended } from '../../repositories/user-repository';
 import { UserService } from '../../services/user-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as users from './list';
@@ -22,13 +23,20 @@ describe('users', () => {
 
       sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      const mockResponse = [
+      const mockResponse: SystemUserExtended[] = [
         {
-          id: 1,
+          system_user_id: 1,
+          user_identity_source_id: 2,
           user_identifier: 'identifier',
-          user_guid: 'aaaa',
+          user_guid: '123-456-789',
           identity_source: 'idir',
+          record_effective_date: '',
           record_end_date: '',
+          create_user: 1,
+          create_date: '',
+          update_user: null,
+          update_date: null,
+          revision_count: 0,
           role_ids: [1, 2],
           role_names: ['System Admin', 'Project Lead']
         }

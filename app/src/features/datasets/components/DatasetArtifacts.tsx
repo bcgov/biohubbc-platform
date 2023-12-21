@@ -15,11 +15,12 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { ISnackbarProps } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
+import { hasAtLeastOneValidValue } from 'utils/authUtils';
 import { downloadFile, getFormattedDate, getFormattedFileSize, pluralize as p } from 'utils/Utils';
 import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
@@ -68,7 +69,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const [artifactToDelete, setArtifactToDelete] = useState<IArtifact | undefined>(undefined);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
 
-  const keycloakWrapper = useKeycloakWrapper();
+  const authStateContext = useAuthStateContext();
   const biohubApi = useApi();
   const dialogContext = useDialogContext();
 
@@ -81,7 +82,10 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     (artifact) => artifact.supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING
   ).length;
 
-  const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
+  const hasAdministrativePermissions = hasAtLeastOneValidValue(
+    VALID_SYSTEM_ROLES,
+    authStateContext.biohubUserWrapper.roleNames
+  );
 
   const handleApplySecurity = (artifact: IArtifact) => {
     setSelectedArtifacts([artifact]);

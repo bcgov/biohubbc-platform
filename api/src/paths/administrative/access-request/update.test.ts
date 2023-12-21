@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
-import { Models } from '../../../models';
+import { SystemUserExtended } from '../../../repositories/user-repository';
 import { AdministrativeService } from '../../../services/administrative-service';
 import { GCNotifyService } from '../../../services/gcnotify-service';
 import { UserService } from '../../../services/user-service';
@@ -68,12 +68,19 @@ describe('updateAccessRequest', () => {
 
     const systemUserId = 4;
     const existingRoleIds = [1, 2];
-    const mockSystemUser: Models.user.UserObject = {
-      id: systemUserId,
-      user_identifier: '',
+    const mockSystemUser: SystemUserExtended = {
+      system_user_id: systemUserId,
+      user_identity_source_id: 2,
+      user_identifier: 'username',
       user_guid: '',
-      identity_source: '',
       record_end_date: '',
+      record_effective_date: '2023-12-08',
+      create_date: '2023-12-08 14:37:41.315999-08',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0,
+      identity_source: 'identitySource',
       role_ids: existingRoleIds,
       role_names: []
     };

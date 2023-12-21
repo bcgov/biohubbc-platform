@@ -70,7 +70,7 @@ describe('getArtifactsByDatasetId', () => {
       const mockResponse = {
         artifact_id: 1,
         create_date: '1970-01-01T00:00:00.000Z',
-        description: 'aaa',
+        description: 'description',
         file_name: 'Lecture 5 - Partial Fraction.pdf',
         file_size: 2405262,
         file_type: 'Report',

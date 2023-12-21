@@ -13,8 +13,8 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import headerImageLarge from 'assets/images/gov-bc-logo-horiz.png';
 import headerImageSmall from 'assets/images/gov-bc-logo-vert.png';
-import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'components/security/Guards';
 import { SYSTEM_ROLE } from 'constants/roles';
+import { AuthGuard, SystemRoleGuard, UnAuthGuard } from 'guards/Guards';
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { LoggedInUser, PublicViewUser } from './UserControls';
@@ -158,7 +158,12 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     fontWeight: 700
                   }
                 }}>
-                <MenuItem tabIndex={1} component={RouterLink} to="/" id="menu_home_sm">
+                <MenuItem
+                  tabIndex={1}
+                  component={RouterLink}
+                  to="/"
+                  id="menu_home_sm"
+                  data-testid="collapsed_home-header-item">
                   Home
                 </MenuItem>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
@@ -167,16 +172,26 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     component={RouterLink}
                     to="/admin/dashboard"
                     id="menu_dashboard_sm"
-                    onClick={hideMobileMenu}>
+                    onClick={hideMobileMenu}
+                    data-testid="collapsed_submissions-header-item">
                     Submissions
                   </MenuItem>
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <MenuItem id="menu_admin_users_sm" component={RouterLink} to="/admin/users" onClick={hideMobileMenu}>
+                  <MenuItem
+                    id="menu_admin_users_sm"
+                    component={RouterLink}
+                    to="/admin/users"
+                    onClick={hideMobileMenu}
+                    data-testid="collapsed_manage-users-header-item">
                     Manage Users
                   </MenuItem>
                 </SystemRoleGuard>
-                <MenuItem component="button" onClick={showSupportDialog} sx={{ width: '100%' }}>
+                <MenuItem
+                  component="button"
+                  onClick={showSupportDialog}
+                  sx={{ width: '100%' }}
+                  data-testid="collapsed_support-header-item">
                   Support
                 </MenuItem>
                 <AuthGuard>
@@ -228,16 +243,16 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                     textTransform: 'none'
                   }
                 }}>
-                <RouterLink to="/" id="menu_home">
+                <RouterLink to="/" id="menu_home" data-testid="home-header-item">
                   Home
                 </RouterLink>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/dashboard" id="menu_dashboard">
+                  <RouterLink to="/admin/dashboard" id="menu_dashboard" data-testid="submissions-header-item">
                     Submissions
                   </RouterLink>
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/users" id="menu_admin_users">
+                  <RouterLink to="/admin/users" id="menu_admin_users" data-testid="manage-users-header-item">
                     Manage Users
                   </RouterLink>
                 </SystemRoleGuard>
@@ -249,7 +264,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   sx={{
                     m: '8px',
                     p: 1
-                  }}>
+                  }}
+                  data-testid="support-header-item">
                   Support
                 </Button>
               </Box>
