@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import {
-  IGetSubmissionFeatureResponse,
+  IGetSubmissionGroupedFeatureResponse,
   IListSubmissionsResponse,
   SubmissionRecordPublished,
   SubmissionRecordWithSecurity,
@@ -50,12 +50,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch submission features
+   * For the given submission, fetches all feature groups (e.g., "dataset", "sample_site"), with their
+   * respective features.
    *
    * @param {number} submissionId
    * @return {*}  {Promise<IGetSubmissionFeatureResponse>}
    */
-  const getSubmissionFeatures = async (submissionId: number): Promise<IGetSubmissionFeatureResponse[]> => {
+  const getSubmissionFeatureGroups = async (submissionId: number): Promise<IGetSubmissionGroupedFeatureResponse[]> => {
     const { data } = await axios.get(`api/submission/${submissionId}/features`);
 
     return data;
@@ -111,17 +112,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  const getSubmissionFeatureRules = async () => {};
-
-  const applySubmissionFeatureRules = async (features: number[], rules: number[], override = false) => {
-    const { data } = await axios.post(`api/administrative/security/apply`, {
-      override,
-      features,
-      rules
-    });
-    return data;
-  };
-
   /**
    * Fetch all published submission records.
    *
@@ -137,10 +127,8 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     listSubmissions,
     getSignedUrl,
     getSubmissionDownloadPackage,
-    getSubmissionFeatures,
+    getSubmissionFeatureGroups,
     getSubmissionRecordWithSecurity,
-    applySubmissionFeatureRules,
-    getSubmissionFeatureRules,
     getUnreviewedSubmissionsForAdmins,
     getReviewedSubmissionsForAdmins,
     updateSubmissionRecord,

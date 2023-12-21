@@ -77,7 +77,8 @@ export type SubmissionFeatureRecordWithTypeAndSecurity = {
   feature_type_display_name: string;
   submission_feature_security_ids: number[];
 };
-export interface IGetSubmissionFeatureResponse {
+
+export interface IGetSubmissionGroupedFeatureResponse {
   feature_type_name: string;
   feature_type_display_name: string;
   features: SubmissionFeatureRecordWithTypeAndSecurity[];

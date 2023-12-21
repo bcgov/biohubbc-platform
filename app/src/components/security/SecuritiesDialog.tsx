@@ -4,12 +4,11 @@ import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
-import useDataLoader from 'hooks/useDataLoader';
 import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
   features: number[];
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 }
 
@@ -17,29 +16,29 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useDialogContext();
   const api = useApi();
 
-  const submissionFeatureRulesDataLoader = useDataLoader(api.security.getSecurityRulesForSubmissions);
-  submissionFeatureRulesDataLoader.load(props.features);
-
   const submissionContext = useSubmissionContext();
-  const securityRules = submissionContext.securityRulesDataLoader.data || [];
+  const { allSecurityRulesStaticListDataLoader, submissionFeaturesAppliedRulesDataLoader } = submissionContext;
+  const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
+  const appliedSecurityRecords = submissionFeaturesAppliedRulesDataLoader.data || [];
 
-  const initialAppliedSecurityRules: ISecurityRuleAndCategory[] = !submissionFeatureRulesDataLoader.data?.length
+  const initialAppliedSecurityRules: ISecurityRuleAndCategory[] = !appliedSecurityRecords.length
     ? []
-    : securityRules.filter((securityRule) => {
-        return submissionFeatureRulesDataLoader.data?.some(
+    : allSecurityRules.filter((securityRule) => {
+        return appliedSecurityRecords.some(
           (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
         );
       });
 
   const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
     try {
-      await api.submissions
-        .applySubmissionFeatureRules(
+      await api.security
+        .applySecurityRulesToSubmissionFeatures(
           props.features,
-          rules.map((item) => item.security_rule_id)
+          rules.map((item) => item.security_rule_id),
+          true // Override will replace all rules on submit
         )
         .then(() => {
-          submissionFeatureRulesDataLoader.refresh(props.features);
+          submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
         });
 
       dialogContext.setSnackbar({
@@ -67,7 +66,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   return (
     <EditDialog
       dialogTitle="Secure Records"
-      open={props.isOpen}
+      open={props.open}
       dialogSaveButtonLabel="APPLY"
       onCancel={props.onClose}
       onSave={(values: ISecurityRuleFormikProps) => handleSubmit(values.rules)}
