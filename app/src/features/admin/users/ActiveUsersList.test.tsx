@@ -50,10 +50,12 @@ describe('ActiveUsersList', () => {
     const { getByText } = renderContainer({
       activeUsers: [
         {
-          id: 1,
+          system_user_id: 1,
           user_identifier: 'username',
           user_guid: 'user-guid',
-          user_record_end_date: '2020-10-10',
+          record_end_date: '2020-10-10',
+          identity_source: '',
+          role_ids: [1, 2],
           role_names: ['role 1', 'role 2']
         }
       ],
@@ -71,10 +73,12 @@ describe('ActiveUsersList', () => {
     const { getByTestId } = renderContainer({
       activeUsers: [
         {
-          id: 1,
+          system_user_id: 1,
           user_identifier: 'username',
           user_guid: 'user-guid',
-          user_record_end_date: '2020-10-10',
+          record_end_date: '2020-10-10',
+          identity_source: '',
+          role_ids: [],
           role_names: []
         }
       ],

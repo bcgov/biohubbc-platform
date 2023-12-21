@@ -18,9 +18,9 @@ describe('keycloakUtils', () => {
     });
 
     it('returns their guid', () => {
-      const response = getUserGuid({ preferred_username: 'aaaaa@idir' });
+      const response = getUserGuid({ preferred_username: '123-456-789@idir' });
 
-      expect(response).to.equal('aaaaa');
+      expect(response).to.equal('123-456-789');
     });
   });
 
@@ -32,19 +32,19 @@ describe('keycloakUtils', () => {
     });
 
     it('returns null response when a keycloakToken is provided with a missing username field', () => {
-      const response = getUserIdentifier({ preferred_username: 'aaaaa@idir' });
+      const response = getUserIdentifier({ preferred_username: '123-456-789@idir' });
 
       expect(response).to.be.null;
     });
 
     it('returns the identifier from their IDIR username', () => {
-      const response = getUserIdentifier({ preferred_username: 'aaaaa@idir', idir_username: 'idiruser' });
+      const response = getUserIdentifier({ preferred_username: '123-456-789@idir', idir_username: 'idiruser' });
 
       expect(response).to.equal('idiruser');
     });
 
     it('returns the identifier from their BCeID username', () => {
-      const response = getUserIdentifier({ preferred_username: 'aaaaa@idir', bceid_username: 'bceiduser' });
+      const response = getUserIdentifier({ preferred_username: '123-456-789@idir', bceid_username: 'bceiduser' });
 
       expect(response).to.equal('bceiduser');
     });

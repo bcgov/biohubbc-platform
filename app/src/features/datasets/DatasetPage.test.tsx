@@ -3,7 +3,6 @@ import { cleanup, render, waitFor } from '@testing-library/react';
 import { FeatureCollection } from 'geojson';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { Router } from 'react-router';
 import appTheme from 'themes/appTheme';
 import DatasetPage from './DatasetPage';
@@ -21,11 +20,6 @@ const renderContainer = () => {
 };
 
 jest.mock('../../hooks/useApi');
-jest.mock('../../hooks/useKeycloakWrapper');
-
-const mockUseKeycloakWrapper = {
-  hasSystemRole: (_roles: string[]) => true
-};
 
 const mockUseApi = {
   dataset: {
@@ -40,12 +34,10 @@ const mockUseApi = {
 };
 
 const mockBiohubApi = useApi as jest.Mock;
-const mockKeycloakWrapper = useKeycloakWrapper as jest.Mock;
 
 describe('DatasetPage', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
-    mockKeycloakWrapper.mockImplementation(() => mockUseKeycloakWrapper);
   });
 
   afterEach(() => {

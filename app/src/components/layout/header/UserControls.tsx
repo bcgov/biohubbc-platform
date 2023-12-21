@@ -4,17 +4,16 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
+import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { useAuthStateContext } from 'hooks/useAuthStateContext';
-import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
-import { useMemo } from 'react';
 import { getFormattedIdentitySource } from 'utils/Utils';
 
 // Authenticated view
 export const LoggedInUser = () => {
-  const { keycloakWrapper } = useAuthStateContext();
+  const authStateContext = useAuthStateContext();
 
-  const identitySource = keycloakWrapper?.getIdentitySource() || '';
-  const userIdentifier = keycloakWrapper?.getUserIdentifier() || '';
+  const identitySource = authStateContext.biohubUserWrapper.identitySource ?? '';
+  const userIdentifier = authStateContext.biohubUserWrapper.userIdentifier ?? '';
   const formattedUsername = [getFormattedIdentitySource(identitySource as SYSTEM_IDENTITY_SOURCE), userIdentifier]
     .filter(Boolean)
     .join('/');
@@ -49,7 +48,7 @@ export const LoggedInUser = () => {
         <Button
           component="a"
           variant="text"
-          href="/logout"
+          onClick={() => authStateContext.auth.signoutRedirect()}
           data-testid="menu_log_out"
           sx={{
             color: 'inherit',
@@ -63,7 +62,7 @@ export const LoggedInUser = () => {
       <MenuItem
         component="a"
         color="#1a5a96"
-        href="/logout"
+        onClick={() => authStateContext.auth.signoutRedirect()}
         data-testid="collapsed_menu_log_out"
         sx={{
           display: { xs: 'block', lg: 'none' }
@@ -76,8 +75,7 @@ export const LoggedInUser = () => {
 
 // Unauthenticated public view
 export const PublicViewUser = () => {
-  const { keycloakWrapper } = useAuthStateContext();
-  const loginUrl = useMemo(() => keycloakWrapper?.getLoginUrl(), [keycloakWrapper]);
+  const authStateContext = useAuthStateContext();
 
   return (
     <>
@@ -85,7 +83,7 @@ export const PublicViewUser = () => {
         component="a"
         color="inherit"
         variant="text"
-        href={loginUrl}
+        onClick={() => authStateContext.auth.signinRedirect()}
         disableElevation
         startIcon={<Icon path={mdiLoginVariant} size={1} />}
         data-testid="menu_log_in"

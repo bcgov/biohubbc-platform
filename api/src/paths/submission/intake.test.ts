@@ -30,7 +30,7 @@ describe('intake', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        id: 'aaaa',
+        id: '123-456-789',
         type: 'submission',
         properties: {},
         features: []
@@ -61,7 +61,7 @@ describe('intake', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        id: 'aaaa',
+        id: '123-456-789',
         type: 'submission',
         properties: {},
         features: []
@@ -105,7 +105,7 @@ describe('intake', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        id: 'aaaa',
+        id: '123-456-789',
         type: 'submission',
         properties: { additionalInformation: 'test' },
         features: []

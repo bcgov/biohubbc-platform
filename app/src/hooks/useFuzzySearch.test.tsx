@@ -58,8 +58,8 @@ describe('useFuzzySearch', () => {
 
     it('should setFuzzyData to default when character count is less than minMatchCharLength', () => {
       const { result } = renderHook(() => useFuzzySearch(mockDataArray, mockOptions));
-      act(() => result.current.handleSearch({ target: { value: 'aaaa' } } as any));
-      expect(result.current.searchValue).toBe('aaaa');
+      act(() => result.current.handleSearch({ target: { value: 'searchKeyword' } } as any));
+      expect(result.current.searchValue).toBe('searchKeyword');
       expect(result.current.fuzzyData).toStrictEqual(mockFuzzyData);
     });
   });

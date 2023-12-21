@@ -1,12 +1,14 @@
+import { mdiArrowRight } from '@mdi/js';
+import Icon from '@mdi/react';
 import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
 import BaseHeader from 'components/layout/header/BaseHeader';
 import ManageSecurity from 'components/security/ManageSecurity';
-import PublishSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/PublishSecurityReviewButton';
+import CompleteSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewButton';
 import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
-
+import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
 export interface ISubmissionHeaderProps {
   selectedFeatures: number[];
 }
@@ -33,18 +35,44 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
     await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: true });
     dialogContext.setSnackbar({
       open: true,
-      snackbarMessage: 'Submission Published'
+      snackbarMessage: 'Submission Security Reviewed'
     });
-    submissionContext.submissionRecordDataLoader.refresh(submissionContext.submissionId);
+    submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
   const onSecurityReviewRemove = async () => {
-    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: false });
+    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+      security_reviewed: false,
+      published: false
+    });
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: 'Submission Security Review Reopened'
+    });
+    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+  };
+
+  const onSecurityReviewPublish = async () => {
+    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+      security_reviewed: true,
+      published: true
+    });
+    dialogContext.setSnackbar({
+      open: true,
+      snackbarMessage: 'Submission Published'
+    });
+    submissionRecordDataLoader.refresh(submissionContext.submissionId);
+  };
+
+  const onSecurityReviewUnPublish = async () => {
+    await api.submissions.updateSubmissionRecord(submissionContext.submissionId, {
+      published: false
+    });
     dialogContext.setSnackbar({
       open: true,
       snackbarMessage: 'Submission Unpublished'
     });
-    submissionContext.submissionRecordDataLoader.refresh(submissionContext.submissionId);
+    submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
   return (
@@ -57,12 +85,24 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
       }
       buttonJSX={
         <Stack flexDirection="row" alignItems="center" gap={1}>
-          <ManageSecurity features={props.selectedFeatures} />
+          <ManageSecurity
+            features={props.selectedFeatures}
+            onClose={() => {
+              submissionRecordDataLoader.refresh(submissionContext.submissionId);
+              submissionContext.submissionFeaturesDataLoader.refresh(submissionContext.submissionId);
+            }}
+          />
 
-          <PublishSecurityReviewButton
+          <CompleteSecurityReviewButton
             submission={submission}
             onComplete={onSecurityReviewComplete}
             onRemove={onSecurityReviewRemove}
+          />
+          {submission.publish_timestamp == null && <Icon path={mdiArrowRight} size={0.75} />}
+          <PublishSecurityReviewButton
+            submission={submission}
+            onComplete={onSecurityReviewPublish}
+            onUnpublish={onSecurityReviewUnPublish}
           />
         </Stack>
       }
