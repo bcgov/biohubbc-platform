@@ -1,6 +1,6 @@
+import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
-import { SYSTEM_IDENTITY_SOURCE } from 'hooks/useKeycloakWrapper';
 import { Router } from 'react-router-dom';
 import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
 import { render } from 'test-helpers/test-utils';
@@ -32,7 +32,7 @@ describe('Header', () => {
   it('renders the username and logout button', () => {
     const authState = getMockAuthState({
       base: SystemAdminAuthState,
-      overrides: { keycloakWrapper: { getIdentitySource: () => SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS } }
+      overrides: { biohubUserWrapper: { identitySource: SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS } }
     });
 
     const { getByTestId, getByText } = render(

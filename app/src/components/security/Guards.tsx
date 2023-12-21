@@ -1,10 +1,10 @@
 import { SYSTEM_ROLE } from 'constants/roles';
-import { AuthStateContext } from 'contexts/authStateContext';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { isFunction } from 'lodash-es';
-import { isValidElement, ReactElement, useContext } from 'react';
-import { isAuthenticated } from 'utils/authUtils';
+import { isValidElement, PropsWithChildren, ReactElement } from 'react';
+import { hasAtLeastOneValidValue } from 'utils/authUtils';
 
-interface IGuardProps<T = never> extends React.PropsWithChildren {
+interface IGuardProps<T = never> extends PropsWithChildren {
   /**
    * An optional backup ReactElement to render if the guard fails.
    *
@@ -14,47 +14,16 @@ interface IGuardProps<T = never> extends React.PropsWithChildren {
 }
 
 /**
- * Renders `props.children` only if the user is NOT authenticated and has none of the specified valid system roles
- *
- * @param {*} props
- * @return {*}
- */
-export const NoRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>> = (
-  props
-) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
-
-  const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);
-
-  if (!hasSystemRole) {
-    // User has no matching system role
-    return <>{props.children}</>;
-  }
-
-  // User has matching system role
-  if (props.fallback) {
-    if (isValidElement(props.fallback)) {
-      return <>{props.fallback}</>;
-    } else if (isFunction(props.fallback)) {
-      return props.fallback();
-    }
-  }
-
-  return <></>;
-};
-
-/**
  * Renders `props.children` only if the user is authenticated and has at least 1 of the specified valid system roles.
  *
- * @param {*} props
+ * @param {(PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps)} props
  * @return {*}
  */
-export const SystemRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>> = (
-  props
-) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
+export const SystemRoleGuard = (props: PropsWithChildren<{ validSystemRoles: SYSTEM_ROLE[] } & IGuardProps>) => {
+  const authStateContext = useAuthStateContext();
+  const { validSystemRoles } = props;
 
-  const hasSystemRole = keycloakWrapper?.hasSystemRole(props.validSystemRoles);
+  const hasSystemRole = hasAtLeastOneValidValue(validSystemRoles, authStateContext.biohubUserWrapper.roleNames);
 
   if (hasSystemRole) {
     // User has a matching system role
@@ -79,10 +48,10 @@ export const SystemRoleGuard: React.FC<React.PropsWithChildren<{ validSystemRole
  * @param {*} props
  * @return {*}
  */
-export const AuthGuard: React.FC<React.PropsWithChildren<IGuardProps>> = (props) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
+export const AuthGuard: React.FC<PropsWithChildren<IGuardProps>> = (props) => {
+  const authStateContext = useAuthStateContext();
 
-  if (isAuthenticated(keycloakWrapper)) {
+  if (authStateContext.auth.isAuthenticated) {
     // User is logged in
     return <>{props.children}</>;
   }
@@ -105,10 +74,10 @@ export const AuthGuard: React.FC<React.PropsWithChildren<IGuardProps>> = (props)
  * @param {*} props
  * @return {*}
  */
-export const UnAuthGuard: React.FC<React.PropsWithChildren<IGuardProps>> = (props) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
+export const UnAuthGuard: React.FC<PropsWithChildren<IGuardProps>> = (props) => {
+  const authStateContext = useAuthStateContext();
 
-  if (!isAuthenticated(keycloakWrapper)) {
+  if (!authStateContext.auth.isAuthenticated) {
     // User is not logged in
     return <>{props.children}</>;
   }

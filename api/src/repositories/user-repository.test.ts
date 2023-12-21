@@ -101,7 +101,7 @@ describe('UserRepository', () => {
         {
           system_user_id: 1,
           user_identifier: 1,
-          user_guid: 'aaaa',
+          user_guid: '123-456-789',
           identity_source: 'idir',
           record_end_date: 'data',
           role_ids: [1],
@@ -118,7 +118,7 @@ describe('UserRepository', () => {
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.getUserByGuid('aaaa');
+      const response = await userRepository.getUserByGuid('123-456-789');
 
       expect(response).to.equal(mockResponse);
     });
@@ -153,7 +153,7 @@ describe('UserRepository', () => {
           system_user_id: 1,
           user_identity_source_id: 1,
           user_identifier: 'user',
-          user_guid: 'aaaa',
+          user_guid: '123-456-789',
           record_end_date: 'data',
           record_effective_date: 'date'
         }
@@ -168,7 +168,7 @@ describe('UserRepository', () => {
 
       const userRepository = new UserRepository(mockDBConnection);
 
-      const response = await userRepository.addSystemUser('aaaa', 'user', 'idir');
+      const response = await userRepository.addSystemUser('123-456-789', 'user', 'idir');
 
       expect(response).to.equal(mockResponse[0]);
     });

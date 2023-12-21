@@ -1,132 +1,75 @@
 import CircularProgress from '@mui/material/CircularProgress';
-import { AuthStateContext } from 'contexts/authStateContext';
-import useRedirect from 'hooks/useRedirect';
-import React, { PropsWithChildren, useContext } from 'react';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useRedirectUri } from 'hooks/useRedirect';
+import { useEffect } from 'react';
+import { hasAuthParams } from 'react-oidc-context';
 import { Redirect, Route, RouteProps, useLocation } from 'react-router';
+import { buildUrl } from 'utils/Utils';
 
 /**
- * Special route guard that requires the user to be authenticated, but also accounts for routes that are exceptions to
- * requiring authentication, and accounts for the case where a user can authenticate, but has not yet been granted
- * application access.
+ * Route guard that requires the user to be authenticated and registered with Sims.
  *
- * Only relevant on top-level routers. Child routers can leverage regular guards.
- *
- * @param {*} { children, ...rest }
+ * @param {RouteProps} props
  * @return {*}
  */
-export const AuthenticatedRouteGuard: React.FC<React.PropsWithChildren<RouteProps>> = ({ children, ...rest }) => {
-  return (
-    <CheckForKeycloakAuthenticated>
-      <WaitForKeycloakToLoadUserInfo>
-        <CheckIfAuthenticatedUser>
-          <Route {...rest}>{children}</Route>
-        </CheckIfAuthenticatedUser>
-      </WaitForKeycloakToLoadUserInfo>
-    </CheckForKeycloakAuthenticated>
-  );
-};
+export const AuthenticatedRouteGuard = (props: RouteProps) => {
+  const { children, ...rest } = props;
 
-/**
- * Redirects the user as appropriate, or renders the `children`.
- *
- * @param {*} { children }
- * @return {*}
- */
-const CheckForKeycloakAuthenticated = (props: PropsWithChildren<Record<never, unknown>>) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
+  const authStateContext = useAuthStateContext();
 
   const location = useLocation();
 
-  if (!keycloakWrapper?.keycloak.authenticated) {
-    // Trigger login, then redirect to the desired route
-    return <Redirect to={`/login?redirect=${encodeURIComponent(location.pathname)}`} />;
-  }
-
-  return <>{props.children}</>;
-};
-
-/**
- * Waits for the keycloakWrapper to finish loading user info.
- *
- * Renders a spinner or the `children`.
- *
- * @param {*} { children }
- * @return {*}
- */
-const WaitForKeycloakToLoadUserInfo: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
-
-  if (!keycloakWrapper?.hasLoadedAllUserInfo) {
-    // User data has not been loaded, can not yet determine if user has sufficient roles
-    return <CircularProgress className="pageProgress" size={40} />;
-  }
-
-  return <>{children}</>;
-};
-
-/**
- * Checks if the user is a registered user.
- *
- * Redirects the user as appropriate, or renders the `children`.
- *
- * @param {*} { children }
- * @return {*}
- */
-const CheckIfAuthenticatedUser: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
-
-  const location = useLocation();
-
-  if (!keycloakWrapper?.systemUserId) {
-    // User is not a registered system user
-    if (location.pathname !== '/logout') {
-      // User attempted to go to restricted page
-      return <Redirect to="/forbidden" />;
+  useEffect(() => {
+    if (
+      !authStateContext.auth.isLoading &&
+      !hasAuthParams() &&
+      !authStateContext.auth.isAuthenticated &&
+      !authStateContext.auth.activeNavigator
+    ) {
+      // User is not authenticated and has no active authentication navigator, redirect to the keycloak login page
+      authStateContext.auth.signinRedirect({ redirect_uri: buildUrl(window.location.origin, location.pathname) });
     }
+  }, [authStateContext.auth, location.pathname]);
+
+  if (
+    authStateContext.auth.isLoading ||
+    authStateContext.biohubUserWrapper.isLoading ||
+    !authStateContext.auth.isAuthenticated
+  ) {
+    return <CircularProgress className="pageProgress" data-testid={'authenticated-route-guard-spinner'} />;
   }
 
-  return <>{children}</>;
+  if (!authStateContext.biohubUserWrapper.systemUserId) {
+    // Redirect to forbidden page
+    return <Redirect to="/forbidden" />;
+  }
+
+  // The user is a registered system user
+  return <Route {...rest}>{children}</Route>;
 };
 
 /**
  * Route guard that requires the user to not be authenticated.
  *
- * @param {*} { children, ...rest }
+ * @param {RouteProps} props
  * @return {*}
  */
 export const UnAuthenticatedRouteGuard = (props: RouteProps) => {
   const { children, ...rest } = props;
 
-  return (
-    <CheckIfNotAuthenticatedUser>
-      <Route {...rest}>{children}</Route>
-    </CheckIfNotAuthenticatedUser>
-  );
-};
+  const authStateContext = useAuthStateContext();
 
-/**
- * Checks if the user is not a registered user.
- *
- * Redirects the user as appropriate, or renders the `children`.
- *
- * @param {*} { children }
- * @return {*}
- */
-const CheckIfNotAuthenticatedUser = (props: PropsWithChildren<Record<never, unknown>>) => {
-  const { keycloakWrapper } = useContext(AuthStateContext);
-  const { redirect } = useRedirect('/');
+  const redirectUri = useRedirectUri('/');
 
-  if (keycloakWrapper?.keycloak.authenticated) {
+  if (authStateContext.auth.isAuthenticated) {
     /**
      * If the user happens to be authenticated, rather than just redirecting them to `/`, we can
      * check if the URL contains a redirect query param, and send them there instead (for
-     * example, links to `/login` generated by SIMS will typically include a redirect query param).
+     * example, links to `/login` generated by BioHub will typically include a redirect query param).
      * If there is no redirect query param, they will be sent to `/` as a fallback.
      */
-    redirect();
-
-    return <></>;
+    return <Redirect to={redirectUri} />;
   }
 
-  return <>{props.children}</>;
+  return <Route {...rest}>{children}</Route>;
 };

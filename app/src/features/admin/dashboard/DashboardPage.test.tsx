@@ -2,7 +2,6 @@ import { ThemeProvider } from '@mui/styles';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { Router } from 'react-router';
 import appTheme from 'themes/appTheme';
 import DashboardPage from './DashboardPage';
@@ -10,11 +9,6 @@ import DashboardPage from './DashboardPage';
 const history = createMemoryHistory();
 
 jest.mock('../../../hooks/useApi');
-jest.mock('../../../hooks/useKeycloakWrapper');
-
-const mockUseKeycloakWrapper = {
-  hasSystemRole: (_roles: string[]) => true
-};
 
 const mockUseApi = {
   dataset: {
@@ -33,12 +27,10 @@ const renderContainer = () => {
 };
 
 const mockBiohubApi = useApi as jest.Mock;
-const mockKeycloakWrapper = useKeycloakWrapper as jest.Mock;
 
 describe('DashboardPage', () => {
   beforeEach(() => {
     mockBiohubApi.mockImplementation(() => mockUseApi);
-    mockKeycloakWrapper.mockImplementation(() => mockUseKeycloakWrapper);
   });
 
   afterEach(() => {
