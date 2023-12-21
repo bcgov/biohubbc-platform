@@ -3,7 +3,9 @@ import { HTTP403 } from '../errors/http-error';
 import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
+  SecurityCategoryRecord,
   SecurityRepository,
+  SecurityRuleAndCategory,
   SecurityRuleRecord,
   SECURITY_APPLIED_STATUS,
   SubmissionFeatureSecurityRecord
@@ -381,5 +383,25 @@ export class SecurityService extends DBService {
    */
   async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
     return this.securityRepository.getActiveSecurityRules();
+  }
+
+  /**
+   * Gets a list of all active security rules with associated categories
+   *
+   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
+   * @memberof SecurityService
+   */
+  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
+    return this.securityRepository.getActiveRulesAndCategories();
+  }
+
+  /**
+   * Gets a list of all active security categories
+   *
+   * @return {*}  {Promise<SecurityCategoryRecord[]>}
+   * @memberof SecurityService
+   */
+  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
+    return this.securityRepository.getActiveSecurityCategories();
   }
 }

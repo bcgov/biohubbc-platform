@@ -1,7 +1,7 @@
 import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { ISecurityRule } from 'hooks/api/useSecurityApi';
+import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
@@ -23,7 +23,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const submissionContext = useSubmissionContext();
   const securityRules = submissionContext.securityRulesDataLoader.data || [];
 
-  const initialAppliedSecurityRules: ISecurityRule[] = !submissionFeatureRulesDataLoader.data?.length
+  const initialAppliedSecurityRules: ISecurityRuleAndCategory[] = !submissionFeatureRulesDataLoader.data?.length
     ? []
     : securityRules.filter((securityRule) => {
         return submissionFeatureRulesDataLoader.data?.some(
@@ -31,7 +31,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         );
       });
 
-  const handleSubmit = async (rules: ISecurityRule[]) => {
+  const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
     try {
       await api.submissions
         .applySubmissionFeatureRules(

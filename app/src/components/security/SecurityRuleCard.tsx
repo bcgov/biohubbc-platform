@@ -1,15 +1,20 @@
-import { Stack, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 
 interface ISecurityRuleCardProps {
   title: string;
+  category: string;
   subtitle: string;
 }
 const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
   return (
-    <Stack gap={0.5}>
+    <Box>
+      <Typography variant="body2" color="textSecondary">
+        {props.category}
+      </Typography>
       <Typography
         variant="body1"
-        fontWeight="bold"
+        fontWeight={700}
+        gutterBottom
         sx={{
           display: '-webkit-box',
           WebkitLineClamp: '2',
@@ -24,6 +29,7 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
         color="textSecondary"
         sx={{
           display: '-webkit-box',
+          maxWidth: '92ch',
           WebkitLineClamp: '2',
           WebkitBoxOrient: 'vertical',
           overflow: 'hidden',
@@ -31,7 +37,7 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
         }}>
         {props.subtitle}
       </Typography>
-    </Stack>
+    </Box>
   );
 };
 

@@ -21,13 +21,13 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   const dialogContext = useDialogContext();
   const api = useApi();
 
-  const submissionDataLoader = submissionContext.submissionDataLoader;
+  const submissionRecordDataLoader = submissionContext.submissionRecordDataLoader;
 
-  if (!submissionDataLoader.data) {
+  if (!submissionRecordDataLoader.data) {
     return <CircularProgress className="pageProgress" size={40} />;
   }
 
-  const submission = submissionDataLoader.data?.submission;
+  const submission = submissionRecordDataLoader.data;
 
   const onSecurityReviewComplete = async () => {
     await api.submissions.updateSubmissionRecord(submissionContext.submissionId, { security_reviewed: true });
@@ -35,7 +35,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
       open: true,
       snackbarMessage: 'Submission Published'
     });
-    submissionContext.submissionDataLoader.refresh(submissionContext.submissionId);
+    submissionContext.submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
   const onSecurityReviewRemove = async () => {
@@ -44,7 +44,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
       open: true,
       snackbarMessage: 'Submission Unpublished'
     });
-    submissionContext.submissionDataLoader.refresh(submissionContext.submissionId);
+    submissionContext.submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
   return (

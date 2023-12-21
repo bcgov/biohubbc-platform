@@ -249,6 +249,7 @@ export const SubmissionRecord = z.object({
   source_system: z.string(),
   name: z.string(),
   description: z.string().nullable(),
+  publish_timestamp: z.string().nullable(),
   create_date: z.string(),
   create_user: z.number(),
   update_date: z.string().nullable(),
@@ -258,11 +259,11 @@ export const SubmissionRecord = z.object({
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
 
-export const SubmissionWithSecurityRecord = SubmissionRecord.extend({
+export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS)
 });
 
-export type SubmissionWithSecurityRecord = z.infer<typeof SubmissionWithSecurityRecord>;
+export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
 
 export const SubmissionRecordWithRootFeatureType = SubmissionRecord.extend({
   feature_type_id: z.number(),
@@ -1279,7 +1280,7 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
       WHERE
         submission_id = ${submissionId}
-      GROUP BY 
+      GROUP BY
         submission_feature.submission_feature_id,
         feature_type.name,
         feature_type.display_name,
@@ -1304,12 +1305,12 @@ export class SubmissionRepository extends BaseRepository {
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
-   * @return {*}  {Promise<SubmissionWithSecurityRecord>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
    * @memberof SubmissionRepository
    */
-  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionWithSecurityRecord> {
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
     const sqlStatement = SQL`
-      SELECT 
+      SELECT
         submission.*,
         CASE
           WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
@@ -1317,23 +1318,23 @@ export class SubmissionRepository extends BaseRepository {
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END as security
-      FROM 
+      FROM
         submission
-      LEFT 
+      LEFT
         JOIN submission_feature
-      ON 
+      ON
         submission_feature.submission_id = submission.submission_id
-      LEFT JOIN 
+      LEFT JOIN
         submission_feature_security
-      ON 
+      ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
-      WHERE 
+      WHERE
         submission.submission_id = ${submissionId}
-      GROUP BY 
+      GROUP BY
         submission.submission_id;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionWithSecurityRecord);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get submission record with security status', [
@@ -1348,10 +1349,10 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that have been reviewed (with security status)
    *
-   * @return {*}  {Promise<SubmissionWithSecurityRecord[]>}
+   * @return {*}  {Promise<SubmissionRecordWithSecurity[]>}
    * @memberof SubmissionRepository
    */
-  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionWithSecurityRecord[]> {
+  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionRecordWithSecurity[]> {
     const sqlStatement = SQL`
       SELECT s.*,
         CASE
@@ -1369,7 +1370,7 @@ export class SubmissionRepository extends BaseRepository {
       ORDER by s.submission_id
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionWithSecurityRecord);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);
 
     return response.rows;
   }

@@ -13,14 +13,42 @@ import { Knex } from 'knex';
  * @return {*}  {Promise<void>}
  */
 export async function up(knex: Knex): Promise<void> {
-  await knex.raw(`
+  await knex.raw(`--sql
     ----------------------------------------------------------------------------------------
     -- Create tables
     ----------------------------------------------------------------------------------------
     set search_path=biohub,public;
 
+
+    CREATE TABLE security_category(
+      security_category_id     integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      name                     varchar(100)      NOT NULL,
+      description              varchar(500),
+      record_effective_date    date              DEFAULT now() NOT NULL,
+      record_end_date          date,
+      create_date              timestamptz(6)    DEFAULT now() NOT NULL,
+      create_user              integer           NOT NULL,
+      update_date              timestamptz(6),
+      update_user              integer,
+      revision_count           integer           DEFAULT 0 NOT NULL,
+      CONSTRAINT security_category_pk PRIMARY KEY (security_category_id)
+    );
+
+    COMMENT ON COLUMN security_category.security_category_id     IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN security_category.name                    IS 'The name of the security_category record.';
+    COMMENT ON COLUMN security_category.description             IS 'The description of the security_category record.';
+    COMMENT ON COLUMN security_category.create_date             IS 'The category the record was created.';
+    COMMENT ON COLUMN security_category.create_user             IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN security_category.update_date             IS 'The category the record was updated.';
+    COMMENT ON COLUMN security_category.update_user             IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN security_category.revision_count          IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  security_category                         IS 'Security Category.';
+
+    ----------------------------------------------------------------------------------------
+
     CREATE TABLE security_rule(
       security_rule_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      security_category_id           integer           NOT NULL,
       name                           varchar(100)      NOT NULL,
       description                    varchar(500),
       record_effective_date          date              DEFAULT now() NOT NULL,
@@ -34,6 +62,7 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN security_rule.security_rule_id           IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN security_rule.security_category_id       IS 'Foreign key to the security_category table.';
     COMMENT ON COLUMN security_rule.name                       IS 'The name of the security_rule record.';
     COMMENT ON COLUMN security_rule.description                IS 'The description of the security_rule record.';
     COMMENT ON COLUMN security_rule.record_effective_date      IS 'Record level effective date.';
@@ -216,6 +245,10 @@ export async function up(knex: Knex): Promise<void> {
     -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
     CREATE UNIQUE INDEX security_rule_nuk1 ON security_rule(name, (record_end_date is NULL)) where record_end_date is null;
 
+    ALTER TABLE security_rule ADD CONSTRAINT security_category_fk1
+      FOREIGN KEY (security_category_id)
+      REFERENCES security_category(security_category_id);
+
     ----------------------------------------------------------------------------------------
     -- Create Indexes and Constraints for table: submission_feature_security
     ----------------------------------------------------------------------------------------
@@ -302,6 +335,16 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX security_spatial_idx1 ON security_spatial(security_rule_id);
 
     ----------------------------------------------------------------------------------------
+    -- Create Indexes and Constraints for table: security_category
+    ----------------------------------------------------------------------------------------
+
+    -- Add unique end-date key constraint (don't allow 2 records with the same name and a NULL record_end_date)
+    CREATE UNIQUE INDEX security_category_nuk1 ON security_category(name, (record_end_date is NULL)) where record_end_date is null;
+
+    -- add indexes for foreign keys
+    CREATE INDEX security_category_idx1 ON security_category(security_category_id);
+
+    ----------------------------------------------------------------------------------------
     -- Create audit and journal triggers
     ----------------------------------------------------------------------------------------
 
@@ -322,6 +365,9 @@ export async function up(knex: Knex): Promise<void> {
 
     create trigger audit_security_spatial before insert or update or delete on security_spatial for each row execute procedure tr_audit_trigger();
     create trigger journal_security_spatial after insert or update or delete on security_spatial for each row execute procedure tr_journal_trigger();
+
+    create trigger audit_security_category before insert or update or delete on security_category for each row execute procedure tr_audit_trigger();
+    create trigger journal_security_category after insert or update or delete on security_category for each row execute procedure tr_journal_trigger();
   `);
 }
 
