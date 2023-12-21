@@ -62,13 +62,13 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
 
   const columns: GridColDef[] = [
     {
-      field: 'submission_feature_security_id',
+      field: 'submission_feature_security_ids',
       headerName: 'Security',
       flex: 0,
       disableColumnMenu: true,
       width: 160,
       renderCell: (params) => {
-        if (params.value > 0) {
+        if (params.value.length > 0) {
           return (
             <Stack flexDirection="row" alignItems="center" gap={1}>
               <Icon path={mdiLock} size={0.75} />

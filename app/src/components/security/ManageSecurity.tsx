@@ -11,6 +11,7 @@ import UnsecureDialog from './UnsecureDialog';
 
 interface IManageSecurityProps {
   features: number[];
+  onClose: () => void;
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
@@ -42,6 +43,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
         features={props.features}
         isOpen={isSecuritiesDialogOpen}
         onClose={() => {
+          props.onClose();
           setIsSecuritiesDialogOpen(false);
           handleMenuClose();
         }}
@@ -50,6 +52,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
         features={props.features}
         isOpen={isUnsecureDialogOpen}
         onClose={() => {
+          props.onClose();
           setIsUnsecuredDialogOpen(false);
           handleMenuClose();
         }}

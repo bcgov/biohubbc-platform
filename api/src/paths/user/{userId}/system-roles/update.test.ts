@@ -30,11 +30,18 @@ describe('updateSystemRolesHandler', () => {
     };
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
+      user_identity_source_id: 2,
       user_identifier: 'test name',
-      user_guid: 'aaaa',
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [11, 22],
       role_names: ['role 11', 'role 22']
     });
@@ -77,11 +84,18 @@ describe('updateSystemRolesHandler', () => {
     });
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
+      user_identity_source_id: 2,
       user_identifier: 'test name',
-      user_guid: 'aaaa',
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [11, 22],
       role_names: ['role 11', 'role 22']
     });
@@ -114,11 +128,18 @@ describe('updateSystemRolesHandler', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
+      user_identity_source_id: 2,
       user_identifier: 'test name',
-      user_guid: 'aaaa',
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [11, 22],
       role_names: ['role 1', 'role 2']
     });
@@ -158,11 +179,18 @@ describe('updateSystemRolesHandler', () => {
     });
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
+      user_identity_source_id: 2,
       user_identifier: 'test name',
-      user_guid: 'aaaa',
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [],
       role_names: []
     });

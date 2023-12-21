@@ -1,7 +1,7 @@
 import { SOURCE_SYSTEM } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
-import { Models } from '../models';
+import { SystemUserExtended } from '../repositories/user-repository';
 import { getKeycloakSource, getUserGuid } from '../utils/keycloak-utils';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
@@ -61,26 +61,24 @@ export type AuthorizationScheme = AuthorizeConfigAnd | AuthorizeConfigOr;
 
 export class AuthorizationService extends DBService {
   _userService = new UserService(this.connection);
-  _systemUser: Models.user.UserObject | undefined = undefined;
+  _systemUser: SystemUserExtended | undefined = undefined;
   _keycloakToken: object | undefined = undefined;
 
-  constructor(connection: IDBConnection, init?: { systemUser?: Models.user.UserObject; keycloakToken?: object }) {
+  constructor(connection: IDBConnection, init?: { systemUser?: SystemUserExtended; keycloakToken?: object }) {
     super(connection);
 
     this._systemUser = init?.systemUser;
     this._keycloakToken = init?.keycloakToken;
   }
 
-  get systemUser(): Models.user.UserObject | undefined {
+  get systemUser(): SystemUserExtended | undefined {
     return this._systemUser;
   }
 
   /**
    * Execute the `authorizationScheme` against the current user, and return `true` if they have access, `false` otherwise.
    *
-   * @param {UserObject} systemUserObject
    * @param {AuthorizationScheme} authorizationScheme
-   * @param {IDBConnection} connection
    * @return {*}  {Promise<boolean>} `true` if the `authorizationScheme` indicates the user has access, `false` otherwise.
    */
   async executeAuthorizationScheme(authorizationScheme: AuthorizationScheme): Promise<boolean> {
@@ -245,7 +243,7 @@ export class AuthorizationService extends DBService {
     return false;
   };
 
-  async getSystemUserObject(): Promise<Models.user.UserObject | null> {
+  async getSystemUserObject(): Promise<SystemUserExtended | null> {
     let systemUserWithRoles;
 
     try {
@@ -264,9 +262,9 @@ export class AuthorizationService extends DBService {
   /**
    * Finds a single user based on their keycloak token information.
    *
-   * @return {*}  {(Promise<Models.user.UserObject | null>)}
+   * @return {*}  {(Promise<SystemUserExtended | null>)}
    */
-  async getSystemUserWithRoles(): Promise<Models.user.UserObject | null> {
+  async getSystemUserWithRoles(): Promise<SystemUserExtended | null> {
     if (!this._keycloakToken) {
       return null;
     }

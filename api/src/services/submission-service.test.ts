@@ -5,7 +5,6 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { UserObject } from '../models/user';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISourceTransformModel,
@@ -21,6 +20,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { SystemUserExtended } from '../repositories/user-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
@@ -459,7 +459,7 @@ describe('SubmissionService', () => {
       it('should return submission with count object', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
@@ -482,7 +482,7 @@ describe('SubmissionService', () => {
       it('should return submission with count object', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
@@ -507,7 +507,7 @@ describe('SubmissionService', () => {
       it('should return null', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon

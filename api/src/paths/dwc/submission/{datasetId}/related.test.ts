@@ -284,7 +284,7 @@ describe('getRelatedDatasetsByDatasetId', () => {
 
     const submissionServiceStub = sinon
       .stub(SubmissionService.prototype, 'findRelatedDatasetsByDatasetId')
-      .resolves([{ datasetId: 'aaa' }, { datasetId: 'bbb' }] as RelatedDataset[]);
+      .resolves([{ datasetId: '123' }, { datasetId: '456' }] as RelatedDataset[]);
 
     const isSystemUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
@@ -307,13 +307,13 @@ describe('getRelatedDatasetsByDatasetId', () => {
     expect(mockRes.jsonValue).to.eql({
       datasetsWithSupplementaryData: [
         {
-          datasetId: 'aaa',
+          datasetId: '123',
           supplementaryData: {
             isPendingReview: true
           }
         },
         {
-          datasetId: 'bbb',
+          datasetId: '456',
           supplementaryData: {
             isPendingReview: false
           }

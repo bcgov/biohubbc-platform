@@ -4,7 +4,7 @@ import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
  * Parses out the user's GUID from a keycloak token, which is extracted from the
  * `preferred_username` property.
  *
- * @example getUserGuid({ preferred_username: 'aaabbaaa@idir' }) // => 'aaabbaaa'
+ * @example getUserGuid({ preferred_username: '123-456-789@idir' }) // => '123-456-789'
  *
  * @param {object} keycloakToken
  * @return {*} {(string | null)}
@@ -25,7 +25,7 @@ export const getUserGuid = (keycloakToken: object): string | null => {
  * identity source is inferred from the `preferred_username` field as a contingency.
  *
  * @example getUserIdentitySource({ ...token, identity_provider: 'bceidbasic' }) => SYSTEM_IDENTITY_SOURCE.BCEID_BASIC
- * @example getUserIdentitySource({ preferred_username: 'aaaa@idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
+ * @example getUserIdentitySource({ preferred_username: '123-456-789@idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
  *
  * @param {object} keycloakToken
  * @return {*} {SYSTEM_IDENTITY_SOURCE}

@@ -5,7 +5,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
-import { UserObject } from '../models/user';
 import {
   IGetSecurityTransformRecord,
   IGetSpatialTransformRecord,
@@ -15,6 +14,7 @@ import {
   ISubmissionSpatialSearchResponseRow,
   SpatialRepository
 } from '../repositories/spatial-repository';
+import { SystemUserExtended } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import { Srid3005 } from './geo-service';
 import { SpatialService } from './spatial-service';
@@ -269,7 +269,7 @@ describe('SpatialService', () => {
     it('should return spatial component search result rows', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
-      const mockUserObject = { role_names: [] } as unknown as UserObject;
+      const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const mockResponseRows = [
@@ -305,7 +305,7 @@ describe('SpatialService', () => {
     it('should call findSpatialComponentsByCriteriaAsAdminUser as data admin', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
-      const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
+      const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as SystemUserExtended;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
@@ -329,7 +329,7 @@ describe('SpatialService', () => {
     it('should call findSpatialComponentsByCriteriaAsAdminUser as system admin', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
-      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+      const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as SystemUserExtended;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
@@ -353,7 +353,7 @@ describe('SpatialService', () => {
     it('should return spatial component search result rows', async () => {
       const mockDBConnection = getMockDBConnection();
       const spatialService = new SpatialService(mockDBConnection);
-      const mockUserObject = { role_names: [] } as unknown as UserObject;
+      const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const mockResponseRows = [
@@ -446,7 +446,7 @@ describe('SpatialService', () => {
       it('should return spatial component metadata', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
@@ -473,7 +473,7 @@ describe('SpatialService', () => {
       it('should return spatial component metadata', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
@@ -509,7 +509,7 @@ describe('SpatialService', () => {
       it('should return spatial component metadata as system admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
-        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
@@ -543,7 +543,7 @@ describe('SpatialService', () => {
       it('should return spatial component metadata as data admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
-        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
+        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const mockResponseRows: ISpatialComponentFeaturePropertiesRow[] = [
@@ -612,7 +612,7 @@ describe('SpatialService', () => {
       it('should return [] as system admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
-        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as UserObject;
+        const mockUserObject = { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const repo = sinon
@@ -628,7 +628,7 @@ describe('SpatialService', () => {
       it('should return [] as data admin', async () => {
         const mockDBConnection = getMockDBConnection();
         const spatialService = new SpatialService(mockDBConnection);
-        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as UserObject;
+        const mockUserObject = { role_names: [SYSTEM_ROLE.DATA_ADMINISTRATOR] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const repo = sinon

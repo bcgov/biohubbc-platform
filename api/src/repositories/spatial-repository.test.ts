@@ -7,7 +7,6 @@ import sinonChai from 'sinon-chai';
 import SQL from 'sql-template-strings';
 import { SPATIAL_COMPONENT_TYPE } from '../constants/spatial';
 import { ApiGeneralError } from '../errors/api-error';
-import { UserObject } from '../models/user';
 import { Srid3005 } from '../services/geo-service';
 import { UserService } from '../services/user-service';
 import * as spatialUtils from '../utils/spatial-utils';
@@ -18,6 +17,7 @@ import {
   ISubmissionSpatialComponent,
   SpatialRepository
 } from './spatial-repository';
+import { SystemUserExtended } from './user-repository';
 
 chai.use(sinonChai);
 
@@ -440,7 +440,7 @@ describe('SpatialRepository', () => {
     it('should call _findSpatialComponentsByCriteria', async () => {
       const mockDBConnection = getMockDBConnection();
 
-      const mockUserObject = { role_names: [] } as unknown as UserObject;
+      const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
       sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
       const findSpatialComponentsByCriteriaAsAdminUserStub = sinon
