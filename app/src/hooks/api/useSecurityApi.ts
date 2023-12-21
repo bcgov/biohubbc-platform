@@ -137,7 +137,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<any[]>}
    */
-  const removeSecurityRulesToSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
+  const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
     const { data } = await axios.post('api/administrative/security/remove', {
       features: submissionFeatureIds
     });
@@ -168,7 +168,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
     getActiveSecurityRules,
     addSecurityRule,
     applySecurityRulesToSubmissionFeatures,
-    removeSecurityRulesToSubmissionFeatures,
+    removeSecurityRulesFromSubmissionFeatures,
     getSecurityRulesForSubmissionFeatures,
     getActiveSecurityRulesAndCategories
   };

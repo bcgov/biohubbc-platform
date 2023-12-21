@@ -15,7 +15,7 @@ const UnsecureDialog = (props: IUnsecureDialogProps) => {
 
   const handleRemove = async () => {
     try {
-      await api.security.removeSecurityRulesToSubmissionFeatures(props.features);
+      await api.security.removeSecurityRulesFromSubmissionFeatures(props.features);
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
