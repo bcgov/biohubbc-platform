@@ -3,8 +3,7 @@ import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import { useApi } from 'hooks/useApi';
-import useDataLoader from 'hooks/useDataLoader';
+import { useSubmissionContext } from 'hooks/useContext';
 import React, { useState } from 'react';
 import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
@@ -15,13 +14,9 @@ interface IManageSecurityProps {
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
-  const api = useApi();
-  const submissionFeatureRulesDataLoader = useDataLoader(api.security.getSecurityRulesForSubmissions);
-  if (props.features.length) {
-    submissionFeatureRulesDataLoader.load(props.features);
-  }
+  const { submissionFeaturesAppliedRulesDataLoader } = useSubmissionContext();
 
-  const hasSecurity = Boolean(submissionFeatureRulesDataLoader.data?.length);
+  const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [isUnsecureDialogOpen, setIsUnsecuredDialogOpen] = useState(false);
@@ -34,7 +29,6 @@ const ManageSecurity = (props: IManageSecurityProps) => {
   };
   const handleMenuClose = () => {
     setAnchorEl(null);
-    submissionFeatureRulesDataLoader.refresh(props.features);
   };
 
   return (
