@@ -22,7 +22,9 @@ import { getFormattedDate, pluralize as p } from 'utils/Utils';
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const unreviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getUnreviewedSubmissions());
+  const unreviewedSubmissionsDataLoader = useDataLoader(() =>
+    biohubApi.submissions.getUnreviewedSubmissionsForAdmins()
+  );
 
   unreviewedSubmissionsDataLoader.load();
 
@@ -96,7 +98,7 @@ const UnreviewedSubmissionsTable = () => {
                 }
                 action={
                   <Chip
-                    label={submissionRecord.feature_type_name}
+                    label={submissionRecord.root_feature_type_name}
                     size="small"
                     sx={{
                       my: '-2px',

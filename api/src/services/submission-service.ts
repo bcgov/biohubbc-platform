@@ -20,7 +20,9 @@ import {
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
   SubmissionRecord,
+  SubmissionRecordPublished,
   SubmissionRecordWithSecurity,
+  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -549,28 +551,20 @@ export class SubmissionService extends DBService {
   /**
    * Get all submissions that are pending security review (are unreviewed).
    *
-   * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
-   *   >)}
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
-  async getUnreviewedSubmissionsForAdmins(): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
-  > {
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
   }
 
   /**
    * Get all submissions that have completed security review (are reviewed).
    *
-   * @return {*}  {(Promise<
-   *     (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
-   *   >)}
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionService
    */
-  async getReviewedSubmissionsForAdmins(): Promise<
-    (SubmissionRecord & { feature_type_id: number; feature_type_name: string })[]
-  > {
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     return this.submissionRepository.getReviewedSubmissionsForAdmins();
   }
 
@@ -586,13 +580,13 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Get all submissions (with security status) that have been reviewed.
+   * Get all published submissions.
    *
-   * @return {*}  {Promise<SubmissionRecordWithSecurity[]>}
+   * @return {*}  {Promise<SubmissionRecordPublished[]>}
    * @memberof SubmissionService
    */
-  async getReviewedSubmissionsWithSecurity(): Promise<SubmissionRecordWithSecurity[]> {
-    return this.submissionRepository.getReviewedSubmissionsWithSecurity();
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
+    return this.submissionRepository.getPublishedSubmissions();
   }
 
   /**

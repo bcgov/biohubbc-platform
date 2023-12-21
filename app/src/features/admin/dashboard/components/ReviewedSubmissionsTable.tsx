@@ -22,7 +22,7 @@ import { getFormattedDate, pluralize as p } from 'utils/Utils';
 const ReviewedSubmissionsTable = () => {
   const biohubApi = useApi();
 
-  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getReviewedSubmissions());
+  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getReviewedSubmissionsForAdmins());
 
   reviewedSubmissionsDataLoader.load();
 
@@ -96,7 +96,7 @@ const ReviewedSubmissionsTable = () => {
                 }
                 action={
                   <Chip
-                    label={submissionRecord.feature_type_name}
+                    label={submissionRecord.root_feature_type_name}
                     size="small"
                     sx={{
                       my: '-2px',
