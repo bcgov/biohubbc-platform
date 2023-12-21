@@ -68,7 +68,8 @@ describe('patchSubmissionRecord', () => {
       submissionId: String(submissionId)
     };
     mockReq.body = {
-      security_reviewed: true
+      security_reviewed: true,
+      published: true
     };
 
     const getReviewedSubmissionsStub = sinon
@@ -79,7 +80,10 @@ describe('patchSubmissionRecord', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
-    expect(getReviewedSubmissionsStub).to.have.been.calledOnceWith(submissionId, { security_reviewed: true });
+    expect(getReviewedSubmissionsStub).to.have.been.calledOnceWith(submissionId, {
+      security_reviewed: true,
+      published: true
+    });
     expect(mockRes.statusValue).to.equal(200);
     expect(mockRes.jsonValue).to.eql(mockSubmissionRecord);
   });

@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
@@ -287,7 +288,8 @@ export const SubmissionMessageRecord = z.object({
 export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
 
 export const PatchSubmissionRecord = z.object({
-  security_reviewed: z.boolean().optional()
+  security_reviewed: z.boolean().optional(),
+  published: z.boolean().optional()
 });
 
 export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
@@ -1435,16 +1437,39 @@ export class SubmissionRepository extends BaseRepository {
     const knex = getKnex();
     const queryBuilder = knex.table('submission').where('submission_id', submissionId).returning('*');
 
-    if (patch.security_reviewed !== undefined) {
-      // Don't patch security_review_timestamp if security_reviewed not provided
-      if (patch.security_reviewed) {
-        // Set security_review_timestamp to now() if it is currently null
-        queryBuilder.update({ security_review_timestamp: knex.raw('now()') }).where('security_review_timestamp', null);
-      } else {
-        // Set security_review_timestamp to null if it is currently not null
-        queryBuilder.update({ security_review_timestamp: null }).whereNot('security_review_timestamp', null);
-      }
+    // Collect all update operations
+    let updateOperations: Record<string, Knex.Raw> = {};
+
+    if (patch.security_reviewed === true) {
+      updateOperations = {
+        ...updateOperations,
+        security_review_timestamp: knex.raw(
+          'CASE WHEN security_review_timestamp IS NULL THEN NOW() ELSE security_review_timestamp END'
+        )
+      };
+    } else if (patch.security_reviewed === false) {
+      updateOperations = {
+        ...updateOperations,
+        security_review_timestamp: knex.raw(
+          'CASE WHEN security_review_timestamp IS NOT NULL THEN NULL ELSE security_review_timestamp END'
+        )
+      };
     }
+
+    if (patch.published === true) {
+      updateOperations = {
+        ...updateOperations,
+        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
+      };
+    } else if (patch.published === false) {
+      updateOperations = {
+        ...updateOperations,
+        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NOT NULL THEN NULL ELSE publish_timestamp END')
+      };
+    }
+
+    // Register all update operations
+    queryBuilder.update(updateOperations);
 
     const response = await this.connection.knex(queryBuilder, SubmissionRecord);
 

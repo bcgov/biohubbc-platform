@@ -3,7 +3,8 @@ import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { ISecurityRule } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
-import { useDialogContext } from 'hooks/useContext';
+import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
+import useDataLoader from 'hooks/useDataLoader';
 import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
@@ -16,12 +17,30 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useDialogContext();
   const api = useApi();
 
+  const submissionFeatureRulesDataLoader = useDataLoader(api.security.getSecurityRulesForSubmissions);
+  submissionFeatureRulesDataLoader.load(props.features);
+
+  const submissionContext = useSubmissionContext();
+  const securityRules = submissionContext.securityRulesDataLoader.data || [];
+
+  const initialAppliedSecurityRules: ISecurityRule[] = !submissionFeatureRulesDataLoader.data?.length
+    ? []
+    : securityRules.filter((securityRule) => {
+        return submissionFeatureRulesDataLoader.data?.some(
+          (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
+        );
+      });
+
   const handleSubmit = async (rules: ISecurityRule[]) => {
     try {
-      await api.submissions.applySubmissionFeatureRules(
-        props.features,
-        rules.map((item) => item.security_rule_id)
-      );
+      await api.submissions
+        .applySubmissionFeatureRules(
+          props.features,
+          rules.map((item) => item.security_rule_id)
+        )
+        .then(() => {
+          submissionFeatureRulesDataLoader.refresh(props.features);
+        });
 
       dialogContext.setSnackbar({
         snackbarMessage: (
@@ -54,7 +73,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onSave={(values: ISecurityRuleFormikProps) => handleSubmit(values.rules)}
       component={{
         element: <SecurityRuleForm features={props.features} />,
-        initialValues: { rules: [] },
+        initialValues: { rules: initialAppliedSecurityRules },
         validationSchema: SecurityRuleFormYupSchema
       }}
     />
