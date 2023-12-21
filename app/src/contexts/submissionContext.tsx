@@ -39,14 +39,10 @@ export interface ISubmissionContext {
    * The Data Loader used to load the list of all security rules applied to the set of
    * given submission features.
    *
-   * @type {DataLoader<[features: number[]], ISubmissionFeatureSecurityRecord[], unknown>}
+   * @type {DataLoader<[], ISubmissionFeatureSecurityRecord[], unknown>}
    * @memberof ISubmissionContext
    */
-  submissionFeaturesAppliedRulesDataLoader: DataLoader<
-    [features: number[]],
-    ISubmissionFeatureSecurityRecord[],
-    unknown
-  >;
+  submissionFeaturesAppliedRulesDataLoader: DataLoader<[], ISubmissionFeatureSecurityRecord[], unknown>;
   /**
    * The submission id.
    *
@@ -61,20 +57,37 @@ export const SubmissionContext = React.createContext<ISubmissionContext | undefi
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const api = useApi();
 
-  // The static list of all security rules that could be applied to a submission feature
+  // Stores the static list of all security rules that could be applied to a submission feature
   const allSecurityRulesStaticListDataLoader = useDataLoader(api.security.getActiveSecurityRulesAndCategories);
 
-  // The submission record, including security metadata
+  // Stores the submission record, including security metadata
   const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
 
-  // The list of all features for the given submission
+  // Stores the list of all features for the given submission
   const submissionFeatureGroupsDataLoader = useDataLoader(api.submissions.getSubmissionFeatureGroups);
 
-  // The list of all security rules applied to the given features
-  const submissionFeaturesAppliedRulesDataLoader = useDataLoader(api.security.getSecurityRulesForSubmissionFeatures);
+  // The collection of all feature IDs belonging to this submission
+  const allSubmissionFeatureIds: number[] = useMemo(() => {
+    if (!submissionFeatureGroupsDataLoader.data) {
+      return [];
+    }
+
+    return submissionFeatureGroupsDataLoader.data.reduce(
+      (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
+        return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
+      },
+      []
+    );
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submissionFeatureGroupsDataLoader.data]);
+
+  // Stores the list of all security rules applied to the given features
+  const submissionFeaturesAppliedRulesDataLoader = useDataLoader(() => {
+    return api.security.getSecurityRulesForSubmissionFeatures(allSubmissionFeatureIds);
+  });
 
   const urlParams = useParams();
-
   const submissionId = Number(urlParams['submission_id']);
 
   if (!submissionId) {
@@ -103,20 +116,8 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
    * Refreshes the list of all applied security rules, whenever the list of submission features changes
    */
   useEffect(() => {
-    if (!submissionFeatureGroupsDataLoader.data) {
-      return;
-    }
-
-    const featureIds = submissionFeatureGroupsDataLoader.data.reduce(
-      (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
-        return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
-      },
-      []
-    );
-
-    submissionFeaturesAppliedRulesDataLoader.refresh(featureIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionFeatureGroupsDataLoader.data]);
+    submissionFeaturesAppliedRulesDataLoader.refresh();
+  }, [allSubmissionFeatureIds]);
 
   const submissionContext: ISubmissionContext = useMemo(() => {
     return {

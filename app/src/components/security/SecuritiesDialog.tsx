@@ -10,7 +10,6 @@ interface ISecuritiesDialogProps {
   features: number[];
   open: boolean;
   onClose: () => void;
-  // onSubmit: () => void; // TODO need some way to trigger a refresh of all applied security rules...
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
@@ -32,11 +31,15 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
 
   const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
     try {
-      await api.security.applySecurityRulesToSubmissionFeatures(
-        props.features,
-        rules.map((item) => item.security_rule_id),
-        true // Override will replace all rules on submit
-      );
+      await api.security
+        .applySecurityRulesToSubmissionFeatures(
+          props.features,
+          rules.map((item) => item.security_rule_id),
+          true // Override will replace all rules on submit
+        )
+        .then(() => {
+          submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
+        });
 
       dialogContext.setSnackbar({
         snackbarMessage: (
