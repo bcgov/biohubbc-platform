@@ -14,11 +14,11 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import RecordsFoundSkeletonLoader from 'components/skeleton/submission-card/RecordsFoundSkeletonLoader';
 import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/SubmissionCardSkeletonLoader';
-import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import dayjs from 'dayjs';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import { Link as RouterLink } from 'react-router-dom';
-import { getFormattedDate, pluralize as p } from 'utils/Utils';
+import { getDaysSinceDate, pluralize as p } from 'utils/Utils';
 
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
@@ -169,7 +169,7 @@ const UnreviewedSubmissionsTable = () => {
                     }}>
                     <Stack flexDirection="row">
                       <dd>Submitted:</dd>
-                      <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
+                      <dt>{getDaysSinceDate(dayjs(submissionRecord.create_date))}</dt>
                     </Stack>
                     <Stack flexDirection="row">
                       <dd>Source:</dd>

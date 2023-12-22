@@ -1,6 +1,6 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
-import { default as dayjs } from 'dayjs';
+import { Dayjs, default as dayjs } from 'dayjs';
 import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
 import _ from 'lodash';
@@ -30,6 +30,28 @@ export const ensureProtocol = (url: string, protocol: 'http://' | 'https://' = '
   }
 
   return `${protocol}${url}`;
+};
+
+/**
+ * Returns a label specifying the number of days since Today.
+ * Label will include 'Today', 'Yesterday' or a count of the days.
+ *
+ * @param {Dayjs} oldDate Older date to get difference from
+ * @param {Dayjs} futureDate Future date to get difference from, defaulted to Today.
+ * @returns {string} Label constructed with date difference.
+ */
+export const getDaysSinceDate = (oldDate: Dayjs, futureDate = dayjs()) => {
+  const days = futureDate.diff(oldDate, 'days');
+  let label = '';
+  if (days < 1) {
+    // today
+    label = `Today (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  } else if (days < 2) {
+    label = `Yesterday (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  } else {
+    label = `${days} days ago (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  }
+  return label;
 };
 
 /**
