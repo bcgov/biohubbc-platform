@@ -1661,4 +1661,45 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql([mockResponse]);
     });
   });
+
+  describe('downloadPublishedSubmission', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.downloadPublishedSubmission(1);
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get submission with associated features');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        submission_feature_id: 1,
+        parent_submission_feature_id: null,
+        feature_type_name: 'string',
+        data: {},
+        level: 1
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.downloadPublishedSubmission(1);
+
+      expect(response).to.eql([mockResponse]);
+    });
+  });
 });

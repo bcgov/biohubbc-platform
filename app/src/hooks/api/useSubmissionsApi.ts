@@ -46,6 +46,20 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * @returns {Promise<IGetDownloadSubmissionResponse[]>} json data repackaged from each level of children
    */
   const getSubmissionDownloadPackage = async (submissionId: number): Promise<IGetDownloadSubmissionResponse[]> => {
+    const { data } = await axios.get(`/api/submission/${submissionId}/download`);
+
+    return data;
+  };
+
+  /**
+   * repackages and retrieves json data from self and each child under submission for published data
+   *
+   * @async
+   * @returns {Promise<IGetDownloadSubmissionResponse[]>} json data repackaged from each level of children
+   */
+  const getSubmissionPublishedDownloadPackage = async (
+    submissionId: number
+  ): Promise<IGetDownloadSubmissionResponse[]> => {
     const { data } = await axios.get(`/api/submission/${submissionId}/published/download`);
 
     return data;
@@ -129,6 +143,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     listSubmissions,
     getSignedUrl,
     getSubmissionDownloadPackage,
+    getSubmissionPublishedDownloadPackage,
     getSubmissionFeatureGroups,
     getSubmissionRecordWithSecurity,
     getUnreviewedSubmissionsForAdmins,

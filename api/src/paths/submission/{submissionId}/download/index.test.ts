@@ -3,15 +3,15 @@ import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as index from '.';
-import * as db from '../../../../../database/db';
-import { HTTP400, HTTPError } from '../../../../../errors/http-error';
-import { SubmissionService } from '../../../../../services/submission-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../../../__mocks__/db';
+import * as db from '../../../../database/db';
+import { HTTP400, HTTPError } from '../../../../errors/http-error';
+import { SubmissionService } from '../../../../services/submission-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
 describe('index', () => {
-  describe('downloadPublishedSubmission', () => {
+  describe('downloadSubmission', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -22,10 +22,10 @@ describe('index', () => {
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
       const getSubmissionAndFeaturesBySubmissionIdStub = sinon
-        .stub(SubmissionService.prototype, 'downloadPublishedSubmission')
+        .stub(SubmissionService.prototype, 'downloadSubmission')
         .throws(new HTTP400('Error', ['Error']));
 
-      const requestHandler = index.downloadPublishedSubmission();
+      const requestHandler = index.downloadSubmission();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
@@ -52,10 +52,10 @@ describe('index', () => {
       const mockResponse = [] as unknown as any;
 
       const getSubmissionAndFeaturesBySubmissionIdStub = sinon
-        .stub(SubmissionService.prototype, 'downloadPublishedSubmission')
+        .stub(SubmissionService.prototype, 'downloadSubmission')
         .resolves(mockResponse);
 
-      const requestHandler = index.downloadPublishedSubmission();
+      const requestHandler = index.downloadSubmission();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 

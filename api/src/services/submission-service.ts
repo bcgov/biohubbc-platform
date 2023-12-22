@@ -697,4 +697,15 @@ export class SubmissionService extends DBService {
   async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
     return this.submissionRepository.downloadSubmission(submissionId);
   }
+
+  /**
+   *  Download Published Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadPublishedSubmission(submissionId);
+  }
 }

@@ -1,13 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../../database/db';
-import { defaultErrorResponses } from '../../../../../openapi/schemas/http-responses';
-import { SubmissionService } from '../../../../../services/submission-service';
-import { getLogger } from '../../../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
+import { SubmissionService } from '../../../../services/submission-service';
+import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/{submissionId}/published/download');
+const defaultLog = getLogger('paths/submission/{submissionId}/download');
 
-export const GET: Operation = [downloadPublishedSubmission()];
+export const GET: Operation = [downloadSubmission()];
 
 GET.apiDoc = {
   description: 'Downloads a submission record and all associated features from the submission table',
@@ -74,7 +74,7 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function downloadPublishedSubmission(): RequestHandler {
+export function downloadSubmission(): RequestHandler {
   return async (req, res) => {
     const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
@@ -85,13 +85,13 @@ export function downloadPublishedSubmission(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.downloadPublishedSubmission(submissionId);
+      const result = await submissionService.downloadSubmission(submissionId);
 
       await connection.commit();
 
       res.status(200).json(result);
     } catch (error) {
-      defaultLog.error({ label: 'downloadPublishedSubmission', message: 'error', error });
+      defaultLog.error({ label: 'downloadSubmission', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
