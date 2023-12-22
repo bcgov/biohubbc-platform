@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import {
+  IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
   IListSubmissionsResponse,
   SubmissionRecordPublished,
@@ -40,13 +41,14 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
 
   /**
    * repackages and retrieves json data from self and each child under submission
-   * Note: unknown how this will work with artifacts. SignedURL?
    *
    * @async
-   * @returns {Promise<any>} json data repackaged from each level of children
+   * @returns {Promise<IGetDownloadSubmissionResponse[]>} json data repackaged from each level of children
    */
-  const getSubmissionDownloadPackage = async (): Promise<any> => {
-    return { mockJson: 'mockValue' };
+  const getSubmissionDownloadPackage = async (submissionId: number): Promise<IGetDownloadSubmissionResponse[]> => {
+    const { data } = await axios.get(`/api/submission/${submissionId}/published/download`);
+
+    return data;
   };
 
   /**
