@@ -3,6 +3,7 @@ import Icon from '@mdi/react';
 import { Button, Menu, MenuItem } from '@mui/material';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import { useSubmissionContext } from 'hooks/useContext';
 import React, { useState } from 'react';
 import SecuritiesDialog from './SecuritiesDialog';
 import UnsecureDialog from './UnsecureDialog';
@@ -13,6 +14,10 @@ interface IManageSecurityProps {
 }
 
 const ManageSecurity = (props: IManageSecurityProps) => {
+  const { submissionFeaturesAppliedRulesDataLoader } = useSubmissionContext();
+
+  const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
+
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [isUnsecureDialogOpen, setIsUnsecuredDialogOpen] = useState(false);
   const [isSecuritiesDialogOpen, setIsSecuritiesDialogOpen] = useState(false);
@@ -53,7 +58,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
         onClick={handleMenuClick}
         startIcon={<Icon path={mdiSecurity} size={0.75} />}
         endIcon={open ? <Icon path={mdiChevronUp} size={0.75} /> : <Icon path={mdiChevronDown} size={0.75} />}>
-        Manage Security
+        {hasSecurity ? 'Edit Security' : 'Add Security'}
       </Button>
       <Menu
         open={open}
