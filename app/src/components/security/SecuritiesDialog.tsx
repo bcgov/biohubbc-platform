@@ -28,7 +28,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
           (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
         );
       });
-
+  const hasSecurity = Boolean(initialAppliedSecurityRules.length);
   const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
     try {
       await api.security
@@ -65,7 +65,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
 
   return (
     <EditDialog
-      dialogTitle="Secure Records"
+      dialogTitle={hasSecurity ? 'Edit Security Reasons' : ' Add Security Reasons'}
       open={props.open}
       dialogSaveButtonLabel="APPLY"
       onCancel={props.onClose}
