@@ -113,6 +113,16 @@ export const FeatureTypeRecord = z.object({
 
 export type FeatureTypeRecord = z.infer<typeof FeatureTypeRecord>;
 
+export const SubmissionFeatureDownloadRecord = z.object({
+  submission_feature_id: z.number(),
+  parent_submission_feature_id: z.number().nullable(),
+  feature_type_name: z.string(),
+  data: z.record(z.any()),
+  level: z.number()
+});
+
+export type SubmissionFeatureDownloadRecord = z.infer<typeof SubmissionFeatureDownloadRecord>;
+
 export interface ISubmissionRecordWithSpatial {
   id: string;
   source: Record<string, unknown>;
@@ -1251,9 +1261,9 @@ export class SubmissionRepository extends BaseRepository {
           feature_type
         ON
           feature_type.feature_type_id = submission_feature.feature_type_id
-        LEFT JOIN 
+        LEFT JOIN
           submission_feature_security
-        ON 
+        ON
           submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
         WHERE
           submission.security_review_timestamp IS NOT NULL
@@ -1270,7 +1280,7 @@ export class SubmissionRepository extends BaseRepository {
         *
       FROM
         w_unique_submissions
-      ORDER BY 
+      ORDER BY
         submitted_timestamp DESC;
     `;
 
@@ -1391,15 +1401,15 @@ export class SubmissionRepository extends BaseRepository {
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
 	      ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END as security
-      FROM 
+      FROM
         submission
-      INNER JOIN 
+      INNER JOIN
         submission_feature
-      ON 
+      ON
         submission_feature.submission_id = submission.submission_id
       LEFT JOIN
         submission_feature_security
-      ON 
+      ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       INNER JOIN
         feature_type
@@ -1409,14 +1419,14 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature.parent_submission_feature_id IS NULL
       AND
         submission.security_review_timestamp IS NOT NULL
-      AND 
+      AND
         submission.publish_timestamp IS NOT NULL
-      GROUP BY 
+      GROUP BY
         submission.submission_id,
         feature_type.feature_type_id,
         feature_type.name,
         feature_type.display_name
-      ORDER BY 
+      ORDER BY
         submission.publish_timestamp ASC;
     `;
 
@@ -1559,5 +1569,90 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Download Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    const sqlStatement = SQL`
+    WITH RECURSIVE w_submission_feature AS (
+      SELECT
+        sf.submission_id,
+        sf.submission_feature_id,
+        sf.parent_submission_feature_id,
+        ft.name as feature_type_name,
+        sf.data,
+        1 AS level
+      FROM
+        submission_feature sf
+      INNER JOIN
+        submission s
+      ON
+        sf.submission_id = s.submission_id
+      INNER JOIN
+        feature_type ft
+      ON
+        ft.feature_type_id = sf.feature_type_id
+      WHERE
+        parent_submission_feature_id IS null
+      AND
+        s.submission_id = ${submissionId}
+
+      UNION ALL
+
+      SELECT
+        sf.submission_id,
+        sf.submission_feature_id,
+        sf.parent_submission_feature_id,
+        ft.name as feature_type_name,
+        sf.data,
+        wsf.level + 1
+      FROM
+        submission_feature sf
+      INNER JOIN
+        w_submission_feature wsf
+      ON
+        sf.parent_submission_feature_id = wsf.submission_feature_id
+      INNER JOIN
+        feature_type ft
+      ON
+      ft.feature_type_id = sf.feature_type_id
+      where
+        sf.submission_id = ${submissionId}
+    )
+    SELECT
+      w_submission_feature.submission_feature_id,
+      w_submission_feature.parent_submission_feature_id,
+      w_submission_feature.feature_type_name,
+      w_submission_feature.data,
+      w_submission_feature.level
+    FROM
+      w_submission_feature
+    LEFT JOIN
+     submission
+    ON
+      w_submission_feature.submission_id = submission.submission_id
+    WHERE
+      submission.submission_id = ${submissionId}
+    ORDER BY
+      level,
+      submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Failed to get submission with associated features', [
+        'SubmissionRepository->downloadSubmission',
+        `rowCount was ${response.rowCount}, expected rowCount > 0`
+      ]);
+    }
+
+    return response.rows;
   }
 }
