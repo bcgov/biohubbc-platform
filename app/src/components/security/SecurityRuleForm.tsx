@@ -69,7 +69,9 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             options={alphabetizeObjects(securityRules, 'name')}
             filterOptions={(options, state) => {
               const searchFilter = createFilterOptions<ISecurityRuleAndCategory>({
-                ignoreCase: true
+                ignoreCase: true,
+                matchFrom: 'any',
+                stringify: (option) => option.name + option.category_name
               });
               const unselectedOptions = options.filter(
                 (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
