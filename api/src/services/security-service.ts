@@ -360,8 +360,8 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
-  async removeSecurityRulesFromSubmissionFeatures(submissions: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissions);
+  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
   }
 
   /**

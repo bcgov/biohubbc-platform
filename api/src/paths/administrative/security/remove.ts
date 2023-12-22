@@ -37,7 +37,7 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           properties: {
-            submissions: {
+            features: {
               type: 'array',
               items: {
                 type: 'number'
@@ -100,7 +100,7 @@ export function removeSecurityRulesFromSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.removeSecurityRulesFromSubmissionFeatures(req.body.submissions);
+      const data = await service.removeSecurityRulesFromSubmissionFeatures(req.body.features);
 
       await connection.commit();
 

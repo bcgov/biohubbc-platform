@@ -113,7 +113,7 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
 
       const data = await service.applySecurityRulesToSubmissionFeatures(
         req.body.features,
-        req.body.rules,
+        req.body.rules || [],
         Boolean(req.body.override)
       );
 
