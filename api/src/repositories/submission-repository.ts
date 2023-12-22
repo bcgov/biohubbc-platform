@@ -1259,6 +1259,10 @@ export class SubmissionRepository extends BaseRepository {
           submission.security_review_timestamp IS NOT NULL
         AND
           submission_feature.parent_submission_feature_id IS NULL
+        GROUP BY
+          submission.submission_id,
+          submission_feature.feature_type_id,
+          feature_type.name
         ORDER BY
           submission.uuid, submission.submission_id DESC
       )
@@ -1266,7 +1270,8 @@ export class SubmissionRepository extends BaseRepository {
         *
       FROM
         w_unique_submissions
-      ORDER BY submitted_timestamp DESC;
+      ORDER BY 
+        submitted_timestamp DESC;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);

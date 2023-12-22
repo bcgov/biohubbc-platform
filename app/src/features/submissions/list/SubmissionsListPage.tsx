@@ -1,14 +1,13 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import RecordsFoundSkeletonLoader from 'components/skeleton/submission-card/RecordsFoundSkeletonLoader';
 import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/SubmissionCardSkeletonLoader';
 import SecureDataAccessRequestDialog from 'features/datasets/security/SecureDataAccessRequestDialog';
 import { SearchInput } from 'features/search/SearchComponent';
-import SubmissionsListSortMenu from 'features/submissions/components/SubmissionsListSortMenu';
 import SubmissionsList from 'features/submissions/list/SubmissionsList';
+import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { FuseResult } from 'fuse.js';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
@@ -16,7 +15,6 @@ import useDownloadJSON from 'hooks/useDownloadJSON';
 import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
-import { pluralize as p } from 'utils/Utils';
 
 /**
  * Renders reviewed Submissions as cards with download and request access actions
@@ -81,17 +79,12 @@ const SubmissionsListPage = () => {
               </>
             )) || (
               <>
-                <Stack mb={4} flexDirection="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h4" component="h2">
-                    {`${fuzzyData.length} ${p(fuzzyData.length, 'record')} found`}
-                  </Typography>
-                  <SubmissionsListSortMenu
-                    data={fuzzyData}
-                    handleSortedFuzzyData={(data) => {
-                      handleFuzzyData(data);
-                    }}
-                  />
-                </Stack>
+                <SubmissionsListSortMenu
+                  submissions={fuzzyData}
+                  handleSortedFuzzyData={(data) => {
+                    handleFuzzyData(data);
+                  }}
+                />
                 <SubmissionsList
                   submissions={fuzzyData}
                   onDownload={onDownload}

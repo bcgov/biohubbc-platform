@@ -1,5 +1,6 @@
-import { mdiCommentOutline, mdiTrayArrowDown } from '@mdi/js';
+import { mdiCommentOutline, mdiTextBoxSearchOutline, mdiTrayArrowDown } from '@mdi/js';
 import Icon from '@mdi/react';
+import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActions from '@mui/material/CardActions';
@@ -7,6 +8,7 @@ import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Chip from '@mui/material/Chip';
 import grey from '@mui/material/colors/grey';
+import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/system/Stack';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
@@ -26,6 +28,33 @@ const SubmissionsList = (props: ISubmissionsListProps) => {
   const { submissions, onDownload, onAccessRequest } = props;
 
   const { highlight } = useFuzzySearch();
+
+  if (submissions.length === 0) {
+    return (
+      <>
+        <Stack alignItems="center" justifyContent="center" p={3} component={Paper} elevation={0} minHeight={168}>
+          <Box
+            sx={{
+              '& svg': {
+                color: 'text.secondary'
+              }
+            }}>
+            <Icon path={mdiTextBoxSearchOutline} size={2} />
+          </Box>
+          <Typography
+            data-testid="no-security-reviews"
+            component="h2"
+            variant="h4"
+            fontWeight={700}
+            sx={{
+              mb: 1
+            }}>
+            No records found
+          </Typography>
+        </Stack>
+      </>
+    );
+  }
 
   return (
     <Stack gap={2}>

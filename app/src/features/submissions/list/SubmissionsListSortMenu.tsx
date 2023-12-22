@@ -3,16 +3,19 @@ import Icon from '@mdi/react';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import useTheme from '@mui/system/useTheme';
 import { FuseResult } from 'fuse.js';
 import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
 import sortBy from 'lodash-es/sortBy';
 import { useState } from 'react';
+import { pluralize as p } from 'utils/Utils';
 
 type SortBy = 'asc' | 'desc';
 
 interface ISubmissionsListSortMenuProps {
-  data: FuseResult<SubmissionRecordPublished>[];
+  submissions: FuseResult<SubmissionRecordPublished>[];
   handleSortedFuzzyData: (data: FuseResult<SubmissionRecordPublished>[]) => void;
 }
 
@@ -24,6 +27,8 @@ interface ISubmissionsListSortMenuProps {
  * @returns {*}
  */
 const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
+  const { submissions, handleSortedFuzzyData } = props;
+
   const theme = useTheme();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -47,9 +52,9 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
   const handleSort = (sortKey: keyof SubmissionRecordPublished, sortDirection: SortBy) => {
     const sortedData =
       sortDirection === 'asc'
-        ? sortBy(props.data, (fuzzyDataset) => fuzzyDataset.item[sortKey])
-        : sortBy(props.data, (fuzzyDataset) => fuzzyDataset.item[sortKey]).reverse();
-    props.handleSortedFuzzyData(sortedData);
+        ? sortBy(submissions, (fuzzyDataset) => fuzzyDataset.item[sortKey])
+        : sortBy(submissions, (fuzzyDataset) => fuzzyDataset.item[sortKey]).reverse();
+    handleSortedFuzzyData(sortedData);
     handleClose();
   };
 
@@ -73,14 +78,18 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
   };
 
   return (
-    <div>
+    <Stack mb={4} flexDirection="row" alignItems="center" justifyContent="space-between">
+      <Typography variant="h4" component="h2">
+        {`${submissions.length} ${p(submissions.length, 'record')} found`}
+      </Typography>
       <Button
         id="sort-button"
         onClick={handleClick}
         variant="outlined"
         disableElevation
         size="small"
-        endIcon={<Icon path={mdiChevronDown} size={0.75} />}>
+        endIcon={<Icon path={mdiChevronDown} size={0.75} />}
+        disabled={!submissions.length}>
         Sort By
       </Button>
       <Menu id="sort-menu" anchorEl={anchorEl} open={open} onClose={handleClose}>
@@ -89,7 +98,7 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
         {sortMenuItem('submitted_timestamp', 'Date')}
         {sortMenuItem('submitted_timestamp', 'Date', 'desc')}
       </Menu>
-    </div>
+    </Stack>
   );
 };
 
