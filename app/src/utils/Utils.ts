@@ -1,9 +1,9 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
+import { default as dayjs } from 'dayjs';
 import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
 import _ from 'lodash';
-import moment from 'moment';
 
 /**
  * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
@@ -70,14 +70,14 @@ export const getFormattedDateRangeString = (
  * @return {string} formatted date string, or an empty string if unable to parse the date
  */
 export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateObject = dayjs(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateObject.isValid()) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(dateFormat);
+  return dateObject.format(dateFormat);
 };
 
 /**
@@ -88,14 +88,14 @@ export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string 
  * @return {string} formatted time string, or an empty string if unable to parse the date
  */
 export const getFormattedTime = (timeFormat: TIME_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateObject = dayjs(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateObject.isValid()) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(timeFormat);
+  return dateObject.format(timeFormat);
 };
 
 /**

@@ -1,5 +1,5 @@
+import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
-import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -532,8 +532,8 @@ export class SubmissionService extends DBService {
    * @returns {*} {string} the most recent date found
    */
   mostRecentDate(dates: string[]): string {
-    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
-    return dates[0] ?? moment();
+    dates.sort((d1, d2) => dayjs(d1).diff(dayjs(d2)));
+    return dates[0] ?? dayjs();
   }
 
   /**
