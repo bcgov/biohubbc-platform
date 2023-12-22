@@ -1,3 +1,5 @@
+import { pluralize as p } from 'utils/Utils';
+
 export const SystemUserI18N = {
   removeSystemUserTitle: 'Remove System User ',
   removeUserErrorTitle: 'Error Removing User From Team',
@@ -24,8 +26,16 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  applySecuritySuccess: (submissionCount: number) =>
-    `Successfully applied security rules to: ${submissionCount} features.`,
+  applySecuritySuccess: (ruleCount: number, featureCount: number) => {
+    if (ruleCount === 0) {
+      return `Successfully removed all security rules for ${featureCount} ${p(featureCount, 'feature')}.`;
+    }
+
+    return `Successfully applied ${ruleCount} ${p(ruleCount, 'security rule')} to ${featureCount} ${p(
+      featureCount,
+      'feature'
+    )}.`;
+  },
 
   applySecurityRulesErrorTitle: 'Error Applying Security',
   applySecurityRulesErrorText:

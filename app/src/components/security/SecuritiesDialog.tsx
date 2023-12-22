@@ -44,7 +44,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(props.features.length)}
+            {ApplySecurityRulesI18N.applySecuritySuccess(rules.length, props.features.length)}
           </Typography>
         ),
         open: true
