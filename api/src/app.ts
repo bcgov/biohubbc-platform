@@ -8,6 +8,7 @@ import { ensureHTTPError, HTTPErrorType } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
 import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
 import { getLogger } from './utils/logger';
+import { initDBConstants } from './database/db-constants';
 
 const defaultLog = getLogger('app');
 
@@ -112,6 +113,7 @@ app.use('/api-docs', swaggerUIExperss.serve, swaggerUIExperss.setup(openAPIFrame
 // Start api
 try {
   initDBPool(defaultPoolConfig);
+  initDBConstants();
 
   app.listen(PORT, () => {
     defaultLog.info({ label: 'start api', message: `started api on ${HOST}:${PORT}/api` });

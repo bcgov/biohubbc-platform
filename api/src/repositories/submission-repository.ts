@@ -1353,7 +1353,6 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submission features by submission id.
    *
-   *
    * @param {number} submissionId
    * @return {*}  {Promise<SubmissionFeatureRecordWithTypeAndSecurity[]>}
    * @memberof SubmissionRepository

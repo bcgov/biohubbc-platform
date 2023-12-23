@@ -1,11 +1,10 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SOURCE_SYSTEM } from '../../constants/database';
 import { SYSTEM_ROLE } from '../../constants/roles';
 import { getDBConnection, getServiceAccountDBConnection } from '../../database/db';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
-import { getKeycloakSource } from '../../utils/keycloak-utils';
+import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/artifact/delete');
@@ -19,7 +18,6 @@ export const POST: Operation = [
           discriminator: 'SystemRole'
         },
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -98,9 +96,10 @@ export function deleteArtifact(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'deleteArtifact', message: 'request body', req_body: req.query });
 
-    const sourceSystem = getKeycloakSource(req['keycloak_token']);
-    const connection = sourceSystem
-      ? getServiceAccountDBConnection(sourceSystem)
+    const serviceClientUser = getServiceClientSystemUser(req['keycloak_token']);
+
+    const connection = serviceClientUser
+      ? getServiceAccountDBConnection(serviceClientUser)
       : getDBConnection(req['keycloak_token']);
 
     try {
