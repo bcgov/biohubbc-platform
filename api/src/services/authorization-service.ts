@@ -1,8 +1,7 @@
-import { SOURCE_SYSTEM } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { SystemUserExtended } from '../repositories/user-repository';
-import { getKeycloakSource, getUserGuid } from '../utils/keycloak-utils';
+import { getServiceClientSystemUser, getUserGuid } from '../utils/keycloak-utils';
 import { DBService } from './db-service';
 import { UserService } from './user-service';
 
@@ -41,7 +40,6 @@ export interface AuthorizeBySystemUser {
  * @interface AuthorizeByServiceClient
  */
 export interface AuthorizeByServiceClient {
-  validServiceClientIDs: SOURCE_SYSTEM[];
   discriminator: 'ServiceClient';
 }
 
@@ -107,7 +105,7 @@ export class AuthorizationService extends DBService {
           authorizeResults.push(await this.authorizeBySystemUser());
           break;
         case 'ServiceClient':
-          authorizeResults.push(await this.authorizeByServiceClient(authorizeRule));
+          authorizeResults.push(await this.authorizeByServiceClient());
           break;
       }
     }
@@ -190,24 +188,25 @@ export class AuthorizationService extends DBService {
   }
 
   /**
-   * Check if the user is a valid system client.
+   * Check if the user is a known service client system user.
    *
-   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a valid system user, `Promise<false>` otherwise.
+   * @return {*}  {Promise<boolean>} `Promise<true>` if the user is a known service client system user,
+   * `Promise<false>` otherwise.
    */
-  async authorizeByServiceClient(authorizeServiceClient: AuthorizeByServiceClient): Promise<boolean> {
+  async authorizeByServiceClient(): Promise<boolean> {
     if (!this._keycloakToken) {
       // Cannot verify token source
       return false;
     }
 
-    const source = getKeycloakSource(this._keycloakToken);
+    const source = getServiceClientSystemUser(this._keycloakToken);
 
     if (!source) {
-      // Cannot verify token source
+      // Failed to find known service client system user
       return false;
     }
 
-    return AuthorizationService.hasAtLeastOneValidValue(authorizeServiceClient.validServiceClientIDs, source);
+    return true;
   }
 
   /**

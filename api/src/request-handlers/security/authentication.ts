@@ -1,6 +1,7 @@
 import { Request } from 'express';
 import { decode, verify } from 'jsonwebtoken';
 import { JwksClient } from 'jwks-rsa';
+import { getDBConstants } from '../../database/db-constants';
 import { HTTP401 } from '../../errors/http-error';
 import { getLogger } from '../../utils/logger';
 
@@ -75,7 +76,7 @@ export const authenticateRequest = async function (req: Request): Promise<true> 
     // Verify token using public signing key
     const verifiedToken = verify(tokenString, signingKey, {
       issuer: KEYCLOAK_ISSUER,
-      audience: [KEYCLOAK_CLIENT_ID, 'sims-svc-4464'] // TODO this sims service name should not be hardcoded here
+      audience: [KEYCLOAK_CLIENT_ID, ...getDBConstants().serviceClientUsers.map((item) => item.user_identifier)]
     });
 
     if (!verifiedToken) {

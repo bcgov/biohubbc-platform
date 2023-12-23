@@ -1459,7 +1459,7 @@ describe.skip('DarwinCoreService', () => {
 
       const indexStub = sinon.stub().returns('es response');
 
-      sinon.stub(DarwinCoreService.prototype, 'getEsClient').resolves({
+      sinon.stub(ESService.prototype, 'getEsClient').resolves({
         index: indexStub
       } as unknown as Client);
 

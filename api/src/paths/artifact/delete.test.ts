@@ -93,7 +93,7 @@ describe('delete artifact', () => {
     it('catches and throws error', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(false);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
       sinon.stub(ArtifactService.prototype, 'deleteArtifacts').throws('There was an issue deleting an artifact.');
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {
@@ -114,7 +114,7 @@ describe('delete artifact', () => {
     it('responds with proper data', async () => {
       const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(false);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
       sinon.stub(ArtifactService.prototype, 'deleteArtifacts').resolves();
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.body = {

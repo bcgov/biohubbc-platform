@@ -104,7 +104,7 @@ export class ValidationService extends DBService {
       const dataProperty = dataProperties[property.name];
 
       if (!dataProperty) {
-        throw new Error(`Property ${property.name} not found in data`);
+        throw new Error(`Property [${property.name}] not found in data`);
       }
 
       switch (property.type) {

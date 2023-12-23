@@ -1,4 +1,6 @@
-import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { getDBConstants } from '../database/db-constants';
+import { SystemUser } from '../repositories/user-repository';
 
 /**
  * Parses out the user's GUID from a keycloak token, which is extracted from the
@@ -89,24 +91,23 @@ export const getUserIdentifier = (keycloakToken: object): string | null => {
 };
 
 /**
- * Parses out the `clientId` and `azp` fields from the token and maps them to a known `SOURCE_SYSTEM`, or null if no
- * match is found.
+ * Parses out the `clientId` and `azp` fields from the token and maps them to a known service client system user.
  *
  * @param {object} keycloakToken
- * @return {*}  {(SOURCE_SYSTEM | null)}
+ * @return {*}  {(SystemUser | null)}
  */
-export const getKeycloakSource = (keycloakToken: object): SOURCE_SYSTEM | null => {
-  const clientId = keycloakToken?.['clientId']?.toUpperCase();
-
-  const azp = keycloakToken?.['azp']?.toUpperCase();
+export const getServiceClientSystemUser = (keycloakToken: object): SystemUser | null => {
+  const clientId = keycloakToken?.['clientId'];
+  const azp = keycloakToken?.['azp'];
 
   if (!clientId && !azp) {
     return null;
   }
 
-  if ([clientId, azp].includes(SOURCE_SYSTEM['SIMS-SVC-4464'])) {
-    return SOURCE_SYSTEM['SIMS-SVC-4464'];
-  }
-
-  return null;
+  // Find and return a matching known service client,if one exists
+  return (
+    getDBConstants().serviceClientUsers.find(
+      (item) => item.user_identifier === clientId || item.user_identifier === azp
+    ) || null
+  );
 };

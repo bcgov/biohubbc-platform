@@ -1,13 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SOURCE_SYSTEM } from '../../../constants/database';
 import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { ISecurityRequest, SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
 import { scanFileForVirus } from '../../../utils/file-utils';
-import { getKeycloakSource } from '../../../utils/keycloak-utils';
+import { getServiceClientSystemUser } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/queue');
@@ -17,7 +16,6 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -154,20 +152,20 @@ export function queueForProcess(): RequestHandler {
     }
 
     const file: Express.Multer.File = req.files[0];
-    const sourceSystem = getKeycloakSource(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
 
     if (!(await scanFileForVirus(file))) {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
-    if (!sourceSystem) {
+    if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
         'token did not contain a clientId/azp or clientId/azp value is unknown'
       ]);
     }
 
     const id = req.body.data_package_id;
-    const connection = getServiceAccountDBConnection(sourceSystem);
+    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();
