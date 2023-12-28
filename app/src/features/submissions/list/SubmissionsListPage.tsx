@@ -15,6 +15,7 @@ import useDownloadJSON from 'hooks/useDownloadJSON';
 import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
+import { pluralize as p } from 'utils/Utils';
 
 /**
  * Renders reviewed Submissions as cards with download and request access actions
@@ -79,12 +80,19 @@ const SubmissionsListPage = () => {
               </>
             )) || (
               <>
-                <SubmissionsListSortMenu
-                  submissions={fuzzyData}
-                  handleSortedFuzzyData={(data) => {
-                    handleFuzzyData(data);
-                  }}
-                />
+                <Box pb={4} display="flex" flexDirection="row" justifyContent="space-between">
+                  <Typography variant="h4" component="h2">{`${fuzzyData.length} ${p(
+                    fuzzyData.length,
+                    'record'
+                  )} found`}</Typography>
+                  <SubmissionsListSortMenu
+                    sortMenuItems={{ name: 'Name', publish_timestamp: 'Publish Date' }}
+                    submissions={fuzzyData}
+                    handleSubmissions={(data) => {
+                      handleFuzzyData(data);
+                    }}
+                  />
+                </Box>
                 <SubmissionsList
                   submissions={fuzzyData}
                   onDownload={onDownload}

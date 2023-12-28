@@ -23,13 +23,16 @@ export async function seed(knex: Knex): Promise<void> {
   // 2. submission (1) without children but with security_review_timestamp
   await insertSubmissionRecord(knex, true);
 
-  // 3. submission (1) with children and SECURE (all submission features secure)
+  // 2. submission (1) without children but with security_review_timestamp and published_timestamp
+  await insertSubmissionRecord(knex, true, true);
+
+  // 4. submission (1) with children and SECURE (all submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'SECURE');
 
-  // 4. submission (1) with children and PARTIALLY SECURE (some submission features secure)
+  // 5. submission (1) with children and PARTIALLY SECURE (some submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'PARTIALLY SECURE');
 
-  // 5. submission (1) with children and UNSECURE (zero submission features secure)
+  // 6. submission (1) with children and UNSECURE (zero submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'UNSECURE');
 }
 
@@ -41,7 +44,7 @@ const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, 
 };
 
 const createSubmissionWithSecurity = async (knex: Knex, securityLevel: 'PARTIALLY SECURE' | 'SECURE' | 'UNSECURE') => {
-  const submission_id = await insertSubmissionRecord(knex, true);
+  const submission_id = await insertSubmissionRecord(knex, true, true);
   const parent_submission_feature_id = await insertDatasetRecord(knex, { submission_id });
   const submission_feature_id = await insertSampleSiteRecord(knex, {
     parent_submission_feature_id,

@@ -1281,7 +1281,7 @@ export class SubmissionRepository extends BaseRepository {
       FROM
         w_unique_submissions
       ORDER BY
-        submitted_timestamp DESC;
+        security_review_timestamp DESC;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
