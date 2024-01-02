@@ -359,6 +359,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       </Container>
 
       <EditDialog
+        isLoading={false}
         dialogTitle={'Add Users'}
         open={openAddUserDialog}
         dialogSaveButtonLabel={'Add'}

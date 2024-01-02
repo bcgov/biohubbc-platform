@@ -1,35 +1,32 @@
-import { mdiChevronDown, mdiSortAlphabeticalAscending, mdiSortAlphabeticalDescending } from '@mdi/js';
+import { mdiChevronDown } from '@mdi/js';
 import Icon from '@mdi/react';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import useTheme from '@mui/system/useTheme';
 import { FuseResult } from 'fuse.js';
-import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
-import sortBy from 'lodash-es/sortBy';
-import { useState } from 'react';
-import { pluralize as p } from 'utils/Utils';
+import { SubmissionRecord } from 'interfaces/useSubmissionsApi.interface';
+import React, { useState } from 'react';
+import SortMenuItem from './SortMenuItem';
 
-type SortBy = 'asc' | 'desc';
+export type SortSubmission = FuseResult<SubmissionRecord> | SubmissionRecord;
 
-interface ISubmissionsListSortMenuProps {
-  submissions: FuseResult<SubmissionRecordPublished>[];
-  handleSortedFuzzyData: (data: FuseResult<SubmissionRecordPublished>[]) => void;
+export interface ISubmissionsListSortMenuProps<TSubmission> {
+  submissions: TSubmission[];
+  handleSubmissions: (data: TSubmission[]) => void;
+  sortMenuItems: Partial<Record<keyof SubmissionRecord, string>>;
 }
 
 /**
- * Renders 'Sort By' button for SubmissionsListPage
- * Note: currently supports title and date sorting
+ * Renders 'Sort By' button for Submission pages
  *
+ * Note: supports both submission and fuzzy submission types
  * @param {ISubmissionsListSortMenuProps} props
  * @returns {*}
  */
-const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
-  const { submissions, handleSortedFuzzyData } = props;
-
-  const theme = useTheme();
+const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
+  props: ISubmissionsListSortMenuProps<TSubmission>
+) => {
+  const { submissions, sortMenuItems, handleSubmissions } = props;
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
@@ -43,45 +40,13 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
     setAnchorEl(null);
   };
 
-  /**
-   * sorts datasets by property
-   *
-   * @param {keyof IDataset} sortKey - property to sort datasets by
-   * @param {SortBy} [sortDirection] - ascending or descending sort
-   */
-  const handleSort = (sortKey: keyof SubmissionRecordPublished, sortDirection: SortBy) => {
-    const sortedData =
-      sortDirection === 'asc'
-        ? sortBy(submissions, (fuzzyDataset) => fuzzyDataset.item[sortKey])
-        : sortBy(submissions, (fuzzyDataset) => fuzzyDataset.item[sortKey]).reverse();
-    handleSortedFuzzyData(sortedData);
+  const handleSort = (submissions: TSubmission[]) => {
     handleClose();
-  };
-
-  const sortMenuItem = (sortKey: keyof SubmissionRecordPublished, itemName: string, sortBy: SortBy = 'asc') => {
-    const label = `${itemName} ${sortBy === 'asc' ? 'ascending' : 'descending'}`;
-    return (
-      <MenuItem
-        onClick={() => {
-          handleSort(sortKey, sortBy);
-        }}
-        dense>
-        <Icon
-          color={theme.palette.text.secondary}
-          path={sortBy === 'asc' ? mdiSortAlphabeticalAscending : mdiSortAlphabeticalDescending}
-          size={1}
-          style={{ marginRight: theme.spacing(1) }}
-        />
-        {label}
-      </MenuItem>
-    );
+    handleSubmissions(submissions);
   };
 
   return (
     <Stack mb={4} flexDirection="row" alignItems="center" justifyContent="space-between">
-      <Typography variant="h4" component="h2">
-        {`${submissions.length} ${p(submissions.length, 'record')} found`}
-      </Typography>
       <Button
         id="sort-button"
         onClick={handleClick}
@@ -92,11 +57,16 @@ const SubmissionsListSortMenu = (props: ISubmissionsListSortMenuProps) => {
         disabled={!submissions.length}>
         Sort By
       </Button>
-      <Menu id="sort-menu" anchorEl={anchorEl} open={open} onClose={handleClose}>
-        {sortMenuItem('name', 'Title')}
-        {sortMenuItem('name', 'Title', 'desc')}
-        {sortMenuItem('submitted_timestamp', 'Date')}
-        {sortMenuItem('submitted_timestamp', 'Date', 'desc')}
+      <Menu id="sort-menu" anchorEl={anchorEl} open={open} onClose={handleClose} keepMounted>
+        {Object.keys(sortMenuItems).map((key) => (
+          <SortMenuItem
+            key={key}
+            submissions={submissions}
+            handleSort={handleSort}
+            name={sortMenuItems[key]}
+            sortKey={key as keyof SubmissionRecord}
+          />
+        ))}
       </Menu>
     </Stack>
   );

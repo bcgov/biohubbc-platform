@@ -25,7 +25,12 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
         justifyContent: 'space-between',
         background: grey[100]
       }}>
-      <SecurityRuleCard key={props.security_rule_id} title={props.name} category={props.category} subtitle={props.description} />
+      <SecurityRuleCard
+        key={props.security_rule_id}
+        title={props.name}
+        category={props.category}
+        subtitle={props.description}
+      />
       <IconButton onClick={() => props.remove(props.security_rule_id)} aria-label="Remove security rule">
         <Icon path={mdiClose} size={1} />
       </IconButton>

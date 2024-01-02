@@ -135,7 +135,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * Removes all of the security rules for the given submission feature IDs, rendering them unsecure.
    *
    * @deprecated Use `applySecurityRulesToSubmissionFeatures(submissionFeatureIds, [], true)`
-   * 
+   *
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<any[]>}
    */

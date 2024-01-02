@@ -85,8 +85,12 @@ const insertRecord = async (knex: Knex) => {
   }
 };
 
-export const insertSubmissionRecord = async (knex: Knex, includeSecurityReview = false): Promise<number> => {
-  const response = await knex.raw(`${insertSubmission(includeSecurityReview)}`);
+export const insertSubmissionRecord = async (
+  knex: Knex,
+  includeSecurityReview = false,
+  includePublishTimestamp = false
+): Promise<number> => {
+  const response = await knex.raw(`${insertSubmission(includeSecurityReview, includePublishTimestamp)}`);
   const submission_id = response.rows[0].submission_id;
 
   return submission_id;
@@ -246,8 +250,9 @@ const insertAnimalRecord = async (
   return submission_feature_id;
 };
 
-export const insertSubmission = (includeSecurityReview: boolean) => {
-  const securityReviewTimestamp = includeSecurityReview ? `$$${faker.date.past().toISOString()}$$` : null;
+export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includePublishTimestamp: boolean) => {
+  const securityReviewTimestamp = includeSecurityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
+  const publishTimestamp = includePublishTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
   return `
     INSERT INTO submission
     (
@@ -255,6 +260,7 @@ export const insertSubmission = (includeSecurityReview: boolean) => {
         name,
         description,
         security_review_timestamp,
+        publish_timestamp,
         source_system
     )
     values
@@ -263,6 +269,7 @@ export const insertSubmission = (includeSecurityReview: boolean) => {
         $$${faker.company.name()}$$,
         $$${faker.lorem.words({ min: 5, max: 100 })}$$,
         ${securityReviewTimestamp},
+        ${publishTimestamp},
         'SIMS'
     )
     RETURNING submission_id;
