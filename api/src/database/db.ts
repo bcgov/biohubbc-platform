@@ -21,6 +21,7 @@ const DB_PASSWORD = process.env.DB_USER_API_PASS;
 const DB_DATABASE = process.env.DB_DATABASE;
 
 const DB_POOL_SIZE: number = Number(process.env.DB_POOL_SIZE) || 20;
+const DB_CONNECTION_MAX_USES: number = Number(process.env.DB_CONNECTION_MAX_USES) || 7500;
 const DB_CONNECTION_TIMEOUT: number = Number(process.env.DB_CONNECTION_TIMEOUT) || 0;
 const DB_IDLE_TIMEOUT: number = Number(process.env.DB_IDLE_TIMEOUT) || 10000;
 
@@ -31,6 +32,7 @@ export const defaultPoolConfig: pg.PoolConfig = {
   port: DB_PORT,
   host: DB_HOST,
   max: DB_POOL_SIZE,
+  maxUses: DB_CONNECTION_MAX_USES,
   connectionTimeoutMillis: DB_CONNECTION_TIMEOUT,
   idleTimeoutMillis: DB_IDLE_TIMEOUT
 };
