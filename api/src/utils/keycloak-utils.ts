@@ -3,40 +3,114 @@ import { getDBConstants } from '../database/db-constants';
 import { SystemUser } from '../repositories/user-repository';
 
 /**
- * Parses out the user's GUID from a keycloak token, which is extracted from the
- * `preferred_username` property.
- *
- * @example getUserGuid({ preferred_username: '123-456-789@idir' }) // => '123-456-789'
- *
- * @param {object} keycloakToken
- * @return {*} {(string | null)}
+ * User information from a verified IDIR Keycloak token.
  */
-export const getUserGuid = (keycloakToken: object): string | null => {
-  const userIdentifier = keycloakToken?.['preferred_username']?.split('@')?.[0];
-
-  if (!userIdentifier) {
-    return null;
-  }
-
-  return userIdentifier;
+export type IdirUserInformation = {
+  idir_user_guid: string;
+  identity_provider: 'idir';
+  idir_username: string;
+  email_verified: boolean;
+  name: string;
+  preferred_username: string;
+  display_name: string;
+  given_name: string;
+  family_name: string;
+  email: string;
 };
 
 /**
- * Parses out the preferred_username identity source ('idir', 'bceidbasic', etc.) from the token and maps it to a known
- * `SYSTEM_IDENTITY_SOURCE`. If the `identity_provider` field in the keycloak token object is undefined, then the
- * identity source is inferred from the `preferred_username` field as a contingency.
- *
- * @example getUserIdentitySource({ ...token, identity_provider: 'bceidbasic' }) => SYSTEM_IDENTITY_SOURCE.BCEID_BASIC
- * @example getUserIdentitySource({ preferred_username: '123-456-789@idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
- *
- * @param {object} keycloakToken
- * @return {*} {SYSTEM_IDENTITY_SOURCE}
+ * User information from a verified BCeID Basic Keycloak token.
  */
-export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SOURCE => {
-  const userIdentitySource: string =
-    keycloakToken?.['identity_provider'] || keycloakToken?.['preferred_username']?.split('@')?.[1];
+export type BceidBasicUserInformation = {
+  bceid_user_guid: string;
+  identity_provider: 'bceidbasic';
+  bceid_username: string;
+  email_verified: boolean;
+  name: string;
+  preferred_username: string;
+  display_name: string;
+  given_name: string;
+  family_name: string;
+  email: string;
+};
 
-  return coerceUserIdentitySource(userIdentitySource);
+/**
+ * User information from a verified BCeID Keycloak token.
+ */
+export type BceidBusinessUserInformation = {
+  bceid_business_guid: string;
+  bceid_business_name: string;
+  bceid_user_guid: string;
+  identity_provider: 'bceidbusiness';
+  bceid_username: string;
+  email_verified: boolean;
+  name: string;
+  preferred_username: string;
+  display_name: string;
+  given_name: string;
+  family_name: string;
+  email: string;
+};
+
+/**
+ * User information for a keycloak service client userF.
+ */
+export type ServiceClientUserInformation = {
+  database_user_guid: string;
+  identity_provider: 'system';
+  username: string;
+  clientId?: string;
+  azp?: string;
+};
+
+/**
+ * User information for an internal database user.
+ */
+export type DatabaseUserInformation = {
+  database_user_guid: string;
+  identity_provider: 'database';
+  username: string;
+};
+
+/**
+ * User information from either an IDIR or BCeID Basic or BCeID Business Keycloak token.
+ */
+export type KeycloakUserInformation =
+  | IdirUserInformation
+  | BceidBasicUserInformation
+  | BceidBusinessUserInformation
+  | ServiceClientUserInformation
+  | DatabaseUserInformation;
+
+/**
+ * Returns the user information guid.
+ *
+ * @param {KeycloakUserInformation} keycloakUserInformation
+ * @return {*}  {(string | null)}
+ */
+export const getUserGuid = (keycloakUserInformation: KeycloakUserInformation): string => {
+  if (isIdirUserInformation(keycloakUserInformation)) {
+    return keycloakUserInformation.idir_user_guid;
+  }
+
+  if (isBceidBusinessUserInformation(keycloakUserInformation) || isBceidBasicUserInformation(keycloakUserInformation)) {
+    return keycloakUserInformation.bceid_user_guid;
+  }
+
+  return keycloakUserInformation.database_user_guid;
+};
+
+/**
+ * Returns the user information identity source ('idir', 'bceidbasic', 'database, etc) and maps it to a known
+ * `SYSTEM_IDENTITY_SOURCE`.
+ *
+ * @example getUserIdentitySource({ identity_provider: 'idir' }) => SYSTEM_IDENTITY_SOURCE.IDIR
+ *
+ * @param {Record<string, any>} keycloakToken
+ * @return {*} {SYSTEM_IDENTITY_SOURCE} the identity source belonging to type SYSTEM_IDENTITY_SOURCE
+ */
+export const getUserIdentitySource = (keycloakUserInformation: KeycloakUserInformation): SYSTEM_IDENTITY_SOURCE => {
+  return coerceUserIdentitySource(keycloakUserInformation.identity_provider);
 };
 
 /**
@@ -46,25 +120,25 @@ export const getUserIdentitySource = (keycloakToken: object): SYSTEM_IDENTITY_SO
  *
  * @example coerceUserIdentitySource('idir') => 'idir' satisfies SYSTEM_IDENTITY_SOURCE.IDIR
  *
- * @param userIdentitySource the identity source string
- * @returns {*} {SYSTEM_IDENTITY_SOURCE} the identity source belonging to type SYSTEM_IDENTITY_SOURCE
+ * @param {string} userIdentitySource
+ * @return {*}  {SYSTEM_IDENTITY_SOURCE} the identity source belonging to type SYSTEM_IDENTITY_SOURCE
  */
-export const coerceUserIdentitySource = (userIdentitySource: string | null): SYSTEM_IDENTITY_SOURCE => {
+export const coerceUserIdentitySource = (userIdentitySource: string): SYSTEM_IDENTITY_SOURCE => {
   switch (userIdentitySource?.toUpperCase()) {
+    case SYSTEM_IDENTITY_SOURCE.IDIR:
+      return SYSTEM_IDENTITY_SOURCE.IDIR;
+
     case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
       return SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
 
     case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
       return SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS;
 
-    case SYSTEM_IDENTITY_SOURCE.IDIR:
-      return SYSTEM_IDENTITY_SOURCE.IDIR;
+    case SYSTEM_IDENTITY_SOURCE.DATABASE:
+      return SYSTEM_IDENTITY_SOURCE.DATABASE;
 
     case SYSTEM_IDENTITY_SOURCE.SYSTEM:
       return SYSTEM_IDENTITY_SOURCE.SYSTEM;
-
-    case SYSTEM_IDENTITY_SOURCE.DATABASE:
-      return SYSTEM_IDENTITY_SOURCE.DATABASE;
 
     default:
       // Covers a user created directly in keycloak which wouldn't have an identity source
@@ -73,21 +147,53 @@ export const coerceUserIdentitySource = (userIdentitySource: string | null): SYS
 };
 
 /**
- * Parses out the user's identifier from a keycloak token.
+ * Returns the user information identifier (aka: username).
  *
- * @example getUserIdentifier({ ....token, bceid_username: 'jsmith@idir' }) => 'jsmith'
+ * @example getUserIdentifier({ idir_username: 'jsmith' }) => 'jsmith'
  *
- * @param {object} keycloakToken
- * @return {*} {(string | null)}
+ * @param {KeycloakUserInformation} keycloakUserInformation
+ * @return {*}  {string}
  */
-export const getUserIdentifier = (keycloakToken: object): string | null => {
-  const userIdentifier = keycloakToken?.['idir_username'] || keycloakToken?.['bceid_username'];
-
-  if (!userIdentifier) {
-    return null;
+export const getUserIdentifier = (keycloakUserInformation: KeycloakUserInformation): string => {
+  if (isIdirUserInformation(keycloakUserInformation)) {
+    return keycloakUserInformation.idir_username;
   }
 
-  return userIdentifier;
+  if (isBceidBusinessUserInformation(keycloakUserInformation) || isBceidBasicUserInformation(keycloakUserInformation)) {
+    return keycloakUserInformation.bceid_username;
+  }
+
+  return keycloakUserInformation.username;
+};
+
+export const isIdirUserInformation = (
+  keycloakUserInformation: KeycloakUserInformation
+): keycloakUserInformation is IdirUserInformation => {
+  return keycloakUserInformation.identity_provider === SYSTEM_IDENTITY_SOURCE.IDIR.toLowerCase();
+};
+
+export const isBceidBasicUserInformation = (
+  keycloakUserInformation: KeycloakUserInformation
+): keycloakUserInformation is BceidBasicUserInformation => {
+  return keycloakUserInformation.identity_provider === SYSTEM_IDENTITY_SOURCE.BCEID_BASIC.toLowerCase();
+};
+
+export const isBceidBusinessUserInformation = (
+  keycloakUserInformation: KeycloakUserInformation
+): keycloakUserInformation is BceidBusinessUserInformation => {
+  return keycloakUserInformation.identity_provider === SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS.toLowerCase();
+};
+
+export const isDatabaseUserInformation = (
+  keycloakUserInformation: KeycloakUserInformation
+): keycloakUserInformation is DatabaseUserInformation => {
+  return keycloakUserInformation.identity_provider === SYSTEM_IDENTITY_SOURCE.DATABASE.toLowerCase();
+};
+
+export const isServiceClientUserInformation = (
+  keycloakUserInformation: KeycloakUserInformation
+): keycloakUserInformation is ServiceClientUserInformation => {
+  return keycloakUserInformation.identity_provider === SYSTEM_IDENTITY_SOURCE.SYSTEM.toLowerCase();
 };
 
 /**
