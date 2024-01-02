@@ -29,7 +29,7 @@ describe('SubmissionsListSortMenu', () => {
     const actions = renderMenu();
     const menuBtn = actions.getByRole('button', { name: 'Sort By' });
 
-    expect(menuBtn).toBeTruthy();
+    expect(menuBtn).toBeVisible();
   });
 
   it('renders the menu items correctly', async () => {
@@ -41,23 +41,8 @@ describe('SubmissionsListSortMenu', () => {
     const menuItemA = actions.getByText('NAME');
     const menuItemB = actions.getByText('TEST');
 
-    expect(menuItemA).toBeTruthy();
-    expect(menuItemB).toBeTruthy();
-  });
-
-  it('clicking menu item calls handler function', async () => {
-    const actions = renderMenu();
-    const menuBtn = actions.getByRole('button', { name: 'Sort By' });
-
-    fireEvent.click(menuBtn);
-
-    const menuItemA = actions.getByText('NAME');
-    const menuItemB = actions.getByText('TEST');
-
-    fireEvent.click(menuItemA);
-    fireEvent.click(menuItemB);
-
-    expect(mockHandleSubmissions).toHaveBeenCalledTimes(2);
+    expect(menuItemA).toBeVisible();
+    expect(menuItemB).toBeVisible();
   });
 
   it('clicking menu item calls handler function', async () => {

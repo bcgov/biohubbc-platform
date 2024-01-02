@@ -39,7 +39,8 @@ const SubmissionsListPage = () => {
   const onDownload = async (submission: FuseResult<SubmissionRecordPublished>) => {
     // make request here for JSON data of submission and children
     const data = await biohubApi.submissions.getSubmissionPublishedDownloadPackage(submission.item.submission_id);
-    download(data, `${submission.item.name.toLowerCase().replace(/ /g, '-')}-${submission.item.submission_id}`);
+    const fileName = `${submission.item.name.toLowerCase().replace(/ /g, '-')}-${submission.item.submission_id}`;
+    download(data, fileName);
   };
 
   return (
