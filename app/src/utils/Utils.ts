@@ -1,9 +1,9 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
+import { Dayjs, default as dayjs } from 'dayjs';
 import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
 import _ from 'lodash';
-import moment from 'moment';
 
 /**
  * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
@@ -30,6 +30,28 @@ export const ensureProtocol = (url: string, protocol: 'http://' | 'https://' = '
   }
 
   return `${protocol}${url}`;
+};
+
+/**
+ * Returns a label specifying the number of days since Today.
+ * Label will include 'Today', 'Yesterday' or a count of the days.
+ *
+ * @param {Dayjs} oldDate Older date to get difference from
+ * @param {Dayjs} futureDate Future date to get difference from, defaulted to Today.
+ * @returns {string} Label constructed with date difference.
+ */
+export const getDaysSinceDate = (oldDate: Dayjs, futureDate = dayjs()) => {
+  const days = futureDate.diff(oldDate, 'days');
+  let label = '';
+  if (days < 1) {
+    // today
+    label = `Today (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  } else if (days < 2) {
+    label = `Yesterday (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  } else {
+    label = `${days} days ago (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  }
+  return label;
 };
 
 /**
@@ -70,14 +92,14 @@ export const getFormattedDateRangeString = (
  * @return {string} formatted date string, or an empty string if unable to parse the date
  */
 export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateObject = dayjs(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateObject.isValid()) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(dateFormat);
+  return dateObject.format(dateFormat);
 };
 
 /**
@@ -88,14 +110,14 @@ export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string 
  * @return {string} formatted time string, or an empty string if unable to parse the date
  */
 export const getFormattedTime = (timeFormat: TIME_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateObject = dayjs(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateObject.isValid()) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(timeFormat);
+  return dateObject.format(timeFormat);
 };
 
 /**

@@ -14,11 +14,13 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import RecordsFoundSkeletonLoader from 'components/skeleton/submission-card/RecordsFoundSkeletonLoader';
 import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/SubmissionCardSkeletonLoader';
-import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import dayjs from 'dayjs';
+import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
+import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
-import { getFormattedDate, pluralize as p } from 'utils/Utils';
+import { getDaysSinceDate, pluralize as p } from 'utils/Utils';
 
 const UnreviewedSubmissionsTable = () => {
   const biohubApi = useApi();
@@ -30,6 +32,10 @@ const UnreviewedSubmissionsTable = () => {
   unreviewedSubmissionsDataLoader.load();
 
   const submissionRecords = unreviewedSubmissionsDataLoader.data || [];
+
+  const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
+    unreviewedSubmissionsDataLoader.setData(submissions);
+  };
 
   if (unreviewedSubmissionsDataLoader.isLoading) {
     return (
@@ -77,11 +83,16 @@ const UnreviewedSubmissionsTable = () => {
 
   return (
     <>
-      <Box pb={4}>
+      <Box pb={4} display="flex" flexDirection="row" justifyContent="space-between">
         <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
         )} found`}</Typography>
+        <SubmissionsListSortMenu
+          sortMenuItems={{ publish_timestamp: 'Publish Timestamp' }}
+          submissions={submissionRecords}
+          handleSubmissions={handleSortSubmissions}
+        />
       </Box>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
@@ -169,7 +180,7 @@ const UnreviewedSubmissionsTable = () => {
                     }}>
                     <Stack flexDirection="row">
                       <dd>Submitted:</dd>
-                      <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
+                      <dt>{getDaysSinceDate(dayjs(submissionRecord.create_date))}</dt>
                     </Stack>
                     <Stack flexDirection="row">
                       <dd>Source:</dd>

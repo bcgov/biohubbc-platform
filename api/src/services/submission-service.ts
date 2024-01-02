@@ -1,5 +1,5 @@
+import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
-import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
@@ -16,6 +16,7 @@ import {
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
   PatchSubmissionRecord,
+  SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionMessageRecord,
@@ -532,8 +533,8 @@ export class SubmissionService extends DBService {
    * @returns {*} {string} the most recent date found
    */
   mostRecentDate(dates: string[]): string {
-    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
-    return dates[0] ?? moment();
+    dates.sort((d1, d2) => dayjs(d1).diff(dayjs(d2)));
+    return dates[0] ?? dayjs();
   }
 
   /**
@@ -684,5 +685,27 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
     return this.submissionRepository.getSubmissionRootFeature(submissionId);
+  }
+
+  /**
+   *  Download Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadSubmission(submissionId);
+  }
+
+  /**
+   *  Download Published Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadPublishedSubmission(submissionId);
   }
 }

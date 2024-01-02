@@ -4,7 +4,7 @@
  */
 
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import moment from 'moment';
+import { default as dayjs } from 'dayjs';
 import * as yup from 'yup';
 
 yup.addMethod(yup.array, 'isUniquePermitNumber', function (message: string) {
@@ -68,7 +68,7 @@ yup.addMethod(
         return true;
       }
 
-      return moment(value, dateFormat, true).isValid();
+      return dayjs(value, dateFormat, true).isValid();
     });
   }
 );
@@ -83,8 +83,8 @@ yup.addMethod(
         return true;
       }
 
-      const endDateTime = moment(`2020-10-20 ${this.parent.end_time}`, DATE_FORMAT.ShortDateTimeFormat);
-      const startDateTime = moment(`2020-10-20 ${this.parent[startTimeName]}`, DATE_FORMAT.ShortDateTimeFormat);
+      const endDateTime = dayjs(`2020-10-20 ${this.parent.end_time}`, DATE_FORMAT.ShortDateTimeFormat);
+      const startDateTime = dayjs(`2020-10-20 ${this.parent[startTimeName]}`, DATE_FORMAT.ShortDateTimeFormat);
 
       // compare valid start and end times
       return startDateTime.isBefore(endDateTime);
@@ -106,13 +106,13 @@ yup.addMethod(
         return true;
       }
 
-      if (!moment(this.parent[startDateName], dateFormat, true).isValid()) {
+      if (!dayjs(this.parent[startDateName], dateFormat, true).isValid()) {
         // don't validate start_date if it is invalid
         return true;
       }
 
       // compare valid start and end dates
-      return moment(this.parent.start_date, dateFormat, true).isBefore(moment(value, dateFormat, true));
+      return dayjs(this.parent.start_date, dateFormat, true).isBefore(dayjs(value, dateFormat, true));
     });
   }
 );
@@ -127,7 +127,7 @@ yup.addMethod(
         return true;
       }
 
-      if (moment(value, dateFormat).isAfter(moment(maxDate))) {
+      if (dayjs(value, dateFormat).isAfter(dayjs(maxDate))) {
         return false;
       }
 
@@ -146,7 +146,7 @@ yup.addMethod(
         return true;
       }
 
-      if (moment(value, dateFormat).isBefore(moment(minDate))) {
+      if (dayjs(value, dateFormat).isBefore(dayjs(minDate))) {
         return false;
       }
 

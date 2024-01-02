@@ -4,6 +4,7 @@ import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
+import { useState } from 'react';
 import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
@@ -13,6 +14,7 @@ interface ISecuritiesDialogProps {
 }
 
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
+  const [isLoading, setIsLoading] = useState(false);
   const dialogContext = useDialogContext();
   const api = useApi();
 
@@ -31,6 +33,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const hasSecurity = Boolean(initialAppliedSecurityRules.length);
   const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
     try {
+      setIsLoading(true);
       await api.security
         .applySecurityRulesToSubmissionFeatures(
           props.features,
@@ -59,12 +62,14 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
         open: true
       });
     } finally {
+      setIsLoading(false);
       props.onClose();
     }
   };
 
   return (
     <EditDialog
+      isLoading={isLoading}
       dialogTitle={hasSecurity ? 'Edit Security Reasons' : ' Add Security Reasons'}
       open={props.open}
       dialogSaveButtonLabel="APPLY"

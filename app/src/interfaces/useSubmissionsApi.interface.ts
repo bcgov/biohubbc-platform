@@ -83,3 +83,11 @@ export interface IGetSubmissionGroupedFeatureResponse {
   feature_type_display_name: string;
   features: SubmissionFeatureRecordWithTypeAndSecurity[];
 }
+
+export interface IGetDownloadSubmissionResponse {
+  submission_feature_id: number;
+  parent_submission_feature_id: number;
+  feature_type_name: string;
+  data: Record<string, any>;
+  level: number;
+}
