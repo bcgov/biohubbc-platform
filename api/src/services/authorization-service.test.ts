@@ -283,7 +283,9 @@ describe('authorizeByServiceClient', function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    const authorizationService = new AuthorizationService(mockDBConnection);
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: undefined
+    });
 
     const result = await authorizationService.authorizeByServiceClient();
 
@@ -295,16 +297,22 @@ describe('authorizeByServiceClient', function () {
 
     const systemUser = null;
 
-    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
+    const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
 
-    const authorizationService = new AuthorizationService(mockDBConnection);
+    const keycloakToken = {
+      preferred_username: 'unknown-user'
+    };
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: keycloakToken
+    });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient();
 
     expect(isAuthorizedBySystemRole).to.equal(false);
+    expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
   });
 
-  it.only('returns true if the service client matches a known service client system user', async function () {
+  it('returns true if the service client matches a known service client system user', async function () {
     const mockDBConnection = getMockDBConnection();
 
     const systemUser: SystemUser = {
@@ -321,13 +329,19 @@ describe('authorizeByServiceClient', function () {
       revision_count: 0
     };
 
-    sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
+    const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
 
-    const authorizationService = new AuthorizationService(mockDBConnection);
+    const keycloakToken = {
+      preferred_username: 'sims-svc-4464'
+    };
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: keycloakToken
+    });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient();
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+    expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
   });
 });
 
