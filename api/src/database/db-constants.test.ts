@@ -10,7 +10,7 @@ import { getDBConstants, initDBConstants } from './db-constants';
 
 chai.use(sinonChai);
 
-describe.only('db-constants', () => {
+describe('db-constants', () => {
   afterEach(() => {
     sinon.restore();
   });
