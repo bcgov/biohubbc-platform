@@ -6,12 +6,12 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
+import { SystemUser } from '../../../repositories/user-repository';
 import { SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
 import * as fileUtils from '../../../utils/file-utils';
 import * as keycloakUtils from '../../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as queue from './queue';
-import { SystemUser } from '../../../repositories/user-repository';
 
 chai.use(sinonChai);
 
