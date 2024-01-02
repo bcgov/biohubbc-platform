@@ -76,11 +76,19 @@ export class UserService extends DBService {
    * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
+   * @param {string} displayName
+   * @param {string} email
    * @return {*}  {Promise<SystemUser>}
    * @memberof UserService
    */
-  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<SystemUser> {
-    return this.userRepository.addSystemUser(userGuid, userIdentifier, identitySource);
+  async addSystemUser(
+    userGuid: string | null,
+    userIdentifier: string,
+    identitySource: string,
+    displayName: string,
+    email: string
+  ): Promise<SystemUser> {
+    return this.userRepository.addSystemUser(userGuid, userIdentifier, identitySource, displayName, email);
   }
 
   /**
@@ -100,13 +108,17 @@ export class UserService extends DBService {
    * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
+   * @param {string} displayName
+   * @param {string} email
    * @return {*}  {Promise<SystemUserExtended>}
    * @memberof UserService
    */
   async ensureSystemUser(
-    userGuid: string,
+    userGuid: string | null,
     userIdentifier: string,
-    identitySource: string
+    identitySource: string,
+    displayName: string,
+    email: string
   ): Promise<SystemUserExtended> {
     // Check if the user exists in SIMS
     const existingUser = userGuid
@@ -122,7 +134,7 @@ export class UserService extends DBService {
       }
 
       // Found no existing user, add them
-      const newUserId = await this.addSystemUser(userGuid, userIdentifier, identitySource);
+      const newUserId = await this.addSystemUser(userGuid, userIdentifier, identitySource, displayName, email);
 
       // fetch the new user object
       return this.getUserById(newUserId.system_user_id);

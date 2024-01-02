@@ -40,7 +40,7 @@ POST.apiDoc = {
         schema: {
           title: 'User Response Object',
           type: 'object',
-          required: ['userIdentifier', 'identitySource', 'roleId'],
+          required: ['userIdentifier', 'identitySource', 'displayName', 'email', 'roleId'],
           properties: {
             userGuid: {
               type: 'string',
@@ -57,6 +57,14 @@ POST.apiDoc = {
                 SYSTEM_IDENTITY_SOURCE.BCEID_BASIC,
                 SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS
               ]
+            },
+            displayName: {
+              type: 'string',
+              description: 'The display name for the user.'
+            },
+            email: {
+              type: 'string',
+              description: 'The email for the user.'
             },
             roleId: {
               type: 'number',
@@ -87,6 +95,8 @@ export function addSystemRoleUser(): RequestHandler {
     const userGuid = req.body?.userGuid || null;
     const userIdentifier = req.body?.userIdentifier || null;
     const identitySource = req.body?.identitySource || null;
+    const displayName: string | null = req.body?.displayName || null;
+    const email: string | null = req.body?.email || null;
 
     const roleId = req.body?.roleId || null;
 
@@ -102,6 +112,14 @@ export function addSystemRoleUser(): RequestHandler {
       throw new HTTP400('Missing required body param: identitySource');
     }
 
+    if (!displayName) {
+      throw new HTTP400('Missing required body param: identitySource');
+    }
+
+    if (!email) {
+      throw new HTTP400('Missing required body param: identitySource');
+    }
+
     if (!roleId) {
       throw new HTTP400('Missing required body param: roleId');
     }
@@ -111,7 +129,13 @@ export function addSystemRoleUser(): RequestHandler {
 
       const userService = new UserService(connection);
 
-      const userObject = await userService.ensureSystemUser(userGuid, userIdentifier, identitySource);
+      const userObject = await userService.ensureSystemUser(
+        userGuid,
+        userIdentifier,
+        identitySource,
+        displayName,
+        email
+      );
 
       if (userObject) {
         await userService.addUserSystemRoles(userObject.system_user_id, [roleId]);

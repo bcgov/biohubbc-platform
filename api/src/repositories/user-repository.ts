@@ -227,10 +227,18 @@ export class UserRepository extends BaseRepository {
    * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
+   * @param {string} displayName
+   * @param {string} email
    * @return {*}  {Promise<SystemUser>}
    * @memberof UserRepository
    */
-  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<SystemUser> {
+  async addSystemUser(
+    userGuid: string | null,
+    userIdentifier: string,
+    identitySource: string,
+    displayName: string,
+    email: string
+  ): Promise<SystemUser> {
     const sqlStatement = SQL`
       INSERT INTO
         system_user
@@ -238,6 +246,8 @@ export class UserRepository extends BaseRepository {
         user_guid,
         user_identity_source_id,
         user_identifier,
+        display_name,
+        email,
         record_effective_date
       )
       VALUES (
@@ -251,6 +261,8 @@ export class UserRepository extends BaseRepository {
             name = ${identitySource.toUpperCase()}
         ),
         ${userIdentifier},
+        ${displayName},
+        ${email.toLowerCase()},
         now()
       )
       RETURNING
@@ -297,7 +309,7 @@ export class UserRepository extends BaseRepository {
       ON
       	su.user_identity_source_id = uis.user_identity_source_id
       WHERE
-        su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}, ${SYSTEM_IDENTITY_SOURCE.SYSTEM})
+        su.record_end_date IS NULL AND uis.name not in (${SYSTEM_IDENTITY_SOURCE.DATABASE}})
       GROUP BY
         su.system_user_id,
         su.user_identity_source_id,
