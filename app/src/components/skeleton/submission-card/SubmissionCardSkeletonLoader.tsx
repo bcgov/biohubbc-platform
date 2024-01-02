@@ -9,7 +9,7 @@ import Typography from '@mui/material/Typography';
 
 const SubmissionCardSkeletonLoader = () => {
   return (
-    <Card elevation={0}>
+    <Card elevation={0} data-testid="submission-card-skeleton">
       <CardHeader
         title={
           <Typography variant="h4">

@@ -39,6 +39,10 @@ export type DataLoader<AFArgs extends any[], AFResponse = unknown, AFError = unk
    * Clears any errors caught from a failed `fetchData` call.
    */
   clear: () => void;
+  /**
+   * Setter for manually handling data. Useful for sorting
+   */
+  setData: (data: AFResponse) => void;
 };
 
 /**
@@ -118,5 +122,5 @@ export default function useDataLoader<AFArgs extends any[], AFResponse = unknown
     setError(undefined);
   };
 
-  return { data, error, isLoading, isReady, load, refresh, clear };
+  return { data, error, isLoading, isReady, load, refresh, clear, setData };
 }
