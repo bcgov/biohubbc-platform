@@ -156,7 +156,15 @@ describe('keycloakUtils', () => {
   });
 
   describe('getServiceClientSystemUser', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
     it('returns null if the clientId field is undefined', () => {
+      const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
+
+      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
+
       const token = { clientId: undefined, azp: 'not-null' };
 
       const response = getServiceClientSystemUser(token);
@@ -165,6 +173,10 @@ describe('keycloakUtils', () => {
     });
 
     it('returns null if the azp field is undefined', () => {
+      const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
+
+      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
+
       const token = { clientId: 'not-null', azp: undefined };
 
       const response = getServiceClientSystemUser(token);
@@ -173,6 +185,10 @@ describe('keycloakUtils', () => {
     });
 
     it('returns null if no matching known service client system user is found', () => {
+      const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
+
+      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
+
       const token = { clientId: 'not-null', azp: 'not-null' };
 
       const response = getServiceClientSystemUser(token);
