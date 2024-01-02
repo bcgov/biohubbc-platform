@@ -11,8 +11,6 @@ import SubmissionsListPage from './list/SubmissionsListPage';
 const SubmissionsRouter = () => {
   return (
     <Switch>
-      {/* <Redirect exact from="/datasets/:id" to="/submissions/:id/details" /> */}
-
       <RouteWithTitle exact path="/" title={getTitle('Submissions')}>
         <SubmissionsListPage />
       </RouteWithTitle>

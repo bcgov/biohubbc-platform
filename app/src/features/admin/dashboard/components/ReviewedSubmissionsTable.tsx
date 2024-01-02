@@ -15,10 +15,12 @@ import Typography from '@mui/material/Typography';
 import RecordsFoundSkeletonLoader from 'components/skeleton/submission-card/RecordsFoundSkeletonLoader';
 import SubmissionCardSkeletonLoader from 'components/skeleton/submission-card/SubmissionCardSkeletonLoader';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDownloadJSON from 'hooks/useDownloadJSON';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
+import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
@@ -36,6 +38,10 @@ const ReviewedSubmissionsTable = () => {
     // make request here for JSON data of submission and children
     const data = await biohubApi.submissions.getSubmissionDownloadPackage(submission.submission_id);
     download(data, `${submission.name.toLowerCase().replace(/ /g, '-')}-${submission.submission_id}`);
+  };
+
+  const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
+    reviewedSubmissionsDataLoader.setData(submissions);
   };
 
   if (reviewedSubmissionsDataLoader.isLoading) {
@@ -84,11 +90,21 @@ const ReviewedSubmissionsTable = () => {
 
   return (
     <>
-      <Box pb={4}>
+      <Box pb={4} display="flex" flexDirection="row" justifyContent="space-between">
         <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
         )} found`}</Typography>
+        <SubmissionsListSortMenu
+          sortMenuItems={{
+            name: 'Name',
+            security_review_timestamp: 'Review Complete',
+            publish_timestamp: 'Publish Date',
+            source_system: 'Submitting System'
+          }}
+          submissions={submissionRecords}
+          handleSubmissions={handleSortSubmissions}
+        />
       </Box>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
