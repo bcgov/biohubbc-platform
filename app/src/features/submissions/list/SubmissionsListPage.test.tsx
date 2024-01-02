@@ -41,21 +41,36 @@ describe('SubmissionsListPage', () => {
     it('should render page', async () => {
       mockUseApi.submissions.getPublishedSubmissions.mockResolvedValue([]);
       const actions = renderPage();
+
       await waitFor(() => {
         expect(actions.getByText(/biohub bc/i)).toBeVisible();
         expect(actions.getByPlaceholderText(/keyword/i)).toBeVisible();
       });
     });
 
-    it('should render skeleton loaders when dataloader is loading', async () => {
-      //jest.mock('hooks/useDataLoader', () => ({ isLoading: false }));
+    it('should render skeleton loaders', async () => {
       mockUseApi.submissions.getPublishedSubmissions.mockResolvedValue([]);
       const actions = renderPage();
+
       await waitFor(() => {
         expect(actions.getByTestId('records-found-skeleton')).toBeVisible();
         expect(actions.getByTestId('submission-card-skeleton')).toBeVisible();
       });
+
+      await waitFor(() => {
+        expect(actions.getByText(/0 records found/i)).toBeVisible();
+      });
     });
+
+    // it('should render submission card', async () => {
+    //   mockUseApi.submissions.getPublishedSubmissions.mockResolvedValue([]);
+    //   const actions = renderPage();
+    //
+    //   await waitFor(() => {
+    //
+    //   });
+    //
+    // });
   });
 
   // describe('Secure Access Request Dialog', () => {

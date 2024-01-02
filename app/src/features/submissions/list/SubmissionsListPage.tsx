@@ -74,12 +74,12 @@ const SubmissionsListPage = () => {
         </Paper>
         <Container maxWidth="xl">
           <Box py={4}>
-            {(reviewedSubmissionsDataLoader.isLoading && (
+            {reviewedSubmissionsDataLoader.isLoading ? (
               <>
                 <RecordsFoundSkeletonLoader />
                 <SubmissionCardSkeletonLoader />
               </>
-            )) || (
+            ) : (
               <>
                 <Box pb={4} display="flex" flexDirection="row" justifyContent="space-between">
                   <Typography variant="h4" component="h2">{`${fuzzyData.length} ${p(
