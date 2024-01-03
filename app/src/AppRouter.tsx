@@ -1,5 +1,3 @@
-import { SystemRoleGuard } from 'components/security/Guards';
-import { AuthenticatedRouteGuard, UnAuthenticatedRouteGuard } from 'components/security/RouteGuards';
 import { SYSTEM_ROLE } from 'constants/roles';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
@@ -7,13 +5,11 @@ import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
 import ManageSecurityRulesRouter from 'features/admin/security/ManageSecurityRulesRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
-import HomeRouter from 'features/home/HomeRouter';
-import MapRouter from 'features/map/MapRouter';
 import SearchRouter from 'features/search/SearchRouter';
+import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
+import { SystemRoleGuard } from 'guards/Guards';
+import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
-import ContentLayout from 'layouts/ContentLayout';
-import LoginPage from 'pages/authentication/LoginPage';
-import LogOutPage from 'pages/authentication/LogOutPage';
 import { Redirect, Route, Switch, useLocation } from 'react-router-dom';
 import RouteWithTitle from 'utils/RouteWithTitle';
 import { getTitle } from 'utils/Utils';
@@ -27,7 +23,7 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
 
       <Route exact path="/">
         <BaseLayout>
-          <HomeRouter />
+          <SubmissionsRouter />
         </BaseLayout>
       </Route>
 
@@ -41,12 +37,6 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
         <BaseLayout>
           <DatasetsRouter />
         </BaseLayout>
-      </Route>
-
-      <Route path="/map">
-        <ContentLayout>
-          <MapRouter />
-        </ContentLayout>
       </Route>
 
       <RouteWithTitle path="/page-not-found" title={getTitle('Page Not Found')}>
@@ -63,7 +53,7 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
 
       <Redirect exact from="/admin" to="/admin/dashboard" />
 
-      <Route exact path="/admin/dashboard">
+      <Route path="/admin/dashboard">
         <BaseLayout>
           <AuthenticatedRouteGuard>
             <SystemRoleGuard
@@ -98,21 +88,6 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
           </AuthenticatedRouteGuard>
         </BaseLayout>
       </Route>
-
-      <RouteWithTitle path="/logout" title={getTitle('Logout')}>
-        <BaseLayout>
-          <AuthenticatedRouteGuard>
-            <LogOutPage />
-          </AuthenticatedRouteGuard>
-        </BaseLayout>
-      </RouteWithTitle>
-
-      <Route path="/login">
-        <UnAuthenticatedRouteGuard>
-          <LoginPage />
-        </UnAuthenticatedRouteGuard>
-      </Route>
-
       <RouteWithTitle title="*" path="*">
         <Redirect to="/page-not-found" />
       </RouteWithTitle>

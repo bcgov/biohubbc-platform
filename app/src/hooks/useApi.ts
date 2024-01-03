@@ -3,6 +3,7 @@ import { useContext } from 'react';
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
+import useCodesApi from './api/useCodesApi';
 import useDatasetApi from './api/useDatasetApi';
 import useSearchApi, { usePublicSearchApi } from './api/useSearchApi';
 import useSecurityApi from './api/useSecurityApi';
@@ -39,6 +40,8 @@ export const useApi = () => {
 
   const security = useSecurityApi(apiAxios);
 
+  const codes = useCodesApi(apiAxios);
+
   return {
     user,
     admin,
@@ -48,6 +51,7 @@ export const useApi = () => {
     dataset,
     taxonomy,
     security,
-    artifact
+    artifact,
+    codes
   };
 };

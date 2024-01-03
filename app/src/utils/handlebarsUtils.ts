@@ -1,5 +1,5 @@
+import dayjs from 'dayjs';
 import Handlebars, { HelperOptions } from 'handlebars';
-import moment from 'moment';
 
 export const useHandlebars = () => {
   /**
@@ -36,7 +36,7 @@ export const useHandlebars = () => {
   };
 
   /**
-   * This is a Handlesbars helper to format date strings from a given format to another using moment
+   * This is a Handlesbars helper to format date strings from a given format to another using dayjs
    * Example of use
    * <MyHandleBarsTemplate>
    *  {{formatDate MyDateProperty 'YYYY-MM-DD' 'MMM YYYY'}}
@@ -44,7 +44,7 @@ export const useHandlebars = () => {
    */
   const formatDateHelper = () => {
     Handlebars.registerHelper('formatDate', (dateString: string, ogFormat: string, newFormat: string) => {
-      return moment(dateString, ogFormat).format(newFormat).toString();
+      return dayjs(dateString, ogFormat).format(newFormat).toString();
     });
   };
 

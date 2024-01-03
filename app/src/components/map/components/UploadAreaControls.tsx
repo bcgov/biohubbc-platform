@@ -24,6 +24,7 @@ const UploadAreaControls: React.FC<React.PropsWithChildren<any>> = (props) => {
   return (
     <>
       <EditDialog
+        isLoading={false}
         dialogTitle={'Import Custom Boundary'}
         open={openUploadArea}
         dialogSaveButtonLabel={'Import Boundary'}

@@ -2,26 +2,19 @@ import { mdiAlertCircleOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-import { AuthStateContext } from 'contexts/authStateContext';
-import { useContext } from 'react';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import { Redirect, useHistory } from 'react-router';
 
 const AccessDenied = () => {
   const history = useHistory();
 
-  const { keycloakWrapper } = useContext(AuthStateContext);
+  const authStateContext = useAuthStateContext();
 
-  if (!keycloakWrapper?.keycloak.authenticated) {
+  if (!authStateContext.auth.isAuthenticated) {
     // User is not logged in
     return <Redirect to={{ pathname: '/' }} />;
-  }
-
-  if (!keycloakWrapper.hasLoadedAllUserInfo) {
-    // User data has not been loaded, can not yet determine if they have a role
-    return <CircularProgress className="pageProgress" />;
   }
 
   return (

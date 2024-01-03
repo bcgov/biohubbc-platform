@@ -51,6 +51,23 @@ export async function up(knex: Knex): Promise<void> {
     END;
     $$;
 
+    -- Executes a single security_datetime condition against the provided submission_feature_id
+    -- Note: Returns true if the condition hit (applied).
+    CREATE OR REPLACE FUNCTION evaluate_security_datetime_condition(rule_name VARCHAR, submission_feature_id integer)
+    RETURNS TABLE (result BOOLEAN) 
+    language plpgsql
+    set client_min_messages = warning
+    AS $$
+    DECLARE
+        comparator TEXT;  
+        value timestamptz(6);
+    BEGIN
+        SELECT security_datetime.comparator, security_datetime.value INTO comparator, value FROM security_datetime WHERE name = evaluate_security_datetime_condition.rule_name;
+    
+        RETURN QUERY execute format('SELECT CASE WHEN EXISTS (SELECT 1 FROM search_datetime WHERE submission_feature_id = %s and value %s ''%s'') THEN TRUE ELSE FALSE END', evaluate_security_datetime_condition.submission_feature_id, comparator, value);
+    END;
+    $$;
+
     -- Executes a single security_spatial condition against the provided submission_feature_id
     -- Note: Returns true if the condition hit (applied).
     -- Note: SRID of both geometries must be the same (prefer 4326)

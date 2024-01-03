@@ -9,11 +9,11 @@ export const SystemUser = z.object({
   user_identity_source_id: z.number(),
   user_identifier: z.string(),
   user_guid: z.string(),
-  record_effective_date: z.date(),
-  record_end_date: z.date().nullable(),
-  create_date: z.date(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
   create_user: z.number(),
-  update_date: z.date().nullable(),
+  update_date: z.string().nullable(),
   update_user: z.number().nullable(),
   revision_count: z.number()
 });
@@ -58,7 +58,6 @@ export class UserRepository extends BaseRepository {
 
   /**
    * Fetch a single system user by their system user ID.
-   *
    *
    * @param {number} systemUserId
    * @return {*}  {Promise<SystemUserExtended>}
@@ -146,6 +145,60 @@ export class UserRepository extends BaseRepository {
         uis.user_identity_source_id = su.user_identity_source_id
       WHERE
         su.user_guid = ${userGuid}
+      GROUP BY
+        su.system_user_id,
+        su.user_identity_source_id,
+        su.user_identifier,
+        su.user_guid,
+        su.record_effective_date,
+        su.record_end_date,
+        su.create_date,
+        su.create_user,
+        su.update_date,
+        su.update_user,
+        su.revision_count,
+        uis.name;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SystemUserExtended);
+
+    return response.rows;
+  }
+
+  /**
+   * Get an existing system user by their user identifier and identity source.
+   *
+   * @param userIdentifier the user's identifier
+   * @param identitySource the user's identity source, e.g. `'IDIR'`
+   * @return {*}  {Promise<SystemUserExtended[]>} Promise resolving an array containing the user, if they match the
+   * search criteria.
+   * @memberof UserService
+   */
+  async getUserByIdentifier(userIdentifier: string, identitySource: string): Promise<SystemUserExtended[]> {
+    const sqlStatement = SQL`
+      SELECT
+        su.*,
+        uis.name AS identity_source,
+        array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
+        array_remove(array_agg(sr.name), NULL) AS role_names
+      FROM
+        system_user su
+      LEFT JOIN
+        system_user_role sur
+      ON
+        su.system_user_id = sur.system_user_id
+      LEFT JOIN
+        system_role sr
+      ON
+        sur.system_role_id = sr.system_role_id
+      LEFT JOIN
+        user_identity_source uis
+      ON
+        uis.user_identity_source_id = su.user_identity_source_id
+      WHERE
+        LOWER(su.user_identifier) = ${userIdentifier.toLowerCase()}
+      AND
+        uis.name = ${identitySource.toUpperCase()}
       GROUP BY
         su.system_user_id,
         su.user_identity_source_id,

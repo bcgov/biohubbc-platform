@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
 import Footer from 'components/layout/footer/Footer';
 import Header from 'components/layout/header/Header';
+import { CodesContextProvider } from 'contexts/codesContext';
 import { DialogContextProvider } from 'contexts/dialogContext';
 import React from 'react';
 
@@ -24,19 +25,21 @@ const BaseLayout: React.FC<React.PropsWithChildren> = (props) => {
     <Box display="flex" flexDirection="column" height="100vh">
       <CssBaseline />
       <DialogContextProvider>
-        {!isSupportedBrowser() && (
-          <Alert severity="error">This is an unsupported browser. Some functionality may not work as expected.</Alert>
-        )}
+        <CodesContextProvider>
+          {!isSupportedBrowser() && (
+            <Alert severity="error">This is an unsupported browser. Some functionality may not work as expected.</Alert>
+          )}
 
-        <Header />
+          <Header />
 
-        <Box component="main" flex="1 1 auto">
-          {React.Children.map(props.children, (child: any) => {
-            return React.cloneElement(child);
-          })}
-        </Box>
+          <Box component="main" flex="1 1 auto">
+            {React.Children.map(props.children, (child: any) => {
+              return React.cloneElement(child);
+            })}
+          </Box>
 
-        <Footer />
+          <Footer />
+        </CodesContextProvider>
       </DialogContextProvider>
     </Box>
   );

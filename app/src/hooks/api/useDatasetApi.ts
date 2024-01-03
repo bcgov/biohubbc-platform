@@ -1,10 +1,5 @@
 import { AxiosInstance } from 'axios';
-import {
-  IArtifact,
-  IDatasetForReview,
-  IHandlebarsTemplates,
-  IListRelatedDatasetsResponse
-} from 'interfaces/useDatasetApi.interface';
+import { IArtifact, IHandlebarsTemplates, IListRelatedDatasetsResponse } from 'interfaces/useDatasetApi.interface';
 import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
 /**
@@ -26,17 +21,6 @@ const useDatasetApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch all unsecure datasets for review.
-   *
-   * @returns {*} {Promise<IDatasetForReview[]>}
-   */
-  const listAllDatasetsForReview = async (): Promise<IDatasetForReview[]> => {
-    const { data } = await axios.get(`api/administrative/review/list`);
-
-    return data;
-  };
-
-  /**
    * Fetch dataset metadata by datasetId.
    *
    * @param {string} datasetId
@@ -44,6 +28,18 @@ const useDatasetApi = (axios: AxiosInstance) => {
    */
   const getDatasetEML = async (datasetId: string): Promise<any> => {
     const { data } = await axios.get(`api/dwc/submission/${datasetId}/get`);
+
+    return data;
+  };
+
+  /**
+   * Fetch dataset data by datasetUUID.
+   *
+   * @param {string} datasetUUID
+   * @return {*}  {Promise<any>}
+   */
+  const getDataset = async (datasetUUID: string): Promise<any> => {
+    const { data } = await axios.get(`api/dataset/${datasetUUID}`);
 
     return data;
   };
@@ -97,8 +93,8 @@ const useDatasetApi = (axios: AxiosInstance) => {
 
   return {
     listAllDatasets,
-    listAllDatasetsForReview,
     getDatasetEML,
+    getDataset,
     getDatasetArtifacts,
     getArtifactSignedUrl,
     getHandleBarsTemplateByDatasetId,

@@ -85,19 +85,32 @@ const insertRecord = async (knex: Knex) => {
   }
 };
 
-const insertSubmissionRecord = async (knex: Knex): Promise<number> => {
-  const response = await knex.raw(`${insertSubmission()}`);
+export const insertSubmissionRecord = async (
+  knex: Knex,
+  includeSecurityReview = false,
+  includePublishTimestamp = false
+): Promise<number> => {
+  const response = await knex.raw(`${insertSubmission(includeSecurityReview, includePublishTimestamp)}`);
   const submission_id = response.rows[0].submission_id;
 
   return submission_id;
 };
 
-const insertDatasetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
+export const insertDatasetRecord = async (knex: Knex, options: { submission_id: number }): Promise<number> => {
   const response = await knex.raw(
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: null,
-      feature_type: 'dataset'
+      feature_type: 'dataset',
+      data: {
+        name: faker.lorem.words(3),
+        start_date: faker.date.past().toISOString(),
+        end_date: faker.date.future().toISOString(),
+        geometry: random.point(
+          1, // number of features in feature collection
+          [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
+        )['features'][0]['geometry']
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -113,9 +126,9 @@ const insertDatasetRecord = async (knex: Knex, options: { submission_id: number 
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -125,7 +138,7 @@ const insertDatasetRecord = async (knex: Knex, options: { submission_id: number 
   return submission_feature_id;
 };
 
-const insertSampleSiteRecord = async (
+export const insertSampleSiteRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
@@ -133,7 +146,15 @@ const insertSampleSiteRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'sample_site'
+      feature_type: 'sample_site',
+      data: {
+        name: faker.lorem.words(3),
+        description: faker.lorem.words({ min: 5, max: 100 }),
+        geometry: random.point(
+          1, // number of features in feature collection
+          [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
+        )['features'][0]['geometry']
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -146,7 +167,7 @@ const insertSampleSiteRecord = async (
   return submission_feature_id;
 };
 
-const insertObservationRecord = async (
+export const insertObservationRecord = async (
   knex: Knex,
   options: { submission_id: number; parent_submission_feature_id: number }
 ): Promise<number> => {
@@ -154,7 +175,15 @@ const insertObservationRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'observation'
+      feature_type: 'observation',
+      data: {
+        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        geometry: random.point(
+          1, // number of features in feature collection
+          [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
+        )['features'][0]['geometry'],
+        count: faker.number.int({ min: 0, max: 100 })
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -170,10 +199,10 @@ const insertObservationRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
-  await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
+  //   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
 
   await knex.raw(`${insertSpatialPoint({ submission_feature_id })}`);
 
@@ -188,7 +217,14 @@ const insertAnimalRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'animal'
+      feature_type: 'animal',
+      data: {
+        species: faker.lorem.words(3),
+        count: faker.number.int({ min: 0, max: 100 }),
+        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        start_date: faker.date.past().toISOString(),
+        end_date: faker.date.future().toISOString()
+      }
     })}`
   );
   const submission_feature_id = response.rows[0].submission_feature_id;
@@ -204,7 +240,7 @@ const insertAnimalRecord = async (
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
   await knex.raw(`${insertSearchNumber({ submission_feature_id })}`);
 
-  await knex.raw(`${insertSearchTaxonomy({ submission_feature_id })}`);
+  await knex.raw(`${insertSearchStringTaxonomy({ submission_feature_id })}`);
 
   await knex.raw(`${insertSearchStartDatetime({ submission_feature_id })}`);
   await knex.raw(`${insertSearchEndDatetime({ submission_feature_id })}`);
@@ -214,24 +250,37 @@ const insertAnimalRecord = async (
   return submission_feature_id;
 };
 
-const insertSubmission = () => `
+export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includePublishTimestamp: boolean) => {
+  const securityReviewTimestamp = includeSecurityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
+  const publishTimestamp = includePublishTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
+  return `
     INSERT INTO submission
     (
-        source_transform_id,
-        uuid
+        uuid,
+        name,
+        description,
+        security_review_timestamp,
+        publish_timestamp,
+        source_system
     )
     values
     (
-        1,
-        public.gen_random_uuid()
+        public.gen_random_uuid(),
+        $$${faker.company.name()}$$,
+        $$${faker.lorem.words({ min: 5, max: 100 })}$$,
+        ${securityReviewTimestamp},
+        ${publishTimestamp},
+        'SIMS'
     )
     RETURNING submission_id;
 `;
+};
 
 const insertSubmissionFeature = (options: {
   submission_id: number;
   parent_submission_feature_id: number | null;
   feature_type: 'dataset' | 'sample_site' | 'observation' | 'animal';
+  data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
     (
@@ -246,9 +295,7 @@ const insertSubmissionFeature = (options: {
         ${options.submission_id},
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
-        '{
-          "name": "${faker.lorem.words(3)}"
-        }',
+        ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
         now()
     )
     RETURNING submission_feature_id;
@@ -284,8 +331,8 @@ const insertSearchNumber = (options: { submission_feature_id: number }) => `
     );
 `;
 
-const insertSearchTaxonomy = (options: { submission_feature_id: number }) => `
-    INSERT INTO search_taxonomy
+const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) => `
+    INSERT INTO search_string
     (
         submission_feature_id,
         feature_property_id,
@@ -294,7 +341,7 @@ const insertSearchTaxonomy = (options: { submission_feature_id: number }) => `
     values
     (
         ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'number'),
+        (select feature_property_id from feature_property where name = 'taxonomy'),
         $$${faker.number.int({ min: 10000, max: 99999 })}$$
     );
 `;

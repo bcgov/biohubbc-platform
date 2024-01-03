@@ -1,3 +1,4 @@
+import { LoadingButton } from '@mui/lab';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -62,6 +63,11 @@ export interface IEditDialogProps<T> {
    * @memberof IEditDialogProps
    */
   onSave: (values: T) => void;
+
+  /**
+   * Prop to track if the dialog should be in a 'loading' state
+   */
+  isLoading: boolean;
 }
 
 /**
@@ -75,7 +81,7 @@ export interface IEditDialogProps<T> {
 export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildren<IEditDialogProps<T>>) => {
   const theme = useTheme();
 
-  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+  const fullScreen = useMediaQuery(theme.breakpoints.down('lg'));
 
   if (!props.open) {
     return <></>;
@@ -93,8 +99,8 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
       }}>
       {(formikProps) => (
         <Dialog
-          fullScreen={fullScreen}
           fullWidth
+          fullScreen={fullScreen}
           maxWidth="md"
           open={props.open}
           aria-labelledby="edit-dialog-title"
@@ -102,14 +108,15 @@ export const EditDialog = <T extends FormikValues>(props: React.PropsWithChildre
           <DialogTitle id="edit-dialog-title">{props.dialogTitle}</DialogTitle>
           <DialogContent>{props.component.element}</DialogContent>
           <DialogActions>
-            <Button
+            <LoadingButton
+              loading={props.isLoading}
               onClick={formikProps.submitForm}
               color="primary"
               variant="contained"
               autoFocus
               data-testid="edit-dialog-save-button">
               {props.dialogSaveButtonLabel || 'Save Changes'}
-            </Button>
+            </LoadingButton>
             <Button onClick={props.onCancel} color="primary" variant="outlined" data-testid="edit-dialog-cancel-button">
               Cancel
             </Button>

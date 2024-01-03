@@ -26,11 +26,18 @@ describe('removeSystemUser', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
       user_identifier: 'testname',
-      user_guid: 'aaaa',
+      user_identity_source_id: 2,
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '2010-10-10',
       record_end_date: '2010-10-10',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [1, 2],
       role_names: ['role 1', 'role 2']
     });
@@ -58,11 +65,18 @@ describe('removeSystemUser', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
       user_identifier: 'testname',
-      user_guid: 'aaaa',
+      user_identity_source_id: 2,
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '2010-10-10',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [1, 2],
       role_names: ['role 1', 'role 2']
     });
@@ -91,11 +105,18 @@ describe('removeSystemUser', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
       user_identifier: 'testname',
-      user_guid: 'aaaa',
+      user_identity_source_id: 2,
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '2010-10-10',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [1, 2],
       role_names: ['role 1', 'role 2']
     });
@@ -126,11 +147,18 @@ describe('removeSystemUser', () => {
     sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     sinon.stub(UserService.prototype, 'getUserById').resolves({
-      id: 1,
+      system_user_id: 1,
       user_identifier: 'testname',
-      user_guid: 'aaaa',
+      user_identity_source_id: 2,
+      user_guid: '123-456-789',
       identity_source: 'idir',
+      record_effective_date: '2010-10-10',
       record_end_date: '',
+      create_user: 1,
+      create_date: '',
+      update_user: null,
+      update_date: null,
+      revision_count: 0,
       role_ids: [1, 2],
       role_names: ['role 1', 'role 2']
     });

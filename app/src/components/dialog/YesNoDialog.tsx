@@ -4,6 +4,8 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import useTheme from '@mui/material/styles/useTheme';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { ReactNode } from 'react';
 
 export interface IYesNoDialogProps {
@@ -95,12 +97,18 @@ export interface IYesNoDialogProps {
  * @return {*}
  */
 const YesNoDialog: React.FC<React.PropsWithChildren<IYesNoDialogProps>> = (props) => {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
   if (!props.open) {
     return <></>;
   }
 
   return (
     <Dialog
+      fullWidth
+      fullScreen={fullScreen}
+      maxWidth="md"
       open={props.open}
       onClose={props.onClose}
       data-testid="yes-no-dialog"

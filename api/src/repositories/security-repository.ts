@@ -16,11 +16,66 @@ export const PersecutionAndHarmSecurity = z.object({
 
 export type PersecutionAndHarmSecurity = z.infer<typeof PersecutionAndHarmSecurity>;
 
+export const SecurityRuleRecord = z.object({
+  security_rule_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+export type SecurityRuleRecord = z.infer<typeof SecurityRuleRecord>;
+
+export const SecurityCategoryRecord = z.object({
+  security_category_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+export type SecurityCategoryRecord = z.infer<typeof SecurityCategoryRecord>;
+
+export const SecurityRuleAndCategory = z.object({
+  security_rule_id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  security_category_id: z.number(),
+  category_name: z.string(),
+  category_description: z.string(),
+  category_record_effective_date: z.string(),
+  category_record_end_date: z.string().nullable()
+});
+export type SecurityRuleAndCategory = z.infer<typeof SecurityRuleAndCategory>;
+
+export const SubmissionFeatureSecurityRecord = z.object({
+  submission_feature_security_id: z.number(),
+  submission_feature_id: z.number(),
+  security_rule_id: z.number(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+export type SubmissionFeatureSecurityRecord = z.infer<typeof SubmissionFeatureSecurityRecord>;
+
 export const SecurityReason = z.object({
   id: z.number(),
   type_id: z.number()
 });
-
 export type SecurityReason = z.infer<typeof SecurityReason>;
 
 export const ArtifactPersecution = z.object({
@@ -34,6 +89,7 @@ export type ArtifactPersecution = z.infer<typeof ArtifactPersecution>;
 export enum SECURITY_APPLIED_STATUS {
   SECURED = 'SECURED',
   UNSECURED = 'UNSECURED',
+  PARTIALLY_SECURED = 'PARTIALLY SECURED',
   PENDING = 'PENDING'
 }
 
@@ -169,11 +225,11 @@ export class SecurityRepository extends BaseRepository {
     defaultLog.debug({ label: 'deleteSecurityRulesForArtifactUUID' });
 
     const sql = SQL`
-      DELETE 
-      FROM artifact_persecution 
+      DELETE
+      FROM artifact_persecution
       WHERE artifact_id IN (
-        SELECT a.artifact_id 
-        FROM artifact a 
+        SELECT a.artifact_id
+        FROM artifact a
         WHERE a.uuid = ${artifactUUID}
       );
     `;
@@ -228,5 +284,138 @@ export class SecurityRepository extends BaseRepository {
     const results = (response.rowCount && response.rows) || [];
 
     return results;
+  }
+
+  /**
+   * Get all active security categories
+   *
+   * @return {*}  {Promise<SecurityCategoryRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
+    defaultLog.debug({ label: 'getActiveSecurityCategories' });
+    const sql = SQL`
+      SELECT * FROM security_category WHERE record_end_date IS NULL;
+    `;
+    const response = await this.connection.sql(sql, SecurityCategoryRecord);
+    return response.rows;
+  }
+
+  /**
+   * Get active security rules with associated categories
+   *
+   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
+   * @memberof SecurityRepository
+   */
+  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
+    defaultLog.debug({ label: 'getActiveRulesAndCategories' });
+    const sql = SQL`
+      SELECT 
+        sr.security_rule_id,
+        sr.name,
+        sr.description,
+        sr.record_effective_date,
+        sr.record_end_date,
+        sc.security_category_id,
+        sc.name as category_name,
+        sc.description as category_description,
+        sc.record_effective_date as category_record_effective_date,
+        sc.record_end_date as category_record_end_date
+      FROM security_rule sr, security_category sc 
+      WHERE sr.security_category_id = sc.security_category_id
+      AND sr.record_end_date IS NULL;
+    `;
+    const response = await this.connection.sql(sql, SecurityRuleAndCategory);
+    return response.rows;
+  }
+
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
+    defaultLog.debug({ label: 'getActiveSecurityRules' });
+    const sql = SQL`
+      SELECT * FROM security_rule WHERE record_end_date IS NULL;
+    `;
+    const response = await this.connection.sql(sql, SecurityRuleRecord);
+    return response.rows;
+  }
+
+  /**
+   * Gets a list of all active security rules
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async applySecurityRulesToSubmissionFeatures(
+    features: number[],
+    rules: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!rules.length || !features.length) {
+      // no rules to apply, leave early
+      return [];
+    }
+
+    const final = features.flatMap((item) => {
+      return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
+    });
+
+    const insertSQL = SQL`
+    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
+    VALUES `;
+    insertSQL.append(final.join(', '));
+    insertSQL.append(`
+    ON CONFLICT (submission_feature_id, security_rule_id)
+    DO NOTHING
+    RETURNING *;`);
+
+    const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Removes all security rules for a given set of submission features
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!features.length) {
+      // no features, return early
+      return [];
+    }
+    const deleteSQL = SQL`
+      DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
+
+    deleteSQL.append(features.join(', '));
+    deleteSQL.append(`) RETURNING *;`);
+    const response = await this.connection.sql(deleteSQL, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Gets Submission Feature Security Records for a given set of submission features
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!features.length) {
+      // no features, return early
+      return [];
+    }
+    const sql = SQL`
+      SELECT * FROM submission_feature_security WHERE submission_feature_id IN (`;
+
+    sql.append(features.join(', '));
+    sql.append(`);`);
+
+    const response = await this.connection.sql(sql, SubmissionFeatureSecurityRecord);
+    return response.rows;
   }
 }

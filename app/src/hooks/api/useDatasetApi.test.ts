@@ -64,14 +64,14 @@ describe('useDatasetApi', () => {
   });
 
   it('getRelatedDatasets works as expected', async () => {
-    mock.onGet(`api/dwc/submission/${'aaaa'}/related`).reply(200, {
-      datasets: [{ datasetId: 'bbb' }, { datasetId: 'ccc' }]
+    mock.onGet(`api/dwc/submission/${'123-456-789'}/related`).reply(200, {
+      datasets: [{ datasetId: '123' }, { datasetId: '456' }]
     });
 
-    const actualResult = await useDatasetApi(axios).getRelatedDatasets('aaaa');
+    const actualResult = await useDatasetApi(axios).getRelatedDatasets('123-456-789');
 
     expect(actualResult).toEqual({
-      datasets: [{ datasetId: 'bbb' }, { datasetId: 'ccc' }]
+      datasets: [{ datasetId: '123' }, { datasetId: '456' }]
     });
   });
 

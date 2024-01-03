@@ -274,7 +274,7 @@ describe('SecurityService', () => {
         .resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -311,7 +311,7 @@ describe('SecurityService', () => {
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -344,7 +344,7 @@ describe('SecurityService', () => {
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -377,7 +377,7 @@ describe('SecurityService', () => {
         .resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -485,7 +485,7 @@ describe('SecurityService', () => {
 
       const getArtifactByIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
         key: 'secured-string',
-        security_review_timestamp: new Date()
+        security_review_timestamp: 'date'
       } as Artifact);
 
       const result = await securityService.isArtifactPendingReview(1000);
@@ -558,6 +558,162 @@ describe('SecurityService', () => {
 
       expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
       expect(result).to.eql(false);
+    });
+  });
+
+  describe('applySecurityRulesToSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeFunction = sinon
+        .stub(SecurityService.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+      const applySecurity = sinon.stub(SecurityService.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 1,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
+      ]);
+
+      const response = await service.applySecurityRulesToSubmissionFeatures([1], [1]);
+
+      expect(removeFunction).to.not.be.called;
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+
+    it('should succeed with override called', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeFunction = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+      const applySecurity = sinon
+        .stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures')
+        .resolves([
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: '',
+            update_user: 1,
+            revision_count: 1
+          }
+        ]);
+      const response = await service.applySecurityRulesToSubmissionFeatures([1], [1], true);
+
+      expect(removeFunction).to.be.calledOnce;
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+  });
+
+  describe('removeSecurityRulesFromSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('removeSecurityRulesFromSubmissionFeatures', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const applySecurity = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: '',
+            update_user: 1,
+            revision_count: 1
+          }
+        ]);
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([1]);
+
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+  });
+  describe('getSecurityRulesForSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('getSecurityRulesForSubmissionFeatures', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const applySecurity = sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 1,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
+      ]);
+      const response = await service.getSecurityRulesForSubmissionFeatures([1]);
+
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+  });
+
+  describe('getSecurityRulesForSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('getActiveSecurityRules', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const applySecurity = sinon.stub(SecurityRepository.prototype, 'getActiveSecurityRules').resolves([
+        {
+          security_rule_id: 1,
+          name: '',
+          description: '',
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
+      ]);
+      const response = await service.getActiveSecurityRules();
+
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
     });
   });
 });

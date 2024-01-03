@@ -1,5 +1,4 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { AlertColor } from '@mui/material/Alert';
 import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
 import { ErrorDialog, IErrorDialogProps } from 'components/dialog/ErrorDialog';
@@ -55,11 +54,8 @@ export interface IDialogContext {
 }
 
 export interface ISnackbarProps {
-  open: boolean;
-  onClose: () => void;
-  severity?: AlertColor;
-  color?: AlertColor;
   snackbarMessage: ReactNode;
+  open: boolean;
 }
 
 export const defaultYesNoDialogProps: IYesNoDialogProps = {
@@ -91,10 +87,7 @@ export const defaultErrorDialogProps: IErrorDialogProps = {
 
 export const defaultSnackbarProps: ISnackbarProps = {
   snackbarMessage: '',
-  open: false,
-  onClose: () => {
-    // default do nothing
-  }
+  open: false
 };
 
 export const DialogContext = createContext<IDialogContext>({
@@ -160,11 +153,9 @@ export const DialogContextProvider: React.FC<React.PropsWithChildren> = (props) 
         onClose={() => setSnackbar({ open: false })}
         message={snackbarProps.snackbarMessage}
         action={
-          <>
-            <IconButton size="small" aria-label="close" color="inherit" onClick={() => setSnackbar({ open: false })}>
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </>
+          <IconButton size="small" aria-label="close" color="inherit" onClick={() => setSnackbar({ open: false })}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
         }
       />
     </DialogContext.Provider>

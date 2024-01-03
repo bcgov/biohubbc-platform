@@ -12,12 +12,13 @@ import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import YesNoDialog from 'components/dialog/YesNoDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
+import { ISnackbarProps } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { IArtifact, IPersecutionAndHarmRule } from 'interfaces/useDatasetApi.interface';
-import React, { useContext, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { pluralize as p } from 'utils/Utils';
 import yup from 'utils/YupSchema';
 import { ISecurityReason } from './SecurityReasonCategory';
@@ -63,7 +64,7 @@ const ApplySecurityDialog: React.FC<IApplySecurityDialog> = (props) => {
   const biohubApi = useApi();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('xl'));
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const persecutionHarmDataLoader = useDataLoader(() => biohubApi.security.listPersecutionHarmRules());
   persecutionHarmDataLoader.load();

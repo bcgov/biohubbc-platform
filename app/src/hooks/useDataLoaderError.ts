@@ -1,6 +1,6 @@
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
-import { DialogContext } from 'contexts/dialogContext';
-import { useContext, useEffect } from 'react';
+import { useDialogContext } from 'hooks/useContext';
+import { useEffect } from 'react';
 import { APIError } from './api/useAxios';
 import { DataLoader } from './useDataLoader';
 
@@ -20,7 +20,7 @@ export default function useDataLoaderError<AFArgs extends any[], AFResponse = un
   dataLoader: DataLoader<AFArgs, AFResponse, AFError>,
   getErrorDialogProps: (dataLoader: DataLoader<AFArgs, AFResponse, AFError>) => Partial<IErrorDialogProps>
 ) {
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   useEffect(() => {
     if (!dataLoader.error || dialogContext.errorDialogProps.open) {

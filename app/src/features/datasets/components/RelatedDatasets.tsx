@@ -6,9 +6,10 @@ import { DataGrid, GridColDef, GridRenderCellParams, GridTreeNodeWithRender } fr
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
 import useDataLoader from 'hooks/useDataLoader';
-import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IRelatedDataset } from 'interfaces/useDatasetApi.interface';
+import { hasAtLeastOneValidValue } from 'utils/authUtils';
 import { ensureProtocol } from 'utils/Utils';
 
 const VALID_SYSTEM_ROLES: SYSTEM_ROLE[] = [SYSTEM_ROLE.DATA_ADMINISTRATOR, SYSTEM_ROLE.SYSTEM_ADMIN];
@@ -43,14 +44,17 @@ const RelatedDatasets: React.FC<IRelatedDatasetsProps> = (props) => {
   const { datasetId } = props;
 
   const biohubApi = useApi();
-  const keycloakWrapper = useKeycloakWrapper();
+  const authStateContext = useAuthStateContext();
 
   const relatedDatasetsDataLoader = useDataLoader(() => biohubApi.dataset.getRelatedDatasets(datasetId));
   relatedDatasetsDataLoader.load();
 
   const relatedDatasetsList: IRelatedDataset[] = relatedDatasetsDataLoader.data?.datasetsWithSupplementaryData ?? [];
 
-  const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
+  const hasAdministrativePermissions = hasAtLeastOneValidValue(
+    VALID_SYSTEM_ROLES,
+    authStateContext.biohubUserWrapper.roleNames
+  );
 
   const columns: GridColDef<IRelatedDataset>[] = [
     {

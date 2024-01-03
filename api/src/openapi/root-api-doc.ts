@@ -168,6 +168,35 @@ export const rootAPIDoc = {
           }
         },
         additionalProperties: false
+      },
+      feature: {
+        type: 'object',
+        required: ['submission_feature_id', 'submission_id', 'feature_type', 'data', 'parent_submission_feature_id'],
+        properties: {
+          submission_feature_id: {
+            type: 'number'
+          },
+          submission_id: {
+            type: 'number'
+          },
+          feature_type: {
+            type: 'string'
+          },
+          data: {
+            type: 'object'
+          },
+          submission_feature_security_ids: {
+            nullable: true,
+            type: 'array',
+            items: {
+              type: 'number'
+            }
+          },
+          parent_submission_feature_id: {
+            type: 'number',
+            nullable: true
+          }
+        }
       }
     }
   }

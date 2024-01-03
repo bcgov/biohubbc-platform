@@ -1,67 +1,86 @@
+import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { SYSTEM_ROLE } from 'constants/roles';
 import { IAuthState } from 'contexts/authStateContext';
-import Keycloak from 'keycloak-js';
+import { AuthContextProps } from 'react-oidc-context';
 
+/**
+ * Represents an unauthenticated user who has:
+ *  - not yet successfully authenticated (all keycloak details about the user will be false, null, or undefined)
+ */
 export const UnauthenticatedUserAuthState: IAuthState = {
-  keycloakWrapper: {
-    keycloak: {
-      authenticated: false
-    } as unknown as Keycloak,
-    hasLoadedAllUserInfo: false,
-    systemRoles: [],
-    hasSystemRole: () => false,
-    getUserIdentifier: () => 'testusername',
-    getIdentitySource: () => 'idir',
-    username: 'testusername',
-    displayName: 'testdisplayname',
-    email: 'test@email.com',
-    systemUserId: 1,
-    getLoginUrl: () => 'fake/login/url',
-    refresh: () => {
-      // do nothing
-    }
-  }
-};
-
-export const SystemUserAuthState: IAuthState = {
-  keycloakWrapper: {
-    keycloak: {
-      authenticated: true
-    } as unknown as Keycloak,
-    hasLoadedAllUserInfo: true,
-    systemRoles: [],
-    hasSystemRole: () => false,
-    getUserIdentifier: () => 'testusername',
-    getIdentitySource: () => 'idir',
-    username: 'testusername',
-    displayName: 'testdisplayname',
-    email: 'test@email.com',
-    systemUserId: 1,
-    getLoginUrl: () => 'fake/login/url',
-    refresh: () => {
-      // do nothing
-    }
-  }
-};
-
-export const SystemAdminAuthState: IAuthState = {
-  keycloakWrapper: {
-    keycloak: {
-      authenticated: true
-    } as unknown as Keycloak,
-    hasLoadedAllUserInfo: true,
-    systemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
-    hasSystemRole: () => true,
-    getUserIdentifier: () => 'testusername',
-    getIdentitySource: () => 'idir',
-    username: 'testusername',
-    displayName: 'testdisplayname',
-    email: 'test@email.com',
-    systemUserId: 1,
-    refresh: () => {
+  auth: {
+    isLoading: false,
+    isAuthenticated: false,
+    signoutRedirect: () => {
       // do nothing
     },
-    getLoginUrl: () => 'test/login'
+    signinRedirect: () => {
+      // do nothing
+    }
+  } as unknown as AuthContextProps,
+  biohubUserWrapper: {
+    isLoading: false,
+    systemUserId: undefined,
+    userGuid: null,
+    userIdentifier: undefined,
+    roleNames: [],
+    identitySource: null
+  }
+};
+
+/**
+ * Represents an IDIR user who has:
+ *  - successfully authenticated
+ *  - has already been granted system access (has no pending access request)
+ *  - has had all user info loaded successfully
+ *  - has no system or project level roles
+ */
+export const SystemUserAuthState: IAuthState = {
+  auth: {
+    isLoading: false,
+    isAuthenticated: true,
+    signoutRedirect: () => {
+      // do nothing
+    },
+    signinRedirect: () => {
+      // do nothing
+    }
+  } as unknown as AuthContextProps,
+  biohubUserWrapper: {
+    isLoading: false,
+    systemUserId: 1,
+    userGuid: '987-654-321',
+    userIdentifier: 'testusername',
+    roleNames: [],
+    identitySource: SYSTEM_IDENTITY_SOURCE.IDIR
+  }
+};
+
+/**
+ * Represents an IDIR user who has:
+ *  - successfully authenticated
+ *  - has already been granted system access (has no pending access request)
+ *  - has had all user info loaded successfully
+ *  - has the `System Administrator` system level role
+ */
+export const SystemAdminAuthState: IAuthState = {
+  auth: {
+    isLoading: false,
+    isAuthenticated: true,
+    signoutRedirect: () => {
+      // do nothing
+    },
+    signinRedirect: () => {
+      // do nothing
+    }
+  } as unknown as AuthContextProps,
+  biohubUserWrapper: {
+    isLoading: false,
+    systemUserId: 1,
+    userGuid: '123-456-789',
+    userIdentifier: 'admin-username',
+    roleNames: [SYSTEM_ROLE.SYSTEM_ADMIN],
+    identitySource: SYSTEM_IDENTITY_SOURCE.IDIR
   }
 };
 
@@ -82,13 +101,13 @@ export const getMockAuthState = (options: { base: IAuthState; overrides?: Subset
   return {
     ...base,
     ...overrides,
-    keycloakWrapper: {
-      ...base.keycloakWrapper,
-      ...overrides?.keycloakWrapper,
-      Keycloak: {
-        ...base.keycloakWrapper?.keycloak,
-        ...overrides?.keycloakWrapper?.keycloak
-      }
+    auth: {
+      ...base.auth,
+      ...overrides?.auth
+    },
+    biohubUserWrapper: {
+      ...base.biohubUserWrapper,
+      ...overrides?.biohubUserWrapper
     }
   } as unknown as IAuthState;
 };

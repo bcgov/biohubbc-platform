@@ -1,34 +1,25 @@
 import { grey } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
 import type {} from '@mui/x-data-grid/themeAugmentation';
-import 'styles/fonts.scss';
+import 'styles.scss';
 
 const appTheme = createTheme({
-  breakpoints: {
-    values: {
-      xs: 0,
-      sm: 600,
-      md: 960,
-      lg: 1440,
-      xl: 1720
-    }
-  },
   typography: {
     fontFamily: 'BCSans',
     h1: {
-      fontSize: '2rem',
-      fontWeight: 700
-    },
-    h2: {
       fontSize: '1.875rem',
       fontWeight: 700
     },
+    h2: {
+      fontSize: '1.75rem',
+      fontWeight: 700
+    },
     h3: {
-      fontSize: '1.5rem',
+      fontSize: '1.25rem',
       fontWeight: 700
     },
     h4: {
-      fontSize: '1.25rem',
+      fontSize: '1.125rem',
       fontWeight: 700
     },
     h5: {
@@ -51,6 +42,9 @@ const appTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        body: {
+          overflowY: 'scroll'
+        },
         a: {
           color: '#1a5a96',
           '&:focus': {
@@ -58,6 +52,15 @@ const appTheme = createTheme({
             outlineOffset: '-1px',
             borderRadius: '4px'
           }
+        },
+        dl: {
+          margin: 0
+        },
+        dd: {
+          margin: 0
+        },
+        dt: {
+          margin: 0
         },
         fieldset: {
           margin: 0,
@@ -78,32 +81,17 @@ const appTheme = createTheme({
       styleOverrides: {
         root: {
           fontSize: '0.9rem',
-          padding: '12px 20px',
-          borderWidth: '1px',
-          borderStyle: 'solid'
+          padding: '12px 20px'
         },
         icon: {
           marginRight: '1rem'
-        },
-        standardInfo: {
-          borderColor: '#a3d4fa',
-          '& .MuiAlert-icon': {
-            color: '#313132'
-          }
-        },
-        standardError: {
-          color: '#A12622',
-          borderColor: '#ebccd1',
-          '& .MuiAlert-icon': {
-            color: '#A12622'
-          }
-        },
-        standardSuccess: {
-          backgroundColor: '#dff0d8',
-          borderColor: '#c0dcb3',
-          '& .MuiAlert-icon': {
-            color: '#2d4821'
-          }
+        }
+      }
+    },
+    MuiAlertTitle: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
         }
       }
     },
@@ -170,20 +158,10 @@ const appTheme = createTheme({
         }
       }
     },
-    MuiDialogContent: {
-      styleOverrides: {
-        root: {
-          paddingTop: '8px'
-        }
-      }
-    },
     MuiDialogActions: {
       styleOverrides: {
         root: {
-          padding: '20px 24px',
-          '& button': {
-            minWidth: '6rem'
-          }
+          padding: '20px 24px'
         }
       }
     },
@@ -191,7 +169,7 @@ const appTheme = createTheme({
       styleOverrides: {
         root: ({ ownerState, theme }) => ({
           ...(ownerState && {
-            backgroundColor: '#fff'
+            backgroundColor: theme.palette.grey[50]
           })
         })
       }
@@ -216,7 +194,7 @@ const appTheme = createTheme({
     MuiTableCell: {
       styleOverrides: {
         root: {
-          fontSize: '0.9rem'
+          fontSize: '0.875rem'
         },
         head: {
           fontSize: '0.875rem',
@@ -228,7 +206,7 @@ const appTheme = createTheme({
     MuiDataGrid: {
       styleOverrides: {
         root: {
-          fontSize: '0.9rem',
+          fontSize: '0.875rem',
           borderWidth: 0,
           '& .MuiDataGrid-columnHeaders': {
             fontSize: '0.875rem',
@@ -268,6 +246,21 @@ const appTheme = createTheme({
         },
         colorSecondary: {
           backgroundColor: 'red'
+        }
+      }
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          fontWeight: 700
+        }
+      }
+    },
+    MuiTabs: {
+      styleOverrides: {
+        indicator: {
+          borderLeft: '16px solid #fff',
+          borderRight: '16px solid #fff'
         }
       }
     }

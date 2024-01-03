@@ -1,32 +1,25 @@
 @import 'styles/fonts.scss';
 
+fieldset {
+  border: none;
+  padding: 0;
+  min-width: 0;
+}
+
+legend.MuiTypography-root {
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.MuiDialogActions-root {
+  button {
+    min-width: 6rem;
+  }
+}
 
 .sectionHeaderButton {
   & + button {
     margin-left: 0.5rem;
-  }
-}
-
-dd {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.ddInline {
-  dd {
-    position: relative;
-    display: inline-block;
-    &:after {
-      content: ', ';
-      display: inline-block;
-      margin-right: 0.25rem;
-    }
-  }
-
-  dd:last-child {
-    &:after {
-      display: none;
-    }
   }
 }
 

@@ -17,13 +17,14 @@ import { makeStyles } from '@mui/styles';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { AddSystemUserI18N, DeleteSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
-import { DialogContext, ISnackbarProps } from 'contexts/dialogContext';
+import { ISnackbarProps } from 'contexts/dialogContext';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
-import { IGetUserResponse } from 'interfaces/useUserApi.interface';
-import { useContext, useState } from 'react';
+import { ISystemUser } from 'interfaces/useUserApi.interface';
+import { useState } from 'react';
 import { handleChangePage, handleChangeRowsPerPage } from 'utils/tablePaginationUtils';
 import AddSystemUsersForm, {
   AddSystemUsersFormInitialValues,
@@ -40,7 +41,7 @@ const useStyles = makeStyles(() => ({
 }));
 
 export interface IActiveUsersListProps {
-  activeUsers: IGetUserResponse[];
+  activeUsers: ISystemUser[];
   refresh: () => void;
 }
 
@@ -68,7 +69,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
 
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [page, setPage] = useState(0);
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const [openAddUserDialog, setOpenAddUserDialog] = useState(false);
 
@@ -76,7 +77,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
     dialogContext.setSnackbar({ ...textDialogProps, open: true });
   };
 
-  const handleRemoveUserClick = (row: IGetUserResponse) => {
+  const handleRemoveUserClick = (row: ISystemUser) => {
     dialogContext.setYesNoDialog({
       dialogTitle: 'Remove user?',
       dialogContent: (
@@ -102,12 +103,12 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
     });
   };
 
-  const deActivateSystemUser = async (user: IGetUserResponse) => {
-    if (!user?.id) {
+  const deActivateSystemUser = async (user: ISystemUser) => {
+    if (!user?.system_user_id) {
       return;
     }
     try {
-      await biohubApi.user.deleteSystemUser(user.id);
+      await biohubApi.user.deleteSystemUser(user.system_user_id);
 
       showSnackBar({
         snackbarMessage: (
@@ -140,7 +141,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
     }
   };
 
-  const handleChangeUserPermissionsClick = (row: IGetUserResponse, newRoleName: any, newRoleId: number) => {
+  const handleChangeUserPermissionsClick = (row: ISystemUser, newRoleName: any, newRoleId: number) => {
     dialogContext.setYesNoDialog({
       dialogTitle: 'Change User Role?',
       dialogContent: (
@@ -165,14 +166,14 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
     });
   };
 
-  const changeSystemUserRole = async (user: IGetUserResponse, roleId: number, roleName: string) => {
-    if (!user?.id) {
+  const changeSystemUserRole = async (user: ISystemUser, roleId: number, roleName: string) => {
+    if (!user?.system_user_id) {
       return;
     }
     const roleIds = [roleId];
 
     try {
-      await biohubApi.user.updateSystemUserRoles(user.id, roleIds);
+      await biohubApi.user.updateSystemUserRoles(user.system_user_id, roleIds);
 
       showSnackBar({
         snackbarMessage: (
@@ -305,7 +306,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
                 )}
                 {activeUsers.length > 0 &&
                   activeUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((row, index) => (
-                    <TableRow data-testid={`active-user-row-${index}`} key={row.id}>
+                    <TableRow data-testid={`active-user-row-${index}`} key={row.system_user_id}>
                       <TableCell>{row.user_identifier || 'No identifier'}</TableCell>
                       <TableCell>
                         <CustomMenuButton
@@ -358,6 +359,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
       </Container>
 
       <EditDialog
+        isLoading={false}
         dialogTitle={'Add Users'}
         open={openAddUserDialog}
         dialogSaveButtonLabel={'Add'}

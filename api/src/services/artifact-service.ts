@@ -84,7 +84,11 @@ export class ArtifactService extends DBService {
     });
 
     // Create a new submission for the artifact collection
-    const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict(dataPackageId);
+    const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict(
+      dataPackageId,
+      'TODO_Temp',
+      'TODO_Temp'
+    );
 
     // Upload the artifact to S3
     await uploadFileToS3(file, s3Key, { filename: file.originalname });
