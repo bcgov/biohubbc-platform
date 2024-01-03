@@ -22,10 +22,13 @@ export enum SYSTEM_IDENTITY_SOURCE {
    * External machine users (ie: keycloak service client users for external platform applications).
    */
   SYSTEM = 'SYSTEM',
+
   /**
    * Internal machine users (ie: postgres, biohub_api).
    */
-  DATABASE = 'DATABASE'
+  DATABASE = 'DATABASE',
+
+  //UNVERIFIED = 'UNVERIFIED' // TODO needed?
 }
 
 /**

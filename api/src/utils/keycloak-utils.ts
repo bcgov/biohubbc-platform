@@ -7,7 +7,7 @@ import { SystemUser } from '../repositories/user-repository';
  */
 export type IdirUserInformation = {
   idir_user_guid: string;
-  identity_provider: SYSTEM_IDENTITY_SOURCE.IDIR;
+  identity_provider: 'idir';
   idir_username: string;
   email_verified: boolean;
   name: string;
@@ -23,7 +23,7 @@ export type IdirUserInformation = {
  */
 export type BceidBasicUserInformation = {
   bceid_user_guid: string;
-  identity_provider: SYSTEM_IDENTITY_SOURCE.BCEID_BASIC;
+  identity_provider: 'bceidbasic';
   bceid_username: string;
   email_verified: boolean;
   name: string;
@@ -41,7 +41,7 @@ export type BceidBusinessUserInformation = {
   bceid_business_guid: string;
   bceid_business_name: string;
   bceid_user_guid: string;
-  identity_provider: SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS;
+  identity_provider: 'bceidbusiness';
   bceid_username: string;
   email_verified: boolean;
   name: string;
@@ -57,7 +57,7 @@ export type BceidBusinessUserInformation = {
  */
 export type ServiceClientUserInformation = {
   database_user_guid: string;
-  identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM;
+  identity_provider: 'system';
   username: string;
   clientId?: string;
   azp?: string;
@@ -68,7 +68,7 @@ export type ServiceClientUserInformation = {
  */
 export type DatabaseUserInformation = {
   database_user_guid: string;
-  identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE;
+  identity_provider: 'database';
   username: string;
 };
 
