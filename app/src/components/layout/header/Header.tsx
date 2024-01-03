@@ -188,9 +188,14 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   </MenuItem>
                 </SystemRoleGuard>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <Link to="/admin/security" id="menu_admin_security">
+                  <MenuItem
+                    id="menu_admin_security"
+                    component={RouterLink}
+                    to="/admin/security"
+                    onClick={hideMobileMenu}
+                  >
                     Security
-                  </Link>
+                  </MenuItem>
                 </SystemRoleGuard>
                 <MenuItem
                   component="button"
@@ -259,6 +264,11 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
                   <RouterLink to="/admin/users" id="menu_admin_users" data-testid="manage-users-header-item">
                     Manage Users
+                  </RouterLink>
+                </SystemRoleGuard>
+                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                  <RouterLink to="/admin/security" id="menu_admin_security">
+                    Security
                   </RouterLink>
                 </SystemRoleGuard>
                 <Button
