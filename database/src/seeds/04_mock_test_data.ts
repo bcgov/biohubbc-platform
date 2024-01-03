@@ -58,7 +58,9 @@ export async function seed(knex: Knex): Promise<void> {
  */
 const insertRecord = async (knex: Knex) => {
   // Submission (1)
-  const submission_id = await insertSubmissionRecord(knex);
+  const isReviewed = Math.random() > 0.5; // Mark half of submissions as reviewed
+  const isPublished = isReviewed && Math.random() > 0.5; // Mark half of reviewed submissions as published
+  const submission_id = await insertSubmissionRecord(knex, isReviewed, isPublished);
 
   // Dataset (1)
   const parent_submission_feature_id1 = await insertDatasetRecord(knex, { submission_id });
@@ -252,7 +254,10 @@ const insertAnimalRecord = async (
 
 export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includePublishTimestamp: boolean) => {
   const securityReviewTimestamp = includeSecurityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
-  const publishTimestamp = includePublishTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
+  // Only generate a non-null publish timestamp if the security timestamp is non-null (to confirm to database constraints)
+  const publishTimestamp =
+    includePublishTimestamp && !!securityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
+
   return `
     INSERT INTO submission
     (

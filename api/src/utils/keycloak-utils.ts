@@ -197,23 +197,18 @@ export const isServiceClientUserInformation = (
 };
 
 /**
- * Parses out the `clientId` and `azp` fields from the token and maps them to a known service client system user.
+ * Parses out the `sub` field from the token and maps them to a known service client system user.
  *
  * @param {object} keycloakToken
  * @return {*}  {(SystemUser | null)}
  */
 export const getServiceClientSystemUser = (keycloakToken: object): SystemUser | null => {
-  const clientId = keycloakToken?.['clientId'];
-  const azp = keycloakToken?.['azp'];
+  const sub = keycloakToken?.['sub'];
 
-  if (!clientId && !azp) {
+  if (!sub) {
     return null;
   }
 
-  // Find and return a matching known service client,if one exists
-  return (
-    getDBConstants().serviceClientUsers.find(
-      (item) => item.user_identifier === clientId || item.user_identifier === azp
-    ) || null
-  );
+  // Find and return a matching known service client, if one exists
+  return getDBConstants().serviceClientUsers.find((item) => item.user_guid === sub) || null;
 };

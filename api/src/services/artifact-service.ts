@@ -87,6 +87,7 @@ export class ArtifactService extends DBService {
     const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict(
       dataPackageId,
       'TODO_Temp',
+      'TODO_Temp',
       'TODO_Temp'
     );
 
