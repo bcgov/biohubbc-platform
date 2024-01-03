@@ -160,24 +160,12 @@ describe('keycloakUtils', () => {
       sinon.restore();
     });
 
-    it('returns null if the clientId field is undefined', () => {
+    it('returns null if the sub field is undefined', () => {
       const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
 
       sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
 
-      const token = { clientId: undefined, azp: 'not-null' };
-
-      const response = getServiceClientSystemUser(token);
-
-      expect(response).to.be.null;
-    });
-
-    it('returns null if the azp field is undefined', () => {
-      const dbConstantsMock: dbConstants.DBConstants = { serviceClientUsers: [] };
-
-      sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
-
-      const token = { clientId: 'not-null', azp: undefined };
+      const token = { sub: undefined };
 
       const response = getServiceClientSystemUser(token);
 
@@ -189,7 +177,7 @@ describe('keycloakUtils', () => {
 
       sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
 
-      const token = { clientId: 'not-null', azp: 'not-null' };
+      const token = { sub: 'not-null' };
 
       const response = getServiceClientSystemUser(token);
 
@@ -215,7 +203,7 @@ describe('keycloakUtils', () => {
 
       sinon.stub(dbConstants, 'getDBConstants').returns(dbConstantsMock);
 
-      const token = { clientId: 'known-service-client', azp: 'known-service-client' };
+      const token = { sub: 'known-service-client-guid' };
 
       const response = getServiceClientSystemUser(token);
 

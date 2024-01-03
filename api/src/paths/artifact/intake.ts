@@ -154,7 +154,7 @@ export function intakeArtifacts(): RequestHandler {
     const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
     if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
-        'token clientId/azp did not match any known system user guid for a service client user'
+        'token sub did not match any known system user guid for a service client user'
       ]);
     }
 

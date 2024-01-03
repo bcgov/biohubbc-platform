@@ -60,7 +60,8 @@ describe('SubmissionService', () => {
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
         '123-456-789',
         'submission name',
-        'source systemF'
+        'submission desc',
+        'source system'
       );
 
       expect(repo).to.be.calledOnce;

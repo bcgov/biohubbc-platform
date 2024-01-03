@@ -493,6 +493,7 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.insertSubmissionRecordWithPotentialConflict(
         '123-456-789',
         'submission name',
+        'submission desc',
         'source system'
       );
 
@@ -510,6 +511,7 @@ describe('SubmissionRepository', () => {
         await submissionRepository.insertSubmissionRecordWithPotentialConflict(
           '123-456-789',
           'submission name',
+          'submission desc',
           'source system'
         );
         expect.fail();

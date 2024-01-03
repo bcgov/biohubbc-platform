@@ -98,7 +98,7 @@ export function submissionIntake(): RequestHandler {
 
     if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
+        'token did not contain a sub or sub value is unknown'
       ]);
     }
 
@@ -128,7 +128,8 @@ export function submissionIntake(): RequestHandler {
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
         submission.id,
         submission.name,
-        submission.description
+        submission.description,
+        serviceClientSystemUser.user_identifier
       );
 
       // insert each submission feature record
