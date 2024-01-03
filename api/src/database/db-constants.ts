@@ -16,8 +16,6 @@ let DBConstants: DBConstants | undefined;
 /**
  * Initializes the singleton db constants instance used by the api.
  *
- * If the constants cannot be created successfully, `process.exit(1)` is called to terminate the API.
- *
  * @return {*}  {Promise<void>}
  */
 export const initDBConstants = async function (): Promise<void> {
@@ -36,7 +34,7 @@ export const initDBConstants = async function (): Promise<void> {
 
       DBConstants = { serviceClientUsers: response.rows };
 
-      await await connection.commit();
+      await connection.commit();
     } catch (error) {
       defaultLog.error({ label: 'initDBConstants', message: 'error', error });
       await connection.rollback();
@@ -46,7 +44,7 @@ export const initDBConstants = async function (): Promise<void> {
     }
   } catch (error) {
     defaultLog.error({ label: 'initDBConstants', message: 'failed to create db constants', error });
-    process.exit(1);
+    throw error;
   }
 };
 
