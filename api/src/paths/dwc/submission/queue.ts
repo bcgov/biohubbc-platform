@@ -160,7 +160,7 @@ export function queueForProcess(): RequestHandler {
 
     if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
+        'token did not contain a sub or sub value is unknown'
       ]);
     }
 

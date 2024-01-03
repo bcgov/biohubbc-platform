@@ -362,26 +362,30 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {string} uuid
    * @param {string} name
-   * @param {string} sourceSystem
+   * @param {string} description
+   * @param {string} userIdentifier
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecordWithPotentialConflict(
     uuid: string,
     name: string,
-    sourceSystem: string
+    description: string,
+    userIdentifier: string
   ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
         submitted_timestamp,
         name,
+        description,
         source_system
       ) VALUES (
         ${uuid},
         now(),
         ${name},
-        ${sourceSystem}
+        ${description},
+        ${userIdentifier}
       )
       RETURNING
         submission_id;
