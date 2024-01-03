@@ -17,18 +17,16 @@ describe('db-constants', () => {
 
   describe('when db constants has not been initialized', () => {
     describe('initDBConstants', () => {
-      it('catches an error and exits the process', () => {
-        const processExitStub = sinon.stub(process, 'exit');
-
+      it('catches and re-throws an error', async () => {
         const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').throws(new Error('test error'));
 
         try {
-          initDBConstants();
+          await initDBConstants();
 
           expect.fail();
         } catch (actualError) {
+          expect((actualError as Error).message).to.equal('test error');
           expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
-          expect(processExitStub).to.have.been.calledOnce;
         }
       });
     });
@@ -50,7 +48,7 @@ describe('db-constants', () => {
     let dbConnectionObj: db.IDBConnection;
     let getAPIUserDBConnectionStub: SinonStub<[], db.IDBConnection>;
 
-    before(() => {
+    before(async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [
@@ -79,15 +77,15 @@ describe('db-constants', () => {
 
       getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
-      initDBConstants();
+      await initDBConstants();
     });
 
     describe('initDBConstants', () => {
-      it('does nothing if db constants has already been initialized', () => {
+      it('does nothing if db constants has already been initialized', async () => {
         expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
 
         // Call init a second time
-        initDBConstants();
+        await initDBConstants();
 
         // Expect not to have been called again (twice)
         expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
