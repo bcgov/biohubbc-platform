@@ -1,7 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
 import { insertDatasetRecord, insertSampleSiteRecord, insertSubmissionRecord } from './04_mock_test_data';
-import { insertSecurityCategoryRecord, insertSecurityRuleRecord } from './05_security_test_data';
 
 /**
  * Inserts mock submission data
@@ -41,8 +40,7 @@ export async function seed(knex: Knex): Promise<void> {
   await createSubmissionWithSecurity(knex, 'UNSECURE', false);
 }
 
-const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, security_category_id: number) => {
-  const security_rule_id = await insertSecurityRuleRecord(knex, security_category_id);
+const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, security_rule_id: number) => {
   await knex.raw(`
   INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date)
   VALUES($$${submission_feature_id}$$, $$${security_rule_id}$$, $$${faker.date.past().toISOString()}$$);`);
@@ -59,16 +57,15 @@ const createSubmissionWithSecurity = async (
     parent_submission_feature_id,
     submission_id
   });
-  const categoryId = await insertSecurityCategoryRecord(knex);
 
   if (securityLevel === 'PARTIALLY SECURE') {
-    await insertFeatureSecurity(knex, submission_feature_id, categoryId);
+    await insertFeatureSecurity(knex, submission_feature_id, 1);
     return;
   }
 
   if (securityLevel === 'SECURE') {
-    await insertFeatureSecurity(knex, parent_submission_feature_id, categoryId);
-    await insertFeatureSecurity(knex, submission_feature_id, categoryId);
+    await insertFeatureSecurity(knex, parent_submission_feature_id, 2);
+    await insertFeatureSecurity(knex, submission_feature_id, 3);
     return;
   }
 };
