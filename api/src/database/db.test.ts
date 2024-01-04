@@ -3,9 +3,10 @@ import { describe } from 'mocha';
 import * as pg from 'pg';
 import Sinon, { SinonStub } from 'sinon';
 import SQL from 'sql-template-strings';
-import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { HTTPError } from '../errors/http-error';
+import { SystemUser } from '../repositories/user-repository';
 import { getMockDBConnection } from '../__mocks__/db';
 import * as db from './db';
 import {
@@ -15,16 +16,12 @@ import {
   getDBPool,
   getKnex,
   getKnexQueryBuilder,
+  getServiceAccountDBConnection,
   IDBConnection,
   initDBPool
 } from './db';
 
 describe('db', () => {
-  beforeEach(() => {
-    // reset singleton pg pool instance so that each test can control its existence as needed
-    global['DBPool'] = undefined;
-  });
-
   describe('getDBPool', () => {
     it('returns an undefined database pool instance if it has not yet been initialized', () => {
       const pool = getDBPool();
@@ -418,10 +415,24 @@ describe('db', () => {
       const mockDBConnection = getMockDBConnection();
       const getDBConnectionStub = Sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-      db.getServiceAccountDBConnection(SOURCE_SYSTEM['SIMS-SVC-4464']);
+      const systemUser: SystemUser = {
+        system_user_id: 1,
+        user_identity_source_id: 2,
+        user_identifier: 'sims-svc-4464',
+        user_guid: 'service-account-sims-svc-4464',
+        record_effective_date: '',
+        record_end_date: '',
+        create_date: '2023-12-12',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+
+      getServiceAccountDBConnection(systemUser);
 
       expect(getDBConnectionStub).to.have.been.calledWith({
-        preferred_username: `service-account-${SOURCE_SYSTEM['SIMS-SVC-4464']}`,
+        preferred_username: 'service-account-sims-svc-4464',
         identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
       });
 

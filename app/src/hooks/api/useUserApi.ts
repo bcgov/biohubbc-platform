@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { IGetRoles } from 'interfaces/useAdminApi.interface';
-import { IGetUserResponse } from 'interfaces/useUserApi.interface';
+import { ISystemUser } from 'interfaces/useUserApi.interface';
 
 /**
  * Returns a set of supported api methods for working with users.
@@ -23,9 +23,9 @@ const useUserApi = (axios: AxiosInstance) => {
   /**
    * Get user details for the currently authenticated user.
    *
-   * @return {*}  {Promise<IGetUserResponse>}
+   * @return {*}  {Promise<ISystemUser>}
    */
-  const getUser = async (): Promise<IGetUserResponse> => {
+  const getUser = async (): Promise<ISystemUser> => {
     const { data } = await axios.get('/api/user/self');
 
     return data;
@@ -35,9 +35,9 @@ const useUserApi = (axios: AxiosInstance) => {
    * Get user from userId
    *
    * @param {number} userId
-   * @return {*}  {Promise<IGetUserResponse>}
+   * @return {*}  {Promise<ISystemUser>}
    */
-  const getUserById = async (userId: number): Promise<IGetUserResponse> => {
+  const getUserById = async (userId: number): Promise<ISystemUser> => {
     const { data } = await axios.get(`/api/user/${userId}/get`);
     return data;
   };
@@ -45,9 +45,9 @@ const useUserApi = (axios: AxiosInstance) => {
   /**
    * Get user details for all users.
    *
-   * @return {*}  {Promise<IGetUserResponse[]>}
+   * @return {*}  {Promise<ISystemUser[]>}
    */
-  const getUsersList = async (): Promise<IGetUserResponse[]> => {
+  const getUsersList = async (): Promise<ISystemUser[]> => {
     const { data } = await axios.get('/api/user/list');
 
     return data;
@@ -56,7 +56,7 @@ const useUserApi = (axios: AxiosInstance) => {
   /**
    * Get user details for all users.
    *
-   * @return {*}  {Promise<IGetUserResponse[]>}
+   * @return {*}  {Promise<ISystemUser[]>}
    */
   const deleteSystemUser = async (userId: number): Promise<number> => {
     const { data } = await axios.delete(`/api/user/${userId}/delete`);
@@ -80,9 +80,9 @@ const useUserApi = (axios: AxiosInstance) => {
   /**
    * Get user details for all users.
    *
-   * @return {*}  {Promise<IGetUserResponse[]>}
+   * @return {*}  {Promise<ISystemUser[]>}
    */
-  const updateSystemUserRoles = async (userId: number, roleIds: number[]): Promise<IGetUserResponse> => {
+  const updateSystemUserRoles = async (userId: number, roleIds: number[]): Promise<ISystemUser> => {
     const { data } = await axios.patch(`/api/user/${userId}/system-roles/update`, { roles: roleIds });
 
     return data;

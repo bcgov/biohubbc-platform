@@ -2,8 +2,13 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { IDatasetSubmission } from '../repositories/submission-repository';
-import { IInsertStyleSchema, IStyleModel, ValidationRepository } from '../repositories/validation-repository';
+import { ISubmissionFeature } from '../repositories/submission-repository';
+import {
+  IFeatureProperties,
+  IInsertStyleSchema,
+  IStyleModel,
+  ValidationRepository
+} from '../repositories/validation-repository';
 import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
 import * as validatorParser from '../utils/media/validation/validation-schema-parser';
 import { getMockDBConnection } from '../__mocks__/db';
@@ -108,161 +113,207 @@ describe('ValidationService', () => {
     });
   });
 
-  describe('validateDatasetSubmission', () => {
+  describe('validateSubmissionFeatures', () => {
     it('should return false if the dataset is invalid', async () => {
       const mockDBConnection = getMockDBConnection();
 
-      const getFeatureValidationPropertiesSpy = sinon.spy(
-        ValidationService.prototype,
-        'getFeatureValidationProperties'
-      );
-
-      const validatePropertiesStub = sinon.stub(ValidationService.prototype, 'validateProperties').returns(true);
+      const validateSubmissionFeatureStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeature')
+        .throws(new Error('validation error'));
 
       const mockDatasetProperties = {
         name: 'dataset name',
         start_date: '2023-12-22'
       };
+
       const mockObservationProperties1 = {
         count: 11,
         sex: 'male',
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
+      const mockObservationSubmissionFeature1 = {
+        id: '1',
+        type: 'observation',
+        properties: mockObservationProperties1,
+        features: []
+      };
+
       const mockObservationProperties2 = {
         count: 22,
         sex: 'female',
         geometry: {
-          type: 'Feature'
-          // Invalid geometry
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
-      const mockDataset: IDatasetSubmission = {
+      const mockObservationSubmissionFeature2 = {
+        id: '2',
+        type: 'observation',
+        properties: mockObservationProperties2,
+        features: []
+      };
+
+      const mockDatasetSubmissionFeature = {
         id: '123',
         type: 'dataset',
         properties: mockDatasetProperties,
-        features: [
-          { id: '1', type: 'observation', properties: mockObservationProperties1 },
-          { id: '2', type: 'observation', properties: mockObservationProperties2 }
-        ]
+        features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
       };
+
+      const mockSubmissionFeatures: ISubmissionFeature[] = [mockDatasetSubmissionFeature];
 
       const validationService = new ValidationService(mockDBConnection);
 
-      const mockDatasetValidationProperties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
-      ];
-      const mockObservationValidationProperties = [
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'sex', display_name: '', description: '', type: 'string' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' }
-      ];
-      // Set cache for dataset type
-      validationService.validationPropertiesCache.set('dataset', mockDatasetValidationProperties);
-      // Set cache for observation type
-      validationService.validationPropertiesCache.set('observation', mockObservationValidationProperties);
+      const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      const response = await validationService.validateDatasetSubmission(mockDataset);
-
-      expect(response).to.be.true;
-      expect(getFeatureValidationPropertiesSpy).to.have.been.calledWith('dataset');
-      expect(getFeatureValidationPropertiesSpy).to.have.been.calledWith('observation');
-      expect(validatePropertiesStub).to.have.been.calledWith(mockDatasetValidationProperties, mockDatasetProperties);
-      expect(validatePropertiesStub).to.have.been.calledWith(
-        mockObservationValidationProperties,
-        mockObservationProperties1
-      );
-      expect(validatePropertiesStub).to.have.been.calledWith(
-        mockObservationValidationProperties,
-        mockObservationProperties2
-      );
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
+      expect(response).to.be.false;
     });
 
     it('should return true if the dataset is valid', async () => {
       const mockDBConnection = getMockDBConnection();
 
-      const getFeatureValidationPropertiesSpy = sinon.spy(
-        ValidationService.prototype,
-        'getFeatureValidationProperties'
-      );
-
-      const validatePropertiesStub = sinon.stub(ValidationService.prototype, 'validateProperties').returns(true);
+      const validateSubmissionFeatureStub = sinon
+        .stub(ValidationService.prototype, 'validateSubmissionFeature')
+        .resolves(true);
 
       const mockDatasetProperties = {
         name: 'dataset name',
         start_date: '2023-12-22'
       };
+
       const mockObservationProperties1 = {
         count: 11,
         sex: 'male',
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
+      const mockObservationSubmissionFeature1 = {
+        id: '1',
+        type: 'observation',
+        properties: mockObservationProperties1,
+        features: []
+      };
+
       const mockObservationProperties2 = {
         count: 22,
         sex: 'female',
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
-      const mockDataset: IDatasetSubmission = {
+      const mockObservationSubmissionFeature2 = {
+        id: '2',
+        type: 'observation',
+        properties: mockObservationProperties2,
+        features: []
+      };
+
+      const mockDatasetSubmissionFeature = {
         id: '123',
         type: 'dataset',
         properties: mockDatasetProperties,
+        features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
+      };
+
+      const mockSubmissionFeatures: ISubmissionFeature[] = [mockDatasetSubmissionFeature];
+
+      const validationService = new ValidationService(mockDBConnection);
+
+      const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
+
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith({
+        ...mockObservationSubmissionFeature1,
+        features: []
+      });
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith({
+        ...mockObservationSubmissionFeature2,
+        features: []
+      });
+      expect(response).to.be.true;
+    });
+  });
+
+  describe('validateSubmissionFeature', () => {
+    it('fetches validation properties and calls validate', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const mockFeatureProperties: IFeatureProperties[] = [
+        {
+          name: 'field1',
+          display_name: 'Field 1',
+          description: 'A Field 1',
+          type: 'string'
+        }
+      ];
+
+      const getFeatureValidationPropertiesStub = sinon
+        .stub(ValidationService.prototype, 'getFeatureValidationProperties')
+        .resolves(mockFeatureProperties);
+
+      const validatePropertiesStub = sinon.stub(ValidationService.prototype, 'validateProperties').returns(true);
+
+      const mockSubmissionProperties = {};
+      const mockSubmissionFeature = {
+        id: '1',
+        type: 'feature type',
+        properties: mockSubmissionProperties,
         features: [
-          { id: '1', type: 'observation', properties: mockObservationProperties1 },
-          { id: '2', type: 'observation', properties: mockObservationProperties2 }
+          { id: '2', type: 'child feature type', properties: {}, features: [] },
+          { id: '3', type: 'child feature type', properties: {}, features: [] }
         ]
       };
 
       const validationService = new ValidationService(mockDBConnection);
 
-      const mockDatasetValidationProperties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
-      ];
-      const mockObservationValidationProperties = [
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'sex', display_name: '', description: '', type: 'string' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' }
-      ];
-      // Set cache for dataset type
-      validationService.validationPropertiesCache.set('dataset', mockDatasetValidationProperties);
-      // Set cache for observation type
-      validationService.validationPropertiesCache.set('observation', mockObservationValidationProperties);
+      const result = await validationService.validateSubmissionFeature(mockSubmissionFeature);
 
-      const response = await validationService.validateDatasetSubmission(mockDataset);
-
-      expect(response).to.be.true;
-      expect(getFeatureValidationPropertiesSpy).to.have.been.calledWith('dataset');
-      expect(getFeatureValidationPropertiesSpy).to.have.been.calledWith('observation');
-      expect(validatePropertiesStub).to.have.been.calledWith(mockDatasetValidationProperties, mockDatasetProperties);
-      expect(validatePropertiesStub).to.have.been.calledWith(
-        mockObservationValidationProperties,
-        mockObservationProperties1
-      );
-      expect(validatePropertiesStub).to.have.been.calledWith(
-        mockObservationValidationProperties,
-        mockObservationProperties2
-      );
+      expect(result).to.be.true;
+      expect(getFeatureValidationPropertiesStub).to.have.been.calledOnceWith('feature type');
+      expect(validatePropertiesStub).to.have.been.calledOnceWith(mockFeatureProperties, mockSubmissionProperties);
     });
   });
 
@@ -285,12 +336,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         }
       };
 
@@ -299,7 +355,7 @@ describe('ValidationService', () => {
       try {
         validationService.validateProperties(properties, dataProperties);
       } catch (error) {
-        expect((error as Error).message).to.equal('Property start_date not found in data');
+        expect((error as Error).message).to.equal('Property [start_date] not found in data');
       }
     });
 
@@ -321,12 +377,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -358,12 +419,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -395,12 +461,17 @@ describe('ValidationService', () => {
         published: 'true',
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -432,12 +503,17 @@ describe('ValidationService', () => {
         published: true,
         permit: [],
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };
@@ -499,12 +575,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: {}
       };
@@ -536,12 +617,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: 'not a valid date'
       };
@@ -573,12 +659,17 @@ describe('ValidationService', () => {
         published: true,
         permit: {},
         geometry: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            coordinates: [-125.44339737241725, 49.36887682703687],
-            type: 'Point'
-          }
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                coordinates: [-125.44339737241725, 49.36887682703687],
+                type: 'Point'
+              }
+            }
+          ]
         },
         start_date: '2023-11-22'
       };

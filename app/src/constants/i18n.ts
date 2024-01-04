@@ -1,3 +1,5 @@
+import { pluralize as p } from 'utils/Utils';
+
 export const SystemUserI18N = {
   removeSystemUserTitle: 'Remove System User ',
   removeUserErrorTitle: 'Error Removing User From Team',
@@ -24,8 +26,22 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  applySecurityRulesErrorTitle: 'Error Securing Documents',
-  applySecurityRulesErrorText: 'Failed to apply security to the selected documents. Please try again.',
-  unapplySecurityRulesErrorTitle: 'Error Unsecuring Documents',
-  unapplySecurityRulesErrorText: 'Failed to unsecure the selected documents. Please try again.'
+  applySecuritySuccess: (ruleCount: number, featureCount: number) => {
+    if (ruleCount === 0) {
+      return `Successfully removed all security rules for ${featureCount} ${p(featureCount, 'feature')}.`;
+    }
+
+    return `Successfully applied ${ruleCount} ${p(ruleCount, 'security rule')} to ${featureCount} ${p(
+      featureCount,
+      'feature'
+    )}.`;
+  },
+
+  applySecurityRulesErrorTitle: 'Error Applying Security',
+  applySecurityRulesErrorText:
+    'An error occurred while applying security to features, please try again. If the problem persists, please contact your system administrator',
+  unApplySecurityRulesSuccess: (submissionCount: number) => `Successfully unsecured: ${submissionCount} features`,
+  unapplySecurityRulesErrorTitle: 'Error Unsecuring Features',
+  unapplySecurityRulesErrorText:
+    'Failed to unsecure the selected features, please try again. If the problem persists, please contact your system administrator'
 };

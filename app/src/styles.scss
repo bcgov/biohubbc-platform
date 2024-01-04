@@ -1,9 +1,5 @@
 @import 'styles/fonts.scss';
 
-body {
-  overflow-y: scroll;
-}
-
 fieldset {
   border: none;
   padding: 0;
@@ -24,29 +20,6 @@ legend.MuiTypography-root {
 .sectionHeaderButton {
   & + button {
     margin-left: 0.5rem;
-  }
-}
-
-dd {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.ddInline {
-  dd {
-    position: relative;
-    display: inline-block;
-    &:after {
-      content: ', ';
-      display: inline-block;
-      margin-right: 0.25rem;
-    }
-  }
-
-  dd:last-child {
-    &:after {
-      display: none;
-    }
   }
 }
 

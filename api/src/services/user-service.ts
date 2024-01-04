@@ -1,12 +1,8 @@
 import { SYSTEM_ROLE } from '../constants/roles';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { Models } from '../models';
-import { SystemRoles, UserRepository } from '../repositories/user-repository';
-import { getLogger } from '../utils/logger';
+import { SystemRoles, SystemUser, SystemUserExtended, UserRepository } from '../repositories/user-repository';
 import { DBService } from './db-service';
-
-const defaultLog = getLogger('services/user-service');
 
 export class UserService extends DBService {
   userRepository: UserRepository;
@@ -30,32 +26,46 @@ export class UserService extends DBService {
    * Fetch a single system user by their system user ID.
    *
    * @param {number} systemUserId
-   * @return {*}  {(Promise<Models.user.UserObject>)}
+   * @return {*}  {Promise<SystemUserExtended>}
    * @memberof UserService
    */
-  async getUserById(systemUserId: number): Promise<Models.user.UserObject> {
-    const response = await this.userRepository.getUserById(systemUserId);
-
-    return new Models.user.UserObject(response);
+  async getUserById(systemUserId: number): Promise<SystemUserExtended> {
+    return this.userRepository.getUserById(systemUserId);
   }
 
   /**
    * Get an existing system user by their GUID.
    *
    * @param {string} userGuid The user's GUID
-   * @return {*}  {(Promise<Models.user.UserObject | null>)}
+   * @return {*}  {(Promise<SystemUserExtended | null>)}
    * @memberof UserService
    */
-  async getUserByGuid(userGuid: string): Promise<Models.user.UserObject | null> {
-    defaultLog.debug({ label: 'getUserByGuid', userGuid });
-
+  async getUserByGuid(userGuid: string): Promise<SystemUserExtended | null> {
     const response = await this.userRepository.getUserByGuid(userGuid);
 
     if (response.length !== 1) {
       return null;
     }
 
-    return new Models.user.UserObject(response[0]);
+    return response[0];
+  }
+
+  /**
+   * Get an existing system user by their user identifier and identity source.
+   *
+   * @param userIdentifier the user's identifier
+   * @param identitySource the user's identity source, e.g. `'IDIR'`
+   * @return {*}  {(Promise<SystemUserExtended | null>)} Promise resolving the User, or `null` if the user wasn't found.
+   * @memberof UserService
+   */
+  async getUserByIdentifier(userIdentifier: string, identitySource: string): Promise<SystemUserExtended | null> {
+    const response = await this.userRepository.getUserByIdentifier(userIdentifier, identitySource);
+
+    if (response.length !== 1) {
+      return null;
+    }
+
+    return response[0];
   }
 
   /**
@@ -66,29 +76,21 @@ export class UserService extends DBService {
    * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
-   * @return {*}  {Promise<Models.user.UserObject>}
+   * @return {*}  {Promise<SystemUser>}
    * @memberof UserService
    */
-  async addSystemUser(
-    userGuid: string,
-    userIdentifier: string,
-    identitySource: string
-  ): Promise<Models.user.UserObject> {
-    const response = await this.userRepository.addSystemUser(userGuid, userIdentifier, identitySource);
-
-    return new Models.user.UserObject(response);
+  async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<SystemUser> {
+    return this.userRepository.addSystemUser(userGuid, userIdentifier, identitySource);
   }
 
   /**
    * Get a list of all system users.
    *
-   * @return {*}  {Promise<Models.user.UserObject[]>}
+   * @return {*}  {Promise<SystemUserExtended[]>}
    * @memberof UserService
    */
-  async listSystemUsers(): Promise<Models.user.UserObject[]> {
-    const response = await this.userRepository.listSystemUsers();
-
-    return response.map((row) => new Models.user.UserObject(row));
+  async listSystemUsers(): Promise<SystemUserExtended[]> {
+    return this.userRepository.listSystemUsers();
   }
 
   /**
@@ -98,19 +100,21 @@ export class UserService extends DBService {
    * @param {string} userGuid
    * @param {string} userIdentifier
    * @param {string} identitySource
-   * @return {*}  {Promise<Models.user.UserObject>}
+   * @return {*}  {Promise<SystemUserExtended>}
    * @memberof UserService
    */
   async ensureSystemUser(
     userGuid: string,
     userIdentifier: string,
     identitySource: string
-  ): Promise<Models.user.UserObject> {
-    // Check if the user exists
-    let userObject = await this.getUserByGuid(userGuid);
+  ): Promise<SystemUserExtended> {
+    // Check if the user exists in SIMS
+    const existingUser = userGuid
+      ? await this.getUserByGuid(userGuid)
+      : await this.getUserByIdentifier(userIdentifier, identitySource);
 
-    if (!userObject) {
-      // ID of the current authenticated user
+    if (!existingUser) {
+      // Id of the current authenticated user
       const systemUserId = this.connection.systemUserId();
 
       if (!systemUserId) {
@@ -118,47 +122,22 @@ export class UserService extends DBService {
       }
 
       // Found no existing user, add them
-      userObject = await this.addSystemUser(userGuid, userIdentifier, identitySource);
+      const newUserId = await this.addSystemUser(userGuid, userIdentifier, identitySource);
+
+      // fetch the new user object
+      return this.getUserById(newUserId.system_user_id);
     }
 
-    if (!userObject.record_end_date) {
+    if (!existingUser.record_end_date) {
       // system user is already active
-      return userObject;
+      return existingUser;
     }
 
     // system user is not active, re-activate them
-    await this.activateSystemUser(userObject.id);
+    await this.activateSystemUser(existingUser.system_user_id);
 
     // get the newly activated user
-    return this.getUserById(userObject.id);
-  }
-
-  /**
-   * Gets a system user, adding them if they do not already exist.
-   *
-   * @param {string} userGuid
-   * @param {string} userIdentifier
-   * @param {string} identitySource
-   * @return {*}  {Promise<Models.user.UserObject>}
-   * @memberof UserService
-   */
-  async getOrCreateSystemUser(
-    userGuid: string,
-    userIdentifier: string,
-    identitySource: string
-  ): Promise<Models.user.UserObject> {
-    defaultLog.debug({ label: 'getUserByGuid', userGuid, userIdentifier, identitySource });
-
-    // Check if the user exists
-    let userObject = await this.getUserByGuid(userGuid);
-
-    if (!userObject) {
-      // Found no existing user, add them
-      userObject = await this.addSystemUser(userGuid, userIdentifier, identitySource);
-    }
-
-    // return the user object
-    return userObject;
+    return this.getUserById(existingUser.system_user_id);
   }
 
   /**

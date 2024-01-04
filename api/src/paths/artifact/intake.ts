@@ -1,14 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { validate as validateUuid } from 'uuid';
-import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
 import { scanFileForVirus } from '../../utils/file-utils';
-import { getKeycloakSource } from '../../utils/keycloak-utils';
+import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/artifact/intake');
@@ -18,7 +17,6 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -153,14 +151,14 @@ export function intakeArtifacts(): RequestHandler {
       throw new HTTP400('Malicious content detected, upload cancelled');
     }
 
-    const sourceSystem = getKeycloakSource(req['keycloak_token']);
-    if (!sourceSystem) {
+    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
+        'token sub did not match any known system user guid for a service client user'
       ]);
     }
 
-    const connection = getServiceAccountDBConnection(sourceSystem);
+    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();

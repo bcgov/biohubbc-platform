@@ -8,7 +8,6 @@ import { getLogger } from '../utils/logger';
 import { formatPhoneNumber, makeLoginUrl } from '../utils/string-utils';
 import { ArtifactService } from './artifact-service';
 import { DBService } from './db-service';
-import { KeycloakService } from './keycloak-service';
 
 export interface ISubmitArtifactRequestAccess {
   fullName: string;
@@ -251,9 +250,10 @@ export class GCNotifyService extends DBService {
    * @memberof GCNotifyService
    */
   async getUserKeycloakEmail(userIdentifier: string, identitySource: string): Promise<string> {
-    const keycloakService = new KeycloakService();
-    const userDetails = await keycloakService.getUserByUsername(`${userIdentifier}@${identitySource}`);
-    return userDetails.email;
+    // const keycloakService = new KeycloakService();
+    // const userDetails = await keycloakService.getUserByUsername(`${userIdentifier}@${identitySource}`);
+    // return userDetails.email;
+    return Promise.resolve('');
   }
 
   /**

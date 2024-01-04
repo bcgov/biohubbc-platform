@@ -1,5 +1,4 @@
 import { IDBConnection } from '../database/db';
-import { ESService } from './es-service';
 
 /**
  * Base class for services that require a database connection.
@@ -7,11 +6,10 @@ import { ESService } from './es-service';
  * @export
  * @class DBService
  */
-export class DBService extends ESService {
+export class DBService {
   connection: IDBConnection;
 
   constructor(connection: IDBConnection) {
-    super();
     this.connection = connection;
   }
 }

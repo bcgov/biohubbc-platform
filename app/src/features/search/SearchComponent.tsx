@@ -8,8 +8,9 @@ import InputAdornment from '@mui/material/InputAdornment';
 import { makeStyles } from '@mui/styles';
 import { useFormikContext } from 'formik';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
+import { ChangeEvent } from 'react';
 
-const useStyles = makeStyles((theme: Theme) => ({
+export const useSearchInputStyles = makeStyles((theme: Theme) => ({
   searchInputContainer: {
     position: 'relative'
   },
@@ -59,8 +60,35 @@ const useStyles = makeStyles((theme: Theme) => ({
   }
 }));
 
+interface ISearchInputProps {
+  placeholderText: string;
+  handleChange: (e: ChangeEvent<any>) => void;
+  value: string;
+}
+
+export const SearchInput = (props: ISearchInputProps) => {
+  const classes = useSearchInputStyles();
+  return (
+    <Input
+      tabIndex={0}
+      className={classes.searchInput}
+      name="keywords"
+      fullWidth
+      startAdornment={
+        <InputAdornment position="start">
+          <Icon path={mdiMagnify} size={1} />
+        </InputAdornment>
+      }
+      disableUnderline={true}
+      placeholder={props.placeholderText}
+      onChange={props.handleChange}
+      value={props.value}
+    />
+  );
+};
+
 const SearchComponent: React.FC<React.PropsWithChildren> = () => {
-  const classes = useStyles();
+  const classes = useSearchInputStyles();
 
   const formikProps = useFormikContext<IAdvancedSearch>();
   const { handleSubmit, handleChange, values } = formikProps;
@@ -68,19 +96,9 @@ const SearchComponent: React.FC<React.PropsWithChildren> = () => {
   return (
     <form onSubmit={handleSubmit} autoComplete="off">
       <Box className={classes.searchInputContainer}>
-        <Input
-          tabIndex={0}
-          className={classes.searchInput}
-          name="keywords"
-          fullWidth
-          startAdornment={
-            <InputAdornment position="start">
-              <Icon path={mdiMagnify} size={1} />
-            </InputAdornment>
-          }
-          disableUnderline={true}
-          placeholder="Enter a species name or keyword"
-          onChange={handleChange}
+        <SearchInput
+          placeholderText="Enter a species name or keyword"
+          handleChange={handleChange}
           value={values.keywords}
         />
         <Button

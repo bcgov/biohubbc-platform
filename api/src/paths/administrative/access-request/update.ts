@@ -125,7 +125,7 @@ export function updateAccessRequest(): RequestHandler {
 
       if (rolesIdsToAdd?.length) {
         // Add any missing roles (if any)
-        await userService.addUserSystemRoles(systemUserObject.id, rolesIdsToAdd);
+        await userService.addUserSystemRoles(systemUserObject.system_user_id, rolesIdsToAdd);
       }
 
       // Update the access request record status

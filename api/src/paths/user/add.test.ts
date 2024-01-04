@@ -5,7 +5,7 @@ import sinonChai from 'sinon-chai';
 import { SYSTEM_IDENTITY_SOURCE } from '../../constants/database';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
-import { Models } from '../../models';
+import { SystemUserExtended } from '../../repositories/user-repository';
 import { UserService } from '../../services/user-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
 import * as user from './add';
@@ -46,7 +46,7 @@ describe('user', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        userGuid: 'aaaa',
+        userGuid: '123-456-789',
         identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
         roleId: 1
       };
@@ -94,7 +94,7 @@ describe('user', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        userGuid: 'aaaa',
+        userGuid: '123-456-789',
         userIdentifier: 'username',
         roleId: 1
       };
@@ -118,7 +118,7 @@ describe('user', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        userGuid: 'aaaa',
+        userGuid: '123-456-789',
         userIdentifier: 'username',
         identitySource: SYSTEM_IDENTITY_SOURCE.IDIR
       };
@@ -142,18 +142,25 @@ describe('user', () => {
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
       mockReq.body = {
-        userGuid: 'aaaa',
+        userGuid: '123-456-789',
         userIdentifier: 'username',
         identitySource: SYSTEM_IDENTITY_SOURCE.IDIR,
         roleId: 1
       };
 
-      const mockUserObject: Models.user.UserObject = {
-        id: 1,
+      const mockUserObject: SystemUserExtended = {
+        system_user_id: 1,
+        user_identity_source_id: 2,
         user_identifier: '',
         user_guid: '',
         identity_source: '',
+        record_effective_date: '',
         record_end_date: '',
+        create_date: 'string',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1,
         role_ids: [1],
         role_names: []
       };
