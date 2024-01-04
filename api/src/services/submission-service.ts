@@ -570,6 +570,16 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get all submissions that have completed security review and are published.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getPublishedSubmissionsForAdmins();
+  }
+
+  /**
    * Get a submission record by id (with security status).
    *
    * @param {number} submissionId
