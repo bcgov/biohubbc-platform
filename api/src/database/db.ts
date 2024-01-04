@@ -2,9 +2,10 @@ import knex, { Knex } from 'knex';
 import * as pg from 'pg';
 import { SQLStatement } from 'sql-template-strings';
 import { z } from 'zod';
-import { SOURCE_SYSTEM, SYSTEM_IDENTITY_SOURCE } from '../constants/database';
+import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import * as UserQueries from '../queries/database/user-context-queries';
+import { SystemUser } from '../repositories/user-repository';
 import { getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
 import { asyncErrorWrapper, getZodQueryResult, syncErrorWrapper } from './db-utils';
@@ -20,6 +21,7 @@ const DB_PASSWORD = process.env.DB_USER_API_PASS;
 const DB_DATABASE = process.env.DB_DATABASE;
 
 const DB_POOL_SIZE: number = Number(process.env.DB_POOL_SIZE) || 20;
+const DB_CONNECTION_MAX_USES: number = Number(process.env.DB_CONNECTION_MAX_USES) || 7500;
 const DB_CONNECTION_TIMEOUT: number = Number(process.env.DB_CONNECTION_TIMEOUT) || 0;
 const DB_IDLE_TIMEOUT: number = Number(process.env.DB_IDLE_TIMEOUT) || 10000;
 
@@ -30,6 +32,7 @@ export const defaultPoolConfig: pg.PoolConfig = {
   port: DB_PORT,
   host: DB_HOST,
   max: DB_POOL_SIZE,
+  maxUses: DB_CONNECTION_MAX_USES,
   connectionTimeoutMillis: DB_CONNECTION_TIMEOUT,
   idleTimeoutMillis: DB_IDLE_TIMEOUT
 };
@@ -42,15 +45,25 @@ export const defaultPoolConfig: pg.PoolConfig = {
 pg.types.setTypeParser(pg.types.builtins.DATE, (stringValue: string) => {
   return stringValue; // 1082 for `DATE` type
 });
+// Adding a TIMESTAMP type parser to keep all dates used in the system consistent
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (stringValue: string) => {
+  return stringValue; // 1082 for `TIMESTAMP` type
+});
+// Adding a TIMESTAMPTZ type parser to keep all dates used in the system consistent
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (stringValue: string) => {
+  return stringValue; // 1082 for `DATE` type
+});
+// NUMERIC column types return as strings to maintain precision. Converting this to a float so it is usable by the system
+// Explanation of why Numeric returns as a string: https://github.com/brianc/node-postgres/issues/811
+pg.types.setTypeParser(pg.types.builtins.NUMERIC, (stringValue: string) => {
+  return parseFloat(stringValue);
+});
 
 // singleton pg pool instance used by the api
 let DBPool: pg.Pool | undefined;
 
 /**
  * Initializes the singleton pg pool instance used by the api.
- *
- * If the pool cannot be created successfully, `process.exit(1)` is called to terminate the API.
- * Why? The API is of no use if the database can't be reached.
  *
  * @param {pg.PoolConfig} [poolConfig]
  */
@@ -66,7 +79,7 @@ export const initDBPool = function (poolConfig?: pg.PoolConfig): void {
     DBPool = new pg.Pool(poolConfig);
   } catch (error) {
     defaultLog.error({ label: 'create db pool', message: 'failed to create db pool', error });
-    process.exit(1);
+    throw error;
   }
 };
 
@@ -416,12 +429,12 @@ export const getAPIUserDBConnection = (): IDBConnection => {
  * Note: Use of this should be limited to requests that are sent by an external system that is participating in BioHub
  * by submitting data to the BioHub Platform Backbone.
  *
- * @param {SOURCE_SYSTEM} sourceSystem
+ * @param {SystemUser} systemUser
  * @return {*}  {IDBConnection}
  */
-export const getServiceAccountDBConnection = (sourceSystem: SOURCE_SYSTEM): IDBConnection => {
+export const getServiceAccountDBConnection = (systemUser: SystemUser): IDBConnection => {
   return getDBConnection({
-    preferred_username: `service-account-${sourceSystem}`,
+    preferred_username: systemUser.user_guid,
     identity_provider: SYSTEM_IDENTITY_SOURCE.SYSTEM
   });
 };

@@ -68,7 +68,7 @@ describe('useSearchApi', () => {
     const result = await useSearchApi(axios).getSpatialDataFile({
       boundary: [{ type: 'Feature' }] as Feature[],
       type: ['type'],
-      datasetID: 'AAA-BBB'
+      datasetID: '123'
     });
 
     expect(typeof result).toBe('string');

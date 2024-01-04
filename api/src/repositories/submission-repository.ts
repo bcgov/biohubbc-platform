@@ -1,3 +1,4 @@
+import { Knex } from 'knex';
 import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
@@ -5,6 +6,7 @@ import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
+import { SECURITY_APPLIED_STATUS } from './security-repository';
 import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 export interface IHandlebarsTemplates {
@@ -19,17 +21,11 @@ export interface IDatasetsForReview {
   keywords: string[];
 }
 
-export interface IFeatureSubmission {
+export interface ISubmissionFeature {
   id: string;
   type: string;
   properties: object;
-}
-
-export interface IDatasetSubmission {
-  id: string;
-  type: string;
-  properties: object;
-  features: IFeatureSubmission[];
+  features: ISubmissionFeature[];
 }
 
 export const DatasetMetadata = z.object({
@@ -76,6 +72,57 @@ export interface ISubmissionRecord {
   revision_count?: string;
 }
 
+export const SubmissionFeatureRecord = z.object({
+  submission_feature_id: z.number(),
+  submission_id: z.number(),
+  feature_type_id: z.number(),
+  data: z.record(z.any()),
+  parent_submission_feature_id: z.number().nullable(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionFeatureRecord = z.infer<typeof SubmissionFeatureRecord>;
+
+export const SubmissionFeatureRecordWithTypeAndSecurity = SubmissionFeatureRecord.extend({
+  feature_type_name: z.string(),
+  feature_type_display_name: z.string(),
+  submission_feature_security_ids: z.array(z.number())
+});
+
+export type SubmissionFeatureRecordWithTypeAndSecurity = z.infer<typeof SubmissionFeatureRecordWithTypeAndSecurity>;
+
+export const FeatureTypeRecord = z.object({
+  feature_type_id: z.number(),
+  name: z.string(),
+  display_name: z.string(),
+  description: z.string(),
+  record_effective_date: z.string(),
+  record_end_date: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type FeatureTypeRecord = z.infer<typeof FeatureTypeRecord>;
+
+export const SubmissionFeatureDownloadRecord = z.object({
+  submission_feature_id: z.number(),
+  parent_submission_feature_id: z.number().nullable(),
+  feature_type_name: z.string(),
+  data: z.record(z.any()),
+  level: z.number()
+});
+
+export type SubmissionFeatureDownloadRecord = z.infer<typeof SubmissionFeatureDownloadRecord>;
+
 export interface ISubmissionRecordWithSpatial {
   id: string;
   source: Record<string, unknown>;
@@ -90,8 +137,8 @@ export interface ISubmissionRecordWithSpatial {
  */
 export interface ISubmissionModel {
   submission_id?: number;
-  source_transform_id: number;
   uuid: string;
+  security_review_timestamp?: string | null;
   create_date?: string;
   create_user?: number;
   update_date?: string | null;
@@ -204,6 +251,72 @@ export interface ISubmissionObservationRecord {
   revision_count?: string;
 }
 
+export const SubmissionRecord = z.object({
+  submission_id: z.number(),
+  uuid: z.string(),
+  security_review_timestamp: z.string().nullable(),
+  submitted_timestamp: z.string(),
+  source_system: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  publish_timestamp: z.string().nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+
+export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS)
+});
+
+export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSecurity>;
+
+export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  root_feature_type_id: z.number(),
+  root_feature_type_name: z.string()
+});
+
+export type SubmissionRecordWithSecurityAndRootFeatureType = z.infer<
+  typeof SubmissionRecordWithSecurityAndRootFeatureType
+>;
+
+export const SubmissionRecordPublished = SubmissionRecord.extend({
+  security: z.nativeEnum(SECURITY_APPLIED_STATUS),
+  root_feature_type_id: z.number(),
+  root_feature_type_name: z.string(),
+  root_feature_type_display_name: z.string()
+});
+
+export type SubmissionRecordPublished = z.infer<typeof SubmissionRecordPublished>;
+
+export const SubmissionMessageRecord = z.object({
+  submission_message_id: z.number(),
+  submission_message_type_id: z.number(),
+  submission_id: z.number(),
+  label: z.string(),
+  message: z.string(),
+  data: z.record(z.string(), z.any()).nullable(),
+  create_date: z.string(),
+  create_user: z.number(),
+  update_date: z.string().nullable(),
+  update_user: z.number().nullable(),
+  revision_count: z.number()
+});
+
+export type SubmissionMessageRecord = z.infer<typeof SubmissionMessageRecord>;
+
+export const PatchSubmissionRecord = z.object({
+  security_reviewed: z.boolean().optional(),
+  published: z.boolean().optional()
+});
+
+export type PatchSubmissionRecord = z.infer<typeof PatchSubmissionRecord>;
+
 /**
  * A repository class for accessing submission data.
  *
@@ -245,26 +358,35 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission record, returning the record having the matching UUID if it already exists.
-   *
-   * Because `ON CONFLICT ... DO NOTHING` fails to yield the submission_id, the query simply updates the
-   * uuid with the given value in the case that they match, which allows us to retrieve the submission_id
-   * and infer that the query ran successfully.
+   * Insert a new submission record.
    *
    * @param {string} uuid
+   * @param {string} name
+   * @param {string} description
+   * @param {string} userIdentifier
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecordWithPotentialConflict(uuid: string): Promise<{ submission_id: number }> {
+  async insertSubmissionRecordWithPotentialConflict(
+    uuid: string,
+    name: string,
+    description: string,
+    userIdentifier: string
+  ): Promise<{ submission_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
-        publish_timestamp
+        submitted_timestamp,
+        name,
+        description,
+        source_system
       ) VALUES (
         ${uuid},
-        now()
+        now(),
+        ${name},
+        ${description},
+        ${userIdentifier}
       )
-      ON CONFLICT (uuid) DO UPDATE SET publish_timestamp = now()
       RETURNING
         submission_id;
     `;
@@ -285,7 +407,7 @@ export class SubmissionRepository extends BaseRepository {
    * Insert a new submission feature record.
    *
    * @param {number} submissionId
-   * @param {IFeatureSubmission} feature
+   * @param {ISubmissionFeature} feature
    * @param {number} featureTypeId
    * @return {*}  {Promise<{ submission_feature_id: number }>}
    * @memberof SubmissionRepository
@@ -293,7 +415,7 @@ export class SubmissionRepository extends BaseRepository {
   async insertSubmissionFeatureRecord(
     submissionId: number,
     featureTypeId: number,
-    feature: IFeatureSubmission
+    feature: ISubmissionFeature['properties']
   ): Promise<{ submission_feature_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
@@ -1069,5 +1191,566 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows[0];
+  }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionRepository
+   */
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    const sqlStatement = SQL`
+      WITH w_unique_submissions as (
+        SELECT
+          DISTINCT ON (submission.uuid) submission.*,
+          submission_feature.feature_type_id as root_feature_type_id,
+          feature_type.name as root_feature_type_name,
+          ${SECURITY_APPLIED_STATUS.PENDING} as security
+        FROM
+          submission
+        INNER JOIN
+          submission_feature
+        ON
+          submission.submission_id = submission_feature.submission_id
+        INNER JOIN
+          feature_type
+        ON
+          feature_type.feature_type_id = submission_feature.feature_type_id
+        WHERE
+          submission.security_review_timestamp IS NULL
+        AND
+          submission_feature.parent_submission_feature_id IS NULL
+        ORDER BY
+          submission.uuid, submission.submission_id DESC
+      )
+      SELECT
+        *
+      FROM
+        w_unique_submissions
+      ORDER BY submitted_timestamp DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submissions that have completed security review (are reviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionRepository
+   */
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    const sqlStatement = SQL`
+      WITH w_unique_submissions as (
+        SELECT
+          DISTINCT ON (submission.uuid) submission.*,
+          submission_feature.feature_type_id as root_feature_type_id,
+          feature_type.name as root_feature_type_name,
+          CASE
+            WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+            WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+            WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+            ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+          END as security
+        FROM
+          submission
+        INNER JOIN
+          submission_feature
+        ON
+          submission.submission_id = submission_feature.submission_id
+        INNER JOIN
+          feature_type
+        ON
+          feature_type.feature_type_id = submission_feature.feature_type_id
+        LEFT JOIN
+          submission_feature_security
+        ON
+          submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+        WHERE
+          submission.security_review_timestamp IS NOT NULL
+        AND
+          submission_feature.parent_submission_feature_id IS NULL
+        GROUP BY
+          submission.submission_id,
+          submission_feature.feature_type_id,
+          feature_type.name
+        ORDER BY
+          submission.uuid, submission.submission_id DESC
+      )
+      SELECT
+        *
+      FROM
+        w_unique_submissions
+      ORDER BY
+        security_review_timestamp DESC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all submission features by submission id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureRecordWithTypeAndSecurity[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeaturesBySubmissionId(
+    submissionId: number
+  ): Promise<SubmissionFeatureRecordWithTypeAndSecurity[]> {
+    const sqlStatement = SQL`
+      SELECT
+        submission_feature.*,
+        feature_type.name as feature_type_name,
+        feature_type.display_name as feature_type_display_name,
+        array_remove(array_agg(submission_feature_security.submission_feature_security_id), NULL) AS submission_feature_security_ids
+      FROM
+        submission_feature
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+       LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature_security.submission_feature_id = submission_feature.submission_feature_id
+      WHERE
+        submission_id = ${submissionId}
+      GROUP BY
+        submission_feature.submission_feature_id,
+        feature_type.name,
+        feature_type.display_name,
+        feature_type.sort
+      ORDER BY
+        feature_type.sort ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecordWithTypeAndSecurity);
+
+    if (!response.rowCount) {
+      throw new ApiExecuteSQLError('Failed to get submission feature record', [
+        'SubmissionRepository->getSubmissionFeaturesBySubmissionId',
+        'rowCount was null or undefined, expected rowCount != 0'
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
+   * Get a submission record by id (with security status).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
+    const sqlStatement = SQL`
+      SELECT
+        submission.*,
+        CASE
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+        END as security
+      FROM
+        submission
+      INNER JOIN
+        submission_feature
+      ON
+        submission_feature.submission_id = submission.submission_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      WHERE
+        submission.submission_id = ${submissionId}
+      GROUP BY
+        submission.submission_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurity);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission record with security status', [
+        'SubmissionRepository->getSubmissionRecordBySubmissionIdWithSecurity',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get all published submissions.
+   *
+   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   * @memberof SubmissionRepository
+   */
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
+    const sqlStatement = SQL`
+      SELECT
+        submission.*,
+        feature_type.feature_type_id as root_feature_type_id,
+        feature_type.name as root_feature_type_name,
+        feature_type.display_name as root_feature_type_display_name,
+        CASE
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+	      ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+        END as security
+      FROM
+        submission
+      INNER JOIN
+        submission_feature
+      ON
+        submission_feature.submission_id = submission.submission_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      WHERE
+        submission_feature.parent_submission_feature_id IS NULL
+      AND
+        submission.security_review_timestamp IS NOT NULL
+      AND
+        submission.publish_timestamp IS NOT NULL
+      GROUP BY
+        submission.submission_id,
+        feature_type.feature_type_id,
+        feature_type.name,
+        feature_type.display_name
+      ORDER BY
+        submission.publish_timestamp ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublished);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all messages for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission_message
+      WHERE
+        submission_id = ${submissionId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionMessageRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Creates submission message records.
+   *
+   * @param {(Pick<
+   *       SubmissionMessageRecord,
+   *       'submission_id' | 'submission_message_type_id' | 'label' | 'message' | 'data'
+   *     >[])} messages
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async createMessages(
+    messages: Pick<
+      SubmissionMessageRecord,
+      'submission_id' | 'submission_message_type_id' | 'label' | 'message' | 'data'
+    >[]
+  ): Promise<void> {
+    const knex = getKnex();
+    const queryBuilder = knex.queryBuilder().insert(messages);
+
+    const response = await this.connection.knex(queryBuilder);
+
+    if (response.rowCount !== messages.length) {
+      throw new ApiExecuteSQLError('Failed to create submission messages', [
+        'SubmissionRepository->createMessages',
+        `rowCount was ${response.rowCount}, expected rowCount === ${messages.length}`
+      ]);
+    }
+  }
+
+  /**
+   * Patch a submission record.
+   *
+   * @param {number} submissionId
+   * @param {PatchSubmissionRecord} patch
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionRepository
+   */
+  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
+    const knex = getKnex();
+    const queryBuilder = knex.table('submission').where('submission_id', submissionId).returning('*');
+
+    // Collect all update operations
+    let updateOperations: Record<string, Knex.Raw> = {};
+
+    if (patch.security_reviewed === true) {
+      updateOperations = {
+        ...updateOperations,
+        security_review_timestamp: knex.raw(
+          'CASE WHEN security_review_timestamp IS NULL THEN NOW() ELSE security_review_timestamp END'
+        )
+      };
+    } else if (patch.security_reviewed === false) {
+      updateOperations = {
+        ...updateOperations,
+        security_review_timestamp: knex.raw(
+          'CASE WHEN security_review_timestamp IS NOT NULL THEN NULL ELSE security_review_timestamp END'
+        )
+      };
+    }
+
+    if (patch.published === true) {
+      updateOperations = {
+        ...updateOperations,
+        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
+      };
+    } else if (patch.published === false) {
+      updateOperations = {
+        ...updateOperations,
+        publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NOT NULL THEN NULL ELSE publish_timestamp END')
+      };
+    }
+
+    // Register all update operations
+    queryBuilder.update(updateOperations);
+
+    const response = await this.connection.knex(queryBuilder, SubmissionRecord);
+
+    return response.rows[0];
+  }
+
+  /**
+   * Get the root submission feature record for a submission.
+   *
+   * Note: A 'root' submission feature is indicated by parent_submission_feature_id being null.
+   * Note: If more than one 'root' submission feature is found, returns the first one. Only one record is expected.
+   *
+   * @param {number} submissionId
+   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission_feature
+      WHERE
+        submission_id = ${submissionId}
+      and
+        parent_submission_feature_id is null;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get root submission feature record', [
+        'SubmissionRepository->getSubmissionRootFeature',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Download Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    const sqlStatement = SQL`
+    WITH RECURSIVE w_submission_feature AS (
+      SELECT
+        sf.submission_id,
+        sf.submission_feature_id,
+        sf.parent_submission_feature_id,
+        ft.name as feature_type_name,
+        sf.data,
+        1 AS level
+      FROM
+        submission_feature sf
+      INNER JOIN
+        submission s
+      ON
+        sf.submission_id = s.submission_id
+      INNER JOIN
+        feature_type ft
+      ON
+        ft.feature_type_id = sf.feature_type_id
+      WHERE
+        parent_submission_feature_id IS null
+      AND
+        s.submission_id = ${submissionId}
+
+      UNION ALL
+
+      SELECT
+        sf.submission_id,
+        sf.submission_feature_id,
+        sf.parent_submission_feature_id,
+        ft.name as feature_type_name,
+        sf.data,
+        wsf.level + 1
+      FROM
+        submission_feature sf
+      INNER JOIN
+        w_submission_feature wsf
+      ON
+        sf.parent_submission_feature_id = wsf.submission_feature_id
+      INNER JOIN
+        feature_type ft
+      ON
+      ft.feature_type_id = sf.feature_type_id
+      where
+        sf.submission_id = ${submissionId}
+    )
+    SELECT
+      w_submission_feature.submission_feature_id,
+      w_submission_feature.parent_submission_feature_id,
+      w_submission_feature.feature_type_name,
+      w_submission_feature.data,
+      w_submission_feature.level
+    FROM
+      w_submission_feature
+    LEFT JOIN
+     submission
+    ON
+      w_submission_feature.submission_id = submission.submission_id
+    WHERE
+      submission.submission_id = ${submissionId}
+    ORDER BY
+      level,
+      submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Failed to get submission with associated features', [
+        'SubmissionRepository->downloadSubmission',
+        `rowCount was ${response.rowCount}, expected rowCount > 0`
+      ]);
+    }
+
+    return response.rows;
+  }
+
+  /**
+   * Download Published Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    const sqlStatement = SQL`
+    WITH RECURSIVE w_submission_feature AS (
+      SELECT
+        sf.submission_id,
+        sf.submission_feature_id,
+        sf.parent_submission_feature_id,
+        ft.name as feature_type_name,
+        sf.data,
+        1 AS level
+      FROM
+        submission_feature sf
+      INNER JOIN
+        submission s
+      ON
+        sf.submission_id = s.submission_id
+      INNER JOIN
+        feature_type ft
+      ON
+        ft.feature_type_id = sf.feature_type_id
+      LEFT JOIN
+        submission_feature_security sfs
+      ON
+        sf.submission_feature_id = sfs.submission_feature_id
+      WHERE
+        parent_submission_feature_id IS null
+      AND
+        s.submission_id = ${submissionId}
+      AND sfs.submission_feature_security_id IS NULL
+
+      UNION ALL
+
+      SELECT
+        sf.submission_id,
+        sf.submission_feature_id,
+        sf.parent_submission_feature_id,
+        ft.name as feature_type_name,
+        sf.data,
+        wsf.level + 1
+      FROM
+        submission_feature sf
+      INNER JOIN
+        w_submission_feature wsf
+      ON
+        sf.parent_submission_feature_id = wsf.submission_feature_id
+      INNER JOIN
+        feature_type ft
+      ON
+      ft.feature_type_id = sf.feature_type_id
+      LEFT JOIN
+        submission_feature_security sfs
+      ON
+        sf.submission_feature_id = sfs.submission_feature_id
+      WHERE
+        sf.submission_id = ${submissionId}
+      AND sfs.submission_feature_security_id IS NULL
+    )
+    SELECT
+      w_submission_feature.submission_feature_id,
+      w_submission_feature.parent_submission_feature_id,
+      w_submission_feature.feature_type_name,
+      w_submission_feature.data,
+      w_submission_feature.level
+    FROM
+      w_submission_feature
+    LEFT JOIN
+     submission
+    ON
+      w_submission_feature.submission_id = submission.submission_id
+    WHERE
+      submission.submission_id = ${submissionId}
+    ORDER BY
+      level,
+      submission_feature_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureDownloadRecord);
+
+    if (response.rowCount === 0) {
+      throw new ApiExecuteSQLError('Failed to get submission with associated features', [
+        'SubmissionRepository->downloadSubmission',
+        `rowCount was ${response.rowCount}, expected rowCount > 0`
+      ]);
+    }
+
+    return response.rows;
   }
 }

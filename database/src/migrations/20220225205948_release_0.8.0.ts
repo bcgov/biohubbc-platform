@@ -44,6 +44,10 @@ export async function up(knex: Knex): Promise<void> {
     path.join(__dirname, DB_RELEASE, 'populate_system_metadata_constant.sql')
   );
 
+  const tr_prevent_publish_before_review = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'tr_prevent_publish_before_review_trigger.sql')
+  );
+
   await knex.raw(`
     -- set up spatial extensions
     ${create_spatial_extensions}
@@ -85,6 +89,7 @@ export async function up(knex: Knex): Promise<void> {
     ${api_get_system_constant}
     ${api_get_system_metadata_constant}
     ${create_sequences}
+    ${tr_prevent_publish_before_review}
 
     -- populate look up tables
     ${populate_system_role}

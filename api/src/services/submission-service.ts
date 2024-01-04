@@ -1,13 +1,13 @@
+import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
-import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   IDatasetsForReview,
-  IFeatureSubmission,
   IHandlebarsTemplates,
   ISourceTransformModel,
+  ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
   ISubmissionModel,
@@ -15,6 +15,15 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  PatchSubmissionRecord,
+  SubmissionFeatureDownloadRecord,
+  SubmissionFeatureRecord,
+  SubmissionFeatureRecordWithTypeAndSecurity,
+  SubmissionMessageRecord,
+  SubmissionRecord,
+  SubmissionRecordPublished,
+  SubmissionRecordWithSecurity,
+  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
@@ -55,24 +64,37 @@ export class SubmissionService extends DBService {
    * in the database.
    *
    * @param {string} uuid
+   * @param {string} name
+   * @param {string} description
+   * @param {string} userIdentifier
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecordWithPotentialConflict(uuid: string): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(uuid);
+  async insertSubmissionRecordWithPotentialConflict(
+    uuid: string,
+    name: string,
+    description: string,
+    userIdentifier: string
+  ): Promise<{ submission_id: number }> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
+      uuid,
+      name,
+      description,
+      userIdentifier
+    );
   }
 
   /**
    * insert submission feature record
    *
    * @param {number} submissionId
-   * @param {IFeatureSubmission[]} submissionFeature
+   * @param {ISubmissionFeature[]} submissionFeature
    * @return {*}  {Promise<{ submission_feature_id: number }[]>}
    * @memberof SubmissionService
    */
   async insertSubmissionFeatureRecords(
     submissionId: number,
-    submissionFeature: IFeatureSubmission[]
+    submissionFeature: ISubmissionFeature[]
   ): Promise<{ submission_feature_id: number }[]> {
     const promise = submissionFeature.map(async (feature) => {
       const featureTypeId = await this.submissionRepository.getFeatureTypeIdByName(feature.type);
@@ -80,7 +102,7 @@ export class SubmissionService extends DBService {
       return this.submissionRepository.insertSubmissionFeatureRecord(
         submissionId,
         featureTypeId.feature_type_id,
-        feature
+        feature.properties
       );
     });
 
@@ -518,8 +540,8 @@ export class SubmissionService extends DBService {
    * @returns {*} {string} the most recent date found
    */
   mostRecentDate(dates: string[]): string {
-    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
-    return dates[0] ?? moment();
+    dates.sort((d1, d2) => dayjs(d1).diff(dayjs(d2)));
+    return dates[0] ?? dayjs();
   }
 
   /**
@@ -532,5 +554,165 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
+  }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get all submissions that have completed security review (are reviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getReviewedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get a submission record by id (with security status).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
+    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+  }
+
+  /**
+   * Get all published submissions.
+   *
+   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   * @memberof SubmissionService
+   */
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
+    return this.submissionRepository.getPublishedSubmissions();
+  }
+
+  /**
+   * Retrieves submission features with type and name.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<
+   *     {
+   *       feature_type_name: string;
+   *       feature_type_display_name: string;
+   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
+   *     }[]
+   *   >}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
+    {
+      feature_type_name: string;
+      feature_type_display_name: string;
+      features: SubmissionFeatureRecordWithTypeAndSecurity[];
+    }[]
+  > {
+    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+
+    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
+
+    for (const feature of uncategorizedFeatures) {
+      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
+
+      if (featureCategoryArray) {
+        // Append to existing array of matching feature type
+        categorizedFeatures[feature.feature_type_name] = featureCategoryArray.concat(feature);
+      } else {
+        // Create new array for feature type
+        categorizedFeatures[feature.feature_type_name] = [feature];
+      }
+    }
+
+    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
+      feature_type_name: featureType,
+      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
+      features: submissionFeatures
+    }));
+
+    return submissionFeatures;
+  }
+
+  /**
+   * Get all messages for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
+    return this.submissionRepository.getMessages(submissionId);
+  }
+
+  /**
+   * Creates submission message records for a submission.
+   *
+   * @param {number} submissionId
+   * @param {(Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[])} messages
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionService
+   */
+  async createMessages(
+    submissionId: number,
+    messages: Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[]
+  ): Promise<void> {
+    // Add submission_id to message object
+    const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
+
+    return this.submissionRepository.createMessages(messagesToInsert);
+  }
+
+  /**
+   * Patch a submission record.
+   *
+   * @param {number} submissionId
+   * @param {PatchSubmissionRecord} patch
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionServiceF
+   */
+  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
+    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
+  }
+
+  /**
+   * Get the root submission feature record for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
+    return this.submissionRepository.getSubmissionRootFeature(submissionId);
+  }
+
+  /**
+   *  Download Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadSubmission(submissionId);
+  }
+
+  /**
+   *  Download Published Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadPublishedSubmission(submissionId);
   }
 }

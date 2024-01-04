@@ -2,18 +2,17 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { SOURCE_SYSTEM } from '../constants/database';
 import { SYSTEM_ROLE } from '../constants/roles';
 import * as db from '../database/db';
-import { Models } from '../models';
+import { SystemUser, SystemUserExtended } from '../repositories/user-repository';
 import {
   AuthorizationScheme,
   AuthorizationService,
-  AuthorizeByServiceClient,
   AuthorizeBySystemRoles,
   AuthorizeRule
 } from '../services/authorization-service';
 import { UserService } from '../services/user-service';
+import * as keycloakUtils from '../utils/keycloak-utils';
 import { getMockDBConnection } from '../__mocks__/db';
 
 chai.use(sinonChai);
@@ -91,7 +90,6 @@ describe('executeAuthorizeConfig', function () {
         discriminator: 'SystemUser'
       },
       {
-        validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
         discriminator: 'ServiceClient'
       }
     ];
@@ -131,7 +129,7 @@ describe('authorizeByServiceClient', function () {
 
     const mockGetSystemUsersObjectResponse = {
       role_names: [SYSTEM_ROLE.SYSTEM_ADMIN]
-    } as unknown as Models.user.UserObject;
+    } as unknown as SystemUserExtended;
 
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
@@ -166,7 +164,7 @@ describe('authorizeBySystemRole', function () {
     };
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = null as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -183,7 +181,7 @@ describe('authorizeBySystemRole', function () {
     };
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = { record_end_date: 'datetime' } as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = { record_end_date: 'datetime' } as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -201,7 +199,7 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: {} as unknown as Models.user.UserObject
+      systemUser: {} as unknown as SystemUserExtended
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -217,7 +215,7 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: { role_names: [] } as unknown as Models.user.UserObject
+      systemUser: { role_names: [] } as unknown as SystemUserExtended
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -233,7 +231,7 @@ describe('authorizeBySystemRole', function () {
     const mockDBConnection = getMockDBConnection();
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as Models.user.UserObject
+      systemUser: { role_names: [SYSTEM_ROLE.SYSTEM_ADMIN] } as unknown as SystemUserExtended
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemRole(mockAuthorizeSystemRoles);
@@ -250,7 +248,7 @@ describe('authorizeBySystemUser', function () {
   it('returns false if `systemUserObject` is null', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = null as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -263,11 +261,11 @@ describe('authorizeBySystemUser', function () {
   it('returns true if `systemUserObject` is not null', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
+    const mockGetSystemUsersObjectResponse = null as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      systemUser: {} as unknown as Models.user.UserObject
+      systemUser: {} as unknown as SystemUserExtended
     });
 
     const isAuthorizedBySystemRole = await authorizationService.authorizeBySystemUser();
@@ -285,69 +283,65 @@ describe('authorizeByServiceClient', function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    const authorizationService = new AuthorizationService(mockDBConnection);
-
-    const authorizeByServiceClientData = {
-      validServiceClientIDs: SOURCE_SYSTEM['SIMS-SVC-4464'],
-      discriminator: 'ServiceClient'
-    } as unknown as AuthorizeByServiceClient;
-
-    const result = await authorizationService.authorizeByServiceClient(authorizeByServiceClientData);
-
-    expect(result).to.be.false;
-  });
-
-  it('returns null if the system user identifier is null', async function () {
-    const mockDBConnection = getMockDBConnection();
-    sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
-
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { preferred_username: '' }
+      keycloakToken: undefined
     });
 
-    const authorizeByServiceClientData = {
-      validServiceClientIDs: SOURCE_SYSTEM['SIMS-SVC-4464'],
-      discriminator: 'ServiceClient'
-    } as unknown as AuthorizeByServiceClient;
-
-    const result = await authorizationService.authorizeByServiceClient(authorizeByServiceClientData);
+    const result = await authorizationService.authorizeByServiceClient();
 
     expect(result).to.be.false;
   });
 
-  it('returns false if `systemUserObject` is null', async function () {
+  it('returns false if the service client does not match a known service client system user', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const authorizationService = new AuthorizationService(mockDBConnection);
+    const systemUser = null;
 
-    const authorizeByServiceClientData = {
-      validServiceClientIDs: SOURCE_SYSTEM['SIMS-SVC-4464'],
-      discriminator: 'ServiceClient'
-    } as unknown as AuthorizeByServiceClient;
+    const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
 
-    const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient(authorizeByServiceClientData);
+    const keycloakToken = {
+      preferred_username: 'unknown-user'
+    };
+    const authorizationService = new AuthorizationService(mockDBConnection, {
+      keycloakToken: keycloakToken
+    });
+
+    const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient();
 
     expect(isAuthorizedBySystemRole).to.equal(false);
+    expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
   });
 
-  it('returns true if `systemUserObject` hasAtLeastOneValidValue', async function () {
+  it('returns true if the service client matches a known service client system user', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const mockGetSystemUsersObjectResponse = null as unknown as Models.user.UserObject;
-    sinon.stub(AuthorizationService.prototype, 'getSystemUserObject').resolves(mockGetSystemUsersObjectResponse);
+    const systemUser: SystemUser = {
+      system_user_id: 1,
+      user_identity_source_id: 2,
+      user_identifier: 'sims-svc-4464',
+      user_guid: 'service-account-sims-svc-4464',
+      record_effective_date: '',
+      record_end_date: '',
+      create_date: '2023-12-12',
+      create_user: 1,
+      update_date: null,
+      update_user: null,
+      revision_count: 0
+    };
 
+    const getServiceClientSystemUserStub = sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(systemUser);
+
+    const keycloakToken = {
+      preferred_username: 'sims-svc-4464'
+    };
     const authorizationService = new AuthorizationService(mockDBConnection, {
-      keycloakToken: { clientId: SOURCE_SYSTEM['SIMS-SVC-4464'] }
+      keycloakToken: keycloakToken
     });
 
-    const authorizeByServiceClientData = {
-      validServiceClientIDs: SOURCE_SYSTEM['SIMS-SVC-4464'],
-      discriminator: 'ServiceClient'
-    } as unknown as AuthorizeByServiceClient;
-
-    const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient(authorizeByServiceClientData);
+    const isAuthorizedBySystemRole = await authorizationService.authorizeByServiceClient();
 
     expect(isAuthorizedBySystemRole).to.equal(true);
+    expect(getServiceClientSystemUserStub).to.have.been.calledOnceWith(keycloakToken);
   });
 });
 
@@ -493,10 +487,10 @@ describe('getSystemUserObject', function () {
     expect(systemUserObject).to.equal(null);
   });
 
-  it('returns a `UserObject`', async function () {
+  it('returns a system user', async function () {
     const mockDBConnection = getMockDBConnection();
 
-    const mockSystemUserWithRolesResponse = new Models.user.UserObject();
+    const mockSystemUserWithRolesResponse = {} as unknown as SystemUserExtended;
     sinon.stub(AuthorizationService.prototype, 'getSystemUserWithRoles').resolves(mockSystemUserWithRolesResponse);
 
     const authorizationService = new AuthorizationService(mockDBConnection);
@@ -536,11 +530,11 @@ describe('getSystemUserWithRoles', function () {
     expect(result).to.be.null;
   });
 
-  it('returns a UserObject', async function () {
+  it('returns a system user', async function () {
     const mockDBConnection = getMockDBConnection();
     sinon.stub(db, 'getDBConnection').returns(mockDBConnection);
 
-    const userObjectMock = new Models.user.UserObject();
+    const userObjectMock = {} as unknown as SystemUserExtended;
     sinon.stub(UserService.prototype, 'getUserByGuid').resolves(userObjectMock);
 
     const authorizationService = new AuthorizationService(mockDBConnection, {

@@ -5,16 +5,23 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { UserObject } from '../models/user';
+import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISourceTransformModel,
   ISubmissionJobQueueRecord,
+  ISubmissionMetadataRecord,
   ISubmissionModel,
   ISubmissionObservationRecord,
+  PatchSubmissionRecord,
+  SubmissionFeatureDownloadRecord,
+  SubmissionRecord,
+  SubmissionRecordPublished,
+  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { SystemUserExtended } from '../repositories/user-repository';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
 import { SubmissionService } from './submission-service';
@@ -50,10 +57,43 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
         .resolves({ submission_id: 1 });
 
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict('aaaa');
+      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
+        '123-456-789',
+        'submission name',
+        'submission desc',
+        'source system'
+      );
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ submission_id: 1 });
+    });
+  });
+
+  describe('insertSubmissionFeatureRecords', () => {
+    it('should return submission_id on insert', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const getFeatureTypeIdByNameStub = sinon
+        .stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName')
+        .resolves({ feature_type_id: 1 });
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .resolves({ submission_feature_id: 1 });
+
+      const response = await submissionService.insertSubmissionFeatureRecords(1, [
+        {
+          id: '1',
+          type: 'string',
+          properties: {},
+          features: []
+        }
+      ]);
+
+      expect(repo).to.be.calledOnce;
+      expect(getFeatureTypeIdByNameStub).to.be.calledOnce;
+      expect(response).to.be.eql([{ submission_feature_id: 1 }]);
     });
   });
 
@@ -421,7 +461,7 @@ describe('SubmissionService', () => {
       it('should return submission with count object', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
@@ -444,7 +484,7 @@ describe('SubmissionService', () => {
       it('should return submission with count object', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
@@ -469,7 +509,7 @@ describe('SubmissionService', () => {
       it('should return null', async () => {
         const mockDBConnection = getMockDBConnection();
         const submissionService = new SubmissionService(mockDBConnection);
-        const mockUserObject = { role_names: [] } as unknown as UserObject;
+        const mockUserObject = { role_names: [] } as unknown as SystemUserExtended;
         sinon.stub(UserService.prototype, 'getUserById').resolves(mockUserObject);
 
         const findSubmissionRecordEMLJSONByDatasetIdStub = sinon
@@ -502,6 +542,26 @@ describe('SubmissionService', () => {
 
       expect(repo).to.be.calledOnce;
       expect(response).to.be.eql({ test: 'test' });
+    });
+  });
+
+  describe('insertSubmissionMetadataRecord', () => {
+    it('should return a submission observation record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const repo = sinon.stub(SubmissionRepository.prototype, 'insertSubmissionMetadataRecord').resolves({
+        submission_metadata_id: 1
+      });
+
+      const response = await submissionService.insertSubmissionMetadataRecord({
+        submission_id: 1
+      } as unknown as ISubmissionMetadataRecord);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql({
+        submission_metadata_id: 1
+      });
     });
   });
 
@@ -701,6 +761,377 @@ describe('SubmissionService', () => {
         header: 'header',
         details: 'details'
       });
+    });
+  });
+
+  describe('getUnreviewedSubmissionsForAdmins', () => {
+    it('should return an array of submission records', async () => {
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.PENDING,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.PENDING,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getUnreviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getUnreviewedSubmissionsForAdmins')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getUnreviewedSubmissionsForAdmins();
+
+      expect(getUnreviewedSubmissionsForAdminsStub).to.be.calledOnce;
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getReviewedSubmissionsForAdmins', () => {
+    it('should return an array of submission records', async () => {
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getReviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getReviewedSubmissionsForAdmins')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getReviewedSubmissionsForAdmins();
+
+      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getSubmissionRecordBySubmissionIdWithSecurity', () => {
+    it('should return a submission observation record', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const mockResponse = {
+        submission_id: 1,
+        uuid: 'string',
+        security_review_timestamp: null,
+        submitted_timestamp: 'string',
+        source_system: 'string',
+        name: 'string',
+        description: null,
+        publish_timestamp: '2023-12-12',
+        create_date: 'string',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1,
+        security: SECURITY_APPLIED_STATUS.SECURED
+      };
+
+      const repo = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionRecordBySubmissionIdWithSecurity')
+        .resolves(mockResponse);
+
+      const response = await submissionService.getSubmissionRecordBySubmissionIdWithSecurity(1);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql(mockResponse);
+    });
+  });
+
+  describe('getPublishedSubmissions', () => {
+    it('should return an array of submission records with security property', async () => {
+      const mockSubmissionRecords: SubmissionRecordPublished[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'type',
+          root_feature_type_display_name: 'Type'
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'type',
+          root_feature_type_display_name: 'Type'
+        },
+        {
+          submission_id: 3,
+          uuid: '999-456-123',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: '2023-12-12',
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'type',
+          root_feature_type_display_name: 'Type'
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getReviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getPublishedSubmissions')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getPublishedSubmissions();
+
+      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('createMessages', () => {
+    beforeEach(() => {
+      sinon.restore();
+    });
+
+    it('should create messages and return void', async () => {
+      const submissionId = 1;
+
+      const mockMessages = [
+        {
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const createMessagesStub = sinon.stub(SubmissionRepository.prototype, 'createMessages').resolves(undefined);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.createMessages(submissionId, mockMessages);
+
+      expect(createMessagesStub).to.have.been.calledOnceWith([
+        {
+          submission_id: submissionId,
+          submission_message_type_id: 2,
+          label: 'label1',
+          message: 'message1',
+          data: null
+        },
+        {
+          submission_id: submissionId,
+          submission_message_type_id: 3,
+          label: 'label2',
+          message: 'message2',
+          data: {
+            dataField: 'dataField'
+          }
+        }
+      ]);
+      expect(response).to.be.undefined;
+    });
+  });
+
+  describe('patchSubmissionRecord', () => {
+    it('should patch the submission record and return the updated record', async () => {
+      const submissionId = 1;
+
+      const patch: PatchSubmissionRecord = { security_reviewed: true };
+
+      const mockSubmissionRecord: SubmissionRecord = {
+        submission_id: 1,
+        uuid: '123-456-789',
+        security_review_timestamp: '2023-12-12',
+        submitted_timestamp: '2023-12-12',
+        source_system: 'SIMS',
+        name: 'name',
+        description: 'description',
+        publish_timestamp: '2023-12-12',
+        create_date: '2023-12-12',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+      const mockDBConnection = getMockDBConnection();
+
+      const patchSubmissionRecordStub = sinon
+        .stub(SubmissionRepository.prototype, 'patchSubmissionRecord')
+        .resolves(mockSubmissionRecord);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.patchSubmissionRecord(submissionId, patch);
+
+      expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
+      expect(response).to.be.eql(mockSubmissionRecord);
+    });
+  });
+
+  describe('downloadSubmission', () => {
+    it('should get submission with associated features ready for download', async () => {
+      const submissionId = 1;
+
+      const mockResponse: SubmissionFeatureDownloadRecord[] = [
+        {
+          submission_feature_id: 1,
+          parent_submission_feature_id: null,
+          feature_type_name: 'string',
+          data: {},
+          level: 1
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const downloadSubmissionStub = sinon
+        .stub(SubmissionRepository.prototype, 'downloadSubmission')
+        .resolves(mockResponse);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.downloadSubmission(submissionId);
+
+      expect(downloadSubmissionStub).to.be.calledOnceWith(submissionId);
+      expect(response).to.be.eql(mockResponse);
+    });
+  });
+
+  describe('downloadPublishedSubmission', () => {
+    it('should get submission with associated features ready for download', async () => {
+      const submissionId = 1;
+
+      const mockResponse: SubmissionFeatureDownloadRecord[] = [
+        {
+          submission_feature_id: 1,
+          parent_submission_feature_id: null,
+          feature_type_name: 'string',
+          data: {},
+          level: 1
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const downloadPublishedSubmissionStub = sinon
+        .stub(SubmissionRepository.prototype, 'downloadPublishedSubmission')
+        .resolves(mockResponse);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.downloadPublishedSubmission(submissionId);
+
+      expect(downloadPublishedSubmissionStub).to.be.calledOnceWith(submissionId);
+      expect(response).to.be.eql(mockResponse);
     });
   });
 });
