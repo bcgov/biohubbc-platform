@@ -1,4 +1,4 @@
-import { mdiClockOutline, mdiLock, mdiLockAlertOutline, mdiLockOpenOutline } from '@mdi/js';
+import { mdiLock, mdiLockAlertOutline, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
@@ -18,17 +18,6 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
   let securityStatus = <></>;
 
   switch (submission.security) {
-    case SECURITY_APPLIED_STATUS.UNSECURED: {
-      securityStatus = (
-        <>
-          <Icon path={mdiLockOpenOutline} size={0.75} />
-          <Typography component="span" variant="body2">
-            Unsecured
-          </Typography>
-        </>
-      );
-      break;
-    }
     case SECURITY_APPLIED_STATUS.SECURED: {
       securityStatus = (
         <>
@@ -54,9 +43,9 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
     default: {
       securityStatus = (
         <>
-          <Icon path={mdiClockOutline} size={0.75} />
+          <Icon path={mdiLockOpenOutline} size={0.75} />
           <Typography component="span" variant="body2">
-            Pending Review
+            Unsecured
           </Typography>
         </>
       );

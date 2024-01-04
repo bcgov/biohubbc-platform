@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
@@ -9,7 +8,7 @@ import { authorizeRequestHandler } from '../../request-handlers/security/authori
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
-import { getKeycloakSource } from '../../utils/keycloak-utils';
+import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/intake');
@@ -19,7 +18,6 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]
@@ -63,6 +61,7 @@ POST.apiDoc = {
               items: {
                 $ref: '#/components/schemas/SubmissionFeature'
               },
+              minItems: 1,
               maxItems: 1,
               additionalProperties: false
             }
@@ -95,11 +94,11 @@ POST.apiDoc = {
 
 export function submissionIntake(): RequestHandler {
   return async (req, res) => {
-    const sourceSystem = getKeycloakSource(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
 
-    if (!sourceSystem) {
+    if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
+        'token did not contain a sub or sub value is unknown'
       ]);
     }
 
@@ -111,7 +110,7 @@ export function submissionIntake(): RequestHandler {
 
     const submissionFeatures: ISubmissionFeature[] = req.body.features;
 
-    const connection = getServiceAccountDBConnection(sourceSystem);
+    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();
@@ -129,7 +128,8 @@ export function submissionIntake(): RequestHandler {
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
         submission.id,
         submission.name,
-        submission.description
+        submission.description,
+        serviceClientSystemUser.user_identifier
       );
 
       // insert each submission feature record

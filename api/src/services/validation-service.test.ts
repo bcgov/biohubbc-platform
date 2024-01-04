@@ -355,7 +355,7 @@ describe('ValidationService', () => {
       try {
         validationService.validateProperties(properties, dataProperties);
       } catch (error) {
-        expect((error as Error).message).to.equal('Property start_date not found in data');
+        expect((error as Error).message).to.equal('Property [start_date] not found in data');
       }
     });
 

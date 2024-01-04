@@ -6,6 +6,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
+import { SystemUser } from '../../repositories/user-repository';
 import { ArtifactService } from '../../services/artifact-service';
 import * as fileUtils from '../../utils/file-utils';
 import * as keycloakUtils from '../../utils/keycloak-utils';
@@ -645,7 +646,7 @@ describe('intake', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -679,7 +680,7 @@ describe('intake', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -713,7 +714,7 @@ describe('intake', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const requestHandler = intake.intakeArtifacts();
 
@@ -726,7 +727,7 @@ describe('intake', () => {
       }
     });
 
-    it('throws error if getKeycloakSource returns null', async () => {
+    it('throws error if getServiceClientSystemUser returns null', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
@@ -750,7 +751,7 @@ describe('intake', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
       const uploadStub = sinon.stub(ArtifactService.prototype, 'uploadAndPersistArtifact').resolves();
 
       const requestHandler = intake.intakeArtifacts();
@@ -787,7 +788,7 @@ describe('intake', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       sinon.stub(ArtifactService.prototype, 'uploadAndPersistArtifact').throws(new Error('test error'));
 
@@ -827,7 +828,7 @@ describe('intake', () => {
       };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const uploadStub = sinon
         .stub(ArtifactService.prototype, 'uploadAndPersistArtifact')

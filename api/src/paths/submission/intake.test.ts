@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
+import { SystemUser } from '../../repositories/user-repository';
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
@@ -23,7 +24,7 @@ describe('intake', () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
 
       const requestHandler = intake.submissionIntake();
 
@@ -50,7 +51,7 @@ describe('intake', () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const validateSubmissionFeaturesStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeatures')
@@ -82,7 +83,7 @@ describe('intake', () => {
       const dbConnectionObj = getMockDBConnection();
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const validateSubmissionFeaturesStub = sinon
         .stub(ValidationService.prototype, 'validateSubmissionFeatures')

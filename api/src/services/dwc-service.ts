@@ -14,7 +14,7 @@ import { ArchiveFile } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { EMLService } from './eml-service';
-import { ElasticSearchIndices } from './es-service';
+import { ElasticSearchIndices, ESService } from './es-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 
@@ -24,6 +24,7 @@ export class DarwinCoreService extends DBService {
   submissionService: SubmissionService;
   spatialService: SpatialService;
   emlService: EMLService;
+  esService: ESService;
 
   /**
    * Creates an instance of DarwinCoreService.
@@ -37,6 +38,7 @@ export class DarwinCoreService extends DBService {
     this.spatialService = new SpatialService(this.connection);
     this.submissionService = new SubmissionService(this.connection);
     this.emlService = new EMLService(this.connection);
+    this.esService = new ESService();
   }
 
   // Look and see if the decorate needs to be run on a fresh record
@@ -753,7 +755,7 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async uploadToElasticSearch(dataPackageId: string, convertedEML: string) {
-    const esClient = await this.getEsClient();
+    const esClient = await this.esService.getEsClient();
 
     return esClient.index({
       id: dataPackageId,
@@ -770,7 +772,7 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
-    const esClient = await this.getEsClient();
+    const esClient = await this.esService.getEsClient();
 
     return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
   }
