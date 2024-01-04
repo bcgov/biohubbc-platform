@@ -59,11 +59,11 @@ const defaultLog = getLogger('services/keycloak-service');
 export class KeycloakService {
   keycloakHost: string;
 
-  // Used to authenticate with the SIMS Service Client
+  // Used to authenticate with the BioHub Service Client
   keycloakServiceClientId: string;
   keycloakServiceClientSecret: string;
 
-  // Used to authenticate with the SIMS CSS API
+  // Used to authenticate with the BioHub CSS API
   keycloakApiTokenUrl: string;
   keycloakApiClientId: string;
   keycloakApiClientSecret: string;
@@ -87,7 +87,7 @@ export class KeycloakService {
   }
 
   /**
-   * Get an access token from keycloak for the SIMS Service account.
+   * Get an access token from keycloak for the BioHub Service account.
    *
    * @return {*}  {Promise<string>}
    * @memberof KeycloakService
@@ -116,7 +116,7 @@ export class KeycloakService {
   }
 
   /**
-   * Get an access token from keycloak for the sims-team account user.
+   * Get an access token from keycloak for the biohub-team account user.
    *
    * @return {*}  {Promise<string>}
    * @memberof KeycloakService
