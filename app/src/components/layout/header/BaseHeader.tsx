@@ -44,8 +44,8 @@ const BaseHeader = (props: IBaseHeader) => {
             <Typography
               variant="h1"
               sx={{
-                mt: '-4px',
                 ml: '-2px',
+                pb: 0.75,
                 display: '-webkit-box',
                 WebkitLineClamp: '2',
                 WebkitBoxOrient: 'vertical',

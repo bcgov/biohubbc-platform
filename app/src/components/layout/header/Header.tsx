@@ -71,8 +71,8 @@ const Header: React.FC<React.PropsWithChildren> = () => {
             <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
             <img src={headerImageSmall} alt={'Government of British Columbia'} />
           </picture>
-          <span>
-            BioHub
+          <Typography component="span" sx={{fontSize: '1.25rem', fontWeight: 700}}>
+            BioHub BC
             <Box
               component="sup"
               sx={{
@@ -84,7 +84,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
               }}>
               <BetaLabel />
             </Box>
-          </span>
+          </Typography>
         </RouterLink>
       </Box>
     );
@@ -223,7 +223,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                 <AppBrand></AppBrand>
               </Box>
               <Box
-                ml={8}
+                ml={4}
                 display="flex"
                 alignItems="center"
                 sx={{
