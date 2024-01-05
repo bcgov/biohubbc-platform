@@ -14,10 +14,6 @@ import yup from 'utils/YupSchema';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 
-export interface ISecurityRuleFormProps {
-  features: number[];
-}
-
 export interface ISecurityRuleFormikProps {
   rules: ISecurityRuleAndCategory[];
 }
@@ -26,7 +22,7 @@ export const SecurityRuleFormYupSchema = yup.object().shape({
   rules: yup.array(yup.object())
 });
 
-const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
+const SecurityRuleForm = () => {
   const { handleSubmit, values, setFieldValue } = useFormikContext<ISecurityRuleFormikProps>();
   const [searchText, setSearchText] = useState('');
 

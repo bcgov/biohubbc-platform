@@ -8,7 +8,7 @@ import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/administrative/security/apply');
 
-export const POST: Operation = [
+export const PATCH: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
@@ -22,9 +22,9 @@ export const POST: Operation = [
   applySecurityRulesToSubmissionFeatures()
 ];
 
-POST.apiDoc = {
+PATCH.apiDoc = {
   description:
-    'Applies security rules to a list of submission features. A flag can also be passed to make application of security rules override existing ones or add new ones to the existing list of security rules per submission feature.',
+    'Applies security rules to a list of submission features.',
   tags: ['security'],
   security: [
     {
@@ -38,18 +38,20 @@ POST.apiDoc = {
         schema: {
           type: 'object',
           properties: {
-            override: {
-              type: 'boolean',
-              nullable: true
-            },
-            features: {
+            submissionFeatureIds: {
               type: 'array',
               items: {
                 type: 'number'
               },
               minItems: 1
             },
-            rules: {
+            applyRuleIds: {
+              type: 'array',
+              items: {
+                type: 'number'
+              }
+            },
+            removeRuleIds: {
               type: 'array',
               items: {
                 type: 'number'
@@ -62,7 +64,7 @@ POST.apiDoc = {
   },
   responses: {
     200: {
-      description: 'Features.',
+      description: 'Features with applied security rules.',
       content: {
         'application/json': {
           schema: {
@@ -108,13 +110,17 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
 
+    const submissionFeatureIds: number[] = req.body.submissionFeatureIds;
+    const applyRuleIds: number[] = req.body.applyRuleIds;
+    const removeRuleIds: number[] = req.body.applyRuleIds;
+
     try {
       await connection.open();
 
       const data = await service.applySecurityRulesToSubmissionFeatures(
-        req.body.features,
-        req.body.rules || [],
-        Boolean(req.body.override)
+        submissionFeatureIds,
+        applyRuleIds,
+        removeRuleIds
       );
 
       await connection.commit();

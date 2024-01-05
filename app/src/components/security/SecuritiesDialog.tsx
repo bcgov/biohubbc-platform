@@ -8,7 +8,7 @@ import { useState } from 'react';
 import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
-  features: number[];
+  submissionFeatureIds: number[];
   open: boolean;
   onClose: () => void;
 }
@@ -76,7 +76,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onCancel={props.onClose}
       onSave={(values: ISecurityRuleFormikProps) => handleSubmit(values.rules)}
       component={{
-        element: <SecurityRuleForm features={props.features} />,
+        element: <SecurityRuleForm />,
         initialValues: { rules: initialAppliedSecurityRules },
         validationSchema: SecurityRuleFormYupSchema
       }}

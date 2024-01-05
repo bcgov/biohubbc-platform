@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
+import { getKnex } from '../database/db';
 
 const defaultLog = getLogger('repositories/security-repository');
 
@@ -381,23 +382,43 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Removes all security rules for a given set of submission features
    *
-   * @param {number[]} features
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!features.length) {
-      // no features, return early
-      return [];
-    }
-    const deleteSQL = SQL`
-      DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
+  async removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    const queryBuilder = getKnex()
+      .delete()
+      .from('submission_feature_security')
+      .whereIn('submission_feature_id', submissionFeatureIds)
+      .returning('*');
 
-    deleteSQL.append(features.join(', '));
-    deleteSQL.append(`) RETURNING *;`);
-    const response = await this.connection.sql(deleteSQL, SubmissionFeatureSecurityRecord);
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+
     return response.rows;
+
   }
+
+  /**
+   * Removes the given security rules for a given set of given submission features
+   *
+   * @param {number[]} submissionFeatureIds
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+    async removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[], removeRuleIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+      const queryBuilder = getKnex()
+        .delete()
+        .from('submission_feature_security')
+        .whereIn('submission_feature_id', submissionFeatureIds)
+        .and
+        .whereIn('security_rule_id', removeRuleIds) // TODO
+        .returning('*');
+
+      const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+
+      return response.rows;
+    }
 
   /**
    * Gets Submission Feature Security Records for a given set of submission features

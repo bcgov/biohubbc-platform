@@ -330,38 +330,47 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Applies all given security rules to the given set of submission feature ids.
-   * This process is additive unless the override flag is set to `true`.
-   * If the override is set to `true` all security rules for the given set of features will be removed.
-   * Then the new security rules will be applied as normal.
+   * 
    *
-   * @param {number[]} features
-   * @param {number[]} rules
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} applyRuleIds
+   * @param {number[]} removeRuleIds
    * @param {boolean}
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
   async applySecurityRulesToSubmissionFeatures(
-    features: number[],
-    rules: number[],
-    override = false
+    submissionFeatureIds: number[],
+    applyRuleIds: number[],
+    removeRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (override) {
-      // we want to override any security rules present and can achieve this by remove everything first
-      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
-    }
+    
+    await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
 
-    return this.securityRepository.applySecurityRulesToSubmissionFeatures(features, rules);
+    return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
   }
 
   /**
-   * Removes all security rules for the given set of submission feature ids
+   * Removes the given security rules from the given set of submission feature ids. If
+   * no security rules ID is provided, all security rules will be removed for the given set
+   * of subission features.
    *
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} [removeRuleIds]
+   * 
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
-  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
+  async removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[], removeRuleIds?: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!submissionFeatureIds.length) {
+      return [];
+    }
+
+    if (!removeRuleIds) {
+      return this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
+    }
+
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
   }
 
   /**

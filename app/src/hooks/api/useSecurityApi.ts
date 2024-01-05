@@ -116,10 +116,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Applies all of the given security rule IDs to all of the given submission feature IDs. If the
-   * `override` parameter is supplied as `true`, then all rules for these submission features will
-   * be replaced with the incoming set. Otherwise, the union of the existing rules and supplied
-   * rules will be applied to these features (deafult behaviour).
+   * Patches security rules that are applied or removed to the given set of submission features. If
+   * a particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always
+   * be added. 
    *
    * @param {number[]} submissionFeatureIds
    * @param {number[]} ruleIds
@@ -127,10 +126,10 @@ const useSecurityApi = (axios: AxiosInstance) => {
    */
   const applySecurityRulesToSubmissionFeatures = async (
     featureSecurityRulesPath: IPatchFeatureSecurityRules
-  ): Promise<void> => {
-    await axios.patch('api/administrative/security/apply', featureSecurityRulesPath);
+  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
+    const { data } = await axios.patch('api/administrative/security/apply', featureSecurityRulesPath);
 
-    return;
+    return data;
   };
 
   /**
