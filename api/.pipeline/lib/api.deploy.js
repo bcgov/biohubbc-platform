@@ -44,14 +44,20 @@ const apiDeploy = async (settings) => {
         TZ: phases[phase].tz,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
         // Keycloak
-        KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
-        KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
-        KEYCLOAK_SECRET_ADMIN_PASSWORD: phases[phase].sso.keycloakSecretAdminPassword,
-        KEYCLOAK_HOST: phases[phase].sso.url,
-        KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
+        KEYCLOAK_HOST: phases[phase].sso.host,
         KEYCLOAK_REALM: phases[phase].sso.realm,
-        KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
-        KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
+        KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
+        // Keycloak secret
+        KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
+        // Keycloak Service Client
+        KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.serviceClient.serviceClientName,
+        KEYCLOAK_SECRET_ADMIN_PASSWORD_KEY: phases[phase].sso.serviceClient.keycloakSecretServiceClientPasswordKey,
+        // Keycloak CSS API
+        KEYCLOAK_API_TOKEN_URL: phases[phase].sso.cssApi.cssApiTokenUrl,
+        KEYCLOAK_API_CLIENT_ID: phases[phase].sso.cssApi.cssApiClientId,
+        KEYCLOAK_API_CLIENT_SECRET_KEY: phases[phase].sso.cssApi.keycloakSecretCssApiSecretKey,
+        KEYCLOAK_API_HOST: phases[phase].sso.cssApi.cssApiHost,
+        KEYCLOAK_API_ENVIRONMENT: phases[phase].sso.cssApi.cssApiEnvironment,
         // Log Level
         LOG_LEVEL: phases[phase].logLevel || 'info',
         // OPenshift Resources

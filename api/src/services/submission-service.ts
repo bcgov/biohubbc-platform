@@ -65,16 +65,23 @@ export class SubmissionService extends DBService {
    *
    * @param {string} uuid
    * @param {string} name
-   * @param {string} sourceSystem
+   * @param {string} description
+   * @param {string} userIdentifier
    * @return {*}  {Promise<{ submission_id: number }>}
    * @memberof SubmissionService
    */
   async insertSubmissionRecordWithPotentialConflict(
     uuid: string,
     name: string,
-    sourceSystem: string
+    description: string,
+    userIdentifier: string
   ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(uuid, name, sourceSystem);
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
+      uuid,
+      name,
+      description,
+      userIdentifier
+    );
   }
 
   /**
