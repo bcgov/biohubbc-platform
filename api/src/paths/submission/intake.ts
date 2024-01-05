@@ -1,11 +1,13 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { Feature } from 'geojson';
 import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { BCGWService } from '../../services/bcgw-service';
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
@@ -110,6 +112,7 @@ export function submissionIntake(): RequestHandler {
     };
 
     const submissionFeatures: ISubmissionFeature[] = req.body.features;
+    const others: Feature[] = req.body.features;
 
     const connection = getServiceAccountDBConnection(sourceSystem);
 
@@ -119,6 +122,7 @@ export function submissionIntake(): RequestHandler {
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
       const searchIndexService = new SearchIndexService(connection);
+      const layerService = new BCGWService();
 
       // validate the submission
       if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
@@ -131,6 +135,11 @@ export function submissionIntake(): RequestHandler {
         submission.name,
         submission.description
       );
+      console.log('UHHH OK SO WHAT ARE WE TALKING ABOUT HERE...');
+      console.log(others);
+
+      const regions = await layerService.getUniqueRegionsForFeatures(others, connection);
+      console.log(regions);
 
       // insert each submission feature record
       await submissionService.insertSubmissionFeatureRecords(response.submission_id, submissionFeatures);
