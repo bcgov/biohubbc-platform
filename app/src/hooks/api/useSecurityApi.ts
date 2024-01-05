@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
+import { IListPersecutionHarmResponse, IPatchFeatureSecurityRules, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 
 export interface ISecurityRule {
   security_rule_id: number;
@@ -86,11 +86,19 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Gets a list of all active security rules. A security rule is active if it has not
+   * been end-dated.
+   */
   const getActiveSecurityRules = async (): Promise<ISecurityRule[]> => {
     const { data } = await axios.get('api/administrative/security');
     return data;
   };
 
+  /**
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
+   */
   const getActiveSecurityRulesAndCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
     const { data } = await axios.get('api/administrative/security/category/fetch');
     return data;
@@ -118,23 +126,17 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @return {*}  {Promise<any[]>}
    */
   const applySecurityRulesToSubmissionFeatures = async (
-    submissionFeatureIds: number[],
-    ruleIds: number[],
-    override = false
-  ): Promise<any[]> => {
-    const { data } = await axios.post('api/administrative/security/apply', {
-      override,
-      features: submissionFeatureIds,
-      rules: ruleIds
-    });
+    featureSecurityRulesPath: IPatchFeatureSecurityRules
+  ): Promise<void> => {
+    await axios.patch('api/administrative/security/apply', featureSecurityRulesPath);
 
-    return data;
+    return;
   };
 
   /**
    * Removes all of the security rules for the given submission feature IDs, rendering them unsecure.
    *
-   * @deprecated Use `applySecurityRulesToSubmissionFeatures(submissionFeatureIds, [], true)`
+   * @deprecated Not supported. Use `applySecurityRulesToSubmissionFeatures` instead.
    *
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<any[]>}

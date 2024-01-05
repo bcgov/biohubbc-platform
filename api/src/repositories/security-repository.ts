@@ -302,7 +302,8 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Get active security rules with associated categories
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleAndCategory[]>}
    * @memberof SecurityRepository
@@ -330,7 +331,8 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Gets a list of all active security rules
+   * Gets a list of all active security rules. A security rule is active if it has not
+   * been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityRepository

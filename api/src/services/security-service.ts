@@ -376,7 +376,8 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Gets a list of all active security rules
+   * Gets a list of all active security rules. A security rule is active if it has not
+   * been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityService
@@ -386,7 +387,8 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Gets a list of all active security rules with associated categories
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleAndCategory[]>}
    * @memberof SecurityService

@@ -28,3 +28,36 @@ export interface IPersecutionHarmRule {
   name: string;
   description: string | null;
 }
+
+
+/**
+ * Represents a patch request made to apply security;
+ *
+ * @export
+ * @interface IPatchFeatureSecurityRules
+ */
+export interface IPatchFeatureSecurityRules {
+  /**
+   * The array of submission feature IDs whose security rules will be mutated
+   *
+   * @type {number[]}
+   * @memberof IPatchFeatureSecurityRules
+   */
+  submissionFeatureIds: number[];
+  /**
+   * The array of the security rule IDs that will be applied to all of the given features.
+   * Note that it is possible that a particular rule ID may also belong to `removeRuleIds`.
+   *
+   * @type {number[]}
+   * @memberof IPatchFeatureSecurityRules
+   */
+  applyRuleIds: number[];
+  /**
+   * The array of the security rule IDs that will be removed from all of the given features.
+   * Note that it is possible that a particular rule ID may also belong to `applyRuleIds`.
+   *
+   * @type {number[]}
+   * @memberof IPatchFeatureSecurityRules
+   */
+  removeRuleIds: number[];
+}
