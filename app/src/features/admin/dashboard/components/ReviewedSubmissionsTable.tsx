@@ -95,17 +95,20 @@ const ReviewedSubmissionsTable = () => {
           submissionRecords.length,
           'record'
         )} found`}</Typography>
-        <SubmissionsListSortMenu
-          sortMenuItems={{
-            name: 'Name',
-            security_review_timestamp: 'Review Complete',
-            publish_timestamp: 'Publish Date',
-            source_system: 'Submitting System'
-          }}
-          submissions={submissionRecords}
-          handleSubmissions={handleSortSubmissions}
-        />
-      </Box>
+        <Box my={-1}>
+          <SubmissionsListSortMenu
+            sortMenuItems={{
+              publish_timestamp: 'Publish Date',
+              name: 'Name',
+              security_review_timestamp: 'Review Complete',
+              source_system: 'Submitting System'
+            }}
+            submissions={submissionRecords}
+            handleSubmissions={handleSortSubmissions}
+            apiSortSync={{ key: 'publish_timestamp', sort: 'asc' }}
+          />
+        </Box>
+      </Stack>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           return (

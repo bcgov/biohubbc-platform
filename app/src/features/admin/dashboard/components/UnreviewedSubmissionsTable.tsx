@@ -88,12 +88,15 @@ const UnreviewedSubmissionsTable = () => {
           submissionRecords.length,
           'record'
         )} found`}</Typography>
-        <SubmissionsListSortMenu
-          sortMenuItems={{ publish_timestamp: 'Publish Timestamp' }}
-          submissions={submissionRecords}
-          handleSubmissions={handleSortSubmissions}
-        />
-      </Box>
+        <Box my={-1}>
+          <SubmissionsListSortMenu
+            sortMenuItems={{ submitted_timestamp: 'Date Submitted' }}
+            submissions={submissionRecords}
+            handleSubmissions={handleSortSubmissions}
+            apiSortSync={{ key: 'submitted_timestamp', sort: 'desc' }}
+          />
+        </Box>
+      </Stack>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           return (
