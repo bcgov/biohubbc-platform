@@ -5,6 +5,8 @@ import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
 import { useSubmissionContext } from 'hooks/useContext';
 import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
 import SubmissionDataGrid from './components/SubmissionDataGrid';
+import { useState } from 'react';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 
 /**
  * AdminSubmissionPage component for reviewing submissions.
@@ -12,6 +14,8 @@ import SubmissionDataGrid from './components/SubmissionDataGrid';
  * @return {*}
  */
 const AdminSubmissionPage = () => {
+  const [selectedSubmissionFeatures, setSelectedSubmissionFeatures] = useState<Record<IGetSubmissionGroupedFeatureResponse['feature_type_name'], GridRowSelectionModel>>({});
+
   const submissionContext = useSubmissionContext();
 
   const { submissionFeatureGroupsDataLoader } = submissionContext;
@@ -24,18 +28,33 @@ const AdminSubmissionPage = () => {
     []
   );
 
+  const onRowSelectionModelChange = (
+    featureTypeName: IGetSubmissionGroupedFeatureResponse['feature_type_name'],
+    rowSelectionModel: GridRowSelectionModel
+  ) => {
+    setSelectedSubmissionFeatures((prev) => ({
+      ...prev,
+      [featureTypeName]: rowSelectionModel
+    }));
+  }
+
   return (
     <>
       <SubmissionHeader selectedFeatures={allSubmissionFeatureIds} />
       <Container maxWidth="xl">
         <Stack gap={3} sx={{ py: 4 }}>
           {submissionFeatureGroups.map((submissionFeatureGroup) => {
+            const featureTypeName = submissionFeatureGroup.feature_type_name;
+            const rowSelectionModel = selectedSubmissionFeatures[submissionFeatureGroup.feature_type_name];
+
             return (
-              <Box key={submissionFeatureGroup.feature_type_name}>
+              <Box key={featureTypeName}>
                 <SubmissionDataGrid
                   feature_type_display_name={submissionFeatureGroup.feature_type_display_name}
-                  feature_type_name={submissionFeatureGroup.feature_type_name}
+                  feature_type_name={featureTypeName}
                   submissionFeatures={submissionFeatureGroup.features || []}
+                  onRowSelectionModelChange={(model) => onRowSelectionModelChange(featureTypeName, model)}
+                  rowSelectionModel={rowSelectionModel}
                 />
               </Box>
             );

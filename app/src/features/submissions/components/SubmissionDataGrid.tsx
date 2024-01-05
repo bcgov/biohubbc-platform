@@ -6,6 +6,7 @@ import { Box } from '@mui/system';
 import {
   DataGrid,
   GridColDef,
+  GridInputRowSelectionModel,
   GridRenderCellParams,
   GridRowSelectionModel,
   GridValueGetterParams
@@ -13,12 +14,13 @@ import {
 import { useCodesContext } from 'hooks/useContext';
 import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
-import { useState } from 'react';
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
   feature_type_name: string;
   submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
+  rowSelectionModel: GridInputRowSelectionModel;
+  onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
 }
 
 /**
@@ -36,8 +38,6 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const featureTypeWithProperties =
     featureTypesWithProperties?.find((item) => item.feature_type['name'] === feature_type_name)
       ?.feature_type_properties || [];
-
-  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
   const fieldColumns = featureTypeWithProperties.map((featureType: IFeatureTypeProperties) => {
     return {
@@ -72,7 +72,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           return (
             <Stack flexDirection="row" alignItems="center" gap={1}>
               <Icon path={mdiLock} size={0.75} />
-              <span>SECURED</span>
+              <Typography component='span' sx={{ textTransform: 'uppercase' }}>Secured</Typography>
             </Stack>
           );
         }
@@ -85,7 +85,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
               color: 'text.secondary'
             }}>
             <Icon path={mdiLockOpenOutline} size={0.75} />
-            <span>UNSECURED</span>
+            <Typography component='span' sx={{ textTransform: 'uppercase' }}>Unsecured</Typography>
           </Stack>
         );
       }
@@ -121,6 +121,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       <Box px={3}>
         <Divider flexItem></Divider>
         <DataGrid
+          checkboxSelection
           data-testid="submission-reviews-data-grid"
           getRowId={(row) => row.submission_feature_id}
           autoHeight
@@ -128,10 +129,8 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           columns={columns}
           pageSizeOptions={[5]}
           editMode="row"
-          rowSelectionModel={rowSelectionModel}
-          onRowSelectionModelChange={(model) => {
-            setRowSelectionModel(model);
-          }}
+          rowSelectionModel={props.rowSelectionModel}
+          onRowSelectionModelChange={props.onRowSelectionModelChange}
           disableRowSelectionOnClick
           disableColumnSelector
           disableColumnMenu
