@@ -3,7 +3,6 @@ import Icon from '@mdi/react';
 import { MenuItem, useTheme } from '@mui/material';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
-import Stack from '@mui/material/Stack';
 import { FuseResult } from 'fuse.js';
 import { SubmissionRecord } from 'interfaces/useSubmissionsApi.interface';
 import sortBy from 'lodash-es/sortBy';
@@ -125,7 +124,7 @@ const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
   };
 
   return (
-    <Stack mb={4} flexDirection="row" alignItems="center" justifyContent="space-between">
+    <>
       <Button
         id="sort-button"
         onClick={handleClick}
@@ -160,7 +159,7 @@ const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
           </MenuItem>
         ))}
       </Menu>
-    </Stack>
+    </>
   );
 };
 

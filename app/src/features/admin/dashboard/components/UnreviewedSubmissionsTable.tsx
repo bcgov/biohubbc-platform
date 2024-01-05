@@ -83,7 +83,7 @@ const UnreviewedSubmissionsTable = () => {
 
   return (
     <>
-      <Stack mb={4} flexDirection="row" justifyContent="space-between">
+      <Stack mb={4} alignItems="center" flexDirection="row" justifyContent="space-between">
         <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
