@@ -54,6 +54,9 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN region_lookup.update_user IS 'The id of the user who updated the record as identified in the system user table.';
     COMMENT ON COLUMN region_lookup.revision_count IS 'Revision count used for concurrency control.';
     COMMENT ON TABLE region_lookup IS 'Lookup table for regions.';
+
+    create trigger audit_region_lookup before insert or update or delete on region_lookup for each row execute procedure tr_audit_trigger();
+    create trigger journal_region_lookup after insert or update or delete on region_lookup for each row execute procedure tr_journal_trigger();
   `);
 }
 
