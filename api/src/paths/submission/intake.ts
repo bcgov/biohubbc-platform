@@ -1,6 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { Feature } from 'geojson';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
@@ -111,7 +110,6 @@ export function submissionIntake(): RequestHandler {
     };
 
     const submissionFeatures: ISubmissionFeature[] = req.body.features;
-    const others: Feature[] = req.body.features;
 
     const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
@@ -135,8 +133,12 @@ export function submissionIntake(): RequestHandler {
         submission.description,
         serviceClientSystemUser.user_identifier
       );
-
-      await layerService.getUniqueRegionsForFeatures(others, connection);
+      console.log('Dataset -> Properties');
+      const temp = req.body.features[0].properties.geometry.features;
+      const regions = await layerService.getUniqueRegionsForFeatures(temp, connection);
+      console.log('___');
+      console.log('REGIONS');
+      console.log(regions);
 
       // insert each submission feature record
       await submissionService.insertSubmissionFeatureRecords(response.submission_id, submissionFeatures);
