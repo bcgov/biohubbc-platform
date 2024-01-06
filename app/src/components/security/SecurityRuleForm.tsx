@@ -13,8 +13,9 @@ import { alphabetizeObjects } from 'utils/Utils';
 import yup from 'utils/YupSchema';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
+import { GroupedSubmissionFeatureSelection } from './SecuritiesDialog';
 
-export interface ISecurityRuleFormikProps {
+export interface ISecurityRuleForm {
   rules: ISecurityRuleAndCategory[];
 }
 
@@ -22,8 +23,12 @@ export const SecurityRuleFormYupSchema = yup.object().shape({
   rules: yup.array(yup.object())
 });
 
-const SecurityRuleForm = () => {
-  const { handleSubmit, values, setFieldValue } = useFormikContext<ISecurityRuleFormikProps>();
+interface ISecurityRuleFormProps {
+  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
+}
+
+const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
+  const formikProps = useFormikContext<ISecurityRuleForm>();
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
@@ -31,20 +36,20 @@ const SecurityRuleForm = () => {
   // List of all potential security rules
   const securityRules = submissionContext.allSecurityRulesStaticListDataLoader.data || [];
 
-  const hasNoSecuritySelected = !values.rules.length;
+  const hasNoSecuritySelected = !formikProps.values.rules.length;
 
   const handleAdd = (selected: ISecurityRuleAndCategory) => {
-    setFieldValue(`rules[${values.rules.length}]`, selected);
+    formikProps.setFieldValue(`rules[${formikProps.values.rules.length}]`, selected);
   };
 
   const handleRemove = (idToRemove: number) => {
-    const formData = values.rules;
+    const formData = formikProps.values.rules;
     const filteredData = formData.filter((item) => item.security_rule_id !== idToRemove);
-    setFieldValue('rules', filteredData);
+    formikProps.setFieldValue('rules', filteredData);
   };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={formikProps.handleSubmit}>
       <Box component="fieldset">
         <Typography
           variant="body1"
@@ -54,6 +59,7 @@ const SecurityRuleForm = () => {
           }}>
           Specify reasons why this information should be secured.
         </Typography>
+        <Typography variant='body2'>{JSON.stringify(props)}</Typography>
         <Box mt={3}>
           <Autocomplete
             id={'autocomplete-security-rule-search'}
@@ -70,7 +76,7 @@ const SecurityRuleForm = () => {
                 stringify: (option) => option.name + option.category_name
               });
               const unselectedOptions = options.filter(
-                (item) => !values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
+                (item) => !formikProps.values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
               );
               return searchFilter(unselectedOptions, state);
             }}
@@ -125,7 +131,7 @@ const SecurityRuleForm = () => {
           />
         </Box>
         <Stack component={TransitionGroup} gap={1} mt={1}>
-          {values.rules.map((rule: ISecurityRuleAndCategory) => {
+          {formikProps.values.rules.map((rule: ISecurityRuleAndCategory) => {
             return (
               <Collapse key={rule.security_rule_id}>
                 <SecurityRuleActionCard

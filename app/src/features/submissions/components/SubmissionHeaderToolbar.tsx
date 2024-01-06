@@ -1,24 +1,23 @@
 import { mdiArrowRight } from '@mdi/js';
 import Icon from '@mdi/react';
-import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
-import BaseHeader from 'components/layout/header/BaseHeader';
 import ManageSecurity from 'components/security/ManageSecurity';
 import CompleteSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewButton';
-import SubmissionHeaderSecurityStatus from 'features/submissions/components/SubmissionHeaderSecurityStatus';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
-export interface ISubmissionHeaderProps {
-  selectedFeatures: number[];
+import { GroupedSubmissionFeatureSelection } from 'components/security/SecuritiesDialog';
+
+export interface ISubmissionHeaderToolbarProps {
+  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
 }
 
 /**
- * Submission header for admin single-submission view.
+ * Submission header toolbar for admin single-submission view.
  *
  * @return {*}
  */
-const SubmissionHeader = (props: ISubmissionHeaderProps) => {
+const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
   const submissionContext = useSubmissionContext();
   const dialogContext = useDialogContext();
   const api = useApi();
@@ -26,7 +25,7 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
   const submissionRecordDataLoader = submissionContext.submissionRecordDataLoader;
 
   if (!submissionRecordDataLoader.data) {
-    return <CircularProgress className="pageProgress" size={40} />;
+    return <></> // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
   }
 
   const submission = submissionRecordDataLoader.data;
@@ -75,39 +74,32 @@ const SubmissionHeader = (props: ISubmissionHeaderProps) => {
     submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
-  return (
-    <BaseHeader
-      title={submission.name}
-      subTitle={
-        <Stack flexDirection="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
-          <SubmissionHeaderSecurityStatus submission={submission} />
-        </Stack>
-      }
-      buttonJSX={
-        <Stack flexDirection="row" alignItems="center" gap={1}>
-          <ManageSecurity
-            features={props.selectedFeatures}
-            onClose={() => {
-              submissionRecordDataLoader.refresh(submissionContext.submissionId);
-              submissionContext.submissionFeatureGroupsDataLoader.refresh(submissionContext.submissionId);
-            }}
-          />
 
-          <CompleteSecurityReviewButton
-            submission={submission}
-            onComplete={onSecurityReviewComplete}
-            onRemove={onSecurityReviewRemove}
-          />
-          {submission.publish_timestamp == null && <Icon path={mdiArrowRight} size={0.75} />}
-          <PublishSecurityReviewButton
-            submission={submission}
-            onComplete={onSecurityReviewPublish}
-            onUnpublish={onSecurityReviewUnPublish}
-          />
-        </Stack>
-      }
-    />
+
+  return (
+
+    <Stack flexDirection="row" alignItems="center" gap={1}>
+      <ManageSecurity
+        groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection}
+        onClose={() => {
+          submissionRecordDataLoader.refresh(submissionContext.submissionId);
+          submissionContext.submissionFeatureGroupsDataLoader.refresh(submissionContext.submissionId);
+        }}
+      />
+
+      <CompleteSecurityReviewButton
+        submission={submission}
+        onComplete={onSecurityReviewComplete}
+        onRemove={onSecurityReviewRemove}
+      />
+      {submission.publish_timestamp == null && <Icon path={mdiArrowRight} size={0.75} />}
+      <PublishSecurityReviewButton
+        submission={submission}
+        onComplete={onSecurityReviewPublish}
+        onUnpublish={onSecurityReviewUnPublish}
+      />
+    </Stack>
   );
 };
 
-export default SubmissionHeader;
+export default SubmissionHeaderToolbar;

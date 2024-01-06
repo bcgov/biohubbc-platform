@@ -1,12 +1,43 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
-import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
 import { useSubmissionContext } from 'hooks/useContext';
 import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
 import SubmissionDataGrid from './components/SubmissionDataGrid';
 import { useState } from 'react';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
+import BaseHeader from 'components/layout/header/BaseHeader';
+import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
+import SubmissionHeaderToolbar from 'features/submissions/components/SubmissionHeaderToolbar';
+import { Skeleton } from '@mui/material';
+import { GroupedSubmissionFeatureSelection } from 'components/security/SecuritiesDialog';
+
+const SubmissionHeader = (props: { groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection }) => {
+  const submissionContext = useSubmissionContext();
+  const submission = submissionContext.submissionRecordDataLoader.data;
+
+  if (!submission) {
+    return <></> // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
+  }
+
+  return (
+    <BaseHeader
+      title={submission.name} // TODO
+      subTitle={
+        <Stack flexDirection="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
+          {submission ? (
+            <SubmissionHeaderSecurityStatus submission={submission} />
+          ) : (
+            <Skeleton variant='rectangular' /> // TODO
+          )}
+        </Stack>
+      }
+      buttonJSX={
+        <SubmissionHeaderToolbar groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection} />
+      }
+    />
+  )
+}
 
 /**
  * AdminSubmissionPage component for reviewing submissions.
@@ -14,25 +45,18 @@ import { GridRowSelectionModel } from '@mui/x-data-grid';
  * @return {*}
  */
 const AdminSubmissionPage = () => {
-  const [selectedSubmissionFeatures, setSelectedSubmissionFeatures] = useState<Record<IGetSubmissionGroupedFeatureResponse['feature_type_name'], GridRowSelectionModel>>({});
+  const [groupedSubmissionFeatureSelection, setGroupedSubmissionFeatureSelection] = useState<GroupedSubmissionFeatureSelection>({});
 
   const submissionContext = useSubmissionContext();
 
   const { submissionFeatureGroupsDataLoader } = submissionContext;
   const submissionFeatureGroups = submissionFeatureGroupsDataLoader.data || [];
 
-  const allSubmissionFeatureIds = submissionFeatureGroups.reduce(
-    (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
-      return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
-    },
-    []
-  );
-
   const onRowSelectionModelChange = (
     featureTypeName: IGetSubmissionGroupedFeatureResponse['feature_type_name'],
     rowSelectionModel: GridRowSelectionModel
   ) => {
-    setSelectedSubmissionFeatures((prev) => ({
+    setGroupedSubmissionFeatureSelection((prev) => ({
       ...prev,
       [featureTypeName]: rowSelectionModel
     }));
@@ -40,12 +64,12 @@ const AdminSubmissionPage = () => {
 
   return (
     <>
-      <SubmissionHeader selectedFeatures={allSubmissionFeatureIds} />
+      <SubmissionHeader groupedSubmissionFeatureSelection={groupedSubmissionFeatureSelection} />
       <Container maxWidth="xl">
         <Stack gap={3} sx={{ py: 4 }}>
           {submissionFeatureGroups.map((submissionFeatureGroup) => {
             const featureTypeName = submissionFeatureGroup.feature_type_name;
-            const rowSelectionModel = selectedSubmissionFeatures[submissionFeatureGroup.feature_type_name];
+            const rowSelectionModel = groupedSubmissionFeatureSelection[submissionFeatureGroup.feature_type_name];
 
             return (
               <Box key={featureTypeName}>

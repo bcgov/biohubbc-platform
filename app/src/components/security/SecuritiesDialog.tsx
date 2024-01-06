@@ -1,14 +1,17 @@
-import Typography from '@mui/material/Typography';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
-import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
+import SecurityRuleForm, { ISecurityRuleForm, SecurityRuleFormYupSchema } from './SecurityRuleForm';
+import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
+
+export type GroupedSubmissionFeatureSelection = Record<IGetSubmissionGroupedFeatureResponse['feature_type_name'], GridRowSelectionModel>
 
 interface ISecuritiesDialogProps {
-  submissionFeatureIds: number[];
+  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
   open: boolean;
   onClose: () => void;
 }
@@ -30,28 +33,38 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
           (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
         );
       });
+  
   const hasSecurity = Boolean(initialAppliedSecurityRules.length);
-  const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
+
+  const numSelectedSubmissionFeatures = Object
+    .values(props.groupedSubmissionFeatureSelection)
+    .reduce((count: number, submissionFeatureIds: GridRowSelectionModel) => {
+      return count + submissionFeatureIds.length;
+    }, 0);
+
+  const handleSave = async (values: ISecurityRuleForm) => {
     try {
       setIsLoading(true);
-      await api.security
-        .applySecurityRulesToSubmissionFeatures(
-          props.features,
-          rules.map((item) => item.security_rule_id),
-          true // Override will replace all rules on submit
-        )
-        .then(() => {
-          submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
-        });
 
-      dialogContext.setSnackbar({
-        snackbarMessage: (
-          <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(rules.length, props.features.length)}
-          </Typography>
-        ),
-        open: true
-      });
+      // await api.security
+      //   .applySecurityRulesToSubmissionFeatures(
+      //     props.features,
+      //     rules.map((item) => item.security_rule_id),
+      //     true // Override will replace all rules on submit
+      //   )
+      //   .then(() => {
+      //     submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
+      //   });
+
+      // dialogContext.setSnackbar({
+      //   snackbarMessage: (
+      //     <Typography variant="body2" component="div">
+      //       {ApplySecurityRulesI18N.applySecuritySuccess(rules.length, numSelectedSubmissionFeatures)}
+      //     </Typography>
+      //   ),
+      //   open: true
+      // });
+
     } catch (error) {
       // Show error dialog
       dialogContext.setErrorDialog({
@@ -74,10 +87,10 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       open={props.open}
       dialogSaveButtonLabel="APPLY"
       onCancel={props.onClose}
-      onSave={(values: ISecurityRuleFormikProps) => handleSubmit(values.rules)}
+      onSave={handleSave}
       component={{
-        element: <SecurityRuleForm />,
-        initialValues: { rules: initialAppliedSecurityRules },
+        element: <SecurityRuleForm groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection}/>,
+        initialValues: { rules: initialAppliedSecurityRules }, // TODO
         validationSchema: SecurityRuleFormYupSchema
       }}
     />
