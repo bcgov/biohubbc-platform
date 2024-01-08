@@ -120,6 +120,7 @@ export async function up(knex: Knex): Promise<void> {
       display_name                  varchar(100)      NOT NULL,
       description                   varchar(500),
       parent_feature_property_id    integer,
+      calculated_value              boolean           DEFAULT false,
       record_effective_date         date              DEFAULT now() NOT NULL,
       record_end_date               date,
       create_date                   timestamptz(6)    DEFAULT now() NOT NULL,
@@ -136,6 +137,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN feature_property.display_name                  IS 'The formatted name of the feature_property record.';
     COMMENT ON COLUMN feature_property.description                   IS 'The description of the feature_property record.';
     COMMENT ON COLUMN feature_property.parent_feature_property_id    IS 'Foreign key to the feature_property table.';
+    COMMENT ON COLUMN feature_property.calculated_value              IS 'A boolean indicating if feature_properties have a calculated or derived value based on business rules in the system.';
     COMMENT ON COLUMN feature_property.record_effective_date         IS 'Record level effective date.';
     COMMENT ON COLUMN feature_property.record_end_date               IS 'Record level end date.';
     COMMENT ON COLUMN feature_property.create_date                   IS 'The datetime the record was created.';
