@@ -86,13 +86,16 @@ const SubmissionsListPage = () => {
                     fuzzyData.length,
                     'record'
                   )} found`}</Typography>
-                  <SubmissionsListSortMenu
-                    sortMenuItems={{ name: 'Name', publish_timestamp: 'Publish Date' }}
-                    submissions={fuzzyData}
-                    handleSubmissions={(data) => {
-                      handleFuzzyData(data);
-                    }}
-                  />
+                  <Box my={-1}>
+                    <SubmissionsListSortMenu
+                      sortMenuItems={{ publish_timestamp: 'Publish Date', name: 'Name' }}
+                      submissions={fuzzyData}
+                      handleSubmissions={(data) => {
+                        handleFuzzyData(data);
+                      }}
+                      apiSortSync={{ key: 'publish_timestamp', sort: 'asc' }}
+                    />
+                  </Box>
                 </Box>
                 <SubmissionsList
                   submissions={fuzzyData}

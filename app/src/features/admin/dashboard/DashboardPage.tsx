@@ -20,7 +20,7 @@ const DashboardPage = () => {
             py: 4,
             pb: 0
           }}>
-          <Typography variant="h1" sx={{ mt: '-4px', ml: '-2px' }}>
+          <Typography variant="h1" sx={{ ml: '-2px' }}>
             Submissions
           </Typography>
 
