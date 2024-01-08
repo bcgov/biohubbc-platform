@@ -20,7 +20,6 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDownloadJSON from 'hooks/useDownloadJSON';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
-import React from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 

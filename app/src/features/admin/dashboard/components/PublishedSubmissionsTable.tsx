@@ -89,22 +89,25 @@ const PublishedSubmissionsTable = () => {
 
   return (
     <>
-      <Box pb={4} display="flex" flexDirection="row" justifyContent="space-between">
+      <Stack mb={4} alignItems="center" flexDirection="row" justifyContent="space-between">
         <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
         )} found`}</Typography>
-        <SubmissionsListSortMenu
-          sortMenuItems={{
-            name: 'Name',
-            security_review_timestamp: 'Review Complete',
-            publish_timestamp: 'Publish Date',
-            source_system: 'Submitting System'
-          }}
-          submissions={submissionRecords}
-          handleSubmissions={handleSortSubmissions}
-        />
-      </Box>
+        <Box my={-1}>
+          <SubmissionsListSortMenu
+            sortMenuItems={{
+              name: 'Name',
+              security_review_timestamp: 'Review Complete',
+              publish_timestamp: 'Publish Date',
+              source_system: 'Submitting System'
+            }}
+            submissions={submissionRecords}
+            handleSubmissions={handleSortSubmissions}
+            apiSortSync={{ key: 'publish_timestamp', sort: 'asc' }}
+          />
+        </Box>
+      </Stack>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           return (
@@ -192,6 +195,13 @@ const PublishedSubmissionsTable = () => {
                     <Stack flexDirection="row">
                       <dd>Submitted:</dd>
                       <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
+                    </Stack>
+                    <Stack flexDirection="row">
+                      <dd>Published:</dd>
+                      <dt>
+                        {submissionRecord.publish_timestamp &&
+                          getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.publish_timestamp)}
+                      </dt>
                     </Stack>
                     <Stack flexDirection="row">
                       <dd>Source:</dd>
