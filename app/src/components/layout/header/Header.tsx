@@ -71,7 +71,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
             <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
             <img src={headerImageSmall} alt={'Government of British Columbia'} />
           </picture>
-          <Typography component="span" sx={{fontSize: '1.25rem', fontWeight: 700}}>
+          <Typography component="span" sx={{ fontSize: '1.25rem', fontWeight: 700 }}>
             BioHub BC
             <Box
               component="sup"

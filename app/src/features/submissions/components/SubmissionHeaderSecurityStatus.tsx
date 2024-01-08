@@ -20,16 +20,20 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
   switch (submission.security) {
     case SECURITY_APPLIED_STATUS.SECURED: {
       securityStatus = (
-        <Stack flexDirection="row" alignItems="center" gap={0.75} sx={{
-          '& *': {
-            color: 'error.main'
-          },
-          '& svg': {
-            mt: '-2px'
-          }
-        }}>
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          gap={0.75}
+          sx={{
+            '& *': {
+              color: 'error.main'
+            },
+            '& svg': {
+              mt: '-2px'
+            }
+          }}>
           <Icon path={mdiLock} size={0.75} />
-          <Typography component="strong" variant="body2" sx={{fontWeight: 700}}>
+          <Typography component="strong" variant="body2" sx={{ fontWeight: 700 }}>
             Secured
           </Typography>
         </Stack>
@@ -38,16 +42,20 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
     }
     case SECURITY_APPLIED_STATUS.PARTIALLY_SECURED: {
       securityStatus = (
-        <Stack flexDirection="row" alignItems="center" gap={0.75} sx={{
-          '& *': {
-            color: 'error.main'
-          },
-          '& svg': {
-            mt: '-2px'
-          }
-        }}>
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          gap={0.75}
+          sx={{
+            '& *': {
+              color: 'error.main'
+            },
+            '& svg': {
+              mt: '-2px'
+            }
+          }}>
           <Icon path={mdiLockAlertOutline} size={0.75} />
-          <Typography component="strong" variant="body2" sx={{fontWeight: 700}}>
+          <Typography component="strong" variant="body2" sx={{ fontWeight: 700 }}>
             Partially Secured
           </Typography>
         </Stack>
@@ -56,16 +64,20 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
     }
     default: {
       securityStatus = (
-        <Stack flexDirection="row" alignItems="center" gap={0.75} sx={{
-          '& *': {
-            color: 'error.main'
-          },
-          '& svg': {
-            mt: '-2px'
-          }
-        }}>
+        <Stack
+          flexDirection="row"
+          alignItems="center"
+          gap={0.75}
+          sx={{
+            '& *': {
+              color: 'error.main'
+            },
+            '& svg': {
+              mt: '-2px'
+            }
+          }}>
           <Icon path={mdiLockOpenOutline} size={0.75} />
-          <Typography component="strong" variant="body2" sx={{fontWeight: 700}}>
+          <Typography component="strong" variant="body2" sx={{ fontWeight: 700 }}>
             Unsecured
           </Typography>
         </Stack>
@@ -84,16 +96,13 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
         textTransform: 'uppercase'
       }}
       title="Open access to all records">
-      <Stack
-        flexDirection="row"
-        alignItems="center"
-        gap={1}>
+      <Stack flexDirection="row" alignItems="center" gap={1}>
         {securityStatus}
       </Stack>
 
       {submission.publish_timestamp ? (
         <Stack flexDirection="row" alignItems="center" gap={0.75}>
-          <Typography component="span" variant="body2" sx={{fontWeight: 700}}>
+          <Typography component="span" variant="body2" sx={{ fontWeight: 700 }}>
             Published
           </Typography>
           <Typography component="span" variant="body2">
@@ -102,7 +111,7 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
         </Stack>
       ) : submission.security_review_timestamp ? (
         <Stack flexDirection="row" alignItems="center" gap={0.75}>
-          <Typography component="span" variant="body2" sx={{fontWeight: 700}}>
+          <Typography component="span" variant="body2" sx={{ fontWeight: 700 }}>
             Review Complete
           </Typography>
           <Typography component="span" variant="body2">
@@ -111,14 +120,14 @@ const SubmissionHeaderSecurityStatus = (props: ISubmissionHeaderSecurityStatusPr
         </Stack>
       ) : (
         <Stack flexDirection="row" alignItems="center">
-          <Typography component="span" variant="body2" sx={{fontWeight: 700}}>
+          <Typography component="span" variant="body2" sx={{ fontWeight: 700 }}>
             Pending Review
           </Typography>
         </Stack>
       )}
 
       <Stack flexDirection="row" alignItems="center" gap={0.75}>
-        <Typography component="span" variant="body2" sx={{fontWeight: 700}}>
+        <Typography component="span" variant="body2" sx={{ fontWeight: 700 }}>
           Date Submitted
         </Typography>
         <Typography component="span" variant="body2">
