@@ -40,12 +40,10 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
-  
+
+  // List all potential security rules
   const { allSecurityRulesStaticListDataLoader } = submissionContext;
   const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
-
-  // List of all potential security rules
-  const securityRules = submissionContext.allSecurityRulesStaticListDataLoader.data || [];
 
   const hasNoSecuritySelected = !formikProps.values.securityAppliedRule.length;
 
@@ -79,7 +77,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             clearOnBlur
             loading={submissionContext.allSecurityRulesStaticListDataLoader.isLoading}
             noOptionsText="No records found"
-            options={alphabetizeObjects(securityRules, 'name')}
+            options={alphabetizeObjects(allSecurityRules, 'name')}
             filterOptions={(options, state) => {
               const searchFilter = createFilterOptions<ISecurityRuleAndCategory>({
                 ignoreCase: true,
@@ -110,7 +108,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
               <TextField
                 {...params}
                 variant="outlined"
-                placeholder={'Find security reasons'}
+                placeholder={'Add security reasons'}
                 fullWidth
                 InputProps={{
                   ...params.InputProps,

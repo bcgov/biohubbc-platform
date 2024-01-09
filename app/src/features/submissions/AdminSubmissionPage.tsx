@@ -70,9 +70,16 @@ const AdminSubmissionPage = () => {
       return acc.concat(featureIds);
     }, []);
 
+  const allSubmissionFeatureIds = submissionFeatureGroups.reduce(
+    (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
+      return acc.concat(submissionFeatureGroup.features.map((feature) => feature.submission_feature_id));
+    },
+    []
+  );
+
   return (
     <>
-      <SubmissionHeader submissionFeatureIds={submissionFeatureIds} />
+      <SubmissionHeader submissionFeatureIds={submissionFeatureIds.length ? submissionFeatureIds : allSubmissionFeatureIds} />
       <Container maxWidth="xl">
         <Stack gap={3} sx={{ py: 4 }}>
           {submissionFeatureGroups.map((submissionFeatureGroup) => {
