@@ -52,7 +52,7 @@ const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, 
 };
 
 const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) => {
-  const S3_KEY = 'blah';
+  const S3_KEY = 'dev-artifacts/artifact.txt';
 
   const sql = insertSubmissionFeature({
     submission_id: row.submission_id,

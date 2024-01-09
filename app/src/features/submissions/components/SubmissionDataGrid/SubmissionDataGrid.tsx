@@ -1,6 +1,6 @@
 import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Divider, Paper, Stack, Toolbar } from '@mui/material';
+import { Button, Divider, Paper, Stack, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { Box } from '@mui/system';
 import {
@@ -10,10 +10,14 @@ import {
   GridRowSelectionModel,
   GridValueGetterParams
 } from '@mui/x-data-grid';
+import { useApi } from 'hooks/useApi';
 import { useCodesContext } from 'hooks/useContext';
 import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
-import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
-import { useState } from 'react';
+import {
+  SubmissionFeatureRecordWithTypeAndSecurity,
+  SubmissionFeatureSignedUrlPayload
+} from 'interfaces/useSubmissionsApi.interface';
+import React, { useState } from 'react';
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
@@ -29,6 +33,8 @@ export interface ISubmissionDataGridProps {
  */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const codesContext = useCodesContext();
+  const api = useApi();
+
   const { submissionFeatures, feature_type_display_name, feature_type_name } = props;
 
   const featureTypesWithProperties = codesContext.codesDataLoader.data?.feature_type_with_properties;
@@ -40,23 +46,55 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
   const fieldColumns = featureTypeWithProperties.map((featureType: IFeatureTypeProperties) => {
+    if (featureType.type === 's3_key') {
+      const openLinkInNewTab = async (payload: SubmissionFeatureSignedUrlPayload) => {
+        try {
+          const signedUrl = await api.submissions.getSubmissionFeatureSignedUrl(payload);
+          window.open(signedUrl, '_blank');
+        } catch (err) {
+          console.log(err);
+        }
+      };
+      return {
+        field: featureType.name,
+        headerName: '',
+        flex: 1,
+        disableColumnMenu: true,
+        valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
+        renderCell: (params: GridRenderCellParams) => {
+          return (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => {
+                return openLinkInNewTab({
+                  submissionId: params.row.submission_id,
+                  submissionFeatureId: params.row.submission_feature_id,
+                  submissionFeatureKey: featureType.type,
+                  submissionFeatureValue: params.value
+                });
+              }}>
+              Download
+            </Button>
+          );
+        }
+      };
+    }
     return {
       field: featureType.name,
       headerName: featureType.display_name,
       flex: 1,
       disableColumnMenu: true,
       valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
-      renderCell: (params: GridRenderCellParams) => {
-        return (
-          <Box
-            sx={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-            {String(params.value)}
-          </Box>
-        );
-      }
+      renderCell: (params: GridRenderCellParams) => (
+        <Box
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+          {String(params.value)}
+        </Box>
+      )
     };
   });
 

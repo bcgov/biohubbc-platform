@@ -3,6 +3,7 @@ import {
   IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
   IListSubmissionsResponse,
+  SubmissionFeatureSignedUrlPayload,
   SubmissionRecordPublished,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeature
@@ -139,6 +140,16 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSubmissionFeatureSignedUrl = async (params: SubmissionFeatureSignedUrlPayload): Promise<string> => {
+    const { submissionFeatureKey, submissionFeatureValue, submissionId, submissionFeatureId } = params;
+
+    const { data } = await axios.get(
+      `api/submission/${submissionId}/features/${submissionFeatureId}/signed-url?key=${submissionFeatureKey}&value=${submissionFeatureValue}`
+    );
+
+    return data;
+  };
+
   return {
     listSubmissions,
     getSignedUrl,
@@ -149,7 +160,8 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getUnreviewedSubmissionsForAdmins,
     getReviewedSubmissionsForAdmins,
     updateSubmissionRecord,
-    getPublishedSubmissions
+    getPublishedSubmissions,
+    getSubmissionFeatureSignedUrl
   };
 };
 

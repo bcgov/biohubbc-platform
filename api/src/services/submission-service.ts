@@ -2,7 +2,7 @@ import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
   IDatasetsForReview,
   IHandlebarsTemplates,
@@ -19,6 +19,7 @@ import {
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
+  SubmissionFeatureSignedUrlPayload,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRecordPublished,
@@ -28,6 +29,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { getS3SignedURL } from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
@@ -714,5 +716,35 @@ export class SubmissionService extends DBService {
    */
   async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
     return this.submissionRepository.downloadPublishedSubmission(submissionId);
+  }
+
+  /**
+   * Generates a signed URL for submission feature artifact key value pair
+   *
+   * Handles admin requests differently, admin can bypass submission feature security check.
+   *
+   * @async
+   * @param {SubmissionFeatureSignedUrlPayload} payload
+   * @throws {ApiGeneralError}
+   * @memberof SubmissionService
+   * @returns {Promise<string>} signed URL for artifact
+   */
+  async getSubmissionFeatureSignedUrl(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
+    // const artifactKey = payload.isAdmin
+    //   ? await this.submissionRepository.getAdminSubmissionFeatureArtifactKey(payload)
+    //   : await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
+
+    const artifactKey = await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
+
+    const signedUrl = await getS3SignedURL(artifactKey);
+
+    if (!signedUrl) {
+      throw new ApiGeneralError(
+        `Failed to generate signed URL for "${payload.submissionFeatureObj.key}":"${payload.submissionFeatureObj.value}"`,
+        ['SubmissionRepository->getSubmissionFeatureSignedUrl', 'getS3SignedUrl returned NULL']
+      );
+    }
+
+    return signedUrl;
   }
 }
