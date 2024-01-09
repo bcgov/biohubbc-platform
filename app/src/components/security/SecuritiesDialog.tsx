@@ -2,8 +2,9 @@ import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
-import SecurityRuleForm, { ISecurityRuleForm, SecurityRuleFormYupSchema } from './SecurityRuleForm';
+import SecurityRuleForm, { SecurityRuleFormYupSchema } from './SecurityRuleForm';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
+import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 
 
 
@@ -23,7 +24,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const initialAppliedSecurityRules = submissionFeaturesAppliedRulesDataLoader.data || [];
   const hasSecurity = Boolean(initialAppliedSecurityRules.length);
 
-  const handleSave = async (values: ISecurityRuleForm) => {
+  const handleSave = async (values: IPatchFeatureSecurityRules) => {
     try {
       setIsLoading(true);
 
@@ -62,7 +63,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   };
 
   return (
-    <EditDialog
+    <EditDialog<IPatchFeatureSecurityRules>
       isLoading={isLoading}
       dialogTitle={hasSecurity ? 'Edit Security Reasons' : ' Add Security Reasons'}
       open={props.open}
@@ -70,8 +71,8 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onCancel={props.onClose}
       onSave={handleSave}
       component={{
-        element: <SecurityRuleForm submissionFeatureIds={props.submissionFeatureIds}/>,
-        initialValues: { securityAppliedRule: initialAppliedSecurityRules, diff: null as never },
+        element: <SecurityRuleForm initialAppliedSecurityRules={initialAppliedSecurityRules} />,
+        initialValues: { submissionFeatureIds: props.submissionFeatureIds, removeRuleIds: [], applyRuleIds: [] },
         validationSchema: SecurityRuleFormYupSchema
       }}
     />

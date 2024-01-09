@@ -7,7 +7,7 @@ import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import { ISecurityRuleAndCategory, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
 import { useSubmissionContext } from 'hooks/useContext';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
 import { alphabetizeObjects } from 'utils/Utils';
 import yup from 'utils/YupSchema';
@@ -16,46 +16,71 @@ import SecurityRuleCard from './SecurityRuleCard';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 
-/**
- * Form data that represents the security state of all selected security rules
- *
- * @export
- * @interface ISecurityRuleForm
- */
-export interface ISecurityRuleForm {
-  securityAppliedRule: ISubmissionFeatureSecurityRecord[];
-  diff: IPatchFeatureSecurityRules;
-}
-
 export const SecurityRuleFormYupSchema = yup.object().shape({
   // rules: yup.array(yup.object()) // TODO
 });
 
 export interface ISecurityRuleFormProps {
-  submissionFeatureIds: GridRowSelectionModel
+  initialAppliedSecurityRules: ISubmissionFeatureSecurityRecord[]
+}
+
+interface IAppliedSecurityRuleGroup {
+  securityRuleId: number;
+  submissionFeatureIds: number[];
 }
 
 const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
-  const formikProps = useFormikContext<ISecurityRuleForm>();
+  const formikProps = useFormikContext<IPatchFeatureSecurityRules>();
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
 
   // List all potential security rules
   const { allSecurityRulesStaticListDataLoader } = submissionContext;
-  const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
 
-  const hasNoSecuritySelected = !formikProps.values.securityAppliedRule.length;
+  const hasNoSecuritySelected = !props.initialAppliedSecurityRules.length;
 
-  const handleAdd = (selected: ISecurityRuleAndCategory) => {
-    formikProps.setFieldValue(`rules[${formikProps.values.securityAppliedRule.length}]`, selected);
-  };
+  const groupedAppliedSecurityRules: IAppliedSecurityRuleGroup[] = useMemo(() => {
+    return props
+      .initialAppliedSecurityRules
+      .reduce((groups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
+        const groupIndex = groups.findIndex((group) => group.securityRuleId === securityRecord.security_rule_id)
 
-  const handleRemove = (idToRemove: number) => {
-    const formData = formikProps.values.securityAppliedRule;
-    const filteredData = formData.filter((item) => item.security_rule_id !== idToRemove);
-    formikProps.setFieldValue('rules', filteredData);
-  };
+        if (groupIndex === -1) {
+          groups.push({
+            securityRuleId: securityRecord.security_rule_id,
+            submissionFeatureIds: [securityRecord.submission_feature_id]
+          })
+        } else {
+          groups[groupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id)
+        }
+
+        return groups;
+      }, []);
+    }, [props.initialAppliedSecurityRules]);
+
+  console.log({ groupedAppliedSecurityRules, allSecurityRulesStaticListData: allSecurityRulesStaticListDataLoader.data })
+
+  const [appliedRules, unappliedRules] = useMemo(() => {
+    const applied: ISecurityRuleAndCategory[] = [];
+    const unapplied: ISecurityRuleAndCategory[] = [];
+
+    (allSecurityRulesStaticListDataLoader.data ?? []).forEach((securityRule) => {
+      if (groupedAppliedSecurityRules.some((group) => group.securityRuleId === securityRule.security_rule_id)) {
+        applied.push(securityRule);
+      } else {
+        unapplied.push(securityRule);
+      }
+    });
+
+    return [applied, unapplied];
+  }, [allSecurityRulesStaticListDataLoader.data]) // TODO Deps
+
+  const stageForApply = (securityRule: ISecurityRuleAndCategory) => {
+    formikProps.setFieldValue('applyRuleIds', [...formikProps.values.applyRuleIds, securityRule.security_rule_id])
+  }
+
+  console.log({appliedRules, unappliedRules})
 
   return (
     <form onSubmit={formikProps.handleSubmit}>
@@ -70,6 +95,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
         </Typography>
         <Typography variant='body2'>{JSON.stringify(props)}</Typography>
         <Box mt={3}>
+          <Typography variant='h6'>Apply a New Rule</Typography>
           <Autocomplete
             id={'autocomplete-security-rule-search'}
             data-testid={'autocomplete-security-rule-search'}
@@ -77,17 +103,14 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             clearOnBlur
             loading={submissionContext.allSecurityRulesStaticListDataLoader.isLoading}
             noOptionsText="No records found"
-            options={alphabetizeObjects(allSecurityRules, 'name')}
+            options={alphabetizeObjects(unappliedRules, 'name')}
             filterOptions={(options, state) => {
               const searchFilter = createFilterOptions<ISecurityRuleAndCategory>({
                 ignoreCase: true,
                 matchFrom: 'any',
                 stringify: (option) => option.name + option.category_name
               });
-              const unselectedOptions = options.filter(
-                (item) => !formikProps.values.securityAppliedRule.some((existing) => existing.security_rule_id === item.security_rule_id)
-              );
-              return searchFilter(unselectedOptions, state);
+              return searchFilter(unappliedRules, state);
             }}
             getOptionLabel={(option) => option.name}
             isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
@@ -101,7 +124,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             }}
             onChange={(_, option) => {
               if (option) {
-                handleAdd(option);
+                stageForApply(option);
               }
             }}
             renderInput={(params) => (
@@ -139,7 +162,13 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
             }}
           />
         </Box>
+        <p>{JSON.stringify({ applyRuleIds: formikProps.values.applyRuleIds })}</p>
+
+        <Box mt={3}>
+          <Typography variant='h6'>Previously Applied Rules</Typography>
+        </Box>
         <Stack component={TransitionGroup} gap={1} mt={1}>
+          uhhhh
           {/* {formikProps.values.rules.map((rule: ISecurityRuleAndCategory) => {
             return (
               <Collapse key={rule.security_rule_id}>

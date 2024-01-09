@@ -41,7 +41,7 @@ GET.apiDoc = {
               type: 'object',
               properties: {
                 security_category_id: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 name: {
                   type: 'string'
@@ -60,7 +60,7 @@ GET.apiDoc = {
                   type: 'string'
                 },
                 create_user: {
-                  type: 'string'
+                  type: 'integer'
                 },
                 update_date: {
                   type: 'string',
@@ -71,7 +71,7 @@ GET.apiDoc = {
                   nullable: true
                 },
                 revision_count: {
-                  type: 'number'
+                  type: 'integer'
                 }
               }
             }

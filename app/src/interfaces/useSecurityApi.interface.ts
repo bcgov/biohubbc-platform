@@ -1,3 +1,5 @@
+import { GridRowSelectionModel } from "@mui/x-data-grid";
+
 export interface ISecureDataAccessRequestForm {
   fullName: string;
   emailAddress: string;
@@ -43,7 +45,7 @@ export interface IPatchFeatureSecurityRules {
    * @type {number[]}
    * @memberof IPatchFeatureSecurityRules
    */
-  submissionFeatureIds: number[];
+  submissionFeatureIds: number[] | GridRowSelectionModel
   /**
    * The array of the security rule IDs that will be applied to all of the given features.
    * Note that it is possible that a particular rule ID may also belong to `removeRuleIds`.
