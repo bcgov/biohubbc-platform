@@ -57,13 +57,13 @@ export const SubmissionContext = React.createContext<ISubmissionContext | undefi
 export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (props) => {
   const api = useApi();
 
-  // Stores the static list of all security rules that could be applied to a submission feature
+  // Retrieves the static list of all security rules that could be applied to a submission feature
   const allSecurityRulesStaticListDataLoader = useDataLoader(api.security.getActiveSecurityRulesAndCategories);
 
-  // Stores the submission record, including security metadata
+  // Retrieves the submission record, including security metadata
   const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);
 
-  // Stores the list of all features for the given submission
+  // Retrieves the list of all features for the given submission
   const submissionFeatureGroupsDataLoader = useDataLoader(api.submissions.getSubmissionFeatureGroups);
 
   // The collection of all feature IDs belonging to this submission
@@ -82,7 +82,10 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionFeatureGroupsDataLoader.data]);
 
-  // Stores the list of all security rules applied to the given features
+  /**
+   * Stores the list of pivot values representing all security rules that apply to all the feaures belonging
+   * to the current submission.
+   */
   const submissionFeaturesAppliedRulesDataLoader = useDataLoader(() => {
     return api.security.getSecurityRulesForSubmissionFeatures(allSubmissionFeatureIds);
   });

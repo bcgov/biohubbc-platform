@@ -1,17 +1,14 @@
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
-import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
 import SecurityRuleForm, { ISecurityRuleForm, SecurityRuleFormYupSchema } from './SecurityRuleForm';
-import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 
-export type GroupedSubmissionFeatureSelection = Record<IGetSubmissionGroupedFeatureResponse['feature_type_name'], GridRowSelectionModel>
+
 
 interface ISecuritiesDialogProps {
-  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
+  submissionFeatureIds: GridRowSelectionModel
   open: boolean;
   onClose: () => void;
 }
@@ -19,28 +16,13 @@ interface ISecuritiesDialogProps {
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const dialogContext = useDialogContext();
-  const api = useApi();
 
   const submissionContext = useSubmissionContext();
   const { allSecurityRulesStaticListDataLoader, submissionFeaturesAppliedRulesDataLoader } = submissionContext;
-  const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
-  const appliedSecurityRecords = submissionFeaturesAppliedRulesDataLoader.data || [];
+  // const allSecurityRules = allSecurityRulesStaticListDataLoader.data || []; // TODO possibly remove? 
 
-  const initialAppliedSecurityRules: ISecurityRuleAndCategory[] = !appliedSecurityRecords.length
-    ? []
-    : allSecurityRules.filter((securityRule) => {
-        return appliedSecurityRecords.some(
-          (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
-        );
-      });
-  
+  const initialAppliedSecurityRules = submissionFeaturesAppliedRulesDataLoader.data || [];
   const hasSecurity = Boolean(initialAppliedSecurityRules.length);
-
-  const numSelectedSubmissionFeatures = Object
-    .values(props.groupedSubmissionFeatureSelection)
-    .reduce((count: number, submissionFeatureIds: GridRowSelectionModel) => {
-      return count + submissionFeatureIds.length;
-    }, 0);
 
   const handleSave = async (values: ISecurityRuleForm) => {
     try {
@@ -89,8 +71,8 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onCancel={props.onClose}
       onSave={handleSave}
       component={{
-        element: <SecurityRuleForm groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection}/>,
-        initialValues: { rules: initialAppliedSecurityRules }, // TODO
+        element: <SecurityRuleForm submissionFeatureIds={props.submissionFeatureIds}/>,
+        initialValues: { securityAppliedRule: initialAppliedSecurityRules, diff: null as never },
         validationSchema: SecurityRuleFormYupSchema
       }}
     />

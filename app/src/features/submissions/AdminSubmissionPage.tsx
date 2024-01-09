@@ -10,9 +10,10 @@ import BaseHeader from 'components/layout/header/BaseHeader';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 import SubmissionHeaderToolbar from 'features/submissions/components/SubmissionHeaderToolbar';
 import { Skeleton } from '@mui/material';
-import { GroupedSubmissionFeatureSelection } from 'components/security/SecuritiesDialog';
 
-const SubmissionHeader = (props: { groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection }) => {
+type GroupedSubmissionFeatureSelection = Record<IGetSubmissionGroupedFeatureResponse['feature_type_name'], GridRowSelectionModel>
+
+const SubmissionHeader = (props: { submissionFeatureIds: GridRowSelectionModel }) => {
   const submissionContext = useSubmissionContext();
   const submission = submissionContext.submissionRecordDataLoader.data;
 
@@ -33,7 +34,7 @@ const SubmissionHeader = (props: { groupedSubmissionFeatureSelection: GroupedSub
         </Stack>
       }
       buttonJSX={
-        <SubmissionHeaderToolbar groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection} />
+        <SubmissionHeaderToolbar submissionFeatureIds={props.submissionFeatureIds} />
       }
     />
   )
@@ -62,9 +63,16 @@ const AdminSubmissionPage = () => {
     }));
   }
 
+  const submissionFeatureIds: GridRowSelectionModel = Object
+    .values(groupedSubmissionFeatureSelection)
+    .reduce((acc: GridRowSelectionModel, featureIds: GridRowSelectionModel) => {
+
+      return acc.concat(featureIds);
+    }, []);
+
   return (
     <>
-      <SubmissionHeader groupedSubmissionFeatureSelection={groupedSubmissionFeatureSelection} />
+      <SubmissionHeader submissionFeatureIds={submissionFeatureIds} />
       <Container maxWidth="xl">
         <Stack gap={3} sx={{ py: 4 }}>
           {submissionFeatureGroups.map((submissionFeatureGroup) => {

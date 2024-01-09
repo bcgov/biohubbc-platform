@@ -6,10 +6,10 @@ import CompleteSecurityReviewButton from 'features/submissions/components/Publis
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
-import { GroupedSubmissionFeatureSelection } from 'components/security/SecuritiesDialog';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 
 export interface ISubmissionHeaderToolbarProps {
-  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
+  submissionFeatureIds: GridRowSelectionModel
 }
 
 /**
@@ -80,7 +80,7 @@ const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
 
     <Stack flexDirection="row" alignItems="center" gap={1}>
       <ManageSecurity
-        groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection}
+        submissionFeatureIds={props.submissionFeatureIds}
         onClose={() => {
           submissionRecordDataLoader.refresh(submissionContext.submissionId);
           submissionContext.submissionFeatureGroupsDataLoader.refresh(submissionContext.submissionId);

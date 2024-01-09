@@ -91,7 +91,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * been end-dated.
    */
   const getActiveSecurityRules = async (): Promise<ISecurityRule[]> => {
-    const { data } = await axios.get('api/administrative/security');
+    const { data } = await axios.get('api/administrative/security/rules');
     return data;
   };
 
@@ -100,19 +100,9 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * active if it has not been end-dated.
    */
   const getActiveSecurityRulesAndCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
-    const { data } = await axios.get('api/administrative/security/category/fetch');
+    // TODO confirm if the JSDOC for this function is actually true...
+    const { data } = await axios.get('api/administrative/security/categories');
     return data;
-  };
-
-  const addSecurityRule = async (newRule: {
-    name: string;
-    description: string;
-    record_effective_date: string;
-    record_end_date?: string;
-  }): Promise<number> => {
-    await axios.post('api/administrative/security', {});
-    // new item id
-    return 1;
   };
 
   /**
@@ -125,9 +115,10 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @return {*}  {Promise<any[]>}
    */
   const applySecurityRulesToSubmissionFeatures = async (
+    submissionId: number,
     featureSecurityRulesPath: IPatchFeatureSecurityRules
   ): Promise<ISubmissionFeatureSecurityRecord[]> => {
-    const { data } = await axios.patch('api/administrative/security/apply', featureSecurityRulesPath);
+    const { data } = await axios.patch(`api/administrative/security/submission/${submissionId}`, featureSecurityRulesPath);
 
     return data;
   };
@@ -140,7 +131,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<any[]>}
    */
-  const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
+  const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => { // TODO delete this function
     const { data } = await axios.post('api/administrative/security/remove', {
       features: submissionFeatureIds
     });
@@ -151,15 +142,32 @@ const useSecurityApi = (axios: AxiosInstance) => {
   /**
    * Retrieves the list of all security rule IDs associated with the list of given submission feature IDs
    *
+   * @deprecated Not supported. You can retrieve the list of all security rule IDs associated with all of the
+   * features belonging to a particular submission using `getAllSecurityRulesForSubmission`
+   * 
    * @param {number[]} features
    * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
    */
-  const getSecurityRulesForSubmissionFeatures = async (
-    features: number[]
+  const getSecurityRulesForSubmissionFeatures = async ( // TODO delete this function
+    submissionFeatureIds: number[]
   ): Promise<ISubmissionFeatureSecurityRecord[]> => {
     const { data } = await axios.post('api/administrative/security/fetch', {
-      features
+      submissionFeatureIds
     });
+
+    return data;
+  };
+
+  /**
+   * Retrieves the list of all security rule IDs associated with the features belonging to the given submission.
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
+   */
+  const getAllSecurityRulesForSubmission = async (
+    submissionId: number
+  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
+    const { data } = await axios.get(`api/administrative/security/submission/${submissionId}`);
 
     return data;
   };
@@ -169,10 +177,10 @@ const useSecurityApi = (axios: AxiosInstance) => {
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
     getActiveSecurityRules,
-    addSecurityRule,
     applySecurityRulesToSubmissionFeatures,
     removeSecurityRulesFromSubmissionFeatures,
     getSecurityRulesForSubmissionFeatures,
+    getAllSecurityRulesForSubmission,
     getActiveSecurityRulesAndCategories
   };
 };

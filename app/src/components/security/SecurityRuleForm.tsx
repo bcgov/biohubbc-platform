@@ -5,7 +5,7 @@ import Autocomplete, { createFilterOptions } from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
-import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
+import { ISecurityRuleAndCategory, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
 import { useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
@@ -13,18 +13,25 @@ import { alphabetizeObjects } from 'utils/Utils';
 import yup from 'utils/YupSchema';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
-import { GroupedSubmissionFeatureSelection } from './SecuritiesDialog';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 
+/**
+ * Form data that represents the security state of all selected security rules
+ *
+ * @export
+ * @interface ISecurityRuleForm
+ */
 export interface ISecurityRuleForm {
-  rules: ISecurityRuleAndCategory[];
+  securityAppliedRule: ISubmissionFeatureSecurityRecord[];
+  diff: never; // TODO
 }
 
 export const SecurityRuleFormYupSchema = yup.object().shape({
-  rules: yup.array(yup.object())
+  // rules: yup.array(yup.object()) // TODO
 });
 
-interface ISecurityRuleFormProps {
-  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
+export interface ISecurityRuleFormProps {
+  submissionFeatureIds: GridRowSelectionModel
 }
 
 const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
@@ -36,14 +43,14 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
   // List of all potential security rules
   const securityRules = submissionContext.allSecurityRulesStaticListDataLoader.data || [];
 
-  const hasNoSecuritySelected = !formikProps.values.rules.length;
+  const hasNoSecuritySelected = !formikProps.values.securityAppliedRule.length;
 
   const handleAdd = (selected: ISecurityRuleAndCategory) => {
-    formikProps.setFieldValue(`rules[${formikProps.values.rules.length}]`, selected);
+    formikProps.setFieldValue(`rules[${formikProps.values.securityAppliedRule.length}]`, selected);
   };
 
   const handleRemove = (idToRemove: number) => {
-    const formData = formikProps.values.rules;
+    const formData = formikProps.values.securityAppliedRule;
     const filteredData = formData.filter((item) => item.security_rule_id !== idToRemove);
     formikProps.setFieldValue('rules', filteredData);
   };
@@ -76,7 +83,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
                 stringify: (option) => option.name + option.category_name
               });
               const unselectedOptions = options.filter(
-                (item) => !formikProps.values.rules.some((existing) => existing.security_rule_id === item.security_rule_id)
+                (item) => !formikProps.values.securityAppliedRule.some((existing) => existing.security_rule_id === item.security_rule_id)
               );
               return searchFilter(unselectedOptions, state);
             }}
@@ -131,7 +138,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
           />
         </Box>
         <Stack component={TransitionGroup} gap={1} mt={1}>
-          {formikProps.values.rules.map((rule: ISecurityRuleAndCategory) => {
+          {/* {formikProps.values.rules.map((rule: ISecurityRuleAndCategory) => {
             return (
               <Collapse key={rule.security_rule_id}>
                 <SecurityRuleActionCard
@@ -143,7 +150,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
                 />
               </Collapse>
             );
-          })}
+          })} */}
         </Stack>
         {hasNoSecuritySelected && (
           <Alert severity="error" sx={{ marginTop: 1 }}>

@@ -3,10 +3,11 @@ import Icon from '@mdi/react';
 import { Button } from '@mui/material';
 import { useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
-import SecuritiesDialog, { GroupedSubmissionFeatureSelection } from './SecuritiesDialog';
+import SecuritiesDialog from './SecuritiesDialog';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 
 interface IManageSecurityProps {
-  groupedSubmissionFeatureSelection: GroupedSubmissionFeatureSelection;
+  submissionFeatureIds: GridRowSelectionModel
   onClose: () => void;
 }
 
@@ -20,7 +21,7 @@ const ManageSecurity = (props: IManageSecurityProps) => {
   return (
     <>
       <SecuritiesDialog
-        groupedSubmissionFeatureSelection={props.groupedSubmissionFeatureSelection}
+        submissionFeatureIds={props.submissionFeatureIds}
         open={isSecuritiesDialogOpen}
         onClose={() => {
           props.onClose();
