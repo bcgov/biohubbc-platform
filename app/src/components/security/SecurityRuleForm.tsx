@@ -14,6 +14,7 @@ import yup from 'utils/YupSchema';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
+import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 
 /**
  * Form data that represents the security state of all selected security rules
@@ -23,7 +24,7 @@ import { GridRowSelectionModel } from '@mui/x-data-grid';
  */
 export interface ISecurityRuleForm {
   securityAppliedRule: ISubmissionFeatureSecurityRecord[];
-  diff: never; // TODO
+  diff: IPatchFeatureSecurityRules;
 }
 
 export const SecurityRuleFormYupSchema = yup.object().shape({
@@ -39,6 +40,9 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
+  
+  const { allSecurityRulesStaticListDataLoader } = submissionContext;
+  const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
 
   // List of all potential security rules
   const securityRules = submissionContext.allSecurityRulesStaticListDataLoader.data || [];

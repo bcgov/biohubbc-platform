@@ -87,7 +87,7 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
    * to the current submission.
    */
   const submissionFeaturesAppliedRulesDataLoader = useDataLoader(() => {
-    return api.security.getSecurityRulesForSubmissionFeatures(allSubmissionFeatureIds);
+    return api.security.getAllSecurityRulesForSubmission(submissionId);
   });
 
   const urlParams = useParams();

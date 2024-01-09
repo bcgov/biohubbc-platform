@@ -18,8 +18,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const dialogContext = useDialogContext();
 
   const submissionContext = useSubmissionContext();
-  const { allSecurityRulesStaticListDataLoader, submissionFeaturesAppliedRulesDataLoader } = submissionContext;
-  // const allSecurityRules = allSecurityRulesStaticListDataLoader.data || []; // TODO possibly remove? 
+  const { submissionFeaturesAppliedRulesDataLoader } = submissionContext;
 
   const initialAppliedSecurityRules = submissionFeaturesAppliedRulesDataLoader.data || [];
   const hasSecurity = Boolean(initialAppliedSecurityRules.length);
