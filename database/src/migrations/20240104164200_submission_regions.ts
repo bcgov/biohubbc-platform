@@ -55,8 +55,43 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN region_lookup.revision_count IS 'Revision count used for concurrency control.';
     COMMENT ON TABLE region_lookup IS 'Lookup table for regions.';
 
+    CREATE TABLE submission_regions (
+      submission_id   integer             NOT NULL,
+      region_id       integer             NOT NULL,
+      create_date     timestamptz(6)      DEFAULT now() NOT NULL,
+      create_user     integer             NOT NULL,
+      update_date     timestamptz(6),
+      update_user     integer,
+      revision_count  integer             DEFAULT 0 NOT NULL,
+      CONSTRAINT submission_region_pk PRIMARY KEY (submission_id, region_id)
+    );
+
+    COMMENT ON COLUMN submission_regions.submission_id IS 'A Foreign key that points to submissions.';
+    COMMENT ON COLUMN submission_regions.region_id IS 'A foreign key that points to regions to associate to submissions.';
+    COMMENT ON COLUMN submission_regions.create_date IS 'The date time the record was created.';
+    COMMENT ON COLUMN submission_regions.create_user IS 'The id of the user who created the record.';
+    COMMENT ON COLUMN submission_regions.update_date IS 'The date time the record was updated.';
+    COMMENT ON COLUMN submission_regions.update_user IS 'The id of the user who updated the record.';
+    COMMENT ON COLUMN submission_regions.revision_count IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE submission_regions IS 'A join table for submissions and regions.';
+
+    ----------------------------------------------------------------------------------------
+    -- Create table indexes and constraints
+    ----------------------------------------------------------------------------------------
+    ALTER TABLE submission_regions ADD CONSTRAINT submission_regions_fk1 FOREIGN KEY (submission_id) REFERENCES submission(submission_id);
+    ALTER TABLE submission_regions ADD CONSTRAINT submission_regions_fk2 FOREIGN KEY (region_id) REFERENCES region_lookup(region_id);
+
+    CREATE INDEX submission_regions_fk1 ON submission_regions(submission_id);
+    CREATE INDEX submission_regions_fk2 ON submission_regions(region_id);
+
+    ----------------------------------------------------------------------------------------
+    -- Create table triggers
+    ----------------------------------------------------------------------------------------
     create trigger audit_region_lookup before insert or update or delete on region_lookup for each row execute procedure tr_audit_trigger();
     create trigger journal_region_lookup after insert or update or delete on region_lookup for each row execute procedure tr_journal_trigger();
+
+    create trigger audit_submission_regions before insert or update or delete on submission_regions for each row execute procedure tr_audit_trigger();
+    create trigger journal_submission_regions after insert or update or delete on submission_regions for each row execute procedure tr_journal_trigger();
   `);
 }
 

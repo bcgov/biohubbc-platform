@@ -498,4 +498,8 @@ export class BCGWService {
 
     return regionNames.map((name) => ({ regionName: name, sourceLayer: BcgwWildlifeManagementUnitsLayer }));
   }
+
+  async calculateRegionsForASubmissionId(submissionId: number): Promise<string[]> {
+    return [];
+  }
 }

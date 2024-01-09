@@ -5,7 +5,6 @@ import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
-import { BCGWService } from '../../services/bcgw-service';
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
@@ -119,7 +118,7 @@ export function submissionIntake(): RequestHandler {
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
       const searchIndexService = new SearchIndexService(connection);
-      const layerService = new BCGWService();
+      // const layerService = new BCGWService();
 
       // validate the submission
       if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
@@ -133,12 +132,6 @@ export function submissionIntake(): RequestHandler {
         submission.description,
         serviceClientSystemUser.user_identifier
       );
-      console.log('Dataset -> Properties');
-      const temp = req.body.features[0].properties.geometry.features;
-      const regions = await layerService.getUniqueRegionsForFeatures(temp, connection);
-      console.log('___');
-      console.log('REGIONS');
-      console.log(regions);
 
       // insert each submission feature record
       await submissionService.insertSubmissionFeatureRecords(response.submission_id, submissionFeatures);
