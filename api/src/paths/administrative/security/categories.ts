@@ -1,12 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../../services/security-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SecurityService } from '../../../services/security-service';
+import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/security/category');
+const defaultLog = getLogger('paths/administrative/security/categories');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -23,7 +23,7 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get all active security categories.',
+  description: 'Get all active security rules with their associated categories. A security category is active if it has not been end-dated.',
   tags: ['security'],
   security: [
     {
@@ -40,7 +40,7 @@ GET.apiDoc = {
             items: {
               type: 'object',
               properties: {
-                security_rule_id: {
+                security_category_id: {
                   type: 'number'
                 },
                 name: {
@@ -56,21 +56,22 @@ GET.apiDoc = {
                   type: 'string',
                   nullable: true
                 },
-                security_category_id: {
-                  type: 'number'
-                },
-                category_name: {
+                create_date: {
                   type: 'string'
                 },
-                category_description: {
+                create_user: {
                   type: 'string'
                 },
-                category_record_effective_date: {
-                  type: 'string'
-                },
-                category_record_end_date: {
+                update_date: {
                   type: 'string',
                   nullable: true
+                },
+                update_user: {
+                  type: 'string',
+                  nullable: true
+                },
+                revision_count: {
+                  type: 'number'
                 }
               }
             }
@@ -104,13 +105,13 @@ export function getActiveSecurityCategories(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.getActiveRulesAndCategories();
+      const data = await service.getActiveSecurityCategories();
 
       await connection.commit();
 
       return res.status(200).json(data);
     } catch (error) {
-      defaultLog.error({ label: 'getActiveSecurityRules', message: 'error', error });
+      defaultLog.error({ label: 'getActiveSecurityCategories', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

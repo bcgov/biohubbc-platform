@@ -6,9 +6,9 @@ import { authorizeRequestHandler } from '../../../request-handlers/security/auth
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/security/remove');
+const defaultLog = getLogger('paths/administrative/security/rules');
 
-export const POST: Operation = [
+export const GET: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
@@ -19,39 +19,20 @@ export const POST: Operation = [
       ]
     };
   }),
-  removeSecurityRulesFromSubmissionFeatures()
+  getActiveSecurityRules()
 ];
 
-POST.apiDoc = {
-  description: 'Remove Security for given submission features',
+GET.apiDoc = {
+  description: 'Get all active security rules. A security rule is active if it has not been end-dated.',
   tags: ['security'],
   security: [
     {
       Bearer: []
     }
   ],
-  requestBody: {
-    description: 'Unsecure object.',
-    content: {
-      'application/json': {
-        schema: {
-          type: 'object',
-          properties: {
-            features: {
-              type: 'array',
-              items: {
-                type: 'number'
-              },
-              minItems: 1
-            }
-          }
-        }
-      }
-    }
-  },
   responses: {
     200: {
-      description: 'Features.',
+      description: 'Security Rules.',
       content: {
         'application/json': {
           schema: {
@@ -59,13 +40,37 @@ POST.apiDoc = {
             items: {
               type: 'object',
               properties: {
-                submission_feature_security_id: {
-                  type: 'number'
-                },
-                submission_feature_id: {
-                  type: 'number'
-                },
                 security_rule_id: {
+                  type: 'number'
+                },
+                name: {
+                  type: 'string'
+                },
+                description: {
+                  type: 'string'
+                },
+                record_effective_date: {
+                  type: 'string'
+                },
+                record_end_date: {
+                  type: 'string',
+                  nullable: true
+                },
+                create_date: {
+                  type: 'string'
+                },
+                create_user: {
+                  type: 'number'
+                },
+                update_date: {
+                  type: 'string',
+                  nullable: true
+                },
+                update_user: {
+                  type: 'number',
+                  nullable: true
+                },
+                revision_count: {
                   type: 'number'
                 }
               }
@@ -92,7 +97,7 @@ POST.apiDoc = {
   }
 };
 
-export function removeSecurityRulesFromSubmissionFeatures(): RequestHandler {
+export function getActiveSecurityRules(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
@@ -100,13 +105,13 @@ export function removeSecurityRulesFromSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.removeSecurityRulesFromSubmissionFeatures(req.body.features);
+      const data = await service.getActiveSecurityRules();
 
       await connection.commit();
 
       return res.status(200).json(data);
     } catch (error) {
-      defaultLog.error({ label: 'removeSecurityRulesFromSubmissionFeatures', message: 'error', error });
+      defaultLog.error({ label: 'getActiveSecurityRules', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

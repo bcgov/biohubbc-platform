@@ -376,12 +376,28 @@ export class SecurityService extends DBService {
   /**
    * Gets Submission Feature Security Records for a given set of submission feature ids
    *
-   * @param {number[]} features
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityService
    */
-  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.getSecurityRulesForSubmissionFeatures(features);
+  async getSecurityRulesForSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!submissionFeatureIds.length) {
+      // no features, return early
+      return [];
+    }
+
+    return this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
+  }
+
+  /**
+   * Gets all Security Records for all featues belonging to the given submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
+  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.getAllSecurityRulesForSubmission(submissionId);
   }
 
   /**
@@ -407,7 +423,8 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Gets a list of all active security categories
+   * Gets a list of all active security categories. A security category is active if it has 
+   * not been end-dated.
    *
    * @return {*}  {Promise<SecurityCategoryRecord[]>}
    * @memberof SecurityService

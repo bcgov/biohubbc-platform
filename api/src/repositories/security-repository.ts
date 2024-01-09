@@ -288,7 +288,8 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Get all active security categories
+   * Get all active security categories. A security category is active if it has not been
+   * end-dated.
    *
    * @return {*}  {Promise<SecurityCategoryRecord[]>}
    * @memberof SecurityRepository
@@ -423,22 +424,41 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Gets Submission Feature Security Records for a given set of submission features
    *
-   * @param {number[]} features
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!features.length) {
-      // no features, return early
-      return [];
-    }
-    const sql = SQL`
-      SELECT * FROM submission_feature_security WHERE submission_feature_id IN (`;
+  async getSecurityRulesForSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+    const queryBuilder = getKnex()
+      .select('*')
+      .from('submission_feature_security')
+      .whereIn('submission_feature_id', submissionFeatureIds);
 
-    sql.append(features.join(', '));
-    sql.append(`);`);
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
-    const response = await this.connection.sql(sql, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Gets Submission Feature Security Records for a given set of submission features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
+    const queryBuilder = getKnex()
+      .select('*')
+      .from('submission_feature_security')
+      .whereIn('submission_feature_id', (subQuery) => {
+        return subQuery
+          .select('submission_feature_id')
+          .from('submission_feature')
+          .where('submission_id', submissionId);
+      });
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+
     return response.rows;
   }
 }
