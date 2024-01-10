@@ -1144,11 +1144,15 @@ describe('SubmissionService', () => {
       submissionFeatureObj: { key: 'a', value: 'b' }
     };
 
-    it('should call admin repository when isAdmin == true', async () => {
+    it.only('should call admin repository when isAdmin == true', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const getAdminSubmissionFeatureSignedUrlStub = sinon
         .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
+        .resolves('KEY');
+
+      const getSubmissionFeatureSignedUrlStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
         .resolves('KEY');
 
       const submissionService = new SubmissionService(mockDBConnection);
@@ -1156,6 +1160,7 @@ describe('SubmissionService', () => {
       await submissionService.getSubmissionFeatureSignedUrl(payload);
 
       expect(getAdminSubmissionFeatureSignedUrlStub).to.be.calledOnceWith(payload);
+      expect(getSubmissionFeatureSignedUrlStub).to.not.be.called;
     });
 
     it('should call regular user repository when isAdmin == false', async () => {
@@ -1165,11 +1170,16 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
         .resolves('KEY');
 
+      const getAdminSubmissionFeatureSignedUrlStub = sinon
+        .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
+        .resolves('KEY');
+
       const submissionService = new SubmissionService(mockDBConnection);
 
       await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
 
       expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
+      expect(getAdminSubmissionFeatureSignedUrlStub).to.not.be.called;
     });
 
     it('should return signed url if no error', async () => {

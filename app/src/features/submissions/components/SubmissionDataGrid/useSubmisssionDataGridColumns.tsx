@@ -23,7 +23,7 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
 
   const featureTypeWithProperties =
     featureTypesWithProperties?.find((item) => item.feature_type['name'] === featureTypeName)
-      ?.feature_type_properties || [];
+      ?.feature_type_properties ?? [];
 
   const fieldColumns = featureTypeWithProperties.map((featureType: IFeatureTypeProperties) => {
     if (featureType.type === 's3_key') {

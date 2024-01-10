@@ -1710,7 +1710,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it.only('should throw an error when insert sql fails', async () => {
+    it('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -1755,7 +1755,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it.only('should throw an error when insert sql fails', async () => {
+    it('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
