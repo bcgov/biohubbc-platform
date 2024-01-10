@@ -1,4 +1,5 @@
 import { Box, Typography } from '@mui/material';
+import { ReactNode } from 'react';
 
 export interface ISecurityRuleCardProps {
   key?: string | number;
@@ -6,6 +7,7 @@ export interface ISecurityRuleCardProps {
   category: string;
   description: string;
   featureMembers?: string[];
+  actionContent?: ReactNode;
 }
 const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
   return (
@@ -39,6 +41,7 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
         }}>
         {props.description}
       </Typography>
+      {props.actionContent}
       {props.featureMembers && props.featureMembers?.length && (
         <Box component='ul' pl={4} mb={0} mt={1}>
           {props.featureMembers.map((featureMember) => (

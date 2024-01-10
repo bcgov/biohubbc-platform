@@ -101,7 +101,7 @@ const SecurityRuleForm = () => {
   console.log({ groupedAppliedSecurityRules })
   console.log({ test: submissionFeatureGroupsDataLoader.data })
 
-  const [appliedRules, unappliedRules] = useMemo(() => {
+  const [previouslyAppliedRules, previosulyUnappliedRules] = useMemo(() => {
     const applied: ISecurityRuleAndCategory[] = [];
     const unapplied: ISecurityRuleAndCategory[] = [];
 
@@ -116,13 +116,36 @@ const SecurityRuleForm = () => {
     return [applied, unapplied];
   }, [allSecurityRules]) // TODO Deps
 
-  const stageForApply = (securityRule: ISecurityRuleAndCategory) => {
-    formikProps.setFieldValue('applyRuleIds', [...formikProps.values.applyRuleIds, securityRule.security_rule_id])
+  const stageForApply = (securityRuleId: ISecurityRuleAndCategory['security_rule_id']) => {
+    if (formikProps.values.applyRuleIds.includes(securityRuleId)) {
+      formikProps.setFieldValue('applyRuleIds', formikProps.values.applyRuleIds.filter((value) => value !== securityRuleId))
+    } else {
+      formikProps.setFieldValue('applyRuleIds', [...formikProps.values.applyRuleIds, securityRuleId])
+    }
   }
 
-  const hasNoSecuritySelected = !initialAppliedSecurityRules.length;
+  const toggleStageRemove = (securityRuleId: ISecurityRuleAndCategory['security_rule_id']) => {
+    if (formikProps.values.removeRuleIds.includes(securityRuleId)) {
+      formikProps.setFieldValue('removeRuleIds', formikProps.values.removeRuleIds.filter((value) => value !== securityRuleId))
+    } else {
+      formikProps.setFieldValue('removeRuleIds', [...formikProps.values.removeRuleIds, securityRuleId]);
+    }
+  }
 
-  console.log({appliedRules, unappliedRules})
+  const applyRulesAvailableOptions = useMemo(() => {
+    return alphabetizeObjects(
+      previosulyUnappliedRules.filter((securityRule) => !formikProps.values.applyRuleIds.includes(securityRule.security_rule_id)),
+      'name'
+    );
+  }, [previosulyUnappliedRules, formikProps.values.applyRuleIds]);
+
+  // TODO
+  // const applyRuleSelectedOptions = useMemo(() => {
+  //   return formikProps.values.applyRuleIds
+  //     .map((ruleId) => allSecurityRules.find((securityRule) => securityRule.security_rule_id === ruleId)
+  // }, [])
+
+  const hasNoSecuritySelected = !initialAppliedSecurityRules.length;
 
   return (
     <form onSubmit={formikProps.handleSubmit}>
@@ -145,14 +168,14 @@ const SecurityRuleForm = () => {
             clearOnBlur
             loading={submissionContext.allSecurityRulesStaticListDataLoader.isLoading}
             noOptionsText="No records found"
-            options={alphabetizeObjects(unappliedRules, 'name')}
+            options={applyRulesAvailableOptions}
             filterOptions={(options, state) => {
               const searchFilter = createFilterOptions<ISecurityRuleAndCategory>({
                 ignoreCase: true,
                 matchFrom: 'any',
                 stringify: (option) => option.name + option.category_name
               });
-              return searchFilter(unappliedRules, state);
+              return searchFilter(applyRulesAvailableOptions, state);
             }}
             getOptionLabel={(option) => option.name}
             isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
@@ -166,7 +189,7 @@ const SecurityRuleForm = () => {
             }}
             onChange={(_, option) => {
               if (option) {
-                stageForApply(option);
+                stageForApply(option.security_rule_id);
               }
             }}
             renderInput={(params) => (
@@ -204,7 +227,7 @@ const SecurityRuleForm = () => {
             }}
           />
         </Box>
-        <p>{JSON.stringify({ applyRuleIds: formikProps.values.applyRuleIds })}</p>
+        {/* TODO add newly applied rules */}
 
         <Box mt={3}>
           <Typography variant='h6'>Previously Applied Rules</Typography>
@@ -214,11 +237,15 @@ const SecurityRuleForm = () => {
             return (
               <Collapse key={group.securityRule.security_rule_id}>
                 <SecurityRuleActionCard
+                  action={formikProps.values.removeRuleIds.includes(group.securityRule.security_rule_id)
+                    ? 'remove'
+                    : 'persist'
+                  }
                   title={group.securityRule.name}
                   category={group.securityRule.category_name}
                   description={group.securityRule.description}
                   featureMembers={group.appliedFeatureGroups.map((featureGroup) => `${featureGroup.displayName} (${featureGroup.numFeatures})`)}
-                  onRemove={() => {}}
+                  onRemove={() => toggleStageRemove(group.securityRule.security_rule_id)}
                 />
               </Collapse>
             );
