@@ -58,7 +58,7 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
   const api = useApi();
 
   // Retrieves the static list of all security rules that could be applied to a submission feature
-  const allSecurityRulesStaticListDataLoader = useDataLoader(api.security.getActiveSecurityRulesAndCategories);
+  const allSecurityRulesStaticListDataLoader = useDataLoader(api.security.getActiveSecurityRulesWithCategories);
 
   // Retrieves the submission record, including security metadata
   const submissionRecordDataLoader = useDataLoader(api.submissions.getSubmissionRecordWithSecurity);

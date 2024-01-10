@@ -87,21 +87,12 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Gets a list of all active security rules. A security rule is active if it has not
-   * been end-dated.
-   */
-  const getActiveSecurityRules = async (): Promise<ISecurityRule[]> => {
-    const { data } = await axios.get('api/administrative/security/rules');
-    return data;
-  };
-
-  /**
    * Gets a list of all active security rules with associated categories. A security rule is
    * active if it has not been end-dated.
    */
-  const getActiveSecurityRulesAndCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
+  const getActiveSecurityRulesWithCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
     // TODO confirm if the JSDOC for this function is actually true...
-    const { data } = await axios.get('api/administrative/security/categories');
+    const { data } = await axios.get('api/administrative/security/rules');
     return data;
   };
 
@@ -176,12 +167,11 @@ const useSecurityApi = (axios: AxiosInstance) => {
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
-    getActiveSecurityRules,
     applySecurityRulesToSubmissionFeatures,
     removeSecurityRulesFromSubmissionFeatures,
     getSecurityRulesForSubmissionFeatures,
     getAllSecurityRulesForSubmission,
-    getActiveSecurityRulesAndCategories
+    getActiveSecurityRulesWithCategories
   };
 };
 

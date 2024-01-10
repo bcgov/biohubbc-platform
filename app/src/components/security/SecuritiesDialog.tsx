@@ -21,8 +21,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const submissionContext = useSubmissionContext();
   const { submissionFeaturesAppliedRulesDataLoader } = submissionContext;
 
-  const initialAppliedSecurityRules = submissionFeaturesAppliedRulesDataLoader.data || [];
-  const hasSecurity = Boolean(initialAppliedSecurityRules.length);
+  const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
 
   const handleSave = async (values: IPatchFeatureSecurityRules) => {
     try {
@@ -71,7 +70,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onCancel={props.onClose}
       onSave={handleSave}
       component={{
-        element: <SecurityRuleForm initialAppliedSecurityRules={initialAppliedSecurityRules} />,
+        element: <SecurityRuleForm />,
         initialValues: { submissionFeatureIds: props.submissionFeatureIds, removeRuleIds: [], applyRuleIds: [] },
         validationSchema: SecurityRuleFormYupSchema
       }}

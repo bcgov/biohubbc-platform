@@ -1,9 +1,11 @@
 import { Box, Typography } from '@mui/material';
 
-interface ISecurityRuleCardProps {
+export interface ISecurityRuleCardProps {
+  key?: string | number;
   title: string;
   category: string;
-  subtitle: string;
+  description: string;
+  featureMembers?: string[];
 }
 const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
   return (
@@ -35,8 +37,23 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
           overflow: 'hidden',
           textOverflow: 'ellipsis'
         }}>
-        {props.subtitle}
+        {props.description}
       </Typography>
+      {props.featureMembers && props.featureMembers?.length && (
+        <Box component='ul' pl={4} mb={0} mt={1}>
+          {props.featureMembers.map((featureMember) => (
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              sx={{
+
+              }}
+              component='li'>
+              {featureMember}
+            </Typography>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };

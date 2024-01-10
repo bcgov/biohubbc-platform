@@ -13,60 +13,95 @@ import { alphabetizeObjects } from 'utils/Utils';
 import yup from 'utils/YupSchema';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
+
 import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
+
 
 export const SecurityRuleFormYupSchema = yup.object().shape({
   // rules: yup.array(yup.object()) // TODO
 });
 
-export interface ISecurityRuleFormProps {
-  initialAppliedSecurityRules: ISubmissionFeatureSecurityRecord[]
-}
+// export interface ISecurityRuleFormProps { // ODO not needed anymore?
+//   initialAppliedSecurityRules: ISubmissionFeatureSecurityRecord[]
+// }
 
 interface IAppliedSecurityRuleGroup {
-  securityRuleId: number;
+  securityRule: ISecurityRuleAndCategory;
   submissionFeatureIds: number[];
+  appliedFeatureGroups: { displayName: string, numFeatures: number }[]
 }
 
-const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
+const SecurityRuleForm = () => {
   const formikProps = useFormikContext<IPatchFeatureSecurityRules>();
   const [searchText, setSearchText] = useState('');
 
   const submissionContext = useSubmissionContext();
 
   // List all potential security rules
-  const { allSecurityRulesStaticListDataLoader } = submissionContext;
+  const {
+    allSecurityRulesStaticListDataLoader, 
+    submissionFeaturesAppliedRulesDataLoader,
+    submissionFeatureGroupsDataLoader
+  } = submissionContext;
 
-  const hasNoSecuritySelected = !props.initialAppliedSecurityRules.length;
+  const allSecurityRules = useMemo(() => {
+    return allSecurityRulesStaticListDataLoader.data ?? [];
+  }, [allSecurityRulesStaticListDataLoader.data]);
 
+  const initialAppliedSecurityRules = useMemo(() => {
+    return submissionFeaturesAppliedRulesDataLoader.data ?? []
+  }, [submissionFeaturesAppliedRulesDataLoader.data]);
+
+  /**
+   * An aggregate of all security rules that have been applied to one or more of the selected features,
+   * in addition to all of the features IDs and features types (with counts) that belong to each rule.
+   */
   const groupedAppliedSecurityRules: IAppliedSecurityRuleGroup[] = useMemo(() => {
-    return props
-      .initialAppliedSecurityRules
-      .reduce((groups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
-        const groupIndex = groups.findIndex((group) => group.securityRuleId === securityRecord.security_rule_id)
+    return initialAppliedSecurityRules.reduce((ruleGroups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
+      const ruleGroupIndex = ruleGroups.findIndex((ruleGroup) => ruleGroup.securityRule.security_rule_id === securityRecord.security_rule_id)
 
-        if (groupIndex === -1) {
-          groups.push({
-            securityRuleId: securityRecord.security_rule_id,
-            submissionFeatureIds: [securityRecord.submission_feature_id]
+      const featureGroupDisplayName = (submissionFeatureGroupsDataLoader.data ?? [])
+        .find((featureGroup) => {
+          return featureGroup.features.some((feature) => feature.submission_feature_id === securityRecord.submission_feature_id)
+        })
+        ?.feature_type_display_name || 'Other'
+
+      if (ruleGroupIndex === -1) {
+        const securityRule = allSecurityRules.find((securityRule) => securityRule.security_rule_id === securityRecord.security_rule_id);
+        if (securityRule) {
+          ruleGroups.push({
+            securityRule,
+            submissionFeatureIds: [securityRecord.submission_feature_id],
+            appliedFeatureGroups: [{ displayName: featureGroupDisplayName, numFeatures: 1 }]
           })
-        } else {
-          groups[groupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id)
         }
+      } else {
+        ruleGroups[ruleGroupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id);
 
-        return groups;
-      }, []);
-    }, [props.initialAppliedSecurityRules]);
+        const featureGroupIndex = ruleGroups[ruleGroupIndex].appliedFeatureGroups.findIndex((featureGroup) => {
+          return featureGroup.displayName === featureGroupDisplayName
+        });
 
-  console.log({ groupedAppliedSecurityRules, allSecurityRulesStaticListData: allSecurityRulesStaticListDataLoader.data })
+        if (featureGroupIndex === -1) {
+          ruleGroups[ruleGroupIndex].appliedFeatureGroups.push({ displayName: featureGroupDisplayName, numFeatures: 1 })
+        } else {
+          ruleGroups[ruleGroupIndex].appliedFeatureGroups[featureGroupIndex].numFeatures ++;
+        }
+      }
+
+      return ruleGroups;
+    }, []);
+  }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
+
+  console.log({ groupedAppliedSecurityRules })
+  console.log({ test: submissionFeatureGroupsDataLoader.data })
 
   const [appliedRules, unappliedRules] = useMemo(() => {
     const applied: ISecurityRuleAndCategory[] = [];
     const unapplied: ISecurityRuleAndCategory[] = [];
 
-    (allSecurityRulesStaticListDataLoader.data ?? []).forEach((securityRule) => {
-      if (groupedAppliedSecurityRules.some((group) => group.securityRuleId === securityRule.security_rule_id)) {
+    allSecurityRules.forEach((securityRule) => {
+      if (groupedAppliedSecurityRules.some((group) => group.securityRule.security_rule_id === securityRule.security_rule_id)) {
         applied.push(securityRule);
       } else {
         unapplied.push(securityRule);
@@ -74,11 +109,13 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
     });
 
     return [applied, unapplied];
-  }, [allSecurityRulesStaticListDataLoader.data]) // TODO Deps
+  }, [allSecurityRules]) // TODO Deps
 
   const stageForApply = (securityRule: ISecurityRuleAndCategory) => {
     formikProps.setFieldValue('applyRuleIds', [...formikProps.values.applyRuleIds, securityRule.security_rule_id])
   }
+
+  const hasNoSecuritySelected = !initialAppliedSecurityRules.length;
 
   console.log({appliedRules, unappliedRules})
 
@@ -93,7 +130,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
           }}>
           Specify reasons why this information should be secured.
         </Typography>
-        <Typography variant='body2'>{JSON.stringify(props)}</Typography>
+
         <Box mt={3}>
           <Typography variant='h6'>Apply a New Rule</Typography>
           <Autocomplete
@@ -155,7 +192,7 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
                   <SecurityRuleCard
                     title={renderOption.name}
                     category={renderOption.category_name}
-                    subtitle={renderOption.description}
+                    description={renderOption.description}
                   />
                 </ListItem>
               );
@@ -168,20 +205,19 @@ const SecurityRuleForm = (props: ISecurityRuleFormProps) => {
           <Typography variant='h6'>Previously Applied Rules</Typography>
         </Box>
         <Stack component={TransitionGroup} gap={1} mt={1}>
-          uhhhh
-          {/* {formikProps.values.rules.map((rule: ISecurityRuleAndCategory) => {
+          {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {
             return (
-              <Collapse key={rule.security_rule_id}>
+              <Collapse key={group.securityRule.security_rule_id}>
                 <SecurityRuleActionCard
-                  security_rule_id={rule.security_rule_id}
-                  name={rule.name}
-                  category={rule.category_name}
-                  description={rule.description}
-                  remove={handleRemove}
+                  title={group.securityRule.name}
+                  category={group.securityRule.category_name}
+                  description={group.securityRule.description}
+                  featureMembers={group.appliedFeatureGroups.map((featureGroup) => `${featureGroup.displayName} (${featureGroup.numFeatures})`)}
+                  onRemove={() => {}}
                 />
               </Collapse>
             );
-          })} */}
+          })}
         </Stack>
         {hasNoSecuritySelected && (
           <Alert severity="error" sx={{ marginTop: 1 }}>
