@@ -2,9 +2,10 @@ import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
-import SecurityRuleForm, { SecurityRuleFormYupSchema } from './SecurityRuleForm';
+import SecurityRuleForm from './SecurityRuleForm';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
+import yup from 'utils/YupSchema';
 
 
 
@@ -71,8 +72,8 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onSave={handleSave}
       component={{
         element: <SecurityRuleForm />,
-        initialValues: { submissionFeatureIds: props.submissionFeatureIds, removeRuleIds: [], applyRuleIds: [] },
-        validationSchema: SecurityRuleFormYupSchema
+        initialValues: { submissionFeatureIds: props.submissionFeatureIds, stagedForRemove: [], stagedForApply: [] },
+        validationSchema: yup.object()
       }}
     />
   );

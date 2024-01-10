@@ -28,9 +28,9 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
         {...rest}
         actionContent={
           props.action === 'apply'
-            ? <FormHelperText color='info'>Will be applied to all features</FormHelperText>
+            ? <FormHelperText sx={(theme) => ({ color: theme.palette.info.dark })}>Will be applied to all features</FormHelperText>
             : (props.action === 'remove'
-              ? <FormHelperText error sx={{ color: 'error' }}>Will be removed from all features</FormHelperText>
+              ? <FormHelperText sx={(theme) => ({ color: theme.palette.error.main })}>Will be removed from all features</FormHelperText>
               : <></>
             )
         }
