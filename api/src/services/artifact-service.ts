@@ -3,6 +3,7 @@ import { ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchIndexRepository } from '../repositories/search-index-respository';
 import { SecurityRepository } from '../repositories/security-repository';
+import { SubmissionFeatureRecord } from '../repositories/submission-repository';
 import { deleteFileFromS3, generateSubmissionFeatureS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { CodeService } from './code-service';
@@ -55,10 +56,13 @@ export class ArtifactService extends DBService {
    *
    * @param {string} artifactUploadKey
    * @param {Express.Multer.File} file
-   * @return {*}  {Promise<void>}
+   * @return {*}  {Promise<SubmissionFeatureRecord>}
    * @memberof ArtifactService
    */
-  async uploadSubmissionFeatureArtifact(artifactUploadKey: string, file: Express.Multer.File): Promise<void> {
+  async uploadSubmissionFeatureArtifact(
+    artifactUploadKey: string,
+    file: Express.Multer.File
+  ): Promise<SubmissionFeatureRecord> {
     const artifactFeatureSubmission = await this.submissionService.getSubmissionFeatureByUuid(artifactUploadKey);
 
     // Generate S3 key
@@ -87,6 +91,8 @@ export class ArtifactService extends DBService {
 
     // Upload artifact to S3
     await uploadFileToS3(file, artifactS3Key, { filename: file.originalname });
+
+    return artifactFeatureSubmission;
   }
 
   /**

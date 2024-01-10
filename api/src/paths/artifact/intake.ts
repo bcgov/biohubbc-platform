@@ -70,11 +70,11 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['artifact_id'],
+            required: ['artifact_uuid'],
             properties: {
-              artifact_id: {
-                type: 'integer',
-                minimum: 1
+              artifact_uuid: {
+                type: 'string',
+                format: 'uuid'
               }
             }
           }
@@ -114,9 +114,9 @@ export function intakeArtifact(): RequestHandler {
 
       const artifactService = new ArtifactService(connection);
 
-      const response = await artifactService.uploadSubmissionFeatureArtifact(artifactUploadKey, file);
+      const artifactSubmissionFeature = await artifactService.uploadSubmissionFeatureArtifact(artifactUploadKey, file);
 
-      res.status(200).json(response);
+      res.status(200).json({ artifact_uuid: artifactSubmissionFeature.uuid });
 
       await connection.commit();
     } catch (error) {

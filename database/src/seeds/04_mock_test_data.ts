@@ -261,21 +261,21 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
   return `
     INSERT INTO submission
     (
-        uuid,
+        source_id,
+        system_user_id,
         name,
         description,
         security_review_timestamp,
-        publish_timestamp,
-        source_system
+        publish_timestamp
     )
     values
     (
         public.gen_random_uuid(),
+        (SELECT system_user_id from system_user where user_identifier = 'SIMS'),
         $$${faker.company.name()}$$,
         $$${faker.lorem.words({ min: 5, max: 100 })}$$,
         ${securityReviewTimestamp},
-        ${publishTimestamp},
-        'SIMS'
+        ${publishTimestamp}
     )
     RETURNING submission_id;
 `;
@@ -292,6 +292,7 @@ const insertSubmissionFeature = (options: {
         submission_id,
         parent_submission_feature_id,
         feature_type_id,
+        source_id,
         data,
         record_effective_date
     )
@@ -300,6 +301,7 @@ const insertSubmissionFeature = (options: {
         ${options.submission_id},
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
+        public.gen_random_uuid(),
         ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
         now()
     )

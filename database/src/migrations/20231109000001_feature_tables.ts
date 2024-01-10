@@ -21,7 +21,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE submission_feature(
       submission_feature_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      uuid                           uuid              GENERATED ALWAYS AS public.gen_random_uuid(),
+      uuid                           uuid              DEFAULT public.gen_random_uuid(),
       submission_id                  integer           NOT NULL,
       feature_type_id                integer           NOT NULL,
       source_id                      varchar(100)      NOT NULL,

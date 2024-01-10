@@ -28,7 +28,7 @@ COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire 
 
 CREATE TABLE submission(
     submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    uuid                        uuid              GENERATED ALWAYS AS public.gen_random_uuid(),
+    uuid                        uuid              DEFAULT public.gen_random_uuid(),
     source_id                   varchar(100)      NOT NULL,
     system_user_id              integer           NOT NULL,
     security_review_timestamp   timestamptz(6),
