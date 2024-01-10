@@ -24,7 +24,7 @@ export interface IDatasetsForReview {
 export interface ISubmissionFeature {
   id: string;
   type: string;
-  properties: object;
+  properties: Record<string, unknown>;
   features: ISubmissionFeature[];
 }
 
@@ -74,8 +74,10 @@ export interface ISubmissionRecord {
 
 export const SubmissionFeatureRecord = z.object({
   submission_feature_id: z.number(),
+  uuid: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
+  source_id: z.string(),
   data: z.record(z.any()),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
@@ -254,6 +256,7 @@ export interface ISubmissionObservationRecord {
 export const SubmissionRecord = z.object({
   submission_id: z.number(),
   uuid: z.string(),
+  source_id: z.string(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
   source_system: z.string(),
@@ -360,38 +363,38 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {string} uuid
+   * @param {string} sourceId
    * @param {string} name
    * @param {string} description
    * @param {string} userIdentifier
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecordWithPotentialConflict(
-    uuid: string,
+    sourceId: string,
     name: string,
     description: string,
     userIdentifier: string
-  ): Promise<{ submission_id: number }> {
+  ): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        uuid,
+        source_id,
         submitted_timestamp,
         name,
         description,
         source_system
       ) VALUES (
-        ${uuid},
+        ${sourceId},
         now(),
         ${name},
         ${description},
         ${userIdentifier}
       )
       RETURNING
-        submission_id;
+        *;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get or insert submission record', [
@@ -406,16 +409,17 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission feature record.
    *
+   * @param {number} submissionFeatureId
    * @param {number} submissionId
-   * @param {ISubmissionFeature} feature
-   * @param {number} featureTypeId
+   * @param {string} featureTypeName
+   * @param {ISubmissionFeature['properties']} featureProperties
    * @return {*}  {Promise<{ submission_feature_id: number }>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
-    featureTypeId: number,
-    feature: ISubmissionFeature['properties']
+    featureTypeName: string,
+    featureProperties: ISubmissionFeature['properties']
   ): Promise<{ submission_feature_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
@@ -425,15 +429,15 @@ export class SubmissionRepository extends BaseRepository {
         record_effective_date
       ) VALUES (
         ${submissionId},
-        ${featureTypeId},
-        ${feature},
+        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName})
+        ${featureProperties},
         now()
       )
       RETURNING
         submission_feature_id;
     `;
 
-    const response = await this.connection.sql<{ submission_feature_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission feature record', [
@@ -1384,6 +1388,91 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
+  }
+
+  /**
+   * Get a submission feature record by uuid.
+   *
+   * @param {string} submissionUuid
+   * @return {*}  {Promise<SubmissionFeatureRecord>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatureByUuid(submissionUuid: string): Promise<SubmissionFeatureRecord> {
+    const sqlStatement = SQL`
+      SELECT
+        *
+      FROM
+        submission_feature
+      WHERE
+        uuid = ${submissionUuid};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission feature record', [
+        'SubmissionRepository->getSubmissionFeatureByUuid',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Find and return all submission feature records that match the provided criteria.
+   *
+   * @param {{
+   *     submissionId?: number;
+   *     systemUserId?: number;
+   *     featureTypeNames?: string[];
+   *     includeDeleted?: boolean;
+   *   }} [criteria]
+   * @return {*}  {Promise<SubmissionFeatureRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async findSubmissionFeatures(criteria?: {
+    submissionId?: number;
+    systemUserId?: number;
+    featureTypeNames?: string[];
+    includeDeleted?: boolean;
+  }): Promise<SubmissionFeatureRecord[]> {
+    const knex = getKnex();
+
+    const queryBuilder = knex.queryBuilder();
+
+    queryBuilder.select().from('submission_feature');
+
+    if (criteria?.submissionId) {
+      // Filter by submitter system user id
+      queryBuilder.where('submission_id', criteria.submissionId);
+    }
+
+    if (criteria?.systemUserId) {
+      // Filter by submitter system user id
+      queryBuilder.where('systemUserId', criteria.systemUserId);
+    }
+
+    if (criteria?.featureTypeNames?.length) {
+      // Filter by feature type names
+      queryBuilder.whereIn('feature_type_id', (qb) => {
+        qb.select('feature_type_id')
+          .from('feature_type')
+          .where(
+            'LOWERCASE(name)',
+            criteria.featureTypeNames?.map((featureTypeName) => featureTypeName.toLowerCase())
+          );
+      });
+    }
+
+    console.log('=========================================');
+    console.log(queryBuilder.toSQL().toNative().sql);
+    console.log(queryBuilder.toSQL().toNative().bindings);
+    console.log('---------------------------------------');
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureRecord);
+
+    return response.rows;
   }
 
   /**

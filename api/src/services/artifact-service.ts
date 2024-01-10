@@ -1,9 +1,11 @@
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
-import { Artifact, ArtifactMetadata, ArtifactRepository } from '../repositories/artifact-repository';
+import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
+import { SearchIndexRepository } from '../repositories/search-index-respository';
 import { SecurityRepository } from '../repositories/security-repository';
-import { deleteFileFromS3, generateArtifactS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import { deleteFileFromS3, generateSubmissionFeatureS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
+import { CodeService } from './code-service';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
 
@@ -49,59 +51,42 @@ export class ArtifactService extends DBService {
   }
 
   /**
-   * Generates an S3 key by the given data package UUID and artifact file, uploads the file to S3, and persists
-   * the artifact in the database.
+   * Generates an S3 key for the artifact, uploads the file to S3, and persists the artifact key in the database.
    *
-   * @param {string} dataPackageId The submission UUID
-   * @param {IArtifactMetadata} metadata Metadata object pertaining to the artifact
-   * @param {string} fileUuid The UUID of the artifact
-   * @param {Express.Multer.File} file The artifact file
-   * @returns {*} {Promise<{ artifact_id: number }>} The primary key of the artifact upon insertion
+   * @param {string} artifactUploadKey
+   * @param {Express.Multer.File} file
+   * @return {*}  {Promise<void>}
    * @memberof ArtifactService
    */
-  async uploadAndPersistArtifact(
-    dataPackageId: string,
-    metadata: ArtifactMetadata,
-    fileUuid: string,
-    file: Express.Multer.File
-  ): Promise<{ artifact_id: number }> {
-    defaultLog.debug({ label: 'uploadAndPersistArtifact' });
+  async uploadSubmissionFeatureArtifact(artifactUploadKey: string, file: Express.Multer.File): Promise<void> {
+    const artifactFeatureSubmission = await this.submissionService.getSubmissionFeatureByUuid(artifactUploadKey);
 
-    // NOTE: Disabled for now, as we are not using the source transform record
-    // Fetch the source transform record for this submission based on the source system user id
-    // const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySystemUserId(
-    //   this.connection.systemUserId()
-    // );
-
-    // Retrieve the next artifact primary key assigned to this artifact once it is inserted
-    const artifact_id = (await this.getNextArtifactIds())[0];
-
-    // Generate the S3 key for the artifact, using the preemptive artifact ID + the package UUID
-    const s3Key = generateArtifactS3FileKey({
-      datasetUUID: dataPackageId,
-      artifactId: artifact_id,
-      fileName: file.originalname
+    // Generate S3 key
+    const artifactS3Key = generateSubmissionFeatureS3FileKey({
+      submissionId: artifactFeatureSubmission.submission_id,
+      submissionFeatureId: artifactFeatureSubmission.submission_feature_id,
+      artifactId: artifactFeatureSubmission.source_id // TODO is this needed. The submission_feature_id should be enough.
     });
 
-    // Create a new submission for the artifact collection
-    const { submission_id } = await this.submissionService.insertSubmissionRecordWithPotentialConflict(
-      dataPackageId,
-      'TODO_Temp',
-      'TODO_Temp',
-      'TODO_Temp'
-    );
+    defaultLog.debug({ label: 'uploadSubmissionFeatureArtifact', message: 'S3 key', artifactS3Key });
 
-    // Upload the artifact to S3
-    await uploadFileToS3(file, s3Key, { filename: file.originalname });
+    // TODO add api codes cache: so lookups like this are fast (especially since codes dont change often)
+    const codeService = new CodeService(this.connection);
+    const artifactFeatureProperties = await codeService.getFeaturePropertyByName('s3_key');
 
-    // If the file was successfully uploaded, we persist the artifact in the database
-    return this.insertArtifactRecord({
-      ...metadata,
-      artifact_id,
-      submission_id,
-      key: s3Key,
-      uuid: fileUuid
-    });
+    const searchIndexRepository = new SearchIndexRepository(this.connection);
+
+    // Insert S3 key in search string table
+    await searchIndexRepository.insertSearchableStringRecords([
+      {
+        submission_feature_id: artifactFeatureSubmission.submission_feature_id,
+        feature_property_id: artifactFeatureProperties.feature_property_id,
+        value: artifactS3Key
+      }
+    ]);
+
+    // Upload artifact to S3
+    await uploadFileToS3(file, artifactS3Key, { filename: file.originalname });
   }
 
   /**

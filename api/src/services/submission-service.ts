@@ -28,6 +28,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { generateSubmissionFeatureS3FileKey } from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 
@@ -63,21 +64,21 @@ export class SubmissionService extends DBService {
    * Insert a new submission record, returning the record having the matching UUID if it already exists
    * in the database.
    *
-   * @param {string} uuid
+   * @param {string} sourceId
    * @param {string} name
    * @param {string} description
    * @param {string} userIdentifier
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
   async insertSubmissionRecordWithPotentialConflict(
-    uuid: string,
+    sourceId: string,
     name: string,
     description: string,
     userIdentifier: string
-  ): Promise<{ submission_id: number }> {
+  ): Promise<SubmissionRecord> {
     return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
-      uuid,
+      sourceId,
       name,
       description,
       userIdentifier
@@ -94,16 +95,10 @@ export class SubmissionService extends DBService {
    */
   async insertSubmissionFeatureRecords(
     submissionId: number,
-    submissionFeature: ISubmissionFeature[]
+    submissionFeatures: ISubmissionFeature[]
   ): Promise<{ submission_feature_id: number }[]> {
-    const promise = submissionFeature.map(async (feature) => {
-      const featureTypeId = await this.submissionRepository.getFeatureTypeIdByName(feature.type);
-
-      return this.submissionRepository.insertSubmissionFeatureRecord(
-        submissionId,
-        featureTypeId.feature_type_id,
-        feature.properties
-      );
+    const promise = submissionFeatures.map(async (feature) => {
+      return this.submissionRepository.insertSubmissionFeatureRecord(submissionId, feature.type, feature.properties);
     });
 
     return Promise.all(promise);
@@ -684,6 +679,17 @@ export class SubmissionService extends DBService {
   }
 
   /**
+   * Get a submission feature record by uuid.
+   *
+   * @param {string} submissionFeatureUuid
+   * @return {*}  {Promise<SubmissionFeatureRecord>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeatureByUuid(submissionFeatureUuid: string): Promise<SubmissionFeatureRecord> {
+    return this.submissionRepository.getSubmissionFeatureByUuid(submissionFeatureUuid);
+  }
+
+  /**
    * Get the root submission feature record for a submission.
    *
    * @param {number} submissionId
@@ -692,6 +698,27 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
     return this.submissionRepository.getSubmissionRootFeature(submissionId);
+  }
+
+  /**
+   * Find and return all submission feature records that match the provided criteria.
+   *
+   * @param {{
+   *     submissionId?: number;
+   *     systemUserId?: number;
+   *     featureTypeNames?: string[];
+   *     includeDeleted?: boolean;
+   *   }} [criteria]
+   * @return {*}  {Promise<SubmissionFeatureRecord[]>}
+   * @memberof SubmissionService
+   */
+  async findSubmissionFeatures(criteria?: {
+    submissionId?: number;
+    systemUserId?: number;
+    featureTypeNames?: string[];
+    includeDeleted?: boolean;
+  }): Promise<SubmissionFeatureRecord[]> {
+    return this.submissionRepository.findSubmissionFeatures(criteria);
   }
 
   /**
@@ -714,5 +741,32 @@ export class SubmissionService extends DBService {
    */
   async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
     return this.submissionRepository.downloadPublishedSubmission(submissionId);
+  }
+
+  /**
+   * Apply modifications to submission features.
+   *
+   * @param {number} submissionId
+   * @param {number} submissionFeatureId
+   * @param {ISubmissionFeature} submissionFeature
+   * @return {*}  {Promise<ISubmissionFeature[]>}
+   * @memberof SubmissionService
+   */
+  async applySubmissionFeatureModifications(
+    submissionId: number,
+    submissionFeatureId: number,
+    submissionFeature: ISubmissionFeature
+  ): Promise<ISubmissionFeature> {
+    if (submissionFeature.type === 'artifact') {
+      const key = generateSubmissionFeatureS3FileKey({
+        submissionId: submissionId,
+        submissionFeatureId: submissionFeatureId,
+        artifactId: submissionFeature.id
+      });
+
+      submissionFeature.properties = { ...submissionFeature.properties, s3_key: key };
+    }
+
+    return submissionFeature;
   }
 }

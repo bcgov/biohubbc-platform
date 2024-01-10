@@ -105,7 +105,7 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
       parent_submission_feature_id: null,
       feature_type: 'dataset',
       data: {
-        name: faker.lorem.words(3),
+        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}}`,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
         geometry: random.point(
@@ -150,7 +150,7 @@ export const insertSampleSiteRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'sample_site',
       data: {
-        name: faker.lorem.words(3),
+        name: `Sample Site ${faker.lorem.words(3)}`,
         description: faker.lorem.words({ min: 5, max: 100 }),
         geometry: random.point(
           1, // number of features in feature collection
@@ -221,7 +221,7 @@ const insertAnimalRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'animal',
       data: {
-        species: faker.lorem.words(3),
+        species: faker.animal.type(),
         count: faker.number.int({ min: 0, max: 100 }),
         taxonomy: faker.number.int({ min: 10000, max: 99999 }),
         start_date: faker.date.past().toISOString(),

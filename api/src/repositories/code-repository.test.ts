@@ -13,6 +13,7 @@ describe('CodeRepository', () => {
     afterEach(() => {
       sinon.restore();
     });
+
     it('should return rows if succeeds', async () => {
       const mockQueryResponse = {
         rowCount: 1,

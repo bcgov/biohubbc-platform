@@ -28,13 +28,15 @@ COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire 
 
 CREATE TABLE submission(
     submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    uuid                        uuid              DEFAULT public.gen_random_uuid() NOT NULL,
+    uuid                        uuid              GENERATED ALWAYS AS public.gen_random_uuid(),
+    source_id                   varchar(100)      NOT NULL,
+    system_user_id              integer           NOT NULL,
     security_review_timestamp   timestamptz(6),
     publish_timestamp           timestamptz(6),
     submitted_timestamp         timestamptz(6)    DEFAULT now() NOT NULL,
-    source_system               varchar(200)      NOT NULL,
     name                        varchar(200)      NOT NULL,
     description                 varchar(3000),
+    record_end_date             timestamptz(6)    DEFAULT now() NOT NULL,
     create_date                 timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                 integer           NOT NULL,
     update_date                 timestamptz(6),
@@ -44,11 +46,12 @@ CREATE TABLE submission(
 );
 
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
-COMMENT ON COLUMN submission.uuid IS 'The universally unique identifier for the submission as supplied by the source system.';
+COMMENT ON COLUMN submission.uuid IS 'The globally unique identifier for this submission as supplied by BioHub.';
+COMMENT ON COLUMN submission.source_id IS 'The unique identifier for the submission as supplied by the source system. May not be unique globally or within BioHub.';
+COMMENT ON COLUMN submission.system_user_id IS 'Foreign key to the system_user table.';
 COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';
 COMMENT ON COLUMN submission.publish_timestamp IS 'The timestamp of when the submission is published (made public). Null indicates the submission is not publicly visible.';
 COMMENT ON COLUMN submission.submitted_timestamp IS 'The timestamp of when the submission was received by BioHub from the source system.';
-COMMENT ON COLUMN submission.source_system IS 'The name of the source system from which the submission originated.';
 COMMENT ON COLUMN submission.name IS 'The name of the submission.';
 COMMENT ON COLUMN submission.description IS 'The description of the submission.';
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.';
@@ -79,7 +82,7 @@ CREATE TABLE submission_job_queue(
 );
 
 COMMENT ON COLUMN submission_job_queue.submission_job_queue_id IS 'Surrogate primary key identifier. This value should be selected from the appropriate sequence and populated manually.';
-COMMENT ON COLUMN submission_job_queue.submission_id IS 'System generated surrogate primary key identifier.';
+COMMENT ON COLUMN submission_job_queue.submission_id IS 'Foreign key to the submission table.';
 COMMENT ON COLUMN submission_job_queue.job_start_timestamp IS 'The timestamp of the job process instantiation.';
 COMMENT ON COLUMN submission_job_queue.job_end_timestamp IS 'The timestamp of the job process completion.';
 COMMENT ON COLUMN submission_job_queue.security_request IS 'A document supplied by the submitter outlining a security request for submission observations.';
@@ -274,70 +277,43 @@ COMMENT ON COLUMN user_identity_source.revision_count IS 'Revision count used fo
 COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. This source is traditionally the system that authenticates the user. Example sources could include IDIR, BCEID and DATABASE.';
 
 -- 
--- INDEX: "submission_job_queue_idx1" 
+-- TABLE: submission 
 --
 
-CREATE INDEX submission_job_queue_idx1 ON submission_job_queue(submission_id);
+ALTER TABLE submission ADD CONSTRAINT submission_fk1
+    FOREIGN KEY (system_user_id)
+    REFERENCES system_user(system_user_id);
+
+CREATE INDEX submission_idx1 ON submission(system_user_id);
 
 -- 
--- INDEX: system_constant_uk1 
---
-
-CREATE UNIQUE INDEX system_constant_uk1 ON system_constant(constant_name);
-
--- 
--- INDEX: system_metadata_constant_uk1 
---
-
-CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(constant_name);
-
--- 
--- INDEX: system_role_nuk1 
---
-
-CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NULL)) where record_end_date is null;
-
--- 
--- INDEX: system_user_nuk1 
---
-
-CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, (record_end_date is NULL)) where record_end_date is null;
-
--- 
--- INDEX: "system_user_idx1" 
---
-
-CREATE INDEX system_user_id_idx1 ON system_user(user_identity_source_id);
--- 
--- INDEX: system_user_role_uk1 
---
-
-CREATE UNIQUE INDEX system_user_role_uk1 ON system_user_role(system_user_id, system_role_id);
-
--- 
--- INDEX: "system_user_role_idx1" 
---
-
-CREATE INDEX system_user_role_idx1 ON system_user_role(system_user_id);
--- 
--- INDEX: "system_user_role_idx2" 
---
-
-CREATE INDEX system_user_role_idx2 ON system_user_role(system_role_id);
-
--- 
--- INDEX: user_identity_source_nuk1 
---
-
-CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null;
-
--- 
--- TABLE: submission_job_queue 
+-- TABLE: submission_job_queue
 --
 
 ALTER TABLE submission_job_queue ADD CONSTRAINT submission_job_queue_fk1
     FOREIGN KEY (submission_id)
     REFERENCES submission(submission_id);
+
+
+CREATE INDEX submission_job_queue_idx1 ON submission_job_queue(submission_id);
+
+-- 
+-- TABLE: system_constant
+--
+
+CREATE UNIQUE INDEX system_constant_uk1 ON system_constant(constant_name);
+
+-- 
+-- TABLE: system_metadata_constant 
+--
+
+CREATE UNIQUE INDEX system_metadata_constant_uk1 ON system_metadata_constant(constant_name);
+
+-- 
+-- TABLE: system_role
+--
+
+CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NULL)) where record_end_date is null;
 
 -- 
 -- TABLE: system_user 
@@ -346,6 +322,10 @@ ALTER TABLE submission_job_queue ADD CONSTRAINT submission_job_queue_fk1
 ALTER TABLE system_user ADD CONSTRAINT system_user_fk1
     FOREIGN KEY (user_identity_source_id)
     REFERENCES user_identity_source(user_identity_source_id);
+
+CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, (record_end_date is NULL)) where record_end_date is null;
+
+CREATE INDEX system_user_id_idx1 ON system_user(user_identity_source_id);
 
 -- 
 -- TABLE: system_user_role 
@@ -358,3 +338,15 @@ ALTER TABLE system_user_role ADD CONSTRAINT system_user_role_fk1
 ALTER TABLE system_user_role ADD CONSTRAINT system_user_role_fk2
     FOREIGN KEY (system_role_id)
     REFERENCES system_role(system_role_id);
+
+CREATE UNIQUE INDEX system_user_role_uk1 ON system_user_role(system_user_id, system_role_id);
+
+CREATE INDEX system_user_role_idx1 ON system_user_role(system_user_id);
+
+CREATE INDEX system_user_role_idx2 ON system_user_role(system_role_id);
+
+-- 
+-- TABLE: user_identity_source
+--
+
+CREATE UNIQUE INDEX user_identity_source_nuk1 ON user_identity_source(name, (record_end_date is NULL)) where record_end_date is null;

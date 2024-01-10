@@ -21,8 +21,10 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE submission_feature(
       submission_feature_id          integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      uuid                           uuid              GENERATED ALWAYS AS public.gen_random_uuid(),
       submission_id                  integer           NOT NULL,
       feature_type_id                integer           NOT NULL,
+      source_id                      varchar(100)      NOT NULL,
       data                           jsonb             NOT NULL,
       parent_submission_feature_id   integer,
       record_effective_date          date              DEFAULT now() NOT NULL,
@@ -36,8 +38,10 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     COMMENT ON COLUMN submission_feature.submission_feature_id           IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN submission_feature.uuid                            IS 'The globally unique identifier for this submission feature as supplied by BioHub.';
     COMMENT ON COLUMN submission_feature.submission_id                   IS 'Foreign key to the submission table.';
     COMMENT ON COLUMN submission_feature.feature_type_id                 IS 'Foreign key to the feature_type table.';
+    COMMENT ON COLUMN submission_feature.source_id                       IS 'The unique identifier for the submission feature as supplied by the source system. May not be unique globally or within BioHub.';
     COMMENT ON COLUMN submission_feature.data                            IS 'The json data of the submission_feature record.';
     COMMENT ON COLUMN submission_feature.parent_submission_feature_id    IS 'Foreign key to the submission_feature table.';
     COMMENT ON COLUMN submission_feature.record_effective_date           IS 'Record level effective date.';

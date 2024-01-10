@@ -147,20 +147,20 @@ export const rootAPIDoc = {
         required: ['id', 'type', 'properties', 'features'],
         properties: {
           id: {
-            title: 'Unique id of the feature',
+            description: 'Unique id of the feature',
             type: 'string'
           },
           type: {
-            title: 'Feature type',
+            description: 'Feature type',
             type: 'string'
           },
           properties: {
-            title: 'Feature properties',
+            description: 'Feature properties',
             type: 'object',
             properties: {}
           },
           features: {
-            title: 'Feature child features',
+            description: 'Child features',
             type: 'array',
             items: {
               $ref: '#/components/schemas/SubmissionFeature'
@@ -168,35 +168,6 @@ export const rootAPIDoc = {
           }
         },
         additionalProperties: false
-      },
-      feature: {
-        type: 'object',
-        required: ['submission_feature_id', 'submission_id', 'feature_type', 'data', 'parent_submission_feature_id'],
-        properties: {
-          submission_feature_id: {
-            type: 'number'
-          },
-          submission_id: {
-            type: 'number'
-          },
-          feature_type: {
-            type: 'string'
-          },
-          data: {
-            type: 'object'
-          },
-          submission_feature_security_ids: {
-            nullable: true,
-            type: 'array',
-            items: {
-              type: 'number'
-            }
-          },
-          parent_submission_feature_id: {
-            type: 'number',
-            nullable: true
-          }
-        }
       }
     }
   }

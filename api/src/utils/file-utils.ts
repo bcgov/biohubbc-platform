@@ -16,9 +16,9 @@ export interface IDatasetS3FileKey {
 }
 
 export interface IArtifactS3FileKey {
-  datasetUUID: string;
-  artifactId: number;
-  fileName: string;
+  submissionId: number;
+  submissionFeatureId: number;
+  artifactId: string;
 }
 
 export interface IQueueS3FileKey {
@@ -216,7 +216,7 @@ export async function getFileFromS3(key: string, versionId?: string): Promise<Ge
 }
 
 /**
- * Get an s3 signed url.
+ * Get an s3 signed url for downloading an object.
  *
  * @param {string} key S3 object key
  * @returns {Promise<string>} the response from S3 or null if required parameters are null
@@ -272,15 +272,15 @@ export async function getObjectMeta(key: string): Promise<HeadObjectOutput> {
  * @param {IArtifactS3FileKey} options
  * @return {*}
  */
-export function generateArtifactS3FileKey(options: IArtifactS3FileKey) {
+export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) {
   const keyParts: (string | number)[] = [];
 
   keyParts.push(_getS3KeyPrefix());
-  keyParts.push('datasets');
-  keyParts.push(options.datasetUUID);
-  keyParts.push('artifacts');
+  keyParts.push('submissions');
+  keyParts.push(options.submissionId);
+  keyParts.push('features');
+  keyParts.push(options.submissionFeatureId);
   keyParts.push(options.artifactId);
-  keyParts.push(options.fileName);
 
   return keyParts.filter(Boolean).join('/');
 }
@@ -333,6 +333,8 @@ export function generateDatasetS3FileKey(options: IDatasetS3FileKey) {
 
 /**
  * Scan a file for viruses.
+ *
+ * TODO: Turn into middleware that is called in app.ts as one of the first steps before the endpoint even receives it?
  *
  * @export
  * @param {Express.Multer.File} file

@@ -62,8 +62,10 @@ export interface ISubmissionFeature {
 }
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
+  uuid: string;
   submission_id: number;
   feature_type_id: number;
+  source_id: string;
   data: Record<string, any>;
   parent_submission_feature_id: number;
   record_effective_date: string;

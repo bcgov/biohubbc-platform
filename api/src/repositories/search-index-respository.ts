@@ -10,7 +10,7 @@ import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/search-index-repository');
 
-const FeaturePropertyRecord = z.object({
+export const FeaturePropertyRecord = z.object({
   feature_property_id: z.number(),
   feature_property_type_id: z.number(),
   name: z.string(),

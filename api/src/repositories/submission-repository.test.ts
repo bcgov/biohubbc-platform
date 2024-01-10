@@ -913,6 +913,7 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '123',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -928,6 +929,7 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
+          source_id: '456',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -964,6 +966,7 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -979,6 +982,7 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
+          source_id: '456',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -1015,7 +1019,7 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          security: SECURITY_APPLIED_STATUS.SECURED,
+          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -1026,12 +1030,13 @@ describe('SubmissionRepository', () => {
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.SECURED
         },
         {
           submission_id: 2,
           uuid: '789-456-123',
-          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
+          source_id: '456',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -1039,6 +1044,7 @@ describe('SubmissionRepository', () => {
           description: 'description',
           create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
+          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
 
           create_user: 1,
           update_date: '2023-12-12',
@@ -1047,8 +1053,8 @@ describe('SubmissionRepository', () => {
         },
         {
           submission_id: 3,
-          security: SECURITY_APPLIED_STATUS.UNSECURED,
           uuid: '999-456-123',
+          source_id: '789',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -1059,7 +1065,8 @@ describe('SubmissionRepository', () => {
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.UNSECURED
         }
       ];
 
@@ -1310,6 +1317,7 @@ describe('SubmissionRepository', () => {
         const mockSubmissionRecord: SubmissionRecord = {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -1345,6 +1353,7 @@ describe('SubmissionRepository', () => {
         const mockSubmissionRecord: SubmissionRecord = {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '456',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
@@ -1390,7 +1399,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
       try {
-        await submissionRepository.insertSubmissionFeatureRecord(1, 1, feature);
+        await submissionRepository.insertSubmissionFeatureRecord(1, 'type', feature);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
@@ -1414,7 +1423,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
 
-      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 1, feature);
+      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 'type', feature);
 
       expect(response).to.eql(mockResponse);
     });
@@ -1546,6 +1555,7 @@ describe('SubmissionRepository', () => {
       const mockResponse: SubmissionRecordPublished = {
         submission_id: 1,
         uuid: 'string',
+        source_id: '123',
         security_review_timestamp: null,
         publish_timestamp: 'string',
         submitted_timestamp: 'string',

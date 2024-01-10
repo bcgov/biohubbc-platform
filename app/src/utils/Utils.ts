@@ -388,6 +388,6 @@ export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURC
  * @param {Obj} obj - object to iterate through
  * @returns {(keyof Obj)[]} array of object keys with correct typings ie: not string[]
  */
-export const objectKeys = <Obj>(obj: Obj): (keyof Obj)[] => {
+export const objectKeys = <Obj extends Record<any, any>>(obj: Obj): (keyof Obj)[] => {
   return Object.keys(obj) as (keyof Obj)[];
 };
