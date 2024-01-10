@@ -1704,4 +1704,94 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql([mockResponse]);
     });
   });
+
+  describe('getAdminSubmissionFeatureAritifactKey', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+          isAdmin: true,
+          submissionFeatureId: 0,
+          submissionFeatureObj: { key: 'a', value: 'b' }
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.match(/signed url/i);
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        value: 'KEY'
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+        isAdmin: true,
+        submissionFeatureId: 0,
+        submissionFeatureObj: { key: 'a', value: 'b' }
+      });
+
+      expect(response).to.eql('KEY');
+    });
+  });
+
+  describe('getSubmissionFeatureAritifactKey', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionFeatureArtifactKey({
+          isAdmin: false,
+          submissionFeatureId: 0,
+          submissionFeatureObj: { key: 'a', value: 'b' }
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.match(/signed url/i);
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        value: 'KEY'
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionFeatureArtifactKey({
+        isAdmin: false,
+        submissionFeatureId: 0,
+        submissionFeatureObj: { key: 'a', value: 'b' }
+      });
+
+      expect(response).to.eql('KEY');
+    });
+  });
 });

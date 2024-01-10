@@ -1787,7 +1787,7 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
 
-    if (response.rows.length === 0) {
+    if (response.rowCount === 0) {
       throw new ApiExecuteSQLError('Failed to get key for signed URL', [
         `submissionFeature is secure or matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
         'SubmissionRepository->getSubmissionFeatureArtifactKey'
@@ -1818,7 +1818,7 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
 
-    if (response.rows.length === 0) {
+    if (response.rowCount === 0) {
       throw new ApiExecuteSQLError('Failed to get key for signed URL', [
         `matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
         'SubmissionRepository->getAdminSubmissionFeatureArtifactKey'

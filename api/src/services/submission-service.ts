@@ -719,22 +719,21 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Generates a signed URL for submission feature artifact key value pair
+   * Generates a signed URL for a submission_feature's (artifact) key value pair
+   * ie: "s3_key": "artifact/test-file.txt"
    *
-   * Handles admin requests differently, admin can bypass submission feature security check.
+   * Note: admin's can generate signed urls for secure submission_features
    *
    * @async
    * @param {SubmissionFeatureSignedUrlPayload} payload
    * @throws {ApiGeneralError}
    * @memberof SubmissionService
-   * @returns {Promise<string>} signed URL for artifact
+   * @returns {Promise<string>} signed URL
    */
   async getSubmissionFeatureSignedUrl(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
-    // const artifactKey = payload.isAdmin
-    //   ? await this.submissionRepository.getAdminSubmissionFeatureArtifactKey(payload)
-    //   : await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
-
-    const artifactKey = await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
+    const artifactKey = payload.isAdmin
+      ? await this.submissionRepository.getAdminSubmissionFeatureArtifactKey(payload)
+      : await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
 
     const signedUrl = await getS3SignedURL(artifactKey);
 
