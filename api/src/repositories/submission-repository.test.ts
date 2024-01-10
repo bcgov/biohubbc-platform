@@ -1710,7 +1710,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when insert sql fails', async () => {
+    it.only('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -1725,7 +1725,7 @@ describe('SubmissionRepository', () => {
         });
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.match(/signed url/i);
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
       }
     });
 
@@ -1755,7 +1755,7 @@ describe('SubmissionRepository', () => {
       sinon.restore();
     });
 
-    it('should throw an error when insert sql fails', async () => {
+    it.only('should throw an error when insert sql fails', async () => {
       const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
 
       const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
@@ -1770,7 +1770,7 @@ describe('SubmissionRepository', () => {
         });
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.match(/signed url/i);
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
       }
     });
 

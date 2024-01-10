@@ -16,10 +16,10 @@ describe('getSubmissionFeatureSignedUrl', () => {
     sinon.restore();
   });
 
-  it.only('throws error if submissionService throws error', async () => {
+  it('throws error if submissionService throws error', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    const getDBConnectionStub = sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
     const getSubmissionFeatureSignedUrlStub = sinon
       .stub(SubmissionService.prototype, 'getSubmissionFeatureSignedUrl')
@@ -30,6 +30,8 @@ describe('getSubmissionFeatureSignedUrl', () => {
     const requestHandler = getSubmissionFeatureSignedUrl();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq['keycloak_token'] = 'TOKEN';
 
     mockReq.params = {
       submissionId: '1',
@@ -46,6 +48,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
 
       expect.fail();
     } catch (error) {
+      expect(getDBConnectionStub).to.have.been.calledWith('TOKEN');
       expect(isSystemUserAdminStub).to.have.been.calledOnce;
       expect(getSubmissionFeatureSignedUrlStub).to.have.been.calledOnce;
       expect((error as HTTPError).status).to.equal(400);
@@ -53,10 +56,10 @@ describe('getSubmissionFeatureSignedUrl', () => {
     }
   });
 
-  it.only('should return 200 on success', async () => {
+  it('should return 200 on success', async () => {
     const dbConnectionObj = getMockDBConnection();
 
-    sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
+    const getAPIUserDBConnectionStub = sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 
     const mockResponse = [] as unknown as any;
 
@@ -82,6 +85,7 @@ describe('getSubmissionFeatureSignedUrl', () => {
 
     await requestHandler(mockReq, mockRes, mockNext);
 
+    expect(getAPIUserDBConnectionStub).to.have.been.calledOnce;
     expect(getSubmissionFeatureSignedUrlStub).to.have.been.calledOnce;
     expect(getSubmissionFeatureSignedUrlStub).to.have.been.calledWith({
       submissionFeatureId: 2,

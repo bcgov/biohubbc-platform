@@ -32,6 +32,8 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
         headerName: '',
         flex: 1,
         disableColumnMenu: true,
+        disableReorder: true,
+        hideSortIcons: true,
         valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
         renderCell: (params: GridRenderCellParams) => {
           return (
