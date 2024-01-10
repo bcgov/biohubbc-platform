@@ -380,3 +380,14 @@ export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURC
       return null;
   }
 };
+
+/**
+ * same implementation as Object.keys but with correct typings for interable
+ *
+ * @template Obj
+ * @param {Obj} obj - object to iterate through
+ * @returns {(keyof Obj)[]} array of object keys with correct typings ie: not string[]
+ */
+export const objectKeys = <Obj>(obj: Obj): (keyof Obj)[] => {
+  return Object.keys(obj) as (keyof Obj)[];
+};
