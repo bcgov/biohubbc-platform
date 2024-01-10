@@ -4,7 +4,8 @@ import { Button, Stack } from '@mui/material';
 import { Box } from '@mui/system';
 import { GridColDef, GridRenderCellParams, GridValueGetterParams } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
-import { useCodesContext, useDialogContext } from 'hooks/useContext';
+import { useCodesContext } from 'hooks/useContext';
+import useDownload from 'hooks/useDownload';
 import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
 import React from 'react';
 
@@ -17,7 +18,7 @@ import React from 'react';
 const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => {
   const api = useApi();
   const codesContext = useCodesContext();
-  const dialogContext = useDialogContext();
+  const { downloadSignedUrl } = useDownload();
 
   const featureTypesWithProperties = codesContext.codesDataLoader.data?.feature_type_with_properties;
 
@@ -41,23 +42,13 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
               variant="outlined"
               size="small"
               onClick={async () => {
-                try {
-                  const signedUrl = await api.submissions.getSubmissionFeatureSignedUrl({
-                    submissionId: params.row.submission_id,
-                    submissionFeatureId: params.row.submission_feature_id,
-                    submissionFeatureKey: featureType.type,
-                    submissionFeatureValue: params.value
-                  });
-                  window.open(signedUrl, '_blank');
-                } catch (err) {
-                  dialogContext.setErrorDialog({
-                    onOk: () => dialogContext.setErrorDialog({ open: false }),
-                    onClose: () => dialogContext.setErrorDialog({ open: false }),
-                    dialogTitle: 'Download Error',
-                    dialogText: err.message,
-                    open: true
-                  });
-                }
+                const signedUrl = api.submissions.getSubmissionFeatureSignedUrl({
+                  submissionId: params.row.submission_id,
+                  submissionFeatureId: params.row.submission_feature_id,
+                  submissionFeatureKey: featureType.type,
+                  submissionFeatureValue: params.value
+                });
+                await downloadSignedUrl(signedUrl);
               }}>
               Download
             </Button>

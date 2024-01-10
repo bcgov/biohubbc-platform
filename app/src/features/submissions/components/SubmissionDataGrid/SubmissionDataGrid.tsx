@@ -4,7 +4,7 @@ import { Box } from '@mui/system';
 import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import React, { useState } from 'react';
-import useColumns from './useSubmisssionDataGridColumns';
+import useColumns from './useSubmissionDataGridColumns';
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;

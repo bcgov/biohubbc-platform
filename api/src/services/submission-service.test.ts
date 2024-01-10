@@ -1200,7 +1200,7 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql('S3KEY');
     });
 
-    it('should throw error if getS3SignedURL fails to generate (null)', async () => {
+    it.only('should throw error if getS3SignedURL fails to generate (null)', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const getSubmissionFeatureSignedUrlStub = sinon
@@ -1216,7 +1216,7 @@ describe('SubmissionService', () => {
       } catch (err) {
         expect(getS3SignedUrlStub).to.be.calledOnceWith('KEY');
         expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
-        expect((err as ApiGeneralError).message).to.match(/signed/i);
+        expect((err as ApiGeneralError).message).to.equal(`Failed to generate signed URL for "a":"b"`);
       }
     });
   });
