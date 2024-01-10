@@ -37,13 +37,13 @@ const SecurityRuleForm = () => {
 
   const submissionContext = useSubmissionContext();
 
-  // List all potential security rules
   const {
     allSecurityRulesStaticListDataLoader, 
     submissionFeaturesAppliedRulesDataLoader,
     submissionFeatureGroupsDataLoader
   } = submissionContext;
 
+  // List all potential security rules
   const allSecurityRules = useMemo(() => {
     return allSecurityRulesStaticListDataLoader.data ?? [];
   }, [allSecurityRulesStaticListDataLoader.data]);
@@ -53,44 +53,49 @@ const SecurityRuleForm = () => {
   }, [submissionFeaturesAppliedRulesDataLoader.data]);
 
   /**
-   * An aggregate of all security rules that have been applied to one or more of the selected features,
+   * An aggregate of all security rules that have been applied to one or more of the *selected* features,
    * in addition to all of the features IDs and features types (with counts) that belong to each rule.
    */
   const groupedAppliedSecurityRules: IAppliedSecurityRuleGroup[] = useMemo(() => {
-    return initialAppliedSecurityRules.reduce((ruleGroups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
-      const ruleGroupIndex = ruleGroups.findIndex((ruleGroup) => ruleGroup.securityRule.security_rule_id === securityRecord.security_rule_id)
+    return initialAppliedSecurityRules
+      // Filter out any security records that don't pertain to the selected.
+      .filter((securityRecord) => formikProps.initialValues.submissionFeatureIds.includes(securityRecord.submission_feature_id))
+  
+      // Group security records by rule, including associated feature IDs and feature type counts.
+      .reduce((ruleGroups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
+        const ruleGroupIndex = ruleGroups.findIndex((ruleGroup) => ruleGroup.securityRule.security_rule_id === securityRecord.security_rule_id)
 
-      const featureGroupDisplayName = (submissionFeatureGroupsDataLoader.data ?? [])
-        .find((featureGroup) => {
-          return featureGroup.features.some((feature) => feature.submission_feature_id === securityRecord.submission_feature_id)
-        })
-        ?.feature_type_display_name || 'Other'
-
-      if (ruleGroupIndex === -1) {
-        const securityRule = allSecurityRules.find((securityRule) => securityRule.security_rule_id === securityRecord.security_rule_id);
-        if (securityRule) {
-          ruleGroups.push({
-            securityRule,
-            submissionFeatureIds: [securityRecord.submission_feature_id],
-            appliedFeatureGroups: [{ displayName: featureGroupDisplayName, numFeatures: 1 }]
+        const featureGroupDisplayName = (submissionFeatureGroupsDataLoader.data ?? [])
+          .find((featureGroup) => {
+            return featureGroup.features.some((feature) => feature.submission_feature_id === securityRecord.submission_feature_id)
           })
-        }
-      } else {
-        ruleGroups[ruleGroupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id);
+          ?.feature_type_display_name || 'Other'
 
-        const featureGroupIndex = ruleGroups[ruleGroupIndex].appliedFeatureGroups.findIndex((featureGroup) => {
-          return featureGroup.displayName === featureGroupDisplayName
-        });
-
-        if (featureGroupIndex === -1) {
-          ruleGroups[ruleGroupIndex].appliedFeatureGroups.push({ displayName: featureGroupDisplayName, numFeatures: 1 })
+        if (ruleGroupIndex === -1) {
+          const securityRule = allSecurityRules.find((securityRule) => securityRule.security_rule_id === securityRecord.security_rule_id);
+          if (securityRule) {
+            ruleGroups.push({
+              securityRule,
+              submissionFeatureIds: [securityRecord.submission_feature_id],
+              appliedFeatureGroups: [{ displayName: featureGroupDisplayName, numFeatures: 1 }]
+            })
+          }
         } else {
-          ruleGroups[ruleGroupIndex].appliedFeatureGroups[featureGroupIndex].numFeatures ++;
-        }
-      }
+          ruleGroups[ruleGroupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id);
 
-      return ruleGroups;
-    }, []);
+          const featureGroupIndex = ruleGroups[ruleGroupIndex].appliedFeatureGroups.findIndex((featureGroup) => {
+            return featureGroup.displayName === featureGroupDisplayName
+          });
+
+          if (featureGroupIndex === -1) {
+            ruleGroups[ruleGroupIndex].appliedFeatureGroups.push({ displayName: featureGroupDisplayName, numFeatures: 1 })
+          } else {
+            ruleGroups[ruleGroupIndex].appliedFeatureGroups[featureGroupIndex].numFeatures ++;
+          }
+        }
+
+        return ruleGroups;
+      }, []);
   }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
 
   console.log({ groupedAppliedSecurityRules })
