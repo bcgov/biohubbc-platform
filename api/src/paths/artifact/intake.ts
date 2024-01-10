@@ -43,7 +43,7 @@ POST.apiDoc = {
           properties: {
             submission_uuid: {
               description:
-                'Unique id of the submission. A submission id is returned by the submission intake endpoint.',
+                'Globally unique id of the submission as assigned by BioHub. A submission uuid is returned by the submission intake endpoint.',
               type: 'string',
               format: 'uuid'
             },
@@ -73,6 +73,7 @@ POST.apiDoc = {
             required: ['artifact_uuid'],
             properties: {
               artifact_uuid: {
+                description: 'Globally unique id of the artifact feature element as assigned by BioHub.',
                 type: 'string',
                 format: 'uuid'
               }

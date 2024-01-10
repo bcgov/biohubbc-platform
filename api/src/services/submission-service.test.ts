@@ -16,6 +16,7 @@ import {
   SubmissionFeatureDownloadRecord,
   SubmissionRecord,
   SubmissionRecordPublished,
+  SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -53,19 +54,38 @@ describe('SubmissionService', () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
+      const mockSubmissionRecord: SubmissionRecord = {
+        submission_id: 1,
+        uuid: '123-456-789',
+        source_id: '123',
+        security_review_timestamp: '2023-12-12',
+        submitted_timestamp: '2023-12-12',
+        system_user_id: 3,
+        source_system: 'SIMS',
+        name: 'name',
+        description: 'description',
+        publish_timestamp: '2023-12-12',
+        create_date: '2023-12-12',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+
       const repo = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionRecordWithPotentialConflict')
-        .resolves({ submission_id: 1 });
+        .resolves(mockSubmissionRecord);
 
       const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
         '123-456-789',
         'submission name',
         'submission desc',
+        3,
         'source system'
       );
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({ submission_id: 1 });
+      expect(response).to.be.eql(mockSubmissionRecord);
     });
   });
 
@@ -770,8 +790,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '321',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -788,8 +810,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
+          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -826,8 +850,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '321',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -844,8 +870,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
+          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -881,11 +909,13 @@ describe('SubmissionService', () => {
       const mockDBConnection = getMockDBConnection();
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const mockResponse = {
+      const mockResponse: SubmissionRecordWithSecurity = {
         submission_id: 1,
         uuid: 'string',
+        source_id: '321',
         security_review_timestamp: null,
         submitted_timestamp: 'string',
+        system_user_id: 3,
         source_system: 'string',
         name: 'string',
         description: null,
@@ -915,8 +945,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -934,8 +966,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
+          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -953,8 +987,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 3,
           uuid: '999-456-123',
+          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1050,8 +1086,10 @@ describe('SubmissionService', () => {
       const mockSubmissionRecord: SubmissionRecord = {
         submission_id: 1,
         uuid: '123-456-789',
+        source_id: '321',
         security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
+        system_user_id: 3,
         source_system: 'SIMS',
         name: 'name',
         description: 'description',

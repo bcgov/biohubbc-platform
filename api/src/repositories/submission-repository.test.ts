@@ -494,6 +494,7 @@ describe('SubmissionRepository', () => {
         '123-456-789',
         'submission name',
         'submission desc',
+        3,
         'source system'
       );
 
@@ -512,6 +513,7 @@ describe('SubmissionRepository', () => {
           '123-456-789',
           'submission name',
           'submission desc',
+          3,
           'source system'
         );
         expect.fail();
@@ -916,6 +918,7 @@ describe('SubmissionRepository', () => {
           source_id: '123',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -932,6 +935,7 @@ describe('SubmissionRepository', () => {
           source_id: '456',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -969,6 +973,7 @@ describe('SubmissionRepository', () => {
           source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -985,6 +990,7 @@ describe('SubmissionRepository', () => {
           source_id: '456',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1022,6 +1028,7 @@ describe('SubmissionRepository', () => {
           source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1039,6 +1046,7 @@ describe('SubmissionRepository', () => {
           source_id: '456',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1057,6 +1065,7 @@ describe('SubmissionRepository', () => {
           source_id: '789',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1320,6 +1329,7 @@ describe('SubmissionRepository', () => {
           source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1356,6 +1366,7 @@ describe('SubmissionRepository', () => {
           source_id: '456',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
@@ -1399,7 +1410,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
       try {
-        await submissionRepository.insertSubmissionFeatureRecord(1, 'type', feature);
+        await submissionRepository.insertSubmissionFeatureRecord(1, '321', 'type', feature);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
@@ -1423,7 +1434,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
 
-      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 'type', feature);
+      const response = await submissionRepository.insertSubmissionFeatureRecord(1, '321', 'type', feature);
 
       expect(response).to.eql(mockResponse);
     });
@@ -1559,6 +1570,7 @@ describe('SubmissionRepository', () => {
         security_review_timestamp: null,
         publish_timestamp: 'string',
         submitted_timestamp: 'string',
+        system_user_id: 3,
         source_system: 'string',
         name: 'string',
         description: null,

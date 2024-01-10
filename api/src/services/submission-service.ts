@@ -67,7 +67,8 @@ export class SubmissionService extends DBService {
    * @param {string} sourceId
    * @param {string} name
    * @param {string} description
-   * @param {string} userIdentifier
+   * @param {number} systemUserId
+   * @param {string} systemUserIdentifier
    * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
@@ -75,13 +76,15 @@ export class SubmissionService extends DBService {
     sourceId: string,
     name: string,
     description: string,
-    userIdentifier: string
+    systemUserId: number,
+    systemUserIdentifier: string
   ): Promise<SubmissionRecord> {
     return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
       sourceId,
       name,
       description,
-      userIdentifier
+      systemUserId,
+      systemUserIdentifier
     );
   }
 
@@ -98,7 +101,12 @@ export class SubmissionService extends DBService {
     submissionFeatures: ISubmissionFeature[]
   ): Promise<{ submission_feature_id: number }[]> {
     const promise = submissionFeatures.map(async (feature) => {
-      return this.submissionRepository.insertSubmissionFeatureRecord(submissionId, feature.type, feature.properties);
+      return this.submissionRepository.insertSubmissionFeatureRecord(
+        submissionId,
+        feature.id,
+        feature.type,
+        feature.properties
+      );
     });
 
     return Promise.all(promise);

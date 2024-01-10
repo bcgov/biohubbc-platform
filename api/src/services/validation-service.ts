@@ -57,11 +57,7 @@ export class ValidationService extends DBService {
         const nodeWithoutFeatures = { ...node[0], features: [] };
 
         // Validate the submissioNFeature object
-        await this.validateSubmissionFeature(nodeWithoutFeatures).catch((error) => {
-          defaultLog.error({ label: 'validateSubmissionFeature', message: 'error', error });
-          // Submission feature is invalid
-          return false;
-        });
+        await this.validateSubmissionFeature(nodeWithoutFeatures);
       }
     } catch (error) {
       defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });

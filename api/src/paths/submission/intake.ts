@@ -78,10 +78,10 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['submission_id'],
+            required: ['submission_uuid'],
             properties: {
               submission_uuid: {
-                description: 'Unique id of the submission.',
+                description: 'Globally unique id of the submission as assigned by BioHub.',
                 type: 'string',
                 format: 'uuid'
               },
@@ -144,7 +144,7 @@ export function submissionIntake(): RequestHandler {
 
       // validate the submission
       if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
-        throw new HTTP400('Invalid submission');
+        throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
       }
 
       // insert the submission record
@@ -152,6 +152,7 @@ export function submissionIntake(): RequestHandler {
         submissionSourceId,
         submissionName,
         submissionDescription,
+        serviceClientSystemUser.system_user_id,
         serviceClientSystemUser.user_identifier
       );
 

@@ -259,6 +259,7 @@ export const SubmissionRecord = z.object({
   source_id: z.string(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
+  system_user_id: z.number(),
   source_system: z.string(),
   name: z.string(),
   description: z.string().nullable(),
@@ -374,7 +375,8 @@ export class SubmissionRepository extends BaseRepository {
     sourceId: string,
     name: string,
     description: string,
-    userIdentifier: string
+    systemUserId: number,
+    systemUserIdentifier: string
   ): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       INSERT INTO submission (
@@ -382,13 +384,15 @@ export class SubmissionRepository extends BaseRepository {
         submitted_timestamp,
         name,
         description,
+        system_user_id,
         source_system
       ) VALUES (
         ${sourceId},
         now(),
         ${name},
         ${description},
-        ${userIdentifier}
+        ${systemUserId},
+        ${systemUserIdentifier}
       )
       RETURNING
         *;
@@ -409,8 +413,8 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission feature record.
    *
-   * @param {number} submissionFeatureId
    * @param {number} submissionId
+   * @param {string} sourceId
    * @param {string} featureTypeName
    * @param {ISubmissionFeature['properties']} featureProperties
    * @return {*}  {Promise<{ submission_feature_id: number }>}
@@ -418,18 +422,21 @@ export class SubmissionRepository extends BaseRepository {
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
+    featureSourceId: string,
     featureTypeName: string,
     featureProperties: ISubmissionFeature['properties']
   ): Promise<{ submission_feature_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
+        source_id,
         feature_type_id,
         data,
         record_effective_date
       ) VALUES (
         ${submissionId},
-        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName})
+        ${featureSourceId},
+        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
         ${featureProperties},
         now()
       )
@@ -1454,13 +1461,15 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     if (criteria?.featureTypeNames?.length) {
+      const featureTypeNames = criteria?.featureTypeNames;
       // Filter by feature type names
       queryBuilder.whereIn('feature_type_id', (qb) => {
         qb.select('feature_type_id')
           .from('feature_type')
           .where(
-            'LOWERCASE(name)',
-            criteria.featureTypeNames?.map((featureTypeName) => featureTypeName.toLowerCase())
+            knex.raw('LOWER(name)'),
+            'IN',
+            featureTypeNames.map((featureTypeName) => featureTypeName.toLowerCase())
           );
       });
     }

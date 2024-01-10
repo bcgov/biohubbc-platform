@@ -263,6 +263,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
     (
         source_id,
         system_user_id,
+        source_system,
         name,
         description,
         security_review_timestamp,
@@ -272,6 +273,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
     (
         public.gen_random_uuid(),
         (SELECT system_user_id from system_user where user_identifier = 'SIMS'),
+        'SIMS',
         $$${faker.company.name()}$$,
         $$${faker.lorem.words({ min: 5, max: 100 })}$$,
         ${securityReviewTimestamp},
