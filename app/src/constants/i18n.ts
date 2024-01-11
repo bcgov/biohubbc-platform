@@ -31,7 +31,9 @@ export const ApplySecurityRulesI18N = {
     const appliedRemoved = [
       numApplied > 0 && `applied ${numApplied} ${p(numApplied, 'security rule')}`,
       numRemoved > 0 && `removed ${numRemoved} ${p(numRemoved, 'security rule')}`
-    ].filter(Boolean).join(' and ');
+    ]
+      .filter(Boolean)
+      .join(' and ');
 
     return `Successfully ${appliedRemoved} to ${featureCount} ${p(featureCount, 'feature')}.`;
   },

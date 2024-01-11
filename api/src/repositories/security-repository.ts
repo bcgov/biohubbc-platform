@@ -1,9 +1,9 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
-import { getKnex } from '../database/db';
 
 const defaultLog = getLogger('repositories/security-repository');
 
@@ -349,7 +349,7 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * TODO jsdoc 
+   * TODO jsdoc
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityRepository
@@ -371,8 +371,7 @@ export class SecurityRepository extends BaseRepository {
     insertSQL.append(`
       ON CONFLICT (submission_feature_id, security_rule_id)
       DO NOTHING
-      RETURNING *;`
-    );
+      RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
@@ -385,7 +384,9 @@ export class SecurityRepository extends BaseRepository {
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-  async removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+  async removeAllSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryBuilder = getKnex()
       .queryBuilder()
       .delete()
@@ -396,7 +397,6 @@ export class SecurityRepository extends BaseRepository {
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
     return response.rows;
-
   }
 
   /**
@@ -406,21 +406,23 @@ export class SecurityRepository extends BaseRepository {
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-    async removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[], removeRuleIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-      defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds })
-      const queryBuilder = getKnex()
-        .queryBuilder()
-        .delete()
-        .fromRaw('submission_feature_security sfs')
-        .whereIn('sfs.submission_feature_id', submissionFeatureIds)
-        .and
-        .whereIn('sfs.security_rule_id', removeRuleIds) // TODO
-        .returning('*');
+  async removeSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[],
+    removeRuleIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds });
+    const queryBuilder = getKnex()
+      .queryBuilder()
+      .delete()
+      .fromRaw('submission_feature_security sfs')
+      .whereIn('sfs.submission_feature_id', submissionFeatureIds)
+      .and.whereIn('sfs.security_rule_id', removeRuleIds) // TODO
+      .returning('*');
 
-      const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
-      return response.rows;
-    }
+    return response.rows;
+  }
 
   /**
    * Gets Submission Feature Security Records for a given set of submission features
@@ -429,7 +431,9 @@ export class SecurityRepository extends BaseRepository {
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-  async getSecurityRulesForSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+  async getSecurityRulesForSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryBuilder = getKnex()
       .queryBuilder()
       .select('*')
@@ -453,10 +457,7 @@ export class SecurityRepository extends BaseRepository {
       .select('*')
       .from('submission_feature_security')
       .whereIn('submission_feature_id', (subQuery) => {
-        return subQuery
-          .select('submission_feature_id')
-          .from('submission_feature')
-          .where('submission_id', submissionId);
+        return subQuery.select('submission_feature_id').from('submission_feature').where('submission_id', submissionId);
       });
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);

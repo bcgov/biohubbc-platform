@@ -72,7 +72,9 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           return (
             <Stack flexDirection="row" alignItems="center" gap={1}>
               <Icon path={mdiLock} size={0.75} />
-              <Typography component='span' sx={{ textTransform: 'uppercase' }}>Secured</Typography>
+              <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+                Secured
+              </Typography>
             </Stack>
           );
         }
@@ -85,7 +87,9 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
               color: 'text.secondary'
             }}>
             <Icon path={mdiLockOpenOutline} size={0.75} />
-            <Typography component='span' sx={{ textTransform: 'uppercase' }}>Unsecured</Typography>
+            <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+              Unsecured
+            </Typography>
           </Stack>
         );
       }

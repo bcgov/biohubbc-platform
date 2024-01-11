@@ -23,7 +23,8 @@ export const GET: Operation = [
 ];
 
 GET.apiDoc = {
-  description: 'Get all active security rules with their associated categories. A security category is active if it has not been end-dated.',
+  description:
+    'Get all active security rules with their associated categories. A security category is active if it has not been end-dated.',
   tags: ['security'],
   security: [
     {

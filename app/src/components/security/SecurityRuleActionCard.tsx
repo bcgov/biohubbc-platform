@@ -1,11 +1,11 @@
 import { mdiClose } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, Card, FormHelperText, IconButton } from '@mui/material';
+import { Button, Card, IconButton } from '@mui/material';
 import grey from '@mui/material/colors/grey';
 import SecurityRuleCard, { ISecurityRuleCardProps } from './SecurityRuleCard';
 
 interface ISecurityRuleActionCardProps extends ISecurityRuleCardProps {
-  action: 'apply' | 'persist' | 'remove'
+  action: 'apply' | 'persist' | 'remove';
   onRemove: () => void;
 }
 
@@ -41,11 +41,9 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
           <Icon path={mdiClose} size={1} />
         </IconButton>
       ) : (
-        <Button
-          variant={props.action === 'remove' ? 'contained' : 'outlined'}
-          color='error'
-          onClick={() => onRemove()}
-        >Remove</Button>
+        <Button variant={props.action === 'remove' ? 'contained' : 'outlined'} color="error" onClick={() => onRemove()}>
+          Remove
+        </Button>
       )}
     </Card>
   );

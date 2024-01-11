@@ -90,7 +90,6 @@ export function getAllSecurityRulesForSubmissionFeatures(): RequestHandler {
     const connection = getDBConnection(req['keycloak_token']);
     const securityService = new SecurityService(connection);
 
-
     try {
       await connection.open();
 
@@ -110,7 +109,6 @@ export function getAllSecurityRulesForSubmissionFeatures(): RequestHandler {
   };
 }
 
-
 export const PATCH: Operation = [
   authorizeRequestHandler(() => {
     return {
@@ -126,8 +124,7 @@ export const PATCH: Operation = [
 ];
 
 PATCH.apiDoc = {
-  description:
-    'Applies security rules to a list of submission features.',
+  description: 'Applies security rules to a list of submission features.',
   tags: ['security'],
   security: [
     {
@@ -168,7 +165,7 @@ PATCH.apiDoc = {
   },
   responses: {
     204: {
-      description: 'Successfully applied and/or removed security rules.',
+      description: 'Successfully applied and/or removed security rules.'
     },
     400: {
       $ref: '#/components/responses/400'
@@ -200,11 +197,7 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      await service.applySecurityRulesToSubmissionFeatures(
-        submissionFeatureIds,
-        applyRuleIds,
-        removeRuleIds
-      );
+      await service.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds, removeRuleIds);
 
       await connection.commit();
 

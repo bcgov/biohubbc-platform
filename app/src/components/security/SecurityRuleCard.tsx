@@ -43,15 +43,9 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
       </Typography>
       {props.actionContent}
       {props.featureMembers && props.featureMembers?.length && (
-        <Box component='ul' pl={4} mb={0} mt={1}>
+        <Box component="ul" pl={4} mb={0} mt={1}>
           {props.featureMembers.map((featureMember) => (
-            <Typography
-              variant="body2"
-              color="textSecondary"
-              sx={{
-
-              }}
-              component='li'>
+            <Typography variant="body2" color="textSecondary" sx={{}} component="li">
               {featureMember}
             </Typography>
           ))}

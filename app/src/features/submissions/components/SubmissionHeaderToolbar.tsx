@@ -1,15 +1,15 @@
 import { mdiArrowRight } from '@mdi/js';
 import Icon from '@mdi/react';
 import Stack from '@mui/material/Stack';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 import ManageSecurity from 'components/security/ManageSecurity';
 import CompleteSecurityReviewButton from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewButton';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
 import PublishSecurityReviewButton from './PublishSecurityReview/PublishSecurityReviewButton';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
 
 export interface ISubmissionHeaderToolbarProps {
-  submissionFeatureIds: GridRowSelectionModel
+  submissionFeatureIds: GridRowSelectionModel;
 }
 
 /**
@@ -25,7 +25,7 @@ const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
   const submissionRecordDataLoader = submissionContext.submissionRecordDataLoader;
 
   if (!submissionRecordDataLoader.data) {
-    return <></> // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
+    return <></>; // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
   }
 
   const submission = submissionRecordDataLoader.data;
@@ -74,10 +74,7 @@ const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
     submissionRecordDataLoader.refresh(submissionContext.submissionId);
   };
 
-
-
   return (
-
     <Stack flexDirection="row" alignItems="center" gap={1}>
       <ManageSecurity
         submissionFeatureIds={props.submissionFeatureIds}

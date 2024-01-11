@@ -1,13 +1,13 @@
 import { mdiSecurity } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button } from '@mui/material';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { useSubmissionContext } from 'hooks/useContext';
 import { useState } from 'react';
 import SecuritiesDialog from './SecuritiesDialog';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
 
 interface IManageSecurityProps {
-  submissionFeatureIds: GridRowSelectionModel
+  submissionFeatureIds: GridRowSelectionModel;
   onClose: () => void;
 }
 

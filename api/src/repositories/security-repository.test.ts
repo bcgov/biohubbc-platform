@@ -498,6 +498,6 @@ describe('SecurityRepository', () => {
       const repo = new SecurityRepository(mockDBConnection);
       const response = await repo.getSecurityRulesForSubmissionFeatures([1, 2]);
       expect(response.length).to.equal(3);
-    })
+    });
   });
 });

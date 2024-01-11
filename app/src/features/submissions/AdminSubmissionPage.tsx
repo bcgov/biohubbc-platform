@@ -1,24 +1,27 @@
+import { Skeleton } from '@mui/material';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Stack from '@mui/material/Stack';
-import { useSubmissionContext } from 'hooks/useContext';
-import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
-import SubmissionDataGrid from './components/SubmissionDataGrid';
-import { useState } from 'react';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import BaseHeader from 'components/layout/header/BaseHeader';
-import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 import SubmissionHeaderToolbar from 'features/submissions/components/SubmissionHeaderToolbar';
-import { Skeleton } from '@mui/material';
+import { useSubmissionContext } from 'hooks/useContext';
+import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
+import { useState } from 'react';
+import SubmissionDataGrid from './components/SubmissionDataGrid';
+import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 
-type GroupedSubmissionFeatureSelection = Record<IGetSubmissionGroupedFeatureResponse['feature_type_name'], GridRowSelectionModel>
+type GroupedSubmissionFeatureSelection = Record<
+  IGetSubmissionGroupedFeatureResponse['feature_type_name'],
+  GridRowSelectionModel
+>;
 
 const SubmissionHeader = (props: { submissionFeatureIds: GridRowSelectionModel }) => {
   const submissionContext = useSubmissionContext();
   const submission = submissionContext.submissionRecordDataLoader.data;
 
   if (!submission) {
-    return <></> // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
+    return <></>; // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
   }
 
   return (
@@ -29,16 +32,14 @@ const SubmissionHeader = (props: { submissionFeatureIds: GridRowSelectionModel }
           {submission ? (
             <SubmissionHeaderSecurityStatus submission={submission} />
           ) : (
-            <Skeleton variant='rectangular' /> // TODO
+            <Skeleton variant="rectangular" /> // TODO
           )}
         </Stack>
       }
-      buttonJSX={
-        <SubmissionHeaderToolbar submissionFeatureIds={props.submissionFeatureIds} />
-      }
+      buttonJSX={<SubmissionHeaderToolbar submissionFeatureIds={props.submissionFeatureIds} />}
     />
-  )
-}
+  );
+};
 
 /**
  * AdminSubmissionPage component for reviewing submissions.
@@ -46,7 +47,8 @@ const SubmissionHeader = (props: { submissionFeatureIds: GridRowSelectionModel }
  * @return {*}
  */
 const AdminSubmissionPage = () => {
-  const [groupedSubmissionFeatureSelection, setGroupedSubmissionFeatureSelection] = useState<GroupedSubmissionFeatureSelection>({});
+  const [groupedSubmissionFeatureSelection, setGroupedSubmissionFeatureSelection] =
+    useState<GroupedSubmissionFeatureSelection>({});
 
   const submissionContext = useSubmissionContext();
 
@@ -61,14 +63,14 @@ const AdminSubmissionPage = () => {
       ...prev,
       [featureTypeName]: rowSelectionModel
     }));
-  }
+  };
 
-  const submissionFeatureIds: GridRowSelectionModel = Object
-    .values(groupedSubmissionFeatureSelection)
-    .reduce((acc: GridRowSelectionModel, featureIds: GridRowSelectionModel) => {
-
+  const submissionFeatureIds: GridRowSelectionModel = Object.values(groupedSubmissionFeatureSelection).reduce(
+    (acc: GridRowSelectionModel, featureIds: GridRowSelectionModel) => {
       return acc.concat(featureIds);
-    }, []);
+    },
+    []
+  );
 
   const allSubmissionFeatureIds = submissionFeatureGroups.reduce(
     (acc: number[], submissionFeatureGroup: IGetSubmissionGroupedFeatureResponse) => {
@@ -79,7 +81,9 @@ const AdminSubmissionPage = () => {
 
   return (
     <>
-      <SubmissionHeader submissionFeatureIds={submissionFeatureIds.length ? submissionFeatureIds : allSubmissionFeatureIds} />
+      <SubmissionHeader
+        submissionFeatureIds={submissionFeatureIds.length ? submissionFeatureIds : allSubmissionFeatureIds}
+      />
       <Container maxWidth="xl">
         <Stack gap={3} sx={{ py: 4 }}>
           {submissionFeatureGroups.map((submissionFeatureGroup) => {

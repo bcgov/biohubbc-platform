@@ -364,11 +364,14 @@ export class SecurityService extends DBService {
    *
    * @param {number[]} submissionFeatureIds
    * @param {number[]} [removeRuleIds]
-   * 
+   *
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
-  async removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[], removeRuleIds?: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+  async removeSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[],
+    removeRuleIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
     if (!submissionFeatureIds.length) {
       return [];
     }
@@ -387,7 +390,9 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityService
    */
-  async getSecurityRulesForSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+  async getSecurityRulesForSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
     if (!submissionFeatureIds.length) {
       // no features, return early
       return [];
@@ -430,7 +435,7 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Gets a list of all active security categories. A security category is active if it has 
+   * Gets a list of all active security categories. A security category is active if it has
    * not been end-dated.
    *
    * @return {*}  {Promise<SecurityCategoryRecord[]>}

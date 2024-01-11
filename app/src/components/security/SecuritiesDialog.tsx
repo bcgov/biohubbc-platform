@@ -1,18 +1,16 @@
+import { Typography } from '@mui/material';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
-import { useState } from 'react';
-import SecurityRuleForm from './SecurityRuleForm';
-import { GridRowSelectionModel } from '@mui/x-data-grid';
-import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
-import yup from 'utils/YupSchema';
 import { useApi } from 'hooks/useApi';
-import { Typography } from '@mui/material';
-
-
+import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
+import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
+import { useState } from 'react';
+import yup from 'utils/YupSchema';
+import SecurityRuleForm from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
-  submissionFeatureIds: GridRowSelectionModel
+  submissionFeatureIds: GridRowSelectionModel;
   open: boolean;
   onClose: () => void;
 }
@@ -31,24 +29,22 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
     try {
       setIsLoading(true);
 
-      await api.security
-        .applySecurityRulesToSubmissionFeatures(
-          submissionId,
-          patch          
-        )
-        .then(() => {
-          submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
-        });
+      await api.security.applySecurityRulesToSubmissionFeatures(submissionId, patch).then(() => {
+        submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
+      });
 
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(patch.stagedForApply.length, patch.stagedForRemove.length, props.submissionFeatureIds.length)}
+            {ApplySecurityRulesI18N.applySecuritySuccess(
+              patch.stagedForApply.length,
+              patch.stagedForRemove.length,
+              props.submissionFeatureIds.length
+            )}
           </Typography>
         ),
         open: true
       });
-
     } catch (error) {
       // Show error dialog
       dialogContext.setErrorDialog({

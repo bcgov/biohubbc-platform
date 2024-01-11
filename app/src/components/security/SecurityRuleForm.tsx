@@ -7,17 +7,17 @@ import TextField from '@mui/material/TextField';
 import { useFormikContext } from 'formik';
 import { ISecurityRuleAndCategory, ISubmissionFeatureSecurityRecord } from 'hooks/api/useSecurityApi';
 import { useSubmissionContext } from 'hooks/useContext';
+import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 import { useMemo, useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
 import { alphabetizeObjects } from 'utils/Utils';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
-import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 
 interface IAppliedSecurityRuleGroup {
   securityRule: ISecurityRuleAndCategory;
   submissionFeatureIds: number[];
-  appliedFeatureGroups: { displayName: string, numFeatures: number }[]
+  appliedFeatureGroups: { displayName: string; numFeatures: number }[];
 }
 
 const SecurityRuleForm = () => {
@@ -27,7 +27,7 @@ const SecurityRuleForm = () => {
   const submissionContext = useSubmissionContext();
 
   const {
-    allSecurityRulesStaticListDataLoader, 
+    allSecurityRulesStaticListDataLoader,
     submissionFeaturesAppliedRulesDataLoader,
     submissionFeatureGroupsDataLoader
   } = submissionContext;
@@ -38,7 +38,7 @@ const SecurityRuleForm = () => {
   }, [allSecurityRulesStaticListDataLoader.data]);
 
   const initialAppliedSecurityRules = useMemo(() => {
-    return submissionFeaturesAppliedRulesDataLoader.data ?? []
+    return submissionFeaturesAppliedRulesDataLoader.data ?? [];
   }, [submissionFeaturesAppliedRulesDataLoader.data]);
 
   /**
@@ -46,87 +46,122 @@ const SecurityRuleForm = () => {
    * in addition to all of the features IDs and features types (with counts) that belong to each rule.
    */
   const groupedAppliedSecurityRules: IAppliedSecurityRuleGroup[] = useMemo(() => {
-    return initialAppliedSecurityRules
-      // Filter out any security records that don't pertain to the selected.
-      .filter((securityRecord) => formikProps.initialValues.submissionFeatureIds.includes(securityRecord.submission_feature_id))
-  
-      // Group security records by rule, including associated feature IDs and feature type counts.
-      .reduce((ruleGroups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
-        const ruleGroupIndex = ruleGroups.findIndex((ruleGroup) => ruleGroup.securityRule.security_rule_id === securityRecord.security_rule_id)
+    return (
+      initialAppliedSecurityRules
+        // Filter out any security records that don't pertain to the selected.
+        .filter((securityRecord) =>
+          formikProps.initialValues.submissionFeatureIds.includes(securityRecord.submission_feature_id)
+        )
 
-        const featureGroupDisplayName = (submissionFeatureGroupsDataLoader.data ?? [])
-          .find((featureGroup) => {
-            return featureGroup.features.some((feature) => feature.submission_feature_id === securityRecord.submission_feature_id)
-          })
-          ?.feature_type_display_name || 'Other'
+        // Group security records by rule, including associated feature IDs and feature type counts.
+        .reduce((ruleGroups: IAppliedSecurityRuleGroup[], securityRecord: ISubmissionFeatureSecurityRecord) => {
+          const ruleGroupIndex = ruleGroups.findIndex(
+            (ruleGroup) => ruleGroup.securityRule.security_rule_id === securityRecord.security_rule_id
+          );
 
-        if (ruleGroupIndex === -1) {
-          const securityRule = allSecurityRules.find((securityRule) => securityRule.security_rule_id === securityRecord.security_rule_id);
-          if (securityRule) {
-            ruleGroups.push({
-              securityRule,
-              submissionFeatureIds: [securityRecord.submission_feature_id],
-              appliedFeatureGroups: [{ displayName: featureGroupDisplayName, numFeatures: 1 }]
-            })
-          }
-        } else {
-          ruleGroups[ruleGroupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id);
+          const featureGroupDisplayName =
+            (submissionFeatureGroupsDataLoader.data ?? []).find((featureGroup) => {
+              return featureGroup.features.some(
+                (feature) => feature.submission_feature_id === securityRecord.submission_feature_id
+              );
+            })?.feature_type_display_name || 'Other';
 
-          const featureGroupIndex = ruleGroups[ruleGroupIndex].appliedFeatureGroups.findIndex((featureGroup) => {
-            return featureGroup.displayName === featureGroupDisplayName
-          });
-
-          if (featureGroupIndex === -1) {
-            ruleGroups[ruleGroupIndex].appliedFeatureGroups.push({ displayName: featureGroupDisplayName, numFeatures: 1 })
+          if (ruleGroupIndex === -1) {
+            const securityRule = allSecurityRules.find(
+              (securityRule) => securityRule.security_rule_id === securityRecord.security_rule_id
+            );
+            if (securityRule) {
+              ruleGroups.push({
+                securityRule,
+                submissionFeatureIds: [securityRecord.submission_feature_id],
+                appliedFeatureGroups: [{ displayName: featureGroupDisplayName, numFeatures: 1 }]
+              });
+            }
           } else {
-            ruleGroups[ruleGroupIndex].appliedFeatureGroups[featureGroupIndex].numFeatures ++;
-          }
-        }
+            ruleGroups[ruleGroupIndex].submissionFeatureIds.push(securityRecord.submission_feature_id);
 
-        return ruleGroups;
-      }, []);
+            const featureGroupIndex = ruleGroups[ruleGroupIndex].appliedFeatureGroups.findIndex((featureGroup) => {
+              return featureGroup.displayName === featureGroupDisplayName;
+            });
+
+            if (featureGroupIndex === -1) {
+              ruleGroups[ruleGroupIndex].appliedFeatureGroups.push({
+                displayName: featureGroupDisplayName,
+                numFeatures: 1
+              });
+            } else {
+              ruleGroups[ruleGroupIndex].appliedFeatureGroups[featureGroupIndex].numFeatures++;
+            }
+          }
+
+          return ruleGroups;
+        }, [])
+    );
   }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
 
-  console.log({ groupedAppliedSecurityRules })
-  console.log({ test: submissionFeatureGroupsDataLoader.data })
+  console.log({ groupedAppliedSecurityRules });
+  console.log({ test: submissionFeatureGroupsDataLoader.data });
 
-  const { previosulyUnappliedRules } = useMemo(function () {
-    const previouslyAppliedRules: ISecurityRuleAndCategory[] = [];
-    const previosulyUnappliedRules: ISecurityRuleAndCategory[] = [];
+  const { previosulyUnappliedRules } = useMemo(
+    function () {
+      const previouslyAppliedRules: ISecurityRuleAndCategory[] = [];
+      const previosulyUnappliedRules: ISecurityRuleAndCategory[] = [];
 
-    allSecurityRules.forEach((securityRule) => {
-      if (groupedAppliedSecurityRules.some((group) => group.securityRule.security_rule_id === securityRule.security_rule_id)) {
-        previouslyAppliedRules.push(securityRule);
-      } else {
-        previosulyUnappliedRules.push(securityRule);
-      }
-    });
+      allSecurityRules.forEach((securityRule) => {
+        if (
+          groupedAppliedSecurityRules.some(
+            (group) => group.securityRule.security_rule_id === securityRule.security_rule_id
+          )
+        ) {
+          previouslyAppliedRules.push(securityRule);
+        } else {
+          previosulyUnappliedRules.push(securityRule);
+        }
+      });
 
-    return { previouslyAppliedRules, previosulyUnappliedRules }
-  }, [allSecurityRules, groupedAppliedSecurityRules]);
+      return { previouslyAppliedRules, previosulyUnappliedRules };
+    },
+    [allSecurityRules, groupedAppliedSecurityRules]
+  );
 
   const toggleStageApply = (securityRule: ISecurityRuleAndCategory) => {
-    if (formikProps.values.stagedForApply.some((applyingRule) => applyingRule.security_rule_id === securityRule.security_rule_id)) {
-      formikProps.setFieldValue('stagedForApply', formikProps.values.stagedForApply.filter((value) => value.security_rule_id !== securityRule.security_rule_id))
+    if (
+      formikProps.values.stagedForApply.some(
+        (applyingRule) => applyingRule.security_rule_id === securityRule.security_rule_id
+      )
+    ) {
+      formikProps.setFieldValue(
+        'stagedForApply',
+        formikProps.values.stagedForApply.filter((value) => value.security_rule_id !== securityRule.security_rule_id)
+      );
     } else {
-      formikProps.setFieldValue('stagedForApply', [...formikProps.values.stagedForApply, securityRule])
+      formikProps.setFieldValue('stagedForApply', [...formikProps.values.stagedForApply, securityRule]);
     }
-  }
+  };
 
   const toggleStageRemove = (securityRule: ISecurityRuleAndCategory) => {
-    if (formikProps.values.stagedForRemove.some((removingRule) => removingRule.security_rule_id === securityRule.security_rule_id)) {
-      formikProps.setFieldValue('stagedForRemove', formikProps.values.stagedForRemove.filter((value) => value.security_rule_id !== securityRule.security_rule_id))
+    if (
+      formikProps.values.stagedForRemove.some(
+        (removingRule) => removingRule.security_rule_id === securityRule.security_rule_id
+      )
+    ) {
+      formikProps.setFieldValue(
+        'stagedForRemove',
+        formikProps.values.stagedForRemove.filter((value) => value.security_rule_id !== securityRule.security_rule_id)
+      );
     } else {
       formikProps.setFieldValue('stagedForRemove', [...formikProps.values.stagedForRemove, securityRule]);
     }
-  }
+  };
 
   const applyRulesAvailableOptions = useMemo(() => {
     return alphabetizeObjects(
       allSecurityRules.filter(
         (securityRule) =>
-          !formikProps.values.stagedForApply.some((applyingRule) => applyingRule.security_rule_id === securityRule.security_rule_id)
-        ),
+          !formikProps.values.stagedForApply.some(
+            (applyingRule) => applyingRule.security_rule_id === securityRule.security_rule_id
+          )
+      ),
       'name'
     );
   }, [previosulyUnappliedRules, formikProps.values.stagedForApply]);
@@ -147,7 +182,7 @@ const SecurityRuleForm = () => {
 
         <Box mt={3}>
           <Box mb={2}>
-            <Typography component='legend'>Add Security Rules</Typography>
+            <Typography component="legend">Add Security Rules</Typography>
           </Box>
           <Autocomplete
             id={'autocomplete-security-rule-search'}
@@ -228,17 +263,21 @@ const SecurityRuleForm = () => {
                   onRemove={() => toggleStageApply(applyingRule)}
                 />
               </Collapse>
-            )
+            );
           })}
         </Stack>
 
         <Box my={2}>
-          <Typography component='legend'>Applied Feature Security</Typography>
-          <Typography variant='body2'>These rules have already been applied to one or more of the selected features.</Typography>
+          <Typography component="legend">Applied Feature Security</Typography>
+          <Typography variant="body2">
+            These rules have already been applied to one or more of the selected features.
+          </Typography>
         </Box>
         <Stack component={TransitionGroup} gap={1}>
           {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {
-            const cardAction = formikProps.values.stagedForRemove.some((removingRule) => removingRule.security_rule_id === group.securityRule.security_rule_id)
+            const cardAction = formikProps.values.stagedForRemove.some(
+              (removingRule) => removingRule.security_rule_id === group.securityRule.security_rule_id
+            )
               ? 'remove'
               : 'persist';
 
@@ -249,7 +288,9 @@ const SecurityRuleForm = () => {
                   title={group.securityRule.name}
                   category={group.securityRule.category_name}
                   description={group.securityRule.description}
-                  featureMembers={group.appliedFeatureGroups.map((featureGroup) => `${featureGroup.displayName} (${featureGroup.numFeatures})`)}
+                  featureMembers={group.appliedFeatureGroups.map(
+                    (featureGroup) => `${featureGroup.displayName} (${featureGroup.numFeatures})`
+                  )}
                   onRemove={() => toggleStageRemove(group.securityRule)}
                 />
               </Collapse>

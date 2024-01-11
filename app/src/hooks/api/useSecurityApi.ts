@@ -1,5 +1,9 @@
 import { AxiosInstance } from 'axios';
-import { IListPersecutionHarmResponse, IPatchFeatureSecurityRules, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
+import {
+  IListPersecutionHarmResponse,
+  IPatchFeatureSecurityRules,
+  ISecureDataAccessRequestForm
+} from 'interfaces/useSecurityApi.interface';
 
 export interface ISecurityRule {
   security_rule_id: number;
@@ -99,7 +103,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
   /**
    * Patches security rules that are applied or removed to the given set of submission features. If
    * a particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always
-   * be added. 
+   * be added.
    *
    * @param {number[]} submissionFeatureIds
    * @param {number[]} ruleIds
@@ -126,7 +130,8 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<any[]>}
    */
-  const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => { // TODO delete this function
+  const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
+    // TODO delete this function
     const { data } = await axios.post('api/administrative/security/remove', {
       features: submissionFeatureIds
     });
@@ -139,11 +144,12 @@ const useSecurityApi = (axios: AxiosInstance) => {
    *
    * @deprecated Not supported. You can retrieve the list of all security rule IDs associated with all of the
    * features belonging to a particular submission using `getAllSecurityRulesForSubmission`
-   * 
+   *
    * @param {number[]} features
    * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
    */
-  const getSecurityRulesForSubmissionFeatures = async ( // TODO delete this function
+  const getSecurityRulesForSubmissionFeatures = async (
+    // TODO delete this function
     submissionFeatureIds: number[]
   ): Promise<ISubmissionFeatureSecurityRecord[]> => {
     const { data } = await axios.post('api/administrative/security/fetch', {
