@@ -29,8 +29,11 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { generateSubmissionFeatureS3FileKey } from '../utils/file-utils';
+import { getLogger } from '../utils/logger';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
+
+const defaultLog = getLogger('submission-service');
 
 export const RelatedDataset = z.object({
   datasetId: z.string(),
@@ -89,27 +92,62 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * insert submission feature record
+   * Insert submission features.
    *
    * @param {number} submissionId
    * @param {ISubmissionFeature[]} submissionFeature
-   * @return {*}  {Promise<{ submission_feature_id: number }[]>}
+   * @return {*}  {Promise<void>}
    * @memberof SubmissionService
    */
-  async insertSubmissionFeatureRecords(
-    submissionId: number,
-    submissionFeatures: ISubmissionFeature[]
-  ): Promise<{ submission_feature_id: number }[]> {
-    const promise = submissionFeatures.map(async (feature) => {
-      return this.submissionRepository.insertSubmissionFeatureRecord(
-        submissionId,
-        feature.id,
-        feature.type,
-        feature.properties
-      );
-    });
+  async insertSubmissionFeatureRecords(submissionId: number, submissionFeatures: ISubmissionFeature[]): Promise<void> {
+    // Debug stats
+    const debugStats = {
+      submissionId,
+      countSubmissionFeatureJsonPaths: 0,
+      countSubmissionFeatures: 0,
+      currentSubmissionFeatureJsonPath: ''
+    };
 
-    return Promise.all(promise);
+    try {
+      // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
+      const submissionFeatureJsonPaths: string[] = JSONPath({
+        path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
+        flatten: true,
+        resultType: 'path',
+        json: submissionFeatures
+      });
+
+      debugStats.countSubmissionFeatureJsonPaths = submissionFeatureJsonPaths.length;
+
+      for (const jsonPath of submissionFeatureJsonPaths) {
+        debugStats.currentSubmissionFeatureJsonPath = jsonPath;
+
+        // Fetch a submissionFeature object
+        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
+
+        if (!node?.length) {
+          continue;
+        }
+
+        // We expect the 'path' to resolve an array of 1 item
+        const nodeWithoutFeatures = { ...node[0], features: [] };
+
+        // Validate the submissioNFeature object
+        await this.submissionRepository.insertSubmissionFeatureRecord(
+          submissionId,
+          nodeWithoutFeatures.id,
+          nodeWithoutFeatures.type,
+          nodeWithoutFeatures.properties
+        );
+
+        debugStats.countSubmissionFeatures++;
+      }
+
+      defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success', debugStats });
+    } catch (error) {
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error, debugStats });
+      throw error;
+    }
   }
 
   /**

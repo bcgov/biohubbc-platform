@@ -32,22 +32,33 @@ export class ValidationService extends DBService {
    * Validate submission features.
    *
    * @param {ISubmissionFeature[]} submissionFeatures
-   * @return {*}  {Promise<boolean>}
+   * @return {*}  {Promise<boolean>} `true` if all submission features are valid, `false` otherwise.
    * @memberof ValidationService
    */
   async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
-    // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
-    const allFeaturesPaths: string[] = JSONPath({
-      path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
-      flatten: true,
-      resultType: 'path',
-      json: submissionFeatures
-    });
+    // Debug stats
+    const debugStats = {
+      countSubmissionFeatureJsonPaths: 0,
+      countSubmissionFeatures: 0,
+      currentSubmissionFeatureJsonPath: ''
+    };
 
     try {
-      for (const path of allFeaturesPaths) {
+      // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
+      const submissionFeatureJsonPaths: string[] = JSONPath({
+        path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
+        flatten: true,
+        resultType: 'path',
+        json: submissionFeatures
+      });
+
+      debugStats.countSubmissionFeatureJsonPaths = submissionFeatureJsonPaths.length;
+
+      for (const jsonPath of submissionFeatureJsonPaths) {
+        debugStats.currentSubmissionFeatureJsonPath = jsonPath;
+
         // Fetch a submissionFeature object
-        const node: ISubmissionFeature[] = JSONPath({ path: path, resultType: 'value', json: submissionFeatures });
+        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
 
         if (!node?.length) {
           continue;
@@ -58,9 +69,13 @@ export class ValidationService extends DBService {
 
         // Validate the submissioNFeature object
         await this.validateSubmissionFeature(nodeWithoutFeatures);
+
+        debugStats.countSubmissionFeatures++;
       }
+
+      defaultLog.debug({ label: 'validateSubmissionFeatures', message: 'success', debugStats });
     } catch (error) {
-      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error, debugStats });
       // Not all submission features are valid
       return false;
     }
