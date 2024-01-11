@@ -1819,7 +1819,7 @@ export class SubmissionRepository extends BaseRepository {
 
     const response = await this.connection.sql(sqlStatement, z.object({ value: z.string() }));
 
-    if (!response.rowCount || !response.rows[0]?.value) {
+    if (response.rowCount === 0 || !response.rows[0]?.value) {
       throw new ApiExecuteSQLError('Failed to get key for signed URL', [
         `matching key value pair does not exist for submissionFeatureId: ${payload.submissionFeatureId}`,
         'SubmissionRepository->getAdminSubmissionFeatureArtifactKey'
