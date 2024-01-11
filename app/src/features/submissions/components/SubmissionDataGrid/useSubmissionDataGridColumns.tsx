@@ -37,19 +37,17 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
         hideSortIcons: true,
         valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
         renderCell: (params: GridRenderCellParams) => {
+          const download = async () => {
+            const signedUrlPromise = api.submissions.getSubmissionFeatureSignedUrl({
+              submissionId: params.row.submission_id,
+              submissionFeatureId: params.row.submission_feature_id,
+              submissionFeatureKey: featureType.type,
+              submissionFeatureValue: params.value
+            });
+            await downloadSignedUrl(signedUrlPromise);
+          };
           return (
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={async () => {
-                const signedUrl = api.submissions.getSubmissionFeatureSignedUrl({
-                  submissionId: params.row.submission_id,
-                  submissionFeatureId: params.row.submission_feature_id,
-                  submissionFeatureKey: featureType.type,
-                  submissionFeatureValue: params.value
-                });
-                await downloadSignedUrl(signedUrl);
-              }}>
+            <Button variant="outlined" size="small" onClick={download}>
               Download
             </Button>
           );

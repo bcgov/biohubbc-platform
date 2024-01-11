@@ -1144,7 +1144,7 @@ describe('SubmissionService', () => {
       submissionFeatureObj: { key: 'a', value: 'b' }
     };
 
-    it.only('should call admin repository when isAdmin == true', async () => {
+    it('should call admin repository when isAdmin == true', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const getAdminSubmissionFeatureSignedUrlStub = sinon
@@ -1200,7 +1200,7 @@ describe('SubmissionService', () => {
       expect(response).to.be.eql('S3KEY');
     });
 
-    it.only('should throw error if getS3SignedURL fails to generate (null)', async () => {
+    it('should throw error if getS3SignedURL fails to generate (null)', async () => {
       const mockDBConnection = getMockDBConnection();
 
       const getSubmissionFeatureSignedUrlStub = sinon

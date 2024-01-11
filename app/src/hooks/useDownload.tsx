@@ -26,16 +26,17 @@ const useDownload = () => {
   /**
    * Downloads / views a signed url
    * displays error dialog if signedUrlService throws error
+   * Note: allows a promise to be passed to handle different api services
    *
    * @async
    * @param {SubmissionFeatureSignedUrlPayload} params
    * @returns {Promise<[void]>}
    */
-  const downloadSignedUrl = async (signedUrlService: Promise<string>) => {
+  const downloadSignedUrl = async (signedUrl: Promise<string> | string) => {
     try {
-      const signedUrl = await signedUrlService;
+      const url = await signedUrl;
 
-      window.open(signedUrl, '_blank');
+      window.open(url, '_blank');
     } catch (err) {
       dialogContext.setErrorDialog({
         onOk: () => dialogContext.setErrorDialog({ open: false }),
