@@ -31,11 +31,13 @@ parameters:
   - name: DB_SERVICE_NAME
     description: 'Database service name associated with deployment'
     required: true
+  # Node
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
     value: 'dev'
   - name: NODE_OPTIONS
+  # Elastic Search
   - name: ELASTICSEARCH_URL
     description: Platform Elasticsearch URL
     required: true
@@ -48,10 +50,6 @@ parameters:
     description: Platform Elasticsearch Taxonomy Index
     required: true
     vale: 'taxonomy_3.0.0'
-  - name: S3_KEY_PREFIX
-    description: S3 key optional prefix
-    required: false
-    value: 'biohub'
   - name: TZ
     description: Application timezone
     required: false
@@ -99,9 +97,14 @@ parameters:
     description: Api default port name
     value: '6100-tcp'
   # Object Store (S3)
+  - name: S3_KEY_PREFIX
+    description: S3 key optional prefix
+    required: false
+    value: 'biohub'
   - name: OBJECT_STORE_SECRETS
     description: Secrets used to read and write to the S3 storage
     value: 'biohubbc-object-store'
+  # GC Notify
   - name: GCNOTIFY_API_SECRET
     description: Secret for gcnotify api key
     value: 'gcnotify-api-key'
@@ -121,8 +124,10 @@ parameters:
     value: https://api.notification.canada.ca/v2/notifications/email
   - name: GCNOTIFY_SMS_URL
     value: https://api.notification.canada.ca/v2/notifications/sms
+  # Log Level
   - name: LOG_LEVEL
     value: 'info'
+  # Openshift
   - name: CPU_REQUEST
     value: '100m'
   - name: CPU_LIMIT
