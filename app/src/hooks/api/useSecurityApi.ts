@@ -109,7 +109,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @param {number[]} ruleIds
    * @return {*}  {Promise<any[]>}
    */
-  const applySecurityRulesToSubmissionFeatures = async (
+  const patchSecurityRulesOnSubmissionFeatures = async (
     submissionId: number,
     featureSecurityRulesPatch: IPatchFeatureSecurityRules
   ): Promise<void> => {
@@ -125,13 +125,13 @@ const useSecurityApi = (axios: AxiosInstance) => {
   /**
    * Removes all of the security rules for the given submission feature IDs, rendering them unsecure.
    *
-   * @deprecated Not supported. Use `applySecurityRulesToSubmissionFeatures` instead.
+   * @deprecated Not supported. Use `patchSecurityRulesOnSubmissionFeatures` instead.
    *
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<any[]>}
    */
   const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
-    // TODO delete this function
+    // TODO delete this function?
     const { data } = await axios.post('api/administrative/security/remove', {
       features: submissionFeatureIds
     });
@@ -149,7 +149,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
    */
   const getSecurityRulesForSubmissionFeatures = async (
-    // TODO delete this function
+    // TODO delete this function?
     submissionFeatureIds: number[]
   ): Promise<ISubmissionFeatureSecurityRecord[]> => {
     const { data } = await axios.post('api/administrative/security/fetch', {
@@ -177,7 +177,7 @@ const useSecurityApi = (axios: AxiosInstance) => {
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
-    applySecurityRulesToSubmissionFeatures,
+    patchSecurityRulesOnSubmissionFeatures,
     removeSecurityRulesFromSubmissionFeatures,
     getSecurityRulesForSubmissionFeatures,
     getAllSecurityRulesForSubmission,

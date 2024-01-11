@@ -120,7 +120,7 @@ export const PATCH: Operation = [
       ]
     };
   }),
-  applySecurityRulesToSubmissionFeatures()
+  patchSecurityRulesOnSubmissionFeatures()
 ];
 
 PATCH.apiDoc = {
@@ -185,7 +185,7 @@ PATCH.apiDoc = {
   }
 };
 
-export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
+export function patchSecurityRulesOnSubmissionFeatures(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
@@ -197,13 +197,13 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      await service.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds, removeRuleIds);
+      await service.patchSecurityRulesOnSubmissionFeatures(submissionFeatureIds, applyRuleIds, removeRuleIds);
 
       await connection.commit();
 
       return res.status(204).send();
     } catch (error) {
-      defaultLog.error({ label: 'applySecurityRulesToSubmissionFeatures', message: 'error', error });
+      defaultLog.error({ label: 'patchSecurityRulesOnSubmissionFeatures', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

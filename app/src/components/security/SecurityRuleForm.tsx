@@ -268,7 +268,7 @@ const SecurityRuleForm = () => {
         </Stack>
 
         <Box my={2}>
-          <Typography component="legend">Applied Feature Security</Typography>
+          <Typography component="legend">Manage Existing Security</Typography>
           <Typography variant="body2">
             These rules have already been applied to one or more of the selected features.
           </Typography>

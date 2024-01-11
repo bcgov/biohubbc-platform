@@ -29,7 +29,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
     try {
       setIsLoading(true);
 
-      await api.security.applySecurityRulesToSubmissionFeatures(submissionId, patch).then(() => {
+      await api.security.patchSecurityRulesOnSubmissionFeatures(submissionId, patch).then(() => {
         submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
       });
 
