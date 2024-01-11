@@ -107,9 +107,13 @@ const useSecurityApi = (axios: AxiosInstance) => {
    */
   const applySecurityRulesToSubmissionFeatures = async (
     submissionId: number,
-    featureSecurityRulesPath: IPatchFeatureSecurityRules
-  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
-    const { data } = await axios.patch(`api/administrative/security/submission/${submissionId}`, featureSecurityRulesPath);
+    featureSecurityRulesPatch: IPatchFeatureSecurityRules
+  ): Promise<void> => {
+    const { data } = await axios.patch(`api/administrative/security/submission/${submissionId}`, {
+      applyRuleIds: featureSecurityRulesPatch.stagedForApply.map((rule) => rule.security_rule_id),
+      removeRuleIds: featureSecurityRulesPatch.stagedForRemove.map((rule) => rule.security_rule_id),
+      submissionFeatureIds: featureSecurityRulesPatch.submissionFeatureIds
+    });
 
     return data;
   };

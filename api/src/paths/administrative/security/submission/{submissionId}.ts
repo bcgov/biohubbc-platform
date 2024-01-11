@@ -140,24 +140,25 @@ PATCH.apiDoc = {
       'application/json': {
         schema: {
           type: 'object',
+          required: ['submissionFeatureIds', 'applyRuleIds', 'removeRuleIds'],
           properties: {
             submissionFeatureIds: {
               type: 'array',
               items: {
-                type: 'number'
+                type: 'integer'
               },
               minItems: 1
             },
             applyRuleIds: {
               type: 'array',
               items: {
-                type: 'number'
+                type: 'integer'
               }
             },
             removeRuleIds: {
               type: 'array',
               items: {
-                type: 'number'
+                type: 'integer'
               }
             }
           }
@@ -166,29 +167,8 @@ PATCH.apiDoc = {
     }
   },
   responses: {
-    200: {
-      description: 'Features with applied security rules.',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                submission_feature_security_id: {
-                  type: 'number'
-                },
-                submission_feature_id: {
-                  type: 'number'
-                },
-                security_rule_id: {
-                  type: 'number'
-                }
-              }
-            }
-          }
-        }
-      }
+    204: {
+      description: 'Successfully applied and/or removed security rules.',
     },
     400: {
       $ref: '#/components/responses/400'
@@ -220,7 +200,7 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.applySecurityRulesToSubmissionFeatures(
+      await service.applySecurityRulesToSubmissionFeatures(
         submissionFeatureIds,
         applyRuleIds,
         removeRuleIds
@@ -228,7 +208,7 @@ export function applySecurityRulesToSubmissionFeatures(): RequestHandler {
 
       await connection.commit();
 
-      return res.status(200).json(data);
+      return res.status(204).send();
     } catch (error) {
       defaultLog.error({ label: 'applySecurityRulesToSubmissionFeatures', message: 'error', error });
       await connection.rollback();

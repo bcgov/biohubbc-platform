@@ -131,12 +131,6 @@ const SecurityRuleForm = () => {
     );
   }, [previosulyUnappliedRules, formikProps.values.stagedForApply]);
 
-  // TODO
-  // const applyRuleSelectedOptions = useMemo(() => {
-  //   return formikProps.values.applyRuleIds
-  //     .map((ruleId) => allSecurityRules.find((securityRule) => securityRule.security_rule_id === ruleId)
-  // }, [])
-
   const hasNoSecuritySelected = !initialAppliedSecurityRules.length;
 
   return (
@@ -153,7 +147,7 @@ const SecurityRuleForm = () => {
 
         <Box mt={3}>
           <Box mb={2}>
-            <Typography component='legend'>Apply Security Rules</Typography>
+            <Typography component='legend'>Add Security Rules</Typography>
           </Box>
           <Autocomplete
             id={'autocomplete-security-rule-search'}
@@ -239,7 +233,8 @@ const SecurityRuleForm = () => {
         </Stack>
 
         <Box my={2}>
-          <Typography component='legend'>Existing Rules</Typography>
+          <Typography component='legend'>Applied Feature Security</Typography>
+          <Typography variant='body2'>These rules have already been applied to one or more of the selected features.</Typography>
         </Box>
         <Stack component={TransitionGroup} gap={1}>
           {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {

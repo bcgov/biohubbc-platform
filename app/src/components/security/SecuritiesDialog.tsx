@@ -6,6 +6,8 @@ import SecurityRuleForm from './SecurityRuleForm';
 import { GridRowSelectionModel } from '@mui/x-data-grid';
 import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 import yup from 'utils/YupSchema';
+import { useApi } from 'hooks/useApi';
+import { Typography } from '@mui/material';
 
 
 
@@ -18,34 +20,34 @@ interface ISecuritiesDialogProps {
 const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const dialogContext = useDialogContext();
+  const api = useApi();
 
   const submissionContext = useSubmissionContext();
-  const { submissionFeaturesAppliedRulesDataLoader } = submissionContext;
+  const { submissionFeaturesAppliedRulesDataLoader, submissionId } = submissionContext;
 
   const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
 
-  const handleSave = async (values: IPatchFeatureSecurityRules) => {
+  const handleSave = async (patch: IPatchFeatureSecurityRules) => {
     try {
       setIsLoading(true);
 
-      // await api.security
-      //   .applySecurityRulesToSubmissionFeatures(
-      //     props.features,
-      //     rules.map((item) => item.security_rule_id),
-      //     true // Override will replace all rules on submit
-      //   )
-      //   .then(() => {
-      //     submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
-      //   });
+      await api.security
+        .applySecurityRulesToSubmissionFeatures(
+          submissionId,
+          patch          
+        )
+        .then(() => {
+          submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
+        });
 
-      // dialogContext.setSnackbar({
-      //   snackbarMessage: (
-      //     <Typography variant="body2" component="div">
-      //       {ApplySecurityRulesI18N.applySecuritySuccess(rules.length, numSelectedSubmissionFeatures)}
-      //     </Typography>
-      //   ),
-      //   open: true
-      // });
+      dialogContext.setSnackbar({
+        snackbarMessage: (
+          <Typography variant="body2" component="div">
+            {ApplySecurityRulesI18N.applySecuritySuccess(patch.stagedForApply.length, patch.stagedForRemove.length, props.submissionFeatureIds.length)}
+          </Typography>
+        ),
+        open: true
+      });
 
     } catch (error) {
       // Show error dialog

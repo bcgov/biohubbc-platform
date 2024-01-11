@@ -408,12 +408,13 @@ export class SecurityRepository extends BaseRepository {
    * @memberof SecurityRepository
    */
     async removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[], removeRuleIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
+      defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds })
       const queryBuilder = getKnex()
         .delete()
-        .from('submission_feature_security')
-        .whereIn('submission_feature_id', submissionFeatureIds)
+        .fromRaw('submission_feature_security sfs')
+        .whereIn('sfs.submission_feature_id', submissionFeatureIds)
         .and
-        .whereIn('security_rule_id', removeRuleIds) // TODO
+        .whereIn('sfs.security_rule_id', removeRuleIds) // TODO
         .returning('*');
 
       const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);

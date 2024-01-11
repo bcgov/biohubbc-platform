@@ -330,7 +330,7 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * 
+   * TODO jsdoc
    *
    * @param {number[]} submissionFeatureIds
    * @param {number[]} applyRuleIds
@@ -343,11 +343,14 @@ export class SecurityService extends DBService {
     submissionFeatureIds: number[],
     applyRuleIds: number[],
     removeRuleIds: number[]
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    
-    await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+  ): Promise<void> {
+    if (removeRuleIds.length > 0) {
+      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+    }
 
-    return this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
+    if (applyRuleIds.length > 0) {
+      await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
+    }
   }
 
   /**
