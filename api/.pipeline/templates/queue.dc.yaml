@@ -273,7 +273,7 @@ objects:
       name: ${NAME}${SUFFIX}
     type: Opaque
   - kind: HorizontalPodAutoscaler
-    apiVersion: autoscaling/v2beta2
+    apiVersion: autoscaling/v2
     metadata:
       annotations: {}
       creationTimestamp: null
