@@ -339,11 +339,15 @@ export class SecurityService extends DBService {
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
-  async applySecurityRulesToSubmissionFeatures(
+  async patchSecurityRulesOnSubmissionFeatures(
     submissionFeatureIds: number[],
     applyRuleIds: number[],
     removeRuleIds: number[]
   ): Promise<void> {
+    if (!submissionFeatureIds.length) {
+      return;
+    }
+
     if (removeRuleIds.length > 0) {
       await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
     }

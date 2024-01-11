@@ -349,32 +349,30 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Gets a list of all active security rules
+   * TODO jsdoc 
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityRepository
    */
   async applySecurityRulesToSubmissionFeatures(
-    features: number[],
-    rules: number[]
+    submissionFeatureIds: number[],
+    securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!rules.length || !features.length) {
-      // no rules to apply, leave early
-      return [];
-    }
-
-    const final = features.flatMap((item) => {
-      return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
+    const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
+      return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
     });
 
     const insertSQL = SQL`
-    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
-    VALUES `;
-    insertSQL.append(final.join(', '));
+      INSERT INTO
+        submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
+      VALUES `;
+
+    insertSQL.append(queryValues.join(', '));
     insertSQL.append(`
-    ON CONFLICT (submission_feature_id, security_rule_id)
-    DO NOTHING
-    RETURNING *;`);
+      ON CONFLICT (submission_feature_id, security_rule_id)
+      DO NOTHING
+      RETURNING *;`
+    );
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
@@ -389,6 +387,7 @@ export class SecurityRepository extends BaseRepository {
    */
   async removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryBuilder = getKnex()
+      .queryBuilder()
       .delete()
       .from('submission_feature_security')
       .whereIn('submission_feature_id', submissionFeatureIds)
@@ -401,7 +400,7 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Removes the given security rules for a given set of given submission features
+   * Removes the given security rules for a given set of given submission features.
    *
    * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
@@ -410,6 +409,7 @@ export class SecurityRepository extends BaseRepository {
     async removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds: number[], removeRuleIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
       defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds })
       const queryBuilder = getKnex()
+        .queryBuilder()
         .delete()
         .fromRaw('submission_feature_security sfs')
         .whereIn('sfs.submission_feature_id', submissionFeatureIds)
@@ -431,6 +431,7 @@ export class SecurityRepository extends BaseRepository {
    */
   async getSecurityRulesForSubmissionFeatures(submissionFeatureIds: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
     const queryBuilder = getKnex()
+      .queryBuilder()
       .select('*')
       .from('submission_feature_security')
       .whereIn('submission_feature_id', submissionFeatureIds);
