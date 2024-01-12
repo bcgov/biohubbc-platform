@@ -7,7 +7,6 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 export interface IHandlebarsTemplates {
   header: string;
@@ -278,7 +277,8 @@ export type SubmissionRecordWithSecurity = z.infer<typeof SubmissionRecordWithSe
 export const SubmissionRecordWithSecurityAndRootFeatureType = SubmissionRecord.extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   root_feature_type_id: z.number(),
-  root_feature_type_name: z.string()
+  root_feature_type_name: z.string(),
+  regions: z.array(z.string())
 });
 
 export type SubmissionRecordWithSecurityAndRootFeatureType = z.infer<
@@ -1101,20 +1101,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Finds an object of handlebars templates for a given datasetId to power the project details page
-   *
-   * //TODO: Eventually will integrate datasetId specific handlebars  @param datasetId a dataset UUID for determining the handlebars template to fetch
-   * @returns {*} {Promise<IDetailsPage>} an object containing a string of handlebars templates
-   * @memberof SubmissionRepository
-   */
-  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
-    return {
-      header: simsHandlebarsTemplate_HEADER,
-      details: simsHandlebarsTemplate_DETAILS
-    };
-  }
-
-  /**
    *
    * @param submissionId the submission to update
    * @param datasetSearch
@@ -1203,10 +1189,11 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
-          DISTINCT ON (submission.uuid) submission.*,
+          submission.*,
           submission_feature.feature_type_id as root_feature_type_id,
           feature_type.name as root_feature_type_name,
-          ${SECURITY_APPLIED_STATUS.PENDING} as security
+          ${SECURITY_APPLIED_STATUS.PENDING} as security,
+          array_remove(array_agg(rl.region_name), NULL) as regions
         FROM
           submission
         INNER JOIN
@@ -1217,12 +1204,19 @@ export class SubmissionRepository extends BaseRepository {
           feature_type
         ON
           feature_type.feature_type_id = submission_feature.feature_type_id
+        LEFT JOIN 
+          submission_regions sr 
+        ON
+          sr.submission_id = submission.submission_id 
+        left join region_lookup rl 
+        on rl.region_id = sr.region_id
         WHERE
           submission.security_review_timestamp IS NULL
         AND
-          submission_feature.parent_submission_feature_id IS NULL
+          submission_feature.parent_submission_feature_id IS null
+        GROUP BY submission.submission_id, submission_feature.feature_type_id, feature_type.name
         ORDER BY
-          submission.uuid, submission.submission_id DESC
+          submission.uuid, submission.submission_id desc
       )
       SELECT
         *
@@ -1232,7 +1226,7 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
-
+    console.log(response.rows);
     return response.rows;
   }
 

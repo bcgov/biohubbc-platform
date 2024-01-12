@@ -96,6 +96,7 @@ const UnreviewedSubmissionsTable = () => {
       </Box>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
+          console.log(submissionRecord.regions);
           return (
             <Card elevation={0} key={submissionRecord.submission_id}>
               <CardHeader
@@ -186,6 +187,12 @@ const UnreviewedSubmissionsTable = () => {
                       <dd>Source:</dd>
                       <dt>{submissionRecord.source_system}</dt>
                     </Stack>
+                    {submissionRecord.regions.length && (
+                      <Stack flexDirection="row">
+                        <dd>Region(s):</dd>
+                        <dt>{submissionRecord.regions.sort().join(', ')}</dt>
+                      </Stack>
+                    )}
                   </Stack>
                   <Stack flexDirection="row" alignItems="center" gap={1} flexWrap="nowrap">
                     <Button

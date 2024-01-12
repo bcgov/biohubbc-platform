@@ -5,7 +5,6 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import {
   IDatasetsForReview,
-  IHandlebarsTemplates,
   ISourceTransformModel,
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
@@ -473,16 +472,6 @@ export class SubmissionService extends DBService {
         url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
       };
     });
-  }
-
-  /**
-   * Gets an object containing handlebars templates for the dataset page for a given dataset ID
-   *
-   * @param datasetId uuid used to fetch handlebars templates
-   * @returns An object containing
-   */
-  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
-    return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
   }
 
   /**

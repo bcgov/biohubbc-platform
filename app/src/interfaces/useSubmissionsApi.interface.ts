@@ -44,6 +44,7 @@ export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
   security: SECURITY_APPLIED_STATUS;
   root_feature_type_id: number;
   root_feature_type_name: string;
+  regions: string[];
 };
 
 export type SubmissionRecordPublished = SubmissionRecord & {

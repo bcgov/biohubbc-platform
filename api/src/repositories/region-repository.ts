@@ -51,17 +51,20 @@ export class RegionRepository extends BaseRepository {
     return response.rows;
   }
 
-  async calculateRegionsForASubmission(submissionId: number, regionAccuracy: number = 1): Promise<number[]> {
+  async calculateRegionsForASubmission(
+    submissionId: number,
+    regionAccuracy: number = 1
+  ): Promise<{ region_id: number }[]> {
     const sql = SQL`
       WITH submission_spatial_point AS (
         SELECT * 
         FROM search_spatial
         ORDER BY RANDOM() 
         LIMIT (
-          SELECT CEIL(:feature_percentage * COUNT(*)) 
+          SELECT CEIL(${regionAccuracy} * COUNT(*)) 
           FROM search_spatial ss, submission_feature sf 
           WHERE ss.submission_feature_id = sf.submission_feature_id 
-          AND	sf.submission_id = :submission_id)
+          AND	sf.submission_id = ${submissionId})
       )
       SELECT rl.region_id
       FROM region_lookup rl 
@@ -69,7 +72,7 @@ export class RegionRepository extends BaseRepository {
         SELECT ST_ConvexHull(st_collect(ss.value::geometry))
         FROM search_spatial ss, submission_feature sf 
         WHERE ss.submission_feature_id = sf.submission_feature_id 
-        AND	sf.submission_id = :submission_id
+        AND	sf.submission_id = ${submissionId}
       ))
       GROUP BY rl.region_name, rl.region_id;
     `;
@@ -77,7 +80,7 @@ export class RegionRepository extends BaseRepository {
     return response.rows;
   }
 
-  async insertSubmissionRegions(submissionId: number, regionIds: number[]) {
+  async insertSubmissionRegions(submissionId: number, regionIds: { region_id: number }[]) {
     // no regions, exit early
     if (!regionIds.length) {
       return;
@@ -89,8 +92,8 @@ export class RegionRepository extends BaseRepository {
 
     sql.append(
       regionIds
-        .map((regionId) => {
-          return `(${[submissionId, regionId].join(',  ')})`;
+        .map((region) => {
+          return `(${[submissionId, region.region_id].join(',  ')})`;
         })
         .join(', ')
     );
