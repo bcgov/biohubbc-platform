@@ -2,20 +2,6 @@ import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { BaseRepository } from './base-repository';
 
-export const SubmissionMessageRecord = z.object({
-  submission_message_id: z.number(),
-  submission_message_type_id: z.number(),
-  submission_id: z.number(),
-  label: z.string(),
-  message: z.string(),
-  data: z.record(z.string(), z.any()).nullable(),
-  create_date: z.string(),
-  create_user: z.number(),
-  update_date: z.string().nullable(),
-  update_user: z.number().nullable(),
-  revision_count: z.number()
-});
-
 export const RegionRecord = z.object({
   region_id: z.any(),
   region_name: z.string(),
@@ -85,9 +71,9 @@ export class RegionRepository extends BaseRepository {
       SELECT rl.region_id
       FROM region_lookup rl 
       WHERE st_intersects(rl.geography, (
-        SELECT ST_ConvexHull(st_collect(ss.value::geometry))
-        FROM search_spatial ss, submission_feature sf 
-        WHERE ss.submission_feature_id = sf.submission_feature_id 
+        SELECT ST_ConvexHull(st_collect(ssp.value::geometry))
+        FROM submission_spatial_point ssp, submission_feature sf 
+        WHERE ssp.submission_feature_id = sf.submission_feature_id 
         AND	sf.submission_id = ${submissionId}
       ))
       GROUP BY rl.region_name, rl.region_id;
@@ -97,7 +83,7 @@ export class RegionRepository extends BaseRepository {
   }
 
   /**
-   * Associates submissions with regions
+   * Associates submissions with regions. This function quits early if no regions are provided.
    *
    * @param {number} submissionId
    * @param {number[]} regionIds
