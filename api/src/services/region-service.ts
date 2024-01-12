@@ -12,7 +12,7 @@ export class RegionService extends DBService {
   }
 
   /**
-   * This function will calculate (via polygon intersect)
+   * This function will calculate and save regions (via polygon intersect) for a given submission id.
    *
    * @param submissionId
    */

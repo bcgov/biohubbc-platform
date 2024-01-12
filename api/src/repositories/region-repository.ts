@@ -43,6 +43,12 @@ export type RegionRecord = z.infer<typeof RegionRecord>;
  * @extends {BaseRepository}
  */
 export class RegionRepository extends BaseRepository {
+  /**
+   * Fetches all region records.
+   *
+   * @returns {*} {Promise<RegionRecord[]>} An array of Region Records
+   * @memberof RegionRepository
+   */
   async getRegions(): Promise<RegionRecord[]> {
     const sql = SQL`
       SELECT * FROM region_lookup
@@ -51,6 +57,16 @@ export class RegionRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Calculates region intersects for a submission search_spatial data.
+   * Submission spatial data is collected then converted into a single polygon using ST_ConvexHull (https://postgis.net/docs/ST_ConvexHull.html)
+   * Any regions intersecting with this calculated value are returned.
+   *
+   * @param {number} submissionId
+   * @param {number} [regionAccuracy=1] regionAccuracy Expected 0-1. Determines the percentage of rows to use
+   * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
+   * @memberof RegionRepository
+   */
   async calculateRegionsForASubmission(
     submissionId: number,
     regionAccuracy: number = 1
@@ -80,6 +96,13 @@ export class RegionRepository extends BaseRepository {
     return response.rows;
   }
 
+  /**
+   * Associates submissions with regions
+   *
+   * @param {number} submissionId
+   * @param {number[]} regionIds
+   * @memberof RegionRepository
+   */
   async insertSubmissionRegions(submissionId: number, regionIds: { region_id: number }[]) {
     // no regions, exit early
     if (!regionIds.length) {
