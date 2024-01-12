@@ -34,18 +34,18 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const featureTypesWithProperties = codesContext.codesDataLoader.data?.feature_type_with_properties;
 
   const featureTypeWithProperties =
-    featureTypesWithProperties?.find((item) => item.feature_type.name === feature_type_name)?.feature_type_properties ||
-    [];
+    featureTypesWithProperties?.find((item) => item.feature_type.feature_type_name === feature_type_name)
+      ?.feature_type_properties || [];
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
   const fieldColumns = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => {
     return {
-      field: featureType.name,
-      headerName: featureType.display_name,
+      field: featureType.feature_property_name,
+      headerName: featureType.feature_property_display_name,
       flex: 1,
       disableColumnMenu: true,
-      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
+      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.feature_property_name] ?? null,
       renderCell: (params: GridRenderCellParams) => {
         return (
           <Box

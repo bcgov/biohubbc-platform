@@ -19,6 +19,7 @@ export class CodeService extends DBService {
 
     this.codeRepository = new CodeRepository(connection);
   }
+
   /**
    * Function that fetches all code sets.
    *
@@ -75,14 +76,14 @@ export class CodeService extends DBService {
       if (index >= 0) {
         groupedFeatureTypePropertyCodes[index].feature_type_properties.push(feature_type_properties);
       } else {
-        groupedFeatureTypePropertyCodes[index] = {
+        groupedFeatureTypePropertyCodes.push({
           feature_type: {
             feature_type_id: featureTypePropertyCode.feature_type_id,
             feature_type_name: featureTypePropertyCode.feature_type_name,
             feature_type_display_name: featureTypePropertyCode.feature_type_display_name
           },
           feature_type_properties: [feature_type_properties]
-        };
+        });
       }
     }
 

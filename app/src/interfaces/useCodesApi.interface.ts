@@ -1,6 +1,7 @@
 export type FeatureTypeCode = {
-  id: number;
-  name: string;
+  feature_type_id: number;
+  feature_type_name: string;
+  feature_type_display_name: string;
 };
 
 export type FeatureTypeWithFeaturePropertiesCode = {
@@ -9,10 +10,11 @@ export type FeatureTypeWithFeaturePropertiesCode = {
 };
 
 export type FeaturePropertyCode = {
-  id: number;
-  name: string;
-  display_name: string;
-  type: string;
+  feature_property_id: number;
+  feature_property_name: string;
+  feature_property_display_name: string;
+  feature_property_type_id: number;
+  feature_property_type_name: string;
 };
 
 /**

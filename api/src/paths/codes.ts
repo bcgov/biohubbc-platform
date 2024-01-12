@@ -29,47 +29,73 @@ GET.apiDoc = {
                   properties: {
                     feature_type: {
                       type: 'object',
-                      required: ['id', 'name'],
+                      required: ['feature_type_id', 'feature_type_name', 'feature_type_display_name'],
                       properties: {
-                        id: {
-                          type: 'number',
-                          description: 'The code id.'
+                        feature_type_id: {
+                          type: 'integer',
+                          description: 'The feature type id.',
+                          minimum: 1
                         },
-                        name: {
+                        feature_type_name: {
                           type: 'string',
-                          description: 'The code name.'
+                          description: 'The feature type name.',
+                          example: 'dataset'
+                        },
+                        feature_type_display_name: {
+                          type: 'string',
+                          description: 'The feature type display name.',
+                          example: 'Dataset'
                         }
-                      }
+                      },
+                      additionalProperties: false
                     },
                     feature_type_properties: {
                       type: 'array',
                       items: {
                         type: 'object',
-                        required: ['id', 'name', 'display_name', 'type'],
+                        required: [
+                          'feature_property_id',
+                          'feature_property_name',
+                          'feature_property_display_name',
+                          'feature_property_type_id',
+                          'feature_property_type_name'
+                        ],
                         properties: {
-                          id: {
-                            type: 'number',
-                            description: 'The code id.'
+                          feature_property_id: {
+                            type: 'integer',
+                            description: 'The feature property id.',
+                            minimum: 1
                           },
-                          name: {
+                          feature_property_name: {
                             type: 'string',
-                            description: 'The code name.'
+                            description: 'The feature property name.',
+                            example: 'description'
                           },
-                          display_name: {
+                          feature_property_display_name: {
                             type: 'string',
-                            description: 'The code display name.'
+                            description: 'The feature property display name.',
+                            example: 'Description'
                           },
-                          type: {
+                          feature_property_type_id: {
+                            type: 'integer',
+                            description: 'The feature property type id.',
+                            minimum: 1
+                          },
+                          feature_property_type_name: {
                             type: 'string',
-                            description: 'The code type.'
+                            description: 'The feature property type name.',
+                            example: 'string'
                           }
-                        }
+                        },
+                        additionalProperties: false
                       }
                     }
-                  }
+                  },
+                  additionalProperties: false
                 }
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }
@@ -81,7 +107,7 @@ GET.apiDoc = {
       $ref: '#/components/responses/401'
     },
     403: {
-      $ref: '#/components/responses/401'
+      $ref: '#/components/responses/403'
     },
     500: {
       $ref: '#/components/responses/500'
