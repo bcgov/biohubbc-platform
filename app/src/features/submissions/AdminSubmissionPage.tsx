@@ -21,18 +21,18 @@ const SubmissionHeader = (props: { submissionFeatureIds: GridRowSelectionModel }
   const submission = submissionContext.submissionRecordDataLoader.data;
 
   if (!submission) {
-    return <></>; // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
+    return <></>;
   }
 
   return (
     <BaseHeader
-      title={submission.name} // TODO
+      title={submission.name}
       subTitle={
         <Stack flexDirection="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
           {submission ? (
             <SubmissionHeaderSecurityStatus submission={submission} />
           ) : (
-            <Skeleton variant="rectangular" /> // TODO
+            <Skeleton variant="rectangular" /> 
           )}
         </Stack>
       }

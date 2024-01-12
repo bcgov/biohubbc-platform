@@ -64,7 +64,7 @@ const SecurityRuleForm = () => {
               return featureGroup.features.some(
                 (feature) => feature.submission_feature_id === securityRecord.submission_feature_id
               );
-            })?.feature_type_display_name || 'Other';
+            })?.feature_type_display_name ?? 'Other';
 
           if (ruleGroupIndex === -1) {
             const securityRule = allSecurityRules.find(

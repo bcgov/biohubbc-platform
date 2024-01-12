@@ -95,8 +95,8 @@ const useSecurityApi = (axios: AxiosInstance) => {
    * active if it has not been end-dated.
    */
   const getActiveSecurityRulesWithCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
-    // TODO confirm if the JSDOC for this function is actually true...
     const { data } = await axios.get('api/administrative/security/rules');
+
     return data;
   };
 
@@ -123,43 +123,6 @@ const useSecurityApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Removes all of the security rules for the given submission feature IDs, rendering them unsecure.
-   *
-   * @deprecated Not supported. Use `patchSecurityRulesOnSubmissionFeatures` instead.
-   *
-   * @param {number[]} submissionFeatureIds
-   * @return {*}  {Promise<any[]>}
-   */
-  const removeSecurityRulesFromSubmissionFeatures = async (submissionFeatureIds: number[]): Promise<any[]> => {
-    // TODO delete this function?
-    const { data } = await axios.post('api/administrative/security/remove', {
-      features: submissionFeatureIds
-    });
-
-    return data;
-  };
-
-  /**
-   * Retrieves the list of all security rule IDs associated with the list of given submission feature IDs
-   *
-   * @deprecated Not supported. You can retrieve the list of all security rule IDs associated with all of the
-   * features belonging to a particular submission using `getAllSecurityRulesForSubmission`
-   *
-   * @param {number[]} features
-   * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
-   */
-  const getSecurityRulesForSubmissionFeatures = async (
-    // TODO delete this function?
-    submissionFeatureIds: number[]
-  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
-    const { data } = await axios.post('api/administrative/security/fetch', {
-      submissionFeatureIds
-    });
-
-    return data;
-  };
-
-  /**
    * Retrieves the list of all security rule IDs associated with the features belonging to the given submission.
    *
    * @param {number[]} features
@@ -178,8 +141,6 @@ const useSecurityApi = (axios: AxiosInstance) => {
     listPersecutionHarmRules,
     applySecurityReasonsToArtifacts,
     patchSecurityRulesOnSubmissionFeatures,
-    removeSecurityRulesFromSubmissionFeatures,
-    getSecurityRulesForSubmissionFeatures,
     getAllSecurityRulesForSubmission,
     getActiveSecurityRulesWithCategories
   };

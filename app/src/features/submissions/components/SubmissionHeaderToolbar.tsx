@@ -25,7 +25,7 @@ const SubmissionHeaderToolbar = (props: ISubmissionHeaderToolbarProps) => {
   const submissionRecordDataLoader = submissionContext.submissionRecordDataLoader;
 
   if (!submissionRecordDataLoader.data) {
-    return <></>; // <CircularProgress className="pageProgress" size={40} />; // TODO makes no sense to show a spinner inside a header
+    return <></>;
   }
 
   const submission = submissionRecordDataLoader.data;

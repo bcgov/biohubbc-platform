@@ -330,11 +330,13 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * TODO jsdoc
+   * Patches security rules that are applied or removed to the given set of submission features. If a
+   * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
+   * added.
    *
-   * @param {number[]} submissionFeatureIds
-   * @param {number[]} applyRuleIds
-   * @param {number[]} removeRuleIds
+   * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
+   * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
+   * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
    * @param {boolean}
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService

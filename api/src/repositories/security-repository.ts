@@ -349,9 +349,11 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * TODO jsdoc
+   * Attaches all of the given security rules to the given submission features.
    *
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} securityRuleIds
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
   async applySecurityRulesToSubmissionFeatures(
@@ -416,7 +418,7 @@ export class SecurityRepository extends BaseRepository {
       .delete()
       .fromRaw('submission_feature_security sfs')
       .whereIn('sfs.submission_feature_id', submissionFeatureIds)
-      .and.whereIn('sfs.security_rule_id', removeRuleIds) // TODO
+      .and.whereIn('sfs.security_rule_id', removeRuleIds)
       .returning('*');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
