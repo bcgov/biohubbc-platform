@@ -113,6 +113,17 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
+   * Fetch all submissions that have completed security review and published.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeature[]>}
+   */
+  const getPublishedSubmissionsForAdmins = async (): Promise<SubmissionRecordWithSecurityAndRootFeature[]> => {
+    const { data } = await axios.get(`api/administrative/submission/published`);
+
+    return data;
+  };
+
+  /**
    * Update (patch) a submission record.
    *
    * @param {number} submissionId
@@ -148,6 +159,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     getSubmissionRecordWithSecurity,
     getUnreviewedSubmissionsForAdmins,
     getReviewedSubmissionsForAdmins,
+    getPublishedSubmissionsForAdmins,
     updateSubmissionRecord,
     getPublishedSubmissions
   };
