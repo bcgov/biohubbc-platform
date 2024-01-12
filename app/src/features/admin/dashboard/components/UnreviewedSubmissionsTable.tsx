@@ -83,17 +83,20 @@ const UnreviewedSubmissionsTable = () => {
 
   return (
     <>
-      <Box pb={4} display="flex" flexDirection="row" justifyContent="space-between">
+      <Stack mb={4} alignItems="center" flexDirection="row" justifyContent="space-between">
         <Typography variant="h4" component="h2">{`${submissionRecords.length} ${p(
           submissionRecords.length,
           'record'
         )} found`}</Typography>
-        <SubmissionsListSortMenu
-          sortMenuItems={{ publish_timestamp: 'Publish Timestamp' }}
-          submissions={submissionRecords}
-          handleSubmissions={handleSortSubmissions}
-        />
-      </Box>
+        <Box my={-1}>
+          <SubmissionsListSortMenu
+            sortMenuItems={{ submitted_timestamp: 'Date Submitted' }}
+            submissions={submissionRecords}
+            handleSubmissions={handleSortSubmissions}
+            apiSortSync={{ key: 'submitted_timestamp', sort: 'desc' }}
+          />
+        </Box>
+      </Stack>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
           console.log(submissionRecord.regions);

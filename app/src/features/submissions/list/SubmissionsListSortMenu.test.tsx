@@ -20,6 +20,7 @@ const renderMenu = () =>
         submissions={mockSubmissions}
         handleSubmissions={mockHandleSubmissions}
         sortMenuItems={menuItems}
+        apiSortSync={{ key: 'name', sort: 'asc' }}
       />
     </ThemeProvider>
   );

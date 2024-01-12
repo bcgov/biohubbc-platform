@@ -1267,6 +1267,8 @@ export class SubmissionRepository extends BaseRepository {
           submission.security_review_timestamp IS NOT NULL
         AND
           submission_feature.parent_submission_feature_id IS NULL
+        AND
+          submission.publish_timestamp IS NULL
         GROUP BY
           submission.submission_id,
           submission_feature.feature_type_id,
@@ -1288,7 +1290,67 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
+   * Get all submissions that have completed security review and are published.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionRepository
+   */
+  async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    const sqlStatement = SQL`
+    WITH w_unique_submissions as (
+      SELECT
+        DISTINCT ON (submission.uuid) submission.*,
+        submission_feature.feature_type_id as root_feature_type_id,
+        feature_type.name as root_feature_type_name,
+        CASE
+          WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+        END as security
+      FROM
+        submission
+      INNER JOIN
+        submission_feature
+      ON
+        submission.submission_id = submission_feature.submission_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      WHERE
+        submission.security_review_timestamp IS NOT NULL
+      AND
+        submission_feature.parent_submission_feature_id IS NULL
+      AND
+        submission.publish_timestamp IS NOT NULL
+      GROUP BY
+        submission.submission_id,
+        submission_feature.feature_type_id,
+        feature_type.name
+      ORDER BY
+        submission.uuid, submission.submission_id DESC
+    )
+    SELECT
+      *
+    FROM
+      w_unique_submissions
+    ORDER BY
+      security_review_timestamp DESC;
+  `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
+
+    return response.rows;
+  }
+
+  /**
    * Get all submission features by submission id.
+   *
    *
    * @param {number} submissionId
    * @return {*}  {Promise<SubmissionFeatureRecordWithTypeAndSecurity[]>}

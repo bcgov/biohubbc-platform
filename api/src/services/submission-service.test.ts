@@ -831,7 +831,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
-          publish_timestamp: '2023-12-12',
+          publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
@@ -849,7 +849,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
-          publish_timestamp: '2023-12-12',
+          publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
@@ -872,6 +872,62 @@ describe('SubmissionService', () => {
       const response = await submissionService.getReviewedSubmissionsForAdmins();
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
+      expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getPublishedSubmissionsForAdmins', () => {
+    it('should return an array of submission records', async () => {
+      const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
+        {
+          submission_id: 1,
+          uuid: '123-456-789',
+          security_review_timestamp: null,
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: null,
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.UNSECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
+        },
+        {
+          submission_id: 2,
+          uuid: '789-456-123',
+          security_review_timestamp: '2023-12-12',
+          submitted_timestamp: '2023-12-12',
+          source_system: 'SIMS',
+          name: 'name',
+          description: 'description',
+          publish_timestamp: null,
+          create_date: '2023-12-12',
+          create_user: 1,
+          update_date: '2023-12-12',
+          update_user: 1,
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.SECURED,
+          root_feature_type_id: 1,
+          root_feature_type_name: 'dataset'
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const getPublishedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getPublishedSubmissionsForAdmins')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getPublishedSubmissionsForAdmins();
+
+      expect(getPublishedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
     });
   });

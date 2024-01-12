@@ -7,9 +7,10 @@ import Typography from '@mui/material/Typography';
 import ReviewedSubmissionsTable from 'features/admin/dashboard/components/ReviewedSubmissionsTable';
 import UnreviewedSubmissionsTable from 'features/admin/dashboard/components/UnreviewedSubmissionsTable';
 import { useState } from 'react';
+import PublishedSubmissionsTable from './components/PublishedSubmissionsTable';
 
 const DashboardPage = () => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'complete'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'complete' | 'published'>('pending');
 
   return (
     <>
@@ -20,7 +21,7 @@ const DashboardPage = () => {
             py: 4,
             pb: 0
           }}>
-          <Typography variant="h1" sx={{ mt: '-4px', ml: '-2px' }}>
+          <Typography variant="h1" sx={{ ml: '-2px' }}>
             Submissions
           </Typography>
 
@@ -44,6 +45,12 @@ const DashboardPage = () => {
               id="submission-complete-tab"
               aria-controls="submission-complete-tabpanel"
             />
+            <Tab
+              value="published"
+              label="Published"
+              id="submission-published-tab"
+              aria-controls="submission-published-tabpanel"
+            />
           </Tabs>
         </Container>
       </Paper>
@@ -64,6 +71,15 @@ const DashboardPage = () => {
             id="submission-complete-tabpanel"
             aria-labelledby="submission-complete-tab">
             <ReviewedSubmissionsTable />
+          </Box>
+        )}
+
+        {activeTab === 'published' && (
+          <Box
+            hidden={activeTab !== 'published'}
+            id="submission-published-tabpanel"
+            aria-labelledby="submission-published-tab">
+            <PublishedSubmissionsTable />
           </Box>
         )}
       </Container>
