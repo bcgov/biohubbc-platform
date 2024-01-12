@@ -40,6 +40,7 @@ const apiDeploy = async (settings) => {
         ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
         // S3 (Object Store)
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
+        OBJECT_STORE_SECRETS: 'biohubbc-object-store',
         // Database
         TZ: phases[phase].tz,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
@@ -60,7 +61,7 @@ const apiDeploy = async (settings) => {
         KEYCLOAK_API_ENVIRONMENT: phases[phase].sso.cssApi.cssApiEnvironment,
         // Log Level
         LOG_LEVEL: phases[phase].logLevel || 'info',
-        // OPenshift Resources
+        // Openshift Resources
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,
         MEMORY_REQUEST: phases[phase].memoryRequest,

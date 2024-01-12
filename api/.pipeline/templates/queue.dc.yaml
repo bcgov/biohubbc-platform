@@ -25,10 +25,12 @@ parameters:
   - name: DB_SERVICE_NAME
     description: 'Database service name associated with deployment'
     required: true
+  # Node
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
     value: 'dev'
+  # Elastic Search
   - name: ELASTICSEARCH_URL
     description: Platform Elasticsearch URL
     required: true
@@ -41,43 +43,22 @@ parameters:
     description: Platform Elasticsearch Taxonomy Index
     required: true
     vale: 'taxonomy_3.0.0'
-  - name: S3_KEY_PREFIX
-    description: S3 key optional prefix
-    required: false
-    value: 'biohub'
   - name: TZ
     description: Application timezone
     required: false
     value: 'America/Vancouver'
-  - name: KEYCLOAK_HOST
-    description: Key clock login url
-    required: true
-  - name: KEYCLOAK_REALM
-    description: Realm identifier or name
-    required: true
-  - name: KEYCLOAK_INTEGRATION_ID
-    description: keycloak integration id
-    required: true
-  - name: KEYCLOAK_API_HOST
-    description: keycloak API host
-    required: true
-  - name: KEYCLOAK_CLIENT_ID
-    description: Client Id for application
-    required: true
-  - name: KEYCLOAK_ADMIN_USERNAME
-    description: keycloak host admin username
-    required: true
-  - name: KEYCLOAK_SECRET
-    description: The name of the keycloak secret
-    required: true
-  - name: KEYCLOAK_SECRET_ADMIN_PASSWORD
-    description: The key of the admin password in the keycloak secret
-    required: true
+  # Object Store (S3)
+  - name: S3_KEY_PREFIX
+    description: S3 key optional prefix
+    required: false
+    value: 'biohub'
   - name: OBJECT_STORE_SECRETS
     description: Secrets used to read and write to the S3 storage
     value: 'biohubbc-object-store'
+  # Log Level
   - name: LOG_LEVEL
     value: 'info'
+  # Openshift
   - name: CPU_REQUEST
     value: '100m'
   - name: CPU_LIMIT
@@ -164,23 +145,6 @@ objects:
                       name: ${DB_SERVICE_NAME}
                 - name: DB_PORT
                   value: '5432'
-                - name: KEYCLOAK_HOST
-                  value: ${KEYCLOAK_HOST}
-                - name: KEYCLOAK_API_HOST
-                  value: ${KEYCLOAK_API_HOST}
-                - name: KEYCLOAK_REALM
-                  value: ${KEYCLOAK_REALM}
-                - name: KEYCLOAK_CLIENT_ID
-                  value: ${KEYCLOAK_CLIENT_ID}
-                - name: KEYCLOAK_INTEGRATION_ID
-                  value: ${KEYCLOAK_INTEGRATION_ID}
-                - name: KEYCLOAK_ADMIN_USERNAME
-                  value: ${KEYCLOAK_ADMIN_USERNAME}
-                - name: KEYCLOAK_ADMIN_PASSWORD
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${KEYCLOAK_SECRET}
-                      key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD}
                 - name: CHANGE_VERSION
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
@@ -273,7 +237,7 @@ objects:
       name: ${NAME}${SUFFIX}
     type: Opaque
   - kind: HorizontalPodAutoscaler
-    apiVersion: autoscaling/v2beta2
+    apiVersion: autoscaling/v2
     metadata:
       annotations: {}
       creationTimestamp: null
