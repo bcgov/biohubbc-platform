@@ -29,11 +29,7 @@ const SubmissionHeader = (props: { submissionFeatureIds: GridRowSelectionModel }
       title={submission.name}
       subTitle={
         <Stack flexDirection="row" alignItems="center" gap={0.25} mt={1} mb={0.25}>
-          {submission ? (
-            <SubmissionHeaderSecurityStatus submission={submission} />
-          ) : (
-            <Skeleton variant="rectangular" /> 
-          )}
+          {submission ? <SubmissionHeaderSecurityStatus submission={submission} /> : <Skeleton variant="rectangular" />}
         </Stack>
       }
       buttonJSX={<SubmissionHeaderToolbar submissionFeatureIds={props.submissionFeatureIds} />}
