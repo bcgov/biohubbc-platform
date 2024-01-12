@@ -32,7 +32,7 @@ describe('CodeRepository', () => {
     });
   });
 
-  describe('getFeatureTypeProperties', async () => {
+  describe('getFeatureTypePropertyCodes', async () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -56,7 +56,7 @@ describe('CodeRepository', () => {
 
       const codeRepository = new CodeRepository(mockDBConnection);
 
-      const result = await codeRepository.getFeatureTypeProperties(1);
+      const result = await codeRepository.getFeatureTypePropertyCodes();
 
       expect(result).to.be.eql([{ id: 1, name: 'name', display_name: 'display', type: 'string' }]);
     });

@@ -1,5 +1,10 @@
 import { IDBConnection } from '../database/db';
-import { CodeRepository, FeatureTypeWithFeaturePropertiesCode, IAllCodeSets } from '../repositories/code-repository';
+import {
+  CodeRepository,
+  FeatureTypeCode,
+  FeatureTypeWithFeaturePropertiesCode,
+  IAllCodeSets
+} from '../repositories/code-repository';
 import { FeaturePropertyRecord } from '../repositories/search-index-respository';
 import { getLogger } from '../utils/logger';
 import { DBService } from './db-service';
@@ -23,7 +28,7 @@ export class CodeService extends DBService {
   async getAllCodeSets(): Promise<IAllCodeSets> {
     defaultLog.debug({ message: 'getAllCodeSets' });
 
-    const [feature_type_with_properties] = await Promise.all([await this.getFeatureTypeProperties()]);
+    const [feature_type_with_properties] = await Promise.all([await this.getFeatureTypePropertyCodes()]);
 
     return {
       feature_type_with_properties
@@ -31,28 +36,57 @@ export class CodeService extends DBService {
   }
 
   /**
-   * Function that fetches all feature type properties.
+   * Get all feature types.
+   *
+   * @return {*}  {Promise<FeatureTypeCode[]>}
+   * @memberof CodeService
+   */
+  async getFeatureTypes(): Promise<FeatureTypeCode[]> {
+    return this.codeRepository.getFeatureTypes();
+  }
+
+  /**
+   * Get all feature properties grouped by feature type.
    *
    * @return {*}  {Promise<FeatureTypeWithFeaturePropertiesCode[]>}
    * @memberof CodeService
    */
-  async getFeatureTypeProperties(): Promise<FeatureTypeWithFeaturePropertiesCode[]> {
-    defaultLog.debug({ message: 'getFeatureTypeProperties' });
+  async getFeatureTypePropertyCodes(): Promise<FeatureTypeWithFeaturePropertiesCode[]> {
+    defaultLog.debug({ message: 'getFeatureTypePropertyCodes' });
 
-    const feature_types = await this.codeRepository.getFeatureTypes();
+    const featureTypePropertyCodes = await this.codeRepository.getFeatureTypePropertyCodes();
 
-    const feature_type_with_properties = await Promise.all(
-      feature_types.map(async (feature_type) => {
-        const feature_type_properties = await this.codeRepository.getFeatureTypeProperties(feature_type.id);
+    const groupedFeatureTypePropertyCodes: FeatureTypeWithFeaturePropertiesCode[] = [];
 
-        return {
-          feature_type,
-          feature_type_properties
+    // Iterate over the raw array of feature type property codes and group them by feature type
+    for (const featureTypePropertyCode of featureTypePropertyCodes) {
+      const index = groupedFeatureTypePropertyCodes.findIndex(
+        (item) => item.feature_type.feature_type_id === featureTypePropertyCode.feature_type_id
+      );
+
+      const feature_type_properties = {
+        feature_property_id: featureTypePropertyCode.feature_property_id,
+        feature_property_name: featureTypePropertyCode.feature_property_name,
+        feature_property_display_name: featureTypePropertyCode.feature_property_display_name,
+        feature_property_type_id: featureTypePropertyCode.feature_property_type_id,
+        feature_property_type_name: featureTypePropertyCode.feature_property_type_name
+      };
+
+      if (index >= 0) {
+        groupedFeatureTypePropertyCodes[index].feature_type_properties.push(feature_type_properties);
+      } else {
+        groupedFeatureTypePropertyCodes[index] = {
+          feature_type: {
+            feature_type_id: featureTypePropertyCode.feature_type_id,
+            feature_type_name: featureTypePropertyCode.feature_type_name,
+            feature_type_display_name: featureTypePropertyCode.feature_type_display_name
+          },
+          feature_type_properties: [feature_type_properties]
         };
-      })
-    );
+      }
+    }
 
-    return feature_type_with_properties;
+    return groupedFeatureTypePropertyCodes;
   }
 
   /**

@@ -5,17 +5,19 @@ import { BaseRepository } from './base-repository';
 import { FeaturePropertyRecord } from './search-index-respository';
 
 const FeatureTypeCode = z.object({
-  id: z.number(),
-  name: z.string()
+  feature_type_id: z.number(),
+  feature_type_name: z.string(),
+  feature_type_display_name: z.string()
 });
 
 export type FeatureTypeCode = z.infer<typeof FeatureTypeCode>;
 
 const FeaturePropertyCode = z.object({
-  id: z.number(),
-  name: z.string(),
-  display_name: z.string(),
-  type: z.string()
+  feature_property_id: z.number(),
+  feature_property_name: z.string(),
+  feature_property_display_name: z.string(),
+  feature_property_type_id: z.number(),
+  feature_property_type_name: z.string()
 });
 
 export type FeaturePropertyCode = z.infer<typeof FeaturePropertyCode>;
@@ -44,51 +46,56 @@ export class CodeRepository extends BaseRepository {
   /**
    * Get all feature types.
    *
-   * @return {*}  {Promise<FeatureTypeWithFeaturePropertiesCode['feature_type'][]>}
+   * @return {*}  {Promise<FeatureTypeCode[]>}
    * @memberof CodeRepository
    */
-  async getFeatureTypes(): Promise<FeatureTypeWithFeaturePropertiesCode['feature_type'][]> {
+  async getFeatureTypes(): Promise<FeatureTypeCode[]> {
     const sql = SQL`
       SELECT 
-        feature_type_id as id, 
-        name
+        feature_type_id, 
+        name as feature_type_name,
+        display_name as feature_type_display_name
       FROM 
         feature_type;
     `;
 
-    const response = await this.connection.sql(sql, FeatureTypeWithFeaturePropertiesCode['feature_type']);
+    const response = await this.connection.sql(sql, FeatureTypeCode);
 
     return response.rows;
   }
 
   /**
-   * Get all feature type properties for the specified feature type.
+   * Get all feature type property codes for all feature types.
    *
-   * @param {number} featureTypeId
-   * @return {*}  {Promise<FeaturePropertyCode[]>}
+   * @return {*}  {(Promise<(FeatureTypeCode & FeaturePropertyCode)[]>)}
    * @memberof CodeRepository
    */
-  async getFeatureTypeProperties(featureTypeId: number): Promise<FeaturePropertyCode[]> {
+  async getFeatureTypePropertyCodes(): Promise<(FeatureTypeCode & FeaturePropertyCode)[]> {
     const sql = SQL`
       SELECT
-        ftp.feature_type_property_id as id,
-        fp.name as name,
-        fp.display_name as display_name,
-        fpt.name as type
+        ft.feature_type_id,
+        ft.name as feature_type_name,
+        ft.display_name as feature_type_display_name,
+        fp.feature_property_id,
+        fp.name as feature_property_name,
+        fp.display_name as feature_property_display_name,
+        fpt.feature_property_type_id,
+        fpt.name as feature_property_type_name
       FROM
-        feature_type_property ftp
+        feature_type ft
+      INNER JOIN
+        feature_type_property ftp on ft.feature_type_id = ftp.feature_type_id 
       INNER JOIN
         feature_property fp ON fp.feature_property_id = ftp.feature_property_id
       INNER JOIN
         feature_property_type fpt ON fpt.feature_property_type_id = fp.feature_property_type_id
-      WHERE
-        ftp.feature_type_id = ${featureTypeId}
       ORDER BY
+        ft.sort, 
         ftp.sort
       ASC;
     `;
 
-    const response = await this.connection.sql(sql, FeaturePropertyCode);
+    const response = await this.connection.sql(sql, FeatureTypeCode.merge(FeaturePropertyCode));
 
     return response.rows;
   }

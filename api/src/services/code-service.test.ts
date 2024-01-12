@@ -23,7 +23,9 @@ describe('codeService', () => {
         feature_type_properties: [{ id: 1, name: 'test', display_name: 'display', type: 'type' }]
       } as unknown as IAllCodeSets['feature_type_with_properties'];
 
-      const getFeatureTypePropertiesStub = sinon.stub(CodeService.prototype, 'getFeatureTypeProperties').resolves(data);
+      const getFeatureTypePropertiesStub = sinon
+        .stub(CodeService.prototype, 'getFeatureTypePropertyCodes')
+        .resolves(data);
 
       const result = await codeService.getAllCodeSets();
 
@@ -32,7 +34,7 @@ describe('codeService', () => {
     });
   });
 
-  describe('getFeatureTypeProperties', () => {
+  describe('getFeatureTypePropertyCodes', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -51,10 +53,10 @@ describe('codeService', () => {
         .resolves([{ id: 1, name: 'test' }]);
 
       const getFeatureTypePropertiesStub = sinon
-        .stub(CodeRepository.prototype, 'getFeatureTypeProperties')
+        .stub(CodeRepository.prototype, 'getFeatureTypePropertyCodes')
         .resolves([{ id: 1, name: 'test', display_name: 'display', type: 'type' }]);
 
-      const result = await codeService.getFeatureTypeProperties();
+      const result = await codeService.getFeatureTypePropertyCodes();
 
       expect(result).to.eql([returnData]);
       expect(getFeatureTypePropertiesStub).to.have.been.calledOnce;
