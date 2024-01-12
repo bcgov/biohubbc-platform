@@ -37,7 +37,7 @@ const useDownload = () => {
       const url = await signedUrl;
 
       window.open(url, '_blank');
-    } catch (err) {
+    } catch (err: any) {
       dialogContext.setErrorDialog({
         onOk: () => dialogContext.setErrorDialog({ open: false }),
         onClose: () => dialogContext.setErrorDialog({ open: false }),
