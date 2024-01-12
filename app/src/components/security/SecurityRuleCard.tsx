@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material';
-import { ReactNode } from 'react';
+import { Stack } from '@mui/system';
 
 export interface ISecurityRuleCardProps {
   key?: string | number;
@@ -7,8 +7,8 @@ export interface ISecurityRuleCardProps {
   category: string;
   description: string;
   featureMembers?: string[];
-  actionContent?: ReactNode;
 }
+
 const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
   return (
     <Box>
@@ -41,15 +41,14 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
         }}>
         {props.description}
       </Typography>
-      {props.actionContent}
       {props.featureMembers && props.featureMembers?.length && (
-        <Box component="ul" pl={4} mb={0} mt={1}>
+        <Stack component="ul" mt={1} pl={0} mb={0} display="flex" flexDirection="row" gap={2}>
           {props.featureMembers.map((featureMember) => (
-            <Typography variant="body2" color="textSecondary" sx={{}} component="li">
+            <Typography variant="body2" color="textSecondary" sx={{ display: 'block' }} component="li">
               {featureMember}
             </Typography>
           ))}
-        </Box>
+        </Stack>
       )}
     </Box>
   );
