@@ -38,6 +38,8 @@ describe('SearchIndexService', () => {
               latitude: 11,
               longitude: 11
             },
+            source_id: '321',
+            uuid: '345-456-234',
             parent_submission_feature_id: null,
             record_effective_date: '',
             record_end_date: null,
@@ -65,6 +67,8 @@ describe('SearchIndexService', () => {
               latitude: 22,
               longitude: 22
             },
+            source_id: '321',
+            uuid: '345-456-234',
             parent_submission_feature_id: null,
             record_effective_date: '',
             record_end_date: null,

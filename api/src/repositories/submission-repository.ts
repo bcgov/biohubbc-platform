@@ -1214,7 +1214,7 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
-          DISTINCT ON (submission.uuid) submission.*,
+          DISTINCT ON (submission.source_id) submission.*,
           submission_feature.feature_type_id as root_feature_type_id,
           feature_type.name as root_feature_type_name,
           ${SECURITY_APPLIED_STATUS.PENDING} as security
@@ -1233,7 +1233,7 @@ export class SubmissionRepository extends BaseRepository {
         AND
           submission_feature.parent_submission_feature_id IS NULL
         ORDER BY
-          submission.uuid, submission.submission_id DESC
+          submission.source_id, submission.submission_id DESC
       )
       SELECT
         *
@@ -1257,7 +1257,7 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
-          DISTINCT ON (submission.uuid) submission.*,
+          DISTINCT ON (submission.source_id) submission.*,
           submission_feature.feature_type_id as root_feature_type_id,
           feature_type.name as root_feature_type_name,
           CASE
@@ -1289,7 +1289,7 @@ export class SubmissionRepository extends BaseRepository {
           submission_feature.feature_type_id,
           feature_type.name
         ORDER BY
-          submission.uuid, submission.submission_id DESC
+          submission.source_id, submission.submission_id DESC
       )
       SELECT
         *
@@ -1473,11 +1473,6 @@ export class SubmissionRepository extends BaseRepository {
           );
       });
     }
-
-    console.log('=========================================');
-    console.log(queryBuilder.toSQL().toNative().sql);
-    console.log(queryBuilder.toSQL().toNative().bindings);
-    console.log('---------------------------------------');
 
     const response = await this.connection.knex(queryBuilder, SubmissionFeatureRecord);
 

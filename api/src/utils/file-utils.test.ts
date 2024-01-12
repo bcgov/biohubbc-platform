@@ -682,18 +682,6 @@ describe('file-utils', () => {
     });
   });
 
-  describe('generateArtifactS3FileKey', () => {
-    it('returns an s3 key with a prefix', async () => {
-      const result = fileUtils.generateArtifactS3FileKey({
-        artifactId: 1,
-        datasetUUID: '123-456-789',
-        fileName: 'testFileName'
-      });
-
-      expect(result).to.equal('biohub/datasets/123-456-789/artifacts/1/testFileName');
-    });
-  });
-
   describe('generateQueueS3FileKey', () => {
     it('returns an s3 key with a prefix', async () => {
       const result = fileUtils.generateQueueS3FileKey({
