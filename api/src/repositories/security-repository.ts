@@ -360,6 +360,8 @@ export class SecurityRepository extends BaseRepository {
     submissionFeatureIds: number[],
     securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
+    defaultLog.debug({ label: 'applySecurityRulesToSubmissionFeatures', submissionFeatureIds, securityRuleIds });
+
     const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
       return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
     });
@@ -413,6 +415,7 @@ export class SecurityRepository extends BaseRepository {
     removeRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
     defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds });
+
     const queryBuilder = getKnex()
       .queryBuilder()
       .delete()

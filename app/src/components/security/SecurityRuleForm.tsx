@@ -10,7 +10,7 @@ import { useSubmissionContext } from 'hooks/useContext';
 import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 import { useMemo, useState } from 'react';
 import { TransitionGroup } from 'react-transition-group';
-import { alphabetizeObjects } from 'utils/Utils';
+import { alphabetizeObjects, pluralize as p } from 'utils/Utils';
 import SecurityRuleActionCard from './SecurityRuleActionCard';
 import SecurityRuleCard from './SecurityRuleCard';
 
@@ -98,9 +98,6 @@ const SecurityRuleForm = () => {
         }, [])
     );
   }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
-
-  console.log({ groupedAppliedSecurityRules });
-  console.log({ test: submissionFeatureGroupsDataLoader.data });
 
   const { previosulyUnappliedRules } = useMemo(
     function () {
@@ -289,7 +286,8 @@ const SecurityRuleForm = () => {
                   category={group.securityRule.category_name}
                   description={group.securityRule.description}
                   featureMembers={group.appliedFeatureGroups.map(
-                    (featureGroup) => `${featureGroup.displayName} (${featureGroup.numFeatures})`
+                    (featureGroup) =>
+                      `${p(featureGroup.numFeatures, featureGroup.displayName)} (${featureGroup.numFeatures})`
                   )}
                   onRemove={() => toggleStageRemove(group.securityRule)}
                 />

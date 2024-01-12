@@ -192,7 +192,7 @@ export function patchSecurityRulesOnSubmissionFeatures(): RequestHandler {
 
     const submissionFeatureIds: number[] = req.body.submissionFeatureIds;
     const applyRuleIds: number[] = req.body.applyRuleIds;
-    const removeRuleIds: number[] = req.body.applyRuleIds;
+    const removeRuleIds: number[] = req.body.removeRuleIds;
 
     try {
       await connection.open();

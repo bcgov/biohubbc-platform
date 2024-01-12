@@ -346,6 +346,8 @@ export class SecurityService extends DBService {
     applyRuleIds: number[],
     removeRuleIds: number[]
   ): Promise<void> {
+    defaultLog.debug({ label: 'patchSecurityRulesOnSubmissionFeatures', applyRuleIds, removeRuleIds });
+
     if (!submissionFeatureIds.length) {
       return;
     }

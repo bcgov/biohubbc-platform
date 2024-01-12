@@ -35,7 +35,7 @@ export const ApplySecurityRulesI18N = {
       .filter(Boolean)
       .join(' and ');
 
-    return `Successfully ${appliedRemoved} to ${featureCount} ${p(featureCount, 'feature')}.`;
+    return `Successfully ${appliedRemoved} for ${featureCount} ${p(featureCount, 'feature')}.`;
   },
 
   applySecurityRulesErrorTitle: 'Error Applying Security',

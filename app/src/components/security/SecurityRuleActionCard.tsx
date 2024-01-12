@@ -24,18 +24,7 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
         justifyContent: 'space-between',
         background: grey[100]
       }}>
-      <SecurityRuleCard
-        {...rest}
-        // TODO remove this
-        // actionContent={
-        //   props.action === 'apply'
-        //     ? <FormHelperText sx={(theme) => ({ color: theme.palette.info.dark })}>Will be applied to all features</FormHelperText>
-        //     : (props.action === 'remove'
-        //       ? <FormHelperText sx={(theme) => ({ color: theme.palette.error.main })}>Will be removed from all features</FormHelperText>
-        //       : <></>
-        //     )
-        // }
-      />
+      <SecurityRuleCard {...rest} />
       {props.action === 'apply' ? (
         <IconButton onClick={() => onRemove()} aria-label="Remove security rule">
           <Icon path={mdiClose} size={1} />
