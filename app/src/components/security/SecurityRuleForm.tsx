@@ -99,9 +99,6 @@ const SecurityRuleForm = () => {
     );
   }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
 
-  console.log({ groupedAppliedSecurityRules });
-  console.log({ test: submissionFeatureGroupsDataLoader.data });
-
   const { previosulyUnappliedRules } = useMemo(
     function () {
       const previouslyAppliedRules: ISecurityRuleAndCategory[] = [];
