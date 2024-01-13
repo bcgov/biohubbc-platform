@@ -151,6 +151,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Fetch signed URL for a submission_feature (artifact) key value pair
+   *
+   * @async
+   * @param {SubmissionFeatureSignedUrlPayload} params
+   * @returns {Promise<string>} signed URL
+   */
   const getSubmissionFeatureSignedUrl = async (params: SubmissionFeatureSignedUrlPayload): Promise<string> => {
     const { submissionFeatureKey, submissionFeatureValue, submissionId, submissionFeatureId } = params;
 

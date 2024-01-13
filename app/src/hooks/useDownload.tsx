@@ -1,20 +1,23 @@
 import { useDialogContext } from './useContext';
 
-const useDownload = () => {
+export const useDownload = () => {
   const dialogContext = useDialogContext();
+
   /**
-   * handler for downloading raw data as JSON
+   * Handler for downloading raw data as JSON.
    * Note: currently this does not zip the file. Can be modified if needed.
    *
-   * @param {any} data - to download
-   * @param {string} fileName - name of file excluding file extension ie: file1
+   * @param {any} data - Data to download.
+   * @param {string} fileName - Name of file excluding file extension ie: file1.
    */
   const downloadJSON = (data: any, fileName: string) => {
     const blob = new Blob([JSON.stringify(data, undefined, 2)], { type: 'application/json' });
 
     const link = document.createElement('a');
 
-    link.download = `${fileName}.json`;
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z ]/g, '');
+
+    link.download = `Biohub-${sanitizedFileName}.json`;
 
     link.href = URL.createObjectURL(blob);
 
@@ -24,13 +27,13 @@ const useDownload = () => {
   };
 
   /**
-   * Downloads / views a signed url
-   * displays error dialog if signedUrlService throws error
-   * Note: allows a promise to be passed to handle different api services
+   * Downloads or views a signed url.
+   * Displays error dialog if signedUrlService throws error.
+   * Note: Allows a promise to be passed to handle different api services.
    *
    * @async
-   * @param {SubmissionFeatureSignedUrlPayload} params
-   * @returns {Promise<[void]>}
+   * @param {Promise<string> | string} params
+   * @returns {Promise<void>}
    */
   const downloadSignedUrl = async (signedUrl: Promise<string> | string) => {
     try {
@@ -49,5 +52,3 @@ const useDownload = () => {
   };
   return { downloadJSON, downloadSignedUrl };
 };
-
-export default useDownload;

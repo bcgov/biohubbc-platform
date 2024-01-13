@@ -64,8 +64,7 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'string',
-            nullable: true
+            type: 'string'
           }
         }
       }
@@ -97,7 +96,7 @@ export function getSubmissionFeatureSignedUrl(): RequestHandler {
 
       const isAdmin = await userService.isSystemUserAdmin();
 
-      const result = await submissionService.getSubmissionFeatureSignedUrl({
+      const signedUrl = await submissionService.getSubmissionFeatureSignedUrl({
         submissionFeatureId,
         submissionFeatureObj: { key: submissionFeatureDataKey, value: submissionFeatureDataValue },
         isAdmin
@@ -105,7 +104,7 @@ export function getSubmissionFeatureSignedUrl(): RequestHandler {
 
       await connection.commit();
 
-      res.status(200).json(result);
+      res.status(200).json(signedUrl);
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionFeatureSignedUrl', message: 'error', error });
       await connection.rollback();

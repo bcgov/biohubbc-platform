@@ -4,7 +4,8 @@ import { Box } from '@mui/system';
 import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import React, { useState } from 'react';
-import useColumns from './useSubmissionDataGridColumns';
+import { pluralize } from 'utils/Utils';
+import useSubmissionDataGridColumns from './useSubmissionDataGridColumns';
 
 export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
@@ -21,7 +22,7 @@ export interface ISubmissionDataGridProps {
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const { submissionFeatures, feature_type_display_name, feature_type_name } = props;
 
-  const columns = useColumns(feature_type_name);
+  const columns = useSubmissionDataGridColumns(feature_type_name);
 
   const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
@@ -29,7 +30,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     <Paper elevation={0}>
       <Toolbar>
         <Typography component="h2" variant="h4">
-          {`${feature_type_display_name} Records`}
+          {`${feature_type_display_name} ${pluralize(submissionFeatures.length, 'Record')}`}
           <Typography component="span" fontSize="inherit" fontWeight="inherit" color="textSecondary" sx={{ ml: 0.5 }}>
             ({submissionFeatures.length})
           </Typography>
