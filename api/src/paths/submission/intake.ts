@@ -141,7 +141,7 @@ export function submissionIntake(): RequestHandler {
       await searchIndexService.indexFeaturesBySubmissionId(response.submission_id);
 
       // Calculate and add submission regions
-      await regionService.calculateRegionsForSubmission(response.submission_id);
+      await regionService.calculateAndAddRegionsForSubmission(response.submission_id);
 
       await connection.commit();
 

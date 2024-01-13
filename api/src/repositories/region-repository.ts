@@ -50,14 +50,14 @@ export class RegionRepository extends BaseRepository {
    * Any regions intersecting with this calculated value are returned.
    *
    * @param {number} submissionId
-   * @param {number} [regionAccuracy=1] regionAccuracy Expected 0-1. Determines the percentage of rows to use
+   * @param {number} [rowPercentage=1] rowPercentage Expected 0-1. Determines the percentage of rows to use
    * @param {number} [intersectThreshold=1] intersectThreshold Expected 0-1. Determines the percentage threshold for intersections to be valid
    * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
    * @memberof RegionRepository
    */
   async calculateRegionsForASubmission(
     submissionId: number,
-    regionAccuracy: number = 1,
+    rowPercentage: number = 1,
     intersectThreshold: number = 1
   ): Promise<{ region_id: number }[]> {
     const sql = SQL`
@@ -67,7 +67,7 @@ export class RegionRepository extends BaseRepository {
         FROM search_spatial
         ORDER BY RANDOM() 
         LIMIT (
-          SELECT CEIL(${regionAccuracy} * COUNT(*)) 
+          SELECT CEIL(${rowPercentage} * COUNT(*)) 
           FROM search_spatial ss, submission_feature sf 
           WHERE ss.submission_feature_id = sf.submission_feature_id 
           AND	sf.submission_id = ${submissionId}

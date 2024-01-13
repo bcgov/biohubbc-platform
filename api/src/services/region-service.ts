@@ -16,8 +16,16 @@ export class RegionService extends DBService {
    *
    * @param submissionId
    */
-  async calculateRegionsForSubmission(submissionId: number): Promise<void> {
-    const regionIds = await this.regionRepository.calculateRegionsForASubmission(submissionId);
+  async calculateAndAddRegionsForSubmission(
+    submissionId: number,
+    rowPercentage: number = 1,
+    intersectThreshold: number = 1
+  ): Promise<void> {
+    const regionIds = await this.regionRepository.calculateRegionsForASubmission(
+      submissionId,
+      rowPercentage,
+      intersectThreshold
+    );
     await this.regionRepository.insertSubmissionRegions(submissionId, regionIds);
   }
 }
