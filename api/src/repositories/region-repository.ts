@@ -46,19 +46,23 @@ export class RegionRepository extends BaseRepository {
   /**
    * Calculates region intersects for a submission search_spatial data.
    * Submission spatial data is collected then converted into a single polygon using ST_ConvexHull (https://postgis.net/docs/ST_ConvexHull.html)
+   * Intersections are calculated based on area coverage passed in through intersectionThreshold
    * Any regions intersecting with this calculated value are returned.
    *
    * @param {number} submissionId
    * @param {number} [regionAccuracy=1] regionAccuracy Expected 0-1. Determines the percentage of rows to use
+   * @param {number} [intersectThreshold=1] intersectThreshold Expected 0-1. Determines the percentage threshold for intersections to be valid
    * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
    * @memberof RegionRepository
    */
   async calculateRegionsForASubmission(
     submissionId: number,
-    regionAccuracy: number = 1
+    regionAccuracy: number = 1,
+    intersectThreshold: number = 1
   ): Promise<{ region_id: number }[]> {
     const sql = SQL`
-      WITH submission_spatial_point AS (
+      -- Get a percentage of search_spatial rows for a given 
+      with submission_spatial_point as (
         SELECT * 
         FROM search_spatial
         ORDER BY RANDOM() 
@@ -66,16 +70,17 @@ export class RegionRepository extends BaseRepository {
           SELECT CEIL(${regionAccuracy} * COUNT(*)) 
           FROM search_spatial ss, submission_feature sf 
           WHERE ss.submission_feature_id = sf.submission_feature_id 
-          AND	sf.submission_id = ${submissionId})
+          AND	sf.submission_id = ${submissionId}
+        )
       )
-      SELECT rl.region_id
+      SELECT rl.region_id , rl.region_name 
       FROM region_lookup rl 
-      WHERE st_intersects(rl.geography, (
-        SELECT ST_ConvexHull(st_collect(ssp.value::geometry))
+      WHERE ST_Intersects_With_Tolerance(rl.geography::geometry, (
+        SELECT ST_ConvexHull(st_collect(ss.value::geometry))
         FROM submission_spatial_point ssp, submission_feature sf 
         WHERE ssp.submission_feature_id = sf.submission_feature_id 
-        AND	sf.submission_id = ${submissionId}
-      ))
+        AND sf.submission_id = ${submissionId}
+      )::geometry, ${intersectThreshold})
       GROUP BY rl.region_name, rl.region_id;
     `;
     const response = await this.connection.sql(sql);
