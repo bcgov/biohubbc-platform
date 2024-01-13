@@ -23,15 +23,15 @@ import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmis
 import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
-const ReviewedSubmissionsTable = () => {
+const PublishedSubmissionsTable = () => {
   const biohubApi = useApi();
   const download = useDownloadJSON();
 
-  const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getReviewedSubmissionsForAdmins());
+  const publishedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getPublishedSubmissionsForAdmins());
 
-  reviewedSubmissionsDataLoader.load();
+  publishedSubmissionsDataLoader.load();
 
-  const submissionRecords = reviewedSubmissionsDataLoader.data || [];
+  const submissionRecords = publishedSubmissionsDataLoader.data || [];
 
   const onDownload = async (submission: SubmissionRecordWithSecurityAndRootFeature) => {
     // make request here for JSON data of submission and children
@@ -40,10 +40,10 @@ const ReviewedSubmissionsTable = () => {
   };
 
   const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
-    reviewedSubmissionsDataLoader.setData(submissions);
+    publishedSubmissionsDataLoader.setData(submissions);
   };
 
-  if (reviewedSubmissionsDataLoader.isLoading) {
+  if (publishedSubmissionsDataLoader.isLoading) {
     return (
       <>
         <RecordsFoundSkeletonLoader />
@@ -97,9 +97,9 @@ const ReviewedSubmissionsTable = () => {
         <Box my={-1}>
           <SubmissionsListSortMenu
             sortMenuItems={{
-              publish_timestamp: 'Publish Date',
               name: 'Name',
               security_review_timestamp: 'Review Complete',
+              publish_timestamp: 'Publish Date',
               source_system: 'Submitting System'
             }}
             submissions={submissionRecords}
@@ -197,6 +197,13 @@ const ReviewedSubmissionsTable = () => {
                       <dt>{getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.create_date)}</dt>
                     </Stack>
                     <Stack flexDirection="row">
+                      <dd>Published:</dd>
+                      <dt>
+                        {submissionRecord.publish_timestamp &&
+                          getFormattedDate(DATE_FORMAT.ShortDateFormat, submissionRecord.publish_timestamp)}
+                      </dt>
+                    </Stack>
+                    <Stack flexDirection="row">
                       <dd>Source:</dd>
                       <dt>{submissionRecord.source_system}</dt>
                     </Stack>
@@ -232,4 +239,4 @@ const ReviewedSubmissionsTable = () => {
   );
 };
 
-export default ReviewedSubmissionsTable;
+export default PublishedSubmissionsTable;
