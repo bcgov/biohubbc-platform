@@ -32,7 +32,7 @@ export class SearchIndexService extends DBService {
    * @memberof SearchIndexService
    */
   async indexFeaturesBySubmissionId(submissionId: number): Promise<void> {
-    defaultLog.debug({ label: 'indexFeaturesBySubmissionId', submissionId });
+    defaultLog.debug({ label: 'indexFeaturesBySubmissionId', message: 'start', submissionId });
 
     const datetimeRecords: InsertDatetimeSearchableRecord[] = [];
     const numberRecords: InsertNumberSearchableRecord[] = [];
@@ -43,33 +43,39 @@ export class SearchIndexService extends DBService {
     const allFeatures = await submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
 
     const codeService = new CodeService(this.connection);
-    const featureTypePropertyCodes = await codeService.getFeatureTypePropertyCodes();
+    const allFeatureTypePropertyCodes = await codeService.getFeatureTypePropertyCodes();
 
     for (const currentFeature of allFeatures) {
+      // All properties of the current feature
       const currentFeatureProperties = Object.entries(currentFeature.data);
 
-      const applicableFeatureProperties = featureTypePropertyCodes.find(
+      // The property codes for the current feature's type
+      const applicableFeatureTypePropertyCodes = allFeatureTypePropertyCodes.find(
         (item) => item.feature_type.feature_type_id === currentFeature.feature_type_id
       );
 
-      if (!applicableFeatureProperties) {
+      if (!applicableFeatureTypePropertyCodes) {
+        // No matching property codes found, nothing to index for the current feature
         continue;
       }
 
+      // For each property of the current feature
       for (const [currentFeaturePropertyName, currentFeaturePropertyValue] of currentFeatureProperties) {
-        const matchingFeatureProperty = applicableFeatureProperties.feature_type_properties.find(
+        const matchingFeatureProperty = applicableFeatureTypePropertyCodes.feature_type_properties.find(
           (item) => item.feature_property_name === currentFeaturePropertyName
         );
 
         if (!matchingFeatureProperty) {
+          // No matching property code found
           continue;
         }
 
+        // Matching property code found, add query data to matching array
         switch (matchingFeatureProperty.feature_property_type_name) {
           case 'datetime':
             if (!currentFeaturePropertyValue) {
               // Datetime value is null or undefined, since the submission system accepts null dates (e.g. `{ end_date: null }`)
-              return;
+              break;
             }
 
             datetimeRecords.push({
@@ -108,6 +114,7 @@ export class SearchIndexService extends DBService {
 
     const promises: Promise<any>[] = [];
 
+    // Execute insert queries for all non-empty search index arrays
     if (datetimeRecords.length) {
       promises.push(this.searchIndexRepository.insertSearchableDatetimeRecords(datetimeRecords));
     }

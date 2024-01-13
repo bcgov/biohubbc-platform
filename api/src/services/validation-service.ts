@@ -36,13 +36,6 @@ export class ValidationService extends DBService {
    * @memberof ValidationService
    */
   async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
-    // Debug stats
-    const debugStats = {
-      countSubmissionFeatureJsonPaths: 0,
-      countSubmissionFeatures: 0,
-      currentSubmissionFeatureJsonPath: ''
-    };
-
     try {
       // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
       const submissionFeatureJsonPaths: string[] = JSONPath({
@@ -52,11 +45,7 @@ export class ValidationService extends DBService {
         json: submissionFeatures
       });
 
-      debugStats.countSubmissionFeatureJsonPaths = submissionFeatureJsonPaths.length;
-
       for (const jsonPath of submissionFeatureJsonPaths) {
-        debugStats.currentSubmissionFeatureJsonPath = jsonPath;
-
         // Fetch a submissionFeature object
         const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
 
@@ -69,13 +58,11 @@ export class ValidationService extends DBService {
 
         // Validate the submissioNFeature object
         await this.validateSubmissionFeature(nodeWithoutFeatures);
-
-        debugStats.countSubmissionFeatures++;
       }
 
-      defaultLog.debug({ label: 'validateSubmissionFeatures', message: 'success', debugStats });
+      defaultLog.debug({ label: 'validateSubmissionFeatures', message: 'success' });
     } catch (error) {
-      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error, debugStats });
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
       // Not all submission features are valid
       return false;
     }

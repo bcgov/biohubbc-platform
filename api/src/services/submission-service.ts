@@ -100,14 +100,6 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async insertSubmissionFeatureRecords(submissionId: number, submissionFeatures: ISubmissionFeature[]): Promise<void> {
-    // Debug stats
-    const debugStats = {
-      submissionId,
-      countSubmissionFeatureJsonPaths: 0,
-      countSubmissionFeatures: 0,
-      currentSubmissionFeatureJsonPath: ''
-    };
-
     try {
       // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
       const submissionFeatureJsonPaths: string[] = JSONPath({
@@ -117,11 +109,7 @@ export class SubmissionService extends DBService {
         json: submissionFeatures
       });
 
-      debugStats.countSubmissionFeatureJsonPaths = submissionFeatureJsonPaths.length;
-
       for (const jsonPath of submissionFeatureJsonPaths) {
-        debugStats.currentSubmissionFeatureJsonPath = jsonPath;
-
         // Fetch a submissionFeature object
         const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
 
@@ -139,13 +127,11 @@ export class SubmissionService extends DBService {
           nodeWithoutFeatures.type,
           nodeWithoutFeatures.properties
         );
-
-        debugStats.countSubmissionFeatures++;
       }
 
-      defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success', debugStats });
+      defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success' });
     } catch (error) {
-      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error, debugStats });
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
       throw error;
     }
   }

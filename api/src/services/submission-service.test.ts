@@ -8,6 +8,7 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISourceTransformModel,
+  ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
   ISubmissionModel,
@@ -90,30 +91,150 @@ describe('SubmissionService', () => {
   });
 
   describe('insertSubmissionFeatureRecords', () => {
-    it('should return submission_id on insert', async () => {
+    it('inserts submission feature records', async () => {
       const mockDBConnection = getMockDBConnection();
+
+      const insertSubmissionFeatureRecordStub = sinon
+        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
+        .resolves();
+
+      const submissionId = 1;
+      const submissionFeatures: ISubmissionFeature[] = [
+        {
+          id: '1-1',
+          type: 'dataset',
+          properties: {
+            name: 'Dataset1'
+          },
+          features: [
+            {
+              id: '2-1',
+              type: 'sample_site',
+              properties: {
+                name: 'SampleSite1'
+              },
+              features: [
+                {
+                  id: '3-1',
+                  type: 'observation',
+                  properties: {
+                    count: 11,
+                    geometry: {
+                      type: 'Feature',
+                      properties: {},
+                      geometry: {
+                        coordinates: [-125.81103991280563, 49.82351418845636],
+                        type: 'Point'
+                      }
+                    }
+                  },
+                  features: []
+                },
+                {
+                  id: '3-2',
+                  type: 'observation',
+                  properties: {
+                    count: 12
+                  },
+                  features: []
+                }
+              ]
+            },
+            {
+              id: '2-2',
+              type: 'sample_site',
+              properties: {
+                name: 'SampleSite2',
+                dateRange: {
+                  start_date: '2024-01-01',
+                  end_date: '2024-02-01'
+                }
+              },
+              features: [
+                {
+                  id: '3-3',
+                  type: 'observation',
+                  properties: {
+                    count: 13
+                  },
+                  features: []
+                },
+                {
+                  id: '3-4',
+                  type: 'observation',
+                  properties: {
+                    count: 14
+                  },
+                  features: []
+                }
+              ]
+            },
+            {
+              id: '2-3',
+              type: 'artifact',
+              properties: {
+                filename: 'Artifact1.txt'
+              },
+              features: []
+            },
+            {
+              id: '2-4',
+              type: 'artifact',
+              properties: {
+                filename: 'Artifact2.txt'
+              },
+              features: []
+            }
+          ]
+        }
+      ];
+
       const submissionService = new SubmissionService(mockDBConnection);
 
-      const getFeatureTypeIdByNameStub = sinon
-        .stub(SubmissionRepository.prototype, 'getFeatureTypeIdByName')
-        .resolves({ feature_type_id: 1 });
+      const response = await submissionService.insertSubmissionFeatureRecords(submissionId, submissionFeatures);
 
-      const repo = sinon
-        .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
-        .resolves({ submission_feature_id: 1 });
+      expect(response).to.be.undefined;
 
-      const response = await submissionService.insertSubmissionFeatureRecords(1, [
-        {
-          id: '1',
-          type: 'string',
+      expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '1-1', 'dataset', {
+        name: 'Dataset1'
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-1', 'sample_site', {
+        name: 'SampleSite1'
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-1', 'observation', {
+        count: 11,
+        geometry: {
+          type: 'Feature',
           properties: {},
-          features: []
+          geometry: {
+            coordinates: [-125.81103991280563, 49.82351418845636],
+            type: 'Point'
+          }
         }
-      ]);
-
-      expect(repo).to.be.calledOnce;
-      expect(getFeatureTypeIdByNameStub).to.be.calledOnce;
-      expect(response).to.be.eql([{ submission_feature_id: 1 }]);
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-2', 'observation', {
+        count: 12
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-2', 'sample_site', {
+        name: 'SampleSite2',
+        dateRange: {
+          start_date: '2024-01-01',
+          end_date: '2024-02-01'
+        }
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-3', 'observation', {
+        count: 13
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-4', 'observation', {
+        count: 14
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-3', 'artifact', {
+        filename: 'Artifact1.txt'
+      });
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-4', 'artifact', {
+        filename: 'Artifact2.txt'
+      });
     });
   });
 
