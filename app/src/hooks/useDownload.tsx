@@ -1,6 +1,6 @@
 import { useDialogContext } from './useContext';
 
-export const useDownload = () => {
+const useDownload = () => {
   const dialogContext = useDialogContext();
 
   /**
@@ -52,3 +52,5 @@ export const useDownload = () => {
   };
   return { downloadJSON, downloadSignedUrl };
 };
+
+export default useDownload;
