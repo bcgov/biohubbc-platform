@@ -1031,9 +1031,11 @@ describe('SubmissionService', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
+          source_id: '321',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           source_system: 'SIMS',
+          system_user_id: 3,
           name: 'name',
           description: 'description',
           publish_timestamp: null,
@@ -1049,8 +1051,10 @@ describe('SubmissionService', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
+          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',

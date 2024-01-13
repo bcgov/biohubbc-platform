@@ -25,7 +25,7 @@ export const POST: Operation = [
 
 POST.apiDoc = {
   description: 'Submit an artifact to BioHub.',
-  tags: ['artifact'],
+  tags: ['submission', 'artifact'],
   security: [
     {
       Bearer: []
@@ -77,7 +77,8 @@ POST.apiDoc = {
                 type: 'string',
                 format: 'uuid'
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }
