@@ -40,7 +40,17 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['security_rule_id', 'name', 'description', 'record_effective_date', 'record_end_date', 'category_name', 'category_description', 'category_record_effective_date', 'category_record_end_date'],
+              required: [
+                'security_rule_id',
+                'name',
+                'description',
+                'record_effective_date',
+                'record_end_date',
+                'category_name',
+                'category_description',
+                'category_record_effective_date',
+                'category_record_end_date'
+              ],
               properties: {
                 security_rule_id: {
                   type: 'integer'

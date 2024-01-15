@@ -99,28 +99,6 @@ const SecurityRuleForm = () => {
     );
   }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
 
-  const { previosulyUnappliedRules } = useMemo(
-    function () {
-      const previouslyAppliedRules: ISecurityRuleAndCategory[] = [];
-      const previosulyUnappliedRules: ISecurityRuleAndCategory[] = [];
-
-      allSecurityRules.forEach((securityRule) => {
-        if (
-          groupedAppliedSecurityRules.some(
-            (group) => group.securityRule.security_rule_id === securityRule.security_rule_id
-          )
-        ) {
-          previouslyAppliedRules.push(securityRule);
-        } else {
-          previosulyUnappliedRules.push(securityRule);
-        }
-      });
-
-      return { previouslyAppliedRules, previosulyUnappliedRules };
-    },
-    [allSecurityRules, groupedAppliedSecurityRules]
-  );
-
   const toggleStageApply = (securityRule: ISecurityRuleAndCategory) => {
     if (
       formikProps.values.stagedForApply.some(
@@ -151,19 +129,14 @@ const SecurityRuleForm = () => {
     }
   };
 
-  const applyRulesAvailableOptions = useMemo(() => {
-    return alphabetizeObjects(
-      allSecurityRules.filter(
-        (securityRule) =>
-          !formikProps.values.stagedForApply.some(
-            (applyingRule) => applyingRule.security_rule_id === securityRule.security_rule_id
-          )
-      ),
-      'name'
-    );
-  }, [previosulyUnappliedRules, formikProps.values.stagedForApply]);
+  const applyRulesAvailableSortedOptions = useMemo(() => {
+    return alphabetizeObjects(allSecurityRules, 'name');
+  }, [allSecurityRules]);
 
   const hasNoSecuritySelected = !initialAppliedSecurityRules.length;
+
+  console.log(formikProps.values);
+  console.log({ applyRulesAvailableSortedOptions });
 
   return (
     <form onSubmit={formikProps.handleSubmit}>
@@ -182,20 +155,28 @@ const SecurityRuleForm = () => {
             <Typography component="legend">Add Security Rules</Typography>
           </Box>
           <Autocomplete
+            value={null}
             id={'autocomplete-security-rule-search'}
             data-testid={'autocomplete-security-rule-search'}
             filterSelectedOptions
             clearOnBlur
             loading={submissionContext.allSecurityRulesStaticListDataLoader.isLoading}
             noOptionsText="No records found"
-            options={applyRulesAvailableOptions}
+            options={applyRulesAvailableSortedOptions}
             filterOptions={(options, state) => {
               const searchFilter = createFilterOptions<ISecurityRuleAndCategory>({
                 ignoreCase: true,
                 matchFrom: 'any',
                 stringify: (option) => option.name + option.category_name
               });
-              return searchFilter(applyRulesAvailableOptions, state);
+
+              const selectableOptions = options.filter((securityRule) => {
+                return !formikProps.values.stagedForApply.some(
+                  (applyingRule) => applyingRule.security_rule_id === securityRule.security_rule_id
+                );
+              });
+
+              return searchFilter(selectableOptions, state);
             }}
             getOptionLabel={(option) => option.name}
             isOptionEqualToValue={(option, value) => option.security_rule_id === value.security_rule_id}
