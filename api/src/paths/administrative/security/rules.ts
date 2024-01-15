@@ -33,16 +33,17 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Security Rules.',
+      description: 'Security rules with category.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
             items: {
               type: 'object',
+              required: ['security_rule_id', 'name', 'description', 'record_effective_date', 'record_end_date', 'category_name', 'category_description', 'category_record_effective_date', 'category_record_end_date'],
               properties: {
                 security_rule_id: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 name: {
                   type: 'string'
@@ -57,22 +58,18 @@ GET.apiDoc = {
                   type: 'string',
                   nullable: true
                 },
-                create_date: {
+                category_name: {
                   type: 'string'
                 },
-                create_user: {
-                  type: 'number'
+                category_description: {
+                  type: 'string'
                 },
-                update_date: {
+                category_record_effective_date: {
+                  type: 'string'
+                },
+                category_record_end_date: {
                   type: 'string',
                   nullable: true
-                },
-                update_user: {
-                  type: 'number',
-                  nullable: true
-                },
-                revision_count: {
-                  type: 'number'
                 }
               }
             }

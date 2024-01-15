@@ -51,15 +51,16 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
+              required: ['submission_feature_security_id', 'submission_feature_id', 'security_rule_id'],
               properties: {
                 submission_feature_security_id: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 submission_feature_id: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 security_rule_id: {
-                  type: 'number'
+                  type: 'integer'
                 }
               }
             }
