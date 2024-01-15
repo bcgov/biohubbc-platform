@@ -750,7 +750,6 @@ export class SubmissionService extends DBService {
    *     submissionId?: number;
    *     systemUserId?: number;
    *     featureTypeNames?: string[];
-   *     includeDeleted?: boolean;
    *   }} [criteria]
    * @return {*}  {Promise<SubmissionFeatureRecord[]>}
    * @memberof SubmissionService
@@ -759,7 +758,6 @@ export class SubmissionService extends DBService {
     submissionId?: number;
     systemUserId?: number;
     featureTypeNames?: string[];
-    includeDeleted?: boolean;
   }): Promise<SubmissionFeatureRecord[]> {
     return this.submissionRepository.findSubmissionFeatures(criteria);
   }

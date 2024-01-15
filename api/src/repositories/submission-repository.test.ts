@@ -12,6 +12,7 @@ import {
   ISourceTransformModel,
   ISpatialComponentCount,
   PatchSubmissionRecord,
+  SubmissionFeatureRecord,
   SubmissionRecord,
   SubmissionRecordPublished,
   SubmissionRecordWithSecurity,
@@ -1608,6 +1609,86 @@ describe('SubmissionRepository', () => {
       const response = await submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(1);
 
       expect(response).to.eql(mockResponse);
+    });
+  });
+
+  describe('getSubmissionFeatureByUuid', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const submissionFeatureRecord: SubmissionFeatureRecord = {
+        submission_feature_id: 2,
+        uuid: '234-456-234',
+        submission_id: 3,
+        feature_type_id: 1,
+        source_id: 'source-id',
+        data: {},
+        parent_submission_feature_id: 1,
+        record_effective_date: '2024-01-01',
+        record_end_date: null,
+        create_date: '2024-01-01',
+        create_user: 3,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [submissionFeatureRecord] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionUuid = '123-456-789';
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionFeatureByUuid(submissionUuid);
+
+      expect(response).to.eql(submissionFeatureRecord);
+    });
+  });
+
+  describe('findSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const submissionFeatureRecords: SubmissionFeatureRecord[] = [
+        {
+          submission_feature_id: 2,
+          uuid: '234-456-234',
+          submission_id: 3,
+          feature_type_id: 1,
+          source_id: 'source-id',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 3,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        }
+      ];
+
+      const mockQueryResponse = { rowCount: 1, rows: submissionFeatureRecords } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const criteria = {
+        submissionId: 1,
+        systemUserId: 2,
+        featureTypeNames: ['dataset', 'artifact']
+      };
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.findSubmissionFeatures(criteria);
+
+      expect(response).to.eql(submissionFeatureRecords);
     });
   });
 

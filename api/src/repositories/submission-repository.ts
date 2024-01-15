@@ -1501,7 +1501,6 @@ export class SubmissionRepository extends BaseRepository {
    *     submissionId?: number;
    *     systemUserId?: number;
    *     featureTypeNames?: string[];
-   *     includeDeleted?: boolean;
    *   }} [criteria]
    * @return {*}  {Promise<SubmissionFeatureRecord[]>}
    * @memberof SubmissionRepository
@@ -1510,13 +1509,12 @@ export class SubmissionRepository extends BaseRepository {
     submissionId?: number;
     systemUserId?: number;
     featureTypeNames?: string[];
-    includeDeleted?: boolean;
   }): Promise<SubmissionFeatureRecord[]> {
     const knex = getKnex();
 
     const queryBuilder = knex.queryBuilder();
 
-    queryBuilder.select().from('submission_feature');
+    queryBuilder.select().from('submission_feature').where('record_end_timestamp', null);
 
     if (criteria?.submissionId) {
       // Filter by submitter system user id
