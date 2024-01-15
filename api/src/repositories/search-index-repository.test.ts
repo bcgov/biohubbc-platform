@@ -1,6 +1,7 @@
 import { expect } from 'chai';
 import { QueryResult } from 'pg';
 import Sinon from 'sinon';
+import { ApiExecuteSQLError } from '../errors/api-error';
 import { getMockDBConnection } from '../__mocks__/db';
 import { FeaturePropertyRecordWithPropertyTypeName, SearchIndexRepository } from './search-index-respository';
 
@@ -383,6 +384,202 @@ describe('SearchIndexRepository', () => {
           revision_count: 0
         }
       ]);
+    });
+  });
+
+  describe('insertSearchableDatetimeRecords', () => {
+    it('should succeed on insert', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ search_datetime_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.insertSearchableDatetimeRecords([
+        {
+          feature_property_id: 1,
+          submission_feature_id: 1,
+          value: new Date('2024-01-15').toDateString()
+        }
+      ]);
+
+      expect(response[0].search_datetime_id).to.equal(1);
+    });
+
+    it('should throw an exception if no rows are retured', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      try {
+        await searchIndexRepository.insertSearchableDatetimeRecords([
+          {
+            feature_property_id: 1,
+            submission_feature_id: 1,
+            value: new Date('2024-01-15').toDateString()
+          }
+        ]);
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert searchable datetime records');
+      }
+    });
+  });
+
+  describe('insertSearchableNumberRecords', () => {
+    it('should succeed on insert', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ search_number_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.insertSearchableNumberRecords([
+        {
+          feature_property_id: 1,
+          submission_feature_id: 1,
+          value: 100
+        }
+      ]);
+
+      expect(response[0].search_number_id).to.equal(1);
+    });
+
+    it('should throw an exception if no rows are retured', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      try {
+        await searchIndexRepository.insertSearchableNumberRecords([
+          {
+            feature_property_id: 1,
+            submission_feature_id: 1,
+            value: 100
+          }
+        ]);
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert searchable number records');
+      }
+    });
+  });
+
+  describe('insertSearchableSpatialRecords', () => {
+    it('should succeed on insert', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ search_spatial_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.insertSearchableSpatialRecords([
+        {
+          feature_property_id: 1,
+          submission_feature_id: 1,
+          value: {
+            type: 'FeatureCollection',
+            features: [
+              {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [-127, 49] }
+              }
+            ]
+          }
+        }
+      ]);
+
+      expect(response[0].search_spatial_id).to.equal(1);
+    });
+
+    it('should throw an exception if no rows are retured', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      try {
+        await searchIndexRepository.insertSearchableSpatialRecords([
+          {
+            feature_property_id: 1,
+            submission_feature_id: 1,
+            value: {
+              type: 'FeatureCollection',
+              features: [
+                {
+                  type: 'Feature',
+                  geometry: { type: 'Point', coordinates: [-127, 49] }
+                }
+              ]
+            }
+          }
+        ]);
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert searchable spatial records');
+      }
+    });
+  });
+
+  describe('insertSearchableStringRecords', () => {
+    it('should succeed on insert', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ search_string_id: 1 }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      const response = await searchIndexRepository.insertSearchableStringRecords([
+        {
+          feature_property_id: 1,
+          submission_feature_id: 1,
+          value: 'Test'
+        }
+      ]);
+
+      expect(response[0].search_string_id).to.equal(1);
+    });
+
+    it('should throw an exception if no rows are retured', async () => {
+      const mockQueryResponse = {
+        rowCount: 0,
+        rows: []
+      } as unknown as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const searchIndexRepository = new SearchIndexRepository(mockDBConnection);
+
+      try {
+        await searchIndexRepository.insertSearchableStringRecords([
+          {
+            feature_property_id: 1,
+            submission_feature_id: 1,
+            value: 'Test'
+          }
+        ]);
+      } catch (error) {
+        expect((error as ApiExecuteSQLError).message).to.equal('Failed to insert searchable string records');
+      }
     });
   });
 });
