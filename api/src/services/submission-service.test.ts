@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
+  SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecord,
@@ -1410,6 +1411,99 @@ describe('SubmissionService', () => {
 
       expect(patchSubmissionRecordStub).to.be.calledOnceWith(submissionId, patch);
       expect(response).to.be.eql(mockSubmissionRecord);
+    });
+  });
+
+  describe('getSubmissionFeatureByUuid', () => {
+    it('finds and returns submission features', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const submissionFeature: SubmissionFeatureRecord = {
+        submission_feature_id: 2,
+        uuid: '234-456-234',
+        submission_id: 3,
+        feature_type_id: 1,
+        source_id: 'source-id',
+        data: {},
+        parent_submission_feature_id: 1,
+        record_effective_date: '2024-01-01',
+        record_end_date: null,
+        create_date: '2024-01-01',
+        create_user: 3,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+
+      const getSubmissionFeatureByUuidStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionFeatureByUuid')
+        .resolves(submissionFeature);
+
+      const submissionFeatureUuid = '123-456-789';
+
+      const response = await submissionService.getSubmissionFeatureByUuid(submissionFeatureUuid);
+
+      expect(getSubmissionFeatureByUuidStub).to.be.calledOnceWith(submissionFeatureUuid);
+      expect(response).to.be.eql(submissionFeature);
+    });
+  });
+
+  describe('getSubmissionRootFeature', () => {
+    it('finds and returns submission features', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const submissionFeature: SubmissionFeatureRecord = {
+        submission_feature_id: 2,
+        uuid: '234-456-234',
+        submission_id: 3,
+        feature_type_id: 1,
+        source_id: 'source-id',
+        data: {},
+        parent_submission_feature_id: 1,
+        record_effective_date: '2024-01-01',
+        record_end_date: null,
+        create_date: '2024-01-01',
+        create_user: 3,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+
+      const getSubmissionRootFeatureStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionRootFeature')
+        .resolves(submissionFeature);
+
+      const submissionId = 1;
+
+      const response = await submissionService.getSubmissionRootFeature(submissionId);
+
+      expect(getSubmissionRootFeatureStub).to.be.calledOnceWith(submissionId);
+      expect(response).to.be.eql(submissionFeature);
+    });
+  });
+
+  describe('findSubmissionFeatures', () => {
+    it('finds and returns submission features', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const submissionFeaturesResponse: SubmissionFeatureRecord[] = [];
+
+      const findSubmissionFeaturesStub = sinon
+        .stub(SubmissionRepository.prototype, 'findSubmissionFeatures')
+        .resolves(submissionFeaturesResponse);
+
+      const criteria = {
+        submissionId: 1,
+        featureTypeNames: ['dataset', 'artifact']
+      };
+
+      const response = await submissionService.findSubmissionFeatures(criteria);
+
+      expect(findSubmissionFeaturesStub).to.be.calledOnceWith(criteria);
+      expect(response).to.be.eql(submissionFeaturesResponse);
     });
   });
 
