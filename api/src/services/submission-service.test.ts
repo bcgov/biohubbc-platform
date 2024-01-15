@@ -15,6 +15,7 @@ import {
   ISubmissionObservationRecord,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
+  SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecord,
   SubmissionRecordPublished,
@@ -1202,6 +1203,120 @@ describe('SubmissionService', () => {
 
       expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnce;
       expect(response).to.be.eql(mockSubmissionRecords);
+    });
+  });
+
+  describe('getSubmissionFeaturesBySubmissionId', () => {
+    it('should return an array of submission features', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const submissionId = 1;
+
+      const mockSubmissionRecords: SubmissionFeatureRecordWithTypeAndSecurity[] = [
+        {
+          submission_feature_id: 1,
+          uuid: '111-234-345',
+          submission_id: submissionId,
+          feature_type_id: 2,
+          source_id: 'source-id-1',
+          data: {},
+          parent_submission_feature_id: 4,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 2,
+          uuid: '222-234-345',
+          submission_id: submissionId,
+          feature_type_id: 2,
+          source_id: 'source-id-2',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 3,
+          uuid: '333-234-345',
+          submission_id: submissionId,
+          feature_type_id: 2,
+          source_id: 'source-id-3',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 4,
+          uuid: '444-234-345',
+          submission_id: submissionId,
+          feature_type_id: 3,
+          source_id: 'source-id-4',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'artifact',
+          feature_type_display_name: 'Artifact',
+          submission_feature_security_ids: []
+        }
+      ];
+
+      const getReviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId')
+        .resolves(mockSubmissionRecords);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getSubmissionFeaturesBySubmissionId(submissionId);
+
+      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnceWith(submissionId);
+      expect(response).to.be.eql([
+        {
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          features: [{ ...mockSubmissionRecords[0] }]
+        },
+        {
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          features: [{ ...mockSubmissionRecords[1] }, { ...mockSubmissionRecords[2] }]
+        },
+        {
+          feature_type_name: 'artifact',
+          feature_type_display_name: 'Artifact',
+          features: [{ ...mockSubmissionRecords[3] }]
+        }
+      ]);
     });
   });
 
