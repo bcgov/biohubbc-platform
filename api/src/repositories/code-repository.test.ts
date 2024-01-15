@@ -71,4 +71,8 @@ describe('CodeRepository', () => {
       expect(result).to.be.eql([mockRow]);
     });
   });
+
+  describe('getFeaturePropertyByName', () => {
+    // @TODO
+  })
 });
