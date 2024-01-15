@@ -2,7 +2,6 @@ import { useDialogContext } from './useContext';
 
 const useDownload = () => {
   const dialogContext = useDialogContext();
-
   /**
    * Handler for downloading raw data as JSON.
    * Note: currently this does not zip the file. Can be modified if needed.
