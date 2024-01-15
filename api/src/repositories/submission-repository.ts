@@ -1208,8 +1208,10 @@ export class SubmissionRepository extends BaseRepository {
           submission_regions sr 
         ON
           sr.submission_id = submission.submission_id 
-        left join region_lookup rl 
-        on rl.region_id = sr.region_id
+        LEFT JOIN
+          region_lookup rl 
+        ON 
+          rl.region_id = sr.region_id
         WHERE
           submission.security_review_timestamp IS NULL
         AND
@@ -1248,7 +1250,8 @@ export class SubmissionRepository extends BaseRepository {
             WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
             WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
             ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-          END as security
+          END as security,
+          array_remove(array_agg(rl.region_name), NULL) as regions
         FROM
           submission
         INNER JOIN
@@ -1263,6 +1266,14 @@ export class SubmissionRepository extends BaseRepository {
           submission_feature_security
         ON
           submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+        LEFT JOIN 
+          submission_regions sr 
+        ON
+          sr.submission_id = submission.submission_id 
+        LEFT JOIN
+          region_lookup rl 
+        ON 
+          rl.region_id = sr.region_id
         WHERE
           submission.security_review_timestamp IS NOT NULL
         AND
@@ -1307,7 +1318,8 @@ export class SubmissionRepository extends BaseRepository {
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-        END as security
+        END as security,
+        array_remove(array_agg(rl.region_name), NULL) as regions
       FROM
         submission
       INNER JOIN
@@ -1322,6 +1334,14 @@ export class SubmissionRepository extends BaseRepository {
         submission_feature_security
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      LEFT JOIN 
+        submission_regions sr 
+      ON
+        sr.submission_id = submission.submission_id 
+      LEFT JOIN
+        region_lookup rl 
+      ON 
+        rl.region_id = sr.region_id
       WHERE
         submission.security_review_timestamp IS NOT NULL
       AND

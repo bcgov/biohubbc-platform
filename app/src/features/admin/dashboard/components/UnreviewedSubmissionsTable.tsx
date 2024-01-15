@@ -192,7 +192,7 @@ const UnreviewedSubmissionsTable = () => {
                     </Stack>
                     {submissionRecord.regions.length && (
                       <Stack flexDirection="row">
-                        <dd>Region(s):</dd>
+                        <dd>{p(submissionRecord.regions.length, 'Region')}:</dd>
                         <dt>{submissionRecord.regions.sort().join(', ')}</dt>
                       </Stack>
                     )}
