@@ -13,7 +13,7 @@ import { intakeArtifact } from './intake';
 
 chai.use(sinonChai);
 
-describe.only('intakeArtifact', () => {
+describe('intakeArtifact', () => {
   afterEach(() => {
     sinon.restore();
   });
