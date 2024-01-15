@@ -30,7 +30,6 @@ import {
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
 import { getS3SignedURL } from '../utils/file-utils';
-import { generateSubmissionFeatureS3FileKey } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -814,32 +813,5 @@ export class SubmissionService extends DBService {
     }
 
     return signedUrl;
-  }
-
-  /**
-   * Apply modifications to submission features.
-   *
-   * @param {number} submissionId
-   * @param {number} submissionFeatureId
-   * @param {ISubmissionFeature} submissionFeature
-   * @return {*}  {Promise<ISubmissionFeature[]>}
-   * @memberof SubmissionService
-   */
-  async applySubmissionFeatureModifications(
-    submissionId: number,
-    submissionFeatureId: number,
-    submissionFeature: ISubmissionFeature
-  ): Promise<ISubmissionFeature> {
-    if (submissionFeature.type === 'artifact') {
-      const key = generateSubmissionFeatureS3FileKey({
-        submissionId: submissionId,
-        submissionFeatureId: submissionFeatureId,
-        artifactId: submissionFeature.id
-      });
-
-      submissionFeature.properties = { ...submissionFeature.properties, s3_key: key };
-    }
-
-    return submissionFeature;
   }
 }
