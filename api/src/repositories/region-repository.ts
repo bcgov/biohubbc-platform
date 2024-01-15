@@ -50,35 +50,21 @@ export class RegionRepository extends BaseRepository {
    * Any regions intersecting with this calculated value are returned.
    *
    * @param {number} submissionId
-   * @param {number} [rowPercentage=1] rowPercentage Expected 0-1. Determines the percentage of rows to use
    * @param {number} [intersectThreshold=1] intersectThreshold Expected 0-1. Determines the percentage threshold for intersections to be valid
    * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
    * @memberof RegionRepository
    */
   async calculateRegionsForASubmission(
     submissionId: number,
-    rowPercentage: number = 1,
     intersectThreshold: number = 1
   ): Promise<{ region_id: number }[]> {
-    const sql = SQL`
-      -- Get a percentage of search_spatial rows for a given 
-      with submission_spatial_point as (
-        SELECT * 
-        FROM search_spatial
-        ORDER BY RANDOM() 
-        LIMIT (
-          SELECT CEIL(${rowPercentage} * COUNT(*)) 
-          FROM search_spatial ss, submission_feature sf 
-          WHERE ss.submission_feature_id = sf.submission_feature_id 
-          AND	sf.submission_id = ${submissionId}
-        )
-      )
+    const sql = SQL`--sql
       SELECT rl.region_id , rl.region_name 
       FROM region_lookup rl 
-      WHERE ST_Intersects_With_Tolerance(rl.geography::geometry, (
+      WHERE fn_calculate_area_intersect(rl.geography::geometry, (
         SELECT ST_ConvexHull(st_collect(ss.value::geometry))
-        FROM submission_spatial_point ssp, submission_feature sf 
-        WHERE ssp.submission_feature_id = sf.submission_feature_id 
+        FROM search_spatial ss, submission_feature sf 
+        WHERE ss.submission_feature_id = sf.submission_feature_id 
         AND sf.submission_id = ${submissionId}
       )::geometry, ${intersectThreshold})
       GROUP BY rl.region_name, rl.region_id;
