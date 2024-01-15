@@ -29,9 +29,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
     try {
       setIsLoading(true);
 
-      await api.security.patchSecurityRulesOnSubmissionFeatures(submissionId, patch).then(() => {
-        submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
-      });
+      await api.security.patchSecurityRulesOnSubmissionFeatures(submissionId, patch);
 
       dialogContext.setSnackbar({
         snackbarMessage: (
