@@ -337,8 +337,7 @@ export class SecurityService extends DBService {
    * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
    * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
    * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
-   * @param {boolean}
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @return {*}  {Promise<void>}
    * @memberof SecurityService
    */
   async patchSecurityRulesOnSubmissionFeatures(

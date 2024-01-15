@@ -135,9 +135,6 @@ const SecurityRuleForm = () => {
 
   const hasNoSecuritySelected = !initialAppliedSecurityRules.length;
 
-  console.log(formikProps.values);
-  console.log({ applyRulesAvailableSortedOptions });
-
   return (
     <form onSubmit={formikProps.handleSubmit}>
       <Box component="fieldset">

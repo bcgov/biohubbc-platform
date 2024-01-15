@@ -407,6 +407,7 @@ export class SecurityRepository extends BaseRepository {
    * Removes the given security rules for a given set of given submission features.
    *
    * @param {number[]} submissionFeatureIds
+   * @param {number[]} removeRuleIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */

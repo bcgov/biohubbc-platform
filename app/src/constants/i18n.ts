@@ -26,7 +26,6 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  // TODO
   applySecuritySuccess: (numApplied: number, numRemoved: number, featureCount: number) => {
     const appliedRemoved = [
       numApplied > 0 && `applied ${numApplied} ${p(numApplied, 'security rule')}`,
