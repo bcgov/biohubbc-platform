@@ -65,7 +65,7 @@ export async function seed(knex: Knex): Promise<void> {
 
     -- feature_type: artifact
     insert into feature_type_property (feature_type_id, feature_property_id, sort, record_effective_date) values ((select feature_type_id from feature_type where name = 'artifact'), (select feature_property_id from feature_property where name = 'filename'), 1, now()) ON CONFLICT DO NOTHING;
-    -- insert into feature_type_property (feature_type_id, feature_property_id, sort, record_effective_date) values ((select feature_type_id from feature_type where name = 'artifact'), (select feature_property_id from feature_property where name = 's3_key'),   2, now()) ON CONFLICT DO NOTHING;
+    insert into feature_type_property (feature_type_id, feature_property_id, sort, record_effective_date) values ((select feature_type_id from feature_type where name = 'artifact'), (select feature_property_id from feature_property where name = 's3_key'),   2, now()) ON CONFLICT DO NOTHING;
 
     -- feature_type: sample_site
     insert into feature_type_property (feature_type_id, feature_property_id, sort, record_effective_date) values ((select feature_type_id from feature_type where name = 'sample_site'), (select feature_property_id from feature_property where name = 'name'),        1, now()) ON CONFLICT DO NOTHING;

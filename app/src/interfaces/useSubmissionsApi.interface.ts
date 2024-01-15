@@ -93,3 +93,10 @@ export interface IGetDownloadSubmissionResponse {
   data: Record<string, any>;
   level: number;
 }
+
+export type SubmissionFeatureSignedUrlPayload = {
+  submissionId: number;
+  submissionFeatureId: number;
+  submissionFeatureKey: string;
+  submissionFeatureValue: string;
+};

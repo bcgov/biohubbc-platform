@@ -2,7 +2,7 @@ import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import {
   IDatasetsForReview,
   IHandlebarsTemplates,
@@ -19,6 +19,7 @@ import {
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
   SubmissionFeatureRecordWithTypeAndSecurity,
+  SubmissionFeatureSignedUrlPayload,
   SubmissionMessageRecord,
   SubmissionRecord,
   SubmissionRecordPublished,
@@ -28,7 +29,7 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
-import { generateSubmissionFeatureS3FileKey } from '../utils/file-utils';
+import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
@@ -786,29 +787,31 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Apply modifications to submission features.
+   * Generates a signed URL for a submission_feature's (artifact) key value pair
+   * ie: "s3_key": "artifact/test-file.txt"
    *
-   * @param {number} submissionId
-   * @param {number} submissionFeatureId
-   * @param {ISubmissionFeature} submissionFeature
-   * @return {*}  {Promise<ISubmissionFeature[]>}
+   * Note: admin's can generate signed urls for secure submission_features
+   *
+   * @async
+   * @param {SubmissionFeatureSignedUrlPayload} payload
+   * @throws {ApiGeneralError}
    * @memberof SubmissionService
+   * @returns {Promise<string>} signed URL
    */
-  async applySubmissionFeatureModifications(
-    submissionId: number,
-    submissionFeatureId: number,
-    submissionFeature: ISubmissionFeature
-  ): Promise<ISubmissionFeature> {
-    if (submissionFeature.type === 'artifact') {
-      const key = generateSubmissionFeatureS3FileKey({
-        submissionId: submissionId,
-        submissionFeatureId: submissionFeatureId,
-        artifactId: submissionFeature.id
-      });
+  async getSubmissionFeatureSignedUrl(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
+    const artifactKey = payload.isAdmin
+      ? await this.submissionRepository.getAdminSubmissionFeatureArtifactKey(payload)
+      : await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
 
-      submissionFeature.properties = { ...submissionFeature.properties, s3_key: key };
+    const signedUrl = await getS3SignedURL(artifactKey);
+
+    if (!signedUrl) {
+      throw new ApiGeneralError(
+        `Failed to generate signed URL for "${payload.submissionFeatureObj.key}":"${payload.submissionFeatureObj.value}"`,
+        ['SubmissionRepository->getSubmissionFeatureSignedUrl', 'getS3SignedUrl returned NULL']
+      );
     }
 
-    return submissionFeature;
+    return signedUrl;
   }
 }

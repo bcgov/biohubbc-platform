@@ -18,14 +18,14 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSortMenu';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import useDownloadJSON from 'hooks/useDownloadJSON';
+import useDownload from 'hooks/useDownload';
 import { SubmissionRecordWithSecurityAndRootFeature } from 'interfaces/useSubmissionsApi.interface';
 import { Link as RouterLink } from 'react-router-dom';
 import { getFormattedDate, pluralize as p } from 'utils/Utils';
 
 const PublishedSubmissionsTable = () => {
   const biohubApi = useApi();
-  const download = useDownloadJSON();
+  const download = useDownload();
 
   const publishedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getPublishedSubmissionsForAdmins());
 
@@ -36,7 +36,7 @@ const PublishedSubmissionsTable = () => {
   const onDownload = async (submission: SubmissionRecordWithSecurityAndRootFeature) => {
     // make request here for JSON data of submission and children
     const data = await biohubApi.submissions.getSubmissionDownloadPackage(submission.submission_id);
-    download(data, `${submission.name.toLowerCase().replace(/ /g, '-')}-${submission.submission_id}`);
+    download.downloadJSON(data, `${submission.name.toLowerCase().replace(/ /g, '-')}-${submission.submission_id}`);
   };
 
   const handleSortSubmissions = (submissions: SubmissionRecordWithSecurityAndRootFeature[]) => {
