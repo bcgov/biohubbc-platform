@@ -4,7 +4,7 @@ import Stack from '@mui/material/Stack';
 import SubmissionHeader from 'features/submissions/components/SubmissionHeader';
 import { useSubmissionContext } from 'hooks/useContext';
 import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
-import SubmissionDataGrid from './components/SubmissionDataGrid';
+import SubmissionDataGrid from './components/SubmissionDataGrid/SubmissionDataGrid';
 
 /**
  * AdminSubmissionPage component for reviewing submissions.

@@ -1,6 +1,11 @@
 import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
-import { insertDatasetRecord, insertSampleSiteRecord, insertSubmissionRecord } from './04_mock_test_data';
+import {
+  insertDatasetRecord,
+  insertSampleSiteRecord,
+  insertSubmissionFeature,
+  insertSubmissionRecord
+} from './04_mock_test_data';
 
 /**
  * Inserts mock submission data
@@ -46,6 +51,30 @@ const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, 
   VALUES($$${submission_feature_id}$$, $$${security_rule_id}$$, $$${faker.date.past().toISOString()}$$);`);
 };
 
+const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) => {
+  const S3_KEY = 'dev-artifacts/artifact.txt';
+
+  const sql = insertSubmissionFeature({
+    submission_id: row.submission_id,
+    parent_submission_feature_id: null,
+    feature_type: 'artifact',
+    data: { s3_key: S3_KEY }
+  });
+
+  const submission_feature = await knex.raw(sql);
+
+  const submission_feature_id = submission_feature.rows[0].submission_feature_id;
+
+  await knex.raw(`
+    INSERT INTO search_string (submission_feature_id, feature_property_id, value)
+    VALUES
+    (
+      ${submission_feature_id},
+      (select feature_property_id from feature_property where name = 's3_key'),
+      $$${S3_KEY}$$
+    );`);
+};
+
 const createSubmissionWithSecurity = async (
   knex: Knex,
   securityLevel: 'PARTIALLY SECURE' | 'SECURE' | 'UNSECURE',
@@ -57,6 +86,8 @@ const createSubmissionWithSecurity = async (
     parent_submission_feature_id,
     submission_id
   });
+
+  await insertArtifactRecord(knex, { submission_id });
 
   if (securityLevel === 'PARTIALLY SECURE') {
     await insertFeatureSecurity(knex, submission_feature_id, 1);

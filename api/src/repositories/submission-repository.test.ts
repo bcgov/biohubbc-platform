@@ -1733,4 +1733,132 @@ describe('SubmissionRepository', () => {
       expect(response).to.eql([mockResponse]);
     });
   });
+
+  describe('getAdminSubmissionFeatureAritifactKey', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails (rowCount 0)', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+          isAdmin: true,
+          submissionFeatureId: 0,
+          submissionFeatureObj: { key: 'a', value: 'b' }
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
+      }
+    });
+
+    it('should throw an error when insert sql fails (missing value property)', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ test: 'blah' }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+          isAdmin: true,
+          submissionFeatureId: 0,
+          submissionFeatureObj: { key: 'a', value: 'b' }
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        value: 'KEY'
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getAdminSubmissionFeatureArtifactKey({
+        isAdmin: true,
+        submissionFeatureId: 0,
+        submissionFeatureObj: { key: 'a', value: 'b' }
+      });
+
+      expect(response).to.eql('KEY');
+    });
+  });
+
+  describe('getSubmissionFeatureAritifactKey', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should throw an error when insert sql fails (rowCount 0)', async () => {
+      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionFeatureArtifactKey({
+          isAdmin: false,
+          submissionFeatureId: 0,
+          submissionFeatureObj: { key: 'a', value: 'b' }
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
+      }
+    });
+
+    it('should throw an error when insert sql fails (missing value prop)', async () => {
+      const mockQueryResponse = { rowCount: 1, rows: [{ test: 'blah' }] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      try {
+        await submissionRepository.getSubmissionFeatureArtifactKey({
+          isAdmin: false,
+          submissionFeatureId: 0,
+          submissionFeatureObj: { key: 'a', value: 'b' }
+        });
+        expect.fail();
+      } catch (actualError) {
+        expect((actualError as ApiGeneralError).message).to.equal('Failed to get key for signed URL');
+      }
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockResponse = {
+        value: 'KEY'
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionFeatureArtifactKey({
+        isAdmin: false,
+        submissionFeatureId: 0,
+        submissionFeatureObj: { key: 'a', value: 'b' }
+      });
+
+      expect(response).to.eql('KEY');
+    });
+  });
 });

@@ -26,6 +26,7 @@ export async function seed(knex: Knex): Promise<void> {
     insert into feature_property_type (name, description, record_effective_date) values ('boolean',  'A boolean type',             now()) ON CONFLICT DO NOTHING;
     insert into feature_property_type (name, description, record_effective_date) values ('object',   'An object type',             now()) ON CONFLICT DO NOTHING;
     insert into feature_property_type (name, description, record_effective_date) values ('array',    'An array type',              now()) ON CONFLICT DO NOTHING;
+    insert into feature_property_type (name, description, record_effective_date) values ('s3_key',   'An S3 key type',             now()) ON CONFLICT DO NOTHING;
 
     -- populate feature_property table
     insert into feature_property (name, display_name, description, feature_property_type_id, parent_feature_property_id, record_effective_date)                   values ('name',                'Name',                 'The name of the record',                   (select feature_property_type_id from feature_property_type where name = 'string'),   null,                                                                         now()) ON CONFLICT DO NOTHING;
