@@ -11,7 +11,7 @@ import SubmissionsListSortMenu from 'features/submissions/list/SubmissionsListSo
 import { FuseResult } from 'fuse.js';
 import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
-import useDownloadJSON from 'hooks/useDownloadJSON';
+import useDownload from 'hooks/useDownload';
 import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
@@ -24,7 +24,7 @@ import { pluralize as p } from 'utils/Utils';
  */
 const SubmissionsListPage = () => {
   const biohubApi = useApi();
-  const download = useDownloadJSON();
+  const { downloadJSON } = useDownload();
 
   const reviewedSubmissionsDataLoader = useDataLoader(() => biohubApi.submissions.getPublishedSubmissions());
   reviewedSubmissionsDataLoader.load();
@@ -40,7 +40,7 @@ const SubmissionsListPage = () => {
     // make request here for JSON data of submission and children
     const data = await biohubApi.submissions.getSubmissionPublishedDownloadPackage(submission.item.submission_id);
     const fileName = `${submission.item.name.toLowerCase().replace(/ /g, '-')}-${submission.item.submission_id}`;
-    download(data, fileName);
+    downloadJSON(data, fileName);
   };
 
   return (

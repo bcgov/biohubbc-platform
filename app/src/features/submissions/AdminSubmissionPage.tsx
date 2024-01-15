@@ -8,7 +8,7 @@ import SubmissionHeaderToolbar from 'features/submissions/components/SubmissionH
 import { useSubmissionContext } from 'hooks/useContext';
 import { IGetSubmissionGroupedFeatureResponse } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
-import SubmissionDataGrid from './components/SubmissionDataGrid';
+import SubmissionDataGrid from './components/SubmissionDataGrid/SubmissionDataGrid';
 import SubmissionHeaderSecurityStatus from './components/SubmissionHeaderSecurityStatus';
 
 type GroupedSubmissionFeatureSelection = Record<
