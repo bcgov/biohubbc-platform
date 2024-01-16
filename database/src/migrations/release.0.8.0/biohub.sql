@@ -28,8 +28,7 @@ COMMENT ON TABLE audit_log IS 'Holds record level audit log data for the entire 
 
 CREATE TABLE submission(
     submission_id               integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-    uuid                        uuid              DEFAULT public.gen_random_uuid(),
-    source_id                   varchar(100)      NOT NULL,
+    uuid                        uuid              NOT NULL,
     system_user_id              integer           NOT NULL,
     source_system               varchar(100)      NOT NULL,
     security_review_timestamp   timestamptz(6),
@@ -47,8 +46,7 @@ CREATE TABLE submission(
 );
 
 COMMENT ON COLUMN submission.submission_id IS 'System generated surrogate primary key identifier.';
-COMMENT ON COLUMN submission.uuid IS 'The globally unique identifier for this submission as supplied by BioHub.';
-COMMENT ON COLUMN submission.source_id IS 'The unique identifier for the submission as supplied by the source system. May not be unique globally or within BioHub.';
+COMMENT ON COLUMN submission.uuid IS 'The globally unique identifier for this submission as supplied by the source system.';
 COMMENT ON COLUMN submission.system_user_id IS 'Foreign key to the system_user table.';
 COMMENT ON COLUMN submission.source_system IS 'The name of the submitting system.';
 COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when the security review of the submission was completed. Null indicates the security review has not been completed.';

@@ -18,7 +18,6 @@ export interface IDatasetS3FileKey {
 export interface IArtifactS3FileKey {
   submissionId: number;
   submissionFeatureId: number;
-  artifactId: string;
 }
 
 export interface IQueueS3FileKey {
@@ -273,16 +272,9 @@ export async function getObjectMeta(key: string): Promise<HeadObjectOutput> {
  * @return {*}
  */
 export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) {
-  const keyParts: (string | number)[] = [];
-
-  keyParts.push(_getS3KeyPrefix());
-  keyParts.push('submissions');
-  keyParts.push(options.submissionId);
-  keyParts.push('features');
-  keyParts.push(options.submissionFeatureId);
-  keyParts.push(options.artifactId);
-
-  return keyParts.filter(Boolean).join('/');
+  return [_getS3KeyPrefix(), 'submissions', options.submissionId, 'features', options.submissionFeatureId]
+    .filter(Boolean)
+    .join('/');
 }
 
 /**

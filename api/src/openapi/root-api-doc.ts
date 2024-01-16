@@ -144,7 +144,7 @@ export const rootAPIDoc = {
       SubmissionFeature: {
         title: 'BioHub Data Submission Feature',
         type: 'object',
-        required: ['id', 'type', 'properties', 'features'],
+        required: ['type', 'properties', 'features'],
         properties: {
           id: {
             description: 'Unique id of the feature',

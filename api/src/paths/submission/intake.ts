@@ -44,6 +44,7 @@ POST.apiDoc = {
           properties: {
             id: {
               description: 'Unique id of the submission.',
+              format: 'uuid',
               type: 'string'
             },
             name: {
@@ -127,7 +128,7 @@ export function submissionIntake(): RequestHandler {
       ]);
     }
 
-    const submissionSourceId = req.body.id;
+    const submissionUuid = req.body.id;
     const submissionName = req.body.name;
     const submissionDescription = req.body.description;
 
@@ -149,7 +150,7 @@ export function submissionIntake(): RequestHandler {
 
       // insert the submission record
       const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict(
-        submissionSourceId,
+        submissionUuid,
         submissionName,
         submissionDescription,
         serviceClientSystemUser.system_user_id,

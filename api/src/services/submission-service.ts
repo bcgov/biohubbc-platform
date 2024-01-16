@@ -68,7 +68,7 @@ export class SubmissionService extends DBService {
    * Insert a new submission record, returning the record having the matching UUID if it already exists
    * in the database.
    *
-   * @param {string} sourceId
+   * @param {string} uuid
    * @param {string} name
    * @param {string} description
    * @param {number} systemUserId
@@ -77,14 +77,14 @@ export class SubmissionService extends DBService {
    * @memberof SubmissionService
    */
   async insertSubmissionRecordWithPotentialConflict(
-    sourceId: string,
+    uuid: string,
     name: string,
     description: string,
     systemUserId: number,
     systemUserIdentifier: string
   ): Promise<SubmissionRecord> {
     return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
-      sourceId,
+      uuid,
       name,
       description,
       systemUserId,

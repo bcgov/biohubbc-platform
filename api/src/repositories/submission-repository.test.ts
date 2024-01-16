@@ -916,7 +916,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          source_id: '123',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -933,7 +932,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          source_id: '456',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -971,7 +969,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -988,7 +985,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1026,7 +1022,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          source_id: '321',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1043,7 +1038,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          source_id: '456',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1080,7 +1074,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1098,7 +1091,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 2,
           uuid: '789-456-123',
-          source_id: '456',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1117,7 +1109,6 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 3,
           uuid: '999-456-123',
-          source_id: '789',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1381,7 +1372,6 @@ describe('SubmissionRepository', () => {
         const mockSubmissionRecord: SubmissionRecord = {
           submission_id: 1,
           uuid: '123-456-789',
-          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1418,7 +1408,6 @@ describe('SubmissionRepository', () => {
         const mockSubmissionRecord: SubmissionRecord = {
           submission_id: 1,
           uuid: '123-456-789',
-          source_id: '456',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
@@ -1701,7 +1690,6 @@ describe('SubmissionRepository', () => {
       const mockResponse: SubmissionRecordPublished = {
         submission_id: 1,
         uuid: 'string',
-        source_id: '123',
         security_review_timestamp: null,
         publish_timestamp: 'string',
         submitted_timestamp: 'string',

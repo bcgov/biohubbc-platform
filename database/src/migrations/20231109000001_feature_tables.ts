@@ -24,7 +24,7 @@ export async function up(knex: Knex): Promise<void> {
       uuid                           uuid              DEFAULT public.gen_random_uuid(),
       submission_id                  integer           NOT NULL,
       feature_type_id                integer           NOT NULL,
-      source_id                      varchar(100)      NOT NULL,
+      source_id                      varchar(200),
       data                           jsonb             NOT NULL,
       parent_submission_feature_id   integer,
       record_effective_date          date              DEFAULT now() NOT NULL,

@@ -51,7 +51,6 @@ describe('getReviewedSubmissionsForAdmins', () => {
       {
         submission_id: 1,
         uuid: '123-456-789',
-        source_id: '321',
         security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
         publish_timestamp: '2023-12-12',
@@ -71,7 +70,6 @@ describe('getReviewedSubmissionsForAdmins', () => {
       {
         submission_id: 2,
         uuid: '789-456-123',
-        source_id: '321',
         security_review_timestamp: '2023-12-12',
         submitted_timestamp: '2023-12-12',
         system_user_id: 3,

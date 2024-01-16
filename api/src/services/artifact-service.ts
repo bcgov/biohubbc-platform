@@ -68,8 +68,7 @@ export class ArtifactService extends DBService {
     // Generate S3 key
     const artifactS3Key = generateSubmissionFeatureS3FileKey({
       submissionId: artifactFeatureSubmission.submission_id,
-      submissionFeatureId: artifactFeatureSubmission.submission_feature_id,
-      artifactId: artifactFeatureSubmission.source_id // TODO is this needed. The submission_feature_id should be enough.
+      submissionFeatureId: artifactFeatureSubmission.submission_feature_id
     });
 
     defaultLog.debug({ label: 'uploadSubmissionFeatureArtifact', message: 'S3 key', artifactS3Key });

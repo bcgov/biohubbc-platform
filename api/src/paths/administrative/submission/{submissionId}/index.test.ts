@@ -51,7 +51,6 @@ describe('patchSubmissionRecord', () => {
     const mockSubmissionRecord: SubmissionRecord = {
       submission_id: 3,
       uuid: '999-456-123',
-      source_id: '321',
       security_review_timestamp: '2023-12-12',
       publish_timestamp: '2023-12-12',
       submitted_timestamp: '2023-12-12',

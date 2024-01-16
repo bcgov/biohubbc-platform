@@ -22,7 +22,7 @@ export interface IDatasetsForReview {
 }
 
 export interface ISubmissionFeature {
-  id: string;
+  id: string | null;
   type: string;
   properties: Record<string, unknown>;
   features: ISubmissionFeature[];
@@ -77,7 +77,7 @@ export const SubmissionFeatureRecord = z.object({
   uuid: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
-  source_id: z.string(),
+  source_id: z.string().nullable(),
   data: z.record(z.any()),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
@@ -256,7 +256,6 @@ export interface ISubmissionObservationRecord {
 export const SubmissionRecord = z.object({
   submission_id: z.number(),
   uuid: z.string(),
-  source_id: z.string(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
   system_user_id: z.number(),
@@ -370,7 +369,7 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission record.
    *
-   * @param {string} sourceId
+   * @param {string} uuid
    * @param {string} name
    * @param {string} description
    * @param {string} userIdentifier
@@ -378,7 +377,7 @@ export class SubmissionRepository extends BaseRepository {
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecordWithPotentialConflict(
-    sourceId: string,
+    uuid: string,
     name: string,
     description: string,
     systemUserId: number,
@@ -386,14 +385,14 @@ export class SubmissionRepository extends BaseRepository {
   ): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       INSERT INTO submission (
-        source_id,
+        uuid,
         submitted_timestamp,
         name,
         description,
         system_user_id,
         source_system
       ) VALUES (
-        ${sourceId},
+        ${uuid},
         now(),
         ${name},
         ${description},
@@ -420,7 +419,7 @@ export class SubmissionRepository extends BaseRepository {
    * Insert a new submission feature record.
    *
    * @param {number} submissionId
-   * @param {string} sourceId
+   * @param {(string | null)} featureSourceId
    * @param {string} featureTypeName
    * @param {ISubmissionFeature['properties']} featureProperties
    * @return {*}  {Promise<{ submission_feature_id: number }>}
@@ -428,7 +427,7 @@ export class SubmissionRepository extends BaseRepository {
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
-    featureSourceId: string,
+    featureSourceId: string | null,
     featureTypeName: string,
     featureProperties: ISubmissionFeature['properties']
   ): Promise<{ submission_feature_id: number }> {
@@ -1220,7 +1219,7 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
-          DISTINCT ON (submission.source_id) submission.*,
+          DISTINCT ON (submission.uuid) submission.*,
           submission_feature.feature_type_id as root_feature_type_id,
           feature_type.name as root_feature_type_name,
           ${SECURITY_APPLIED_STATUS.PENDING} as security
@@ -1239,7 +1238,7 @@ export class SubmissionRepository extends BaseRepository {
         AND
           submission_feature.parent_submission_feature_id IS NULL
         ORDER BY
-          submission.source_id, submission.submission_id DESC
+          submission.uuid, submission.submission_id DESC
       )
       SELECT
         *
@@ -1263,7 +1262,7 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       WITH w_unique_submissions as (
         SELECT
-          DISTINCT ON (submission.source_id) submission.*,
+          DISTINCT ON (submission.uuid) submission.*,
           submission_feature.feature_type_id as root_feature_type_id,
           feature_type.name as root_feature_type_name,
           CASE
@@ -1297,7 +1296,7 @@ export class SubmissionRepository extends BaseRepository {
           submission_feature.feature_type_id,
           feature_type.name
         ORDER BY
-          submission.source_id, submission.submission_id DESC
+          submission.uuid, submission.submission_id DESC
       )
       SELECT
         *

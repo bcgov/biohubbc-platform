@@ -111,7 +111,6 @@ describe('intake', () => {
         .resolves({
           submission_id: submissionId,
           uuid: '123-456-789',
-          source_id: '123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
           system_user_id: 3,
