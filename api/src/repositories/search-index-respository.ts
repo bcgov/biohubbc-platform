@@ -267,8 +267,4 @@ export class SearchIndexRepository extends BaseRepository {
 
     return response.rows;
   }
-
-  async getSpatialRecordsForSubmissionId(submissionId: number): Promise<any[]> {
-    return [];
-  }
 }

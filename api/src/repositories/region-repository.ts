@@ -49,8 +49,14 @@ export class RegionRepository extends BaseRepository {
    * Intersections are calculated based on area coverage passed in through intersectionThreshold
    * Any regions intersecting with this calculated value are returned.
    *
+   * intersectThreshold is expecting a range of values from 0.0 - 1.0.
+   * A value of 0.0 means 0% of the geometries area need to intersect meaning all values from `region_lookup` will be returned.
+   * A value of 1.0 means 100% of the geometries area need to be an exact match before returning a value.
+   * A value of 0.3 means that 30% of the geometries area need to intersect before returning a value.
+   *
+   *
    * @param {number} submissionId
-   * @param {number} [intersectThreshold=1] intersectThreshold Expected 0-1. Determines the percentage threshold for intersections to be valid
+   * @param {number} [intersectThreshold=1] intersectThreshold Expected 0.0 - 1.0. Determines the percentage threshold for intersections to be valid
    * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
    * @memberof RegionRepository
    */

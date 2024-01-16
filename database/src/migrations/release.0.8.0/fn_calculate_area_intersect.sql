@@ -10,8 +10,11 @@
 -- *******************************************************************
 CREATE OR REPLACE FUNCTION fn_calculate_area_intersect(geom1 geometry, geom2 geometry, tolerance float)
 RETURNS boolean AS $$
+DECLARE
+  intersection_area double precision;
 BEGIN
-  RETURN ST_Area(ST_Intersection(geom1, geom2)) / ST_Area(geom1) >= tolerance
-         OR ST_Area(ST_Intersection(geom1, geom2)) / ST_Area(geom2) >= tolerance;
+  select ST_Area(ST_Intersection(geom1, geom2)) into intersection_area;
+  RETURN intersection_area / ST_Area(geom1) >= tolerance
+         OR intersection_area / ST_Area(geom2) >= tolerance;
 END;
 $$ LANGUAGE plpgsql;
