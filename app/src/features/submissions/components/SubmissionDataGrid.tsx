@@ -12,7 +12,7 @@ import {
   GridValueGetterParams
 } from '@mui/x-data-grid';
 import { useCodesContext } from 'hooks/useContext';
-import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
+import { FeaturePropertyCode } from 'interfaces/useCodesApi.interface';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 
 export interface ISubmissionDataGridProps {
@@ -39,13 +39,13 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     featureTypesWithProperties?.find((item) => item.feature_type['name'] === feature_type_name)
       ?.feature_type_properties || [];
 
-  const fieldColumns = featureTypeWithProperties.map((featureType: IFeatureTypeProperties) => {
+  const fieldColumns = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => {
     return {
-      field: featureType.name,
-      headerName: featureType.display_name,
+      field: featureType.feature_property_type_name,
+      headerName: featureType.feature_property_display_name,
       flex: 1,
       disableColumnMenu: true,
-      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.name] ?? null,
+      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.feature_property_type_name] ?? null,
       renderCell: (params: GridRenderCellParams) => {
         return (
           <Box
