@@ -54,30 +54,36 @@ const openAPIFramework = initialize({
   docsPath: '/raw-api-docs', // path to view raw openapi spec
   consumesMiddleware: {
     'application/json': express.json({ limit: MAX_REQ_BODY_SIZE }),
-    'multipart/form-data': function (req, res, next) {
+    'multipart/form-data': async function (req, res, next) {
+      console.log('AA');
       const multerRequestHandler = multer({
         storage: multer.memoryStorage(), // TOOD change to local/PVC storage and stream file uploads to S3?
         limits: { fileSize: MAX_UPLOAD_FILE_SIZE }
       }).array('media', MAX_UPLOAD_NUM_FILES);
-
-      multerRequestHandler(req, res, (error?: any) => {
+      console.log('BB');
+      return multerRequestHandler(req, res, async function (error?: any) {
+        console.log('CC');
         if (error) {
           return next(error);
         }
-
+        console.log('DD');
         if (req.files && req.files.length) {
+          console.log('EE');
           // Set original request file field to empty string to satisfy OpenAPI validation
           // See: https://www.npmjs.com/package/express-openapi#argsconsumesmiddleware
-          (req.files as Express.Multer.File[]).forEach((file) => {
+          for (const file of req.files as Express.Multer.File[]) {
             req.body[file.fieldname] = '';
-
+            console.log('FF');
+            console.log(file);
             // Scan file for malicious content, if enabled
-            if (!scanFileForVirus(file)) {
+            const isFileSafe = await scanFileForVirus(file);
+            console.log('!!!!!');
+            if (!isFileSafe) {
               throw new HTTP400('Malicious file content detected.', [{ file_name: file.originalname }]);
             }
-          });
+          }
         }
-
+        console.log('GG');
         return next();
       });
     },
