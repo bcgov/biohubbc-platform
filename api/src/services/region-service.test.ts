@@ -38,9 +38,9 @@ describe('RegionService', () => {
         .resolves([{ region_id: 1 }]);
       const insert = sinon.stub(RegionRepository.prototype, 'insertSubmissionRegions').resolves();
 
-      await service.calculateAndAddRegionsForSubmission(1, 0.5, 0.5);
+      await service.calculateAndAddRegionsForSubmission(1, 0.5);
 
-      expect(calculate).to.be.calledWith(1, 0.5, 0.5);
+      expect(calculate).to.be.calledWith(1, 0.5);
       expect(insert).to.be.called;
     });
   });

@@ -54,10 +54,7 @@ export class RegionRepository extends BaseRepository {
    * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
    * @memberof RegionRepository
    */
-  async calculateRegionsForASubmission(
-    submissionId: number,
-    intersectThreshold: number = 1
-  ): Promise<{ region_id: number }[]> {
+  async calculateRegionsForASubmission(submissionId: number, intersectThreshold = 1): Promise<{ region_id: number }[]> {
     const sql = SQL`--sql
       SELECT rl.region_id , rl.region_name 
       FROM region_lookup rl 
