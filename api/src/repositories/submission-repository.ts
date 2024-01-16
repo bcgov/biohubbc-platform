@@ -1234,7 +1234,6 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
-    console.log(response.rows);
     return response.rows;
   }
 

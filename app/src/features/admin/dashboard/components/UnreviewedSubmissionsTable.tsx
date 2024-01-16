@@ -99,7 +99,6 @@ const UnreviewedSubmissionsTable = () => {
       </Stack>
       <Stack gap={2}>
         {submissionRecords.map((submissionRecord) => {
-          console.log(submissionRecord.regions);
           return (
             <Card elevation={0} key={submissionRecord.submission_id}>
               <CardHeader
