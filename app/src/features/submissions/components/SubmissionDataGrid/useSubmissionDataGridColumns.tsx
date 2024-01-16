@@ -1,13 +1,12 @@
 import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Button, Stack } from '@mui/material';
+import { Button, Stack, Typography } from '@mui/material';
 import { Box } from '@mui/system';
 import { GridColDef, GridRenderCellParams, GridValueGetterParams } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import { useCodesContext } from 'hooks/useContext';
 import useDownload from 'hooks/useDownload';
 import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
-import React from 'react';
 
 /**
  * Hook to generate columns for SubmissionDataGrid
@@ -84,7 +83,9 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
           return (
             <Stack flexDirection="row" alignItems="center" gap={1}>
               <Icon path={mdiLock} size={0.75} />
-              <span>SECURED</span>
+              <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+                Secured
+              </Typography>
             </Stack>
           );
         }
@@ -97,7 +98,9 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
               color: 'text.secondary'
             }}>
             <Icon path={mdiLockOpenOutline} size={0.75} />
-            <span>UNSECURED</span>
+            <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+              Unsecured
+            </Typography>
           </Stack>
         );
       }

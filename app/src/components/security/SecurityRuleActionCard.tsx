@@ -1,20 +1,19 @@
 import { mdiClose } from '@mdi/js';
 import Icon from '@mdi/react';
-import { Card, IconButton } from '@mui/material';
+import { Button, Card, IconButton } from '@mui/material';
 import grey from '@mui/material/colors/grey';
-import SecurityRuleCard from './SecurityRuleCard';
+import SecurityRuleCard, { ISecurityRuleCardProps } from './SecurityRuleCard';
 
-interface ISecurityRuleActionCardProps {
-  remove: (id: number) => void;
-  security_rule_id: number;
-  name: string;
-  category: string;
-  description: string;
+interface ISecurityRuleActionCardProps extends ISecurityRuleCardProps {
+  action: 'apply' | 'persist' | 'remove';
+  onRemove: () => void;
 }
 
 const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
+  const { key, onRemove, ...rest } = props;
   return (
     <Card
+      key={key}
       variant="outlined"
       sx={{
         display: 'flex',
@@ -25,15 +24,16 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
         justifyContent: 'space-between',
         background: grey[100]
       }}>
-      <SecurityRuleCard
-        key={props.security_rule_id}
-        title={props.name}
-        category={props.category}
-        subtitle={props.description}
-      />
-      <IconButton onClick={() => props.remove(props.security_rule_id)} aria-label="Remove security rule">
-        <Icon path={mdiClose} size={1} />
-      </IconButton>
+      <SecurityRuleCard {...rest} />
+      {props.action === 'apply' ? (
+        <IconButton onClick={() => onRemove()} aria-label="Remove security rule">
+          <Icon path={mdiClose} size={1} />
+        </IconButton>
+      ) : (
+        <Button variant={props.action === 'remove' ? 'contained' : 'outlined'} color="error" onClick={() => onRemove()}>
+          Remove
+        </Button>
+      )}
     </Card>
   );
 };
