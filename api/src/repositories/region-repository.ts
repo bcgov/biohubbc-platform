@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { getKnex } from '../database/db';
 import { BaseRepository } from './base-repository';
 
 export const RegionRecord = z.object({
@@ -46,7 +47,7 @@ export class RegionRepository extends BaseRepository {
   /**
    * Calculates region intersects for a submission search_spatial data.
    * Submission spatial data is collected then converted into a single polygon using ST_ConvexHull (https://postgis.net/docs/ST_ConvexHull.html)
-   * Intersections are calculated based on area coverage passed in through intersectionThreshold
+   * Intersections are calculated based on area coverage passed in through intersectionThreshold. Area calculation done using ST_Area (https://postgis.net/docs/ST_Area.html)
    * Any regions intersecting with this calculated value are returned.
    *
    * intersectThreshold is expecting a range of values from 0.0 - 1.0.
@@ -54,14 +55,13 @@ export class RegionRepository extends BaseRepository {
    * A value of 1.0 means 100% of the geometries area need to be an exact match before returning a value.
    * A value of 0.3 means that 30% of the geometries area need to intersect before returning a value.
    *
-   *
    * @param {number} submissionId
    * @param {number} [intersectThreshold=1] intersectThreshold Expected 0.0 - 1.0. Determines the percentage threshold for intersections to be valid
    * @returns {*} {Promise<{region_id: number}}[]>} An array of found region ids
    * @memberof RegionRepository
    */
   async calculateRegionsForASubmission(submissionId: number, intersectThreshold = 1): Promise<{ region_id: number }[]> {
-    const sql = SQL`--sql
+    const sql = SQL`
       SELECT rl.region_id , rl.region_name 
       FROM region_lookup rl 
       WHERE fn_calculate_area_intersect(rl.geography::geometry, (
@@ -88,20 +88,12 @@ export class RegionRepository extends BaseRepository {
     if (!regionIds.length) {
       return;
     }
-    const sql = SQL`
-      INSERT INTO submission_regions (submission_id, region_id) 
-      VALUES
-    `;
 
-    sql.append(
-      regionIds
-        .map((region) => {
-          return `(${[submissionId, region.region_id].join(',  ')})`;
-        })
-        .join(', ')
-    );
+    const sql = getKnex()
+      .queryBuilder()
+      .into('submission_regions')
+      .insert(regionIds.map(({ region_id }) => ({ region_id, submission_id: submissionId })));
 
-    sql.append(';');
-    await this.connection.sql(sql);
+    await this.connection.knex(sql);
   }
 }
