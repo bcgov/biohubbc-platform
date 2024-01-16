@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
@@ -287,7 +288,8 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Get all active security categories
+   * Get all active security categories. A security category is active if it has not been
+   * end-dated.
    *
    * @return {*}  {Promise<SecurityCategoryRecord[]>}
    * @memberof SecurityRepository
@@ -302,7 +304,8 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Get active security rules with associated categories
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleAndCategory[]>}
    * @memberof SecurityRepository
@@ -330,7 +333,8 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Gets a list of all active security rules
+   * Gets a list of all active security rules. A security rule is active if it has not
+   * been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityRepository
@@ -345,32 +349,33 @@ export class SecurityRepository extends BaseRepository {
   }
 
   /**
-   * Gets a list of all active security rules
+   * Attaches all of the given security rules to the given submission features.
    *
-   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} securityRuleIds
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
   async applySecurityRulesToSubmissionFeatures(
-    features: number[],
-    rules: number[]
+    submissionFeatureIds: number[],
+    securityRuleIds: number[]
   ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!rules.length || !features.length) {
-      // no rules to apply, leave early
-      return [];
-    }
+    defaultLog.debug({ label: 'applySecurityRulesToSubmissionFeatures', submissionFeatureIds, securityRuleIds });
 
-    const final = features.flatMap((item) => {
-      return rules.flatMap((rule) => `(${item}, ${rule}, 'NOW()')`);
+    const queryValues = submissionFeatureIds.flatMap((submissionFeatureId) => {
+      return securityRuleIds.flatMap((securityRuleId) => `(${submissionFeatureId}, ${securityRuleId}, 'NOW()')`);
     });
 
     const insertSQL = SQL`
-    INSERT INTO submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
-    VALUES `;
-    insertSQL.append(final.join(', '));
+      INSERT INTO
+        submission_feature_security (submission_feature_id, security_rule_id, record_effective_date) 
+      VALUES `;
+
+    insertSQL.append(queryValues.join(', '));
     insertSQL.append(`
-    ON CONFLICT (submission_feature_id, security_rule_id)
-    DO NOTHING
-    RETURNING *;`);
+      ON CONFLICT (submission_feature_id, security_rule_id)
+      DO NOTHING
+      RETURNING *;`);
 
     const response = await this.connection.sql(insertSQL, SubmissionFeatureSecurityRecord);
     return response.rows;
@@ -379,43 +384,90 @@ export class SecurityRepository extends BaseRepository {
   /**
    * Removes all security rules for a given set of submission features
    *
-   * @param {number[]} features
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!features.length) {
-      // no features, return early
-      return [];
-    }
-    const deleteSQL = SQL`
-      DELETE FROM submission_feature_security WHERE submission_feature_id IN (`;
+  async removeAllSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    const queryBuilder = getKnex()
+      .queryBuilder()
+      .delete()
+      .from('submission_feature_security')
+      .whereIn('submission_feature_id', submissionFeatureIds)
+      .returning('*');
 
-    deleteSQL.append(features.join(', '));
-    deleteSQL.append(`) RETURNING *;`);
-    const response = await this.connection.sql(deleteSQL, SubmissionFeatureSecurityRecord);
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Removes the given security rules for a given set of given submission features.
+   *
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} removeRuleIds
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async removeSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[],
+    removeRuleIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    defaultLog.debug({ label: 'removeSecurityRulesFromSubmissionFeatures', submissionFeatureIds, removeRuleIds });
+
+    const queryBuilder = getKnex()
+      .queryBuilder()
+      .delete()
+      .fromRaw('submission_feature_security sfs')
+      .whereIn('sfs.submission_feature_id', submissionFeatureIds)
+      .and.whereIn('sfs.security_rule_id', removeRuleIds)
+      .returning('*');
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+
     return response.rows;
   }
 
   /**
    * Gets Submission Feature Security Records for a given set of submission features
    *
-   * @param {number[]} features
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityRepository
    */
-  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (!features.length) {
-      // no features, return early
-      return [];
-    }
-    const sql = SQL`
-      SELECT * FROM submission_feature_security WHERE submission_feature_id IN (`;
+  async getSecurityRulesForSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    const queryBuilder = getKnex()
+      .queryBuilder()
+      .select('*')
+      .from('submission_feature_security')
+      .whereIn('submission_feature_id', submissionFeatureIds);
 
-    sql.append(features.join(', '));
-    sql.append(`);`);
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
 
-    const response = await this.connection.sql(sql, SubmissionFeatureSecurityRecord);
+    return response.rows;
+  }
+
+  /**
+   * Gets Submission Feature Security Records for a given set of submission features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityRepository
+   */
+  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
+    const queryBuilder = getKnex()
+      .select('*')
+      .from('submission_feature_security')
+      .whereIn('submission_feature_id', (subQuery) => {
+        return subQuery.select('submission_feature_id').from('submission_feature').where('submission_id', submissionId);
+      });
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureSecurityRecord);
+
     return response.rows;
   }
 }

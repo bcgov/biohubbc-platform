@@ -1,9 +1,8 @@
 import { Divider, Paper, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { Box } from '@mui/system';
-import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
+import { DataGrid, GridInputRowSelectionModel, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
-import React, { useState } from 'react';
 import { pluralize } from 'utils/Utils';
 import useSubmissionDataGridColumns from './useSubmissionDataGridColumns';
 
@@ -11,6 +10,8 @@ export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
   feature_type_name: string;
   submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
+  rowSelectionModel: GridInputRowSelectionModel;
+  onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
 }
 
 /**
@@ -23,8 +24,6 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const { submissionFeatures, feature_type_display_name, feature_type_name } = props;
 
   const columns = useSubmissionDataGridColumns(feature_type_name);
-
-  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
 
   return (
     <Paper elevation={0}>
@@ -40,6 +39,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       <Box px={3}>
         <Divider flexItem></Divider>
         <DataGrid
+          checkboxSelection
           data-testid="submission-reviews-data-grid"
           getRowId={(row) => row.submission_feature_id}
           autoHeight
@@ -47,10 +47,8 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           columns={columns}
           pageSizeOptions={[5]}
           editMode="row"
-          rowSelectionModel={rowSelectionModel}
-          onRowSelectionModelChange={(model) => {
-            setRowSelectionModel(model);
-          }}
+          rowSelectionModel={props.rowSelectionModel}
+          onRowSelectionModelChange={props.onRowSelectionModelChange}
           disableRowSelectionOnClick
           disableColumnSelector
           disableColumnMenu
