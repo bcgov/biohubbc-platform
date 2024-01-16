@@ -26,15 +26,15 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  applySecuritySuccess: (ruleCount: number, featureCount: number) => {
-    if (ruleCount === 0) {
-      return `Successfully removed all security rules for ${featureCount} ${p(featureCount, 'feature')}.`;
-    }
+  applySecuritySuccess: (numApplied: number, numRemoved: number, featureCount: number) => {
+    const appliedRemoved = [
+      numApplied > 0 && `applied ${numApplied} ${p(numApplied, 'security rule')}`,
+      numRemoved > 0 && `removed ${numRemoved} ${p(numRemoved, 'security rule')}`
+    ]
+      .filter(Boolean)
+      .join(' and ');
 
-    return `Successfully applied ${ruleCount} ${p(ruleCount, 'security rule')} to ${featureCount} ${p(
-      featureCount,
-      'feature'
-    )}.`;
+    return `Successfully ${appliedRemoved} for ${featureCount} ${p(featureCount, 'feature')}.`;
   },
 
   applySecurityRulesErrorTitle: 'Error Applying Security',

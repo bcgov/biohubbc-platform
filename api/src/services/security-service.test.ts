@@ -561,7 +561,7 @@ describe('SecurityService', () => {
     });
   });
 
-  describe('applySecurityRulesToSubmissionFeatures', () => {
+  describe('patchSecurityRulesOnSubmissionFeatures', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -570,59 +570,64 @@ describe('SecurityService', () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
-      const removeFunction = sinon
-        .stub(SecurityService.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
         .resolves([]);
-      const applySecurity = sinon.stub(SecurityService.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([
-        {
-          submission_feature_security_id: 1,
-          submission_feature_id: 1,
-          security_rule_id: 1,
-          record_effective_date: '',
-          record_end_date: null,
-          create_date: '',
-          create_user: 1,
-          update_date: '',
-          update_user: 1,
-          revision_count: 1
-        }
-      ]);
 
-      const response = await service.applySecurityRulesToSubmissionFeatures([1], [1]);
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
 
-      expect(removeFunction).to.not.be.called;
-      expect(applySecurity).to.be.calledOnce;
-      expect(response.length).to.be.greaterThan(0);
+      await service.patchSecurityRulesOnSubmissionFeatures([1, 2, 3], [4, 5], [6, 7]);
+
+      expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
+      expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
     });
 
-    it('should succeed with override called', async () => {
+    it('should succeed when no submissionFeatureIds are called', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
-      const removeFunction = sinon
+      const removeStub = sinon
         .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
         .resolves([]);
-      const applySecurity = sinon
-        .stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures')
-        .resolves([
-          {
-            submission_feature_security_id: 1,
-            submission_feature_id: 1,
-            security_rule_id: 1,
-            record_effective_date: '',
-            record_end_date: null,
-            create_date: '',
-            create_user: 1,
-            update_date: '',
-            update_user: 1,
-            revision_count: 1
-          }
-        ]);
-      const response = await service.applySecurityRulesToSubmissionFeatures([1], [1], true);
 
-      expect(removeFunction).to.be.calledOnce;
-      expect(applySecurity).to.be.calledOnce;
-      expect(response.length).to.be.greaterThan(0);
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([], [4, 5], [6, 7]);
+
+      expect(removeStub).to.not.be.called;
+      expect(applyStub).to.not.be.called;
+    });
+
+    it('should succeed when no remove rule IDs are called', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([1, 2, 3], [4, 5], []);
+
+      expect(removeStub).to.not.be.called;
+      expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
+    });
+
+    it('should succeed when no apply rule IDs are called', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([1, 2, 3], [], [6, 7]);
+
+      expect(applyStub).to.not.be.called;
+      expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
     });
   });
 
@@ -631,11 +636,11 @@ describe('SecurityService', () => {
       sinon.restore();
     });
 
-    it('removeSecurityRulesFromSubmissionFeatures', async () => {
+    it('should succeed at removing a list of security rules', async () => {
       const mockDBConnection = getMockDBConnection();
       const service = new SecurityService(mockDBConnection);
 
-      const applySecurity = sinon
+      const removeSecurityStub = sinon
         .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
         .resolves([
           {
@@ -651,12 +656,50 @@ describe('SecurityService', () => {
             revision_count: 1
           }
         ]);
-      const response = await service.removeSecurityRulesFromSubmissionFeatures([1]);
 
-      expect(applySecurity).to.be.calledOnce;
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([1, 2, 3], [4, 5]);
+
+      expect(removeSecurityStub).to.be.calledOnce;
       expect(response.length).to.be.greaterThan(0);
     });
+
+    it('should succeed at removing all rules when no array is given', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'removeAllSecurityRulesFromSubmissionFeatures')
+        .resolves([
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: '',
+            update_user: 1,
+            revision_count: 1
+          }
+        ]);
+
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([1, 2, 3]);
+
+      expect(removeSecurityStub).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+
+    it('should return an empty array if no submission feature IDs have been given', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([]);
+
+      expect(response).to.eql([]);
+    });
   });
+
   describe('getSecurityRulesForSubmissionFeatures', () => {
     afterEach(() => {
       sinon.restore();

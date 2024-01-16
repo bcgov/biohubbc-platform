@@ -330,53 +330,94 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Applies all given security rules to the given set of submission feature ids.
-   * This process is additive unless the override flag is set to `true`.
-   * If the override is set to `true` all security rules for the given set of features will be removed.
-   * Then the new security rules will be applied as normal.
+   * Patches security rules that are applied or removed to the given set of submission features. If a
+   * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
+   * added.
    *
-   * @param {number[]} features
-   * @param {number[]} rules
-   * @param {boolean}
-   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
+   * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
+   * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
+   * @return {*}  {Promise<void>}
    * @memberof SecurityService
    */
-  async applySecurityRulesToSubmissionFeatures(
-    features: number[],
-    rules: number[],
-    override = false
-  ): Promise<SubmissionFeatureSecurityRecord[]> {
-    if (override) {
-      // we want to override any security rules present and can achieve this by remove everything first
-      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
+  async patchSecurityRulesOnSubmissionFeatures(
+    submissionFeatureIds: number[],
+    applyRuleIds: number[],
+    removeRuleIds: number[]
+  ): Promise<void> {
+    defaultLog.debug({ label: 'patchSecurityRulesOnSubmissionFeatures', applyRuleIds, removeRuleIds });
+
+    if (!submissionFeatureIds.length) {
+      return;
     }
 
-    return this.securityRepository.applySecurityRulesToSubmissionFeatures(features, rules);
+    if (removeRuleIds.length > 0) {
+      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+    }
+
+    if (applyRuleIds.length > 0) {
+      await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
+    }
   }
 
   /**
-   * Removes all security rules for the given set of submission feature ids
+   * Removes the given security rules from the given set of submission feature ids. If
+   * no security rules ID is provided, all security rules will be removed for the given set
+   * of subission features.
+   *
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} [removeRuleIds]
    *
    * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
    * @memberof SecurityService
    */
-  async removeSecurityRulesFromSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(features);
+  async removeSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[],
+    removeRuleIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!submissionFeatureIds.length) {
+      return [];
+    }
+
+    if (!removeRuleIds) {
+      return this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
+    }
+
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
   }
 
   /**
    * Gets Submission Feature Security Records for a given set of submission feature ids
    *
-   * @param {number[]} features
+   * @param {number[]} submissionFeatureIds
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityService
    */
-  async getSecurityRulesForSubmissionFeatures(features: number[]): Promise<SubmissionFeatureSecurityRecord[]> {
-    return this.securityRepository.getSecurityRulesForSubmissionFeatures(features);
+  async getSecurityRulesForSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!submissionFeatureIds.length) {
+      // no features, return early
+      return [];
+    }
+
+    return this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
   }
 
   /**
-   * Gets a list of all active security rules
+   * Gets all Security Records for all featues belonging to the given submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
+  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.getAllSecurityRulesForSubmission(submissionId);
+  }
+
+  /**
+   * Gets a list of all active security rules. A security rule is active if it has not
+   * been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleRecord[]>}
    * @memberof SecurityService
@@ -386,7 +427,8 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Gets a list of all active security rules with associated categories
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
    *
    * @return {*}  {Promise<SecurityRuleAndCategory[]>}
    * @memberof SecurityService
@@ -396,7 +438,8 @@ export class SecurityService extends DBService {
   }
 
   /**
-   * Gets a list of all active security categories
+   * Gets a list of all active security categories. A security category is active if it has
+   * not been end-dated.
    *
    * @return {*}  {Promise<SecurityCategoryRecord[]>}
    * @memberof SecurityService

@@ -1,12 +1,12 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { SYSTEM_ROLE } from '../../../../constants/roles';
-import { getDBConnection } from '../../../../database/db';
-import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
-import { SecurityService } from '../../../../services/security-service';
-import { getLogger } from '../../../../utils/logger';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection } from '../../../database/db';
+import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
+import { SecurityService } from '../../../services/security-service';
+import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/security/category');
+const defaultLog = getLogger('paths/administrative/security/rules');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -19,11 +19,12 @@ export const GET: Operation = [
       ]
     };
   }),
-  getActiveSecurityCategories()
+  getActiveSecurityRules()
 ];
 
 GET.apiDoc = {
-  description: 'Get all active security categories.',
+  description:
+    'Get all active security rules, with their respective categories. A security rule is active if it has not been end-dated.',
   tags: ['security'],
   security: [
     {
@@ -32,16 +33,27 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Security Categories.',
+      description: 'Security rules with category.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
             items: {
               type: 'object',
+              required: [
+                'security_rule_id',
+                'name',
+                'description',
+                'record_effective_date',
+                'record_end_date',
+                'category_name',
+                'category_description',
+                'category_record_effective_date',
+                'category_record_end_date'
+              ],
               properties: {
                 security_rule_id: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 name: {
                   type: 'string'
@@ -55,9 +67,6 @@ GET.apiDoc = {
                 record_end_date: {
                   type: 'string',
                   nullable: true
-                },
-                security_category_id: {
-                  type: 'number'
                 },
                 category_name: {
                   type: 'string'
@@ -96,7 +105,7 @@ GET.apiDoc = {
   }
 };
 
-export function getActiveSecurityCategories(): RequestHandler {
+export function getActiveSecurityRules(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
