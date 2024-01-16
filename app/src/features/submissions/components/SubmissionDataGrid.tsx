@@ -1,0 +1,163 @@
+import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
+import Icon from '@mdi/react';
+import { Divider, Paper, Stack, Toolbar } from '@mui/material';
+import Typography from '@mui/material/Typography';
+import { Box } from '@mui/system';
+import {
+  DataGrid,
+  GridColDef,
+  GridInputRowSelectionModel,
+  GridRenderCellParams,
+  GridRowSelectionModel,
+  GridValueGetterParams
+} from '@mui/x-data-grid';
+import { useCodesContext } from 'hooks/useContext';
+import { FeaturePropertyCode } from 'interfaces/useCodesApi.interface';
+import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
+
+export interface ISubmissionDataGridProps {
+  feature_type_display_name: string;
+  feature_type_name: string;
+  submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
+  rowSelectionModel: GridInputRowSelectionModel;
+  onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
+}
+
+/**
+ * SubmissionDataGrid component for displaying submission data.
+ *
+ * @param {ISubmissionDataGridProps} props
+ * @return {*}
+ */
+export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
+  const codesContext = useCodesContext();
+  const { submissionFeatures, feature_type_display_name, feature_type_name } = props;
+
+  const featureTypesWithProperties = codesContext.codesDataLoader.data?.feature_type_with_properties;
+
+  const featureTypeWithProperties =
+    featureTypesWithProperties?.find((item) => item.feature_type['name'] === feature_type_name)
+      ?.feature_type_properties || [];
+
+  const fieldColumns = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => {
+    return {
+      field: featureType.feature_property_type_name,
+      headerName: featureType.feature_property_display_name,
+      flex: 1,
+      disableColumnMenu: true,
+      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.feature_property_type_name] ?? null,
+      renderCell: (params: GridRenderCellParams) => {
+        return (
+          <Box
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+            {String(params.value)}
+          </Box>
+        );
+      }
+    };
+  });
+
+  const columns: GridColDef[] = [
+    {
+      field: 'submission_feature_security_ids',
+      headerName: 'Security',
+      flex: 0,
+      disableColumnMenu: true,
+      width: 160,
+      renderCell: (params) => {
+        if (params.value.length > 0) {
+          return (
+            <Stack flexDirection="row" alignItems="center" gap={1}>
+              <Icon path={mdiLock} size={0.75} />
+              <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+                Secured
+              </Typography>
+            </Stack>
+          );
+        }
+        return (
+          <Stack
+            flexDirection="row"
+            alignItems="center"
+            gap={1}
+            sx={{
+              color: 'text.secondary'
+            }}>
+            <Icon path={mdiLockOpenOutline} size={0.75} />
+            <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+              Unsecured
+            </Typography>
+          </Stack>
+        );
+      }
+    },
+    {
+      field: 'submission_feature_id',
+      headerName: 'ID',
+      flex: 0,
+      disableColumnMenu: true,
+      width: 100
+    },
+    {
+      field: 'parent_submission_feature_id',
+      headerName: 'Parent ID',
+      flex: 0,
+      disableColumnMenu: true,
+      width: 120
+    },
+    ...fieldColumns
+  ];
+
+  return (
+    <Paper elevation={0}>
+      <Toolbar>
+        <Typography component="h2" variant="h4">
+          {`${feature_type_display_name} Records`}
+          <Typography component="span" fontSize="inherit" fontWeight="inherit" color="textSecondary" sx={{ ml: 0.5 }}>
+            ({submissionFeatures.length})
+          </Typography>
+        </Typography>
+      </Toolbar>
+
+      <Box px={3}>
+        <Divider flexItem></Divider>
+        <DataGrid
+          checkboxSelection
+          data-testid="submission-reviews-data-grid"
+          getRowId={(row) => row.submission_feature_id}
+          autoHeight
+          rows={submissionFeatures}
+          columns={columns}
+          pageSizeOptions={[5]}
+          editMode="row"
+          rowSelectionModel={props.rowSelectionModel}
+          onRowSelectionModelChange={props.onRowSelectionModelChange}
+          disableRowSelectionOnClick
+          disableColumnSelector
+          disableColumnMenu
+          sortingOrder={['asc', 'desc']}
+          initialState={{
+            sorting: { sortModel: [{ field: 'submission_feature_id', sort: 'asc' }] },
+            pagination: {
+              paginationModel: {
+                pageSize: 10
+              }
+            }
+          }}
+          sx={{
+            '& .MuiDataGrid-columnHeaderTitle': {
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              color: 'text.secondary'
+            }
+          }}
+        />
+      </Box>
+    </Paper>
+  );
+};
+
+export default SubmissionDataGrid;

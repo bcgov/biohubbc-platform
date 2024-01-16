@@ -1,14 +1,16 @@
-import Typography from '@mui/material/Typography';
+import { Typography } from '@mui/material';
+import { GridRowSelectionModel } from '@mui/x-data-grid';
 import EditDialog from 'components/dialog/EditDialog';
 import { ApplySecurityRulesI18N } from 'constants/i18n';
-import { ISecurityRuleAndCategory } from 'hooks/api/useSecurityApi';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext, useSubmissionContext } from 'hooks/useContext';
+import { IPatchFeatureSecurityRules } from 'interfaces/useSecurityApi.interface';
 import { useState } from 'react';
-import SecurityRuleForm, { ISecurityRuleFormikProps, SecurityRuleFormYupSchema } from './SecurityRuleForm';
+import yup from 'utils/YupSchema';
+import SecurityRuleForm from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
-  features: number[];
+  submissionFeatureIds: GridRowSelectionModel;
   open: boolean;
   onClose: () => void;
 }
@@ -19,35 +21,24 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   const api = useApi();
 
   const submissionContext = useSubmissionContext();
-  const { allSecurityRulesStaticListDataLoader, submissionFeaturesAppliedRulesDataLoader } = submissionContext;
-  const allSecurityRules = allSecurityRulesStaticListDataLoader.data || [];
-  const appliedSecurityRecords = submissionFeaturesAppliedRulesDataLoader.data || [];
+  const { submissionFeaturesAppliedRulesDataLoader, submissionId } = submissionContext;
 
-  const initialAppliedSecurityRules: ISecurityRuleAndCategory[] = !appliedSecurityRecords.length
-    ? []
-    : allSecurityRules.filter((securityRule) => {
-        return appliedSecurityRecords.some(
-          (securityRecord) => securityRule.security_rule_id === securityRecord.security_rule_id
-        );
-      });
-  const hasSecurity = Boolean(initialAppliedSecurityRules.length);
-  const handleSubmit = async (rules: ISecurityRuleAndCategory[]) => {
+  const hasSecurity = Boolean(submissionFeaturesAppliedRulesDataLoader.data?.length);
+
+  const handleSave = async (patch: IPatchFeatureSecurityRules) => {
     try {
       setIsLoading(true);
-      await api.security
-        .applySecurityRulesToSubmissionFeatures(
-          props.features,
-          rules.map((item) => item.security_rule_id),
-          true // Override will replace all rules on submit
-        )
-        .then(() => {
-          submissionContext.submissionFeaturesAppliedRulesDataLoader.refresh();
-        });
+
+      await api.security.patchSecurityRulesOnSubmissionFeatures(submissionId, patch);
 
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(rules.length, props.features.length)}
+            {ApplySecurityRulesI18N.applySecuritySuccess(
+              patch.stagedForApply.length,
+              patch.stagedForRemove.length,
+              props.submissionFeatureIds.length
+            )}
           </Typography>
         ),
         open: true
@@ -68,17 +59,17 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   };
 
   return (
-    <EditDialog
+    <EditDialog<IPatchFeatureSecurityRules>
       isLoading={isLoading}
       dialogTitle={hasSecurity ? 'Edit Security Reasons' : ' Add Security Reasons'}
       open={props.open}
       dialogSaveButtonLabel="APPLY"
       onCancel={props.onClose}
-      onSave={(values: ISecurityRuleFormikProps) => handleSubmit(values.rules)}
+      onSave={handleSave}
       component={{
-        element: <SecurityRuleForm features={props.features} />,
-        initialValues: { rules: initialAppliedSecurityRules },
-        validationSchema: SecurityRuleFormYupSchema
+        element: <SecurityRuleForm />,
+        initialValues: { submissionFeatureIds: props.submissionFeatureIds, stagedForRemove: [], stagedForApply: [] },
+        validationSchema: yup.object()
       }}
     />
   );

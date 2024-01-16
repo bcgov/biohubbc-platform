@@ -6,7 +6,7 @@ import { authorizeRequestHandler } from '../../../request-handlers/security/auth
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/administrative/security');
+const defaultLog = getLogger('paths/administrative/security/categories');
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
@@ -19,11 +19,12 @@ export const GET: Operation = [
       ]
     };
   }),
-  getActiveSecurityRules()
+  getActiveSecurityCategories()
 ];
 
 GET.apiDoc = {
-  description: 'Get all active security rules.',
+  description:
+    'Get all active security rules with their associated categories. A security category is active if it has not been end-dated.',
   tags: ['security'],
   security: [
     {
@@ -32,16 +33,28 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'Security Rules.',
+      description: 'Security Categories.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
             items: {
               type: 'object',
+              required: [
+                'security_category_id',
+                'name',
+                'description',
+                'record_effective_date',
+                'record_end_date',
+                'create_date',
+                'create_user',
+                'update_date',
+                'update_user',
+                'revision_count'
+              ],
               properties: {
-                security_rule_id: {
-                  type: 'number'
+                security_category_id: {
+                  type: 'integer'
                 },
                 name: {
                   type: 'string'
@@ -60,18 +73,18 @@ GET.apiDoc = {
                   type: 'string'
                 },
                 create_user: {
-                  type: 'number'
+                  type: 'integer'
                 },
                 update_date: {
                   type: 'string',
                   nullable: true
                 },
                 update_user: {
-                  type: 'number',
+                  type: 'string',
                   nullable: true
                 },
                 revision_count: {
-                  type: 'number'
+                  type: 'integer'
                 }
               }
             }
@@ -97,7 +110,7 @@ GET.apiDoc = {
   }
 };
 
-export function getActiveSecurityRules(): RequestHandler {
+export function getActiveSecurityCategories(): RequestHandler {
   return async (req, res) => {
     const connection = getDBConnection(req['keycloak_token']);
     const service = new SecurityService(connection);
@@ -105,13 +118,13 @@ export function getActiveSecurityRules(): RequestHandler {
     try {
       await connection.open();
 
-      const data = await service.getActiveSecurityRules();
+      const data = await service.getActiveSecurityCategories();
 
       await connection.commit();
 
       return res.status(200).json(data);
     } catch (error) {
-      defaultLog.error({ label: 'getActiveSecurityRules', message: 'error', error });
+      defaultLog.error({ label: 'getActiveSecurityCategories', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
