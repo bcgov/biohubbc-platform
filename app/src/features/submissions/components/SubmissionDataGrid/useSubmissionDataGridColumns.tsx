@@ -7,7 +7,6 @@ import { useApi } from 'hooks/useApi';
 import { useCodesContext } from 'hooks/useContext';
 import useDownload from 'hooks/useDownload';
 import { IFeatureTypeProperties } from 'interfaces/useCodesApi.interface';
-import React from 'react';
 
 /**
  * Hook to generate columns for SubmissionDataGrid
