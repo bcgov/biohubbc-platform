@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUser } from '../../repositories/user-repository';
+import { RegionService } from '../../services/region-service';
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
@@ -133,6 +134,10 @@ describe('intake', () => {
         .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
         .resolves();
 
+      const calculateAndAddRegionsForSubmissionStub = sinon
+        .stub(RegionService.prototype, 'calculateAndAddRegionsForSubmission')
+        .resolves();
+
       const findSubmissionFeaturesStub = sinon.stub(SubmissionService.prototype, 'findSubmissionFeatures').resolves([
         {
           submission_feature_id: 2,
@@ -191,6 +196,7 @@ describe('intake', () => {
         featureTypeNames: ['artifact']
       });
 
+      expect(calculateAndAddRegionsForSubmissionStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({
         submission_uuid: '123-456-789',
