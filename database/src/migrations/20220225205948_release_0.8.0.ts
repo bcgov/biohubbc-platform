@@ -47,6 +47,9 @@ export async function up(knex: Knex): Promise<void> {
   const tr_prevent_publish_before_review = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'tr_prevent_publish_before_review_trigger.sql')
   );
+  const fn_calculate_area_intersect = fs.readFileSync(
+    path.join(__dirname, DB_RELEASE, 'fn_calculate_area_intersect.sql')
+  );
 
   await knex.raw(`
     -- set up spatial extensions
@@ -90,6 +93,7 @@ export async function up(knex: Knex): Promise<void> {
     ${api_get_system_metadata_constant}
     ${create_sequences}
     ${tr_prevent_publish_before_review}
+    ${fn_calculate_area_intersect}
 
     -- populate look up tables
     ${populate_system_role}

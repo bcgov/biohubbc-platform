@@ -56,7 +56,8 @@ GET.apiDoc = {
                 'revision_count',
                 'security',
                 'root_feature_type_id',
-                'root_feature_type_name'
+                'root_feature_type_name',
+                'regions'
               ],
               properties: {
                 submission_id: {
@@ -115,6 +116,12 @@ GET.apiDoc = {
                 },
                 root_feature_type_name: {
                   type: 'string'
+                },
+                regions: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
                 }
               }
             }

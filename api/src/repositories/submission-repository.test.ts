@@ -19,7 +19,6 @@ import {
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from './submission-repository';
-import { simsHandlebarsTemplate_DETAILS, simsHandlebarsTemplate_HEADER } from './templates/SIMS-handlebar-template';
 
 chai.use(sinonChai);
 
@@ -878,26 +877,6 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getDatasetsForReview(['']);
-
-      expect(response).to.eql(mockResponse);
-    });
-  });
-
-  describe('getHandleBarsTemplateByDatasetId', () => {
-    beforeEach(() => {
-      sinon.restore();
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        header: simsHandlebarsTemplate_HEADER,
-        details: simsHandlebarsTemplate_DETAILS
-      };
-      const mockDBConnection = getMockDBConnection();
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const response = await submissionRepository.getHandleBarsTemplateByDatasetId('uuid');
 
       expect(response).to.eql(mockResponse);
     });
