@@ -200,7 +200,7 @@ const ReviewedSubmissionsTable = () => {
                       <dd>Source:</dd>
                       <dt>{submissionRecord.source_system}</dt>
                     </Stack>
-                    {submissionRecord.regions.length && (
+                    {submissionRecord.regions.length > 0 && (
                       <Stack flexDirection="row">
                         <dd>{p(submissionRecord.regions.length, 'Region')}:</dd>
                         <dt>{submissionRecord.regions.sort().join(', ')}</dt>
