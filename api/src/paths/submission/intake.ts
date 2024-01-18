@@ -5,6 +5,7 @@ import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { ISubmissionFeature } from '../../repositories/submission-repository';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
+import { RegionService } from '../../services/region-service';
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
@@ -142,6 +143,7 @@ export function submissionIntake(): RequestHandler {
       const submissionService = new SubmissionService(connection);
       const validationService = new ValidationService(connection);
       const searchIndexService = new SearchIndexService(connection);
+      const regionService = new RegionService(connection);
 
       // validate the submission
       if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
@@ -168,6 +170,9 @@ export function submissionIntake(): RequestHandler {
         submissionId: submissionRecord.submission_id,
         featureTypeNames: ['artifact']
       });
+
+      // Calculate and add submission regions
+      await regionService.calculateAndAddRegionsForSubmission(response.submission_id, 0.3);
 
       await connection.commit();
 

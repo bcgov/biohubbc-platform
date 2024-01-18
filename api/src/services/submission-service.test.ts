@@ -888,26 +888,6 @@ describe('SubmissionService', () => {
     });
   });
 
-  describe('getHandleBarsTemplateByDatasetId', () => {
-    it('should succeed with valid data', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const submissionService = new SubmissionService(mockDBConnection);
-
-      const repo = sinon.stub(SubmissionRepository.prototype, 'getHandleBarsTemplateByDatasetId').resolves({
-        header: 'header',
-        details: 'details'
-      });
-
-      const response = await submissionService.getHandleBarsTemplateByDatasetId('uuid');
-
-      expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql({
-        header: 'header',
-        details: 'details'
-      });
-    });
-  });
-
   describe('getUnreviewedSubmissionsForAdmins', () => {
     it('should return an array of submission records', async () => {
       const mockSubmissionRecords: SubmissionRecordWithSecurityAndRootFeatureType[] = [
@@ -928,7 +908,8 @@ describe('SubmissionService', () => {
           revision_count: 0,
           security: SECURITY_APPLIED_STATUS.PENDING,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset'
+          root_feature_type_name: 'dataset',
+          regions: []
         },
         {
           submission_id: 2,
@@ -947,7 +928,8 @@ describe('SubmissionService', () => {
           revision_count: 1,
           security: SECURITY_APPLIED_STATUS.PENDING,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset'
+          root_feature_type_name: 'dataset',
+          regions: []
         }
       ];
 
@@ -986,7 +968,8 @@ describe('SubmissionService', () => {
           revision_count: 0,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset'
+          root_feature_type_name: 'dataset',
+          regions: []
         },
         {
           submission_id: 2,
@@ -1005,7 +988,8 @@ describe('SubmissionService', () => {
           revision_count: 1,
           security: SECURITY_APPLIED_STATUS.SECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset'
+          root_feature_type_name: 'dataset',
+          regions: []
         }
       ];
 
@@ -1044,7 +1028,8 @@ describe('SubmissionService', () => {
           revision_count: 0,
           security: SECURITY_APPLIED_STATUS.UNSECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset'
+          root_feature_type_name: 'dataset',
+          regions: []
         },
         {
           submission_id: 2,
@@ -1063,7 +1048,8 @@ describe('SubmissionService', () => {
           revision_count: 1,
           security: SECURITY_APPLIED_STATUS.SECURED,
           root_feature_type_id: 1,
-          root_feature_type_name: 'dataset'
+          root_feature_type_name: 'dataset',
+          regions: []
         }
       ];
 
