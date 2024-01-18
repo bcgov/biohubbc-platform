@@ -26,22 +26,15 @@ export const DeleteSystemUserI18N = {
 };
 
 export const ApplySecurityRulesI18N = {
-  applySecuritySuccess: (numApplied: number, numRemoved: number, featureCount: number) => {
-    const appliedRemoved = [
-      numApplied > 0 && `applied ${numApplied} ${p(numApplied, 'security rule')}`,
-      numRemoved > 0 && `removed ${numRemoved} ${p(numRemoved, 'security rule')}`
-    ]
-      .filter(Boolean)
-      .join(' and ');
-
-    return `Successfully ${appliedRemoved} for ${featureCount} ${p(featureCount, 'feature')}.`;
+  applySecuritySuccess: (featureCount: number) => {
+    return `Updated security for ${featureCount} ${p(featureCount, 'feature')}.`;
   },
 
-  applySecurityRulesErrorTitle: 'Error Applying Security',
+  applySecurityRulesErrorTitle: 'Error applying security rules',
   applySecurityRulesErrorText:
     'An error occurred while applying security to features, please try again. If the problem persists, please contact your system administrator',
   unApplySecurityRulesSuccess: (submissionCount: number) => `Successfully unsecured: ${submissionCount} features`,
-  unapplySecurityRulesErrorTitle: 'Error Unsecuring Features',
+  unapplySecurityRulesErrorTitle: 'Error unsecuring features',
   unapplySecurityRulesErrorText:
     'Failed to unsecure the selected features, please try again. If the problem persists, please contact your system administrator'
 };

@@ -144,13 +144,11 @@ const SecurityRuleForm = () => {
           sx={{
             maxWidth: '72ch'
           }}>
-          Specify reasons why this information should be secured.
+          Manage security rules for features in this submission.
         </Typography>
 
-        <Box mt={3}>
-          <Box mb={2}>
-            <Typography component="legend">Add Security Rules</Typography>
-          </Box>
+        <Box component="fieldset" mt={3}>
+          <Typography component="legend">Add Security Rules</Typography>
           <Autocomplete
             value={null}
             id={'autocomplete-security-rule-search'}
@@ -209,10 +207,11 @@ const SecurityRuleForm = () => {
             renderOption={(renderProps, renderOption) => {
               return (
                 <ListItem
+                  disablePadding
                   divider
                   sx={{
-                    px: 2,
-                    py: '12px !important'
+                    py: '12px !important',
+                    px: 2
                   }}
                   {...renderProps}>
                   <SecurityRuleCard
@@ -224,61 +223,62 @@ const SecurityRuleForm = () => {
               );
             }}
           />
+          <Stack component={TransitionGroup} gap={1} my={1}>
+            {formikProps.values.stagedForApply.map((applyingRule) => {
+              return (
+                <Collapse key={applyingRule.security_rule_id}>
+                  <SecurityRuleActionCard
+                    action={'apply'}
+                    title={applyingRule.name}
+                    category={applyingRule.category_name}
+                    description={applyingRule.description}
+                    onRemove={() => toggleStageApply(applyingRule)}
+                  />
+                </Collapse>
+              );
+            })}
+          </Stack>
         </Box>
 
-        <Stack component={TransitionGroup} gap={1} my={1}>
-          {formikProps.values.stagedForApply.map((applyingRule) => {
-            return (
-              <Collapse key={applyingRule.security_rule_id}>
-                <SecurityRuleActionCard
-                  action={'apply'}
-                  title={applyingRule.name}
-                  category={applyingRule.category_name}
-                  description={applyingRule.description}
-                  onRemove={() => toggleStageApply(applyingRule)}
-                />
-              </Collapse>
-            );
-          })}
-        </Stack>
-
-        <Box my={2}>
+        <Box component="fieldset" mt={3}>
           <Typography component="legend">Manage Existing Security</Typography>
-          <Typography variant="body2">
-            These rules have already been applied to one or more of the selected features.
+          <Typography variant="body1" color="textSecondary" sx={{ mt: -0.5 }}>
+            Manage security rules have already been applied.
           </Typography>
-        </Box>
-        <Stack component={TransitionGroup} gap={1}>
-          {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {
-            const cardAction = formikProps.values.stagedForRemove.some(
-              (removingRule) => removingRule.security_rule_id === group.securityRule.security_rule_id
-            )
-              ? 'remove'
-              : 'persist';
 
-            return (
-              <Collapse key={group.securityRule.security_rule_id}>
-                <SecurityRuleActionCard
-                  action={cardAction}
-                  title={group.securityRule.name}
-                  category={group.securityRule.category_name}
-                  description={group.securityRule.description}
-                  featureMembers={group.appliedFeatureGroups.map(
-                    (featureGroup) =>
-                      `${p(featureGroup.numFeatures, featureGroup.displayName)} (${featureGroup.numFeatures})`
-                  )}
-                  onRemove={() => toggleStageRemove(group.securityRule)}
-                />
-              </Collapse>
-            );
-          })}
-        </Stack>
-        {hasNoSecuritySelected && (
-          <Alert severity="error" sx={{ marginTop: 1 }}>
-            <AlertTitle>Open access to all records</AlertTitle>
-            All users will have unrestricted access to records that have been included in this submission.
-          </Alert>
-        )}
+          <Stack component={TransitionGroup} gap={1} mt={3}>
+            {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {
+              const cardAction = formikProps.values.stagedForRemove.some(
+                (removingRule) => removingRule.security_rule_id === group.securityRule.security_rule_id
+              )
+                ? 'remove'
+                : 'persist';
+
+              return (
+                <Collapse key={group.securityRule.security_rule_id}>
+                  <SecurityRuleActionCard
+                    action={cardAction}
+                    title={group.securityRule.name}
+                    category={group.securityRule.category_name}
+                    description={group.securityRule.description}
+                    featureMembers={group.appliedFeatureGroups.map(
+                      (featureGroup) =>
+                        `${p(featureGroup.numFeatures, featureGroup.displayName)} (${featureGroup.numFeatures})`
+                    )}
+                    onRemove={() => toggleStageRemove(group.securityRule)}
+                  />
+                </Collapse>
+              );
+            })}
+          </Stack>
+
+          {hasNoSecuritySelected && (
+            <Alert severity="error">
+              <AlertTitle>No security applied</AlertTitle>
+              All users will have unrestricted access to records that have been included in this submission.
+            </Alert>
+          )}
+        </Box>
       </Box>
     </form>
   );
