@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import * as db from '../../database/db';
 import { HTTPError } from '../../errors/http-error';
 import { SystemUser } from '../../repositories/user-repository';
+import { RegionService } from '../../services/region-service';
 import { SearchIndexService } from '../../services/search-index-service';
 import { SubmissionService } from '../../services/submission-service';
 import { ValidationService } from '../../services/validation-service';
@@ -101,6 +102,10 @@ describe('intake', () => {
         .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
         .resolves();
 
+      const calculateAndAddRegionsForSubmissionStub = sinon
+        .stub(RegionService.prototype, 'calculateAndAddRegionsForSubmission')
+        .resolves();
+
       const requestHandler = intake.submissionIntake();
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
@@ -118,6 +123,7 @@ describe('intake', () => {
       expect(insertSubmissionRecordWithPotentialConflictStub).to.have.been.calledOnce;
       expect(insertSubmissionFeatureRecordsStub).to.have.been.calledOnce;
       expect(indexFeaturesBySubmissionIdStub).to.have.been.calledOnce;
+      expect(calculateAndAddRegionsForSubmissionStub).to.have.been.calledOnce;
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql({ submission_id: 1 });
     });

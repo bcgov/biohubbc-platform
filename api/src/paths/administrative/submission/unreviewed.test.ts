@@ -64,7 +64,8 @@ describe('getUnreviewedSubmissionsForAdmins', () => {
         revision_count: 0,
         security: SECURITY_APPLIED_STATUS.PENDING,
         root_feature_type_id: 1,
-        root_feature_type_name: 'dataset'
+        root_feature_type_name: 'dataset',
+        regions: []
       },
       {
         submission_id: 2,
@@ -82,7 +83,8 @@ describe('getUnreviewedSubmissionsForAdmins', () => {
         revision_count: 1,
         security: SECURITY_APPLIED_STATUS.PENDING,
         root_feature_type_id: 1,
-        root_feature_type_name: 'dataset'
+        root_feature_type_name: 'dataset',
+        regions: []
       }
     ];
 
