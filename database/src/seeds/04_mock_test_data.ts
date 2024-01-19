@@ -259,27 +259,27 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
     includePublishTimestamp && !!securityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
 
   return `
-    INSERT INTO submission
-    (
-        uuid,
-        system_user_id,
-        source_system,
-        name,
-        description,
-        security_review_timestamp,
-        publish_timestamp
-    )
-    values
-    (
-        public.gen_random_uuid(),
-        (SELECT system_user_id from system_user where user_identifier = 'SIMS'),
-        'SIMS',
-        $$${faker.company.name()}$$,
-        $$${faker.lorem.words({ min: 5, max: 100 })}$$,
-        ${securityReviewTimestamp},
-        ${publishTimestamp}
-    )
-    RETURNING submission_id;
+  INSERT INTO submission
+  (
+      uuid,
+      name,
+      description,
+      security_review_timestamp,
+      publish_timestamp,
+      system_user_id,
+      source_system
+  )
+  values
+  (
+      public.gen_random_uuid(),
+      $$${faker.company.name()}$$,
+      $$${faker.lorem.words({ min: 5, max: 100 })}$$,
+      ${securityReviewTimestamp},
+      ${publishTimestamp},
+      (SELECT system_user_id from system_user where user_identifier = 'SIMS'),
+      'SIMS'
+  )
+  RETURNING submission_id;
 `;
 };
 

@@ -143,10 +143,6 @@ describe('intake', () => {
         .stub(SearchIndexService.prototype, 'indexFeaturesBySubmissionId')
         .resolves();
 
-      const calculateAndAddRegionsForSubmissionStub = sinon
-        .stub(RegionService.prototype, 'calculateAndAddRegionsForSubmission')
-        .resolves();
-
       const findSubmissionFeaturesStub = sinon.stub(SubmissionService.prototype, 'findSubmissionFeatures').resolves([
         {
           submission_feature_id: 2,
@@ -167,6 +163,10 @@ describe('intake', () => {
           revision_count: 1
         }
       ]);
+
+      const calculateAndAddRegionsForSubmissionStub = sinon
+        .stub(RegionService.prototype, 'calculateAndAddRegionsForSubmission')
+        .resolves();
 
       const requestHandler = intake.submissionIntake();
 
