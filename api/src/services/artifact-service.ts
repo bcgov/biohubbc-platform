@@ -75,7 +75,7 @@ export class ArtifactService extends DBService {
 
     // TODO add api codes cache: so lookups like this are fast (especially since codes dont change often)
     const codeService = new CodeService(this.connection);
-    const artifactFeatureProperties = await codeService.getFeaturePropertyByName('s3_key');
+    const artifactFeatureProperties = await codeService.getFeaturePropertyByName('artifact_key');
 
     const searchIndexRepository = new SearchIndexRepository(this.connection);
 

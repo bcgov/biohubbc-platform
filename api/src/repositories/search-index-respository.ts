@@ -17,6 +17,7 @@ export const FeaturePropertyRecord = z.object({
   display_name: z.string(),
   description: z.string(),
   parent_feature_property_id: z.number().nullable(),
+  calculated_value: z.boolean(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
   create_date: z.string(),

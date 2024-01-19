@@ -24,7 +24,7 @@ export interface ISubmissionFeature {
   id: string | null;
   type: string;
   properties: Record<string, unknown>;
-  features: ISubmissionFeature[];
+  child_features: ISubmissionFeature[];
 }
 
 export const DatasetMetadata = z.object({
@@ -1526,7 +1526,7 @@ export class SubmissionRepository extends BaseRepository {
 
     const queryBuilder = knex.queryBuilder();
 
-    queryBuilder.select().from('submission_feature').where('record_end_timestamp', null);
+    queryBuilder.select().from('submission_feature').where('record_end_date', null);
 
     if (criteria?.submissionId) {
       // Filter by submitter system user id

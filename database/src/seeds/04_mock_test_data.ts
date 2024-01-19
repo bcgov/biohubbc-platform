@@ -261,7 +261,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
   return `
     INSERT INTO submission
     (
-        source_id,
+        uuid,
         system_user_id,
         source_system,
         name,

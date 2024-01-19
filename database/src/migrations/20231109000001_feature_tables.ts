@@ -91,6 +91,7 @@ export async function up(knex: Knex): Promise<void> {
       feature_type_property_id           integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
       feature_type_id                    integer           NOT NULL,
       feature_property_id                integer           NOT NULL,
+      required_value                     boolean           DEFAULT false,
       sort                               integer,
       record_effective_date              date              DEFAULT now() NOT NULL,
       record_end_date                    date,
@@ -105,6 +106,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN feature_type_property.feature_type_property_id    IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN feature_type_property.feature_type_id             IS 'Foreign key to the feature_type table.';
     COMMENT ON COLUMN feature_type_property.feature_property_id         IS 'Foreign key to the feature_property table.';
+    COMMENT ON COLUMN feature_type_property.required_value              IS 'A boolean indicating if the feature property is required by the associated feature type and can be assumed to be non-null.';
     COMMENT ON COLUMN feature_type_property.sort                        IS 'Used to provide a custom sort order to the records.';
     COMMENT ON COLUMN feature_type_property.record_effective_date       IS 'Record level effective date.';
     COMMENT ON COLUMN feature_type_property.record_end_date             IS 'Record level end date.';

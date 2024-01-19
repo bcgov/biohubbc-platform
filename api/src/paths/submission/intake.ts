@@ -41,10 +41,10 @@ POST.apiDoc = {
         schema: {
           title: 'BioHub Data Submission',
           type: 'object',
-          required: ['id', 'name', 'description', 'features'],
+          required: ['id', 'name', 'description', 'content'],
           properties: {
             id: {
-              description: 'Unique id of the submission.',
+              description: 'The Unique identifier of the submission as supplied by the source system.',
               format: 'uuid',
               type: 'string'
             },
@@ -58,14 +58,8 @@ POST.apiDoc = {
               type: 'string',
               maxLength: 3000
             },
-            features: {
-              type: 'array',
-              items: {
-                $ref: '#/components/schemas/SubmissionFeature'
-              },
-              minItems: 1,
-              maxItems: 1,
-              additionalProperties: false
+            content: {
+              $ref: '#/components/schemas/SubmissionFeature'
             }
           },
           additionalProperties: false
@@ -133,7 +127,7 @@ export function submissionIntake(): RequestHandler {
     const submissionName = req.body.name;
     const submissionDescription = req.body.description;
 
-    const submissionFeatures: ISubmissionFeature[] = req.body.features;
+    const submissionFeature: ISubmissionFeature = req.body.content;
 
     const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
@@ -145,8 +139,8 @@ export function submissionIntake(): RequestHandler {
       const searchIndexService = new SearchIndexService(connection);
       const regionService = new RegionService(connection);
 
-      // validate the submission
-      if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
+      // validate theubmission
+      if (!(await validationService.validateSubmissionFeatures([submissionFeature]))) {
         throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
       }
 
@@ -160,7 +154,7 @@ export function submissionIntake(): RequestHandler {
       );
 
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, submissionFeatures);
+      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);
 
       // Index the submission feature record properties
       await searchIndexService.indexFeaturesBySubmissionId(submissionRecord.submission_id);
@@ -172,7 +166,7 @@ export function submissionIntake(): RequestHandler {
       });
 
       // Calculate and add submission regions
-      await regionService.calculateAndAddRegionsForSubmission(response.submission_id, 0.3);
+      await regionService.calculateAndAddRegionsForSubmission(submissionRecord.submission_id, 0.3);
 
       await connection.commit();
 

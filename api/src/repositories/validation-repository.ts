@@ -1,4 +1,5 @@
 import SQL from 'sql-template-strings';
+import { z } from 'zod';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
@@ -10,15 +11,18 @@ export interface IStyleModel {
   something: any; //TODO
 }
 
-export interface IFeatureProperties {
-  name: string;
-  display_name: string;
-  description: string;
-  type: string;
-}
+export const FeatureProperties = z.object({
+  name: z.string(),
+  display_name: z.string(),
+  description: z.string(),
+  type_name: z.string(),
+  required_value: z.boolean()
+});
+
+export type FeatureProperties = z.infer<typeof FeatureProperties>;
 
 /**
- *THIS REPO IS ALL HARD CODED DO NOT USE
+ * A repository class for accessing validation data.
  *
  * @export
  * @class ValidationRepository
@@ -26,37 +30,40 @@ export interface IFeatureProperties {
  */
 export class ValidationRepository extends BaseRepository {
   /**
-   * Get Feature properties for given feature type
+   * Get feature properties for given feature type.
    *
    * @param {string} featureType
-   * @return {*}  {Promise<IFeatureProperties[]>}
+   * @return {*}  {Promise<FeatureProperties[]>}
    * @memberof ValidationRepository
    */
-  async getFeatureValidationProperties(featureType: string): Promise<IFeatureProperties[]> {
+  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperties[]> {
     const sqlStatement = SQL`
       SELECT
-        fp.name,
-        fp.display_name,
-        fp.description,
-        fpt.name as type
+        feature_property.name,
+        feature_property.display_name,
+        feature_property.description,
+        feature_property_type.name as type_name,
+        feature_type_property.required_value
       FROM
-        feature_type_property ftp
-      LEFT JOIN
-        feature_property fp
+        feature_type_property
+      INNER JOIN
+        feature_property
       ON
-        ftp.feature_property_id = fp.feature_property_id
-      LEFT JOIN
-        feature_property_type fpt
+        feature_type_property.feature_property_id = feature_property.feature_property_id
+      INNER JOIN
+        feature_property_type
       ON
-        fp.feature_property_type_id = fpt.feature_property_type_id
+        feature_property.feature_property_type_id = feature_property_type.feature_property_type_id
       WHERE
-        feature_type_id = (select feature_type_id from feature_type ft where ft.name = ${featureType});
+        feature_type_id = (select feature_type_id from feature_type where name = ${featureType})
+      AND
+        feature_property.calculated_value = false;
     `;
 
-    const response = await this.connection.sql<IFeatureProperties>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, FeatureProperties);
 
     if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Failed to get dataset validation properties', [
+      throw new ApiExecuteSQLError(`Failed to get validation properties for feature type: ${featureType}`, [
         'ValidationRepository->getFeatureValidationProperties',
         'rowCount was null or undefined, expected rowCount != 0'
       ]);

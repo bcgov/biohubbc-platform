@@ -7,6 +7,8 @@ import {
   insertSubmissionRecord
 } from './04_mock_test_data';
 
+const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
+
 /**
  * Inserts mock submission data
  *
@@ -15,6 +17,10 @@ import {
  * @return {*}  {Promise<void>}
  */
 export async function seed(knex: Knex): Promise<void> {
+  if (!ENABLE_MOCK_FEATURE_SEEDING) {
+    return knex.raw(`SELECT null;`); // dummy query to appease knex
+  }
+
   await knex.raw(`
     SET SCHEMA 'biohub';
     SET SEARCH_PATH = 'biohub','public';
@@ -58,7 +64,7 @@ const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) 
     submission_id: row.submission_id,
     parent_submission_feature_id: null,
     feature_type: 'artifact',
-    data: { s3_key: S3_KEY }
+    data: { artifact_key: S3_KEY }
   });
 
   const submission_feature = await knex.raw(sql);
@@ -70,7 +76,7 @@ const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) 
     VALUES
     (
       ${submission_feature_id},
-      (select feature_property_id from feature_property where name = 's3_key'),
+      (select feature_property_id from feature_property where name = 'artifact_key'),
       $$${S3_KEY}$$
     );`);
 };

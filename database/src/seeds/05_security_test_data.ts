@@ -1,6 +1,8 @@
 import { faker } from '@faker-js/faker';
 import { Knex } from 'knex';
 
+const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
+
 /**
  * Inserts mock security rule data using real security rule definitions
  *
@@ -9,6 +11,10 @@ import { Knex } from 'knex';
  * @return {*}  {Promise<void>}
  */
 export async function seed(knex: Knex): Promise<void> {
+  if (!ENABLE_MOCK_FEATURE_SEEDING) {
+    return knex.raw(`SELECT null;`); // dummy query to appease knex
+  }
+
   await knex.raw(`
     SET SCHEMA 'biohub';
     SET SEARCH_PATH = 'biohub','public';`);

@@ -26,7 +26,7 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
       ?.feature_type_properties ?? [];
 
   const fieldColumns = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => {
-    if (featureType.feature_property_type_name === 's3_key') {
+    if (featureType.feature_property_type_name === 'artifact_key') {
       return {
         field: featureType.feature_property_name,
         headerName: '',

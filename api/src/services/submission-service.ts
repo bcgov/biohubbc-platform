@@ -95,15 +95,15 @@ export class SubmissionService extends DBService {
    * Insert submission features.
    *
    * @param {number} submissionId
-   * @param {ISubmissionFeature[]} submissionFeature
+   * @param {ISubmissionFeature[]} submissionFeatures
    * @return {*}  {Promise<void>}
    * @memberof SubmissionService
    */
   async insertSubmissionFeatureRecords(submissionId: number, submissionFeatures: ISubmissionFeature[]): Promise<void> {
     try {
-      // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
+      // Generate paths to all non-null nodes which contain a 'child_features' property
       const submissionFeatureJsonPaths: string[] = JSONPath({
-        path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
+        path: '$..[?(@ && @.child_features)]',
         flatten: true,
         resultType: 'path',
         json: submissionFeatures
@@ -775,7 +775,7 @@ export class SubmissionService extends DBService {
 
   /**
    * Generates a signed URL for a submission_feature's (artifact) key value pair
-   * ie: "s3_key": "artifact/test-file.txt"
+   * ie: "artifact_key": "artifact/test-file.txt"
    *
    * Note: admin's can generate signed urls for secure submission_features
    *

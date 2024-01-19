@@ -31,11 +31,20 @@ describe('intake', () => {
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+      const feature1 = {
+        id: '2',
+        type: 'dataset',
+        properties: {
+          name: 'dataset two'
+        },
+        child_features: []
+      };
+
       mockReq.body = {
-        id: '123-456-789',
-        type: 'submission',
-        properties: {},
-        features: []
+        id: '564-987-789',
+        name: 'test submission',
+        description: 'a test submission',
+        content: feature1
       };
 
       try {
@@ -66,7 +75,7 @@ describe('intake', () => {
         id: '123-456-789',
         type: 'submission',
         properties: {},
-        features: []
+        child_features: []
       };
 
       try {
@@ -169,14 +178,14 @@ describe('intake', () => {
         properties: {
           name: 'dataset two'
         },
-        features: []
+        child_features: []
       };
 
       mockReq.body = {
         id: '564-987-789',
         name: 'test submission',
         description: 'a test submission',
-        features: [feature1]
+        content: feature1
       };
 
       await requestHandler(mockReq, mockRes, mockNext);

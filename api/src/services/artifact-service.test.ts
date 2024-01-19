@@ -100,10 +100,11 @@ describe('ArtifactService', () => {
       const s3FeaturePropertyRecord: FeaturePropertyRecord = {
         feature_property_id: 1,
         feature_property_type_id: 1,
-        name: 's3_key',
+        name: 'artifact_key',
         display_name: 'S3 Key',
         description: 'An S3 Key',
         parent_feature_property_id: null,
+        calculated_value: false,
         record_effective_date: '2024-01-01',
         record_end_date: null,
         create_date: '2024-01-01',
@@ -129,7 +130,7 @@ describe('ArtifactService', () => {
       const response = await artifactService.uploadSubmissionFeatureArtifact(artifactUploadKey, artifactFile);
 
       expect(getSubmissionFeatureByUuidStub).to.have.been.calledOnceWith(artifactUploadKey);
-      expect(getFeaturePropertyByNameStub).to.have.been.calledOnceWith('s3_key');
+      expect(getFeaturePropertyByNameStub).to.have.been.calledOnceWith('artifact_key');
       expect(insertSearchableStringRecordsStub).to.have.been.calledOnceWith([
         {
           submission_feature_id: artifactSubmissionFeature.submission_feature_id,

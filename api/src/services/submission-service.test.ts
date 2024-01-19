@@ -109,14 +109,14 @@ describe('SubmissionService', () => {
           properties: {
             name: 'Dataset1'
           },
-          features: [
+          child_features: [
             {
               id: '2-1',
               type: 'sample_site',
               properties: {
                 name: 'SampleSite1'
               },
-              features: [
+              child_features: [
                 {
                   id: '3-1',
                   type: 'observation',
@@ -131,7 +131,7 @@ describe('SubmissionService', () => {
                       }
                     }
                   },
-                  features: []
+                  child_features: []
                 },
                 {
                   id: '3-2',
@@ -139,7 +139,7 @@ describe('SubmissionService', () => {
                   properties: {
                     count: 12
                   },
-                  features: []
+                  child_features: []
                 }
               ]
             },
@@ -153,14 +153,14 @@ describe('SubmissionService', () => {
                   end_date: '2024-02-01'
                 }
               },
-              features: [
+              child_features: [
                 {
                   id: '3-3',
                   type: 'observation',
                   properties: {
                     count: 13
                   },
-                  features: []
+                  child_features: []
                 },
                 {
                   id: '3-4',
@@ -168,7 +168,7 @@ describe('SubmissionService', () => {
                   properties: {
                     count: 14
                   },
-                  features: []
+                  child_features: []
                 }
               ]
             },
@@ -178,7 +178,7 @@ describe('SubmissionService', () => {
               properties: {
                 filename: 'Artifact1.txt'
               },
-              features: []
+              child_features: []
             },
             {
               id: '2-4',
@@ -186,7 +186,7 @@ describe('SubmissionService', () => {
               properties: {
                 filename: 'Artifact2.txt'
               },
-              features: []
+              child_features: []
             }
           ]
         }
