@@ -57,12 +57,15 @@ const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, 
   VALUES($$${submission_feature_id}$$, $$${security_rule_id}$$, $$${faker.date.past().toISOString()}$$);`);
 };
 
-const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) => {
+const insertArtifactRecord = async (
+  knex: Knex,
+  row: { submission_id: number; parent_submission_feature_id: number }
+) => {
   const S3_KEY = 'dev-artifacts/artifact.txt';
 
   const sql = insertSubmissionFeature({
     submission_id: row.submission_id,
-    parent_submission_feature_id: null,
+    parent_submission_feature_id: row.parent_submission_feature_id,
     feature_type: 'artifact',
     data: { artifact_key: S3_KEY }
   });
@@ -88,12 +91,9 @@ const createSubmissionWithSecurity = async (
 ) => {
   const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
   const parent_submission_feature_id = await insertDatasetRecord(knex, { submission_id });
-  const submission_feature_id = await insertSampleSiteRecord(knex, {
-    parent_submission_feature_id,
-    submission_id
-  });
+  const submission_feature_id = await insertSampleSiteRecord(knex, { submission_id, parent_submission_feature_id });
 
-  await insertArtifactRecord(knex, { submission_id });
+  await insertArtifactRecord(knex, { submission_id, parent_submission_feature_id });
 
   if (securityLevel === 'PARTIALLY SECURE') {
     await insertFeatureSecurity(knex, submission_feature_id, 1);

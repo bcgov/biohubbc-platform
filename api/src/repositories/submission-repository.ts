@@ -418,15 +418,17 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission feature record.
    *
-   * @param {number} submissionId
-   * @param {(string | null)} featureSourceId
-   * @param {string} featureTypeName
-   * @param {ISubmissionFeature['properties']} featureProperties
-   * @return {*}  {Promise<{ submission_feature_id: number }>}
+   * @param {number} submissionId The ID of the submission.
+   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
+   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
+   * @param {string} featureTypeName The name of the feature type.
+   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
+   * @return {*}  {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
    * @memberof SubmissionRepository
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
+    parentSubmissionFeatureId: number | null,
     featureSourceId: string | null,
     featureTypeName: string,
     featureProperties: ISubmissionFeature['properties']
@@ -434,12 +436,14 @@ export class SubmissionRepository extends BaseRepository {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
+        parent_submission_feature_id,
         source_id,
         feature_type_id,
         data,
         record_effective_date
       ) VALUES (
         ${submissionId},
+        ${parentSubmissionFeatureId},
         ${featureSourceId},
         (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
         ${featureProperties},
@@ -1196,51 +1200,94 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get all submissions that are pending security review (are unreviewed).
+   * Get all submissions that have not completed security review.
+   *
+   * Note: Will only return the most recent unreviewed submission for each uuid, unless the most recent submission is
+   * already reviewed.
    *
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-      WITH w_unique_submissions as (
+      WITH RankedRows AS (
         SELECT
-          submission.*,
-          submission_feature.feature_type_id as root_feature_type_id,
-          feature_type.name as root_feature_type_name,
-          ${SECURITY_APPLIED_STATUS.PENDING} as security,
-          array_remove(array_agg(rl.region_name), NULL) as regions
-        FROM
-          submission
-        INNER JOIN
-          submission_feature
-        ON
-          submission.submission_id = submission_feature.submission_id
-        INNER JOIN
-          feature_type
-        ON
-          feature_type.feature_type_id = submission_feature.feature_type_id
-        LEFT JOIN 
-          submission_regions sr 
-        ON
-          sr.submission_id = submission.submission_id 
-        LEFT JOIN
-          region_lookup rl 
-        ON 
-          rl.region_id = sr.region_id
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
+        FROM submission t1
+      ),
+      FilteredRows as (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
         WHERE
-          submission.security_review_timestamp IS NULL
-        AND
-          submission_feature.parent_submission_feature_id IS null
-        GROUP BY submission.submission_id, submission_feature.feature_type_id, feature_type.name
-        ORDER BY
-          submission.uuid, submission.submission_id desc
+          t2.security_review_timestamp IS NULL
+        AND 
+          t2.rank = 1
       )
       SELECT
-        *
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id as root_feature_type_id,
+        feature_type.name as root_feature_type_name,
+        ${SECURITY_APPLIED_STATUS.PENDING} as security,
+        array_remove(array_agg(region_lookup.region_name), NULL) as regions
       FROM
-        w_unique_submissions
-      ORDER BY submitted_timestamp DESC;
+        FilteredRows
+      left JOIN
+        submission_feature
+      ON
+        FilteredRows.submission_id = submission_feature.submission_id
+      left JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      LEFT JOIN 
+        submission_regions
+      ON
+        submission_regions.submission_id = FilteredRows.submission_id 
+      LEFT JOIN
+        region_lookup 
+      ON 
+        region_lookup.region_id = submission_regions.region_id
+      where
+        submission_feature.parent_submission_feature_id IS NULL
+      group by 
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id,
+        feature_type.name;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
@@ -1248,66 +1295,103 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get all submissions that have completed security review (are reviewed).
+   * Get all submissions that have completed security review but are not published.
    *
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-      WITH w_unique_submissions as (
+      WITH RankedRows AS (
         SELECT
-          DISTINCT ON (submission.uuid) submission.*,
-          submission_feature.feature_type_id as root_feature_type_id,
-          feature_type.name as root_feature_type_name,
-          CASE
-            WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
-            WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
-            WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
-            ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-          END as security,
-          array_remove(array_agg(rl.region_name), NULL) as regions
-        FROM
-          submission
-        INNER JOIN
-          submission_feature
-        ON
-          submission.submission_id = submission_feature.submission_id
-        INNER JOIN
-          feature_type
-        ON
-          feature_type.feature_type_id = submission_feature.feature_type_id
-        LEFT JOIN
-          submission_feature_security
-        ON
-          submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
-        LEFT JOIN 
-          submission_regions sr 
-        ON
-          sr.submission_id = submission.submission_id 
-        LEFT JOIN
-          region_lookup rl 
-        ON 
-          rl.region_id = sr.region_id
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
+        FROM 
+          submission t1
         WHERE
-          submission.security_review_timestamp IS NOT NULL
+          t1.security_review_timestamp IS NOT NULL
+        OR
+          t1.publish_timestamp IS NOT NULL
+      ),
+      FilteredRows as (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
+        WHERE
+          t2.security_review_timestamp IS NOT NULL
         AND
-          submission_feature.parent_submission_feature_id IS NULL
-        AND
-          submission.publish_timestamp IS NULL
-        GROUP BY
-          submission.submission_id,
-          submission_feature.feature_type_id,
-          feature_type.name
-        ORDER BY
-          submission.uuid, submission.submission_id DESC
+          t2.publish_timestamp IS NULL
+        AND 
+          t2.rank = 1
       )
       SELECT
-        *
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id as root_feature_type_id,
+        feature_type.name as root_feature_type_name,
+        CASE
+          WHEN FilteredRows.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+        END as security,
+        array_remove(array_agg(region_lookup.region_name), NULL) as regions
       FROM
-        w_unique_submissions
-      ORDER BY
-        security_review_timestamp DESC;
+        FilteredRows
+      left JOIN
+        submission_feature
+      ON
+        FilteredRows.submission_id = submission_feature.submission_id
+      left JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      LEFT JOIN 
+        submission_regions
+      ON
+        submission_regions.submission_id = FilteredRows.submission_id 
+      LEFT JOIN
+        region_lookup 
+      ON 
+        region_lookup.region_id = submission_regions.region_id
+      where
+        submission_feature.parent_submission_feature_id IS NULL
+      group by 
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id,
+        feature_type.name;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
@@ -1323,25 +1407,61 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-    WITH w_unique_submissions as (
+      WITH RankedRows AS (
+        SELECT
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
+        FROM 
+          submission t1
+        WHERE
+          t1.security_review_timestamp IS NOT NULL
+        OR
+          t1.publish_timestamp IS NOT NULL
+      ),
+      FilteredRows as (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
+        WHERE
+          t2.security_review_timestamp IS NOT NULL
+        AND
+          t2.publish_timestamp IS NOT NULL
+        AND 
+          t2.rank = 1
+      )
       SELECT
-        DISTINCT ON (submission.uuid) submission.*,
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
         submission_feature.feature_type_id as root_feature_type_id,
         feature_type.name as root_feature_type_name,
         CASE
-          WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN FilteredRows.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END as security,
-        array_remove(array_agg(rl.region_name), NULL) as regions
+        array_remove(array_agg(region_lookup.region_name), NULL) as regions
       FROM
-        submission
-      INNER JOIN
+        FilteredRows
+      left JOIN
         submission_feature
       ON
-        submission.submission_id = submission_feature.submission_id
-      INNER JOIN
+        FilteredRows.submission_id = submission_feature.submission_id
+      left JOIN
         feature_type
       ON
         feature_type.feature_type_id = submission_feature.feature_type_id
@@ -1350,33 +1470,34 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       LEFT JOIN 
-        submission_regions sr 
+        submission_regions
       ON
-        sr.submission_id = submission.submission_id 
+        submission_regions.submission_id = FilteredRows.submission_id 
       LEFT JOIN
-        region_lookup rl 
+        region_lookup 
       ON 
-        rl.region_id = sr.region_id
-      WHERE
-        submission.security_review_timestamp IS NOT NULL
-      AND
+        region_lookup.region_id = submission_regions.region_id
+      where
         submission_feature.parent_submission_feature_id IS NULL
-      AND
-        submission.publish_timestamp IS NOT NULL
-      GROUP BY
-        submission.submission_id,
+      group by 
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
         submission_feature.feature_type_id,
-        feature_type.name
-      ORDER BY
-        submission.uuid, submission.submission_id DESC
-    )
-    SELECT
-      *
-    FROM
-      w_unique_submissions
-    ORDER BY
-      security_review_timestamp DESC;
-  `;
+        feature_type.name;
+    `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
 

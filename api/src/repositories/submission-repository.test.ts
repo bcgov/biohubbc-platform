@@ -1433,7 +1433,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
       try {
-        await submissionRepository.insertSubmissionFeatureRecord(1, '321', 'type', feature);
+        await submissionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
@@ -1457,7 +1457,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
 
-      const response = await submissionRepository.insertSubmissionFeatureRecord(1, '321', 'type', feature);
+      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature);
 
       expect(response).to.eql(mockResponse);
     });

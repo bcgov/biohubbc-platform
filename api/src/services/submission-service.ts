@@ -109,6 +109,12 @@ export class SubmissionService extends DBService {
         json: submissionFeatures
       });
 
+      // Store a mapping of jsonPath to submission_feature_id
+      const parentSubmissionFeatureIdMap: Map<string, number> = new Map();
+
+      // Match the last path segment of a jsonPath that ends with 'child_features[<index>]'
+      const matchLastJsonPathSegment = /\['child_features'\]\[\d+\]$/;
+
       for (const jsonPath of submissionFeatureJsonPaths) {
         // Fetch a submissionFeature object
         const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
@@ -118,15 +124,25 @@ export class SubmissionService extends DBService {
         }
 
         // We expect the 'path' to resolve an array of 1 item
-        const nodeWithoutFeatures = { ...node[0], features: [] };
+        const featureNode = node[0];
 
-        // Validate the submissioNFeature object
-        await this.submissionRepository.insertSubmissionFeatureRecord(
+        // Get the parent jsonPath by stripping the last path segment from the current jsonPath
+        const parentJsonPath = jsonPath.replace(matchLastJsonPathSegment, '');
+
+        // Get the submission_feature_id of the parent submissionFeature object, or null if the current node is the root
+        const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
+
+        // Validate the submissionFeature object
+        const response = await this.submissionRepository.insertSubmissionFeatureRecord(
           submissionId,
-          nodeWithoutFeatures.id,
-          nodeWithoutFeatures.type,
-          nodeWithoutFeatures.properties
+          parentSubmissionFeatureId,
+          featureNode.id,
+          featureNode.type,
+          featureNode.properties
         );
+
+        // Cache the submission_feature_id for the current jsonPath
+        parentSubmissionFeatureIdMap.set(jsonPath, response.submission_feature_id);
       }
 
       defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success' });

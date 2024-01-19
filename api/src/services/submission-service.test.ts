@@ -97,11 +97,13 @@ describe('SubmissionService', () => {
     it('inserts submission feature records', async () => {
       const mockDBConnection = getMockDBConnection();
 
+      const submissionId = 1;
+      const parentSubmissionFeatureId = 2;
+
       const insertSubmissionFeatureRecordStub = sinon
         .stub(SubmissionRepository.prototype, 'insertSubmissionFeatureRecord')
-        .resolves();
+        .resolves({ submission_feature_id: parentSubmissionFeatureId });
 
-      const submissionId = 1;
       const submissionFeatures: ISubmissionFeature[] = [
         {
           id: '1-1',
@@ -199,45 +201,93 @@ describe('SubmissionService', () => {
       expect(response).to.be.undefined;
 
       expect(insertSubmissionFeatureRecordStub.callCount).to.equal(9);
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '1-1', 'dataset', {
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, null, '1-1', 'dataset', {
         name: 'Dataset1'
       });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-1', 'sample_site', {
-        name: 'SampleSite1'
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-1', 'observation', {
-        count: 11,
-        geometry: {
-          type: 'Feature',
-          properties: {},
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '2-1',
+        'sample_site',
+        {
+          name: 'SampleSite1'
+        }
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '3-1',
+        'observation',
+        {
+          count: 11,
           geometry: {
-            coordinates: [-125.81103991280563, 49.82351418845636],
-            type: 'Point'
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              coordinates: [-125.81103991280563, 49.82351418845636],
+              type: 'Point'
+            }
           }
         }
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-2', 'observation', {
-        count: 12
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-2', 'sample_site', {
-        name: 'SampleSite2',
-        dateRange: {
-          start_date: '2024-01-01',
-          end_date: '2024-02-01'
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '3-2',
+        'observation',
+        {
+          count: 12
         }
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-3', 'observation', {
-        count: 13
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '3-4', 'observation', {
-        count: 14
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-3', 'artifact', {
-        filename: 'Artifact1.txt'
-      });
-      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(submissionId, '2-4', 'artifact', {
-        filename: 'Artifact2.txt'
-      });
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '2-2',
+        'sample_site',
+        {
+          name: 'SampleSite2',
+          dateRange: {
+            start_date: '2024-01-01',
+            end_date: '2024-02-01'
+          }
+        }
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '3-3',
+        'observation',
+        {
+          count: 13
+        }
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '3-4',
+        'observation',
+        {
+          count: 14
+        }
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '2-3',
+        'artifact',
+        {
+          filename: 'Artifact1.txt'
+        }
+      );
+      expect(insertSubmissionFeatureRecordStub).to.have.been.calledWith(
+        submissionId,
+        parentSubmissionFeatureId,
+        '2-4',
+        'artifact',
+        {
+          filename: 'Artifact2.txt'
+        }
+      );
     });
   });
 

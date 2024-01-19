@@ -54,10 +54,10 @@ export class ValidationService extends DBService {
         }
 
         // We expect the 'path' to resolve an array of 1 item
-        const nodeWithoutFeatures = { ...node[0], features: [] };
+        const featureNode = node[0];
 
         // Validate the submissioNFeature object
-        await this.validateSubmissionFeature(nodeWithoutFeatures);
+        await this.validateSubmissionFeature(featureNode);
       }
 
       defaultLog.debug({ label: 'validateSubmissionFeatures', message: 'success' });

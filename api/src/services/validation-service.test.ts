@@ -187,7 +187,7 @@ describe('ValidationService', () => {
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockDatasetSubmissionFeature);
       expect(response).to.be.false;
     });
 
@@ -264,15 +264,9 @@ describe('ValidationService', () => {
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({
-        ...mockObservationSubmissionFeature1,
-        features: []
-      });
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({
-        ...mockObservationSubmissionFeature2,
-        features: []
-      });
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockDatasetSubmissionFeature);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockObservationSubmissionFeature1);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockObservationSubmissionFeature2);
       expect(response).to.be.true;
     });
   });
