@@ -20,7 +20,7 @@ import {
   SubmissionFeatureRecordWithTypeAndSecurity,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecord,
-  SubmissionRecordPublished,
+  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
@@ -70,6 +70,7 @@ describe('SubmissionService', () => {
         source_system: 'SIMS',
         name: 'name',
         description: 'description',
+        comment: 'comment',
         publish_timestamp: '2023-12-12',
         create_date: '2023-12-12',
         create_user: 1,
@@ -86,6 +87,7 @@ describe('SubmissionService', () => {
         '123-456-789',
         'submission name',
         'submission desc',
+        'submission comment',
         3,
         'source system'
       );
@@ -952,6 +954,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -972,6 +975,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1012,6 +1016,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -1032,6 +1037,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -1072,6 +1078,7 @@ describe('SubmissionService', () => {
           system_user_id: 3,
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -1092,6 +1099,7 @@ describe('SubmissionService', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -1134,6 +1142,7 @@ describe('SubmissionService', () => {
         source_system: 'string',
         name: 'string',
         description: null,
+        comment: 'comment',
         publish_timestamp: '2023-12-12',
         create_date: 'string',
         create_user: 1,
@@ -1156,7 +1165,7 @@ describe('SubmissionService', () => {
 
   describe('getPublishedSubmissions', () => {
     it('should return an array of submission records with security property', async () => {
-      const mockSubmissionRecords: SubmissionRecordPublished[] = [
+      const mockSubmissionRecords: SubmissionRecordPublishedForPublic[] = [
         {
           submission_id: 1,
           uuid: '123-456-789',
@@ -1611,6 +1620,7 @@ describe('SubmissionService', () => {
         source_system: 'SIMS',
         name: 'name',
         description: 'description',
+        comment: 'comment',
         publish_timestamp: '2023-12-12',
         create_date: '2023-12-12',
         create_user: 1,

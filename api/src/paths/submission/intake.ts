@@ -41,7 +41,7 @@ POST.apiDoc = {
         schema: {
           title: 'BioHub Data Submission',
           type: 'object',
-          required: ['id', 'name', 'description', 'content'],
+          required: ['id', 'name', 'description', 'comment', 'content'],
           properties: {
             id: {
               description: 'The Unique identifier of the submission as supplied by the source system.',
@@ -54,7 +54,14 @@ POST.apiDoc = {
               maxLength: 200
             },
             description: {
-              description: 'A description of the submission. Should not include sensitive information.',
+              description:
+                'A description of the submission. Should not include sensitive information. May be shared with the general public.',
+              type: 'string',
+              maxLength: 3000
+            },
+            comment: {
+              description:
+                'An internal comment/description of the submission for administrative purposes. May include sensitive information. Will never be shared with the general public.',
               type: 'string',
               maxLength: 3000
             },
@@ -126,6 +133,7 @@ export function submissionIntake(): RequestHandler {
     const submissionUuid = req.body.id;
     const submissionName = req.body.name;
     const submissionDescription = req.body.description;
+    const submissionComment = req.body.comment;
 
     const submissionFeature: ISubmissionFeature = req.body.content;
 
@@ -149,6 +157,7 @@ export function submissionIntake(): RequestHandler {
         submissionUuid,
         submissionName,
         submissionDescription,
+        submissionComment,
         serviceClientSystemUser.system_user_id,
         serviceClientSystemUser.user_identifier
       );

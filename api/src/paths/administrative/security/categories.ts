@@ -86,7 +86,8 @@ GET.apiDoc = {
                 revision_count: {
                   type: 'integer'
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

@@ -262,6 +262,7 @@ export const SubmissionRecord = z.object({
   source_system: z.string(),
   name: z.string(),
   description: z.string().nullable(),
+  comment: z.string().nullable(),
   publish_timestamp: z.string().nullable(),
   create_date: z.string(),
   create_user: z.number(),
@@ -289,14 +290,16 @@ export type SubmissionRecordWithSecurityAndRootFeatureType = z.infer<
   typeof SubmissionRecordWithSecurityAndRootFeatureType
 >;
 
-export const SubmissionRecordPublished = SubmissionRecord.extend({
+export const SubmissionRecordPublishedForPublic = SubmissionRecord.extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   root_feature_type_id: z.number(),
   root_feature_type_name: z.string(),
   root_feature_type_display_name: z.string()
+}).omit({
+  comment: true // Should not be included in public (non-admin) response
 });
 
-export type SubmissionRecordPublished = z.infer<typeof SubmissionRecordPublished>;
+export type SubmissionRecordPublishedForPublic = z.infer<typeof SubmissionRecordPublishedForPublic>;
 
 export const SubmissionMessageRecord = z.object({
   submission_message_id: z.number(),
@@ -372,7 +375,9 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {string} uuid
    * @param {string} name
-   * @param {string} description
+   * @param {string} description A description of the submission. Should not contain any sensitive information.
+   * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
+   * sensitive information. Should never be shared with the general public.
    * @param {string} userIdentifier
    * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
@@ -381,6 +386,7 @@ export class SubmissionRepository extends BaseRepository {
     uuid: string,
     name: string,
     description: string,
+    comment: string,
     systemUserId: number,
     systemUserIdentifier: string
   ): Promise<SubmissionRecord> {
@@ -390,6 +396,7 @@ export class SubmissionRepository extends BaseRepository {
         submitted_timestamp,
         name,
         description,
+        comment,
         system_user_id,
         source_system
       ) VALUES (
@@ -397,6 +404,7 @@ export class SubmissionRepository extends BaseRepository {
         now(),
         ${name},
         ${description},
+        ${comment},
         ${systemUserId},
         ${systemUserIdentifier}
       )
@@ -1237,6 +1245,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
+        FilteredRows.comment,
         FilteredRows.record_end_date,
         FilteredRows.create_date,
         FilteredRows.create_user,
@@ -1281,6 +1290,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
+        FilteredRows.comment,
         FilteredRows.record_end_date,
         FilteredRows.create_date,
         FilteredRows.create_user,
@@ -1292,6 +1302,7 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
+
     return response.rows;
   }
 
@@ -1336,6 +1347,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
+        FilteredRows.comment,
         FilteredRows.record_end_date,
         FilteredRows.create_date,
         FilteredRows.create_user,
@@ -1385,6 +1397,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
+        FilteredRows.comment,
         FilteredRows.record_end_date,
         FilteredRows.create_date,
         FilteredRows.create_user,
@@ -1441,6 +1454,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
+        FilteredRows.comment,
         FilteredRows.record_end_date,
         FilteredRows.create_date,
         FilteredRows.create_user,
@@ -1490,6 +1504,7 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.submitted_timestamp,
         FilteredRows.name,
         FilteredRows.description,
+        FilteredRows.comment,
         FilteredRows.record_end_date,
         FilteredRows.create_date,
         FilteredRows.create_user,
@@ -1684,10 +1699,10 @@ export class SubmissionRepository extends BaseRepository {
    *
    * Note: Will only return the most recent published submission for each uuid.
    *
-   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
    * @memberof SubmissionRepository
    */
-  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
     const sqlStatement = SQL`
       WITH RankedRows AS (
         SELECT
@@ -1709,7 +1724,21 @@ export class SubmissionRepository extends BaseRepository {
           t2.rank = 1
       )
       SELECT
-        submission.*,
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
         feature_type.feature_type_id as root_feature_type_id,
         feature_type.name as root_feature_type_name,
         feature_type.display_name as root_feature_type_display_name,
@@ -1721,13 +1750,9 @@ export class SubmissionRepository extends BaseRepository {
       FROM
         FilteredRows
       INNER JOIN
-        submission
-      ON
-        FilteredRows.submission_id = submission.submission_id
-      INNER JOIN
         submission_feature
       ON
-        submission_feature.submission_id = submission.submission_id
+        submission_feature.submission_id = FilteredRows.submission_id
       LEFT JOIN
         submission_feature_security
       ON
@@ -1739,19 +1764,33 @@ export class SubmissionRepository extends BaseRepository {
       WHERE
         submission_feature.parent_submission_feature_id IS NULL
       AND
-        submission.security_review_timestamp IS NOT NULL
+        FilteredRows.security_review_timestamp IS NOT NULL
       AND
-        submission.publish_timestamp IS NOT NULL
+        FilteredRows.publish_timestamp IS NOT NULL
       GROUP BY
-        submission.submission_id,
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
         feature_type.feature_type_id,
         feature_type.name,
         feature_type.display_name
       ORDER BY
-        submission.publish_timestamp ASC;
+        FilteredRows.publish_timestamp ASC;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublished);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublishedForPublic);
 
     return response.rows;
   }

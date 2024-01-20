@@ -4,42 +4,44 @@ import { MenuItem, useTheme } from '@mui/material';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import { FuseResult } from 'fuse.js';
-import { SubmissionRecord } from 'interfaces/useSubmissionsApi.interface';
 import sortBy from 'lodash-es/sortBy';
 import React, { useState } from 'react';
 import { objectKeys } from 'utils/Utils';
 
-export type SortSubmission = FuseResult<SubmissionRecord> | SubmissionRecord;
+export type Sortable<RecordType> = FuseResult<RecordType> | RecordType;
 
-type SortProp = { key: keyof SubmissionRecord; sort: 'asc' | 'desc' };
+type SortProp<SortableRecordType> = { key: keyof SortableRecordType; sort: 'asc' | 'desc' };
 
-export interface ISubmissionsListSortMenuProps<TSubmission> {
+export interface ISubmissionsListSortMenuProps<
+  RecordType extends object,
+  SortableRecordType extends Sortable<RecordType>
+> {
   /**
    * Submissions to sort
    *
-   * @type {TSubmission[]}
+   * @type {SortableRecordType[]}
    * @memberof ISubmissionsListSortMenuProps
    */
-  submissions: TSubmission[];
+  submissions: SortableRecordType[];
 
   /**
    * Callback fired after submissions are sorted
    *
-   * @param {TSubmission[]} - data
+   * @param {SortableRecordType[]} - data
    * @returns {void}
    * @memberof ISubmissionsListSortMenuProps
    */
-  handleSubmissions: (data: TSubmission[]) => void;
+  handleSubmissions: (data: SortableRecordType[]) => void;
 
   /**
    * Sort menu items
    * The object values will be the labels for the menu items
    *
-   * @type {Partial<Record<keyof SubmissionRecord, string>>}
+   * @type {Partial<Record<keyof RecordType, string>>}
    * @example: { name: 'Name', publish_timestamp: 'Publish Date' }
    * @memberof ISubmissionsListSortMenuProps
    */
-  sortMenuItems: Partial<Record<keyof SubmissionRecord, string>>;
+  sortMenuItems: Partial<Record<keyof RecordType, string>>;
 
   /**
    * Manually syncs the default sort with what api responds with
@@ -51,25 +53,28 @@ export interface ISubmissionsListSortMenuProps<TSubmission> {
    * @example: { key: 'publish_timetamp', sort: 'desc' }
    * @memberof ISubmissionsListSortMenuProps
    */
-  apiSortSync?: SortProp;
+  apiSortSync?: SortProp<RecordType>;
 }
 
 /**
  * Renders 'Sort By' button for Submission pages
  *
  * Note: supports both submission and fuzzy submission types
- * @param {ISubmissionsListSortMenuProps} props
- * @returns {*}
+ *
+ * @template RecordType
+ * @template SortableRecordType
+ * @param {ISubmissionsListSortMenuProps<RecordType, SortableRecordType>} props
+ * @return {*}
  */
-const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
-  props: ISubmissionsListSortMenuProps<TSubmission>
+const SubmissionsListSortMenu = <RecordType extends object, SortableRecordType extends Sortable<RecordType>>(
+  props: ISubmissionsListSortMenuProps<RecordType, SortableRecordType>
 ) => {
   const { submissions, sortMenuItems, handleSubmissions, apiSortSync } = props;
 
   const theme = useTheme();
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [sortProp, setSortProp] = useState<SortProp | undefined>(apiSortSync);
+  const [sortProp, setSortProp] = useState<SortProp<RecordType> | undefined>(apiSortSync);
 
   const open = Boolean(anchorEl);
 
@@ -84,24 +89,22 @@ const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
   /**
    * sorts submissions by property
    *
-   * @param {SortProp} _sortProp - property and direction of sort
+   * @param {SortProp<RecordType>} _sortProp _sortProp - property and direction of sort
    */
-  const sortSubmissions = (_sortProp: SortProp) => {
-    const getSortKey = (submission: SortSubmission) =>
+  const sortSubmissions = (_sortProp: SortProp<RecordType>) => {
+    const getSortKey = (submission: Sortable<RecordType>) =>
       // uncertain why this needs to be cast to FuseResult when checking for item property?
-      'item' in submission
-        ? (submission as FuseResult<SubmissionRecord>).item[_sortProp.key]
-        : submission[_sortProp.key];
+      'item' in submission ? submission.item[_sortProp.key] : submission[_sortProp.key];
 
-    const sortedData: TSubmission[] =
+    const sortedData: SortableRecordType[] =
       _sortProp.sort === 'asc' ? sortBy(submissions, getSortKey) : sortBy(submissions, getSortKey).reverse();
 
     return sortedData;
   };
 
-  const handleMenuItemClick = (sortKey: keyof SubmissionRecord) => {
+  const handleMenuItemClick = (sortKey: keyof RecordType) => {
     const sortDirection = !sortProp || sortProp.sort === 'desc' ? 'asc' : 'desc';
-    const newSortProp: SortProp = {
+    const newSortProp: SortProp<RecordType> = {
       key: sortKey,
       sort: sortDirection
     };
@@ -113,7 +116,7 @@ const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
     handleClose();
   };
 
-  const getSortIcon = (sortKey: keyof SubmissionRecord) => {
+  const getSortIcon = (sortKey: keyof RecordType) => {
     if (!sortProp || sortKey !== sortProp.key) {
       return mdiSortReverseVariant;
     }
@@ -153,7 +156,7 @@ const SubmissionsListSortMenu = <TSubmission extends SortSubmission>(
           marginTop: 1
         }}>
         {objectKeys(sortMenuItems).map((key) => (
-          <MenuItem key={key} onClick={() => handleMenuItemClick(key)} dense>
+          <MenuItem key={String(key)} onClick={() => handleMenuItemClick(key)} dense>
             <Icon path={getSortIcon(key)} size={1} style={{ marginRight: theme.spacing(1.5) }} />
             {sortMenuItems[key]}
           </MenuItem>

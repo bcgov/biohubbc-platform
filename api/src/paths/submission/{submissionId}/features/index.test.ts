@@ -21,8 +21,8 @@ describe('index', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const getSubmissionAndFeaturesBySubmissionIdStub = sinon
-        .stub(SubmissionService.prototype, 'getSubmissionFeaturesBySubmissionId')
+      const getSubmissionFeaturesWithSearchKeyValuesBySubmissionIdStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionFeaturesWithSearchKeyValuesBySubmissionId')
         .throws(new HTTP400('Error', ['Error']));
 
       const requestHandler = index.getSubmissionFeatures();
@@ -38,7 +38,7 @@ describe('index', () => {
 
         expect.fail();
       } catch (error) {
-        expect(getSubmissionAndFeaturesBySubmissionIdStub).to.have.been.calledOnce;
+        expect(getSubmissionFeaturesWithSearchKeyValuesBySubmissionIdStub).to.have.been.calledOnceWith(1);
         expect((error as HTTPError).status).to.equal(400);
         expect((error as HTTPError).message).to.equal('Error');
       }
@@ -51,8 +51,8 @@ describe('index', () => {
 
       const mockResponse = [] as unknown as any;
 
-      const getSubmissionAndFeaturesBySubmissionIdStub = sinon
-        .stub(SubmissionService.prototype, 'getSubmissionFeaturesBySubmissionId')
+      const getSubmissionFeaturesWithSearchKeyValuesBySubmissionIdStub = sinon
+        .stub(SubmissionService.prototype, 'getSubmissionFeaturesWithSearchKeyValuesBySubmissionId')
         .resolves(mockResponse);
 
       const requestHandler = index.getSubmissionFeatures();
@@ -65,7 +65,7 @@ describe('index', () => {
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getSubmissionAndFeaturesBySubmissionIdStub).to.have.been.calledOnce;
+      expect(getSubmissionFeaturesWithSearchKeyValuesBySubmissionIdStub).to.have.been.calledOnceWith(1);
       expect(mockRes.statusValue).to.eql(200);
       expect(mockRes.jsonValue).to.eql(mockResponse);
     });

@@ -35,7 +35,8 @@ CREATE TABLE submission(
     publish_timestamp           timestamptz(6),
     submitted_timestamp         timestamptz(6)    DEFAULT now() NOT NULL,
     name                        varchar(200)      NOT NULL,
-    description                 varchar(3000),
+    description                 varchar(3000)     NOT NULL,
+    comment                     varchar(3000)     NOT NULL,
     record_end_date             timestamptz(6)    DEFAULT now() NOT NULL,
     create_date                 timestamptz(6)    DEFAULT now() NOT NULL,
     create_user                 integer           NOT NULL,
@@ -53,7 +54,8 @@ COMMENT ON COLUMN submission.security_review_timestamp IS 'The timestamp of when
 COMMENT ON COLUMN submission.publish_timestamp IS 'The timestamp of when the submission is published (made public). Null indicates the submission is not publicly visible.';
 COMMENT ON COLUMN submission.submitted_timestamp IS 'The timestamp of when the submission was received by BioHub from the source system.';
 COMMENT ON COLUMN submission.name IS 'The name of the submission.';
-COMMENT ON COLUMN submission.description IS 'The description of the submission.';
+COMMENT ON COLUMN submission.description IS 'The public description of the submission. Should not include any personal or sensitive information.';
+COMMENT ON COLUMN submission.comment IS 'An internal comment/description about the submission for administrative purposes. May contain personal or sensitive information.';
 COMMENT ON COLUMN submission.create_date IS 'The datetime the record was created.';
 COMMENT ON COLUMN submission.create_user IS 'The id of the user who created the record as identified in the system user table.';
 COMMENT ON COLUMN submission.update_date IS 'The datetime the record was updated.';

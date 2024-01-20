@@ -62,7 +62,8 @@ GET.apiDoc = {
                 security_rule_id: {
                   type: 'integer'
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

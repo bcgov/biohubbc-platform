@@ -4,7 +4,7 @@ import {
   IGetSubmissionGroupedFeatureResponse,
   IListSubmissionsResponse,
   SubmissionFeatureSignedUrlPayload,
-  SubmissionRecordPublished,
+  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeature
 } from 'interfaces/useSubmissionsApi.interface';
@@ -141,11 +141,11 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   /**
-   * Fetch all published submission records.
+   * Fetch all published submission records for public users.
    *
-   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
    */
-  const getPublishedSubmissions = async (): Promise<SubmissionRecordPublished[]> => {
+  const getPublishedSubmissions = async (): Promise<SubmissionRecordPublishedForPublic[]> => {
     const { data } = await axios.get(`api/submission/published`);
 
     return data;

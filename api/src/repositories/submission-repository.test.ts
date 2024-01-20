@@ -14,7 +14,7 @@ import {
   PatchSubmissionRecord,
   SubmissionFeatureRecord,
   SubmissionRecord,
-  SubmissionRecordPublished,
+  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -494,6 +494,7 @@ describe('SubmissionRepository', () => {
         '123-456-789',
         'submission name',
         'submission desc',
+        'submission comment',
         3,
         'source system'
       );
@@ -513,6 +514,7 @@ describe('SubmissionRepository', () => {
           '123-456-789',
           'submission name',
           'submission desc',
+          'submission comment',
           3,
           'source system'
         );
@@ -901,6 +903,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -917,6 +920,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -954,6 +958,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -970,6 +975,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -1007,6 +1013,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1023,6 +1030,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1059,6 +1067,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1076,6 +1085,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
           security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
@@ -1094,6 +1104,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
           create_user: 1,
@@ -1357,6 +1368,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1393,6 +1405,7 @@ describe('SubmissionRepository', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1666,7 +1679,7 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse: SubmissionRecordPublished = {
+      const mockResponse: SubmissionRecordPublishedForPublic = {
         submission_id: 1,
         uuid: 'string',
         security_review_timestamp: null,

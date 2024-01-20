@@ -23,7 +23,7 @@ import {
   SubmissionFeatureSignedUrlPayload,
   SubmissionMessageRecord,
   SubmissionRecord,
-  SubmissionRecordPublished,
+  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
@@ -72,7 +72,9 @@ export class SubmissionService extends DBService {
    *
    * @param {string} uuid
    * @param {string} name
-   * @param {string} description
+   * @param {string} description A description of the submission. Should not contain any sensitive information.
+   * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
+   * sensitive information. Should never be shared with the general public.
    * @param {number} systemUserId
    * @param {string} systemUserIdentifier
    * @return {*}  {Promise<SubmissionRecord>}
@@ -82,6 +84,7 @@ export class SubmissionService extends DBService {
     uuid: string,
     name: string,
     description: string,
+    comment: string,
     systemUserId: number,
     systemUserIdentifier: string
   ): Promise<SubmissionRecord> {
@@ -89,6 +92,7 @@ export class SubmissionService extends DBService {
       uuid,
       name,
       description,
+      comment,
       systemUserId,
       systemUserIdentifier
     );
@@ -636,10 +640,12 @@ export class SubmissionService extends DBService {
   /**
    * Get all published submissions.
    *
-   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   * Note: This method is used by the public API. Sensitive data should not be included in the response.
+   *
+   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
    * @memberof SubmissionService
    */
-  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
     return this.submissionRepository.getPublishedSubmissions();
   }
 
@@ -715,10 +721,6 @@ export class SubmissionService extends DBService {
 
     const searchIndexService = new SearchIndexService(this.connection);
     const submissionFeatureSearchKeyValues = await searchIndexService.getSearchKeyValuesBySubmissionId(submissionId);
-
-    console.log('111111111111111111111111111111111');
-    console.log(JSON.stringify(submissionFeatureSearchKeyValues));
-    console.log('111111111111111111111111111111111');
 
     const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
 

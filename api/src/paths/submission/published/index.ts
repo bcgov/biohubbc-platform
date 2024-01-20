@@ -26,7 +26,9 @@ GET.apiDoc = {
                 'submission_id',
                 'uuid',
                 'security_review_timestamp',
+                'publish_timestamp',
                 'submitted_timestamp',
+                'system_user_id',
                 'source_system',
                 'name',
                 'description',
@@ -50,10 +52,19 @@ GET.apiDoc = {
                   format: 'uuid'
                 },
                 security_review_timestamp: {
-                  type: 'string'
+                  type: 'string',
+                  nullable: true
+                },
+                publish_timestamp: {
+                  type: 'string',
+                  nullable: true
                 },
                 submitted_timestamp: {
                   type: 'string'
+                },
+                system_user_id: {
+                  type: 'integer',
+                  minimum: 1
                 },
                 source_system: {
                   type: 'string'
@@ -105,7 +116,8 @@ GET.apiDoc = {
                 root_feature_type_display_name: {
                   type: 'string'
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

@@ -44,6 +44,7 @@ GET.apiDoc = {
               'user_guid',
               'record_effective_date',
               'record_end_date',
+              'create_date',
               'create_user',
               'update_date',
               'update_user',
@@ -76,6 +77,9 @@ GET.apiDoc = {
               record_end_date: {
                 type: 'string',
                 nullable: true
+              },
+              create_date: {
+                type: 'string'
               },
               create_user: {
                 type: 'integer',
@@ -112,7 +116,8 @@ GET.apiDoc = {
                   type: 'string'
                 }
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }

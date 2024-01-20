@@ -58,6 +58,7 @@ describe('patchSubmissionRecord', () => {
       source_system: 'SIMS',
       name: 'name',
       description: 'description',
+      comment: 'comment',
       create_date: '2023-12-12',
       create_user: 1,
       update_date: '2023-12-12',

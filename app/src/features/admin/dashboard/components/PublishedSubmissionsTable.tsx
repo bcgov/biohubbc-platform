@@ -95,7 +95,10 @@ const PublishedSubmissionsTable = () => {
           'record'
         )} found`}</Typography>
         <Box my={-1}>
-          <SubmissionsListSortMenu
+          <SubmissionsListSortMenu<
+            SubmissionRecordWithSecurityAndRootFeature,
+            SubmissionRecordWithSecurityAndRootFeature
+          >
             sortMenuItems={{
               name: 'Name',
               security_review_timestamp: 'Review Complete',

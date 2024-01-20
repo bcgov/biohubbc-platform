@@ -44,6 +44,7 @@ describe('intake', () => {
         id: '564-987-789',
         name: 'test submission',
         description: 'a test submission',
+        comment: 'a comment',
         content: feature1
       };
 
@@ -127,6 +128,7 @@ describe('intake', () => {
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -185,6 +187,7 @@ describe('intake', () => {
         id: '564-987-789',
         name: 'test submission',
         description: 'a test submission',
+        comment: 'a comment',
         content: feature1
       };
 
@@ -195,6 +198,7 @@ describe('intake', () => {
         '564-987-789',
         'test submission',
         'a test submission',
+        'a comment',
         serviceClientSystemUser.system_user_id,
         serviceClientSystemUser.user_identifier
       );

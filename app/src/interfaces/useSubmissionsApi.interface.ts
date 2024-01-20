@@ -29,6 +29,7 @@ export type SubmissionRecord = {
   source_system: string;
   name: string;
   description: string;
+  comment: string;
   create_date: string;
   create_user: number;
   update_date: string | null;
@@ -47,7 +48,7 @@ export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
   regions: string[];
 };
 
-export type SubmissionRecordPublished = SubmissionRecord & {
+export type SubmissionRecordPublishedForPublic = Omit<SubmissionRecord, 'comment'> & {
   security: SECURITY_APPLIED_STATUS;
   root_feature_type_id: number;
   root_feature_type_name: string;
