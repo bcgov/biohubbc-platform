@@ -103,6 +103,7 @@ export const FeatureTypeRecord = z.object({
   name: z.string(),
   display_name: z.string(),
   description: z.string(),
+  sort: z.number().nullable(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
   create_date: z.string(),
@@ -1681,11 +1682,32 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all published submissions.
    *
+   * Note: Will only return the most recent published submission for each uuid.
+   *
    * @return {*}  {Promise<SubmissionRecordPublished[]>}
    * @memberof SubmissionRepository
    */
   async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
     const sqlStatement = SQL`
+      WITH RankedRows AS (
+        SELECT
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.publish_timestamp DESC) AS rank
+        FROM 
+          submission t1
+        WHERE
+          t1.security_review_timestamp IS NOT NULL
+        AND
+          t1.publish_timestamp IS NOT NULL
+      ),
+      FilteredRows as (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
+        WHERE
+          t2.rank = 1
+      )
       SELECT
         submission.*,
         feature_type.feature_type_id as root_feature_type_id,
@@ -1697,7 +1719,11 @@ export class SubmissionRepository extends BaseRepository {
 	      ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END as security
       FROM
+        FilteredRows
+      INNER JOIN
         submission
+      ON
+        FilteredRows.submission_id = submission.submission_id
       INNER JOIN
         submission_feature
       ON
@@ -2113,5 +2139,39 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0].value;
+  }
+
+  /**
+   * Get a sorted and distinct list of all unique feature type records for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<FeatureTypeRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async getSubmissionFeatureTypes(submissionId: number): Promise<FeatureTypeRecord[]> {
+    const sqlStatement = SQL`
+      WITH w_distinct_feature_types AS (
+        SELECT DISTINCT ON (feature_type.feature_type_id)
+          feature_type.*
+        FROM 
+          submission_feature
+        INNER JOIN
+          feature_type
+        ON
+          submission_feature.feature_type_id = feature_type.feature_type_id
+        WHERE
+          submission_feature.submission_id = ${submissionId}
+      )
+      SELECT
+        * 
+      FROM 
+        w_distinct_feature_types
+      ORDER BY
+        sort ASC;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, FeatureTypeRecord);
+
+    return response.rows;
   }
 }

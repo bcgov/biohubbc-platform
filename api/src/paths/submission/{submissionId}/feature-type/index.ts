@@ -1,22 +1,17 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { getAPIUserDBConnection } from '../../../../database/db';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/{submissionId}');
 
-export const GET: Operation = [getSubmissionFeatures()];
+export const GET: Operation = [getSubmissionFeatureTypes()];
 
 GET.apiDoc = {
-  description: 'Retrieves a submission record from the submission table',
-  tags: ['eml'],
-  security: [
-    {
-      OptionalBearer: []
-    }
-  ],
+  description: 'Retrieves a sorted and distinct array of feature type records for a submission.',
+  tags: ['submission'],
   parameters: [
     {
       description: 'Submission ID.',
@@ -31,67 +26,53 @@ GET.apiDoc = {
   ],
   responses: {
     200: {
-      description: 'A submission record and all child submission feature records.',
+      description: 'A sorted and distinct array of feature type records.',
       content: {
         'application/json': {
           schema: {
             type: 'array',
             items: {
               type: 'object',
-              required: ['feature_type_name', 'feature_type_display_name', 'features'],
+              required: ['features_types'],
               properties: {
-                feature_type_name: {
-                  type: 'string'
-                },
-                feature_type_display_name: {
-                  type: 'string'
-                },
-                features: {
+                features_types: {
+                  description: 'A sorted and distinct array of feature type records.',
                   type: 'array',
                   items: {
                     type: 'object',
                     required: [
-                      'submission_feature_id',
-                      'uuid',
-                      'submission_id',
                       'feature_type_id',
-                      'data',
-                      'parent_submission_feature_id',
+                      'name',
+                      'display_name',
+                      'description',
                       'record_effective_date',
                       'record_end_date',
                       'create_date',
                       'create_user',
                       'update_date',
                       'update_user',
-                      'revision_count',
-                      'feature_type_name',
-                      'feature_type_display_name',
-                      'submission_feature_security_ids'
+                      'revision_count'
                     ],
                     properties: {
-                      submission_feature_id: {
-                        type: 'integer',
-                        minimum: 1
-                      },
-                      uuid: {
-                        type: 'string',
-                        format: 'uuid'
-                      },
-                      submission_id: {
-                        type: 'integer',
-                        minimum: 1
-                      },
                       feature_type_id: {
                         type: 'integer',
                         minimum: 1
                       },
-                      data: {
-                        type: 'object',
-                        properties: {}
+                      name: {
+                        type: 'string',
+                        maxLength: 100
                       },
-                      parent_submission_feature_id: {
-                        type: 'integer',
-                        minimum: 1,
+                      display_name: {
+                        type: 'string',
+                        maxLength: 100
+                      },
+                      description: {
+                        type: 'string',
+                        nullable: true,
+                        maxLength: 500
+                      },
+                      sort: {
+                        type: 'number',
                         nullable: true
                       },
                       record_effective_date: {
@@ -120,19 +101,6 @@ GET.apiDoc = {
                       revision_count: {
                         type: 'integer',
                         minimum: 0
-                      },
-                      feature_type_name: {
-                        type: 'string'
-                      },
-                      feature_type_display_name: {
-                        type: 'string'
-                      },
-                      submission_feature_security_ids: {
-                        type: 'array',
-                        items: {
-                          type: 'integer',
-                          minimum: 1
-                        }
                       }
                     }
                   }
@@ -148,13 +116,14 @@ GET.apiDoc = {
 };
 
 /**
- * Retrieves all child submission feature records.
+ * Retrieves a sorted and distinct list of all feature type records for a submission.
  *
- * @returns {RequestHandler}
+ * @export
+ * @return {*}  {RequestHandler}
  */
-export function getSubmissionFeatures(): RequestHandler {
+export function getSubmissionFeatureTypes(): RequestHandler {
   return async (req, res) => {
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    const connection = getAPIUserDBConnection();
 
     const submissionId = Number(req.params.submissionId);
 
@@ -163,11 +132,11 @@ export function getSubmissionFeatures(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.getSubmissionFeaturesWithSearchKeyValuesBySubmissionId(submissionId);
+      const featureTypes = await submissionService.getSubmissionFeatureTypes(submissionId);
 
       await connection.commit();
 
-      res.status(200).json(result);
+      res.status(200).json({ feature_types: featureTypes });
     } catch (error) {
       defaultLog.error({ label: 'getSubmissionFeatures', message: 'error', error });
       await connection.rollback();

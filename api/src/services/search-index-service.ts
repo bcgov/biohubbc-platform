@@ -5,7 +5,9 @@ import {
   InsertNumberSearchableRecord,
   InsertSpatialSearchableRecord,
   InsertStringSearchableRecord,
-  SearchIndexRepository
+  SearchIndexRepository,
+  SubmissionFeatureCombinedSearchValues,
+  SubmissionFeatureSearchKeyValues
 } from '../repositories/search-index-respository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getLogger } from '../utils/logger';
@@ -129,5 +131,31 @@ export class SearchIndexService extends DBService {
     }
 
     await Promise.all(promises);
+  }
+
+  /**
+   * Retrieves all search values, for all search types (string, number, datetime, spatial), for the given submission
+   * feature in one unified result set.
+   *
+   * @param {number} submissionFeatureId
+   * @return {*}  {Promise<SubmissionFeatureCombinedSearchValues[]>}
+   * @memberof SearchIndexService
+   */
+  async getCombinedSearchKeyValuesBySubmissionFeatureId(
+    submissionFeatureId: number
+  ): Promise<SubmissionFeatureCombinedSearchValues[]> {
+    return this.searchIndexRepository.getCombinedSearchKeyValuesBySubmissionFeatureId(submissionFeatureId);
+  }
+
+  /**
+   * Retrieves all search values, for all search types (string, number, datetime, spatial), for all submission feature
+   * belonging to the given submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureSearchKeyValues[]>}
+   * @memberof SearchIndexService
+   */
+  async getSearchKeyValuesBySubmissionId(submissionId: number): Promise<SubmissionFeatureSearchKeyValues[]> {
+    return this.searchIndexRepository.getSearchKeyValuesBySubmissionId(submissionId);
   }
 }

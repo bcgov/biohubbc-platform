@@ -3,7 +3,9 @@ import { JSONPath } from 'jsonpath-plus';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
+  FeatureTypeRecord,
   IDatasetsForReview,
   ISourceTransformModel,
   ISubmissionFeature,
@@ -32,6 +34,7 @@ import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
+import { SearchIndexService } from './search-index-service';
 
 const defaultLog = getLogger('submission-service');
 
@@ -641,7 +644,7 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Retrieves submission features with type and name.
+   * Retrieves submission feature records with type, name, and security data included.
    *
    * @param {number} submissionId
    * @return {*}  {Promise<
@@ -673,6 +676,74 @@ export class SubmissionService extends DBService {
       } else {
         // Create new array for feature type
         categorizedFeatures[feature.feature_type_name] = [feature];
+      }
+    }
+
+    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
+      feature_type_name: featureType,
+      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
+      features: submissionFeatures
+    }));
+
+    return submissionFeatures;
+  }
+
+  /**
+   * Retrieves submission features with type and name.
+   *
+   * Note: This method replaces the original feature data object with one built from only the search key values (from
+   * the `search_<type>` tables).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<
+   *     {
+   *       feature_type_name: string;
+   *       feature_type_display_name: string;
+   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
+   *     }[]
+   *   >}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeaturesWithSearchKeyValuesBySubmissionId(submissionId: number): Promise<
+    {
+      feature_type_name: string;
+      feature_type_display_name: string;
+      features: SubmissionFeatureRecordWithTypeAndSecurity[];
+    }[]
+  > {
+    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+
+    const searchIndexService = new SearchIndexService(this.connection);
+    const submissionFeatureSearchKeyValues = await searchIndexService.getSearchKeyValuesBySubmissionId(submissionId);
+
+    console.log('111111111111111111111111111111111');
+    console.log(JSON.stringify(submissionFeatureSearchKeyValues));
+    console.log('111111111111111111111111111111111');
+
+    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
+
+    for (const feature of uncategorizedFeatures) {
+      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
+
+      const featureSearchKeyValueData = submissionFeatureSearchKeyValues
+        .filter((item) => item.submission_feature_id === feature.submission_feature_id)
+        .reduce((acc, obj) => {
+          acc[obj.feature_property_name] = obj.value;
+          return acc;
+        }, {} as Record<SubmissionFeatureSearchKeyValues['feature_property_name'], SubmissionFeatureSearchKeyValues['value']>);
+
+      const featureWithSearchkeyValues = {
+        ...feature,
+        data: featureSearchKeyValueData // overwrite original data with search key values
+      };
+
+      if (featureCategoryArray) {
+        // Append to existing array of matching feature type
+        categorizedFeatures[featureWithSearchkeyValues.feature_type_name] =
+          featureCategoryArray.concat(featureWithSearchkeyValues);
+      } else {
+        // Create new array for feature type
+        categorizedFeatures[featureWithSearchkeyValues.feature_type_name] = [featureWithSearchkeyValues];
       }
     }
 
@@ -816,5 +887,16 @@ export class SubmissionService extends DBService {
     }
 
     return signedUrl;
+  }
+
+  /**
+   * Get a sorted and distinct list of all unique feature type records for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<FeatureTypeRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeatureTypes(submissionId: number): Promise<FeatureTypeRecord[]> {
+    return this.submissionRepository.getSubmissionFeatureTypes(submissionId);
   }
 }

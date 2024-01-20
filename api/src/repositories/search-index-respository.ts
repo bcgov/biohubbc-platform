@@ -6,6 +6,7 @@ import { ApiExecuteSQLError } from '../errors/api-error';
 import { getLogger } from '../utils/logger';
 import { generateGeometryCollectionSQL } from '../utils/spatial-utils';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
+import { shallowJsonSchema } from '../zod-schema/json';
 import { BaseRepository } from './base-repository';
 
 const defaultLog = getLogger('repositories/search-index-repository');
@@ -108,6 +109,28 @@ export type InsertDatetimeSearchableRecord = z.infer<typeof InsertDatetimeSearch
 export type InsertNumberSearchableRecord = z.infer<typeof InsertNumberSearchableRecord>;
 export type InsertStringSearchableRecord = z.infer<typeof InsertStringSearchableRecord>;
 export type InsertSpatialSearchableRecord = z.infer<typeof InsertSpatialSearchableRecord>;
+
+export const SubmissionFeatureSearchKeyValues = z.object({
+  search_id: z.number(),
+  submission_feature_id: z.number(),
+  feature_property_id: z.number(),
+  feature_property_name: z.string(),
+  value: z.union([z.string(), z.number(), shallowJsonSchema])
+});
+
+export type SubmissionFeatureSearchKeyValues = z.infer<typeof SubmissionFeatureSearchKeyValues>;
+
+export const SubmissionFeatureCombinedSearchValues = z.object({
+  search_string_id: z.number(),
+  submission_feature_id: z.number(),
+  feature_property_id: z.number(),
+  string_value: z.string(),
+  number_value: z.number(),
+  datetime_value: z.string(),
+  spatial_value: z.string()
+});
+
+export type SubmissionFeatureCombinedSearchValues = z.infer<typeof SubmissionFeatureCombinedSearchValues>;
 
 /**
  * A class for creating searchable records
@@ -265,6 +288,155 @@ export class SearchIndexRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql(query, FeaturePropertyRecordWithPropertyTypeName);
+
+    return response.rows;
+  }
+
+  /**
+   * Retrieves all search values, for all search types (string, number, datetime, spatial), for the given submission
+   * feature in one unified result set.
+   *
+   * @param {number} submissionFeatureId
+   * @return {*}  {Promise<SubmissionFeatureCombinedSearchValues[]>}
+   * @memberof SearchIndexRepository
+   */
+  async getCombinedSearchKeyValuesBySubmissionFeatureId(
+    submissionFeatureId: number
+  ): Promise<SubmissionFeatureCombinedSearchValues[]> {
+    const sqlStatement = SQL`
+      SELECT
+        search_string_id as search_id,
+        submission_feature_id,
+        feature_property_id,
+        value AS string_value,
+        null::numeric AS number_value,
+        null::timestamptz(6) AS datetime_value,
+        null::public.geometry AS spatial_value
+      FROM 
+        search_string 
+      WHERE 
+        submission_feature_id = ${submissionFeatureId}
+      UNION ALL
+      SELECT
+        search_number_id as search_id,
+        submission_feature_id,
+        feature_property_id,
+        null AS string_value,
+        value AS number_value,
+        null::timestamptz(6) AS datetime_value,
+        null::public.geometry AS spatial_value
+      FROM 
+        search_number 
+      WHERE 
+        submission_feature_id = ${submissionFeatureId}
+      UNION ALL
+      SELECT
+        search_datetime_id as search_id,
+        submission_feature_id,
+        feature_property_id,
+        null AS string_value,
+        null::numeric AS number_value,
+        value AS datetime_value,
+        null::public.geometry AS spatial_value
+      FROM 
+        search_datetime
+      WHERE
+        submission_feature_id = ${submissionFeatureId}
+      UNION ALL
+      SELECT
+        search_spatial_id as search_id,
+        submission_feature_id,
+        feature_property_id,
+        null AS string_value,
+        null::numeric AS number_value,
+        null::timestamptz(6) AS datetime_value,
+        value AS spatial_value
+      FROM 
+        search_spatial
+      WHERE
+        submission_feature_id = ${submissionFeatureId};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureCombinedSearchValues);
+
+    return response.rows;
+  }
+
+  /**
+   * Retrieves all search values, for all search types (string, number, datetime, spatial), for the given submission
+   * feature in one unified result set.
+   *
+   * @param {number} submissionFeatureId
+   * @return {*}  {Promise<SubmissionFeatureSearchKeyValues[]>}
+   * @memberof SearchIndexRepository
+   */
+  async getSearchKeyValuesBySubmissionId(submissionId: number): Promise<SubmissionFeatureSearchKeyValues[]> {
+    const sqlStatement = SQL`
+      with w_submission_features as (
+        select submission_feature_id from submission_feature where submission_id = ${submissionId}
+      )
+      SELECT
+        search_string.search_string_id as search_id,
+        search_string.submission_feature_id,
+        search_string.feature_property_id,
+        feature_property.name as feature_property_name,
+        search_string.value
+      FROM 
+      w_submission_features
+        inner join
+      search_string
+       on w_submission_features.submission_feature_id = search_string.submission_feature_id 
+        inner join 
+      feature_property
+        on search_string.feature_property_id = feature_property.feature_property_id 
+      UNION ALL
+      SELECT
+        search_number.search_number_id as search_id,
+        search_number.submission_feature_id,
+        search_number.feature_property_id,
+        feature_property.name as feature_property_name,
+        search_number.value::text
+      from
+      w_submission_features
+        inner join
+      search_number
+       on w_submission_features.submission_feature_id = search_number.submission_feature_id 
+        inner join 
+      feature_property
+        on search_number.feature_property_id = feature_property.feature_property_id 
+      UNION ALL
+      SELECT
+        search_datetime.search_datetime_id as search_id,
+        search_datetime.submission_feature_id,
+        search_datetime.feature_property_id,
+        feature_property.name as feature_property_name,
+        search_datetime.value::text
+      from
+      w_submission_features
+        inner join
+      search_datetime
+       on w_submission_features.submission_feature_id = search_datetime.submission_feature_id 
+        inner join 
+      feature_property
+        on search_datetime.feature_property_id = feature_property.feature_property_id 
+      UNION ALL
+      SELECT
+        search_spatial.search_spatial_id as search_id,
+        search_spatial.submission_feature_id,
+        search_spatial.feature_property_id,
+        feature_property.name as feature_property_name,
+        search_spatial.value::json::text
+      from
+      w_submission_features
+        inner join
+      search_spatial
+       on w_submission_features.submission_feature_id = search_spatial.submission_feature_id
+         inner join 
+      feature_property
+        on search_spatial.feature_property_id = feature_property.feature_property_id;
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureSearchKeyValues);
 
     return response.rows;
   }

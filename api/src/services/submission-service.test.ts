@@ -5,6 +5,7 @@ import { QueryResult } from 'pg';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import { SECURITY_APPLIED_STATUS } from '../repositories/security-repository';
 import {
   ISourceTransformModel,
@@ -30,6 +31,7 @@ import { SystemUserExtended } from '../repositories/user-repository';
 import * as fileUtils from '../utils/file-utils';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { getMockDBConnection } from '../__mocks__/db';
+import { SearchIndexService } from './search-index-service';
 import { SubmissionService } from './submission-service';
 import { UserService } from './user-service';
 
@@ -1341,6 +1343,199 @@ describe('SubmissionService', () => {
           feature_type_name: 'artifact',
           feature_type_display_name: 'Artifact',
           features: [{ ...mockSubmissionRecords[3] }]
+        }
+      ]);
+    });
+  });
+
+  describe('getSubmissionFeaturesWithSearchKeyValuesBySubmissionId', () => {
+    it('should return an array of submission features', async () => {
+      const mockDBConnection = getMockDBConnection();
+
+      const submissionId = 1;
+
+      const mockSubmissionRecords: SubmissionFeatureRecordWithTypeAndSecurity[] = [
+        {
+          submission_feature_id: 1,
+          uuid: '111-234-345',
+          submission_id: submissionId,
+          feature_type_id: 2,
+          source_id: 'source-id-1',
+          data: {},
+          parent_submission_feature_id: 4,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 2,
+          uuid: '222-234-345',
+          submission_id: submissionId,
+          feature_type_id: 2,
+          source_id: 'source-id-2',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 3,
+          uuid: '333-234-345',
+          submission_id: submissionId,
+          feature_type_id: 2,
+          source_id: 'source-id-3',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          submission_feature_security_ids: []
+        },
+        {
+          submission_feature_id: 4,
+          uuid: '444-234-345',
+          submission_id: submissionId,
+          feature_type_id: 3,
+          source_id: 'source-id-4',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2020-01-01',
+          record_end_date: null,
+          create_date: '2020-01-01',
+          create_user: 1,
+          update_date: null,
+          update_user: null,
+          revision_count: 0,
+          feature_type_name: 'artifact',
+          feature_type_display_name: 'Artifact',
+          submission_feature_security_ids: []
+        }
+      ];
+
+      const mockSubmissionFeatureSearchKeyValues: SubmissionFeatureSearchKeyValues[] = [
+        {
+          search_id: 1,
+          submission_feature_id: 1,
+          feature_property_id: 1,
+          feature_property_name: 'name',
+          value: 'name1'
+        },
+        {
+          search_id: 2,
+          submission_feature_id: 1,
+          feature_property_id: 2,
+          feature_property_name: 'description',
+          value: 'description1'
+        },
+        {
+          search_id: 3,
+          submission_feature_id: 2,
+          feature_property_id: 3,
+          feature_property_name: 'geometry',
+          value: { type: 'Point', coordinates: [100.0, 0.0] }
+        },
+        {
+          search_id: 4,
+          submission_feature_id: 3,
+          feature_property_id: 1,
+          feature_property_name: 'name',
+          value: 'name3'
+        },
+        {
+          search_id: 5,
+          submission_feature_id: 4,
+          feature_property_id: 4,
+          feature_property_name: 'start_date',
+          value: '2024-02-02'
+        },
+        {
+          search_id: 6,
+          submission_feature_id: 4,
+          feature_property_id: 5,
+          feature_property_name: 'count',
+          value: 15
+        }
+      ];
+
+      const getReviewedSubmissionsForAdminsStub = sinon
+        .stub(SubmissionRepository.prototype, 'getSubmissionFeaturesBySubmissionId')
+        .resolves(mockSubmissionRecords);
+
+      const getSearchKeyValuesBySubmissionIdStub = sinon
+        .stub(SearchIndexService.prototype, 'getSearchKeyValuesBySubmissionId')
+        .resolves(mockSubmissionFeatureSearchKeyValues);
+
+      const submissionService = new SubmissionService(mockDBConnection);
+
+      const response = await submissionService.getSubmissionFeaturesWithSearchKeyValuesBySubmissionId(submissionId);
+
+      expect(getReviewedSubmissionsForAdminsStub).to.be.calledOnceWith(submissionId);
+      expect(getSearchKeyValuesBySubmissionIdStub).to.be.calledOnceWith(submissionId);
+      expect(response).to.be.eql([
+        {
+          feature_type_name: 'dataset',
+          feature_type_display_name: 'Dataset',
+          features: [
+            {
+              ...mockSubmissionRecords[0],
+              data: {
+                name: 'name1',
+                description: 'description1'
+              }
+            }
+          ]
+        },
+        {
+          feature_type_name: 'observation',
+          feature_type_display_name: 'Observation',
+          features: [
+            {
+              ...mockSubmissionRecords[1],
+              data: {
+                geometry: { type: 'Point', coordinates: [100.0, 0.0] }
+              }
+            },
+            {
+              ...mockSubmissionRecords[2],
+              data: {
+                name: 'name3'
+              }
+            }
+          ]
+        },
+        {
+          feature_type_name: 'artifact',
+          feature_type_display_name: 'Artifact',
+          features: [
+            {
+              ...mockSubmissionRecords[3],
+              data: {
+                start_date: '2024-02-02',
+                count: 15
+              }
+            }
+          ]
         }
       ]);
     });
