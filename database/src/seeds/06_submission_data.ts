@@ -26,27 +26,16 @@ export async function seed(knex: Knex): Promise<void> {
     SET SEARCH_PATH = 'biohub','public';
   `);
 
-  // 1. submission (2) without children
-  await insertSubmissionRecord(knex);
-  await insertSubmissionRecord(knex);
-
-  // 2. submission (1) without children but with security_review_timestamp
-  await insertSubmissionRecord(knex, true);
-
-  // 3. submission (1) without children but with security_review_timestamp and published_timestamp
-  await insertSubmissionRecord(knex, true, true);
-
-  // 4. submission (1) with children and SECURE (all submission features secure) and published_timestamp
+  // 1. SECURE (all submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'SECURE');
 
-  // 5. submission (1) with children and PARTIALLY SECURE (some submission features secure) and published_timestamp
+  // 2. PARTIALLY SECURE (some submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'PARTIALLY SECURE');
 
-  // 6. submission (1) with children and UNSECURE (zero submission features secure) and published_timestamp
+  // 3. UNSECURE (zero submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'UNSECURE');
 
-  // 7. submission (2) with children and UNSECURE (zero submission features secure)
-  // and not published and not reviewed
+  // 4. UNSECURE (zero submission features secure) and not published and not reviewed
   await createSubmissionWithSecurity(knex, 'UNSECURE', false);
   await createSubmissionWithSecurity(knex, 'UNSECURE', false);
 }
