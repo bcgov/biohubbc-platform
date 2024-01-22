@@ -2157,38 +2157,4 @@ export class SubmissionRepository extends BaseRepository {
 
     return response.rows[0].value;
   }
-
-  /**
-   * Get a sorted and distinct list of all unique feature type records for a submission.
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<FeatureTypeRecord[]>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionFeatureTypes(submissionId: number): Promise<FeatureTypeRecord[]> {
-    const sqlStatement = SQL`
-      WITH w_distinct_feature_types AS (
-        SELECT DISTINCT ON (feature_type.feature_type_id)
-          feature_type.*
-        FROM 
-          submission_feature
-        INNER JOIN
-          feature_type
-        ON
-          submission_feature.feature_type_id = feature_type.feature_type_id
-        WHERE
-          submission_feature.submission_id = ${submissionId}
-      )
-      SELECT
-        * 
-      FROM 
-        w_distinct_feature_types
-      ORDER BY
-        sort ASC;
-    `;
-
-    const response = await this.connection.sql(sqlStatement, FeatureTypeRecord);
-
-    return response.rows;
-  }
 }

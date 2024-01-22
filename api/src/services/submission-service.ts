@@ -5,7 +5,6 @@ import { IDBConnection } from '../database/db';
 import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
-  FeatureTypeRecord,
   IDatasetsForReview,
   ISourceTransformModel,
   ISubmissionFeature,
@@ -889,16 +888,5 @@ export class SubmissionService extends DBService {
     }
 
     return signedUrl;
-  }
-
-  /**
-   * Get a sorted and distinct list of all unique feature type records for a submission.
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<FeatureTypeRecord[]>}
-   * @memberof SubmissionService
-   */
-  async getSubmissionFeatureTypes(submissionId: number): Promise<FeatureTypeRecord[]> {
-    return this.submissionRepository.getSubmissionFeatureTypes(submissionId);
   }
 }
