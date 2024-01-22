@@ -34,11 +34,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       dialogContext.setSnackbar({
         snackbarMessage: (
           <Typography variant="body2" component="div">
-            {ApplySecurityRulesI18N.applySecuritySuccess(
-              patch.stagedForApply.length,
-              patch.stagedForRemove.length,
-              props.submissionFeatureIds.length
-            )}
+            {ApplySecurityRulesI18N.applySecuritySuccess(props.submissionFeatureIds.length)}
           </Typography>
         ),
         open: true
@@ -61,7 +57,7 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
   return (
     <EditDialog<IPatchFeatureSecurityRules>
       isLoading={isLoading}
-      dialogTitle={hasSecurity ? 'Edit Security Reasons' : ' Add Security Reasons'}
+      dialogTitle={hasSecurity ? 'Edit Security' : ' Add Security'}
       open={props.open}
       dialogSaveButtonLabel="APPLY"
       onCancel={props.onClose}
