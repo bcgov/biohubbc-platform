@@ -95,7 +95,8 @@ GET.apiDoc = {
                   nullable: true
                 },
                 update_user: {
-                  type: 'string',
+                  type: 'integer',
+                  minimum: 1,
                   nullable: true
                 },
                 revision_count: {
