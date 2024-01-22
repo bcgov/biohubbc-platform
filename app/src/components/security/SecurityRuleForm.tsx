@@ -138,9 +138,9 @@ const SecurityRuleForm = () => {
   return (
     <form onSubmit={formikProps.handleSubmit}>
       <Box component="fieldset" mt={1}>
-        <Typography component="legend">Add Security Rules</Typography>
+        <Typography component="legend">Secure Records</Typography>
         <Typography variant="body1" color="textSecondary" sx={{ mt: -1, mb: 3 }}>
-          Select one or more security rules to apply to selected records.
+          Secure records by adding one or more security rules.
         </Typography>
         <Autocomplete
           value={null}
@@ -185,7 +185,7 @@ const SecurityRuleForm = () => {
             <TextField
               {...params}
               variant="outlined"
-              placeholder={'Security rules'}
+              placeholder={'Add security rules'}
               fullWidth
               InputProps={{
                 ...params.InputProps,
@@ -234,41 +234,43 @@ const SecurityRuleForm = () => {
       </Box>
       <Box component="fieldset" mt={2}>
         <Typography component="legend">Secured Records</Typography>
-        <Typography variant="body1" color="textSecondary" sx={{ mt: -1 }}>
-          Some of the selected records have been secured using one or more of the following rules.
-        </Typography>
 
-        <Stack component={TransitionGroup} gap={1} mt={3}>
-          {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {
-            const cardAction = formikProps.values.stagedForRemove.some(
-              (removingRule) => removingRule.security_rule_id === group.securityRule.security_rule_id
-            )
-              ? 'remove'
-              : 'persist';
-
-            return (
-              <Collapse key={group.securityRule.security_rule_id}>
-                <SecurityRuleActionCard
-                  action={cardAction}
-                  title={group.securityRule.name}
-                  category={group.securityRule.category_name}
-                  description={group.securityRule.description}
-                  featureMembers={group.appliedFeatureGroups.map(
-                    (featureGroup) =>
-                      `${p(featureGroup.numFeatures, featureGroup.displayName)} (${featureGroup.numFeatures})`
-                  )}
-                  onRemove={() => toggleStageRemove(group.securityRule)}
-                />
-              </Collapse>
-            );
-          })}
-        </Stack>
-
-        {hasNoSecuritySelected && (
-          <Alert severity="error">
+        {hasNoSecuritySelected ? (
+           <Alert severity="error">
             <AlertTitle>No security applied</AlertTitle>
-            All users will have unrestricted access to records that have been included in this submission.
+            All users will have unrestricted access to selected records.
           </Alert>
+          ) : (
+            <>
+            <Typography variant="body1" color="textSecondary" sx={{ mt: -1 }}>
+              Some of the selected records have been secured using the following rules.
+            </Typography>
+            <Stack component={TransitionGroup} gap={1} mt={3}>
+              {groupedAppliedSecurityRules.map((group: IAppliedSecurityRuleGroup) => {
+                const cardAction = formikProps.values.stagedForRemove.some(
+                  (removingRule) => removingRule.security_rule_id === group.securityRule.security_rule_id
+                )
+                  ? 'remove'
+                  : 'persist';
+
+                return (
+                  <Collapse key={group.securityRule.security_rule_id}>
+                    <SecurityRuleActionCard
+                      action={cardAction}
+                      title={group.securityRule.name}
+                      category={group.securityRule.category_name}
+                      description={group.securityRule.description}
+                      featureMembers={group.appliedFeatureGroups.map(
+                        (featureGroup) =>
+                          `${p(featureGroup.numFeatures, featureGroup.displayName)} (${featureGroup.numFeatures})`
+                      )}
+                      onRemove={() => toggleStageRemove(group.securityRule)}
+                    />
+                  </Collapse>
+                );
+              })}
+            </Stack>
+            </>
         )}
       </Box>
     </form>
