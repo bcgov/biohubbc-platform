@@ -236,12 +236,12 @@ const SecurityRuleForm = () => {
         <Typography component="legend">Secured Records</Typography>
 
         {hasNoSecuritySelected ? (
-           <Alert severity="error">
+          <Alert severity="error">
             <AlertTitle>No security applied</AlertTitle>
             All users will have unrestricted access to selected records.
           </Alert>
-          ) : (
-            <>
+        ) : (
+          <>
             <Typography variant="body1" color="textSecondary" sx={{ mt: -1 }}>
               Some of the selected records have been secured using the following rules.
             </Typography>
@@ -270,7 +270,7 @@ const SecurityRuleForm = () => {
                 );
               })}
             </Stack>
-            </>
+          </>
         )}
       </Box>
     </form>
