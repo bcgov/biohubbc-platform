@@ -3,6 +3,7 @@ import { Knex } from 'knex';
 /**
  * Add tables:
  * - taxon
+ * - taxon_alias
  *
  * @export
  * @param {Knex} knex
