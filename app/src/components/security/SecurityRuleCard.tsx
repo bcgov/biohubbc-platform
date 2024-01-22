@@ -45,7 +45,13 @@ const SecurityRuleCard = (props: ISecurityRuleCardProps) => {
       {props.featureMembers && props.featureMembers?.length && (
         <Stack component="ul" flexDirection="row" gap={2} mt={0.75} mb={0} p={0}>
           {props.featureMembers.map((featureMember) => (
-            <Typography key={featureMember} component="li" variant="body2" color="textSecondary" fontWeight={700} sx={{ display: 'block' }}>
+            <Typography
+              key={featureMember}
+              component="li"
+              variant="body2"
+              color="textSecondary"
+              fontWeight={700}
+              sx={{ display: 'block' }}>
               {featureMember}
             </Typography>
           ))}
