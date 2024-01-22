@@ -88,7 +88,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
             }}>
             <Icon path={mdiLockOpenOutline} size={0.75} />
             <Typography component="span" textTransform="uppercase">
-              Unsecuredasdfasdfsd
+              Unsecured
             </Typography>
           </Stack>
         );
