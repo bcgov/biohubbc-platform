@@ -1225,7 +1225,7 @@ export class SubmissionRepository extends BaseRepository {
           ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
         FROM submission t1
       ),
-      FilteredRows as (
+      FilteredRows AS (
         SELECT
           t2.*
         FROM 
@@ -1252,17 +1252,17 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.update_date,
         FilteredRows.update_user,
         FilteredRows.revision_count,
-        submission_feature.feature_type_id as root_feature_type_id,
-        feature_type.name as root_feature_type_name,
-        ${SECURITY_APPLIED_STATUS.PENDING} as security,
-        array_remove(array_agg(region_lookup.region_name), NULL) as regions
+        submission_feature.feature_type_id AS root_feature_type_id,
+        feature_type.name AS root_feature_type_name,
+        ${SECURITY_APPLIED_STATUS.PENDING} AS security,
+        ARRAY_REMOVE(ARRAY_AGG(region_lookup.region_name), NULL) AS regions
       FROM
         FilteredRows
-      left JOIN
+      INNER JOIN
         submission_feature
       ON
         FilteredRows.submission_id = submission_feature.submission_id
-      left JOIN
+      INNER JOIN
         feature_type
       ON
         feature_type.feature_type_id = submission_feature.feature_type_id
@@ -1278,7 +1278,7 @@ export class SubmissionRepository extends BaseRepository {
         region_lookup 
       ON 
         region_lookup.region_id = submission_regions.region_id
-      where
+      WHERE
         submission_feature.parent_submission_feature_id IS NULL
       group by 
         FilteredRows.submission_id,
@@ -1309,6 +1309,9 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Get all submissions that have completed security review but are not published.
    *
+   * Note: Will only return the most recent reviewed submission for each uuid, unless the most recent submission is
+   * already published.
+   *
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
@@ -1325,7 +1328,7 @@ export class SubmissionRepository extends BaseRepository {
         OR
           t1.publish_timestamp IS NOT NULL
       ),
-      FilteredRows as (
+      FilteredRows AS (
         SELECT
           t2.*
         FROM 
@@ -1354,22 +1357,22 @@ export class SubmissionRepository extends BaseRepository {
         FilteredRows.update_date,
         FilteredRows.update_user,
         FilteredRows.revision_count,
-        submission_feature.feature_type_id as root_feature_type_id,
-        feature_type.name as root_feature_type_name,
+        submission_feature.feature_type_id AS root_feature_type_id,
+        feature_type.name AS root_feature_type_name,
         CASE
           WHEN FilteredRows.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-        END as security,
-        array_remove(array_agg(region_lookup.region_name), NULL) as regions
+        END AS security,
+        ARRAY_REMOVE(ARRAY_AGG(region_lookup.region_name), NULL) AS regions
       FROM
         FilteredRows
-      left JOIN
+      INNER JOIN
         submission_feature
       ON
         FilteredRows.submission_id = submission_feature.submission_id
-      left JOIN
+      INNER JOIN
         feature_type
       ON
         feature_type.feature_type_id = submission_feature.feature_type_id
@@ -1385,7 +1388,7 @@ export class SubmissionRepository extends BaseRepository {
         region_lookup 
       ON 
         region_lookup.region_id = submission_regions.region_id
-      where
+      WHERE
         submission_feature.parent_submission_feature_id IS NULL
       group by 
         FilteredRows.submission_id,
@@ -1421,62 +1424,24 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-      WITH RankedRows AS (
-        SELECT
-          t1.*,
-          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
-        FROM 
-          submission t1
-        WHERE
-          t1.security_review_timestamp IS NOT NULL
-        OR
-          t1.publish_timestamp IS NOT NULL
-      ),
-      FilteredRows as (
-        SELECT
-          t2.*
-        FROM 
-          RankedRows t2
-        WHERE
-          t2.security_review_timestamp IS NOT NULL
-        AND
-          t2.publish_timestamp IS NOT NULL
-        AND 
-          t2.rank = 1
-      )
       SELECT
-        FilteredRows.submission_id,
-        FilteredRows.uuid,
-        FilteredRows.system_user_id,
-        FilteredRows.source_system,
-        FilteredRows.security_review_timestamp,
-        FilteredRows.publish_timestamp,
-        FilteredRows.submitted_timestamp,
-        FilteredRows.name,
-        FilteredRows.description,
-        FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
-        FilteredRows.create_user,
-        FilteredRows.update_date,
-        FilteredRows.update_user,
-        FilteredRows.revision_count,
-        submission_feature.feature_type_id as root_feature_type_id,
-        feature_type.name as root_feature_type_name,
+        submission.*,
+        submission_feature.feature_type_id AS root_feature_type_id,
+        feature_type.name AS root_feature_type_name,
         CASE
-          WHEN FilteredRows.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN submission.security_review_timestamp IS NULL THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-        END as security,
-        array_remove(array_agg(region_lookup.region_name), NULL) as regions
+        END AS security,
+        ARRAY_REMOVE(ARRAY_AGG(region_lookup.region_name), NULL) AS regions
       FROM
-        FilteredRows
-      left JOIN
+        submission
+      INNER JOIN
         submission_feature
       ON
-        FilteredRows.submission_id = submission_feature.submission_id
-      left JOIN
+        submission.submission_id = submission_feature.submission_id
+      INNER JOIN
         feature_type
       ON
         feature_type.feature_type_id = submission_feature.feature_type_id
@@ -1487,30 +1452,17 @@ export class SubmissionRepository extends BaseRepository {
       LEFT JOIN 
         submission_regions
       ON
-        submission_regions.submission_id = FilteredRows.submission_id 
+        submission_regions.submission_id = submission.submission_id 
       LEFT JOIN
         region_lookup 
       ON 
         region_lookup.region_id = submission_regions.region_id
-      where
+      WHERE
+        submission.publish_timestamp IS NOT NULL
+      AND
         submission_feature.parent_submission_feature_id IS NULL
       group by 
-        FilteredRows.submission_id,
-        FilteredRows.uuid,
-        FilteredRows.system_user_id,
-        FilteredRows.source_system,
-        FilteredRows.security_review_timestamp,
-        FilteredRows.publish_timestamp,
-        FilteredRows.submitted_timestamp,
-        FilteredRows.name,
-        FilteredRows.description,
-        FilteredRows.comment,
-        FilteredRows.record_end_date,
-        FilteredRows.create_date,
-        FilteredRows.create_user,
-        FilteredRows.update_date,
-        FilteredRows.update_user,
-        FilteredRows.revision_count,
+        submission.submission_id,
         submission_feature.feature_type_id,
         feature_type.name;
     `;
@@ -1882,6 +1834,10 @@ export class SubmissionRepository extends BaseRepository {
         ...updateOperations,
         publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
       };
+
+      // Publishing this submission, first unpublish all submissions with the same uuid as the target submission.
+      // Why? Because we only want one published submission per uuid.
+      await this.unpublishAllSubmissionsBySubmissionId(submissionId);
     } else if (patch.published === false) {
       updateOperations = {
         ...updateOperations,
@@ -1895,6 +1851,28 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.knex(queryBuilder, SubmissionRecord);
 
     return response.rows[0];
+  }
+
+  /**
+   * Unpublish all submissions with the same uuid as the submission with the provided id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async unpublishAllSubmissionsBySubmissionId(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE 
+        submission
+      SET
+        publish_timestamp = null
+      WHERE
+        uuid = (SELECT uuid FROM submission WHERE submission_id = ${submissionId});
+    `;
+
+    await this.connection.sql(sqlStatement);
+
+    return;
   }
 
   /**
