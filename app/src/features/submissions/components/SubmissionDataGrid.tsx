@@ -84,10 +84,10 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
             alignItems="center"
             gap={1}
             sx={{
-              color: 'text.secondary'
+              color: 'error.main'
             }}>
             <Icon path={mdiLockOpenOutline} size={0.75} />
-            <Typography component="span" sx={{ textTransform: 'uppercase' }}>
+            <Typography component="span" textTransform="uppercase">
               Unsecured
             </Typography>
           </Stack>

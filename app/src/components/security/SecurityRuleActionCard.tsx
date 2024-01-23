@@ -17,11 +17,10 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
       variant="outlined"
       sx={{
         display: 'flex',
-        px: 2,
-        py: 1.5,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        p: 2,
         background: grey[100]
       }}>
       <SecurityRuleCard {...rest} />
@@ -30,7 +29,15 @@ const SecurityRuleActionCard = (props: ISecurityRuleActionCardProps) => {
           <Icon path={mdiClose} size={1} />
         </IconButton>
       ) : (
-        <Button variant={props.action === 'remove' ? 'contained' : 'outlined'} color="error" onClick={() => onRemove()}>
+        <Button
+          variant={props.action === 'remove' ? 'contained' : 'outlined'}
+          color="error"
+          sx={{
+            width: '6rem',
+            fontWeight: 700,
+            letterSpacing: '0.02rem'
+          }}
+          onClick={() => onRemove()}>
           Remove
         </Button>
       )}
