@@ -11,9 +11,15 @@ export enum HTTPErrorType {
 
 export class HTTPError extends Error {
   status: number;
-  errors?: (string | object)[];
+  errors?: (string | Record<string, unknown>)[];
 
-  constructor(name: HTTPErrorType, status: number, message: string, errors?: (string | object)[], stack?: string) {
+  constructor(
+    name: HTTPErrorType,
+    status: number,
+    message: string,
+    errors?: (string | Record<string, unknown>)[],
+    stack?: string
+  ) {
     super(message);
 
     this.name = name;
@@ -38,7 +44,7 @@ export class HTTPError extends Error {
  * @extends {HTTPError}
  */
 export class HTTP400 extends HTTPError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(HTTPErrorType.BAD_REQUEST, 400, message, errors);
   }
 }
@@ -51,7 +57,7 @@ export class HTTP400 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP401 extends HTTPError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(HTTPErrorType.UNAUTHORIZE, 401, message, errors);
   }
 }
@@ -64,7 +70,7 @@ export class HTTP401 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP403 extends HTTPError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(HTTPErrorType.FORBIDDEN, 403, message, errors);
   }
 }
@@ -77,7 +83,7 @@ export class HTTP403 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP409 extends HTTPError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(HTTPErrorType.CONFLICT, 409, message, errors);
   }
 }
@@ -90,7 +96,7 @@ export class HTTP409 extends HTTPError {
  * @extends {HTTPError}
  */
 export class HTTP500 extends HTTPError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(HTTPErrorType.INTERNAL_SERVER_ERROR, 500, message, errors);
   }
 }

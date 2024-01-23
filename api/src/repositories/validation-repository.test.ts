@@ -26,11 +26,15 @@ describe('ValidationRepository', () => {
 
       const validationRepository = new ValidationRepository(mockDBConnection);
 
+      const featureType = 'type';
+
       try {
-        await validationRepository.getFeatureValidationProperties('type');
+        await validationRepository.getFeatureValidationProperties(featureType);
         expect.fail();
       } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to get dataset validation properties');
+        expect((actualError as ApiGeneralError).message).to.equal(
+          `Failed to get validation properties for feature type: ${featureType}`
+        );
       }
     });
 

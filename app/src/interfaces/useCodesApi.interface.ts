@@ -1,25 +1,21 @@
-/**
- * A single code value.
- *
- * @export
- * @interface ICode
- */
-export interface ICode {
-  id: number;
-  name: string;
-}
+export type FeatureTypeCode = {
+  feature_type_id: number;
+  feature_type_name: string;
+  feature_type_display_name: string;
+};
 
-/**
- * A code set (an array of ICode values).
- */
-export type CodeSet<T extends ICode = ICode> = T[];
+export type FeatureTypeWithFeaturePropertiesCode = {
+  feature_type: FeatureTypeCode;
+  feature_type_properties: FeaturePropertyCode[];
+};
 
-export interface IFeatureTypeProperties extends CodeSet {
-  id: number;
-  name: string;
-  display_name: string;
-  type: string;
-}
+export type FeaturePropertyCode = {
+  feature_property_id: number;
+  feature_property_name: string;
+  feature_property_display_name: string;
+  feature_property_type_id: number;
+  feature_property_type_name: string;
+};
 
 /**
  * Get all codes response object.
@@ -28,11 +24,5 @@ export interface IFeatureTypeProperties extends CodeSet {
  * @interface IGetAllCodeSetsResponse
  */
 export interface IGetAllCodeSetsResponse {
-  feature_type_with_properties: {
-    feature_type: CodeSet<{
-      id: number;
-      name: string;
-    }>;
-    feature_type_properties: IFeatureTypeProperties[];
-  }[];
+  feature_type_with_properties: FeatureTypeWithFeaturePropertiesCode[];
 }

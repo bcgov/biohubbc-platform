@@ -15,12 +15,12 @@ import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { FuseResult } from 'fuse.js';
 import useFuzzySearch from 'hooks/useFuzzySearch';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
+import { SubmissionRecordPublishedForPublic } from 'interfaces/useSubmissionsApi.interface';
 import { getFormattedDate } from 'utils/Utils';
 
 export interface ISubmissionsListProps {
-  submissions: FuseResult<SubmissionRecordPublished>[];
-  onDownload: (submission: FuseResult<SubmissionRecordPublished>) => void;
+  submissions: FuseResult<SubmissionRecordPublishedForPublic>[];
+  onDownload: (submission: FuseResult<SubmissionRecordPublishedForPublic>) => void;
   onAccessRequest: () => void;
 }
 

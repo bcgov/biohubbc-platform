@@ -41,7 +41,7 @@ export const syncErrorWrapper =
  */
 const parseError = (error: any) => {
   if (error instanceof z.ZodError) {
-    throw new ApiExecuteSQLError('SQL response failed schema check', [error]);
+    throw new ApiExecuteSQLError('SQL response failed schema check', [error as Record<string, any>]);
   }
 
   if (error.message === 'CONCURRENCY_EXCEPTION') {

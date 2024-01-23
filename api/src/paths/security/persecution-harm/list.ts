@@ -48,7 +48,8 @@ GET.apiDoc = {
                 description: {
                   type: 'string'
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

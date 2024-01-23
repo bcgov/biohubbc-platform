@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import { SearchIndexRepository } from '../repositories/search-index-respository';
 import { SubmissionRepository } from '../repositories/submission-repository';
 import { getMockDBConnection } from '../__mocks__/db';
+import { CodeService } from './code-service';
 import { SearchIndexService } from './search-index-service';
 
 chai.use(sinonChai);
@@ -25,59 +26,182 @@ describe('SearchIndexService', () => {
         .resolves([
           {
             submission_feature_id: 11111,
-            submission_id: 1, // Mock submission
-            feature_type_id: 1, // dataset, observation, etc.
+            submission_id: 777,
+            feature_type_id: 1,
             data: {
-              name: 'Ardvark',
-              description: 'Desc1',
-              taxonomy: 1001,
-              start_date: new Date('2000-01-01'),
-              end_date: new Date('2000-01-02'),
-              geometry: { type: 'Point', coordinates: [11, 11] },
-              count: 60,
-              latitude: 11,
-              longitude: 11
+              name: 'Dataset1',
+              description: 'Desc1'
             },
+            source_id: '123',
+            uuid: '123-456-789',
             parent_submission_feature_id: null,
-            record_effective_date: '',
+            record_effective_date: '2024-01-01',
             record_end_date: null,
-            create_date: '',
+            create_date: '2024-01-01',
             create_user: 1,
             update_date: null,
             update_user: null,
-            revision_count: 1,
-            feature_type_name: '',
-            feature_type_display_name: '',
+            revision_count: 0,
+            feature_type_name: 'dataset',
+            feature_type_display_name: 'Dataset',
             submission_feature_security_ids: []
           },
           {
             submission_feature_id: 22222,
-            submission_id: 1, // Mock submission
-            feature_type_id: 1, // dataset, observation, etc.
+            submission_id: 777,
+            feature_type_id: 2,
             data: {
-              name: 'Buffalo',
-              description: 'Desc2',
-              taxonomy: 1002,
+              count: 70,
               start_date: new Date('2001-01-01'),
               end_date: null,
-              geometry: { type: 'Point', coordinates: [22, 22] },
-              count: 70,
-              latitude: 22,
-              longitude: 22
+              latitude: 49,
+              longitude: -127,
+              geometry: { type: 'Point', coordinates: [-127, 49] }
             },
-            parent_submission_feature_id: null,
-            record_effective_date: '',
+            source_id: '456',
+            uuid: '234-456-678',
+            parent_submission_feature_id: 11111,
+            record_effective_date: '2024-01-01',
             record_end_date: null,
-            create_date: '',
+            create_date: '2024-01-01',
             create_user: 1,
             update_date: null,
             update_user: null,
-            revision_count: 1,
-            feature_type_name: '',
-            feature_type_display_name: '',
+            revision_count: 0,
+            feature_type_name: 'observation',
+            feature_type_display_name: 'Observation',
+            submission_feature_security_ids: []
+          },
+          {
+            submission_feature_id: 33333,
+            submission_id: 777,
+            feature_type_id: 3,
+            data: {
+              filename: 'myText.txt',
+              description: 'Desc2'
+            },
+            source_id: '789',
+            uuid: '456-567-567',
+            parent_submission_feature_id: 11111,
+            record_effective_date: '2024-01-01',
+            record_end_date: null,
+            create_date: '2024-01-01',
+            create_user: 1,
+            update_date: null,
+            update_user: null,
+            revision_count: 0,
+            feature_type_name: 'artifact',
+            feature_type_display_name: 'Artifact',
             submission_feature_security_ids: []
           }
         ]);
+
+      sinon.stub(CodeService.prototype, 'getFeatureTypePropertyCodes').resolves([
+        {
+          feature_type: {
+            feature_type_id: 1,
+            feature_type_name: 'dataset',
+            feature_type_display_name: 'Dataset'
+          },
+          feature_type_properties: [
+            {
+              feature_property_id: 1,
+              feature_property_name: 'name',
+              feature_property_display_name: 'Name',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'string'
+            },
+            {
+              feature_property_id: 2,
+              feature_property_name: 'description',
+              feature_property_display_name: 'Description',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'string'
+            }
+          ]
+        },
+        {
+          feature_type: {
+            feature_type_id: 2,
+            feature_type_name: 'observation',
+            feature_type_display_name: 'Observation'
+          },
+          feature_type_properties: [
+            {
+              feature_property_id: 3,
+              feature_property_name: 'count',
+              feature_property_display_name: 'Count',
+              feature_property_type_id: 2,
+              feature_property_type_name: 'number'
+            },
+            {
+              feature_property_id: 4,
+              feature_property_name: 'date_range',
+              feature_property_display_name: 'Date Range',
+              feature_property_type_id: 3,
+              feature_property_type_name: 'object'
+            },
+            {
+              feature_property_id: 5,
+              feature_property_name: 'start_date',
+              feature_property_display_name: 'Start Date',
+              feature_property_type_id: 4,
+              feature_property_type_name: 'datetime'
+            },
+            {
+              feature_property_id: 6,
+              feature_property_name: 'end_date',
+              feature_property_display_name: 'End Date',
+              feature_property_type_id: 4,
+              feature_property_type_name: 'datetime'
+            },
+            {
+              feature_property_id: 7,
+              feature_property_name: 'latitude',
+              feature_property_display_name: 'Latitude',
+              feature_property_type_id: 2,
+              feature_property_type_name: 'number'
+            },
+            {
+              feature_property_id: 8,
+              feature_property_name: 'longitude',
+              feature_property_display_name: 'Longitude',
+              feature_property_type_id: 2,
+              feature_property_type_name: 'number'
+            },
+            {
+              feature_property_id: 9,
+              feature_property_name: 'geometry',
+              feature_property_display_name: 'Geometry',
+              feature_property_type_id: 5,
+              feature_property_type_name: 'spatial'
+            }
+          ]
+        },
+        {
+          feature_type: {
+            feature_type_id: 3,
+            feature_type_name: 'artifact',
+            feature_type_display_name: 'Artifact'
+          },
+          feature_type_properties: [
+            {
+              feature_property_id: 10,
+              feature_property_name: 'filename',
+              feature_property_display_name: 'Filename',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'string'
+            },
+            {
+              feature_property_id: 2,
+              feature_property_name: 'description',
+              feature_property_display_name: 'Description',
+              feature_property_type_id: 1,
+              feature_property_type_name: 'string'
+            }
+          ]
+        }
+      ]);
 
       const insertSearchableStringStub = sinon.stub(SearchIndexRepository.prototype, 'insertSearchableStringRecords');
 
@@ -90,285 +214,66 @@ describe('SearchIndexService', () => {
 
       const insertSearchableNumberStub = sinon.stub(SearchIndexRepository.prototype, 'insertSearchableNumberRecords');
 
-      sinon.stub(SearchIndexRepository.prototype, 'getFeaturePropertiesWithTypeNames').resolves([
-        {
-          feature_property_type_name: 'number',
-          feature_property_id: 8,
-          feature_property_type_id: 2,
-          name: 'count',
-          display_name: 'Count',
-          description: 'The count of the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'object',
-          feature_property_id: 4,
-          feature_property_type_id: 6,
-          name: 'date_range',
-          display_name: 'Date Range',
-          description: 'A date range',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'string',
-          feature_property_id: 2,
-          feature_property_type_id: 1,
-          name: 'description',
-          display_name: 'Description',
-          description: 'The description of the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'datetime',
-          feature_property_id: 6,
-          feature_property_type_id: 3,
-          name: 'end_date',
-          display_name: 'End Date',
-          description: 'The end date of the record',
-          parent_feature_property_id: 4,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'spatial',
-          feature_property_id: 7,
-          feature_property_type_id: 4,
-          name: 'geometry',
-          display_name: 'Geometry',
-          description: 'The location of the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'number',
-          feature_property_id: 9,
-          feature_property_type_id: 2,
-          name: 'latitude',
-          display_name: 'Latitude',
-          description: 'The latitude of the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'number',
-          feature_property_id: 10,
-          feature_property_type_id: 2,
-          name: 'longitude',
-          display_name: 'Longitude',
-          description: 'The longitude of the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'string',
-          feature_property_id: 1,
-          feature_property_type_id: 1,
-          name: 'name',
-          display_name: 'Name',
-          description: 'The name of the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'string',
-          feature_property_id: 21,
-          feature_property_type_id: 1,
-          name: 's3_key',
-          display_name: 'Key',
-          description: 'The S3 storage key for an artifact',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 15:40:29.486362-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'datetime',
-          feature_property_id: 5,
-          feature_property_type_id: 3,
-          name: 'start_date',
-          display_name: 'Start Date',
-          description: 'The start date of the record',
-          parent_feature_property_id: 4,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        },
-        {
-          feature_property_type_name: 'number',
-          feature_property_id: 3,
-          feature_property_type_id: 2,
-          name: 'taxonomy',
-          display_name: 'Taxonomy Id',
-          description: 'The taxonomy Id associated to the record',
-          parent_feature_property_id: null,
-          record_effective_date: '2023-12-08',
-          record_end_date: null,
-          create_date: '2023-12-08 14:37:41.315999-08',
-          create_user: 1,
-          update_date: null,
-          update_user: null,
-          revision_count: 0
-        }
-      ]);
-
       // Act
       await searchIndexService.indexFeaturesBySubmissionId(777);
 
       // Assert
-      expect(getSubmissionFeaturesStub).to.be.calledWith(777);
+      expect(getSubmissionFeaturesStub).to.be.calledOnceWith(777);
 
-      expect(insertSearchableStringStub).to.be.calledWith([
+      expect(insertSearchableStringStub).to.be.calledOnceWith([
         {
           submission_feature_id: 11111,
-          feature_property_id: 1, // Name
-          value: 'Ardvark'
+          feature_property_id: 1,
+          value: 'Dataset1'
         },
         {
           submission_feature_id: 11111,
-          feature_property_id: 2, // Description
+          feature_property_id: 2,
           value: 'Desc1'
         },
         {
-          submission_feature_id: 22222,
-          feature_property_id: 1, // Name
-          value: 'Buffalo'
+          submission_feature_id: 33333,
+          feature_property_id: 10,
+          value: 'myText.txt'
         },
         {
-          submission_feature_id: 22222,
-          feature_property_id: 2, // Description
+          submission_feature_id: 33333,
+          feature_property_id: 2,
           value: 'Desc2'
         }
       ]);
 
-      expect(insertSearchableDatetimeStub).to.be.calledWith([
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 5, // Start Date
-          value: new Date('2000-01-01')
-        },
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 6, // End Date
-          value: new Date('2000-01-02')
-        },
+      expect(insertSearchableDatetimeStub).to.be.calledOnceWith([
         {
           submission_feature_id: 22222,
-          feature_property_id: 5, // Start Date
+          feature_property_id: 5,
           value: new Date('2001-01-01')
         }
       ]);
 
-      expect(insertSearchableSpatialStub).to.be.calledWith([
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 7, // Spatial
-          value: { type: 'Point', coordinates: [11, 11] }
-        },
+      expect(insertSearchableSpatialStub).to.be.calledOnceWith([
         {
           submission_feature_id: 22222,
-          feature_property_id: 7, // Spatial
-          value: { type: 'Point', coordinates: [22, 22] }
+          feature_property_id: 9,
+          value: { type: 'Point', coordinates: [-127, 49] }
         }
       ]);
 
-      expect(insertSearchableNumberStub).to.be.calledWith([
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 3, // Taxonomy
-          value: 1001
-        },
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 8, // Count
-          value: 60
-        },
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 9, // Lat
-          value: 11
-        },
-        {
-          submission_feature_id: 11111,
-          feature_property_id: 10, // Long
-          value: 11
-        },
+      expect(insertSearchableNumberStub).to.be.calledOnceWith([
         {
           submission_feature_id: 22222,
-          feature_property_id: 3, // Taxonomy
-          value: 1002
-        },
-        {
-          submission_feature_id: 22222,
-          feature_property_id: 8, // Count
+          feature_property_id: 3,
           value: 70
         },
         {
           submission_feature_id: 22222,
-          feature_property_id: 9, // Lat
-          value: 22
+          feature_property_id: 7,
+          value: 49
         },
         {
           submission_feature_id: 22222,
-          feature_property_id: 10, // Long
-          value: 22
+          feature_property_id: 8,
+          value: -127
         }
       ]);
     });

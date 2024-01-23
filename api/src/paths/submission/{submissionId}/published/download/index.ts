@@ -59,7 +59,8 @@ GET.apiDoc = {
                   type: 'integer',
                   minimum: 1
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

@@ -105,7 +105,7 @@ export const insertDatasetRecord = async (knex: Knex, options: { submission_id: 
       parent_submission_feature_id: null,
       feature_type: 'dataset',
       data: {
-        name: faker.lorem.words(3),
+        name: `Survey ${faker.animal.type()} ${faker.commerce.department()}}`,
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString(),
         geometry: random.point(
@@ -150,7 +150,7 @@ export const insertSampleSiteRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'sample_site',
       data: {
-        name: faker.lorem.words(3),
+        name: `Sample Site ${faker.lorem.words(3)}`,
         description: faker.lorem.words({ min: 5, max: 100 }),
         geometry: random.point(
           1, // number of features in feature collection
@@ -221,7 +221,7 @@ const insertAnimalRecord = async (
       parent_submission_feature_id: options.parent_submission_feature_id,
       feature_type: 'animal',
       data: {
-        species: faker.lorem.words(3),
+        species: faker.animal.type(),
         count: faker.number.int({ min: 0, max: 100 }),
         taxonomy: faker.number.int({ min: 10000, max: 99999 }),
         start_date: faker.date.past().toISOString(),
@@ -259,25 +259,29 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
     includePublishTimestamp && !!securityReviewTimestamp ? `$$${faker.date.past().toISOString()}$$` : null;
 
   return `
-    INSERT INTO submission
-    (
-        uuid,
-        name,
-        description,
-        security_review_timestamp,
-        publish_timestamp,
-        source_system
-    )
-    values
-    (
-        public.gen_random_uuid(),
-        $$${faker.company.name()}$$,
-        $$${faker.lorem.words({ min: 5, max: 100 })}$$,
-        ${securityReviewTimestamp},
-        ${publishTimestamp},
-        'SIMS'
-    )
-    RETURNING submission_id;
+  INSERT INTO submission
+  (
+      uuid,
+      name,
+      description,
+      comment,
+      security_review_timestamp,
+      publish_timestamp,
+      system_user_id,
+      source_system
+  )
+  values
+  (
+      public.gen_random_uuid(),
+      $$${faker.company.name()}$$,
+      $$Description: ${faker.lorem.words({ min: 5, max: 100 })}$$,
+      $$Comment: ${faker.lorem.words({ min: 5, max: 100 })}$$,
+      ${securityReviewTimestamp},
+      ${publishTimestamp},
+      (SELECT system_user_id from system_user where user_identifier = 'SIMS'),
+      'SIMS'
+  )
+  RETURNING submission_id;
 `;
 };
 
@@ -292,6 +296,7 @@ export const insertSubmissionFeature = (options: {
         submission_id,
         parent_submission_feature_id,
         feature_type_id,
+        source_id,
         data,
         record_effective_date
     )
@@ -300,6 +305,7 @@ export const insertSubmissionFeature = (options: {
         ${options.submission_id},
         ${options.parent_submission_feature_id},
         (select feature_type_id from feature_type where name = '${options.feature_type}'),
+        public.gen_random_uuid(),
         ${options.data ? `$$${JSON.stringify(options.data)}$$` : null},
         now()
     )

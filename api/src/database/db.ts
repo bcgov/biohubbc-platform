@@ -392,7 +392,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
 
       _systemUserId = response?.rows?.[0].api_set_context;
     } catch (error) {
-      throw new ApiExecuteSQLError('Failed to set user context', [error as object]);
+      throw new ApiExecuteSQLError('Failed to set user context', [error as Record<string, unknown>]);
     }
   };
 

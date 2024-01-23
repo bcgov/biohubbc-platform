@@ -2,7 +2,7 @@ import { JSONPath } from 'jsonpath-plus';
 import { IDBConnection } from '../database/db';
 import { ISubmissionFeature } from '../repositories/submission-repository';
 import {
-  IFeatureProperties,
+  FeatureProperties,
   IInsertStyleSchema,
   IStyleModel,
   ValidationRepository
@@ -19,50 +19,48 @@ const defaultLog = getLogger('services/validation-service');
 
 export class ValidationService extends DBService {
   validationRepository: ValidationRepository;
-  validationPropertiesCache: Map<string, IFeatureProperties[]>;
+  validationPropertiesCache: Map<string, FeatureProperties[]>;
 
   constructor(connection: IDBConnection) {
     super(connection);
 
     this.validationRepository = new ValidationRepository(connection);
-    this.validationPropertiesCache = new Map<string, IFeatureProperties[]>();
+    this.validationPropertiesCache = new Map<string, FeatureProperties[]>();
   }
 
   /**
    * Validate submission features.
    *
    * @param {ISubmissionFeature[]} submissionFeatures
-   * @return {*}  {Promise<boolean>}
+   * @return {*}  {Promise<boolean>} `true` if all submission features are valid, `false` otherwise.
    * @memberof ValidationService
    */
   async validateSubmissionFeatures(submissionFeatures: ISubmissionFeature[]): Promise<boolean> {
-    // Generate paths to all non-null nodes which contain a 'features' property, ignoring the 'properties' field
-    const allFeaturesPaths: string[] = JSONPath({
-      path: "$..[?(@ && @parentProperty != 'properties' && @.features)]",
-      flatten: true,
-      resultType: 'path',
-      json: submissionFeatures
-    });
-
     try {
-      for (const path of allFeaturesPaths) {
+      // Generate paths to all non-null nodes which contain a 'child_features' property
+      const submissionFeatureJsonPaths: string[] = JSONPath({
+        path: '$..[?(@ && @.child_features)]',
+        flatten: true,
+        resultType: 'path',
+        json: submissionFeatures
+      });
+
+      for (const jsonPath of submissionFeatureJsonPaths) {
         // Fetch a submissionFeature object
-        const node: ISubmissionFeature[] = JSONPath({ path: path, resultType: 'value', json: submissionFeatures });
+        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
 
         if (!node?.length) {
           continue;
         }
 
         // We expect the 'path' to resolve an array of 1 item
-        const nodeWithoutFeatures = { ...node[0], features: [] };
+        const featureNode = node[0];
 
         // Validate the submissioNFeature object
-        await this.validateSubmissionFeature(nodeWithoutFeatures).catch((error) => {
-          defaultLog.error({ label: 'validateSubmissionFeature', message: 'error', error });
-          // Submission feature is invalid
-          return false;
-        });
+        await this.validateSubmissionFeature(featureNode);
       }
+
+      defaultLog.debug({ label: 'validateSubmissionFeatures', message: 'success' });
     } catch (error) {
       defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
       // Not all submission features are valid
@@ -88,26 +86,31 @@ export class ValidationService extends DBService {
   /**
    * Validate the properties of a submission feature.
    *
-   * @param {IFeatureProperties[]} properties
-   * @param {*} dataProperties
+   * @param {FeatureProperties[]} properties The known/recognized properties of a feature type.
+   * @param {ISubmissionFeature['properties']} dataProperties The raw/original properties of a submission feature.
    * @return {*}  {boolean} `true` if the submission feature is valid, `false` otherwise.
    * @memberof ValidationService
    */
-  validateProperties(properties: IFeatureProperties[], dataProperties: any): boolean {
+  validateProperties(properties: FeatureProperties[], dataProperties: ISubmissionFeature['properties']): boolean {
     defaultLog.debug({ label: 'validateProperties', message: 'params', properties, dataProperties });
 
-    const throwPropertyError = (property: IFeatureProperties) => {
-      throw new Error(`Property ${property.name} is not of type ${property.type}`);
+    const throwPropertyError = (property: FeatureProperties) => {
+      throw new Error(`Property ${property.name} is not of type ${property.type_name}`);
     };
 
     for (const property of properties) {
       const dataProperty = dataProperties[property.name];
 
-      if (!dataProperty) {
-        throw new Error(`Property [${property.name}] not found in data`);
+      if (dataProperty === undefined || dataProperty === null) {
+        if (property.required_value) {
+          // Property is required and is null or undefined. Fail validation.
+          throw new Error(`Property ${property.name} is required but is null or undefined`);
+        }
+        // Property is optional is null or undefined. Skip further validation.
+        continue;
       }
 
-      switch (property.type) {
+      switch (property.type_name) {
         case 'string':
           if (typeof dataProperty !== 'string') {
             throwPropertyError(property);
@@ -138,6 +141,7 @@ export class ValidationService extends DBService {
         case 'datetime': {
           if (typeof dataProperty !== 'string') {
             throwPropertyError(property);
+            break;
           }
 
           const date = new Date(dataProperty);
@@ -155,7 +159,7 @@ export class ValidationService extends DBService {
     return true;
   }
 
-  async getFeatureValidationProperties(featureType: string): Promise<IFeatureProperties[]> {
+  async getFeatureValidationProperties(featureType: string): Promise<FeatureProperties[]> {
     let properties = this.validationPropertiesCache.get(featureType);
 
     if (!properties) {

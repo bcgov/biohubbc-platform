@@ -28,7 +28,7 @@ export const POST: Operation = [
 ];
 
 POST.apiDoc = {
-  description: 'Submit submission to BioHub',
+  description: 'Submit data to BioHub',
   tags: ['submission'],
   security: [
     {
@@ -41,30 +41,32 @@ POST.apiDoc = {
         schema: {
           title: 'BioHub Data Submission',
           type: 'object',
-          required: ['id', 'name', 'description', 'features'],
+          required: ['id', 'name', 'description', 'comment', 'content'],
           properties: {
             id: {
-              title: 'Unique id of the submission',
+              description: 'The Unique identifier of the submission as supplied by the source system.',
+              format: 'uuid',
               type: 'string'
             },
             name: {
-              title: 'The name of the submission. Should not include sensitive information.',
+              description: 'The name of the submission. Should not include sensitive information.',
               type: 'string',
               maxLength: 200
             },
             description: {
-              title: 'A description of the submission. Should not include sensitive information.',
+              description:
+                'A description of the submission. Should not include sensitive information. May be shared with the general public.',
               type: 'string',
               maxLength: 3000
             },
-            features: {
-              type: 'array',
-              items: {
-                $ref: '#/components/schemas/SubmissionFeature'
-              },
-              minItems: 1,
-              maxItems: 1,
-              additionalProperties: false
+            comment: {
+              description:
+                'An internal comment/description of the submission for administrative purposes. May include sensitive information. Will never be shared with the general public.',
+              type: 'string',
+              maxLength: 3000
+            },
+            content: {
+              $ref: '#/components/schemas/SubmissionFeature'
             }
           },
           additionalProperties: false
@@ -79,12 +81,36 @@ POST.apiDoc = {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['submission_id'],
+            required: ['submission_uuid'],
             properties: {
-              submission_id: {
-                type: 'integer'
+              submission_uuid: {
+                description: 'Globally unique id of the submission as assigned by BioHub.',
+                type: 'string',
+                format: 'uuid'
+              },
+              artifact_upload_keys: {
+                description:
+                  'Contains information required by the artifact intake endpoint, which is used to upload artifact files to BioHub.',
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['artifact_filename', 'artifact_upload_key'],
+                  properties: {
+                    artifact_filename: {
+                      description: 'The original file name of the artifact, including the extension.',
+                      type: 'string'
+                    },
+                    artifact_upload_key: {
+                      description:
+                        'The artifact upload key. Use this key in the subsequent requests to upload the actual artifact file.',
+                      type: 'string'
+                    }
+                  },
+                  additionalProperties: false
+                }
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }
@@ -95,6 +121,7 @@ POST.apiDoc = {
 
 export function submissionIntake(): RequestHandler {
   return async (req, res) => {
+    // TODO Allow system admins
     const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
 
     if (!serviceClientSystemUser) {
@@ -103,13 +130,12 @@ export function submissionIntake(): RequestHandler {
       ]);
     }
 
-    const submission = {
-      id: req.body.id,
-      name: req.body.name,
-      description: req.body.description
-    };
+    const submissionUuid = req.body.id;
+    const submissionName = req.body.name;
+    const submissionDescription = req.body.description;
+    const submissionComment = req.body.comment;
 
-    const submissionFeatures: ISubmissionFeature[] = req.body.features;
+    const submissionFeature: ISubmissionFeature = req.body.content;
 
     const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
@@ -121,29 +147,50 @@ export function submissionIntake(): RequestHandler {
       const searchIndexService = new SearchIndexService(connection);
       const regionService = new RegionService(connection);
 
-      // validate the submission
-      if (!(await validationService.validateSubmissionFeatures(submissionFeatures))) {
-        throw new HTTP400('Invalid submission');
+      // validate theubmission
+      if (!(await validationService.validateSubmissionFeatures([submissionFeature]))) {
+        throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
       }
 
       // insert the submission record
-      const response = await submissionService.insertSubmissionRecordWithPotentialConflict(
-        submission.id,
-        submission.name,
-        submission.description,
+      const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict(
+        submissionUuid,
+        submissionName,
+        submissionDescription,
+        submissionComment,
+        serviceClientSystemUser.system_user_id,
         serviceClientSystemUser.user_identifier
       );
 
       // insert each submission feature record
-      await submissionService.insertSubmissionFeatureRecords(response.submission_id, submissionFeatures);
+      await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);
 
       // Index the submission feature record properties
-      await searchIndexService.indexFeaturesBySubmissionId(response.submission_id);
+      await searchIndexService.indexFeaturesBySubmissionId(submissionRecord.submission_id);
+
+      // Fetch all artifact submission features, if any
+      const submissionArtifactFeatures = await submissionService.findSubmissionFeatures({
+        submissionId: submissionRecord.submission_id,
+        featureTypeNames: ['artifact']
+      });
 
       // Calculate and add submission regions
-      await regionService.calculateAndAddRegionsForSubmission(response.submission_id, 0.3);
+      await regionService.calculateAndAddRegionsForSubmission(submissionRecord.submission_id, 0.3);
 
       await connection.commit();
+
+      const response = {
+        submission_uuid: submissionRecord.uuid,
+        // Include artifact upload keys in response, if any
+        ...(submissionArtifactFeatures.length && {
+          artifact_upload_keys: submissionArtifactFeatures.map((item) => {
+            return {
+              artifact_filename: item.data['filename'],
+              artifact_upload_key: item.uuid
+            };
+          })
+        })
+      };
 
       res.status(200).json(response);
     } catch (error) {
