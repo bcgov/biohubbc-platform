@@ -18,74 +18,127 @@ export async function up(knex: Knex): Promise<void> {
     set search_path=biohub,public;
 
     CREATE TABLE taxon (
-      taxon_id                integer             GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      itis_tsn                integer             NOT NULL,
-      bc_taxon_code           varchar(10),
-      scientific_name         varchar(50)         NOT NULL,
+      taxon_id                integer                   GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      itis_tsn                integer                   NOT NULL,
+      bc_taxon_code           varchar(50),
+      itis_scientific_name    varchar(300)              NOT NULL,
       common_name             varchar(50),
-      itis_data               jsonb               NOT NULL,
-      itis_update_date        timestamptz(6)      NOT NULL,
-      record_effective_date   date                DEFAULT now() NOT NULL,
+      itis_data               jsonb                     NOT NULL,
+      itis_update_date        timestamptz(6)            NOT NULL,
+      record_effective_date   date                      DEFAULT now() NOT NULL,
       record_end_date         date,
-      create_date             timestamptz(6)      DEFAULT now() NOT NULL,
-      create_user             integer             NOT NULL,
+      create_date             timestamptz(6)            DEFAULT now() NOT NULL,
+      create_user             integer                   NOT NULL,
       update_date             timestamptz(6),
       update_user             integer,
-      revision_count          integer             DEFAULT 0 NOT NULL,
+      revision_count          integer                   DEFAULT 0 NOT NULL,
 
-      CONSTRAINT              taxon_pk            PRIMARY KEY (taxon_id)
+      CONSTRAINT              taxon_pk                  PRIMARY KEY (taxon_id)
     );
 
-    COMMENT ON COLUMN taxon.taxon_id              IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN taxon.itis_tsn              IS 'ITIS primary key identifier, populated from ITIS response. ITIS (Integrated Taxonomic Information System), TSN (Taxonomic Serial Number). https://itis.gov/pdf/faq_itis_tsn.pdf';
-    COMMENT ON COLUMN taxon.bc_taxon_code         IS 'British Columbia standard taxon identifier.';
-    COMMENT ON COLUMN taxon.scientific_name       IS 'Taxon scientific name, initially populated from ITIS response.';
-    COMMENT ON COLUMN taxon.common_name           IS 'Taxon common name, initially populated from ITIS response.';
-    COMMENT ON COLUMN taxon.itis_data             IS 'Raw ITIS payload, populated from ITIS response.';
-    COMMENT ON COLUMN taxon.itis_update_date      IS 'The datetime the ITIS taxon was updated, populated from ITIS response.';
-    COMMENT ON COLUMN taxon.record_effective_date IS 'Record level effective date.';
-    COMMENT ON COLUMN taxon.record_end_date       IS 'Record level end date.';
-    COMMENT ON COLUMN taxon.create_date           IS 'The datetime the record was created.';
-    COMMENT ON COLUMN taxon.create_user           IS 'The id of the user who created the record as identified in the system user table.';
-    COMMENT ON COLUMN taxon.update_date           IS 'The datetime the record was updated.';
-    COMMENT ON COLUMN taxon.update_user           IS 'The id of the user who updated the record as identified in the system user table.';
-    COMMENT ON COLUMN taxon.revision_count        IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  taxon                       IS 'Taxon cache table, extending ITIS webservice response.';
+    COMMENT ON COLUMN taxon.taxon_id                    IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN taxon.itis_tsn                    IS 'ITIS primary key identifier, populated from ITIS response. ITIS (Integrated Taxonomic Information System), TSN (Taxonomic Serial Number). https://itis.gov/pdf/faq_itis_tsn.pdf';
+    COMMENT ON COLUMN taxon.bc_taxon_code               IS 'British Columbia standard taxon identifier.';
+    COMMENT ON COLUMN taxon.scientific_name             IS 'Taxon scientific name, initially populated from ITIS response.';
+    COMMENT ON COLUMN taxon.common_name                 IS 'Taxon common name, initially populated from ITIS response.';
+    COMMENT ON COLUMN taxon.itis_data                   IS 'Raw ITIS payload, populated from ITIS response.';
+    COMMENT ON COLUMN taxon.itis_update_date            IS 'The datetime the ITIS taxon was updated, populated from ITIS response.';
+    COMMENT ON COLUMN taxon.record_effective_date       IS 'Record level effective date.';
+    COMMENT ON COLUMN taxon.record_end_date             IS 'Record level end date.';
+    COMMENT ON COLUMN taxon.create_date                 IS 'The datetime the record was created.';
+    COMMENT ON COLUMN taxon.create_user                 IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN taxon.update_date                 IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN taxon.update_user                 IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN taxon.revision_count              IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  taxon                             IS 'Taxon cache table, extending ITIS webservice response.';
 
     CREATE TABLE taxon_alias (
-      taxon_alias_id          integer             GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
-      taxon_id                integer             NOT NULL,
-      alias                   varchar(50)         NOT NULL,
-      create_date             timestamptz(6)      DEFAULT now() NOT NULL,
-      create_user             integer             NOT NULL,
+      taxon_alias_id          integer                   GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      taxon_id                integer                   NOT NULL,
+      language_id             integer                   NOT NULL,
+      taxon_alias_origin_id   integer                   NOT NULL,
+      alias                   varchar(300)              NOT NULL,
+      record_effective_date   date                      DEFAULT now() NOT NULL,
+      record_end_date         date,
+      create_date             timestamptz(6)            DEFAULT now() NOT NULL,
+      create_user             integer                   NOT NULL,
       update_date             timestamptz(6),
       update_user             integer,
-      revision_count          integer             DEFAULT 0 NOT NULL,
+      revision_count          integer                   DEFAULT 0 NOT NULL,
 
-      CONSTRAINT              taxon_alias_pk      PRIMARY KEY (taxon_alias_id)
+      CONSTRAINT              taxon_alias_pk            PRIMARY KEY (taxon_alias_id)
     );
 
-    COMMENT ON COLUMN taxon_alias.taxon_alias_id  IS 'System generated surrogate primary key identifier.';
-    COMMENT ON COLUMN taxon_alias.taxon_id        IS 'A foreign key that points to a taxon.';
-    COMMENT ON COLUMN taxon_alias.alias           IS 'A taxon alias.';
-    COMMENT ON COLUMN taxon_alias.create_date     IS 'The datetime the record was created.';
-    COMMENT ON COLUMN taxon_alias.create_user     IS 'The id of the user who created the record as identified in the system user table.';
-    COMMENT ON COLUMN taxon_alias.update_date     IS 'The datetime the record was updated.';
-    COMMENT ON COLUMN taxon_alias.update_user     IS 'The id of the user who updated the record as identified in the system user table.';
-    COMMENT ON COLUMN taxon_alias.revision_count  IS 'Revision count used for concurrency control.';
-    COMMENT ON TABLE  taxon_alias                 IS 'Taxon alias table, for assigning additional alias names to taxons';
+    COMMENT ON COLUMN taxon_alias.taxon_alias_id        IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN taxon_alias.taxon_id              IS 'A foreign key that points to a taxon.';
+    COMMENT ON COLUMN taxon_alias.alias                 IS 'A taxon alias.';
+    COMMENT ON COLUMN taxon_alias.record_effective_date IS 'Record level effective date.';
+    COMMENT ON COLUMN taxon_alias.record_end_date       IS 'Record level end date.';
+    COMMENT ON COLUMN taxon_alias.create_date           IS 'The datetime the record was created.';
+    COMMENT ON COLUMN taxon_alias.create_user           IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN taxon_alias.update_date           IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN taxon_alias.update_user           IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN taxon_alias.revision_count        IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  taxon_alias                       IS 'Taxon alias table, for assigning additional alias names to taxons.';
+
+    CREATE TABLE language_lookup (
+      language_id             integer                   GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      language                varchar(100)              NOT NULL,
+      create_date             timestamptz(6)            DEFAULT now() NOT NULL,
+      create_user             integer                   NOT NULL,
+      update_date             timestamptz(6),
+      update_user             integer,
+      revision_count          integer                   DEFAULT 0 NOT NULL,
+
+      CONSTRAINT              language_lookup_pk        PRIMARY KEY (language_lookup_id)
+    );
+
+    COMMENT ON COLUMN language_lookup.language_id       IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN language_lookup.language          IS 'The name of the language.';
+    COMMENT ON COLUMN language_lookup.create_date       IS 'The datetime the record was created.';
+    COMMENT ON COLUMN language_lookup.create_user       IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN language_lookup.update_date       IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN language_lookup.update_user       IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN language_lookup.revision_count    IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  language_lookup                   IS 'Language lookup table.';
+
+    CREATE TABLE taxon_alias_origin (
+      taxon_alias_origin_id   integer                   GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
+      origin                  varchar(100)              NOT NULL,
+      create_date             timestamptz(6)            DEFAULT now() NOT NULL,
+      create_user             integer                   NOT NULL,
+      update_date             timestamptz(6),
+      update_user             integer,
+      revision_count          integer                   DEFAULT 0 NOT NULL,
+
+      CONSTRAINT              taxon_alias_origin_pk     PRIMARY KEY (taxon_alias_origin_id)
+    );
+
+    COMMENT ON COLUMN taxon_alias_origin.taxon_alias_origin_id  IS 'System generated surrogate primary key identifier.';
+    COMMENT ON COLUMN taxon_alias_origin.origin                 IS 'The origin source of the taxon alias.';
+    COMMENT ON COLUMN taxon_alias_origin.create_date            IS 'The datetime the record was created.';
+    COMMENT ON COLUMN taxon_alias_origin.create_user            IS 'The id of the user who created the record as identified in the system user table.';
+    COMMENT ON COLUMN taxon_alias_origin.update_date            IS 'The datetime the record was updated.';
+    COMMENT ON COLUMN taxon_alias_origin.update_user            IS 'The id of the user who updated the record as identified in the system user table.';
+    COMMENT ON COLUMN taxon_alias_origin.revision_count         IS 'Revision count used for concurrency control.';
+    COMMENT ON TABLE  taxon_alias_origin                        IS 'Taxon alias origin lookup table.';
 
     ----------------------------------------------------------------------------------------
     -- Create table indexes and constraints
     ----------------------------------------------------------------------------------------
     ALTER TABLE taxon_alias ADD CONSTRAINT taxon_alias_fk1 FOREIGN KEY (taxon_id) REFERENCES taxon(taxon_id);
+    ALTER TABLE taxon_alias ADD CONSTRAINT taxon_alias_fk2 FOREIGN KEY (language_id) REFERENCES language_lookup(language_id);
+    ALTER TABLE taxon_alias ADD CONSTRAINT taxon_alias_fk3 FOREIGN KEY (taxon_alias_origin_id) REFERENCES taxon_alias_origin(taxon_alias_origin_id);
 
     CREATE INDEX taxon_alias_fk1 ON taxon_alias(taxon_id);
+    CREATE INDEX taxon_alias_fk2 ON taxon_alias(language_id);
+    CREATE INDEX taxon_alias_fk3 ON taxon_alias(taxon_alias_origin_id);
 
     -- Add unique end-date key constraints
     CREATE UNIQUE INDEX taxon_nuk1 ON taxon(scientific_name, (record_end_date is NULL)) where record_end_date is null;
     CREATE UNIQUE INDEX taxon_nuk2 ON taxon(bc_taxon_code, (record_end_date is NULL)) where record_end_date is null;
     CREATE UNIQUE INDEX taxon_nuk3 ON taxon(itis_tsn, (record_end_date is NULL)) where record_end_date is null;
+    CREATE UNIQUE INDEX taxon_alias_nuk1 ON taxon_alias(taxon_id, alias, (record_end_date is NULL)) where record_end_date is null;
 
     ----------------------------------------------------------------------------------------
     -- Create table triggers
