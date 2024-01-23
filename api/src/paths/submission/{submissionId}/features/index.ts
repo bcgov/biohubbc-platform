@@ -52,8 +52,10 @@ GET.apiDoc = {
                     type: 'object',
                     required: [
                       'submission_feature_id',
+                      'uuid',
                       'submission_id',
                       'feature_type_id',
+                      'source_id',
                       'data',
                       'parent_submission_feature_id',
                       'record_effective_date',
@@ -72,6 +74,10 @@ GET.apiDoc = {
                         type: 'integer',
                         minimum: 1
                       },
+                      uuid: {
+                        type: 'string',
+                        format: 'uuid'
+                      },
                       submission_id: {
                         type: 'integer',
                         minimum: 1
@@ -79,6 +85,10 @@ GET.apiDoc = {
                       feature_type_id: {
                         type: 'integer',
                         minimum: 1
+                      },
+                      source_id: {
+                        type: 'string',
+                        maxLength: 200
                       },
                       data: {
                         type: 'object',
@@ -129,7 +139,8 @@ GET.apiDoc = {
                           minimum: 1
                         }
                       }
-                    }
+                    },
+                    additionalProperties: false
                   }
                 }
               }
@@ -158,7 +169,7 @@ export function getSubmissionFeatures(): RequestHandler {
 
       const submissionService = new SubmissionService(connection);
 
-      const result = await submissionService.getSubmissionFeaturesBySubmissionId(submissionId);
+      const result = await submissionService.getSubmissionFeaturesWithSearchKeyValuesBySubmissionId(submissionId);
 
       await connection.commit();
 

@@ -13,12 +13,12 @@ import { useApi } from 'hooks/useApi';
 import useDataLoader from 'hooks/useDataLoader';
 import useDownload from 'hooks/useDownload';
 import useFuzzySearch from 'hooks/useFuzzySearch';
-import { SubmissionRecordPublished } from 'interfaces/useSubmissionsApi.interface';
+import { SubmissionRecordPublishedForPublic } from 'interfaces/useSubmissionsApi.interface';
 import { useState } from 'react';
 import { pluralize as p } from 'utils/Utils';
 
 /**
- * Renders reviewed Submissions as cards with download and request access actions
+ * Renders reviewed + published Submissions as cards with download and request access actions.
  *
  * @returns {*}
  */
@@ -31,12 +31,12 @@ const SubmissionsListPage = () => {
 
   const [openRequestAccess, setOpenRequestAccess] = useState(false);
 
-  const { fuzzyData, handleFuzzyData, handleSearch, searchValue } = useFuzzySearch<SubmissionRecordPublished>(
+  const { fuzzyData, handleFuzzyData, handleSearch, searchValue } = useFuzzySearch<SubmissionRecordPublishedForPublic>(
     reviewedSubmissionsDataLoader.data,
     { keys: ['name', 'description'] }
   );
 
-  const onDownload = async (submission: FuseResult<SubmissionRecordPublished>) => {
+  const onDownload = async (submission: FuseResult<SubmissionRecordPublishedForPublic>) => {
     // make request here for JSON data of submission and children
     const data = await biohubApi.submissions.getSubmissionPublishedDownloadPackage(submission.item.submission_id);
     const fileName = `${submission.item.name.toLowerCase().replace(/ /g, '-')}-${submission.item.submission_id}`;

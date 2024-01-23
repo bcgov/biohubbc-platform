@@ -7,6 +7,8 @@ import {
   insertSubmissionRecord
 } from './04_mock_test_data';
 
+const ENABLE_MOCK_FEATURE_SEEDING = Boolean(process.env.ENABLE_MOCK_FEATURE_SEEDING === 'true' || false);
+
 /**
  * Inserts mock submission data
  *
@@ -15,32 +17,25 @@ import {
  * @return {*}  {Promise<void>}
  */
 export async function seed(knex: Knex): Promise<void> {
+  if (!ENABLE_MOCK_FEATURE_SEEDING) {
+    return knex.raw(`SELECT null;`); // dummy query to appease knex
+  }
+
   await knex.raw(`
     SET SCHEMA 'biohub';
     SET SEARCH_PATH = 'biohub','public';
   `);
 
-  // 1. submission (2) without children
-  await insertSubmissionRecord(knex);
-  await insertSubmissionRecord(knex);
-
-  // 2. submission (1) without children but with security_review_timestamp
-  await insertSubmissionRecord(knex, true);
-
-  // 3. submission (1) without children but with security_review_timestamp and published_timestamp
-  await insertSubmissionRecord(knex, true, true);
-
-  // 4. submission (1) with children and SECURE (all submission features secure) and published_timestamp
+  // 1. SECURE (all submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'SECURE');
 
-  // 5. submission (1) with children and PARTIALLY SECURE (some submission features secure) and published_timestamp
+  // 2. PARTIALLY SECURE (some submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'PARTIALLY SECURE');
 
-  // 6. submission (1) with children and UNSECURE (zero submission features secure) and published_timestamp
+  // 3. UNSECURE (zero submission features secure) and published_timestamp
   await createSubmissionWithSecurity(knex, 'UNSECURE');
 
-  // 7. submission (2) with children and UNSECURE (zero submission features secure)
-  // and not published and not reviewed
+  // 4. UNSECURE (zero submission features secure) and not published and not reviewed
   await createSubmissionWithSecurity(knex, 'UNSECURE', false);
   await createSubmissionWithSecurity(knex, 'UNSECURE', false);
 }
@@ -51,14 +46,17 @@ const insertFeatureSecurity = async (knex: Knex, submission_feature_id: number, 
   VALUES($$${submission_feature_id}$$, $$${security_rule_id}$$, $$${faker.date.past().toISOString()}$$);`);
 };
 
-const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) => {
+const insertArtifactRecord = async (
+  knex: Knex,
+  row: { submission_id: number; parent_submission_feature_id: number }
+) => {
   const S3_KEY = 'dev-artifacts/artifact.txt';
 
   const sql = insertSubmissionFeature({
     submission_id: row.submission_id,
-    parent_submission_feature_id: null,
+    parent_submission_feature_id: row.parent_submission_feature_id,
     feature_type: 'artifact',
-    data: { s3_key: S3_KEY }
+    data: { artifact_key: S3_KEY }
   });
 
   const submission_feature = await knex.raw(sql);
@@ -70,7 +68,7 @@ const insertArtifactRecord = async (knex: Knex, row: { submission_id: number }) 
     VALUES
     (
       ${submission_feature_id},
-      (select feature_property_id from feature_property where name = 's3_key'),
+      (select feature_property_id from feature_property where name = 'artifact_key'),
       $$${S3_KEY}$$
     );`);
 };
@@ -82,12 +80,9 @@ const createSubmissionWithSecurity = async (
 ) => {
   const submission_id = await insertSubmissionRecord(knex, reviewed, reviewed);
   const parent_submission_feature_id = await insertDatasetRecord(knex, { submission_id });
-  const submission_feature_id = await insertSampleSiteRecord(knex, {
-    parent_submission_feature_id,
-    submission_id
-  });
+  const submission_feature_id = await insertSampleSiteRecord(knex, { submission_id, parent_submission_feature_id });
 
-  await insertArtifactRecord(knex, { submission_id });
+  await insertArtifactRecord(knex, { submission_id, parent_submission_feature_id });
 
   if (securityLevel === 'PARTIALLY SECURE') {
     await insertFeatureSecurity(knex, submission_feature_id, 1);

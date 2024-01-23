@@ -21,10 +21,10 @@ export interface IDatasetsForReview {
 }
 
 export interface ISubmissionFeature {
-  id: string;
+  id: string | null;
   type: string;
-  properties: object;
-  features: ISubmissionFeature[];
+  properties: Record<string, unknown>;
+  child_features: ISubmissionFeature[];
 }
 
 export const DatasetMetadata = z.object({
@@ -73,8 +73,10 @@ export interface ISubmissionRecord {
 
 export const SubmissionFeatureRecord = z.object({
   submission_feature_id: z.number(),
+  uuid: z.string(),
   submission_id: z.number(),
   feature_type_id: z.number(),
+  source_id: z.string().nullable(),
   data: z.record(z.any()),
   parent_submission_feature_id: z.number().nullable(),
   record_effective_date: z.string(),
@@ -101,6 +103,7 @@ export const FeatureTypeRecord = z.object({
   name: z.string(),
   display_name: z.string(),
   description: z.string(),
+  sort: z.number().nullable(),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
   create_date: z.string(),
@@ -255,9 +258,11 @@ export const SubmissionRecord = z.object({
   uuid: z.string(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
+  system_user_id: z.number(),
   source_system: z.string(),
   name: z.string(),
   description: z.string().nullable(),
+  comment: z.string().nullable(),
   publish_timestamp: z.string().nullable(),
   create_date: z.string(),
   create_user: z.number(),
@@ -285,14 +290,16 @@ export type SubmissionRecordWithSecurityAndRootFeatureType = z.infer<
   typeof SubmissionRecordWithSecurityAndRootFeatureType
 >;
 
-export const SubmissionRecordPublished = SubmissionRecord.extend({
+export const SubmissionRecordPublishedForPublic = SubmissionRecord.extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS),
   root_feature_type_id: z.number(),
   root_feature_type_name: z.string(),
   root_feature_type_display_name: z.string()
+}).omit({
+  comment: true // Should not be included in public (non-admin) response
 });
 
-export type SubmissionRecordPublished = z.infer<typeof SubmissionRecordPublished>;
+export type SubmissionRecordPublishedForPublic = z.infer<typeof SubmissionRecordPublishedForPublic>;
 
 export const SubmissionMessageRecord = z.object({
   submission_message_id: z.number(),
@@ -368,36 +375,44 @@ export class SubmissionRepository extends BaseRepository {
    *
    * @param {string} uuid
    * @param {string} name
-   * @param {string} description
+   * @param {string} description A description of the submission. Should not contain any sensitive information.
+   * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
+   * sensitive information. Should never be shared with the general public.
    * @param {string} userIdentifier
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
   async insertSubmissionRecordWithPotentialConflict(
     uuid: string,
     name: string,
     description: string,
-    userIdentifier: string
-  ): Promise<{ submission_id: number }> {
+    comment: string,
+    systemUserId: number,
+    systemUserIdentifier: string
+  ): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
       INSERT INTO submission (
         uuid,
         submitted_timestamp,
         name,
         description,
+        comment,
+        system_user_id,
         source_system
       ) VALUES (
         ${uuid},
         now(),
         ${name},
         ${description},
-        ${userIdentifier}
+        ${comment},
+        ${systemUserId},
+        ${systemUserIdentifier}
       )
       RETURNING
-        submission_id;
+        *;
     `;
 
-    const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecord);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to get or insert submission record', [
@@ -412,34 +427,42 @@ export class SubmissionRepository extends BaseRepository {
   /**
    * Insert a new submission feature record.
    *
-   * @param {number} submissionId
-   * @param {ISubmissionFeature} feature
-   * @param {number} featureTypeId
-   * @return {*}  {Promise<{ submission_feature_id: number }>}
+   * @param {number} submissionId The ID of the submission.
+   * @param {(number | null)} parentSubmissionFeatureId The ID of the parent submission feature, or null.
+   * @param {(string | null)} featureSourceId The source ID of the feature, or null.
+   * @param {string} featureTypeName The name of the feature type.
+   * @param {ISubmissionFeature['properties']} featureProperties The properties of the submission feature.
+   * @return {*}  {Promise<{ submission_feature_id: number }>} Returns a promise that resolves to an object with the submission feature ID.
    * @memberof SubmissionRepository
    */
   async insertSubmissionFeatureRecord(
     submissionId: number,
-    featureTypeId: number,
-    feature: ISubmissionFeature['properties']
+    parentSubmissionFeatureId: number | null,
+    featureSourceId: string | null,
+    featureTypeName: string,
+    featureProperties: ISubmissionFeature['properties']
   ): Promise<{ submission_feature_id: number }> {
     const sqlStatement = SQL`
       INSERT INTO submission_feature (
         submission_id,
+        parent_submission_feature_id,
+        source_id,
         feature_type_id,
         data,
         record_effective_date
       ) VALUES (
         ${submissionId},
-        ${featureTypeId},
-        ${feature},
+        ${parentSubmissionFeatureId},
+        ${featureSourceId},
+        (SELECT feature_type_id FROM feature_type WHERE name = ${featureTypeName}),
+        ${featureProperties},
         now()
       )
       RETURNING
         submission_feature_id;
     `;
 
-    const response = await this.connection.sql<{ submission_feature_id: number }>(sqlStatement);
+    const response = await this.connection.sql(sqlStatement, z.object({ submission_feature_id: z.number() }));
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert submission feature record', [
@@ -1186,118 +1209,206 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get all submissions that are pending security review (are unreviewed).
+   * Get all submissions that have not completed security review.
+   *
+   * Note: Will only return the most recent unreviewed submission for each uuid, unless the most recent submission is
+   * already reviewed.
    *
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-      WITH w_unique_submissions as (
+      WITH RankedRows AS (
         SELECT
-          submission.*,
-          submission_feature.feature_type_id as root_feature_type_id,
-          feature_type.name as root_feature_type_name,
-          ${SECURITY_APPLIED_STATUS.PENDING} as security,
-          array_remove(array_agg(rl.region_name), NULL) as regions
-        FROM
-          submission
-        INNER JOIN
-          submission_feature
-        ON
-          submission.submission_id = submission_feature.submission_id
-        INNER JOIN
-          feature_type
-        ON
-          feature_type.feature_type_id = submission_feature.feature_type_id
-        LEFT JOIN 
-          submission_regions sr 
-        ON
-          sr.submission_id = submission.submission_id 
-        LEFT JOIN
-          region_lookup rl 
-        ON 
-          rl.region_id = sr.region_id
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
+        FROM submission t1
+      ),
+      FilteredRows AS (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
         WHERE
-          submission.security_review_timestamp IS NULL
-        AND
-          submission_feature.parent_submission_feature_id IS null
-        GROUP BY submission.submission_id, submission_feature.feature_type_id, feature_type.name
-        ORDER BY
-          submission.uuid, submission.submission_id desc
+          t2.security_review_timestamp IS NULL
+        AND 
+          t2.rank = 1
       )
       SELECT
-        *
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.comment,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id AS root_feature_type_id,
+        feature_type.name AS root_feature_type_name,
+        ${SECURITY_APPLIED_STATUS.PENDING} AS security,
+        ARRAY_REMOVE(ARRAY_AGG(region_lookup.region_name), NULL) AS regions
       FROM
-        w_unique_submissions
-      ORDER BY submitted_timestamp DESC;
+        FilteredRows
+      INNER JOIN
+        submission_feature
+      ON
+        FilteredRows.submission_id = submission_feature.submission_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      LEFT JOIN 
+        submission_regions
+      ON
+        submission_regions.submission_id = FilteredRows.submission_id 
+      LEFT JOIN
+        region_lookup 
+      ON 
+        region_lookup.region_id = submission_regions.region_id
+      WHERE
+        submission_feature.parent_submission_feature_id IS NULL
+      group by 
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.comment,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id,
+        feature_type.name;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
+
     return response.rows;
   }
 
   /**
-   * Get all submissions that have completed security review (are reviewed).
+   * Get all submissions that have completed security review but are not published.
+   *
+   * Note: Will only return the most recent reviewed submission for each uuid, unless the most recent submission is
+   * already published.
    *
    * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
    * @memberof SubmissionRepository
    */
   async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-      WITH w_unique_submissions as (
+      WITH RankedRows AS (
         SELECT
-          DISTINCT ON (submission.uuid) submission.*,
-          submission_feature.feature_type_id as root_feature_type_id,
-          feature_type.name as root_feature_type_name,
-          CASE
-            WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
-            WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
-            WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
-            ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-          END as security,
-          array_remove(array_agg(rl.region_name), NULL) as regions
-        FROM
-          submission
-        INNER JOIN
-          submission_feature
-        ON
-          submission.submission_id = submission_feature.submission_id
-        INNER JOIN
-          feature_type
-        ON
-          feature_type.feature_type_id = submission_feature.feature_type_id
-        LEFT JOIN
-          submission_feature_security
-        ON
-          submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
-        LEFT JOIN 
-          submission_regions sr 
-        ON
-          sr.submission_id = submission.submission_id 
-        LEFT JOIN
-          region_lookup rl 
-        ON 
-          rl.region_id = sr.region_id
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.submitted_timestamp DESC) AS rank
+        FROM 
+          submission t1
         WHERE
-          submission.security_review_timestamp IS NOT NULL
+          t1.security_review_timestamp IS NOT NULL
+        OR
+          t1.publish_timestamp IS NOT NULL
+      ),
+      FilteredRows AS (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
+        WHERE
+          t2.security_review_timestamp IS NOT NULL
         AND
-          submission_feature.parent_submission_feature_id IS NULL
-        AND
-          submission.publish_timestamp IS NULL
-        GROUP BY
-          submission.submission_id,
-          submission_feature.feature_type_id,
-          feature_type.name
-        ORDER BY
-          submission.uuid, submission.submission_id DESC
+          t2.publish_timestamp IS NULL
+        AND 
+          t2.rank = 1
       )
       SELECT
-        *
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.comment,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id AS root_feature_type_id,
+        feature_type.name AS root_feature_type_name,
+        CASE
+          WHEN FilteredRows.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
+          WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
+          ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
+        END AS security,
+        ARRAY_REMOVE(ARRAY_AGG(region_lookup.region_name), NULL) AS regions
       FROM
-        w_unique_submissions
-      ORDER BY
-        security_review_timestamp DESC;
+        FilteredRows
+      INNER JOIN
+        submission_feature
+      ON
+        FilteredRows.submission_id = submission_feature.submission_id
+      INNER JOIN
+        feature_type
+      ON
+        feature_type.feature_type_id = submission_feature.feature_type_id
+      LEFT JOIN
+        submission_feature_security
+      ON
+        submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
+      LEFT JOIN 
+        submission_regions
+      ON
+        submission_regions.submission_id = FilteredRows.submission_id 
+      LEFT JOIN
+        region_lookup 
+      ON 
+        region_lookup.region_id = submission_regions.region_id
+      WHERE
+        submission_feature.parent_submission_feature_id IS NULL
+      group by 
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.comment,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
+        submission_feature.feature_type_id,
+        feature_type.name;
     `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
@@ -1313,18 +1424,17 @@ export class SubmissionRepository extends BaseRepository {
    */
   async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
     const sqlStatement = SQL`
-    WITH w_unique_submissions as (
       SELECT
-        DISTINCT ON (submission.uuid) submission.*,
-        submission_feature.feature_type_id as root_feature_type_id,
-        feature_type.name as root_feature_type_name,
+        submission.*,
+        submission_feature.feature_type_id AS root_feature_type_id,
+        feature_type.name AS root_feature_type_name,
         CASE
-          WHEN submission.security_review_timestamp is null THEN ${SECURITY_APPLIED_STATUS.PENDING}
+          WHEN submission.security_review_timestamp IS NULL THEN ${SECURITY_APPLIED_STATUS.PENDING}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = 0 THEN ${SECURITY_APPLIED_STATUS.UNSECURED}
           WHEN COUNT(submission_feature_security.submission_feature_security_id) = COUNT(submission_feature.submission_feature_id) THEN ${SECURITY_APPLIED_STATUS.SECURED}
           ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
-        END as security,
-        array_remove(array_agg(rl.region_name), NULL) as regions
+        END AS security,
+        ARRAY_REMOVE(ARRAY_AGG(region_lookup.region_name), NULL) AS regions
       FROM
         submission
       INNER JOIN
@@ -1340,33 +1450,22 @@ export class SubmissionRepository extends BaseRepository {
       ON
         submission_feature.submission_feature_id = submission_feature_security.submission_feature_id
       LEFT JOIN 
-        submission_regions sr 
+        submission_regions
       ON
-        sr.submission_id = submission.submission_id 
+        submission_regions.submission_id = submission.submission_id 
       LEFT JOIN
-        region_lookup rl 
+        region_lookup 
       ON 
-        rl.region_id = sr.region_id
+        region_lookup.region_id = submission_regions.region_id
       WHERE
-        submission.security_review_timestamp IS NOT NULL
+        submission.publish_timestamp IS NOT NULL
       AND
         submission_feature.parent_submission_feature_id IS NULL
-      AND
-        submission.publish_timestamp IS NOT NULL
-      GROUP BY
+      group by 
         submission.submission_id,
         submission_feature.feature_type_id,
-        feature_type.name
-      ORDER BY
-        submission.uuid, submission.submission_id DESC
-    )
-    SELECT
-      *
-    FROM
-      w_unique_submissions
-    ORDER BY
-      security_review_timestamp DESC;
-  `;
+        feature_type.name;
+    `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecordWithSecurityAndRootFeatureType);
 
@@ -1468,15 +1567,130 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Get all published submissions.
+   * Get a submission feature record by uuid.
    *
-   * @return {*}  {Promise<SubmissionRecordPublished[]>}
+   * @param {string} submissionUuid
+   * @return {*}  {Promise<SubmissionFeatureRecord>}
    * @memberof SubmissionRepository
    */
-  async getPublishedSubmissions(): Promise<SubmissionRecordPublished[]> {
+  async getSubmissionFeatureByUuid(submissionUuid: string): Promise<SubmissionFeatureRecord> {
     const sqlStatement = SQL`
       SELECT
-        submission.*,
+        *
+      FROM
+        submission_feature
+      WHERE
+        uuid = ${submissionUuid};
+    `;
+
+    const response = await this.connection.sql(sqlStatement, SubmissionFeatureRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to get submission feature record', [
+        'SubmissionRepository->getSubmissionFeatureByUuid',
+        `rowCount was ${response.rowCount}, expected rowCount === 1`
+      ]);
+    }
+
+    return response.rows[0];
+  }
+
+  /**
+   * Find and return all submission feature records that match the provided criteria.
+   *
+   * @param {{
+   *     submissionId?: number;
+   *     systemUserId?: number;
+   *     featureTypeNames?: string[];
+   *   }} [criteria]
+   * @return {*}  {Promise<SubmissionFeatureRecord[]>}
+   * @memberof SubmissionRepository
+   */
+  async findSubmissionFeatures(criteria?: {
+    submissionId?: number;
+    systemUserId?: number;
+    featureTypeNames?: string[];
+  }): Promise<SubmissionFeatureRecord[]> {
+    const knex = getKnex();
+
+    const queryBuilder = knex.queryBuilder();
+
+    queryBuilder.select().from('submission_feature').where('record_end_date', null);
+
+    if (criteria?.submissionId) {
+      // Filter by submitter system user id
+      queryBuilder.where('submission_id', criteria.submissionId);
+    }
+
+    if (criteria?.systemUserId) {
+      // Filter by submitter system user id
+      queryBuilder.where('systemUserId', criteria.systemUserId);
+    }
+
+    if (criteria?.featureTypeNames?.length) {
+      const featureTypeNames = criteria?.featureTypeNames;
+      // Filter by feature type names
+      queryBuilder.whereIn('feature_type_id', (qb) => {
+        qb.select('feature_type_id')
+          .from('feature_type')
+          .where(
+            knex.raw('LOWER(name)'),
+            'IN',
+            featureTypeNames.map((featureTypeName) => featureTypeName.toLowerCase())
+          );
+      });
+    }
+
+    const response = await this.connection.knex(queryBuilder, SubmissionFeatureRecord);
+
+    return response.rows;
+  }
+
+  /**
+   * Get all published submissions.
+   *
+   * Note: Will only return the most recent published submission for each uuid.
+   *
+   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
+   * @memberof SubmissionRepository
+   */
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
+    const sqlStatement = SQL`
+      WITH RankedRows AS (
+        SELECT
+          t1.*,
+          ROW_NUMBER() OVER (PARTITION BY t1.uuid ORDER BY t1.publish_timestamp DESC) AS rank
+        FROM 
+          submission t1
+        WHERE
+          t1.security_review_timestamp IS NOT NULL
+        AND
+          t1.publish_timestamp IS NOT NULL
+      ),
+      FilteredRows as (
+        SELECT
+          t2.*
+        FROM 
+          RankedRows t2
+        WHERE
+          t2.rank = 1
+      )
+      SELECT
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
         feature_type.feature_type_id as root_feature_type_id,
         feature_type.name as root_feature_type_name,
         feature_type.display_name as root_feature_type_display_name,
@@ -1486,11 +1700,11 @@ export class SubmissionRepository extends BaseRepository {
 	      ELSE ${SECURITY_APPLIED_STATUS.PARTIALLY_SECURED}
         END as security
       FROM
-        submission
+        FilteredRows
       INNER JOIN
         submission_feature
       ON
-        submission_feature.submission_id = submission.submission_id
+        submission_feature.submission_id = FilteredRows.submission_id
       LEFT JOIN
         submission_feature_security
       ON
@@ -1502,19 +1716,33 @@ export class SubmissionRepository extends BaseRepository {
       WHERE
         submission_feature.parent_submission_feature_id IS NULL
       AND
-        submission.security_review_timestamp IS NOT NULL
+        FilteredRows.security_review_timestamp IS NOT NULL
       AND
-        submission.publish_timestamp IS NOT NULL
+        FilteredRows.publish_timestamp IS NOT NULL
       GROUP BY
-        submission.submission_id,
+        FilteredRows.submission_id,
+        FilteredRows.uuid,
+        FilteredRows.system_user_id,
+        FilteredRows.source_system,
+        FilteredRows.security_review_timestamp,
+        FilteredRows.publish_timestamp,
+        FilteredRows.submitted_timestamp,
+        FilteredRows.name,
+        FilteredRows.description,
+        FilteredRows.record_end_date,
+        FilteredRows.create_date,
+        FilteredRows.create_user,
+        FilteredRows.update_date,
+        FilteredRows.update_user,
+        FilteredRows.revision_count,
         feature_type.feature_type_id,
         feature_type.name,
         feature_type.display_name
       ORDER BY
-        submission.publish_timestamp ASC;
+        FilteredRows.publish_timestamp ASC;
     `;
 
-    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublished);
+    const response = await this.connection.sql(sqlStatement, SubmissionRecordPublishedForPublic);
 
     return response.rows;
   }
@@ -1606,6 +1834,10 @@ export class SubmissionRepository extends BaseRepository {
         ...updateOperations,
         publish_timestamp: knex.raw('CASE WHEN publish_timestamp IS NULL THEN NOW() ELSE publish_timestamp END')
       };
+
+      // Publishing this submission, first unpublish all submissions with the same uuid as the target submission.
+      // Why? Because we only want one published submission per uuid.
+      await this.unpublishAllSubmissionsBySubmissionId(submissionId);
     } else if (patch.published === false) {
       updateOperations = {
         ...updateOperations,
@@ -1619,6 +1851,28 @@ export class SubmissionRepository extends BaseRepository {
     const response = await this.connection.knex(queryBuilder, SubmissionRecord);
 
     return response.rows[0];
+  }
+
+  /**
+   * Unpublish all submissions with the same uuid as the submission with the provided id.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionRepository
+   */
+  async unpublishAllSubmissionsBySubmissionId(submissionId: number): Promise<void> {
+    const sqlStatement = SQL`
+      UPDATE 
+        submission
+      SET
+        publish_timestamp = null
+      WHERE
+        uuid = (SELECT uuid FROM submission WHERE submission_id = ${submissionId});
+    `;
+
+    await this.connection.sql(sqlStatement);
+
+    return;
   }
 
   /**

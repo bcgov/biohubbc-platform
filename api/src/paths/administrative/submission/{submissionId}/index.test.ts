@@ -5,6 +5,7 @@ import sinonChai from 'sinon-chai';
 import { patchSubmissionRecord } from '.';
 import * as db from '../../../../database/db';
 import { HTTPError } from '../../../../errors/http-error';
+import { SubmissionRecord } from '../../../../repositories/submission-repository';
 import { SubmissionService } from '../../../../services/submission-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
@@ -47,15 +48,17 @@ describe('patchSubmissionRecord', () => {
 
     const submissionId = 1;
 
-    const mockSubmissionRecord = {
+    const mockSubmissionRecord: SubmissionRecord = {
       submission_id: 3,
       uuid: '999-456-123',
       security_review_timestamp: '2023-12-12',
       publish_timestamp: '2023-12-12',
       submitted_timestamp: '2023-12-12',
+      system_user_id: 3,
       source_system: 'SIMS',
       name: 'name',
       description: 'description',
+      comment: 'comment',
       create_date: '2023-12-12',
       create_user: 1,
       update_date: '2023-12-12',

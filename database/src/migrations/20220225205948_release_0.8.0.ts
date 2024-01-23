@@ -21,6 +21,7 @@ export async function up(knex: Knex): Promise<void> {
   const populate_user_identity_source = fs.readFileSync(
     path.join(__dirname, DB_RELEASE, 'populate_user_identity_source.sql')
   );
+  const populate_system_user = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'populate_system_user.sql'));
   const api_set_context = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'api_set_context.sql'));
 
   const tr_audit_trigger = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'tr_audit_trigger.sql'));
@@ -83,6 +84,7 @@ export async function up(knex: Knex): Promise<void> {
     -- create tables/triggers/functions/etc
     ${biohub_ddl}
     ${populate_user_identity_source}
+    ${populate_system_user}
     ${api_set_context}
     ${tr_audit_trigger}
     ${tr_generated_audit_triggers}

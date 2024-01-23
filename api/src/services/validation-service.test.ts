@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ISubmissionFeature } from '../repositories/submission-repository';
 import {
-  IFeatureProperties,
+  FeatureProperties,
   IInsertStyleSchema,
   IStyleModel,
   ValidationRepository
@@ -147,7 +147,7 @@ describe('ValidationService', () => {
         id: '1',
         type: 'observation',
         properties: mockObservationProperties1,
-        features: []
+        child_features: []
       };
 
       const mockObservationProperties2 = {
@@ -171,14 +171,14 @@ describe('ValidationService', () => {
         id: '2',
         type: 'observation',
         properties: mockObservationProperties2,
-        features: []
+        child_features: []
       };
 
       const mockDatasetSubmissionFeature = {
         id: '123',
         type: 'dataset',
         properties: mockDatasetProperties,
-        features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
+        child_features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
       };
 
       const mockSubmissionFeatures: ISubmissionFeature[] = [mockDatasetSubmissionFeature];
@@ -187,7 +187,7 @@ describe('ValidationService', () => {
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockDatasetSubmissionFeature);
       expect(response).to.be.false;
     });
 
@@ -224,7 +224,7 @@ describe('ValidationService', () => {
         id: '1',
         type: 'observation',
         properties: mockObservationProperties1,
-        features: []
+        child_features: []
       };
 
       const mockObservationProperties2 = {
@@ -248,14 +248,14 @@ describe('ValidationService', () => {
         id: '2',
         type: 'observation',
         properties: mockObservationProperties2,
-        features: []
+        child_features: []
       };
 
       const mockDatasetSubmissionFeature = {
         id: '123',
         type: 'dataset',
         properties: mockDatasetProperties,
-        features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
+        child_features: [mockObservationSubmissionFeature1, mockObservationSubmissionFeature2]
       };
 
       const mockSubmissionFeatures: ISubmissionFeature[] = [mockDatasetSubmissionFeature];
@@ -264,15 +264,9 @@ describe('ValidationService', () => {
 
       const response = await validationService.validateSubmissionFeatures(mockSubmissionFeatures);
 
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({ ...mockDatasetSubmissionFeature, features: [] });
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({
-        ...mockObservationSubmissionFeature1,
-        features: []
-      });
-      expect(validateSubmissionFeatureStub).to.have.been.calledWith({
-        ...mockObservationSubmissionFeature2,
-        features: []
-      });
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockDatasetSubmissionFeature);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockObservationSubmissionFeature1);
+      expect(validateSubmissionFeatureStub).to.have.been.calledWith(mockObservationSubmissionFeature2);
       expect(response).to.be.true;
     });
   });
@@ -281,12 +275,13 @@ describe('ValidationService', () => {
     it('fetches validation properties and calls validate', async () => {
       const mockDBConnection = getMockDBConnection();
 
-      const mockFeatureProperties: IFeatureProperties[] = [
+      const mockFeatureProperties: FeatureProperties[] = [
         {
           name: 'field1',
           display_name: 'Field 1',
           description: 'A Field 1',
-          type: 'string'
+          type_name: 'string',
+          required_value: true
         }
       ];
 
@@ -301,9 +296,9 @@ describe('ValidationService', () => {
         id: '1',
         type: 'feature type',
         properties: mockSubmissionProperties,
-        features: [
-          { id: '2', type: 'child feature type', properties: {}, features: [] },
-          { id: '3', type: 'child feature type', properties: {}, features: [] }
+        child_features: [
+          { id: '2', type: 'child feature type', properties: {}, child_features: [] },
+          { id: '3', type: 'child feature type', properties: {}, child_features: [] }
         ]
       };
 
@@ -322,12 +317,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -355,7 +350,7 @@ describe('ValidationService', () => {
       try {
         validationService.validateProperties(properties, dataProperties);
       } catch (error) {
-        expect((error as Error).message).to.equal('Property [start_date] not found in data');
+        expect((error as Error).message).to.equal('Property start_date is required but is null or undefined');
       }
     });
 
@@ -363,12 +358,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -405,12 +400,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -447,12 +442,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -489,12 +484,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -531,12 +526,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -561,12 +556,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -603,12 +598,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -645,12 +640,12 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const properties = [
-        { name: 'name', display_name: '', description: '', type: 'string' },
-        { name: 'count', display_name: '', description: '', type: 'number' },
-        { name: 'published', display_name: '', description: '', type: 'boolean' },
-        { name: 'permit', display_name: '', description: '', type: 'object' },
-        { name: 'geometry', display_name: '', description: '', type: 'spatial' },
-        { name: 'start_date', display_name: '', description: '', type: 'datetime' }
+        { name: 'name', display_name: '', description: '', type_name: 'string', required_value: true },
+        { name: 'count', display_name: '', description: '', type_name: 'number', required_value: true },
+        { name: 'published', display_name: '', description: '', type_name: 'boolean', required_value: true },
+        { name: 'permit', display_name: '', description: '', type_name: 'object', required_value: true },
+        { name: 'geometry', display_name: '', description: '', type_name: 'spatial', required_value: true },
+        { name: 'start_date', display_name: '', description: '', type_name: 'datetime', required_value: true }
       ];
 
       const dataProperties = {
@@ -687,8 +682,8 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockValidationProperties = [
-        { name: 'name', display_name: 'Name', description: '', type: 'string' },
-        { name: 'description', display_name: 'Description', description: '', type: 'string' }
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
+        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true }
       ];
 
       const getFeatureValidationPropertiesStub = sinon
@@ -709,8 +704,8 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockValidationProperties = [
-        { name: 'name', display_name: 'Name', description: '', type: 'string' },
-        { name: 'description', display_name: 'Description', description: '', type: 'string' }
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
+        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true }
       ];
 
       const getFeatureValidationPropertiesStub = sinon
@@ -723,7 +718,7 @@ describe('ValidationService', () => {
 
       // Set cache for non-matching type
       validationService.validationPropertiesCache.set('observation', [
-        { name: 'count', display_name: 'Count', description: '', type: 'number' }
+        { name: 'count', display_name: 'Count', description: '', type_name: 'number', required_value: true }
       ]);
 
       const properties = await validationService.getFeatureValidationProperties(featureType);
@@ -736,8 +731,8 @@ describe('ValidationService', () => {
       const mockDBConnection = getMockDBConnection();
 
       const mockValidationProperties = [
-        { name: 'name', display_name: 'Name', description: '', type: 'string' },
-        { name: 'description', display_name: 'Description', description: '', type: 'string' }
+        { name: 'name', display_name: 'Name', description: '', type_name: 'string', required_value: true },
+        { name: 'description', display_name: 'Description', description: '', type_name: 'string', required_value: true }
       ];
 
       const getFeatureValidationPropertiesStub = sinon

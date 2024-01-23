@@ -42,16 +42,18 @@ GET.apiDoc = {
               'uuid',
               'security_review_timestamp',
               'submitted_timestamp',
+              'publish_timestamp',
+              'system_user_id',
               'source_system',
               'name',
               'description',
+              'comment',
               'create_date',
               'create_user',
               'update_date',
               'update_user',
               'revision_count',
-              'security',
-              'publish_timestamp'
+              'security'
             ],
             properties: {
               submission_id: {
@@ -66,6 +68,17 @@ GET.apiDoc = {
                 type: 'string',
                 nullable: true
               },
+              submitted_timestamp: {
+                type: 'string'
+              },
+              publish_timestamp: {
+                type: 'string',
+                nullable: true
+              },
+              system_user_id: {
+                type: 'integer',
+                minimum: 1
+              },
               source_system: {
                 type: 'string'
               },
@@ -77,9 +90,9 @@ GET.apiDoc = {
                 type: 'string',
                 maxLength: 3000
               },
-              publish_timestamp: {
+              comment: {
                 type: 'string',
-                nullable: true
+                maxLength: 3000
               },
               create_date: {
                 type: 'string'
@@ -110,7 +123,8 @@ GET.apiDoc = {
                   SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
                 ]
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }

@@ -51,18 +51,60 @@ GET.apiDoc = {
             type: 'array',
             items: {
               type: 'object',
-              required: ['submission_feature_security_id', 'submission_feature_id', 'security_rule_id'],
+              required: [
+                'submission_feature_security_id',
+                'submission_feature_id',
+                'security_rule_id',
+                'record_effective_date',
+                'record_end_date',
+                'create_date',
+                'create_user',
+                'update_date',
+                'update_user',
+                'revision_count'
+              ],
               properties: {
                 submission_feature_security_id: {
-                  type: 'integer'
+                  type: 'integer',
+                  minimum: 1
                 },
                 submission_feature_id: {
-                  type: 'integer'
+                  type: 'integer',
+                  minimum: 1
                 },
                 security_rule_id: {
-                  type: 'integer'
+                  type: 'integer',
+                  minimum: 1
+                },
+                record_effective_date: {
+                  type: 'string'
+                },
+                record_end_date: {
+                  type: 'string',
+                  nullable: true
+                },
+                create_date: {
+                  type: 'string'
+                },
+                create_user: {
+                  type: 'integer',
+                  minimum: 1
+                },
+                update_date: {
+                  type: 'string',
+                  nullable: true
+                },
+                update_user: {
+                  type: 'integer',
+                  minimum: 1,
+                  nullable: true
+                },
+                revision_count: {
+                  type: 'integer',
+                  minimum: 0
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

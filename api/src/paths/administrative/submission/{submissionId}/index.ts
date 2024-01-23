@@ -78,10 +78,13 @@ PATCH.apiDoc = {
               'submission_id',
               'uuid',
               'security_review_timestamp',
+              'publish_timestamp',
               'submitted_timestamp',
+              'system_user_id',
               'source_system',
               'name',
               'description',
+              'comment',
               'create_date',
               'create_user',
               'update_date',
@@ -101,8 +104,16 @@ PATCH.apiDoc = {
                 type: 'string',
                 nullable: true
               },
+              publish_timestamp: {
+                type: 'string',
+                nullable: true
+              },
               submitted_timestamp: {
                 type: 'string'
+              },
+              system_user_id: {
+                type: 'integer',
+                minimum: 1
               },
               source_system: {
                 type: 'string'
@@ -112,6 +123,10 @@ PATCH.apiDoc = {
                 maxLength: 200
               },
               description: {
+                type: 'string',
+                maxLength: 3000
+              },
+              comment: {
                 type: 'string',
                 maxLength: 3000
               },
@@ -135,7 +150,8 @@ PATCH.apiDoc = {
                 type: 'integer',
                 minimum: 0
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }

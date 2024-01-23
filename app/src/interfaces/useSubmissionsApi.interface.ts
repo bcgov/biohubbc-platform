@@ -29,6 +29,7 @@ export type SubmissionRecord = {
   source_system: string;
   name: string;
   description: string;
+  comment: string;
   create_date: string;
   create_user: number;
   update_date: string | null;
@@ -47,7 +48,7 @@ export type SubmissionRecordWithSecurityAndRootFeature = SubmissionRecord & {
   regions: string[];
 };
 
-export type SubmissionRecordPublished = SubmissionRecord & {
+export type SubmissionRecordPublishedForPublic = Omit<SubmissionRecord, 'comment'> & {
   security: SECURITY_APPLIED_STATUS;
   root_feature_type_id: number;
   root_feature_type_name: string;
@@ -63,8 +64,10 @@ export interface ISubmissionFeature {
 }
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
+  uuid: string;
   submission_id: number;
   feature_type_id: number;
+  source_id: string;
   data: Record<string, any>;
   parent_submission_feature_id: number;
   record_effective_date: string;

@@ -2,11 +2,8 @@ import { Knex } from 'knex';
 
 /**
  * Add tables:
- * - submission_message
- * - submission_message_type
- *
- * Populate tables:
- * - submission_message_type
+ * - region_lookup
+ * - submission_regions
  *
  * @export
  * @param {Knex} knex

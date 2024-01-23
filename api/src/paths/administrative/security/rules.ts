@@ -46,6 +46,7 @@ GET.apiDoc = {
                 'description',
                 'record_effective_date',
                 'record_end_date',
+                'security_category_id',
                 'category_name',
                 'category_description',
                 'category_record_effective_date',
@@ -68,6 +69,10 @@ GET.apiDoc = {
                   type: 'string',
                   nullable: true
                 },
+                security_category_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
                 category_name: {
                   type: 'string'
                 },
@@ -81,7 +86,8 @@ GET.apiDoc = {
                   type: 'string',
                   nullable: true
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

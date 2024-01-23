@@ -45,7 +45,9 @@ GET.apiDoc = {
                 'submission_id',
                 'uuid',
                 'security_review_timestamp',
+                'publish_timestamp',
                 'submitted_timestamp',
+                'system_user_id',
                 'source_system',
                 'name',
                 'description',
@@ -56,7 +58,8 @@ GET.apiDoc = {
                 'revision_count',
                 'security',
                 'root_feature_type_id',
-                'root_feature_type_name'
+                'root_feature_type_name',
+                'regions'
               ],
               properties: {
                 submission_id: {
@@ -71,6 +74,17 @@ GET.apiDoc = {
                   type: 'string',
                   nullable: true
                 },
+                publish_timestamp: {
+                  type: 'string',
+                  nullable: true
+                },
+                submitted_timestamp: {
+                  type: 'string'
+                },
+                system_user_id: {
+                  type: 'integer',
+                  minimum: 1
+                },
                 source_system: {
                   type: 'string'
                 },
@@ -79,6 +93,10 @@ GET.apiDoc = {
                   maxLength: 200
                 },
                 description: {
+                  type: 'string',
+                  maxLength: 3000
+                },
+                comment: {
                   type: 'string',
                   maxLength: 3000
                 },
@@ -105,7 +123,6 @@ GET.apiDoc = {
                 security: {
                   type: 'string',
                   enum: [
-                    SECURITY_APPLIED_STATUS.PENDING,
                     SECURITY_APPLIED_STATUS.UNSECURED,
                     SECURITY_APPLIED_STATUS.SECURED,
                     SECURITY_APPLIED_STATUS.PARTIALLY_SECURED
@@ -117,8 +134,15 @@ GET.apiDoc = {
                 },
                 root_feature_type_name: {
                   type: 'string'
+                },
+                regions: {
+                  type: 'array',
+                  items: {
+                    type: 'string'
+                  }
                 }
-              }
+              },
+              additionalProperties: false
             }
           }
         }

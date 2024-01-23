@@ -12,8 +12,9 @@ import {
   ISourceTransformModel,
   ISpatialComponentCount,
   PatchSubmissionRecord,
+  SubmissionFeatureRecord,
   SubmissionRecord,
-  SubmissionRecordPublished,
+  SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
@@ -493,6 +494,8 @@ describe('SubmissionRepository', () => {
         '123-456-789',
         'submission name',
         'submission desc',
+        'submission comment',
+        3,
         'source system'
       );
 
@@ -511,6 +514,8 @@ describe('SubmissionRepository', () => {
           '123-456-789',
           'submission name',
           'submission desc',
+          'submission comment',
+          3,
           'source system'
         );
         expect.fail();
@@ -894,9 +899,11 @@ describe('SubmissionRepository', () => {
           uuid: '123-456-789',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -909,9 +916,11 @@ describe('SubmissionRepository', () => {
           uuid: '789-456-123',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -945,9 +954,11 @@ describe('SubmissionRepository', () => {
           uuid: '123-456-789',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -960,9 +971,11 @@ describe('SubmissionRepository', () => {
           uuid: '789-456-123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: null,
           create_date: '2023-12-12',
           create_user: 1,
@@ -996,9 +1009,11 @@ describe('SubmissionRepository', () => {
           uuid: '123-456-789',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1011,9 +1026,11 @@ describe('SubmissionRepository', () => {
           uuid: '789-456-123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1044,30 +1061,34 @@ describe('SubmissionRepository', () => {
         {
           submission_id: 1,
           uuid: '123-456-789',
-          security: SECURITY_APPLIED_STATUS.SECURED,
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
           update_date: null,
           update_user: null,
-          revision_count: 0
+          revision_count: 0,
+          security: SECURITY_APPLIED_STATUS.SECURED
         },
         {
           submission_id: 2,
           uuid: '789-456-123',
-          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
+          security: SECURITY_APPLIED_STATUS.PARTIALLY_SECURED,
 
           create_user: 1,
           update_date: '2023-12-12',
@@ -1076,19 +1097,21 @@ describe('SubmissionRepository', () => {
         },
         {
           submission_id: 3,
-          security: SECURITY_APPLIED_STATUS.UNSECURED,
           uuid: '999-456-123',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           create_date: '2023-12-12',
           publish_timestamp: '2023-12-12',
           create_user: 1,
           update_date: '2023-12-12',
           update_user: 1,
-          revision_count: 1
+          revision_count: 1,
+          security: SECURITY_APPLIED_STATUS.UNSECURED
         }
       ];
 
@@ -1341,9 +1364,11 @@ describe('SubmissionRepository', () => {
           uuid: '123-456-789',
           security_review_timestamp: '2023-12-12',
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1376,9 +1401,11 @@ describe('SubmissionRepository', () => {
           uuid: '123-456-789',
           security_review_timestamp: null,
           submitted_timestamp: '2023-12-12',
+          system_user_id: 3,
           source_system: 'SIMS',
           name: 'name',
           description: 'description',
+          comment: 'comment',
           publish_timestamp: '2023-12-12',
           create_date: '2023-12-12',
           create_user: 1,
@@ -1419,7 +1446,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
       try {
-        await submissionRepository.insertSubmissionFeatureRecord(1, 1, feature);
+        await submissionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature);
         expect.fail();
       } catch (actualError) {
         expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission feature record');
@@ -1443,7 +1470,7 @@ describe('SubmissionRepository', () => {
         properties: {}
       };
 
-      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 1, feature);
+      const response = await submissionRepository.insertSubmissionFeatureRecord(1, 2, '321', 'type', feature);
 
       expect(response).to.eql(mockResponse);
     });
@@ -1566,18 +1593,99 @@ describe('SubmissionRepository', () => {
     });
   });
 
+  describe('getSubmissionFeatureByUuid', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const submissionFeatureRecord: SubmissionFeatureRecord = {
+        submission_feature_id: 2,
+        uuid: '234-456-234',
+        submission_id: 3,
+        feature_type_id: 1,
+        source_id: 'source-id',
+        data: {},
+        parent_submission_feature_id: 1,
+        record_effective_date: '2024-01-01',
+        record_end_date: null,
+        create_date: '2024-01-01',
+        create_user: 3,
+        update_date: null,
+        update_user: null,
+        revision_count: 0
+      };
+
+      const mockQueryResponse = { rowCount: 1, rows: [submissionFeatureRecord] } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
+
+      const submissionUuid = '123-456-789';
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.getSubmissionFeatureByUuid(submissionUuid);
+
+      expect(response).to.eql(submissionFeatureRecord);
+    });
+  });
+
+  describe('findSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const submissionFeatureRecords: SubmissionFeatureRecord[] = [
+        {
+          submission_feature_id: 2,
+          uuid: '234-456-234',
+          submission_id: 3,
+          feature_type_id: 1,
+          source_id: 'source-id',
+          data: {},
+          parent_submission_feature_id: 1,
+          record_effective_date: '2024-01-01',
+          record_end_date: null,
+          create_date: '2024-01-01',
+          create_user: 3,
+          update_date: null,
+          update_user: null,
+          revision_count: 0
+        }
+      ];
+
+      const mockQueryResponse = { rowCount: 1, rows: submissionFeatureRecords } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({ knex: () => mockQueryResponse });
+
+      const criteria = {
+        submissionId: 1,
+        systemUserId: 2,
+        featureTypeNames: ['dataset', 'artifact']
+      };
+
+      const submissionRepository = new SubmissionRepository(mockDBConnection);
+
+      const response = await submissionRepository.findSubmissionFeatures(criteria);
+
+      expect(response).to.eql(submissionFeatureRecords);
+    });
+  });
+
   describe('getPublishedSubmissions', () => {
     afterEach(() => {
       sinon.restore();
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse: SubmissionRecordPublished = {
+      const mockResponse: SubmissionRecordPublishedForPublic = {
         submission_id: 1,
         uuid: 'string',
         security_review_timestamp: null,
         publish_timestamp: 'string',
         submitted_timestamp: 'string',
+        system_user_id: 3,
         source_system: 'string',
         name: 'string',
         description: null,

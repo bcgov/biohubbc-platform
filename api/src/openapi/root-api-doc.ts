@@ -143,24 +143,32 @@ export const rootAPIDoc = {
       },
       SubmissionFeature: {
         title: 'BioHub Data Submission Feature',
+        description:
+          'The submission feature object is a self-referencing recursive structure designed to support different classes of biotic data, in a hierarchical structure.',
         type: 'object',
-        required: ['id', 'type', 'properties', 'features'],
+        required: ['type', 'properties', 'child_features'],
         properties: {
           id: {
-            title: 'Unique id of the feature',
-            type: 'string'
+            title: 'Unique identifer.',
+            description:
+              'The unique identifier for the submission feature as supplied by the source system. May not be unique globally or within BioHub.',
+            type: 'string',
+            maxLength: 200
           },
           type: {
-            title: 'Feature type',
+            title: 'Feature type.',
+            description: 'The type of the feature. Must match a supported feature type.',
             type: 'string'
           },
           properties: {
-            title: 'Feature properties',
+            title: 'Feature properties.',
+            description: 'The properties of the feature, which are specific to the feature type.',
             type: 'object',
             properties: {}
           },
-          features: {
-            title: 'Feature child features',
+          child_features: {
+            title: 'Child features.',
+            description: 'Child features of the current feature.',
             type: 'array',
             items: {
               $ref: '#/components/schemas/SubmissionFeature'
@@ -168,35 +176,6 @@ export const rootAPIDoc = {
           }
         },
         additionalProperties: false
-      },
-      feature: {
-        type: 'object',
-        required: ['submission_feature_id', 'submission_id', 'feature_type', 'data', 'parent_submission_feature_id'],
-        properties: {
-          submission_feature_id: {
-            type: 'number'
-          },
-          submission_id: {
-            type: 'number'
-          },
-          feature_type: {
-            type: 'string'
-          },
-          data: {
-            type: 'object'
-          },
-          submission_feature_security_ids: {
-            nullable: true,
-            type: 'array',
-            items: {
-              type: 'number'
-            }
-          },
-          parent_submission_feature_id: {
-            type: 'number',
-            nullable: true
-          }
-        }
       }
     }
   }
