@@ -73,6 +73,8 @@ export async function up(knex: Knex): Promise<void> {
 
     COMMENT ON COLUMN taxon_alias.taxon_alias_id        IS 'System generated surrogate primary key identifier.';
     COMMENT ON COLUMN taxon_alias.taxon_id              IS 'A foreign key that points to a taxon.';
+    COMMENT ON COLUMN taxon_alias.language_id           IS 'A foreign key that points to a language.';
+    COMMENT ON COLUMN taxon_alias.taxon_alias_origin_id IS 'A foreign key that points to a taxon alias origin.';
     COMMENT ON COLUMN taxon_alias.alias                 IS 'A taxon alias.';
     COMMENT ON COLUMN taxon_alias.record_effective_date IS 'Record level effective date.';
     COMMENT ON COLUMN taxon_alias.record_end_date       IS 'Record level end date.';
