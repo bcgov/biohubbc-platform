@@ -160,6 +160,7 @@ export async function up(knex: Knex): Promise<void> {
 
     create trigger audit_taxon_alias_origin before insert or update or delete on taxon_alias_origin for each row execute procedure tr_audit_trigger();
     create trigger journal_taxon_alias_origin after insert or update or delete on taxon_alias_origin for each row execute procedure tr_journal_trigger();
+
   `);
 }
 
