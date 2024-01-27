@@ -6,6 +6,11 @@ export const ElasticSearchIndices = {
   TAXONOMY: process.env.ELASTICSEARCH_TAXONOMY_INDEX || 'taxonomy_3.0.0'
 };
 
+export const ITIS_PARAMS = {
+  SORT: 'wt=json&sort=nameWOInd+asc&rows=25',
+  FILTER: 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage'
+};
+
 /**
  * Base class for services that require a elastic search connection.
  *
@@ -80,5 +85,61 @@ export class ESService {
       },
       fields: ['*']
     });
+  }
+
+  /**
+   * Returns the ITIS search URL.
+   *
+   * @param {string} searchParams
+   * @return {*}  {Promise<string>}
+   * @memberof ESService
+   */
+  async getItisTermSearchUrl(searchParams: string): Promise<string> {
+    const itisUrl = process.env.ITIS_URL;
+    if (!itisUrl) {
+      throw new Error('ITIS_SEARCH_URL not defined.');
+    }
+    const itisSearchSpecies = this._getItisSearchSpeciesQuery(searchParams);
+
+    return `${itisUrl}?${ITIS_PARAMS.SORT}&${itisSearchSpecies}&${ITIS_PARAMS.FILTER}`;
+  }
+
+  /**
+   * Returns the ITIS search URL for TSN ids.
+   *
+   * @param {string[]} searchTsnIds
+   * @return {*}  {Promise<string>}
+   * @memberof ESService
+   */
+  async getItisTsnSearchUrl(searchTsnIds: string[]): Promise<string> {
+    const itisUrl = process.env.ITIS_URL;
+    if (!itisUrl) {
+      throw new Error('ITIS_SEARCH_URL not defined.');
+    }
+    const itisSearchSpecies = this._getItisTsnSearch(searchTsnIds);
+
+    return `${itisUrl}?${ITIS_PARAMS.SORT}&${ITIS_PARAMS.FILTER}&q=${itisSearchSpecies}`;
+  }
+
+  /**
+   * Returns the ITIS search species Query.
+   *
+   * @param {string} searchSpecies
+   * @return {*}  {string}
+   * @memberof ESService
+   */
+  _getItisSearchSpeciesQuery(searchSpecies: string): string {
+    return `q=(nameWOInd:*${searchSpecies}*+AND+usage:/(valid|accepted)/)+(vernacular:*${searchSpecies}*+AND+usage:/(valid|accepted)/)`;
+  }
+
+  /**
+   * Returns the ITIS search TSN Query.
+   *
+   * @param {string[]} searchTsnIds
+   * @return {*}  {string}
+   * @memberof ESService
+   */
+  _getItisTsnSearch(searchTsnIds: string[]): string {
+    return searchTsnIds.map((tsn) => `tsn:${tsn}`).join('+');
   }
 }

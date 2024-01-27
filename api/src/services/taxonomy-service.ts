@@ -5,6 +5,7 @@ import {
   SearchRequest,
   SearchResponse
 } from '@elastic/elasticsearch/lib/api/types';
+import axios from 'axios';
 import { getLogger } from '../utils/logger';
 import { ElasticSearchIndices, ESService } from './es-service';
 
@@ -25,6 +26,23 @@ export interface ITaxonomySource {
   parent_hierarchy: { id: number; level: string }[];
 }
 
+export interface IItisSearchResponse {
+  commonNames: string[];
+  kingdom: string;
+  name: string;
+  parentTSN: string;
+  scientificName: string;
+  tsn: string;
+  updateDate: string;
+  usage: string;
+}
+
+export interface IItisSearchResult {
+  id: string;
+  label: string;
+  scientificName: string;
+}
+
 /**
  * Service for retrieving and processing taxonomic data from Elasticsearch.
  *
@@ -33,6 +51,64 @@ export interface ITaxonomySource {
  * @extends {ESService}
  */
 export class TaxonomyService extends ESService {
+  /**
+   * Returns the ITIS search species Query.
+   *
+   * @param {*} searchRequest
+   * @return {*}  {(Promise<IItisSearchResult[] | undefined>)}
+   * @memberof TaxonomyService
+   */
+  async itisTermSearch(searchRequest: string): Promise<IItisSearchResult[] | undefined> {
+    try {
+      const itisClient = await this.getItisTermSearchUrl(searchRequest);
+
+      const response = await axios.get(itisClient);
+
+      if (!response.data || !response.data.response || !response.data.response.docs) {
+        return [];
+      }
+
+      return this._sanitizeItisData(response.data.response.docs);
+    } catch (error) {
+      defaultLog.debug({ label: 'itisTermSearch', message: 'error', error });
+    }
+  }
+
+  /**
+   * Returns the ITIS search by TSN.
+   *
+   * @param {string[]} searchTsnIds
+   * @return {*}  {(Promise<IItisSearchResult[] | undefined>)}
+   * @memberof TaxonomyService
+   */
+  async itisTsnSearch(searchTsnIds: string[]): Promise<IItisSearchResult[] | undefined> {
+    try {
+      const itisClient = await this.getItisTsnSearchUrl(searchTsnIds);
+
+      const response = await axios.get(itisClient);
+
+      if (!response.data || !response.data.response || !response.data.response.docs) {
+        return [];
+      }
+
+      return this._sanitizeItisData(response.data.response.docs);
+    } catch (error) {
+      defaultLog.debug({ label: 'itisTsnSearch', message: 'error', error });
+    }
+  }
+
+  _sanitizeItisData = (data: IItisSearchResponse[]): IItisSearchResult[] => {
+    return data.map((item: IItisSearchResponse) => {
+      const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || item.scientificName;
+
+      return {
+        id: item.tsn,
+        label: commonName,
+        scientificName: item.scientificName
+      };
+    });
+  };
+
   /**
    * Performs a query in Elasticsearch based on the given search criteria
    *
