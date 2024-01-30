@@ -6,6 +6,8 @@ import {
   SearchResponse
 } from '@elastic/elasticsearch/lib/api/types';
 import axios from 'axios';
+import { IDBConnection } from '../database/db';
+import { ItisTaxonRecord, TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { getLogger } from '../utils/logger';
 import { ElasticSearchIndices, ESService } from './es-service';
 
@@ -51,6 +53,12 @@ export interface IItisSearchResult {
  * @extends {ESService}
  */
 export class TaxonomyService extends ESService {
+  taxonRepository: TaxonomyRepository;
+
+  constructor(connection: IDBConnection) {
+    super();
+    this.taxonRepository = new TaxonomyRepository(connection);
+  }
   /**
    * Returns the ITIS search species Query.
    *
@@ -97,6 +105,12 @@ export class TaxonomyService extends ESService {
     }
   }
 
+  /**
+   * Cleans up the ITIS search response data.
+   *
+   * @param {IItisSearchResponse[]} data
+   * @memberof TaxonomyService
+   */
   _sanitizeItisData = (data: IItisSearchResponse[]): IItisSearchResult[] => {
     return data.map((item: IItisSearchResponse) => {
       const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || item.scientificName;
@@ -108,6 +122,47 @@ export class TaxonomyService extends ESService {
       };
     });
   };
+
+  /**
+   * Returns the ITIS Taxon by tsn ids.
+   *
+   * @param {number[]} tsnIds
+   * @return {*}  {Promise<ItisTaxonRecord[]>}
+   * @memberof TaxonomyService
+   */
+  async getTaxonByTsnIds(tsnIds: number[]): Promise<ItisTaxonRecord[]> {
+    return this.taxonRepository.getTaxonByTsnIds(tsnIds);
+  }
+
+  /**
+   * Adds a new taxon record.
+   *
+   * @param {IItisSearchResponse} itisResponse
+   * @param {string} [bcTaxonCode]
+   * @return {*}  {Promise<ItisTaxonRecord>}
+   * @memberof TaxonomyService
+   */
+  async addItisTaxonRecord(itisResponse: IItisSearchResponse, bcTaxonCode?: string): Promise<ItisTaxonRecord> {
+    return this.taxonRepository.addItisTaxonRecord(
+      Number(itisResponse.tsn),
+      bcTaxonCode || '',
+      itisResponse.scientificName,
+      itisResponse.commonNames.join(', '),
+      itisResponse,
+      itisResponse.updateDate
+    );
+  }
+
+  /**
+   * Delete an existing taxon record.
+   *
+   * @param {number} taxonId
+   * @return {*}  {Promise<void>}
+   * @memberof TaxonomyService
+   */
+  async deleteTaxonRecord(taxonId: number): Promise<void> {
+    return this.taxonRepository.deleteTaxonRecord(taxonId);
+  }
 
   /**
    * Performs a query in Elasticsearch based on the given search criteria

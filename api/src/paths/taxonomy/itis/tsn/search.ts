@@ -1,10 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import qs from 'qs';
-import { TaxonomyService } from '../../../services/taxonomy-service';
-import { getLogger } from '../../../utils/logger';
+import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { TaxonomyService } from '../../../../services/taxonomy-service';
+import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/taxonomy/itis/list');
+const defaultLog = getLogger('paths/taxonomy/itis/tsn/list');
 
 export const GET: Operation = [getSpeciesFromIds()];
 
@@ -74,11 +75,12 @@ GET.apiDoc = {
 export function getSpeciesFromIds(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'getSearchResults', message: 'request body', req_body: req.query });
+    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
 
     const ids = Object.values(qs.parse(req.query.ids?.toString() || ''));
 
     try {
-      const taxonomyService = new TaxonomyService();
+      const taxonomyService = new TaxonomyService(connection);
       const response = await taxonomyService.itisTsnSearch(ids as string[]);
 
       // Overwrite default cache-control header, allow caching up to 7 days
