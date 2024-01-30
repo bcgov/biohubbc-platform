@@ -88,23 +88,6 @@ export class ESService {
   }
 
   /**
-   * Returns the ITIS search URL.
-   *
-   * @param {string} searchParams
-   * @return {*}  {Promise<string>}
-   * @memberof ESService
-   */
-  async getItisTermSearchUrl(searchParams: string): Promise<string> {
-    const itisUrl = process.env.ITIS_URL;
-    if (!itisUrl) {
-      throw new Error('ITIS_SEARCH_URL not defined.');
-    }
-    const itisSearchSpecies = this._getItisSearchSpeciesQuery(searchParams);
-
-    return `${itisUrl}?${ITIS_PARAMS.SORT}&${itisSearchSpecies}&${ITIS_PARAMS.FILTER}`;
-  }
-
-  /**
    * Returns the ITIS search URL for TSN ids.
    *
    * @param {string[]} searchTsnIds
