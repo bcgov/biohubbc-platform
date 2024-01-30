@@ -52,6 +52,29 @@ export interface IItisSearchResult {
  */
 export class TaxonomyService extends ESService {
   /**
+   * Returns the ITIS search species Query.
+   *
+   * @param {*} searchRequest
+   * @return {*}  {(Promise<IItisSearchResult[] | undefined>)}
+   * @memberof TaxonomyService
+   */
+  async itisTermSearch(searchRequest: string): Promise<IItisSearchResult[] | undefined> {
+    try {
+      const itisClient = await this.getItisTermSearchUrl(searchRequest);
+
+      const response = await axios.get(itisClient);
+
+      if (!response.data || !response.data.response || !response.data.response.docs) {
+        return [];
+      }
+
+      return this._sanitizeItisData(response.data.response.docs);
+    } catch (error) {
+      defaultLog.debug({ label: 'itisTermSearch', message: 'error', error });
+    }
+  }
+
+  /**
    * Returns the ITIS search by TSN.
    *
    * @param {string[]} searchTsnIds
