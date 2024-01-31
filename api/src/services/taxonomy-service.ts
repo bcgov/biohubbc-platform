@@ -1,6 +1,7 @@
 import { IDBConnection } from '../database/db';
 import { ItisTaxonRecord, TaxonomyRepository } from '../repositories/taxonomy-repository';
 import { ESService } from './es-service';
+import { ItisService } from './itis-service';
 
 export interface ITaxonomySource {
   unit_name1: string;
@@ -29,7 +30,7 @@ export interface IItisSearchResponse {
 }
 
 export interface IItisSearchResult {
-  id: string;
+  tsn: string;
   label: string;
   scientificName: string;
 }
@@ -53,13 +54,40 @@ export class TaxonomyService extends ESService {
    * Get taxon records by TSN ids.
    *
    * @param {number[]} tsnIds
-   * @return {*}  {Promise<ItisTaxonRecord[]>}
+   * @return {*}  {Promise<IItisSearchResult[]>}
    * @memberof TaxonomyService
    */
-  async getTaxonByTsnIds(tsnIds: number[]): Promise<ItisTaxonRecord[]> {
-    return this.taxonRepository.getTaxonByTsnIds(tsnIds);
+  async getTaxonByTsnIds(tsnIds: number[]): Promise<IItisSearchResult[]> {
+    const taxon = await this.taxonRepository.getTaxonByTsnIds(tsnIds);
 
-    // TODO if not found for one or more tsnIds, fetch from itis, add to db, and return overall results
+    if (taxon.length > 0) {
+      return this._sanitizeItisData(taxon);
+    }
+
+    const itisService = new ItisService();
+    const itisResponse = await itisService.searchItisByTSN(tsnIds);
+
+    const taxonRecords: ItisTaxonRecord[] = [];
+    for (const itisRecord of itisResponse) {
+      const taxonRecord = await this.addItisTaxonRecord(itisRecord, itisRecord.tsn);
+      taxonRecords.push(taxonRecord);
+    }
+
+    return this._sanitizeItisData(taxonRecords);
+  }
+
+  _sanitizeItisData(itisData: ItisTaxonRecord[]): IItisSearchResult[] {
+    const sanitizedData: IItisSearchResult[] = [];
+
+    for (const itisRecord of itisData) {
+      const label = itisRecord.common_name || itisRecord.itis_scientific_name;
+      const scientificName = itisRecord.itis_scientific_name;
+      const tsn = itisRecord.itis_tsn.toString();
+
+      sanitizedData.push({ tsn, label, scientificName });
+    }
+
+    return sanitizedData;
   }
 
   /**
@@ -70,17 +98,29 @@ export class TaxonomyService extends ESService {
    * @return {*}  {Promise<ItisTaxonRecord>}
    * @memberof TaxonomyService
    */
-  async addItisTaxonRecord(
-    itisResponse: IItisSearchResponse,
-    bcTaxonCode: string | null = null
-  ): Promise<ItisTaxonRecord> {
+  async addItisTaxonRecord(itisResponse: IItisSearchResponse, bcTaxonCode: string): Promise<ItisTaxonRecord> {
     // TODO include optional param for aliases
+
+    let commonName = '';
+    if (itisResponse.commonNames) {
+      switch (itisResponse.commonNames.length) {
+        case 0:
+          commonName = itisResponse.scientificName;
+          break;
+        case 1:
+          commonName = itisResponse.commonNames[0];
+          break;
+        default:
+          commonName = itisResponse.commonNames.join(', ');
+          break;
+      }
+    }
 
     return this.taxonRepository.addItisTaxonRecord(
       Number(itisResponse.tsn),
       bcTaxonCode,
       itisResponse.scientificName,
-      itisResponse.commonNames.join(', '),
+      commonName,
       itisResponse,
       itisResponse.updateDate
     );

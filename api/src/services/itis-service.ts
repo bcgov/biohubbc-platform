@@ -57,6 +57,7 @@ export class ItisService {
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
     const response = await axios.get(url);
+    console.log('response', response);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -68,11 +69,11 @@ export class ItisService {
   /**
    * Returns the ITIS search by TSN.
    *
-   * @param {string[]} searchTsnIds
-   * @return {*}  {(Promise<IItisSearchResult[]>)}
+   * @param {number[]} searchTsnIds
+   * @return {*}  {(Promise<IItisSearchResponse[]>)}
    * @memberof TaxonomyService
    */
-  async searchItisByTSN(searchTsnIds: string[]): Promise<IItisSearchResult[]> {
+  async searchItisByTSN(searchTsnIds: number[]): Promise<IItisSearchResponse[]> {
     const url = await this.getItisTsnSearchUrl(searchTsnIds);
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
@@ -83,7 +84,7 @@ export class ItisService {
       return [];
     }
 
-    return this._sanitizeItisData(response.data.response.docs);
+    return response.data.response.docs;
   }
 
   /**
@@ -131,11 +132,11 @@ export class ItisService {
   /**
    * Returns the ITIS search URL for TSN ids.
    *
-   * @param {string[]} searchTsnIds
+   * @param {number[]} searchTsnIds
    * @return {*}  {Promise<string>}
    * @memberof ItisService
    */
-  async getItisTsnSearchUrl(searchTsnIds: string[]): Promise<string> {
+  async getItisTsnSearchUrl(searchTsnIds: number[]): Promise<string> {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
@@ -179,6 +180,7 @@ export class ItisService {
    * @return {*}  {string}
    * @memberof ItisService
    */
+  // eslint-disable-next-line @typescript-eslint/no-inferrable-types
   _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit: number = 25): string {
     return `sort=${sortBy}+${sortDir}&rows=${limit}`;
   }
@@ -215,11 +217,11 @@ export class ItisService {
   /**
    * Get ITIS SOLR query by TSN param
    *
-   * @param {string[]} searchTsnIds
+   * @param {number[]} searchTsnIds
    * @return {*}  {string}
    * @memberof ItisService
    */
-  _getItisSolrTsnSearch(searchTsnIds: string[]): string {
+  _getItisSolrTsnSearch(searchTsnIds: number[]): string {
     return searchTsnIds.map((tsn) => `tsn:${tsn}`).join('+');
   }
 }

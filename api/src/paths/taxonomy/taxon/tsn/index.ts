@@ -1,7 +1,9 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getDBConnection } from '../../../../database/db';
+import { getServiceAccountDBConnection } from '../../../../database/db';
+import { HTTP400 } from '../../../../errors/http-error';
 import { TaxonomyService } from '../../../../services/taxonomy-service';
+import { getServiceClientSystemUser } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/taxonomy/taxon/{tsn}');
@@ -89,7 +91,15 @@ export function getTaxonByTSN(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'getTaxonByTSN', message: 'query params', query: req.query });
 
-    const connection = getDBConnection(req['keycloak_token']);
+    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+
+    if (!serviceClientSystemUser) {
+      throw new HTTP400('Failed to identify known submission source system', [
+        'token did not contain a sub or sub value is unknown'
+      ]);
+    }
+
+    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     const tsnIds: number[] = (req.query.tsn as string[]).map(Number);
 

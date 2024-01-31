@@ -10,11 +10,7 @@ export const GET: Operation = [findTaxonBySearchTerms()];
 GET.apiDoc = {
   description: 'Find taxon records by search criteria.',
   tags: ['taxonomy'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
+
   parameters: [
     {
       description: 'Taxonomy search terms.',
@@ -89,11 +85,13 @@ export function findTaxonBySearchTerms(): RequestHandler {
     defaultLog.debug({ label: 'findTaxonBySearchTerms', message: 'query params', query: req.query });
 
     const searchTerms = req.query.terms as string[];
+    console.log('searchTerms', searchTerms);
 
     try {
       const itisService = new ItisService();
 
       const response = await itisService.searchItisByTerm(searchTerms);
+      console.log('response', response);
 
       // Overwrite default cache-control header, allow caching up to 7 days
       res.setHeader('Cache-Control', 'max-age=604800');

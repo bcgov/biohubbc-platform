@@ -147,7 +147,7 @@ export function submissionIntake(): RequestHandler {
       const searchIndexService = new SearchIndexService(connection);
       const regionService = new RegionService(connection);
 
-      // validate theubmission
+      // validate the submission
       if (!(await validationService.validateSubmissionFeatures([submissionFeature]))) {
         throw new HTTP400('Invalid submission'); // TODO return details on why the submission is invalid
       }
