@@ -1,31 +1,41 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import qs from 'qs';
-import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db';
+import { getDBConnection } from '../../../../database/db';
 import { TaxonomyService } from '../../../../services/taxonomy-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/taxonomy/itis/tsn/list');
+const defaultLog = getLogger('paths/taxonomy/taxon/{tsn}');
 
-export const GET: Operation = [getSpeciesFromIds()];
+export const GET: Operation = [getTaxonByTSN()];
 
 GET.apiDoc = {
-  description: 'Gets the labels of the taxonomic units identified by the provided list of ids.',
+  description: 'Get taxon records by TSN ids.',
   tags: ['taxonomy'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   parameters: [
     {
-      description: 'Taxonomy ids.',
+      description: 'Taxon TSN ids.',
       in: 'query',
-      name: 'ids',
-      required: true,
+      name: 'tsn',
       schema: {
-        type: 'string'
-      }
+        type: 'array',
+        description: 'One or more Taxon TSN ids.',
+        items: {
+          type: 'integer',
+          minItems: 1,
+          maxItems: 100
+        }
+      },
+      required: true
     }
   ],
   responses: {
     200: {
-      description: 'Taxonomy search response object.',
+      description: 'Taxonomy response.',
       content: {
         'application/json': {
           schema: {
@@ -36,9 +46,9 @@ GET.apiDoc = {
                 items: {
                   title: 'Species',
                   type: 'object',
-                  required: ['id', 'label'],
+                  required: ['tsn', 'label'],
                   properties: {
-                    id: {
+                    tsn: {
                       type: 'string'
                     },
                     label: {
@@ -58,6 +68,9 @@ GET.apiDoc = {
     400: {
       $ref: '#/components/responses/400'
     },
+    401: {
+      $ref: '#/components/responses/401'
+    },
     500: {
       $ref: '#/components/responses/500'
     },
@@ -68,28 +81,37 @@ GET.apiDoc = {
 };
 
 /**
- * Get taxonomic search results.
+ * Get taxon by ITIS TSN.
  *
  * @returns {RequestHandler}
  */
-export function getSpeciesFromIds(): RequestHandler {
+export function getTaxonByTSN(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'getSearchResults', message: 'request body', req_body: req.query });
-    const connection = req['keycloak_token'] ? getDBConnection(req['keycloak_token']) : getAPIUserDBConnection();
+    defaultLog.debug({ label: 'getTaxonByTSN', message: 'query params', query: req.query });
 
-    const ids = Object.values(qs.parse(req.query.ids?.toString() || ''));
+    const connection = getDBConnection(req['keycloak_token']);
+
+    const tsnIds: number[] = (req.query.tsn as string[]).map(Number);
 
     try {
+      await connection.open();
+
       const taxonomyService = new TaxonomyService(connection);
-      const response = await taxonomyService.itisTsnSearch(ids as string[]);
+
+      const response = await taxonomyService.getTaxonByTsnIds(tsnIds);
+
+      connection.commit();
 
       // Overwrite default cache-control header, allow caching up to 7 days
       res.setHeader('Cache-Control', 'max-age=604800');
 
       res.status(200).json({ searchResponse: response });
     } catch (error) {
-      defaultLog.error({ label: 'getSearchResults', message: 'error', error });
+      defaultLog.error({ label: 'getTaxonByTSN', message: 'error', error });
+      connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   };
 }

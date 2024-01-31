@@ -1,7 +1,5 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import qs from 'qs';
-import { TaxonomyService } from '../../../services/taxonomy-service';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/taxonomy/list');
@@ -72,13 +70,13 @@ export function getSpeciesFromIds(): RequestHandler {
   return async (req, res) => {
     defaultLog.debug({ label: 'getSearchResults', message: 'request body', req_body: req.query });
 
-    const ids = Object.values(qs.parse(req.query.ids?.toString() || ''));
+    // const ids = Object.values(qs.parse(req.query.ids?.toString() || ''));
 
     try {
-      const taxonomyService = new TaxonomyService();
-      const response = await taxonomyService.getSpeciesFromIds(ids as string[]);
+      //   const taxonomyService = new TaxonomyService();
+      //   const response = await taxonomyService.getSpeciesFromIds(ids as string[]);
 
-      res.status(200).json({ searchResponse: response });
+      res.status(200).json({ searchResponse: [] });
     } catch (error) {
       defaultLog.error({ label: 'getSearchResults', message: 'error', error });
       throw error;

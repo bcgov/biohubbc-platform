@@ -3,11 +3,11 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
+import { findTaxonBySearchTerms, GET } from '.';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
-import { TaxonomyService } from '../../../services/taxonomy-service';
+import { ItisService } from '../../../services/itis-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import { GET, searchSpecies } from './search';
 
 chai.use(sinonChai);
 
@@ -30,14 +30,14 @@ describe('search', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const getSpeciesFromIdsStub = sinon.stub(TaxonomyService.prototype, 'itisTermSearch').resolves([]);
+      const getSpeciesFromIdsStub = sinon.stub(ItisService.prototype, 'searchItisByTerm').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {
         terms: ''
       };
 
-      const requestHandler = searchSpecies();
+      const requestHandler = findTaxonBySearchTerms();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -55,14 +55,14 @@ describe('search', () => {
       const mock1 = { id: '1', label: 'something', scientificName: 'string' } as unknown as any;
       const mock2 = { id: '2', label: 'anything', scientificName: 'string' } as unknown as any;
 
-      const getSpeciesFromIdsStub = sinon.stub(TaxonomyService.prototype, 'itisTermSearch').resolves([mock1, mock2]);
+      const getSpeciesFromIdsStub = sinon.stub(ItisService.prototype, 'searchItisByTerm').resolves([mock1, mock2]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {
         terms: 't'
       };
 
-      const requestHandler = searchSpecies();
+      const requestHandler = findTaxonBySearchTerms();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
@@ -77,7 +77,7 @@ describe('search', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(TaxonomyService.prototype, 'itisTermSearch').rejects(new Error('a test error'));
+      sinon.stub(ItisService.prototype, 'searchItisByTerm').rejects(new Error('a test error'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {
@@ -85,7 +85,7 @@ describe('search', () => {
       };
 
       try {
-        const requestHandler = searchSpecies();
+        const requestHandler = findTaxonBySearchTerms();
 
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();

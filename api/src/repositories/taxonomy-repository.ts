@@ -1,5 +1,6 @@
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
+import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
@@ -30,39 +31,25 @@ export type ItisTaxonRecord = z.infer<typeof ItisTaxonRecord>;
  */
 export class TaxonomyRepository extends BaseRepository {
   /**
-   * Gets a taxon record by its taxon id.
+   * Get taxon records by TSN id.
    *
    * @param {number[]} tsnIds
    * @return {*}  {Promise<ItisTaxonRecord>}
    * @memberof TaxonomyRepository
    */
   async getTaxonByTsnIds(tsnIds: number[]): Promise<ItisTaxonRecord[]> {
-    const sqlStatement = SQL`
-      SELECT
-        *
-      FROM
-        taxon
-      WHERE
-        itis_tsn IN (${tsnIds});
-    `;
+    const queryBuilder = getKnex().queryBuilder().select('*').from('taxon').whereIn('itis_tsn', tsnIds);
 
-    const response = await this.connection.sql(sqlStatement, ItisTaxonRecord);
-
-    if (response.rowCount === 0) {
-      throw new ApiExecuteSQLError('Failed to get taxon by tsn', [
-        'TaxonomyRepository->getTaxonByTsnIds',
-        'rowCount was null or undefined, expected rowCount > 0'
-      ]);
-    }
+    const response = await this.connection.knex(queryBuilder, ItisTaxonRecord);
 
     return response.rows;
   }
 
   /**
-   * inserts a new taxon record.
+   * Insert a new taxon record.
    *
    * @param {number} itisTsn
-   * @param {string} bcTaxonCode
+   * @param {(string | null)} [bcTaxonCode=null]
    * @param {string} itisScientificName
    * @param {string} commonName
    * @param {Record<any, any>} itisData
@@ -72,7 +59,7 @@ export class TaxonomyRepository extends BaseRepository {
    */
   async addItisTaxonRecord(
     itisTsn: number,
-    bcTaxonCode: string,
+    bcTaxonCode: string | null = null,
     itisScientificName: string,
     commonName: string,
     itisData: Record<any, any>,
@@ -114,7 +101,7 @@ export class TaxonomyRepository extends BaseRepository {
   }
 
   /**
-   * deletes an existing taxon record.
+   * Delete an existing taxon record.
    *
    * @param {number} taxonId
    * @memberof TaxonomyRepository

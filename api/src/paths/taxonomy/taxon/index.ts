@@ -1,29 +1,40 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { TaxonomyService } from '../../../services/taxonomy-service';
+import { ItisService } from '../../../services/itis-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/taxonomy/itis/search');
+const defaultLog = getLogger('paths/taxonomy/taxon');
 
-export const GET: Operation = [searchSpecies()];
+export const GET: Operation = [findTaxonBySearchTerms()];
 
 GET.apiDoc = {
-  description: 'Gets a list of taxonomic units.',
+  description: 'Find taxon records by search criteria.',
   tags: ['taxonomy'],
+  security: [
+    {
+      Bearer: []
+    }
+  ],
   parameters: [
     {
-      description: 'Taxonomy search parameters.',
+      description: 'Taxonomy search terms.',
       in: 'query',
       name: 'terms',
       required: true,
       schema: {
-        type: 'string'
+        type: 'array',
+        description: 'One or more search terms.',
+        items: {
+          type: 'string',
+          minLength: 3
+        },
+        minItems: 1
       }
     }
   ],
   responses: {
     200: {
-      description: 'Taxonomy search response object.',
+      description: 'Taxonomy response.',
       content: {
         'application/json': {
           schema: {
@@ -32,11 +43,11 @@ GET.apiDoc = {
               searchResponse: {
                 type: 'array',
                 items: {
-                  title: 'Species',
+                  title: 'Taxon',
                   type: 'object',
-                  required: ['id', 'label'],
+                  required: ['tsn', 'label'],
                   properties: {
-                    id: {
+                    tsn: {
                       type: 'string'
                     },
                     label: {
@@ -56,6 +67,9 @@ GET.apiDoc = {
     400: {
       $ref: '#/components/responses/400'
     },
+    401: {
+      $ref: '#/components/responses/401'
+    },
     500: {
       $ref: '#/components/responses/500'
     },
@@ -66,27 +80,27 @@ GET.apiDoc = {
 };
 
 /**
- * Get taxonomic search results from itis.
+ * Get taxon by search terms.
  *
  * @returns {RequestHandler}
  */
-export function searchSpecies(): RequestHandler {
+export function findTaxonBySearchTerms(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'getSearchResults', message: 'request params', req_params: req.query.terms });
+    defaultLog.debug({ label: 'findTaxonBySearchTerms', message: 'query params', query: req.query });
 
-    const term = String(req.query.terms) || '';
+    const searchTerms = req.query.terms as string[];
 
     try {
-      const taxonomyService = new TaxonomyService();
+      const itisService = new ItisService();
 
-      const response = await taxonomyService.itisTermSearch(term.toLowerCase());
+      const response = await itisService.searchItisByTerm(searchTerms);
 
       // Overwrite default cache-control header, allow caching up to 7 days
       res.setHeader('Cache-Control', 'max-age=604800');
 
       res.status(200).json({ searchResponse: response });
     } catch (error) {
-      defaultLog.error({ label: 'getSearchResults', message: 'error', error });
+      defaultLog.error({ label: 'findTaxonBySearchTerms', message: 'error', error });
       throw error;
     }
   };

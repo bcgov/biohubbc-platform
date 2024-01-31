@@ -1,17 +1,6 @@
-import {
-  AggregationsAggregate,
-  QueryDslBoolQuery,
-  SearchHit,
-  SearchRequest,
-  SearchResponse
-} from '@elastic/elasticsearch/lib/api/types';
-import axios from 'axios';
 import { IDBConnection } from '../database/db';
 import { ItisTaxonRecord, TaxonomyRepository } from '../repositories/taxonomy-repository';
-import { getLogger } from '../utils/logger';
-import { ElasticSearchIndices, ESService } from './es-service';
-
-const defaultLog = getLogger('services/taxonomy-service');
+import { ESService } from './es-service';
 
 export interface ITaxonomySource {
   unit_name1: string;
@@ -59,72 +48,9 @@ export class TaxonomyService extends ESService {
     super();
     this.taxonRepository = new TaxonomyRepository(connection);
   }
-  /**
-   * Returns the ITIS search species Query.
-   *
-   * @param {*} searchRequest
-   * @return {*}  {(Promise<IItisSearchResult[] | undefined>)}
-   * @memberof TaxonomyService
-   */
-  async itisTermSearch(searchRequest: string): Promise<IItisSearchResult[] | undefined> {
-    try {
-      const itisClient = await this.getItisTermSearchUrl(searchRequest);
-
-      const response = await axios.get(itisClient);
-
-      if (!response.data || !response.data.response || !response.data.response.docs) {
-        return [];
-      }
-
-      return this._sanitizeItisData(response.data.response.docs);
-    } catch (error) {
-      defaultLog.debug({ label: 'itisTermSearch', message: 'error', error });
-    }
-  }
 
   /**
-   * Returns the ITIS search by TSN.
-   *
-   * @param {string[]} searchTsnIds
-   * @return {*}  {(Promise<IItisSearchResult[] | undefined>)}
-   * @memberof TaxonomyService
-   */
-  async itisTsnSearch(searchTsnIds: string[]): Promise<IItisSearchResult[] | undefined> {
-    try {
-      const itisClient = await this.getItisTsnSearchUrl(searchTsnIds);
-
-      const response = await axios.get(itisClient);
-
-      if (!response.data || !response.data.response || !response.data.response.docs) {
-        return [];
-      }
-
-      return this._sanitizeItisData(response.data.response.docs);
-    } catch (error) {
-      defaultLog.debug({ label: 'itisTsnSearch', message: 'error', error });
-    }
-  }
-
-  /**
-   * Cleans up the ITIS search response data.
-   *
-   * @param {IItisSearchResponse[]} data
-   * @memberof TaxonomyService
-   */
-  _sanitizeItisData = (data: IItisSearchResponse[]): IItisSearchResult[] => {
-    return data.map((item: IItisSearchResponse) => {
-      const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || item.scientificName;
-
-      return {
-        id: item.tsn,
-        label: commonName,
-        scientificName: item.scientificName
-      };
-    });
-  };
-
-  /**
-   * Returns the ITIS Taxon by tsn ids.
+   * Get taxon records by TSN ids.
    *
    * @param {number[]} tsnIds
    * @return {*}  {Promise<ItisTaxonRecord[]>}
@@ -132,20 +58,27 @@ export class TaxonomyService extends ESService {
    */
   async getTaxonByTsnIds(tsnIds: number[]): Promise<ItisTaxonRecord[]> {
     return this.taxonRepository.getTaxonByTsnIds(tsnIds);
+
+    // TODO if not found for one or more tsnIds, fetch from itis, add to db, and return overall results
   }
 
   /**
    * Adds a new taxon record.
    *
    * @param {IItisSearchResponse} itisResponse
-   * @param {string} [bcTaxonCode]
+   * @param {(string | null)} [bcTaxonCode=null]
    * @return {*}  {Promise<ItisTaxonRecord>}
    * @memberof TaxonomyService
    */
-  async addItisTaxonRecord(itisResponse: IItisSearchResponse, bcTaxonCode?: string): Promise<ItisTaxonRecord> {
+  async addItisTaxonRecord(
+    itisResponse: IItisSearchResponse,
+    bcTaxonCode: string | null = null
+  ): Promise<ItisTaxonRecord> {
+    // TODO include optional param for aliases
+
     return this.taxonRepository.addItisTaxonRecord(
       Number(itisResponse.tsn),
-      bcTaxonCode || '',
+      bcTaxonCode,
       itisResponse.scientificName,
       itisResponse.commonNames.join(', '),
       itisResponse,
@@ -162,175 +95,5 @@ export class TaxonomyService extends ESService {
    */
   async deleteTaxonRecord(taxonId: number): Promise<void> {
     return this.taxonRepository.deleteTaxonRecord(taxonId);
-  }
-
-  /**
-   * Performs a query in Elasticsearch based on the given search criteria
-   *
-   * @param {SearchRequest} searchRequest
-   * @return {*}  {(Promise<SearchResponse<ITaxonomySource, Record<string, AggregationsAggregate>> | undefined>)}
-   * Promise resolving the search results from Elasticsearch
-   * @memberof TaxonomyService
-   */
-  async elasticSearch(
-    searchRequest: SearchRequest
-  ): Promise<SearchResponse<ITaxonomySource, Record<string, AggregationsAggregate>> | undefined> {
-    try {
-      const esClient = await this.getEsClient();
-
-      return esClient.search({
-        index: ElasticSearchIndices.TAXONOMY,
-        ...searchRequest
-      });
-    } catch (error) {
-      defaultLog.debug({ label: 'elasticSearch', message: 'error', error });
-    }
-  }
-  /**
-   * Sanitizes species data retrieved from Elasticsearch.
-   *
-   * @param {SearchHit<ITaxonomySource>[]} data The data response from ElasticSearch
-   * @return {*}  {({ id: string; code: string | undefined; label: string }[])} An ID, code, and label tuple for each
-   * taxonomic code
-   * @memberof TaxonomyService
-   */
-  _sanitizeSpeciesData = (
-    data: SearchHit<ITaxonomySource>[]
-  ): { id: string; code: string | undefined; label: string }[] => {
-    return data.map((item: SearchHit<ITaxonomySource>) => {
-      const { _id: id, _source } = item;
-
-      const label = [
-        [
-          _source?.english_name,
-          [_source?.unit_name1, _source?.unit_name2, _source?.unit_name3].filter(Boolean).join(' ')
-        ]
-          .filter(Boolean)
-          .join(', ')
-      ]
-        .filter(Boolean)
-        .join(': ');
-
-      return { id, code: _source?.code, label: label };
-    });
-  };
-
-  /**
-   * Searches the taxonomy Elasticsearch index by taxonomic code IDs
-   *
-   * @param {string[] | number[]} ids The array of taxonomic code IDs
-   * @return {Promise<SearchHit<ITaxonomySource>[]>} The response from Elasticsearch
-   * @memberof TaxonomyService
-   */
-  async getTaxonomyFromIds(ids: string[] | number[]): Promise<SearchHit<ITaxonomySource>[]> {
-    const response = await this.elasticSearch({
-      query: {
-        terms: {
-          _id: ids
-        }
-      }
-    });
-
-    if (!response) {
-      return [];
-    }
-
-    return response.hits.hits;
-  }
-
-  /**
-   * Searches the taxonomy Elasticsearch index by taxonomic code IDs and santizes the response
-   *
-   * @param {string[] | number[]} ids The array of taxonomic code IDs
-   * @returns {Promise<{ id: string, label: string}[]>} Promise resolving an ID and label pair for each taxonomic code
-   * @memberof TaxonomyService
-   */
-  async getSpeciesFromIds(ids: string[] | number[]): Promise<{ id: string; label: string }[]> {
-    const response = await this.elasticSearch({
-      query: {
-        terms: {
-          _id: ids
-        }
-      }
-    });
-
-    return response ? this._sanitizeSpeciesData(response.hits.hits) : [];
-  }
-
-  /**
-   * Maps a taxonomic search term to an Elasticsearch query, then performs the query and sanitizes the response.
-   * The query also includes a boolean match to only include records whose `end_date` field is either
-   * undefined/null or is a date that hasn't occurred yet. This filtering is not done on similar ES queries,
-   * since we must still be able to search by a given taxonomic code ID, even if is one that is expired.
-   *
-   * @param {string} term The search term string
-   * @return {*}  {(Promise<{ id: string; code: string | undefined; label: string }[]>)} Promise resolving an ID, code,
-   * and label tuple for each taxonomic code
-   * @memberof TaxonomyService
-   */
-  async searchSpecies(term: string): Promise<{ id: string; code: string | undefined; label: string }[]> {
-    const searchConfig: object[] = [];
-
-    const splitTerms = term.split(' ');
-
-    splitTerms.forEach((item) => {
-      searchConfig.push({
-        wildcard: {
-          english_name: { value: `*${item}*`, boost: 4.0, case_insensitive: true }
-        }
-      });
-      searchConfig.push({
-        wildcard: { unit_name1: { value: `*${item}*`, boost: 3.0, case_insensitive: true } }
-      });
-      searchConfig.push({
-        wildcard: { unit_name2: { value: `*${item}*`, boost: 3.0, case_insensitive: true } }
-      });
-      searchConfig.push({
-        wildcard: { unit_name3: { value: `*${item}*`, boost: 3.0, case_insensitive: true } }
-      });
-      searchConfig.push({ wildcard: { code: { value: `*${item}*`, boost: 2, case_insensitive: true } } });
-      searchConfig.push({
-        wildcard: { tty_kingdom: { value: `*${item}*`, boost: 1.0, case_insensitive: true } }
-      });
-    });
-
-    const response = await this.elasticSearch({
-      query: {
-        bool: {
-          must: [
-            {
-              bool: {
-                should: searchConfig
-              }
-            },
-            {
-              bool: {
-                minimum_should_match: 1,
-                should: [
-                  {
-                    bool: {
-                      must_not: {
-                        exists: {
-                          field: 'end_date'
-                        }
-                      }
-                    }
-                  },
-                  {
-                    range: {
-                      end_date: {
-                        gt: 'now'
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        } as QueryDslBoolQuery
-      }
-    });
-
-    return response ? this._sanitizeSpeciesData(response.hits.hits) : [];
   }
 }
