@@ -49,7 +49,7 @@ GET.apiDoc = {
                   required: ['tsn', 'label'],
                   properties: {
                     tsn: {
-                      type: 'string'
+                      type: 'number'
                     },
                     label: {
                       type: 'string'
@@ -93,7 +93,7 @@ export function getTaxonByTSN(): RequestHandler {
 
     const connection = getAPIUserDBConnection();
 
-    const tsnIds: number[] = (req.query.tsn as string[]).map(Number);
+    const tsnIds: number[] = (req.query.tsn as (string | number)[]).map(Number);
 
     try {
       await connection.open();

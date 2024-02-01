@@ -59,7 +59,6 @@ export class TaxonomyRepository extends BaseRepository {
    */
   async addItisTaxonRecord(
     itisTsn: number,
-    bcTaxonCode: string | null,
     itisScientificName: string,
     commonName: string | null,
     itisData: Record<any, any>,
@@ -70,7 +69,6 @@ export class TaxonomyRepository extends BaseRepository {
         taxon
       (
         itis_tsn,
-        bc_taxon_code,
         itis_scientific_name,
         common_name,
         itis_data,
@@ -78,7 +76,6 @@ export class TaxonomyRepository extends BaseRepository {
       )
       VALUES (
         ${itisTsn},
-        ${bcTaxonCode},
         ${itisScientificName},
         ${commonName},
         ${itisData},

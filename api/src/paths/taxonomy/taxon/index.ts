@@ -48,7 +48,7 @@ GET.apiDoc = {
                   required: ['tsn', 'label'],
                   properties: {
                     tsn: {
-                      type: 'string'
+                      type: 'number'
                     },
                     label: {
                       type: 'string'
