@@ -44,7 +44,7 @@ GET.apiDoc = {
                   required: ['tsn', 'label'],
                   properties: {
                     tsn: {
-                      type: 'string'
+                      type: 'number'
                     },
                     label: {
                       type: 'string'
@@ -85,13 +85,11 @@ export function findTaxonBySearchTerms(): RequestHandler {
     defaultLog.debug({ label: 'findTaxonBySearchTerms', message: 'query params', query: req.query });
 
     const searchTerms = req.query.terms as string[];
-    console.log('searchTerms', searchTerms);
 
     try {
       const itisService = new ItisService();
 
       const response = await itisService.searchItisByTerm(searchTerms);
-      console.log('response', response);
 
       // Overwrite default cache-control header, allow caching up to 7 days
       res.setHeader('Cache-Control', 'max-age=604800');

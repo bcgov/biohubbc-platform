@@ -30,7 +30,7 @@ export interface IItisSearchResponse {
 }
 
 export interface IItisSearchResult {
-  tsn: string;
+  tsn: number;
   label: string;
   scientificName: string;
 }
@@ -57,7 +57,6 @@ export class ItisService {
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
     const response = await axios.get(url);
-    console.log('response', response);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -98,7 +97,7 @@ export class ItisService {
       const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || item.scientificName;
 
       return {
-        tsn: item.tsn,
+        tsn: Number(item.tsn),
         label: commonName,
         scientificName: item.scientificName
       };
