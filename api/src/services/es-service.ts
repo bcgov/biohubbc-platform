@@ -6,7 +6,6 @@ export const ElasticSearchIndices = {
   TAXONOMY: process.env.ELASTICSEARCH_TAXONOMY_INDEX || 'taxonomy_3.0.0'
 };
 
-
 /**
  * Base class for services that require a elastic search connection.
  *
