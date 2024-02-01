@@ -27,9 +27,9 @@ export class ItisService {
   /**
    * Returns the ITIS search species Query.
    *
-   * @param {*} searchTerms
-   * @return {*}  {(Promise<TaxonSearchResult[]>)}
-   * @memberof TaxonomyService
+   * @param {string[]} searchTerms
+   * @return {*}  {Promise<TaxonSearchResult[]>}
+   * @memberof ItisService
    */
   async searchItisByTerm(searchTerms: string[]): Promise<TaxonSearchResult[]> {
     const url = await this.getItisSolrTermSearchUrl(searchTerms);
@@ -49,8 +49,8 @@ export class ItisService {
    * Returns the ITIS search by TSN.
    *
    * @param {number[]} searchTsnIds
-   * @return {*}  {(Promise<ItisSolrSearchResponse[]>)}
-   * @memberof TaxonomyService
+   * @return {*}  {Promise<ItisSolrSearchResponse[]>}
+   * @memberof ItisService
    */
   async searchItisByTSN(searchTsnIds: number[]): Promise<ItisSolrSearchResponse[]> {
     const url = await this.getItisSolrTsnSearchUrl(searchTsnIds);
@@ -70,7 +70,7 @@ export class ItisService {
    * Cleans up the ITIS search response data.
    *
    * @param {ItisSolrSearchResponse[]} data
-   * @memberof TaxonomyService
+   * @memberof ItisService
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {

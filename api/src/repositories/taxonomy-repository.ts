@@ -49,9 +49,8 @@ export class TaxonomyRepository extends BaseRepository {
    * Insert a new taxon record.
    *
    * @param {number} itisTsn
-   * @param {(string | null)} [bcTaxonCode=null]
    * @param {string} itisScientificName
-   * @param {string} commonName
+   * @param {(string | null)} commonName
    * @param {Record<any, any>} itisData
    * @param {string} itisUpdateDate
    * @return {*}  {Promise<TaxonRecord>}
