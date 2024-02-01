@@ -99,7 +99,7 @@ export class TaxonomyService extends ESService {
    * @memberof TaxonomyService
    */
   async addItisTaxonRecord(itisResponse: IItisSearchResponse): Promise<ItisTaxonRecord> {
-    let commonName = itisResponse.scientificName;
+    let commonName = null;
     if (itisResponse.commonNames) {
       commonName = itisResponse.commonNames && itisResponse.commonNames[0].split('$')[1];
     }
