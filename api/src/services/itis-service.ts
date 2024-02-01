@@ -1,24 +1,10 @@
 import axios from 'axios';
 import { getLogger } from '../utils/logger';
+import { TaxonSearchResult } from './taxonomy-service';
 
 const defaultLog = getLogger('services/taxonomy-service');
 
-export interface ITaxonomySource {
-  unit_name1: string;
-  unit_name2: string;
-  unit_name3: string;
-  taxon_authority: string;
-  code: string;
-  tty_kingdom: string;
-  tty_name: string;
-  english_name: string;
-  note: string | null;
-  end_date: string | null;
-  parent_id: number | null;
-  parent_hierarchy: { id: number; level: string }[];
-}
-
-export interface IItisSearchResponse {
+export type ItisSolrSearchResponse = {
   commonNames: string[];
   kingdom: string;
   name: string;
@@ -27,13 +13,7 @@ export interface IItisSearchResponse {
   tsn: string;
   updateDate: string;
   usage: string;
-}
-
-export interface IItisSearchResult {
-  tsn: number;
-  label: string;
-  scientificName: string;
-}
+};
 
 /**
  * Service for retrieving and processing taxonomic data from the Integrated Taxonomic Information System (ITIS).
@@ -48,10 +28,10 @@ export class ItisService {
    * Returns the ITIS search species Query.
    *
    * @param {*} searchTerms
-   * @return {*}  {(Promise<IItisSearchResult[]>)}
+   * @return {*}  {(Promise<TaxonSearchResult[]>)}
    * @memberof TaxonomyService
    */
-  async searchItisByTerm(searchTerms: string[]): Promise<IItisSearchResult[]> {
+  async searchItisByTerm(searchTerms: string[]): Promise<TaxonSearchResult[]> {
     const url = await this.getItisSolrTermSearchUrl(searchTerms);
 
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
@@ -69,10 +49,10 @@ export class ItisService {
    * Returns the ITIS search by TSN.
    *
    * @param {number[]} searchTsnIds
-   * @return {*}  {(Promise<IItisSearchResponse[]>)}
+   * @return {*}  {(Promise<ItisSolrSearchResponse[]>)}
    * @memberof TaxonomyService
    */
-  async searchItisByTSN(searchTsnIds: number[]): Promise<IItisSearchResponse[]> {
+  async searchItisByTSN(searchTsnIds: number[]): Promise<ItisSolrSearchResponse[]> {
     const url = await this.getItisSolrTsnSearchUrl(searchTsnIds);
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
@@ -89,11 +69,11 @@ export class ItisService {
   /**
    * Cleans up the ITIS search response data.
    *
-   * @param {IItisSearchResponse[]} data
+   * @param {ItisSolrSearchResponse[]} data
    * @memberof TaxonomyService
    */
-  _sanitizeItisData = (data: IItisSearchResponse[]): IItisSearchResult[] => {
-    return data.map((item: IItisSearchResponse) => {
+  _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
+    return data.map((item: ItisSolrSearchResponse) => {
       const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || item.scientificName;
 
       return {

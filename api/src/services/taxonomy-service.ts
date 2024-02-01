@@ -1,6 +1,6 @@
 import { IDBConnection } from '../database/db';
-import { ItisTaxonRecord, TaxonomyRepository } from '../repositories/taxonomy-repository';
-import { ItisService } from './itis-service';
+import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
+import { ItisService, ItisSolrSearchResponse } from './itis-service';
 
 export interface ITaxonomySource {
   unit_name1: string;
@@ -17,22 +17,11 @@ export interface ITaxonomySource {
   parent_hierarchy: { id: number; level: string }[];
 }
 
-export interface IItisSearchResponse {
-  commonNames: string[];
-  kingdom: string;
-  name: string;
-  parentTSN: string;
-  scientificName: string;
-  tsn: string;
-  updateDate: string;
-  usage: string;
-}
-
-export interface IItisSearchResult {
+export type TaxonSearchResult = {
   tsn: number;
   label: string;
   scientificName: string;
-}
+};
 
 /**
  * Service for retrieving and processing taxonomic data from BioHub.
@@ -51,62 +40,61 @@ export class TaxonomyService {
    * Get taxon records by TSN ids.
    *
    * @param {number[]} tsnIds
-   * @return {*}  {Promise<IItisSearchResult[]>}
+   * @return {*}  {Promise<TaxonSearchResult[]>}
    * @memberof TaxonomyService
    */
-  async getTaxonByTsnIds(tsnIds: number[]): Promise<IItisSearchResult[]> {
+  async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonSearchResult[]> {
     // Search for taxon records in the database
-    const taxon = await this.taxonRepository.getTaxonByTsnIds(tsnIds);
+    const existingTaxonRecords = await this.taxonRepository.getTaxonByTsnIds(tsnIds);
 
-    // If taxon records are found, return them
-    if (taxon.length > 0) {
-      return this._sanitizeTaxonRecordsData(taxon);
+    const missingTsnIds = tsnIds.filter((tsnId) => !existingTaxonRecords.find((item) => item.itis_tsn === tsnId));
+
+    if (missingTsnIds.length) {
+      // If the local database does not contain a record for all of the requested ids, search ITIS for the missing
+      // taxon records, patching the missing records in the local database in the process
+      const itisService = new ItisService();
+      const itisResponse = await itisService.searchItisByTSN(missingTsnIds);
+
+      for (const itisRecord of itisResponse) {
+        // Add the taxon record to the database
+        const newTaxonRecord = await this.addItisTaxonRecord(itisRecord);
+        existingTaxonRecords.push(newTaxonRecord);
+      }
     }
 
-    // If no taxon records are found, search ITIS for the taxon records
-    const itisService = new ItisService();
-    const itisResponse = await itisService.searchItisByTSN(tsnIds);
-
-    const taxonRecords: ItisTaxonRecord[] = [];
-    for (const itisRecord of itisResponse) {
-      // Add the taxon record to the database
-      const taxonRecord = await this.addItisTaxonRecord(itisRecord);
-      taxonRecords.push(taxonRecord);
-    }
-
-    // Return the taxon records
-    return this._sanitizeTaxonRecordsData(taxonRecords);
+    // Missing ids patched, return taxon records for all requested ids
+    return this._sanitizeTaxonRecordsData(existingTaxonRecords);
   }
 
-  _sanitizeTaxonRecordsData(itisData: ItisTaxonRecord[]): IItisSearchResult[] {
-    return itisData.map((item: ItisTaxonRecord) => {
+  _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {
+    return taxonRecords.map((item: TaxonRecord) => {
       return {
         tsn: item.itis_tsn,
         label: item.common_name || item.itis_scientific_name,
         scientificName: item.itis_scientific_name
-      } as IItisSearchResult;
+      };
     });
   }
 
   /**
    * Adds a new taxon record.
    *
-   * @param {IItisSearchResponse} itisResponse
-   * @return {*}  {Promise<ItisTaxonRecord>}
+   * @param {ItisSolrSearchResponse} itisSolrResponse
+   * @return {*}  {Promise<TaxonRecord>}
    * @memberof TaxonomyService
    */
-  async addItisTaxonRecord(itisResponse: IItisSearchResponse): Promise<ItisTaxonRecord> {
+  async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
     let commonName = null;
-    if (itisResponse.commonNames) {
-      commonName = itisResponse.commonNames && itisResponse.commonNames[0].split('$')[1];
+    if (itisSolrResponse.commonNames) {
+      commonName = itisSolrResponse.commonNames && itisSolrResponse.commonNames[0].split('$')[1];
     }
 
     return this.taxonRepository.addItisTaxonRecord(
-      Number(itisResponse.tsn),
-      itisResponse.scientificName,
+      Number(itisSolrResponse.tsn),
+      itisSolrResponse.scientificName,
       commonName,
-      itisResponse,
-      itisResponse.updateDate
+      itisSolrResponse,
+      itisSolrResponse.updateDate
     );
   }
 

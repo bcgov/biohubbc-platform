@@ -4,7 +4,7 @@ import { getKnex } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
 import { BaseRepository } from './base-repository';
 
-export const ItisTaxonRecord = z.object({
+export const TaxonRecord = z.object({
   taxon_id: z.number(),
   itis_tsn: z.number(),
   bc_taxon_code: z.string().nullable(),
@@ -20,7 +20,7 @@ export const ItisTaxonRecord = z.object({
   revision_count: z.number()
 });
 
-export type ItisTaxonRecord = z.infer<typeof ItisTaxonRecord>;
+export type TaxonRecord = z.infer<typeof TaxonRecord>;
 
 /**
  * Taxonomy Repository
@@ -34,13 +34,13 @@ export class TaxonomyRepository extends BaseRepository {
    * Get taxon records by TSN id.
    *
    * @param {number[]} tsnIds
-   * @return {*}  {Promise<ItisTaxonRecord>}
+   * @return {*}  {Promise<TaxonRecord>}
    * @memberof TaxonomyRepository
    */
-  async getTaxonByTsnIds(tsnIds: number[]): Promise<ItisTaxonRecord[]> {
+  async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonRecord[]> {
     const queryBuilder = getKnex().queryBuilder().select('*').from('taxon').whereIn('itis_tsn', tsnIds);
 
-    const response = await this.connection.knex(queryBuilder, ItisTaxonRecord);
+    const response = await this.connection.knex(queryBuilder, TaxonRecord);
 
     return response.rows;
   }
@@ -54,7 +54,7 @@ export class TaxonomyRepository extends BaseRepository {
    * @param {string} commonName
    * @param {Record<any, any>} itisData
    * @param {string} itisUpdateDate
-   * @return {*}  {Promise<ItisTaxonRecord>}
+   * @return {*}  {Promise<TaxonRecord>}
    * @memberof TaxonomyRepository
    */
   async addItisTaxonRecord(
@@ -63,7 +63,7 @@ export class TaxonomyRepository extends BaseRepository {
     commonName: string | null,
     itisData: Record<any, any>,
     itisUpdateDate: string
-  ): Promise<ItisTaxonRecord> {
+  ): Promise<TaxonRecord> {
     const sqlStatement = SQL`
       INSERT INTO
         taxon
@@ -85,7 +85,7 @@ export class TaxonomyRepository extends BaseRepository {
         *;
     `;
 
-    const response = await this.connection.sql(sqlStatement, ItisTaxonRecord);
+    const response = await this.connection.sql(sqlStatement, TaxonRecord);
 
     if (response.rowCount !== 1) {
       throw new ApiExecuteSQLError('Failed to insert new taxon record', [
