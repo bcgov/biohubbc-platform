@@ -38,12 +38,6 @@ export class ItisService {
 
     const response = await axios.get(url);
 
-    console.log('===================');
-    console.log('===================');
-    console.log(response.data.response);
-    console.log('===================');
-    console.log('===================');
-
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
     }
