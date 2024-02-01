@@ -83,6 +83,7 @@ const phases = {
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
+    itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: (isStaticDeployment && 'biohub') || `local/${deployChangeId}/biohub`,
     tz: config.timezone.api,
     sso: config.sso.dev,
@@ -111,6 +112,7 @@ const phases = {
     elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
+    itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     sso: config.sso.test,
@@ -139,6 +141,7 @@ const phases = {
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
+    itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     sso: config.sso.prod,

@@ -54,6 +54,11 @@ parameters:
     description: Application timezone
     required: false
     value: 'America/Vancouver'
+  # ITIS SOLR
+  - name: ITIS_SOLR_URL
+    description: ITIS SOLR API URL
+    value: 'https://services.itis.gov'
+    required: true
   # Keycloak
   - name: KEYCLOAK_HOST
     description: Key clock login url
@@ -263,6 +268,8 @@ objects:
                   value: ${ELASTICSEARCH_EML_INDEX}
                 - name: ELASTICSEARCH_TAXONOMY_INDEX
                   value: ${ELASTICSEARCH_TAXONOMY_INDEX}
+                - name: ITIS_SOLR_URL
+                  value: ${ITIS_SOLR_URL}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ
