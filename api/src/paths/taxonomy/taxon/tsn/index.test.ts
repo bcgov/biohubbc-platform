@@ -3,15 +3,15 @@ import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { findTaxonBySearchTerms, GET } from '.';
-import * as db from '../../../database/db';
-import { HTTPError } from '../../../errors/http-error';
-import { ItisService } from '../../../services/itis-service';
-import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
+import { GET, getTaxonByTSN } from '.';
+import * as db from '../../../../database/db';
+import { HTTPError } from '../../../../errors/http-error';
+import { TaxonomyService } from '../../../../services/taxonomy-service';
+import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 
 chai.use(sinonChai);
 
-describe('taxon', () => {
+describe('tsn', () => {
   describe('openapi schema', () => {
     const ajv = new Ajv();
 
@@ -20,7 +20,7 @@ describe('taxon', () => {
     });
   });
 
-  describe('findTaxonBySearchTerms', () => {
+  describe('getTaxonByTSN', () => {
     afterEach(() => {
       sinon.restore();
     });
@@ -30,18 +30,18 @@ describe('taxon', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const getSpeciesFromIdsStub = sinon.stub(ItisService.prototype, 'searchItisByTerm').resolves([]);
+      const getTaxonByTsnIdsStub = sinon.stub(TaxonomyService.prototype, 'getTaxonByTsnIds').resolves([]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {
-        terms: ''
+        tsn: ['1', '2']
       };
 
-      const requestHandler = findTaxonBySearchTerms();
+      const requestHandler = getTaxonByTSN();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getSpeciesFromIdsStub).to.have.been.calledWith('');
+      expect(getTaxonByTsnIdsStub).to.have.been.calledWith([1, 2]);
 
       expect(mockRes.statusValue).to.equal(200);
       expect(mockRes.jsonValue).to.eql({ searchResponse: [] });
@@ -52,21 +52,21 @@ describe('taxon', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mock1 = { id: '1', label: 'something', scientificName: 'string' } as unknown as any;
-      const mock2 = { id: '2', label: 'anything', scientificName: 'string' } as unknown as any;
+      const mock1 = { tsn: '1', label: 'something', scientificName: 'string' } as unknown as any;
+      const mock2 = { tsn: '2', label: 'anything', scientificName: 'string' } as unknown as any;
 
-      const getSpeciesFromIdsStub = sinon.stub(ItisService.prototype, 'searchItisByTerm').resolves([mock1, mock2]);
+      const getTaxonByTsnIdsStub = sinon.stub(TaxonomyService.prototype, 'getTaxonByTsnIds').resolves([mock1, mock2]);
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {
-        terms: 't'
+        tsn: ['1', '2']
       };
 
-      const requestHandler = findTaxonBySearchTerms();
+      const requestHandler = getTaxonByTSN();
 
       await requestHandler(mockReq, mockRes, mockNext);
 
-      expect(getSpeciesFromIdsStub).to.have.been.calledWith('t');
+      expect(getTaxonByTsnIdsStub).to.have.been.calledWith([1, 2]);
 
       expect(mockRes.jsonValue).to.eql({ searchResponse: [mock1, mock2] });
       expect(mockRes.statusValue).to.equal(200);
@@ -77,15 +77,15 @@ describe('taxon', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      sinon.stub(ItisService.prototype, 'searchItisByTerm').rejects(new Error('a test error'));
+      sinon.stub(TaxonomyService.prototype, 'getTaxonByTsnIds').rejects(new Error('a test error'));
 
       const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
       mockReq.query = {
-        ids: 'a'
+        tsn: ['1', '2']
       };
 
       try {
-        const requestHandler = findTaxonBySearchTerms();
+        const requestHandler = getTaxonByTSN();
 
         await requestHandler(mockReq, mockRes, mockNext);
         expect.fail();

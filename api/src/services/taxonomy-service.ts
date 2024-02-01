@@ -2,21 +2,6 @@ import { IDBConnection } from '../database/db';
 import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
 import { ItisService, ItisSolrSearchResponse } from './itis-service';
 
-export interface ITaxonomySource {
-  unit_name1: string;
-  unit_name2: string;
-  unit_name3: string;
-  taxon_authority: string;
-  code: string;
-  tty_kingdom: string;
-  tty_name: string;
-  english_name: string;
-  note: string | null;
-  end_date: string | null;
-  parent_id: number | null;
-  parent_hierarchy: { id: number; level: string }[];
-}
-
 export type TaxonSearchResult = {
   tsn: number;
   label: string;
@@ -86,7 +71,15 @@ export class TaxonomyService {
   async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
     let commonName = null;
     if (itisSolrResponse.commonNames) {
-      commonName = itisSolrResponse.commonNames && itisSolrResponse.commonNames[0].split('$')[1];
+      commonName = itisSolrResponse.commonNames[0].split('$')[1];
+      /* Sample itisResponse:
+       * commonNames: [
+       *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
+       *   '$woolly locoweed$English$N$124501$2011-06-29 00:00:00$',
+       *   '$Davis Mountains locoweed$English$N$124502$2011-06-29 00:00:00$',
+       *   '$woolly milkvetch$English$N$72035$2012-12-21 00:00:00$'
+       * ]
+       */
     }
 
     return this.taxonRepository.addItisTaxonRecord(

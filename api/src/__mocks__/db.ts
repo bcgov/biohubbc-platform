@@ -78,6 +78,13 @@ export class MockRes {
   });
 
   /**
+   * The value of the last `.setHeader(<value>)` call.
+   *
+   * @memberof MockRes
+   */
+  setHeader = sinon.fake();
+
+  /**
    * The value of the last `.json(<value>)` call.
    *
    * @type {*}
