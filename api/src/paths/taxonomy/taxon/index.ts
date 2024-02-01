@@ -26,7 +26,7 @@ GET.apiDoc = {
         description: 'One or more search terms.',
         items: {
           type: 'string',
-          minLength: 3
+          minLength: 1
         },
         minItems: 1
       }

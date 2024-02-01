@@ -26,6 +26,7 @@ GET.apiDoc = {
         description: 'One or more Taxon TSN ids.',
         items: {
           type: 'integer',
+          minimum: 0,
           minItems: 1,
           maxItems: 100
         }

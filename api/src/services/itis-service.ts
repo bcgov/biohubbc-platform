@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
 
-const defaultLog = getLogger('services/taxonomy-service');
+const defaultLog = getLogger('services/itis-service');
 
 export type ItisSolrSearchResponse = {
   commonNames: string[];
