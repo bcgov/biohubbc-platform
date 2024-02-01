@@ -38,6 +38,12 @@ export class ItisService {
 
     const response = await axios.get(url);
 
+    console.log('===================');
+    console.log('===================');
+    console.log(response.data.response);
+    console.log('===================');
+    console.log('===================');
+
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
     }
@@ -185,9 +191,11 @@ export class ItisService {
       .map((term) => term.trim())
       .filter(Boolean)
       .map((term) => {
-        return `(nameWOInd:*${term}*+AND+usage:/(valid|accepted)/)+OR+(vernacular:*${term}*+AND+usage:/(valid|accepted)/)`;
+        // Logical OR between scientific name and vernacular name
+        return `((nameWOInd:*${term}*+AND+usage:/(valid|accepted)/)+OR+(vernacular:*${term}*+AND+usage:/(valid|accepted)/))`;
       })
-      .join('+OR+');
+      // Logical AND between sets of search terms
+      .join('+AND+');
 
     return `q=${queryParams}`;
   }
