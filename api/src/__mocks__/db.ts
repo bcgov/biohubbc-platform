@@ -82,7 +82,12 @@ export class MockRes {
    *
    * @memberof MockRes
    */
-  setHeader = sinon.fake();
+  headerValue: any;
+  setHeader = sinon.fake((header: any) => {
+    this.headerValue = header;
+
+    return this;
+  });
 
   /**
    * The value of the last `.json(<value>)` call.

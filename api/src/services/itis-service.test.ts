@@ -67,7 +67,7 @@ describe('ItisService', () => {
       expect(response).to.eql([
         {
           tsn: 123,
-          label: 'commonName',
+          commonName: 'commonName',
           scientificName: 'scientificName'
         }
       ]);

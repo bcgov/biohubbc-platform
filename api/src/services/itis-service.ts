@@ -74,11 +74,11 @@ export class ItisService {
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
-      const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || item.scientificName;
+      const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || null;
 
       return {
         tsn: Number(item.tsn),
-        label: commonName,
+        commonName: commonName,
         scientificName: item.scientificName
       };
     });

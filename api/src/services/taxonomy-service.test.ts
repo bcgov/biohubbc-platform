@@ -63,7 +63,7 @@ describe('TaxonomyService', () => {
       const response = await taxonomyService.getTaxonByTsnIds([1]);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql([{ tsn: 1, label: 'common_name', scientificName: 'itis_scientific_name' }]);
+      expect(response).to.be.eql([{ tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' }]);
     });
 
     it('if some records do not exist in db should return array of taxon records', async () => {
@@ -118,8 +118,8 @@ describe('TaxonomyService', () => {
       expect(searchItisByTSNStub).to.be.calledOnce;
       expect(itisService).to.be.calledOnce;
       expect(response).to.be.eql([
-        { tsn: 1, label: 'common_name', scientificName: 'itis_scientific_name' },
-        { tsn: 2, label: 'common_name', scientificName: 'itis_scientific_name' }
+        { tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' },
+        { tsn: 2, commonName: 'common_name', scientificName: 'itis_scientific_name' }
       ]);
     });
   });

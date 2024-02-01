@@ -4,7 +4,7 @@ import { ItisService, ItisSolrSearchResponse } from './itis-service';
 
 export type TaxonSearchResult = {
   tsn: number;
-  label: string;
+  commonName: string | null;
   scientificName: string;
 };
 
@@ -55,7 +55,7 @@ export class TaxonomyService {
     return taxonRecords.map((item: TaxonRecord) => {
       return {
         tsn: item.itis_tsn,
-        label: item.common_name || item.itis_scientific_name,
+        commonName: item.common_name,
         scientificName: item.itis_scientific_name
       };
     });
