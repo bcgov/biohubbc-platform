@@ -1,6 +1,5 @@
 import { IDBConnection } from '../database/db';
 import { ItisTaxonRecord, TaxonomyRepository } from '../repositories/taxonomy-repository';
-import { ESService } from './es-service';
 import { ItisService } from './itis-service';
 
 export interface ITaxonomySource {
@@ -36,17 +35,15 @@ export interface IItisSearchResult {
 }
 
 /**
- * Service for retrieving and processing taxonomic data from Elasticsearch.
+ * Service for retrieving and processing taxonomic data from BioHub.
  *
  * @export
  * @class TaxonomyService
- * @extends {ESService}
  */
-export class TaxonomyService extends ESService {
+export class TaxonomyService {
   taxonRepository: TaxonomyRepository;
 
   constructor(connection: IDBConnection) {
-    super();
     this.taxonRepository = new TaxonomyRepository(connection);
   }
 

@@ -36,7 +36,7 @@ export interface IItisSearchResult {
 }
 
 /**
- * Service for retrieving and processing taxonomic data from Integrated Taxonomic Information System (ITIS).
+ * Service for retrieving and processing taxonomic data from the Integrated Taxonomic Information System (ITIS).
  *
  * @See https://itis.gov
  *
@@ -52,12 +52,11 @@ export class ItisService {
    * @memberof TaxonomyService
    */
   async searchItisByTerm(searchTerms: string[]): Promise<IItisSearchResult[]> {
-    const url = await this.getItisTermSearchUrl(searchTerms);
+    const url = await this.getItisSolrTermSearchUrl(searchTerms);
 
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
     const response = await axios.get(url);
-    console.log('response', response);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -74,7 +73,7 @@ export class ItisService {
    * @memberof TaxonomyService
    */
   async searchItisByTSN(searchTsnIds: number[]): Promise<IItisSearchResponse[]> {
-    const url = await this.getItisTsnSearchUrl(searchTsnIds);
+    const url = await this.getItisSolrTsnSearchUrl(searchTsnIds);
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
 
@@ -106,13 +105,13 @@ export class ItisService {
   };
 
   /**
-   * Returns the ITIS search URL.
+   * Get the ITIS SORL search-by-term URL.
    *
    * @param {string} searchTerms
    * @return {*}  {Promise<string>}
    * @memberof ItisService
    */
-  async getItisTermSearchUrl(searchTerms: string[]): Promise<string> {
+  async getItisSolrTermSearchUrl(searchTerms: string[]): Promise<string> {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
@@ -130,13 +129,13 @@ export class ItisService {
   }
 
   /**
-   * Returns the ITIS search URL for TSN ids.
+   * Get the ITIS SOLR search-by-tsn URL.
    *
    * @param {number[]} searchTsnIds
    * @return {*}  {Promise<string>}
    * @memberof ItisService
    */
-  async getItisTsnSearchUrl(searchTsnIds: number[]): Promise<string> {
+  async getItisSolrTsnSearchUrl(searchTsnIds: number[]): Promise<string> {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
@@ -180,8 +179,7 @@ export class ItisService {
    * @return {*}  {string}
    * @memberof ItisService
    */
-  // eslint-disable-next-line @typescript-eslint/no-inferrable-types
-  _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit: number = 25): string {
+  _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit = 25): string {
     return `sort=${sortBy}+${sortDir}&rows=${limit}`;
   }
 
