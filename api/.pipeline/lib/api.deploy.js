@@ -38,6 +38,8 @@ const apiDeploy = async (settings) => {
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
         ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
+        // ITIS SOLR
+        ITIS_SOLR_URL: phases[phase].itisSolrUrl,
         // S3 (Object Store)
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         OBJECT_STORE_SECRETS: 'biohubbc-object-store',

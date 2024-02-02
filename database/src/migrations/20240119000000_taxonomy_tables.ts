@@ -139,9 +139,10 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX taxon_alias_fk3 ON taxon_alias(taxon_alias_origin_id);
 
     -- Add unique end-date key constraints (taxon)
-    CREATE UNIQUE INDEX taxon_nuk1 ON taxon(itis_scientific_name, (record_end_date is NULL)) where record_end_date is null;
-    CREATE UNIQUE INDEX taxon_nuk2 ON taxon(bc_taxon_code, (record_end_date is NULL)) where record_end_date is null;
     CREATE UNIQUE INDEX taxon_nuk3 ON taxon(itis_tsn, (record_end_date is NULL)) where record_end_date is null;
+    CREATE UNIQUE INDEX taxon_nuk1 ON taxon(itis_scientific_name, (record_end_date is NULL)) where record_end_date is null;
+    -- 'bc_taxon_code' can be null, therefore the record_end_date constraint only applies if 'bc_taxon_code' is itself not null
+    CREATE UNIQUE INDEX taxon_nuk2 ON taxon(bc_taxon_code, (record_end_date is NULL)) where record_end_date is null and bc_taxon_code is not null;
 
     -- Add unique end-date key constraints (taxon_alias)
     CREATE UNIQUE INDEX taxon_alias_nuk1 ON taxon_alias(taxon_id, alias, language_id, taxon_alias_origin_id, (record_end_date is NULL)) where record_end_date is null;
