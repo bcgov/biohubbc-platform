@@ -31,6 +31,7 @@ export class TaxonomyService {
   async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonSearchResult[]> {
     // Search for taxon records in the database
     const existingTaxonRecords = await this.taxonRepository.getTaxonByTsnIds(tsnIds);
+    let patchedTaxonRecords: TaxonRecord[] = [];
 
     const missingTsnIds = tsnIds.filter((tsnId) => !existingTaxonRecords.find((item) => item.itis_tsn === tsnId));
 
@@ -40,15 +41,11 @@ export class TaxonomyService {
       const itisService = new ItisService();
       const itisResponse = await itisService.searchItisByTSN(missingTsnIds);
 
-      for (const itisRecord of itisResponse) {
-        // Add the taxon record to the database
-        const newTaxonRecord = await this.addItisTaxonRecord(itisRecord);
-        existingTaxonRecords.push(newTaxonRecord);
-      }
+      patchedTaxonRecords = await Promise.all(itisResponse.map(async (item) => this.addItisTaxonRecord(item)));
     }
 
     // Missing ids patched, return taxon records for all requested ids
-    return this._sanitizeTaxonRecordsData(existingTaxonRecords);
+    return this._sanitizeTaxonRecordsData(existingTaxonRecords.concat(patchedTaxonRecords));
   }
 
   _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {

@@ -74,7 +74,7 @@ export class ItisService {
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
-      const commonName = (item.commonNames && item.commonNames[0].split('$')[1]) || null;
+      const commonName = item.commonNames ? item.commonNames[0].split('$')[1] : null;
 
       return {
         tsn: Number(item.tsn),
@@ -98,8 +98,6 @@ export class ItisService {
       defaultLog.debug({ label: 'getItisTermSearchUrl', message: 'Environment variable ITIS_URL is not defined.' });
       throw new Error('Failed to build ITIS query.');
     }
-
-    // const itisSearchSpecies = this._getItisSolrSearchSpeciesQuery(searchParams);
 
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       'nameWOInd',

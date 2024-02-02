@@ -53,7 +53,8 @@ GET.apiDoc = {
                       type: 'integer'
                     },
                     commonName: {
-                      type: 'string'
+                      type: 'string',
+                      nullable: true
                     },
                     scientificName: {
                       type: 'string'
