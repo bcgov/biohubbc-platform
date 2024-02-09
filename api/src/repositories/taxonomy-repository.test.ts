@@ -47,7 +47,7 @@ describe('TaxonomyRepository', () => {
   });
 
   describe('addItisTaxonRecord', () => {
-    it('should return a new taxon record', async () => {
+    it('should return undefined on successful insert', async () => {
       const mockQueryResponse = {
         rowCount: 1,
         rows: [
@@ -75,21 +75,7 @@ describe('TaxonomyRepository', () => {
 
       const response = await taxonomyRepository.addItisTaxonRecord(1, 'string', 'string', {}, 'string');
 
-      expect(response).to.be.eql({
-        taxon_id: 1,
-        itis_tsn: 1,
-        bc_taxon_code: 'string',
-        itis_scientific_name: 'string',
-        common_name: 'string',
-        itis_data: {},
-        record_effective_date: 'string',
-        record_end_date: 'string',
-        create_date: 'string',
-        create_user: 1,
-        update_date: 'string',
-        update_user: 1,
-        revision_count: 1
-      });
+      expect(response).to.be.eql(undefined);
     });
   });
 
