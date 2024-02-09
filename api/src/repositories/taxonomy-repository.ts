@@ -93,7 +93,7 @@ export class TaxonomyRepository extends BaseRepository {
       UNION
       SELECT * FROM taxon
       WHERE 
-        taxon.itis_tsn = 93
+        taxon.itis_tsn = ${itisTsn}
       AND
         taxon.record_end_date IS null;
     `;
