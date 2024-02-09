@@ -1,6 +1,9 @@
 import { IDBConnection } from '../database/db';
 import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
+import { getLogger } from '../utils/logger';
 import { ItisService, ItisSolrSearchResponse } from './itis-service';
+
+const defaultLog = getLogger('services/taxonomy-service');
 
 export type TaxonSearchResult = {
   tsn: number;
@@ -29,11 +32,13 @@ export class TaxonomyService {
    * @memberof TaxonomyService
    */
   async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonSearchResult[]> {
+    defaultLog.debug({ label: 'getTaxonByTsnIds', tsnIds });
+
     // Search for taxon records in the database
     const existingTaxonRecords = await this.taxonRepository.getTaxonByTsnIds(tsnIds);
-    let patchedTaxonRecords: TaxonRecord[] = [];
+    const existingTsnIds = existingTaxonRecords.map((record) => record.itis_tsn);
 
-    const missingTsnIds = tsnIds.filter((tsnId) => !existingTaxonRecords.find((item) => item.itis_tsn === tsnId));
+    const missingTsnIds = tsnIds.filter((tsnId) => !existingTsnIds.includes(tsnId));
 
     if (missingTsnIds.length) {
       // If the local database does not contain a record for all of the requested ids, search ITIS for the missing
@@ -41,11 +46,11 @@ export class TaxonomyService {
       const itisService = new ItisService();
       const itisResponse = await itisService.searchItisByTSN(missingTsnIds);
 
-      patchedTaxonRecords = await Promise.all(itisResponse.map(async (item) => this.addItisTaxonRecord(item)));
+      await Promise.all(itisResponse.map(this.addItisTaxonRecord));
     }
 
     // Missing ids patched, return taxon records for all requested ids
-    return this._sanitizeTaxonRecordsData(existingTaxonRecords.concat(patchedTaxonRecords));
+    return this._sanitizeTaxonRecordsData(await this.taxonRepository.getTaxonByTsnIds(tsnIds));
   }
 
   _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {
@@ -65,7 +70,7 @@ export class TaxonomyService {
    * @return {*}  {Promise<TaxonRecord>}
    * @memberof TaxonomyService
    */
-  async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
+  async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<void> {
     let commonName = null;
     if (itisSolrResponse.commonNames) {
       commonName = itisSolrResponse.commonNames[0].split('$')[1];
