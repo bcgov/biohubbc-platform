@@ -46,7 +46,7 @@ export class TaxonomyService {
       const itisService = new ItisService();
       const itisResponse = await itisService.searchItisByTSN(missingTsnIds);
 
-      await Promise.all(itisResponse.map(this.addItisTaxonRecord));
+      await Promise.all(itisResponse.map(async (item) => this.addItisTaxonRecord(item)));
     }
 
     // Missing ids patched, return taxon records for all requested ids
