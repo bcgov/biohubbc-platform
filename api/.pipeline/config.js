@@ -88,12 +88,12 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.dev,
     logLevel: (isStaticDeployment && 'info') || 'debug',
-    nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '500m',
+    cpuLimit: '600m',
     memoryRequest: '100Mi',
-    memoryLimit: '2Gi',
-    replicas: '1',
+    memoryLimit: '3Gi',
+    replicas: (isStaticDeployment && '1') || '1',
     replicasMax: (isStaticDeployment && '2') || '1'
   },
   test: {
@@ -117,13 +117,13 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.test,
     logLevel: 'info',
-    nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
     cpuLimit: '1000m',
     memoryRequest: '100Mi',
-    memoryLimit: '2Gi',
+    memoryLimit: '3Gi',
     replicas: '2',
-    replicasMax: '3'
+    replicasMax: '4'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -146,13 +146,13 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.prod,
     logLevel: 'warn',
-    nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
     cpuLimit: '1000m',
     memoryRequest: '100Mi',
-    memoryLimit: '2Gi',
+    memoryLimit: '3Gi',
     replicas: '2',
-    replicasMax: '3'
+    replicasMax: '4'
   }
 };
 
