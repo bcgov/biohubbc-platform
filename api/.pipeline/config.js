@@ -87,7 +87,7 @@ const phases = {
     s3KeyPrefix: (isStaticDeployment && 'biohub') || `local/${deployChangeId}/biohub`,
     tz: config.timezone.api,
     sso: config.sso.dev,
-    logLevel: 'debug',
+    logLevel: (isStaticDeployment && 'info') || 'debug',
     nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
     cpuLimit: '500m',
@@ -145,7 +145,7 @@ const phases = {
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    logLevel: 'info',
+    logLevel: 'warn',
     nodeOptions: '--max_old_space_size=1500', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
     cpuLimit: '1000m',
