@@ -40,17 +40,19 @@ export class TaxonomyService {
 
     const missingTsnIds = tsnIds.filter((tsnId) => !existingTsnIds.includes(tsnId));
 
+    let patchedTaxonRecords: TaxonRecord[] = [];
+
     if (missingTsnIds.length) {
       // If the local database does not contain a record for all of the requested ids, search ITIS for the missing
       // taxon records, patching the missing records in the local database in the process
       const itisService = new ItisService();
       const itisResponse = await itisService.searchItisByTSN(missingTsnIds);
 
-      await Promise.all(itisResponse.map(async (item) => this.addItisTaxonRecord(item)));
+      patchedTaxonRecords = await Promise.all(itisResponse.map(async (item) => this.addItisTaxonRecord(item)));
     }
 
     // Missing ids patched, return taxon records for all requested ids
-    return this._sanitizeTaxonRecordsData(await this.taxonRepository.getTaxonByTsnIds(tsnIds));
+    return this._sanitizeTaxonRecordsData(existingTaxonRecords.concat(patchedTaxonRecords));
   }
 
   _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {
@@ -70,7 +72,7 @@ export class TaxonomyService {
    * @return {*}  {Promise<TaxonRecord>}
    * @memberof TaxonomyService
    */
-  async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<void> {
+  async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
     let commonName = null;
     if (itisSolrResponse.commonNames) {
       commonName = itisSolrResponse.commonNames[0].split('$')[1];

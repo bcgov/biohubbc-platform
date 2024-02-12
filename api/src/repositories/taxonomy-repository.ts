@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getKnex } from '../database/db';
 import { getLogger } from '../utils/logger';
 import { BaseRepository } from './base-repository';
+import { ApiExecuteSQLError } from '../errors/api-error';
 
 const defaultLog = getLogger('repositories/taxonomy-repository');
 
@@ -64,7 +65,7 @@ export class TaxonomyRepository extends BaseRepository {
     commonName: string | null,
     itisData: Record<string, unknown>,
     itisUpdateDate: string
-  ): Promise<void> {
+  ): Promise<TaxonRecord> {
     defaultLog.debug({ label: 'addItisTaxonRecord', itisTsn });
 
     const sqlStatement = SQL`
@@ -98,7 +99,16 @@ export class TaxonomyRepository extends BaseRepository {
         taxon.record_end_date IS null;
     `;
 
-    await this.connection.sql(sqlStatement, TaxonRecord);
+    const response = await this.connection.sql(sqlStatement, TaxonRecord);
+
+    if (response.rowCount !== 1) {
+      throw new ApiExecuteSQLError('Failed to insert new taxon record', [
+        'TaxonomyRepository->addItisTaxonRecord',
+        'rowCount was null or undefined, expected rowCount = 1'
+      ]);
+    }
+
+    return response.rows[0];
   }
 
   /**
