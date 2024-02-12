@@ -1,6 +1,9 @@
 import { IDBConnection } from '../database/db';
 import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
+import { getLogger } from '../utils/logger';
 import { ItisService, ItisSolrSearchResponse } from './itis-service';
+
+const defaultLog = getLogger('services/taxonomy-service');
 
 export type TaxonSearchResult = {
   tsn: number;
@@ -29,11 +32,15 @@ export class TaxonomyService {
    * @memberof TaxonomyService
    */
   async getTaxonByTsnIds(tsnIds: number[]): Promise<TaxonSearchResult[]> {
+    defaultLog.debug({ label: 'getTaxonByTsnIds', tsnIds });
+
     // Search for taxon records in the database
     const existingTaxonRecords = await this.taxonRepository.getTaxonByTsnIds(tsnIds);
-    let patchedTaxonRecords: TaxonRecord[] = [];
+    const existingTsnIds = existingTaxonRecords.map((record) => record.itis_tsn);
 
-    const missingTsnIds = tsnIds.filter((tsnId) => !existingTaxonRecords.find((item) => item.itis_tsn === tsnId));
+    const missingTsnIds = tsnIds.filter((tsnId) => !existingTsnIds.includes(tsnId));
+
+    let patchedTaxonRecords: TaxonRecord[] = [];
 
     if (missingTsnIds.length) {
       // If the local database does not contain a record for all of the requested ids, search ITIS for the missing
