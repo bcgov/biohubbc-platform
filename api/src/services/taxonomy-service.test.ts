@@ -62,7 +62,7 @@ describe('TaxonomyService', () => {
 
       const response = await taxonomyService.getTaxonByTsnIds([1]);
 
-      expect(repo).to.be.calledTwice;
+      expect(repo).to.be.calledOnce;
       expect(response).to.be.eql([{ tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' }]);
     });
 
@@ -104,24 +104,19 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const getTaxonByTsnIdsStub = sinon
-        .stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds')
-        .onCall(0)
-        .resolves([getTaxonRecord[0]])
-        .onCall(1)
-        .resolves([...getTaxonRecord]);
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([getTaxonRecord[0]]);
 
       const searchItisByTSNStub = sinon
         .stub(ItisService.prototype, 'searchItisByTSN')
         .resolves(getItisSolrSearchResponse);
 
-      const addItisTaxonRecordStub = sinon.stub(TaxonomyService.prototype, 'addItisTaxonRecord').resolves();
+      const itisService = sinon.stub(TaxonomyService.prototype, 'addItisTaxonRecord').resolves(getTaxonRecord[1]);
 
       const response = await taxonomyService.getTaxonByTsnIds([1, 2]);
 
-      expect(getTaxonByTsnIdsStub).to.be.calledTwice;
+      expect(repo).to.be.calledOnce;
       expect(searchItisByTSNStub).to.be.calledOnce;
-      expect(addItisTaxonRecordStub).to.be.calledOnce;
+      expect(itisService).to.be.calledOnce;
       expect(response).to.be.eql([
         { tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' },
         { tsn: 2, commonName: 'common_name', scientificName: 'itis_scientific_name' }
@@ -135,11 +130,40 @@ describe('TaxonomyService', () => {
 
       const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const addItisTaxonRecordStub = sinon.stub(TaxonomyRepository.prototype, 'addItisTaxonRecord').resolves();
+      const addItisTaxonRecordStub = sinon.stub(TaxonomyRepository.prototype, 'addItisTaxonRecord').resolves({
+        taxon_id: 1,
+        itis_tsn: 1,
+        bc_taxon_code: null,
+        itis_scientific_name: 'scientificName',
+        common_name: 'commonName',
+        itis_data: {},
+        record_effective_date: 'updateDate',
+        record_end_date: null,
+        create_date: 'now',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1
+      });
 
-      await taxonomyService.addItisTaxonRecord(getItisSolrSearchResponse[0]);
+      const response = await taxonomyService.addItisTaxonRecord(getItisSolrSearchResponse[0]);
 
       expect(addItisTaxonRecordStub).to.be.calledOnce;
+      expect(response).to.be.eql({
+        taxon_id: 1,
+        itis_tsn: 1,
+        bc_taxon_code: null,
+        itis_scientific_name: 'scientificName',
+        common_name: 'commonName',
+        itis_data: {},
+        record_effective_date: 'updateDate',
+        record_end_date: null,
+        create_date: 'now',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1
+      });
     });
   });
 
