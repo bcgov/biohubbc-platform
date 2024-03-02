@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { sortExactMatches } from '../utils/itis';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
-import { sortExactMatches } from '../utils/itis';
 
 const defaultLog = getLogger('services/itis-service');
 
@@ -50,7 +50,7 @@ export class ItisService {
     const sortedResponse = sortExactMatches(sanitizedResponse, searchTerms);
 
     // Return only 25 records
-    return sortedResponse.slice(0, 25);
+    return sortedResponse.slice(0, 15);
   }
 
   /**
@@ -94,7 +94,8 @@ export class ItisService {
         tsn: Number(item.tsn),
         commonNames: commonNames || [],
         scientificName: item.scientificName,
-        rank: item.rank
+        rank: item.rank,
+        kingdom: item.kingdom
       };
     });
   };
@@ -115,9 +116,9 @@ export class ItisService {
     }
 
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'kingdom',
-      'asc',
-      100
+      ['kingdom'],
+      ['asc'],
+      50
     )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}`;
   }
 
@@ -137,8 +138,8 @@ export class ItisService {
     }
 
     return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'kingdom',
-      'desc',
+      ['kingdom'],
+      ['asc'],
       100
     )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
@@ -172,8 +173,8 @@ export class ItisService {
    * @return {*}  {string}
    * @memberof ItisService
    */
-  _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit: number): string {
-    return `sort=${sortBy}+${sortDir}&rows=${limit}`;
+  _getItisSolrSortParam(sortBy: string[], sortDir: ('asc' | 'desc')[], limit: number): string {
+    return `sort=${sortBy.map((f, index) => `${f}+${sortDir[index]}`).join(',')}&rows=${limit}`;
   }
 
   /**

@@ -61,6 +61,9 @@ GET.apiDoc = {
                     },
                     rank: {
                       type: 'string'
+                    },
+                    kingdom: {
+                      type: 'string'
                     }
                   },
                   additionalProperties: false
