@@ -42,7 +42,12 @@ export class ItisService {
       return [];
     }
 
-    return this._sanitizeItisData(response.data.response.docs);
+    const sanitizedResponse = this._sanitizeItisData(response.data.response.docs);
+
+    const sortedResponse = this._sortExactMatches(sanitizedResponse, searchTerms);
+
+    // Return only 25 records
+    return sortedResponse.slice(0, 25);
   }
 
   /**
@@ -65,6 +70,49 @@ export class ItisService {
 
     return response.data.response.docs;
   }
+
+  /**
+   * Sorts the ITIS response such that exact matches with search terms are first
+   *
+   * @param {ItisSolrSearchResponse[]} data
+   * @memberof ItisService
+   */
+  _sortExactMatches = (data: TaxonSearchResult[], searchTerms: string[]): TaxonSearchResult[] => {
+    // Lowercase for exact matches and join
+    const searchTermsLower = searchTerms.map((item) => item.toLowerCase());
+
+    // Custom sorting function
+    const customSort = (a: TaxonSearchResult, b: TaxonSearchResult) => {
+      const aInReference = checkForMatch(a, searchTermsLower);
+      const bInReference = checkForMatch(b, searchTermsLower);
+
+      if (aInReference && !bInReference) {
+        return -1; // Place items from searchTerms before other items
+      } else if (!aInReference && bInReference) {
+        return 1; // Place other items after items from searchTerms
+      } else {
+        return 0; // Maintain the original order if both are from searchTerms or both are not
+      }
+    };
+
+    // Function to check if an item is a match with search terms
+    const checkForMatch = (item: TaxonSearchResult, searchTermsLower: string[]) => {
+      // Lowercase commonName and split into individual words
+      const commonNameWords = item.commonName ? item.commonName.toLowerCase().split(/\s+/) : [];
+
+      // Lowercase scientificName and split into individual words
+      const scientificNameWords = item.scientificName.toLowerCase().split(/\s+/);
+
+      // Check if any word in commonName or scientificName matches any word in searchTerms
+      return searchTermsLower.some(
+        (searchTerm) =>
+          commonNameWords.some((word) => word === searchTerm) || scientificNameWords.some((word) => word === searchTerm)
+      );
+    };
+
+    // Sort the data array using the custom sorting function
+    return data.sort(customSort);
+  };
 
   /**
    * Cleans up the ITIS search response data.
@@ -100,10 +148,10 @@ export class ItisService {
     }
 
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'nameWOInd',
-      'asc',
-      25
-    )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}`;
+      'credibilityRating',
+      'desc',
+      150
+    )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}&qf=nameWOInd^2`;
   }
 
   /**
@@ -122,9 +170,9 @@ export class ItisService {
     }
 
     return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'nameWOInd',
-      'asc',
-      25
+      'credibilityRating',
+      'desc',
+      150
     )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
 
@@ -153,11 +201,11 @@ export class ItisService {
    *
    * @param {string} sortBy
    * @param {('asc' | 'desc')} sortDir
-   * @param {number} [limit=25]
+   * @param {number} limit
    * @return {*}  {string}
    * @memberof ItisService
    */
-  _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit = 25): string {
+  _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit: number): string {
     return `sort=${sortBy}+${sortDir}&rows=${limit}`;
   }
 
