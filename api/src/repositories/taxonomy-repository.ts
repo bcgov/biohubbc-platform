@@ -12,7 +12,7 @@ export const TaxonRecord = z.object({
   itis_tsn: z.number(),
   bc_taxon_code: z.string().nullable(),
   itis_scientific_name: z.string(),
-  common_name: z.string().nullable(),
+  common_name: z.string(),
   itis_data: z.record(z.any()),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),
@@ -53,7 +53,7 @@ export class TaxonomyRepository extends BaseRepository {
    *
    * @param {number} itisTsn
    * @param {string} itisScientificName
-   * @param {(string | null)} commonName
+   * @param {(string | null)} commonNames
    * @param {Record<any, any>} itisData
    * @param {string} itisUpdateDate
    * @return {*}  {Promise<TaxonRecord>}
@@ -62,7 +62,7 @@ export class TaxonomyRepository extends BaseRepository {
   async addItisTaxonRecord(
     itisTsn: number,
     itisScientificName: string,
-    commonName: string | null,
+    commonNames: string | null,
     itisData: Record<string, unknown>,
     itisUpdateDate: string
   ): Promise<TaxonRecord> {
@@ -82,7 +82,7 @@ export class TaxonomyRepository extends BaseRepository {
         VALUES (
           ${itisTsn},
           ${itisScientificName},
-          ${commonName},
+          ${commonNames},
           ${itisData},
           ${itisUpdateDate}
         )

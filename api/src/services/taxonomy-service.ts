@@ -7,7 +7,7 @@ const defaultLog = getLogger('services/taxonomy-service');
 
 export type TaxonSearchResult = {
   tsn: number;
-  commonName: string | null;
+  commonNames: string[];
   scientificName: string;
 };
 
@@ -56,13 +56,11 @@ export class TaxonomyService {
   }
 
   _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {
-    return taxonRecords.map((item: TaxonRecord) => {
-      return {
-        tsn: item.itis_tsn,
-        commonName: item.common_name,
-        scientificName: item.itis_scientific_name
-      };
-    });
+    return taxonRecords.map((item: TaxonRecord) => ({
+      tsn: item.itis_tsn,
+      commonNames: [item.common_name],
+      scientificName: item.itis_scientific_name
+    }));
   }
 
   /**
@@ -73,10 +71,10 @@ export class TaxonomyService {
    * @memberof TaxonomyService
    */
   async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
-    let commonName = null;
+    let commonNames = null;
     if (itisSolrResponse.commonNames) {
       const firstEnglishName = itisSolrResponse.commonNames.find((name) => name.split('$')[2] === 'English');
-      commonName = firstEnglishName ? firstEnglishName.split('$')[1] : null;
+      commonNames = firstEnglishName ? firstEnglishName.split('$')[1] : null;
       /* Sample itisResponse:
        * commonNames: [
        *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
@@ -90,7 +88,7 @@ export class TaxonomyService {
     return this.taxonRepository.addItisTaxonRecord(
       Number(itisSolrResponse.tsn),
       itisSolrResponse.scientificName,
-      commonName,
+      commonNames,
       itisSolrResponse,
       itisSolrResponse.updateDate
     );

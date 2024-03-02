@@ -40,7 +40,7 @@ describe('ItisService', () => {
           response: {
             docs: [
               {
-                commonNames: ['$commonName'],
+                commonNames: ['$commonNames'],
                 kingdom: 'kingdom',
                 name: 'name',
                 parentTSN: 'parentTSN',
@@ -67,7 +67,7 @@ describe('ItisService', () => {
       expect(response).to.eql([
         {
           tsn: 123,
-          commonName: 'commonName',
+          commonNames: 'commonNames',
           scientificName: 'scientificName'
         }
       ]);
@@ -121,7 +121,7 @@ describe('ItisService', () => {
           response: {
             docs: [
               {
-                commonNames: ['$commonName'],
+                commonNames: ['$commonNames'],
                 kingdom: 'kingdom',
                 name: 'name',
                 parentTSN: 'parentTSN',
@@ -145,7 +145,7 @@ describe('ItisService', () => {
 
       expect(response).to.eql([
         {
-          commonNames: ['$commonName'],
+          commonNames: ['$commonNames'],
           kingdom: 'kingdom',
           name: 'name',
           parentTSN: 'parentTSN',

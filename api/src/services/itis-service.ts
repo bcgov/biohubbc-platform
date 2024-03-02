@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { sortExactMatches } from '../utils/itis';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
+import { sortExactMatches } from '../utils/itis';
 
 const defaultLog = getLogger('services/itis-service');
 
@@ -14,6 +14,7 @@ export type ItisSolrSearchResponse = {
   tsn: string;
   updateDate: string;
   usage: string;
+  rank: string;
 };
 
 /**
@@ -86,13 +87,14 @@ export class ItisService {
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
-      const firstEnglishName = item.commonNames?.find((name) => name.split('$')[2] === 'English');
-      const commonName = firstEnglishName ? firstEnglishName.split('$')[1] : null;
+      const englishNames = item.commonNames?.filter((name) => name.split('$')[2] === 'English');
+      const commonNames = englishNames ? englishNames.map((name) => name.split('$')[1]) : null;
 
       return {
         tsn: Number(item.tsn),
-        commonName: commonName,
-        scientificName: item.scientificName
+        commonNames: commonNames || [],
+        scientificName: item.scientificName,
+        rank: item.rank
       };
     });
   };
@@ -113,9 +115,9 @@ export class ItisService {
     }
 
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'credibilityRating',
-      'desc',
-      75
+      'kingdom',
+      'asc',
+      100
     )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}`;
   }
 
@@ -135,9 +137,9 @@ export class ItisService {
     }
 
     return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'credibilityRating',
+      'kingdom',
       'desc',
-      75
+      100
     )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
 
@@ -181,7 +183,7 @@ export class ItisService {
    * @memberof ItisService
    */
   _getItisSolrFilterParam(): string {
-    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage';
+    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank:rankId';
   }
 
   /**

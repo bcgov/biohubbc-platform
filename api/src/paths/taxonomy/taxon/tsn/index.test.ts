@@ -52,8 +52,8 @@ describe('tsn', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mock1 = { tsn: '1', commonName: 'something', scientificName: 'string' } as unknown as any;
-      const mock2 = { tsn: '2', commonName: null, scientificName: 'string' } as unknown as any;
+      const mock1 = { tsn: '1', commonNames: ['something'], scientificName: 'string' } as unknown as any;
+      const mock2 = { tsn: '2', commonNames: null, scientificName: 'string' } as unknown as any;
 
       const getTaxonByTsnIdsStub = sinon.stub(TaxonomyService.prototype, 'getTaxonByTsnIds').resolves([mock1, mock2]);
 

@@ -45,16 +45,21 @@ GET.apiDoc = {
                 items: {
                   title: 'Taxon',
                   type: 'object',
-                  required: ['tsn', 'commonName', 'scientificName'],
+                  required: ['tsn', 'commonNames', 'scientificName'],
                   properties: {
                     tsn: {
                       type: 'integer'
                     },
-                    commonName: {
-                      type: 'string',
-                      nullable: true
+                    commonNames: {
+                      type: 'array',
+                      items: {
+                        type: 'string'
+                      }
                     },
                     scientificName: {
+                      type: 'string'
+                    },
+                    rank: {
                       type: 'string'
                     }
                   },
