@@ -86,7 +86,8 @@ export class ItisService {
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
-      const commonName = item.commonNames ? item.commonNames[0].split('$')[1] : null;
+      const firstEnglishName = item.commonNames?.find((name) => name.split('$')[2] === 'English');
+      const commonName = firstEnglishName ? firstEnglishName.split('$')[1] : null;
 
       return {
         tsn: Number(item.tsn),

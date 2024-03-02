@@ -75,7 +75,8 @@ export class TaxonomyService {
   async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
     let commonName = null;
     if (itisSolrResponse.commonNames) {
-      commonName = itisSolrResponse.commonNames[0].split('$')[1];
+      const firstEnglishName = itisSolrResponse.commonNames.find((name) => name.split('$')[2] === 'English');
+      commonName = firstEnglishName ? firstEnglishName.split('$')[1] : null;
       /* Sample itisResponse:
        * commonNames: [
        *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
