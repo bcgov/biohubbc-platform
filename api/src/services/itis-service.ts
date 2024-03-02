@@ -114,8 +114,8 @@ export class ItisService {
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       'credibilityRating',
       'desc',
-      100
-    )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}&qf=nameWOInd^2`;
+      75
+    )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}`;
   }
 
   /**
@@ -136,7 +136,7 @@ export class ItisService {
     return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       'credibilityRating',
       'desc',
-      100
+      75
     )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
 
