@@ -215,7 +215,7 @@ declare
 						<taxonomicClassification>
 							<taxonRankName>SPECIES</taxonRankName>
 							<taxonRankValue>Amaranthus albus</taxonRankValue>
-							<commonNames>Tumbleweed</commonNames>
+							<commonName>Tumbleweed</commonName>
 							<taxonId provider="https://biohub.bc.ca">AMARALB</taxonId>
 						</taxonomicClassification>
 					</taxonomicCoverage>
