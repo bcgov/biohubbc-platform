@@ -62,7 +62,7 @@ export class TaxonomyRepository extends BaseRepository {
   async addItisTaxonRecord(
     itisTsn: number,
     itisScientificName: string,
-    commonNames: string | null,
+    commonName: string | null,
     itisData: Record<string, unknown>,
     itisUpdateDate: string
   ): Promise<TaxonRecord> {
@@ -82,7 +82,7 @@ export class TaxonomyRepository extends BaseRepository {
         VALUES (
           ${itisTsn},
           ${itisScientificName},
-          ${commonNames},
+          ${commonName},
           ${itisData},
           ${itisUpdateDate}
         )

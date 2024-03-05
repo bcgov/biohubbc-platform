@@ -76,12 +76,7 @@ export class ItisService {
   }
 
   /**
-   * Sorts by exact matches within, ie. Keywords of "Black" and "Bear" would match on "Black Willow"
-   *
-   */
-
-  /**
-   * Cleans up the ITIS search response data.
+   * Cleans up the ITIS search response data
    *
    * @param {ItisSolrSearchResponse[]} data
    * @memberof ItisService
@@ -89,11 +84,11 @@ export class ItisService {
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
       const englishNames = item.commonNames?.filter((name) => name.split('$')[2] === 'English');
-      const commonNames = englishNames ? englishNames.map((name) => name.split('$')[1]) : null;
+      const commonNames = englishNames && englishNames.map((name) => name.split('$')[1])
 
       return {
         tsn: Number(item.tsn),
-        commonNames: commonNames || [],
+        commonNames: commonNames,
         scientificName: item.scientificName,
         rank: item.rank,
         kingdom: item.kingdom
