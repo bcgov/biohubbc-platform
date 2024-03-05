@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { sortExactMatches } from '../utils/itis';
+import { sortExactMatches } from '../utils/itis-sort';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
 
