@@ -109,6 +109,7 @@ export const customSortContainsSearchTermsJoinedExact = (
  * any common name is EXACTLY EQUAL to the search terms joined
  *
  * @param {ItisSolrSearchResponse[]} data
+ * @param {string[]} searchTerms
  * @memberof ItisService
  */
 export const customSortEqualsSearchTermsExact = (
