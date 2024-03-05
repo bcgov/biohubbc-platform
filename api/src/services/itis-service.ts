@@ -140,7 +140,7 @@ export class ItisService {
     return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       ['kingdom'],
       ['asc'],
-      100
+      150
     )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
 
@@ -184,7 +184,7 @@ export class ItisService {
    * @memberof ItisService
    */
   _getItisSolrFilterParam(): string {
-    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank:rankId';
+    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank';
   }
 
   /**

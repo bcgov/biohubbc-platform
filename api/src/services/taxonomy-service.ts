@@ -58,6 +58,7 @@ export class TaxonomyService {
   _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {
     return taxonRecords.map((item: TaxonRecord) => ({
       tsn: item.itis_tsn,
+      // placeholder: wrap commonNames in array until the database supports multiple common names
       commonNames: [item.common_name],
       scientificName: item.itis_scientific_name
     }));

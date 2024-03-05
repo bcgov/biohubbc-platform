@@ -40,14 +40,15 @@ describe('ItisService', () => {
           response: {
             docs: [
               {
-                commonNames: ['$commonNames'],
+                commonNames: ['$commonNames$English'],
                 kingdom: 'kingdom',
                 name: 'name',
                 parentTSN: 'parentTSN',
                 scientificName: 'scientificName',
                 tsn: '123',
                 updateDate: 'updateDate',
-                usage: 'usage'
+                usage: '',
+                rank: 'kingdom'
               }
             ]
           }
@@ -67,8 +68,10 @@ describe('ItisService', () => {
       expect(response).to.eql([
         {
           tsn: 123,
-          commonNames: 'commonNames',
-          scientificName: 'scientificName'
+          commonNames: ['commonNames'],
+          scientificName: 'scientificName',
+          rank: 'kingdom',
+          kingdom: 'kingdom'
         }
       ]);
 
@@ -121,14 +124,15 @@ describe('ItisService', () => {
           response: {
             docs: [
               {
-                commonNames: ['$commonNames'],
+                commonNames: ['$commonNames$English'],
                 kingdom: 'kingdom',
                 name: 'name',
                 parentTSN: 'parentTSN',
                 scientificName: 'scientificName',
                 tsn: '123',
                 updateDate: 'updateDate',
-                usage: 'usage'
+                usage: '',
+                rank: 'kingdom'
               }
             ]
           }
@@ -145,14 +149,15 @@ describe('ItisService', () => {
 
       expect(response).to.eql([
         {
-          commonNames: ['$commonNames'],
+          commonNames: ['$commonNames$English'],
           kingdom: 'kingdom',
           name: 'name',
           parentTSN: 'parentTSN',
           scientificName: 'scientificName',
           tsn: '123',
           updateDate: 'updateDate',
-          usage: 'usage'
+          usage: '',
+          rank: 'kingdom'
         }
       ]);
 
@@ -200,7 +205,7 @@ describe('ItisService', () => {
       const response = await itisService.getItisSolrTermSearchUrl(['term']);
 
       expect(response).to.equal(
-        'https://services.itis.gov/?wt=json&sort=nameWOInd+asc&rows=25&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage&q=((nameWOInd:*term*+AND+usage:/(valid|accepted)/)+OR+(vernacular:*term*+AND+usage:/(valid|accepted)/))'
+        'https://services.itis.gov/?wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&q=((nameWOInd:*term*+AND+usage:/(valid|accepted)/)+OR+(vernacular:*term*+AND+usage:/(valid|accepted)/))'
       );
     });
   });
@@ -228,7 +233,7 @@ describe('ItisService', () => {
       const response = await itisService.getItisSolrTsnSearchUrl([123]);
 
       expect(response).to.equal(
-        'https://services.itis.gov/??wt=json&sort=nameWOInd+asc&rows=25&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage&&q=tsn:123'
+        'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&&q=tsn:123'
       );
     });
   });
