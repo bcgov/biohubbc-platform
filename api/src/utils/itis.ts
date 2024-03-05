@@ -12,11 +12,7 @@ export const sortExactMatches = (data: TaxonSearchResult[], searchTerms: string[
   const contains = customSortContainsAnyMatchingSearchTerm(data, searchTermsLower);
   const someEquals = customSortContainsSearchTermsJoined(contains, searchTermsLower);
   const exactEquals = customSortEqualsSearchTermsJoined(someEquals, searchTermsLower);
-
-  console.log(someEquals);
-  console.log(exactEquals);
-  console.log(exactEquals);
-
+  
   return exactEquals;
 };
 
