@@ -58,6 +58,12 @@ GET.apiDoc = {
                     },
                     scientificName: {
                       type: 'string'
+                    },
+                    rank: {
+                      type: 'string'
+                    },
+                    kingdom: {
+                      type: 'string'
                     }
                   },
                   additionalProperties: false

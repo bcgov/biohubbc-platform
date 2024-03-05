@@ -59,7 +59,7 @@ export class TaxonomyService {
     return taxonRecords.map((item: TaxonRecord) => ({
       tsn: item.itis_tsn,
       commonNames: [item.common_name],
-      scientificName: item.itis_scientific_name,
+      scientificName: item.itis_scientific_name
     }));
   }
 

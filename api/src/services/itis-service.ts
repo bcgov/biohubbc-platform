@@ -118,7 +118,7 @@ export class ItisService {
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
       ['kingdom'],
       ['asc'],
-      50
+      150
     )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}`;
   }
 

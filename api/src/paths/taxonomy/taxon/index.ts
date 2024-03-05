@@ -107,7 +107,7 @@ export function findTaxonBySearchTerms(): RequestHandler {
       const response = await itisService.searchItisByTerm(searchTerms);
 
       // Overwrite default cache-control header, allow caching up to 7 days
-      res.setHeader('Cache-Control', 'max-age=604800');
+      res.setHeader('Cache-Control', 'no-cache');
 
       res.status(200).json({ searchResponse: response });
     } catch (error) {

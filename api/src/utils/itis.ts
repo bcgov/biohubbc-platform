@@ -13,6 +13,10 @@ export const sortExactMatches = (data: TaxonSearchResult[], searchTerms: string[
   const someEquals = customSortContainsSearchTermsJoined(contains, searchTermsLower);
   const exactEquals = customSortEqualsSearchTermsJoined(someEquals, searchTermsLower);
 
+  console.log(someEquals);
+  console.log(exactEquals);
+  console.log(exactEquals);
+
   return exactEquals;
 };
 
@@ -51,7 +55,7 @@ export const customSortContainsAnyMatchingSearchTerm = (
     return searchTerms.some(
       (searchTerm) =>
         scientificNameWords.some((word) => word === searchTerm) || // Check if any word in scientific name matches any search term
-        (commonNameWords && commonNameWords.some((word) => word === searchTerm)) // Check if any word in common names matches any search term
+        commonNameWords?.includes(searchTerm) // Check if any word in common names matches any search term
     );
   };
 
@@ -76,7 +80,7 @@ export const customSortContainsSearchTermsJoined = (
     if (aInReference && !bInReference) {
       return -1; // Place items from searchTerms before other items
     } else if (!aInReference && bInReference) {
-      return 0; // Place other items after items from searchTerms
+      return 1; // Place other items after items from searchTerms
     } else {
       return 0; // Maintain the original order if both are from searchTerms or both are not
     }
@@ -124,9 +128,13 @@ export const customSortEqualsSearchTermsJoined = (
   const checkForMatch = (item: TaxonSearchResult, searchTerms: string[]) => {
     const commonNameWords = item.commonNames && item.commonNames.map((name) => name.toLowerCase());
 
-    const scientificNameWord = item.scientificName.toLowerCase()
+    const scientificNameWord = item.scientificName.toLowerCase();
 
-    return scientificNameWord === searchTerms.join(' ') || commonNameWords.includes(searchTerms.join(' '));
+    // Add a space such that "Black bear" matches "American black bear" and not "Black Bearded"
+    return (
+      scientificNameWord === searchTerms.join(' ') ||
+      commonNameWords?.some((name) => `${name}${' '}`.includes(`${searchTerms.join(' ')}${' '}`))
+    );
   };
 
   return data.sort(customSort);
