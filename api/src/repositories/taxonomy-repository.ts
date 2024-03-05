@@ -12,7 +12,7 @@ export const TaxonRecord = z.object({
   itis_tsn: z.number(),
   bc_taxon_code: z.string().nullable(),
   itis_scientific_name: z.string(),
-  common_name: z.string(),
+  common_name: z.string().nullable(),
   itis_data: z.record(z.any()),
   record_effective_date: z.string(),
   record_end_date: z.string().nullable(),

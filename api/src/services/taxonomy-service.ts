@@ -7,7 +7,7 @@ const defaultLog = getLogger('services/taxonomy-service');
 
 export type TaxonSearchResult = {
   tsn: number;
-  commonNames: string[];
+  commonNames: string[] | [];
   scientificName: string;
 };
 
@@ -59,7 +59,7 @@ export class TaxonomyService {
     return taxonRecords.map((item: TaxonRecord) => ({
       tsn: item.itis_tsn,
       // placeholder: wrap commonNames in array until the database supports multiple common names
-      commonNames: [item.common_name],
+      commonNames: item?.common_name ? [item.common_name] : [],
       scientificName: item.itis_scientific_name
     }));
   }

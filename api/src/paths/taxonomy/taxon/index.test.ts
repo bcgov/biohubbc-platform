@@ -52,7 +52,7 @@ describe('taxon', () => {
 
       sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
 
-      const mock1 = { id: '1', commonNames: 'something', scientificName: 'string' } as unknown as any;
+      const mock1 = { id: '1', commonNames: ['something'], scientificName: 'string' } as unknown as any;
       const mock2 = { id: '2', commonNames: null, scientificName: 'string' } as unknown as any;
 
       const getSpeciesFromIdsStub = sinon.stub(ItisService.prototype, 'searchItisByTerm').resolves([mock1, mock2]);

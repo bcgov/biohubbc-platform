@@ -49,7 +49,8 @@ export class ItisService {
     // Sort the results to place exact matches at the top
     const sortedResponse = sortExactMatches(sanitizedResponse, searchTerms);
 
-    // Return only 25 records
+    // Return only a subset of the records
+    // More records than are returned here are requested from ITIS to help find and prioritize exact matches
     return sortedResponse.slice(0, 15);
   }
 
