@@ -62,12 +62,13 @@ export class TaxonomyRepository extends BaseRepository {
   async addItisTaxonRecord(
     itisTsn: number,
     itisScientificName: string,
-    commonName: string | null,
+    commonNames: string[],
     itisData: Record<string, unknown>,
     itisUpdateDate: string
   ): Promise<TaxonRecord> {
     defaultLog.debug({ label: 'addItisTaxonRecord', itisTsn });
 
+    // TODO: Store multiple common names rather than just the first item of the commonNames array
     const sqlStatement = SQL`
       WITH inserted_row AS (
         INSERT INTO
@@ -82,7 +83,7 @@ export class TaxonomyRepository extends BaseRepository {
         VALUES (
           ${itisTsn},
           ${itisScientificName},
-          ${commonName},
+          ${commonNames[0]},
           ${itisData},
           ${itisUpdateDate}
         )
