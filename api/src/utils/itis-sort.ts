@@ -101,5 +101,5 @@ export const customSortEqualsSearchTermsExact = (
     const aInReference = checkForMatch(a);
     const bInReference = checkForMatch(b);
 
-    return aInReference && !bInReference ? -1 : 0
+    return aInReference && !bInReference ? -1 : 0;
   });
