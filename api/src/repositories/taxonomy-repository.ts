@@ -53,7 +53,7 @@ export class TaxonomyRepository extends BaseRepository {
    *
    * @param {number} itisTsn
    * @param {string} itisScientificName
-   * @param {(string | null)} commonNames
+   * @param {string[]} commonNames
    * @param {Record<any, any>} itisData
    * @param {string} itisUpdateDate
    * @return {*}  {Promise<TaxonRecord>}
