@@ -10,8 +10,8 @@ import { TaxonSearchResult } from '../services/taxonomy-service';
 export const sortExactMatches = (data: TaxonSearchResult[], searchTerms: string[]): TaxonSearchResult[] => {
   const searchTermsLower = searchTerms.map((item) => item.toLowerCase());
   const taxonNames = data.map((item) => {
-    item.scientificName = item.scientificName.toLowerCase();
-    item.commonNames = item.commonNames.map((name) => name.toLowerCase());
+    item.scientificName = item.scientificName.toLowerCase().trim();
+    item.commonNames = item.commonNames.map((name) => name.toLowerCase().trim());
     return item;
   });
 
@@ -43,15 +43,12 @@ export const customSortContainsAnyMatchingSearchTerm = (
   searchTerms: string[]
 ): TaxonSearchResult[] =>
   data.sort((a, b) => {
-    const checkForMatch = (item: TaxonSearchResult) => {
-      const commonNameWords = item.commonNames?.flatMap((name) => name.toLowerCase().split(' '));
-      const scientificNameWords = item.scientificName.toLowerCase().split(' ');
-
-      // Check if any word in commonNames or scientificName matches any word in searchTerms
-      return searchTerms.some(
-        (searchTerm) => scientificNameWords.includes(searchTerm) || commonNameWords?.includes(searchTerm)
+    const checkForMatch = (item: TaxonSearchResult) =>
+      searchTerms.some(
+        (searchTerm) =>
+          item.scientificName.split(' ').includes(searchTerm) ||
+          item.commonNames?.flatMap((name) => name.split(' ')).includes(searchTerm)
       );
-    };
 
     const aInReference = checkForMatch(a);
     const bInReference = checkForMatch(b);
@@ -73,8 +70,10 @@ export const customSortContainsSearchTermsJoinedExact = (
 ): TaxonSearchResult[] =>
   data.sort((a, b) => {
     const checkForMatch = (item: TaxonSearchResult) => {
-      const searchTermString = searchTerms.join(' ');
-      return item.commonNames.some((name) => name.includes(searchTermString)) || item.scientificName === searchTermString;
+      return (
+        item.commonNames.some((name) => name.includes(searchTerms.join(' '))) ||
+        item.scientificName === searchTerms.join(' ')
+      );
     };
 
     const aInReference = checkForMatch(a);
@@ -102,9 +101,5 @@ export const customSortEqualsSearchTermsExact = (
     const aInReference = checkForMatch(a);
     const bInReference = checkForMatch(b);
 
-    if (aInReference && !bInReference) {
-      return -1; // Place items from searchTerms before other items
-    } else {
-      return 0; // Maintain the original order
-    }
+    return aInReference && !bInReference ? -1 : 0
   });
