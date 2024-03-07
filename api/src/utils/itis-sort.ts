@@ -52,8 +52,8 @@ export const customSortContainsAnyMatchingSearchTerm = (
   };
 
   const checkForMatch = (item: TaxonSearchResult, searchTerms: string[]) => {
-    const commonNameWords = item.commonNames?.flatMap((name: string) => name.toLowerCase().split(/\s+/));
-    const scientificNameWords = item.scientificName.toLowerCase().split(/\s+/);
+    const commonNameWords = item.commonNames?.flatMap((name: string) => name.toLowerCase().split(' '))
+    const scientificNameWords = item.scientificName.toLowerCase().split(' ');
 
     // Check if any word in commonNames or scientificName matches any word in searchTerms
     return searchTerms.some(

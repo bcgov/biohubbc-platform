@@ -72,7 +72,10 @@ export class TaxonomyService {
    * @memberof TaxonomyService
    */
   async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
-    const commonNames = itisSolrResponse.commonNames.filter((name) => name.split('$')[2] === 'English') ?? [];
+    const commonNames =
+      itisSolrResponse.commonNames
+        .filter((name) => name.split('$')[2] === 'English')
+        .map((name) => name.split('$')[1]) ?? [];
     /* Sample itisResponse:
      * commonNames: [
      *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
