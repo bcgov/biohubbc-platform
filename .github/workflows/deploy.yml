@@ -731,12 +731,12 @@ jobs:
       - buildDatabase
       - buildDatabaseSetup
       - buildAPI
-      - buildQueue
+      #   - buildQueue
       - deployAPP
       - deployDatabase
       - deployDatabaseSetup
       - deployAPI
-      - deployQueue
+      #   - deployQueue
     steps:
       - name: Log result
         run: |
@@ -747,12 +747,12 @@ jobs:
           echo needs.buildDatabase.result: ${{ needs.buildDatabase.result }}
           echo needs.buildDatabaseSetup.result: ${{ needs.buildDatabaseSetup.result }}
           echo needs.buildAPI.result: ${{ needs.buildAPI.result }}
-          echo needs.buildQueue.result: ${{ needs.buildQueue.result }}
+          #   echo needs.buildQueue.result: ${{ needs.buildQueue.result }}
           echo needs.deployAPP.result: ${{ needs.deployAPP.result }}
           echo needs.deployDatabase.result: ${{ needs.deployDatabase.result }}
           echo needs.deployDatabaseSetup.result: ${{ needs.deployDatabaseSetup.result }}
           echo needs.deployAPI.result: ${{ needs.deployAPI.result }}
-          echo needs.deployQueue.result: ${{ needs.deployQueue.result }}
+          #   echo needs.deployQueue.result: ${{ needs.deployQueue.result }}
 
       - name: Report success
         if: |
