@@ -117,11 +117,11 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.test,
     logLevel: 'info',
-    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=3000', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1750m',
+    cpuLimit: '1250m',
     memoryRequest: '100Mi',
-    memoryLimit: '6Gi',
+    memoryLimit: '4Gi',
     replicas: '2',
     replicasMax: '2'
   },
@@ -146,7 +146,7 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.prod,
     logLevel: 'warn',
-    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=6000', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
     cpuLimit: '1750m',
     memoryRequest: '100Mi',

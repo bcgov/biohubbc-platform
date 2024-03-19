@@ -108,9 +108,9 @@ const phases = {
     env: 'test',
     sso: config.sso.test,
     cpuRequest: '50m',
-    cpuLimit: '500m',
+    cpuLimit: '400m',
     memoryRequest: '100Mi',
-    memoryLimit: '1Gi',
+    memoryLimit: '750Mi',
     replicas: '2',
     replicasMax: '2'
   },
