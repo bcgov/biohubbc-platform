@@ -1,9 +1,11 @@
-import Button, { ButtonProps } from '@mui/material/Button';
+import LoadingButton, { LoadingButtonProps } from '@mui/lab/LoadingButton';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import useTheme from '@mui/material/styles/useTheme';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import { ReactNode } from 'react';
 
 export interface IYesNoDialogProps {
@@ -73,18 +75,18 @@ export interface IYesNoDialogProps {
   /**
    * Optional yes-button props
    *
-   * @type {Partial<ButtonProps>}
+   * @type {Partial<LoadingButtonProps>}
    * @memberof IYesNoDialogProps
    */
-  yesButtonProps?: Partial<ButtonProps>;
+  yesButtonProps?: Partial<LoadingButtonProps>;
 
   /**
    * Optional no-button props
    *
-   * @type {Partial<ButtonProps>}
+   * @type {Partial<LoadingButtonProps>}
    * @memberof IYesNoDialogProps
    */
-  noButtonProps?: Partial<ButtonProps>;
+  noButtonProps?: Partial<LoadingButtonProps>;
 }
 
 /**
@@ -95,12 +97,18 @@ export interface IYesNoDialogProps {
  * @return {*}
  */
 const YesNoDialog: React.FC<React.PropsWithChildren<IYesNoDialogProps>> = (props) => {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
+
   if (!props.open) {
     return <></>;
   }
 
   return (
     <Dialog
+      fullWidth
+      fullScreen={fullScreen}
+      maxWidth="md"
       open={props.open}
       onClose={props.onClose}
       data-testid="yes-no-dialog"
@@ -112,23 +120,23 @@ const YesNoDialog: React.FC<React.PropsWithChildren<IYesNoDialogProps>> = (props
         {props.dialogContent}
       </DialogContent>
       <DialogActions>
-        <Button
+        <LoadingButton
           data-testid="yes-button"
           onClick={props.onYes}
           color="primary"
           variant="contained"
           {...props.yesButtonProps}>
           {props.yesButtonLabel ? props.yesButtonLabel : 'Yes'}
-        </Button>
+        </LoadingButton>
 
-        <Button
+        <LoadingButton
           data-testid="no-button"
           onClick={props.onNo}
           color="primary"
           variant="outlined"
           {...props.noButtonProps}>
           {props.noButtonLabel ? props.noButtonLabel : 'No'}
-        </Button>
+        </LoadingButton>
       </DialogActions>
     </Dialog>
   );

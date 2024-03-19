@@ -1,15 +1,25 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getAPIUserDBConnection } from '../../database/db';
+import { getDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
-import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
+import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { UserService } from '../../services/user-service';
-import { getUserGuid, getUserIdentifier, getUserIdentitySource } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('paths/user/self');
+const defaultLog = getLogger('paths/user/{userId}');
 
-export const GET: Operation = [getUser()];
+export const GET: Operation = [
+  authorizeRequestHandler(() => {
+    return {
+      and: [
+        {
+          discriminator: 'SystemUser'
+        }
+      ]
+    };
+  }),
+  getUser()
+];
 
 GET.apiDoc = {
   description: 'Get user details for the currently authenticated user.',
@@ -27,12 +37,30 @@ GET.apiDoc = {
           schema: {
             title: 'User Response Object',
             type: 'object',
-            required: ['id', 'user_identifier', 'user_guid', 'record_end_date', 'role_ids', 'role_names'],
+            required: [
+              'system_user_id',
+              'user_identity_source_id',
+              'user_identifier',
+              'user_guid',
+              'record_effective_date',
+              'record_end_date',
+              'create_date',
+              'create_user',
+              'update_date',
+              'update_user',
+              'revision_count',
+              'identity_source',
+              'role_ids',
+              'role_names'
+            ],
             properties: {
-              id: {
+              system_user_id: {
                 description: 'user id',
                 type: 'integer',
                 minimum: 1
+              },
+              user_identity_source_id: {
+                type: 'integer'
               },
               user_identifier: {
                 description: 'The unique user identifier',
@@ -43,10 +71,35 @@ GET.apiDoc = {
                 description: 'The GUID for the user.',
                 nullable: true
               },
+              record_effective_date: {
+                type: 'string'
+              },
               record_end_date: {
-                oneOf: [{ type: 'object' }, { type: 'string', format: 'date' }],
-                description: 'Determines if the user record has expired',
+                type: 'string',
                 nullable: true
+              },
+              create_date: {
+                type: 'string'
+              },
+              create_user: {
+                type: 'integer',
+                minimum: 1
+              },
+              update_date: {
+                type: 'string',
+                nullable: true
+              },
+              update_user: {
+                type: 'integer',
+                minimum: 1,
+                nullable: true
+              },
+              revision_count: {
+                type: 'integer',
+                minimum: 0
+              },
+              identity_source: {
+                type: 'string'
               },
               role_ids: {
                 description: 'list of role ids for the user',
@@ -63,45 +116,52 @@ GET.apiDoc = {
                   type: 'string'
                 }
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }
     },
-    ...defaultErrorResponses
+    400: {
+      $ref: '#/components/responses/400'
+    },
+    401: {
+      $ref: '#/components/responses/401'
+    },
+    403: {
+      $ref: '#/components/responses/403'
+    },
+    500: {
+      $ref: '#/components/responses/500'
+    },
+    default: {
+      $ref: '#/components/responses/default'
+    }
   }
 };
 
 /**
- * Get a user by its user identifier.
+ * Get the currently logged in user.
  *
  * @returns {RequestHandler}
  */
 export function getUser(): RequestHandler {
   return async (req, res) => {
-    const keycloakToken = req['keycloak_token'];
-
-    // Use APIUser connection to get or create a new system user if they don't exist
-    const connection = getAPIUserDBConnection();
+    const connection = getDBConnection(req['keycloak_token']);
 
     try {
       await connection.open();
 
-      const userService = new UserService(connection);
+      const userId = connection.systemUserId();
 
-      // Parse GUID, user identity from keycloak token
-      const userGuid = getUserGuid(keycloakToken);
-      const userIdentifier = getUserIdentifier(keycloakToken);
-      const userIdentitySource = getUserIdentitySource(keycloakToken);
-
-      defaultLog.debug({ label: 'getUser', userGuid, userIdentifier, userIdentitySource });
-
-      if (!userGuid || !userIdentifier || !userIdentitySource) {
-        throw new HTTP400("Failed to retrieve user's identifier or GUID");
+      if (!userId) {
+        throw new HTTP400('Failed to identify system user ID');
       }
 
-      // Retrieves the system user if they exist, or creates a system user if they do not
-      const userObject = await userService.getOrCreateSystemUser(userGuid, userIdentifier, userIdentitySource);
+      const userService = new UserService(connection);
+
+      // Fetch system user record
+      const userObject = await userService.getUserById(userId);
 
       await connection.commit();
 

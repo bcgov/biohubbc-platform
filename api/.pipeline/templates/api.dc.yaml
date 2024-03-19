@@ -31,10 +31,13 @@ parameters:
   - name: DB_SERVICE_NAME
     description: 'Database service name associated with deployment'
     required: true
+  # Node
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
     value: 'dev'
+  - name: NODE_OPTIONS
+  # Elastic Search
   - name: ELASTICSEARCH_URL
     description: Platform Elasticsearch URL
     required: true
@@ -47,46 +50,66 @@ parameters:
     description: Platform Elasticsearch Taxonomy Index
     required: true
     vale: 'taxonomy_3.0.0'
-  - name: S3_KEY_PREFIX
-    description: S3 key optional prefix
-    required: false
-    value: 'biohub'
   - name: TZ
     description: Application timezone
     required: false
     value: 'America/Vancouver'
+  # ITIS SOLR
+  - name: ITIS_SOLR_URL
+    description: ITIS SOLR API URL
+    value: 'https://services.itis.gov'
+    required: true
+  # Keycloak
   - name: KEYCLOAK_HOST
     description: Key clock login url
     required: true
   - name: KEYCLOAK_REALM
     description: Realm identifier or name
     required: true
-  - name: KEYCLOAK_INTEGRATION_ID
-    description: keycloak integration id
-    required: true
-  - name: KEYCLOAK_API_HOST
-    description: keycloak API host
-    required: true
   - name: KEYCLOAK_CLIENT_ID
     description: Client Id for application
     required: true
-  - name: KEYCLOAK_ADMIN_USERNAME
-    description: keycloak host admin username
-    required: true
+  # Keycloak secret
   - name: KEYCLOAK_SECRET
     description: The name of the keycloak secret
     required: true
-  - name: KEYCLOAK_SECRET_ADMIN_PASSWORD
+  # Keycloak Service Client
+  - name: KEYCLOAK_ADMIN_USERNAME
+    description: keycloak host admin username
+    required: true
+  - name: KEYCLOAK_SECRET_ADMIN_PASSWORD_KEY
     description: The key of the admin password in the keycloak secret
+    required: true
+  # Keycloak CSS API
+  - name: KEYCLOAK_API_TOKEN_URL
+    description: The url to fetch a css api access token, which is needed to call the css rest api
+    required: true
+  - name: KEYCLOAK_API_CLIENT_ID
+    description: The css api client id
+    required: true
+  - name: KEYCLOAK_API_CLIENT_SECRET_KEY
+    description: The css api client secret
+    required: true
+  - name: KEYCLOAK_API_HOST
+    description: The url of the css rest api
+    required: true
+  - name: KEYCLOAK_API_ENVIRONMENT
+    description: The css api environment to query (dev, test, prod)
     required: true
   - name: API_PORT_DEFAULT
     value: '6100'
   - name: API_PORT_DEFAULT_NAME
     description: Api default port name
     value: '6100-tcp'
+  # Object Store (S3)
+  - name: S3_KEY_PREFIX
+    description: S3 key optional prefix
+    required: false
+    value: 'biohub'
   - name: OBJECT_STORE_SECRETS
     description: Secrets used to read and write to the S3 storage
     value: 'biohubbc-object-store'
+  # GC Notify
   - name: GCNOTIFY_API_SECRET
     description: Secret for gcnotify api key
     value: 'gcnotify-api-key'
@@ -106,8 +129,10 @@ parameters:
     value: https://api.notification.canada.ca/v2/notifications/email
   - name: GCNOTIFY_SMS_URL
     value: https://api.notification.canada.ca/v2/notifications/sms
+  # Log Level
   - name: LOG_LEVEL
     value: 'info'
+  # Openshift
   - name: CPU_REQUEST
     value: '100m'
   - name: CPU_LIMIT
@@ -202,33 +227,50 @@ objects:
                       name: ${DB_SERVICE_NAME}
                 - name: DB_PORT
                   value: '5432'
+                # Keycloak
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
-                - name: KEYCLOAK_API_HOST
-                  value: ${KEYCLOAK_API_HOST}
                 - name: KEYCLOAK_REALM
                   value: ${KEYCLOAK_REALM}
                 - name: KEYCLOAK_CLIENT_ID
                   value: ${KEYCLOAK_CLIENT_ID}
-                - name: KEYCLOAK_INTEGRATION_ID
-                  value: ${KEYCLOAK_INTEGRATION_ID}
+                # Keycloak Service Client
                 - name: KEYCLOAK_ADMIN_USERNAME
                   value: ${KEYCLOAK_ADMIN_USERNAME}
                 - name: KEYCLOAK_ADMIN_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: ${KEYCLOAK_SECRET}
-                      key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD}
+                      key: ${KEYCLOAK_SECRET_ADMIN_PASSWORD_KEY}
+                # Keycloak CSS API
+                - name: KEYCLOAK_API_TOKEN_URL
+                  value: ${KEYCLOAK_API_TOKEN_URL}
+                - name: KEYCLOAK_API_CLIENT_ID
+                  value: ${KEYCLOAK_API_CLIENT_ID}
+                - name: KEYCLOAK_API_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KEYCLOAK_SECRET}
+                      key: ${KEYCLOAK_API_CLIENT_SECRET_KEY}
+                - name: KEYCLOAK_API_HOST
+                  value: ${KEYCLOAK_API_HOST}
+                - name: KEYCLOAK_API_ENVIRONMENT
+                  value: ${KEYCLOAK_API_ENVIRONMENT}
                 - name: CHANGE_VERSION
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
                   value: ${NODE_ENV}
+                - name: NODE_OPTIONS
+                  value: ${NODE_OPTIONS}
                 - name: ELASTICSEARCH_URL
                   value: ${ELASTICSEARCH_URL}
                 - name: ELASTICSEARCH_EML_INDEX
                   value: ${ELASTICSEARCH_EML_INDEX}
                 - name: ELASTICSEARCH_TAXONOMY_INDEX
                   value: ${ELASTICSEARCH_TAXONOMY_INDEX}
+                # ITIS SOLR
+                - name: ITIS_SOLR_URL
+                  value: ${ITIS_SOLR_URL}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ
@@ -391,7 +433,7 @@ objects:
     status:
       ingress: null
   - kind: HorizontalPodAutoscaler
-    apiVersion: autoscaling/v2beta2
+    apiVersion: autoscaling/v2
     metadata:
       annotations: {}
       creationTimestamp: null

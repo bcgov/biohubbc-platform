@@ -291,7 +291,7 @@ describe('download', () => {
     });
 
     it('returns 200', async () => {
-      const datasetID = 'AAA-BBB-CCC-123';
+      const datasetID = '123-456-789';
       const dbConnectionObj = getMockDBConnection({ commit: sinon.stub(), release: sinon.stub() });
       sinon.stub(db, 'getAPIUserDBConnection').returns(dbConnectionObj);
 

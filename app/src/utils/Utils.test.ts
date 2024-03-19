@@ -1,5 +1,5 @@
+import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { IConfig } from 'contexts/configContext';
 import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
   downloadFile,
@@ -9,10 +9,11 @@ import {
   getFormattedDate,
   getFormattedDateRangeString,
   getFormattedFileSize,
-  getLogOutUrl,
+  getFormattedIdentitySource,
   isObject,
   jsonParseObjectProperties,
   jsonStringifyObjectProperties,
+  pluralize,
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
@@ -71,12 +72,12 @@ describe('getFormattedAmount', () => {
 
 describe('getFormattedDate', () => {
   beforeAll(() => {
-    // ignore warning about invalid date string being passed to moment
+    // ignore warning about invalid date string being passed to dayjs
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('returns empty string if invalid date is provided', async () => {
-    const date = '12312312312312312';
+    const date = 'INVALID DATE STRING';
     const formattedDateString = getFormattedDate(DATE_FORMAT.MediumDateFormat, date);
     expect(formattedDateString).toEqual('');
   });
@@ -90,19 +91,19 @@ describe('getFormattedDate', () => {
 
 describe('getFormattedDateRangeString', () => {
   beforeAll(() => {
-    // ignore warning about invalid date string being passed to moment
+    // ignore warning about invalid date string being passed to dayjs
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('returns empty string if invalid startDate is provided', async () => {
-    const startDate = '12312312312312312';
+    const startDate = 'INVALID DATE STRING';
     const formattedDateString = getFormattedDateRangeString(DATE_FORMAT.MediumDateFormat, startDate);
     expect(formattedDateString).toEqual('');
   });
 
   it('returns empty string if invalid endDate is provided', async () => {
     const startDate = '2021-03-04T22:44:55.478682';
-    const endDate = '12312312312312312';
+    const endDate = 'INVALID DATE STRING';
     const formattedDateString = getFormattedDateRangeString(DATE_FORMAT.MediumDateFormat, startDate, endDate);
     expect(formattedDateString).toEqual('');
   });
@@ -125,102 +126,6 @@ describe('getFormattedDateRangeString', () => {
     const endDate = '2021-05-25T22:44:55.478682';
     const formattedDateString = getFormattedDateRangeString(DATE_FORMAT.MediumDateFormat, startDate, endDate, '//');
     expect(formattedDateString).toEqual('March 4, 2021 // May 25, 2021');
-  });
-});
-
-describe('getLogOutUrl', () => {
-  it('returns null when config is null', () => {
-    expect(getLogOutUrl(null as unknown as IConfig)).toBeUndefined();
-  });
-
-  it('returns null when config is missing `KEYCLOAK_CONFIG.url`', () => {
-    const config = {
-      API_HOST: '',
-      CHANGE_VERSION: '',
-      NODE_ENV: '',
-      VERSION: '',
-      KEYCLOAK_CONFIG: {
-        url: '',
-        realm: 'myrealm',
-        clientId: ''
-      },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      REACT_APP_NODE_ENV: 'local',
-      MAX_UPLOAD_NUM_FILES: 10,
-      MAX_UPLOAD_FILE_SIZE: 52428800
-    };
-
-    expect(getLogOutUrl(config)).toBeUndefined();
-  });
-
-  it('returns null when config is missing `KEYCLOAK_CONFIG.realm`', () => {
-    const config = {
-      API_HOST: '',
-      CHANGE_VERSION: '',
-      NODE_ENV: '',
-      VERSION: '',
-      KEYCLOAK_CONFIG: {
-        url: 'https://www.keycloaklogout.com/auth',
-        realm: '',
-        clientId: ''
-      },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      REACT_APP_NODE_ENV: 'local',
-      MAX_UPLOAD_NUM_FILES: 10,
-      MAX_UPLOAD_FILE_SIZE: 52428800
-    };
-
-    expect(getLogOutUrl(config)).toBeUndefined();
-  });
-
-  it('returns null when config is missing `SITEMINDER_LOGOUT_URL`', () => {
-    const config = {
-      API_HOST: '',
-      CHANGE_VERSION: '',
-      NODE_ENV: '',
-      VERSION: '',
-      KEYCLOAK_CONFIG: {
-        url: 'https://www.keycloaklogout.com/auth',
-        realm: 'myrealm',
-        clientId: ''
-      },
-      SITEMINDER_LOGOUT_URL: '',
-      REACT_APP_NODE_ENV: 'local',
-      MAX_UPLOAD_NUM_FILES: 10,
-      MAX_UPLOAD_FILE_SIZE: 52428800
-    };
-
-    expect(getLogOutUrl(config)).toBeUndefined();
-  });
-
-  it('returns a log out url', () => {
-    // @ts-ignore
-    delete window.location;
-
-    // @ts-ignore
-    window.location = {
-      origin: 'https://biohub.com'
-    };
-
-    const config = {
-      API_HOST: '',
-      CHANGE_VERSION: '',
-      NODE_ENV: '',
-      VERSION: '',
-      KEYCLOAK_CONFIG: {
-        url: 'https://www.keycloaklogout.com/auth',
-        realm: 'myrealm',
-        clientId: ''
-      },
-      SITEMINDER_LOGOUT_URL: 'https://www.siteminderlogout.com',
-      REACT_APP_NODE_ENV: 'local',
-      MAX_UPLOAD_NUM_FILES: 10,
-      MAX_UPLOAD_FILE_SIZE: 52428800
-    };
-
-    expect(getLogOutUrl(config)).toEqual(
-      'https://www.siteminderlogout.com?returl=https://www.keycloaklogout.com/auth/realms/myrealm/protocol/openid-connect/logout?redirect_uri=https://biohub.com/&retnow=1'
-    );
   });
 });
 
@@ -410,5 +315,70 @@ describe('downloadFile', () => {
     expect(anchor.href).toEqual(url);
     expect(anchor.click).toHaveBeenCalled();
     expect(anchor.remove).toHaveBeenCalled();
+  });
+});
+
+describe('pluralize', () => {
+  it('pluralizes a word', () => {
+    const response = pluralize(2, 'apple');
+    expect(response).toEqual('apples');
+  });
+
+  it('pluralizes a word with undefined quantity', () => {
+    const response = pluralize(null as unknown as number, 'orange');
+    expect(response).toEqual('oranges');
+  });
+
+  it('does not pluralize a single item', () => {
+    const response = pluralize(1, 'banana');
+    expect(response).toEqual('banana');
+  });
+
+  it('pluralizes a word with a custom suffix', () => {
+    const response = pluralize(10, 'berr', 'y', 'ies');
+    expect(response).toEqual('berries');
+  });
+
+  it('does not pluralize a word with a custom suffix and single quantity', () => {
+    const response = pluralize(1, 'berr', 'y', 'ies');
+    expect(response).toEqual('berry');
+  });
+});
+
+describe('getFormattedIdentitySource', () => {
+  it('returns BCeID Basic', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.BCEID_BASIC);
+
+    expect(result).toEqual('BCeID Basic');
+  });
+
+  it('returns BCeID Business', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS);
+
+    expect(result).toEqual('BCeID Business');
+  });
+
+  it('returns IDIR', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.IDIR);
+
+    expect(result).toEqual('IDIR');
+  });
+
+  it('returns IDIR', () => {
+    const result = getFormattedIdentitySource(SYSTEM_IDENTITY_SOURCE.DATABASE);
+
+    expect(result).toEqual('System');
+  });
+
+  it('returns null for unknown identity source', () => {
+    const result = getFormattedIdentitySource('__default_test_string' as SYSTEM_IDENTITY_SOURCE);
+
+    expect(result).toEqual(null);
+  });
+
+  it('returns null for null identity source', () => {
+    const result = getFormattedIdentitySource(null as unknown as SYSTEM_IDENTITY_SOURCE);
+
+    expect(result).toEqual(null);
   });
 });

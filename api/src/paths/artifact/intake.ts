@@ -1,14 +1,11 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { validate as validateUuid } from 'uuid';
-import { SOURCE_SYSTEM } from '../../constants/database';
 import { getServiceAccountDBConnection } from '../../database/db';
 import { HTTP400 } from '../../errors/http-error';
 import { defaultErrorResponses } from '../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../request-handlers/security/authorization';
 import { ArtifactService } from '../../services/artifact-service';
-import { scanFileForVirus } from '../../utils/file-utils';
-import { getKeycloakSource } from '../../utils/keycloak-utils';
+import { getServiceClientSystemUser } from '../../utils/keycloak-utils';
 import { getLogger } from '../../utils/logger';
 
 const defaultLog = getLogger('paths/artifact/intake');
@@ -18,18 +15,17 @@ export const POST: Operation = [
     return {
       and: [
         {
-          validServiceClientIDs: [SOURCE_SYSTEM['SIMS-SVC-4464']],
           discriminator: 'ServiceClient'
         }
       ]
     };
   }),
-  intakeArtifacts()
+  intakeArtifact()
 ];
 
 POST.apiDoc = {
   description: 'Submit an artifact to BioHub.',
-  tags: ['artifact'],
+  tags: ['submission', 'artifact'],
   security: [
     {
       Bearer: []
@@ -39,68 +35,50 @@ POST.apiDoc = {
     content: {
       'multipart/form-data': {
         schema: {
+          title: 'BioHub Artifact Submission',
+          description:
+            'Allows source systems to upload artifacts to BioHub. The submission intake endpoint must be called first to generate a submission record against which artifacts may be submitted. Additionally, the original submission must include one artifact feature element for each artifact being uploaded to this endpoint.',
           type: 'object',
-          required: ['media', 'metadata', 'data_package_id'],
+          required: ['submission_uuid', 'artifact_upload_key', 'media'],
           properties: {
+            submission_uuid: {
+              description:
+                'Globally unique id of the submission as assigned by BioHub. A submission uuid is returned by the submission intake endpoint.',
+              type: 'string',
+              format: 'uuid'
+            },
+            artifact_upload_key: {
+              description:
+                'The artifact upload key. An upload key is returned by the submission intake endpoint for each artifact feature element included, if any.',
+              type: 'string'
+            },
             media: {
               type: 'string',
               format: 'binary',
-              description: 'An artifact to be uploaded to BioHub'
-            },
-            data_package_id: {
-              type: 'string',
-              format: 'uuid',
-              description: 'The unique identifier for this artifact collection.'
-            },
-            metadata: {
-              type: 'object',
-              required: ['file_name', 'file_size', 'file_type'],
-              properties: {
-                title: {
-                  description: 'The title of the artifact.',
-                  type: 'string',
-                  maxLength: 300
-                },
-                description: {
-                  description: 'The description of the record.',
-                  type: 'string',
-                  maxLength: 3000
-                },
-                file_name: {
-                  description: 'The original name of the artifact.',
-                  type: 'string',
-                  maxLength: 300
-                },
-                file_type: {
-                  description: 'The artifact type. Artifact type examples include video, audio and field data.',
-                  type: 'string',
-                  maxLength: 300
-                },
-                file_size: {
-                  description: 'The size of the artifact, in bytes.',
-                  type: 'string'
-                }
-              }
+              description: 'The artifact.'
             }
-          }
+          },
+          additionalProperties: false
         }
       }
     }
   },
   responses: {
     200: {
-      description: 'Submission OK.',
+      description: 'Artifact OK.',
       content: {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['artifact_id'],
+            required: ['artifact_uuid'],
             properties: {
-              artifact_id: {
-                type: 'integer',
-                minimum: 1
+              artifact_uuid: {
+                description: 'Globally unique id of the artifact feature element as assigned by BioHub.',
+                type: 'string',
+                format: 'uuid'
               }
-            }
+            },
+            additionalProperties: false
           }
         }
       }
@@ -109,76 +87,42 @@ POST.apiDoc = {
   }
 };
 
-export function intakeArtifacts(): RequestHandler {
+export function intakeArtifact(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'intakeArtifacts', body: req.body });
     if (!req.files?.length) {
       throw new HTTP400('Missing required `media`');
     }
 
     if (req.files?.length !== 1) {
-      // no media objects included
       throw new HTTP400('Too many files uploaded, expected 1');
     }
 
-    const dataPackageId = req.body?.data_package_id;
-    if (!dataPackageId) {
-      throw new HTTP400('Data package ID is required');
-    }
-
     const file: Express.Multer.File = Object.values(req.files)[0];
-    const metadata = req.body.metadata;
-    if (!metadata) {
-      throw new HTTP400('Metadata is required');
-    }
 
-    const file_size = Number(metadata.file_size);
-    if (isNaN(file_size) || file_size < 0) {
-      throw new HTTP400('Metadata file_size must be a non-negative integer');
-    }
+    const artifactUploadKey = req.body.artifact_upload_key;
 
-    const fileParts = file.originalname.split('.');
-    if (fileParts.length < 2 || fileParts[fileParts.length - 1].toLocaleLowerCase() !== 'zip') {
-      throw new HTTP400('File must be a .zip archive');
-    }
+    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
 
-    const fileUuid = fileParts[0];
-    if (!validateUuid(fileUuid)) {
-      throw new HTTP400('File name must reflect a valid UUID');
-    }
-
-    // Scan all files for viruses
-    const passesVirusCheck = await scanFileForVirus(file);
-    if (!passesVirusCheck) {
-      throw new HTTP400('Malicious content detected, upload cancelled');
-    }
-
-    const sourceSystem = getKeycloakSource(req['keycloak_token']);
-    if (!sourceSystem) {
+    if (!serviceClientSystemUser) {
       throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a clientId/azp or clientId/azp value is unknown'
+        'token sub did not match any known system user guid for a service client user'
       ]);
     }
 
-    const connection = getServiceAccountDBConnection(sourceSystem);
+    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();
 
       const artifactService = new ArtifactService(connection);
 
-      const response = await artifactService.uploadAndPersistArtifact(
-        dataPackageId,
-        { ...metadata, file_size },
-        fileUuid,
-        file
-      );
+      const artifactSubmissionFeature = await artifactService.uploadSubmissionFeatureArtifact(artifactUploadKey, file);
 
-      res.status(200).json(response);
+      res.status(200).json({ artifact_uuid: artifactSubmissionFeature.uuid });
 
       await connection.commit();
     } catch (error) {
-      defaultLog.error({ label: 'intakeArtifacts', message: 'error', error });
+      defaultLog.error({ label: 'intakeArtifact', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {

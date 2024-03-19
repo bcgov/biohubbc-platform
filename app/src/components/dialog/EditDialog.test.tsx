@@ -39,6 +39,7 @@ const renderContainer = ({
   return render(
     <div id="root">
       <EditDialog
+        isLoading={false}
         dialogTitle="This is dialog title"
         dialogError={dialogError || undefined}
         open={open}

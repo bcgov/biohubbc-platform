@@ -257,4 +257,247 @@ describe('SecurityRepository', () => {
       expect(response).to.eql([]);
     });
   });
+
+  describe('getActiveSecurityRules', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            security_rule_id: 1,
+            name: 'name',
+            description: 'description',
+            record_effective_date: 1,
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.getActiveSecurityRules();
+      expect(response.length).to.greaterThan(0);
+    });
+
+    it('should succeed with no rules', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.getActiveSecurityRules();
+      expect(response.length).to.be.eql(0);
+    });
+  });
+
+  describe('applySecurityRulesToSubmissionFeatures', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 2,
+            submission_feature_id: 2,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 3,
+            submission_feature_id: 3,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 4,
+            submission_feature_id: 1,
+            security_rule_id: 2,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 5,
+            submission_feature_id: 2,
+            security_rule_id: 2,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 6,
+            submission_feature_id: 3,
+            security_rule_id: 2,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.applySecurityRulesToSubmissionFeatures([1, 2, 3], [1, 2]);
+      expect(response.length).to.equal(6);
+    });
+  });
+
+  describe('removeAllSecurityRulesFromSubmissionFeatures', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 3,
+        rows: [
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 2,
+            submission_feature_id: 1,
+            security_rule_id: 2,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 3,
+            submission_feature_id: 2,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.removeAllSecurityRulesFromSubmissionFeatures([1, 2]);
+      expect(response.length).to.equal(3);
+    });
+  });
+
+  describe('getSecurityRulesForSubmissionFeatures', () => {
+    it('should succeed with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 2,
+            submission_feature_id: 1,
+            security_rule_id: 2,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          },
+          {
+            submission_feature_security_id: 3,
+            submission_feature_id: 2,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: 1,
+            create_user: 1,
+            update_date: 1,
+            update_user: 1,
+            revision_count: 1
+          }
+        ]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        knex: () => mockQueryResponse
+      });
+
+      const repo = new SecurityRepository(mockDBConnection);
+      const response = await repo.getSecurityRulesForSubmissionFeatures([1, 2]);
+      expect(response.length).to.equal(3);
+    });
+  });
 });

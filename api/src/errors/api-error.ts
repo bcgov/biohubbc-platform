@@ -6,9 +6,9 @@ export enum ApiErrorType {
 }
 
 export class ApiError extends Error {
-  errors?: (string | object)[];
+  errors?: (string | Record<string, unknown>)[];
 
-  constructor(name: ApiErrorType, message: string, errors?: (string | object)[], stack?: string) {
+  constructor(name: ApiErrorType, message: string, errors?: (string | Record<string, unknown>)[], stack?: string) {
     super(message);
 
     this.name = name;
@@ -33,7 +33,7 @@ export class ApiError extends Error {
  * @extends {ApiError}
  */
 export class ApiGeneralError extends ApiError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(ApiErrorType.GENERAL, message, errors);
   }
 }
@@ -46,7 +46,7 @@ export class ApiGeneralError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiUnknownError extends ApiError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(ApiErrorType.UNKNOWN, message, errors);
   }
 }
@@ -63,7 +63,7 @@ export class ApiUnknownError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiExecuteSQLError extends ApiError {
-  constructor(message: string, errors?: (string | object)[]) {
+  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
     super(ApiErrorType.EXECUTE_SQL, message, errors);
   }
 }

@@ -1,12 +1,13 @@
+import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
-import moment from 'moment';
 import { z } from 'zod';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError } from '../errors/api-error';
+import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
   IDatasetsForReview,
-  IHandlebarsTemplates,
   ISourceTransformModel,
+  ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionMetadataRecord,
   ISubmissionModel,
@@ -14,12 +15,27 @@ import {
   ISubmissionObservationRecord,
   ISubmissionRecord,
   ISubmissionRecordWithSpatial,
+  PatchSubmissionRecord,
+  SubmissionFeatureDownloadRecord,
+  SubmissionFeatureRecord,
+  SubmissionFeatureRecordWithTypeAndSecurity,
+  SubmissionFeatureSignedUrlPayload,
+  SubmissionMessageRecord,
+  SubmissionRecord,
+  SubmissionRecordPublishedForPublic,
+  SubmissionRecordWithSecurity,
+  SubmissionRecordWithSecurityAndRootFeatureType,
   SubmissionRepository,
   SUBMISSION_MESSAGE_TYPE,
   SUBMISSION_STATUS_TYPE
 } from '../repositories/submission-repository';
+import { getS3SignedURL } from '../utils/file-utils';
+import { getLogger } from '../utils/logger';
 import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
+import { SearchIndexService } from './search-index-service';
+
+const defaultLog = getLogger('submission-service');
 
 export const RelatedDataset = z.object({
   datasetId: z.string(),
@@ -51,15 +67,95 @@ export class SubmissionService extends DBService {
 
   /**
    * Insert a new submission record, returning the record having the matching UUID if it already exists
+   * in the database.
    *
-   * @param {ISubmissionModel} submissionData
-   * @return {*}  {Promise<{ submission_id: number }>}
+   * @param {string} uuid
+   * @param {string} name
+   * @param {string} description A description of the submission. Should not contain any sensitive information.
+   * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
+   * sensitive information. Should never be shared with the general public.
+   * @param {number} systemUserId
+   * @param {string} systemUserIdentifier
+   * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
   async insertSubmissionRecordWithPotentialConflict(
-    submissionData: ISubmissionModel
-  ): Promise<{ submission_id: number }> {
-    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(submissionData);
+    uuid: string,
+    name: string,
+    description: string,
+    comment: string,
+    systemUserId: number,
+    systemUserIdentifier: string
+  ): Promise<SubmissionRecord> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
+      uuid,
+      name,
+      description,
+      comment,
+      systemUserId,
+      systemUserIdentifier
+    );
+  }
+
+  /**
+   * Insert submission features.
+   *
+   * @param {number} submissionId
+   * @param {ISubmissionFeature[]} submissionFeatures
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionService
+   */
+  async insertSubmissionFeatureRecords(submissionId: number, submissionFeatures: ISubmissionFeature[]): Promise<void> {
+    try {
+      // Generate paths to all non-null nodes which contain a 'child_features' property
+      const submissionFeatureJsonPaths: string[] = JSONPath({
+        path: '$..[?(@ && @.child_features)]',
+        flatten: true,
+        resultType: 'path',
+        json: submissionFeatures
+      });
+
+      // Store a mapping of jsonPath to submission_feature_id
+      const parentSubmissionFeatureIdMap: Map<string, number> = new Map();
+
+      // Match the last path segment of a jsonPath that ends with 'child_features[<index>]'
+      const matchLastJsonPathSegment = /\['child_features'\]\[\d+\]$/;
+
+      for (const jsonPath of submissionFeatureJsonPaths) {
+        // Fetch a submissionFeature object
+        const node: ISubmissionFeature[] = JSONPath({ path: jsonPath, resultType: 'value', json: submissionFeatures });
+
+        if (!node?.length) {
+          continue;
+        }
+
+        // We expect the 'path' to resolve an array of 1 item
+        const featureNode = node[0];
+
+        // Get the parent jsonPath by stripping the last path segment from the current jsonPath
+        const parentJsonPath = jsonPath.replace(matchLastJsonPathSegment, '');
+
+        // Get the submission_feature_id of the parent submissionFeature object, or null if the current node is the root
+        const parentSubmissionFeatureId = parentSubmissionFeatureIdMap.get(parentJsonPath) || null;
+
+        // Validate the submissionFeature object
+        const response = await this.submissionRepository.insertSubmissionFeatureRecord(
+          submissionId,
+          parentSubmissionFeatureId,
+          featureNode.id,
+          featureNode.type,
+          featureNode.properties
+        );
+
+        // Cache the submission_feature_id for the current jsonPath
+        parentSubmissionFeatureIdMap.set(jsonPath, response.submission_feature_id);
+      }
+
+      defaultLog.debug({ label: 'insertSubmissionFeatureRecords', message: 'success' });
+    } catch (error) {
+      defaultLog.error({ label: 'validateSubmissionFeatures', message: 'error', error });
+      throw error;
+    }
   }
 
   /**
@@ -429,16 +525,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Gets an object containing handlebars templates for the dataset page for a given dataset ID
-   *
-   * @param datasetId uuid used to fetch handlebars templates
-   * @returns An object containing
-   */
-  async getHandleBarsTemplateByDatasetId(datasetId: string): Promise<IHandlebarsTemplates> {
-    return this.submissionRepository.getHandleBarsTemplateByDatasetId(datasetId);
-  }
-
-  /**
    * Gets datasets that have artifacts that require a security review.
    * This will roll up any related projects to provide a "total" count of artifacts to review
    *
@@ -493,8 +579,8 @@ export class SubmissionService extends DBService {
    * @returns {*} {string} the most recent date found
    */
   mostRecentDate(dates: string[]): string {
-    dates.sort((d1, d2) => moment(d1).diff(moment(d2)));
-    return dates[0] ?? moment();
+    dates.sort((d1, d2) => dayjs(d1).diff(dayjs(d2)));
+    return dates[0] ?? dayjs();
   }
 
   /**
@@ -507,5 +593,300 @@ export class SubmissionService extends DBService {
    */
   async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
     return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
+  }
+
+  /**
+   * Get all submissions that are pending security review (are unreviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getUnreviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getUnreviewedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get all submissions that have completed security review (are reviewed).
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getReviewedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getReviewedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get all submissions that have completed security review and are published.
+   *
+   * @return {*}  {Promise<SubmissionRecordWithSecurityAndRootFeatureType[]>}
+   * @memberof SubmissionService
+   */
+  async getPublishedSubmissionsForAdmins(): Promise<SubmissionRecordWithSecurityAndRootFeatureType[]> {
+    return this.submissionRepository.getPublishedSubmissionsForAdmins();
+  }
+
+  /**
+   * Get a submission record by id (with security status).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionRecordWithSecurity>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRecordBySubmissionIdWithSecurity(submissionId: number): Promise<SubmissionRecordWithSecurity> {
+    return this.submissionRepository.getSubmissionRecordBySubmissionIdWithSecurity(submissionId);
+  }
+
+  /**
+   * Get all published submissions.
+   *
+   * Note: This method is used by the public API. Sensitive data should not be included in the response.
+   *
+   * @return {*}  {Promise<SubmissionRecordPublishedForPublic[]>}
+   * @memberof SubmissionService
+   */
+  async getPublishedSubmissions(): Promise<SubmissionRecordPublishedForPublic[]> {
+    return this.submissionRepository.getPublishedSubmissions();
+  }
+
+  /**
+   * Retrieves submission feature records with type, name, and security data included.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<
+   *     {
+   *       feature_type_name: string;
+   *       feature_type_display_name: string;
+   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
+   *     }[]
+   *   >}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeaturesBySubmissionId(submissionId: number): Promise<
+    {
+      feature_type_name: string;
+      feature_type_display_name: string;
+      features: SubmissionFeatureRecordWithTypeAndSecurity[];
+    }[]
+  > {
+    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+
+    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
+
+    for (const feature of uncategorizedFeatures) {
+      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
+
+      if (featureCategoryArray) {
+        // Append to existing array of matching feature type
+        categorizedFeatures[feature.feature_type_name] = featureCategoryArray.concat(feature);
+      } else {
+        // Create new array for feature type
+        categorizedFeatures[feature.feature_type_name] = [feature];
+      }
+    }
+
+    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
+      feature_type_name: featureType,
+      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
+      features: submissionFeatures
+    }));
+
+    return submissionFeatures;
+  }
+
+  /**
+   * Retrieves submission features with type and name.
+   *
+   * Note: This method replaces the original feature data object with one built from only the search key values (from
+   * the `search_<type>` tables).
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<
+   *     {
+   *       feature_type_name: string;
+   *       feature_type_display_name: string;
+   *       features: SubmissionFeatureRecordWithTypeAndSecurity[];
+   *     }[]
+   *   >}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeaturesWithSearchKeyValuesBySubmissionId(submissionId: number): Promise<
+    {
+      feature_type_name: string;
+      feature_type_display_name: string;
+      features: SubmissionFeatureRecordWithTypeAndSecurity[];
+    }[]
+  > {
+    const uncategorizedFeatures = await this.submissionRepository.getSubmissionFeaturesBySubmissionId(submissionId);
+
+    const searchIndexService = new SearchIndexService(this.connection);
+    const submissionFeatureSearchKeyValues = await searchIndexService.getSearchKeyValuesBySubmissionId(submissionId);
+
+    const categorizedFeatures: Record<string, SubmissionFeatureRecordWithTypeAndSecurity[]> = {};
+
+    for (const feature of uncategorizedFeatures) {
+      const featureCategoryArray = categorizedFeatures[feature.feature_type_name];
+
+      const featureSearchKeyValueData = submissionFeatureSearchKeyValues
+        .filter((item) => item.submission_feature_id === feature.submission_feature_id)
+        .reduce((acc, obj) => {
+          acc[obj.feature_property_name] = obj.value;
+          return acc;
+        }, {} as Record<SubmissionFeatureSearchKeyValues['feature_property_name'], SubmissionFeatureSearchKeyValues['value']>);
+
+      const featureWithSearchkeyValues = {
+        ...feature,
+        data: featureSearchKeyValueData // overwrite original data with search key values
+      };
+
+      if (featureCategoryArray) {
+        // Append to existing array of matching feature type
+        categorizedFeatures[featureWithSearchkeyValues.feature_type_name] =
+          featureCategoryArray.concat(featureWithSearchkeyValues);
+      } else {
+        // Create new array for feature type
+        categorizedFeatures[featureWithSearchkeyValues.feature_type_name] = [featureWithSearchkeyValues];
+      }
+    }
+
+    const submissionFeatures = Object.entries(categorizedFeatures).map(([featureType, submissionFeatures]) => ({
+      feature_type_name: featureType,
+      feature_type_display_name: submissionFeatures[0].feature_type_display_name,
+      features: submissionFeatures
+    }));
+
+    return submissionFeatures;
+  }
+
+  /**
+   * Get all messages for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionMessageRecord[]>}
+   * @memberof SubmissionService
+   */
+  async getMessages(submissionId: number): Promise<SubmissionMessageRecord[]> {
+    return this.submissionRepository.getMessages(submissionId);
+  }
+
+  /**
+   * Creates submission message records for a submission.
+   *
+   * @param {number} submissionId
+   * @param {(Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[])} messages
+   * @return {*}  {Promise<void>}
+   * @memberof SubmissionService
+   */
+  async createMessages(
+    submissionId: number,
+    messages: Pick<SubmissionMessageRecord, 'submission_message_type_id' | 'label' | 'message' | 'data'>[]
+  ): Promise<void> {
+    // Add submission_id to message object
+    const messagesToInsert = messages.map((message) => ({ ...message, submission_id: submissionId }));
+
+    return this.submissionRepository.createMessages(messagesToInsert);
+  }
+
+  /**
+   * Patch a submission record.
+   *
+   * @param {number} submissionId
+   * @param {PatchSubmissionRecord} patch
+   * @return {*}  {Promise<SubmissionRecord>}
+   * @memberof SubmissionServiceF
+   */
+  async patchSubmissionRecord(submissionId: number, patch: PatchSubmissionRecord): Promise<SubmissionRecord> {
+    return this.submissionRepository.patchSubmissionRecord(submissionId, patch);
+  }
+
+  /**
+   * Get a submission feature record by uuid.
+   *
+   * @param {string} submissionFeatureUuid
+   * @return {*}  {Promise<SubmissionFeatureRecord>}
+   * @memberof SubmissionService
+   */
+  async getSubmissionFeatureByUuid(submissionFeatureUuid: string): Promise<SubmissionFeatureRecord> {
+    return this.submissionRepository.getSubmissionFeatureByUuid(submissionFeatureUuid);
+  }
+
+  /**
+   * Get the root submission feature record for a submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {(Promise<SubmissionFeatureRecord>)}
+   * @memberof SubmissionService
+   */
+  async getSubmissionRootFeature(submissionId: number): Promise<SubmissionFeatureRecord> {
+    return this.submissionRepository.getSubmissionRootFeature(submissionId);
+  }
+
+  /**
+   * Find and return all submission feature records that match the provided criteria.
+   *
+   * @param {{
+   *     submissionId?: number;
+   *     systemUserId?: number;
+   *     featureTypeNames?: string[];
+   *   }} [criteria]
+   * @return {*}  {Promise<SubmissionFeatureRecord[]>}
+   * @memberof SubmissionService
+   */
+  async findSubmissionFeatures(criteria?: {
+    submissionId?: number;
+    systemUserId?: number;
+    featureTypeNames?: string[];
+  }): Promise<SubmissionFeatureRecord[]> {
+    return this.submissionRepository.findSubmissionFeatures(criteria);
+  }
+
+  /**
+   *  Download Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadSubmission(submissionId);
+  }
+
+  /**
+   *  Download Published Submission with all associated Features
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SubmissionFeatureDownloadRecord[]>}
+   * @memberof SubmissionService
+   */
+  async downloadPublishedSubmission(submissionId: number): Promise<SubmissionFeatureDownloadRecord[]> {
+    return this.submissionRepository.downloadPublishedSubmission(submissionId);
+  }
+
+  /**
+   * Generates a signed URL for a submission_feature's (artifact) key value pair
+   * ie: "artifact_key": "artifact/test-file.txt"
+   *
+   * Note: admin's can generate signed urls for secure submission_features
+   *
+   * @async
+   * @param {SubmissionFeatureSignedUrlPayload} payload
+   * @throws {ApiGeneralError}
+   * @memberof SubmissionService
+   * @returns {Promise<string>} signed URL
+   */
+  async getSubmissionFeatureSignedUrl(payload: SubmissionFeatureSignedUrlPayload): Promise<string> {
+    const artifactKey = payload.isAdmin
+      ? await this.submissionRepository.getAdminSubmissionFeatureArtifactKey(payload)
+      : await this.submissionRepository.getSubmissionFeatureArtifactKey(payload);
+
+    const signedUrl = await getS3SignedURL(artifactKey);
+
+    if (!signedUrl) {
+      throw new ApiGeneralError(
+        `Failed to generate signed URL for "${payload.submissionFeatureObj.key}":"${payload.submissionFeatureObj.value}"`,
+        ['SubmissionRepository->getSubmissionFeatureSignedUrl', 'getS3SignedUrl returned NULL']
+      );
+    }
+
+    return signedUrl;
   }
 }

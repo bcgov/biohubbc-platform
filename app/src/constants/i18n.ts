@@ -1,3 +1,5 @@
+import { pluralize as p } from 'utils/Utils';
+
 export const SystemUserI18N = {
   removeSystemUserTitle: 'Remove System User ',
   removeUserErrorTitle: 'Error Removing User From Team',
@@ -21,4 +23,18 @@ export const DeleteSystemUserI18N = {
   deleteUserErrorTitle: 'Error Deleting System User',
   deleteUserErrorText:
     'An error has occurred while attempting to delete the system user. If the error persists, please contact your system administrator.'
+};
+
+export const ApplySecurityRulesI18N = {
+  applySecuritySuccess: (featureCount: number) => {
+    return `Updated security for ${featureCount} ${p(featureCount, 'feature')}.`;
+  },
+
+  applySecurityRulesErrorTitle: 'Error applying security rules',
+  applySecurityRulesErrorText:
+    'An error occurred while applying security to features, please try again. If the problem persists, please contact your system administrator',
+  unApplySecurityRulesSuccess: (submissionCount: number) => `Successfully unsecured: ${submissionCount} features`,
+  unapplySecurityRulesErrorTitle: 'Error unsecuring features',
+  unapplySecurityRulesErrorText:
+    'Failed to unsecure the selected features, please try again. If the problem persists, please contact your system administrator'
 };

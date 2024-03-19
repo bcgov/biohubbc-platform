@@ -86,5 +86,5 @@ jobs:
         env:
           POD_SELECTOR: biohub-platform
         run: |
-          oc --namespace a0ec71-dev   get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found" $1}' | bash
-          oc --namespace a0ec71-tools get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found" $1}' | bash
+          oc --namespace a0ec71-dev   get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found " $1}' | bash
+          oc --namespace a0ec71-tools get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found " $1}' | bash

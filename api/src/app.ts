@@ -4,9 +4,11 @@ import multer from 'multer';
 import { OpenAPIV3 } from 'openapi-types';
 import swaggerUIExperss from 'swagger-ui-express';
 import { defaultPoolConfig, initDBPool } from './database/db';
-import { ensureHTTPError, HTTPErrorType } from './errors/http-error';
+import { initDBConstants } from './database/db-constants';
+import { ensureHTTPError, HTTP400, HTTPErrorType } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
 import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
+import { scanFileForVirus } from './utils/file-utils';
 import { getLogger } from './utils/logger';
 
 const defaultLog = getLogger('app');
@@ -26,7 +28,7 @@ const app: express.Express = express();
 
 // Enable CORS
 app.use(function (req: Request, res: Response, next: NextFunction) {
-  defaultLog.info(`${req.method} ${req.url}`);
+  defaultLog.debug(`${req.method} ${req.url}`);
 
   res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, responseType');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE, HEAD');
@@ -52,22 +54,29 @@ const openAPIFramework = initialize({
   docsPath: '/raw-api-docs', // path to view raw openapi spec
   consumesMiddleware: {
     'application/json': express.json({ limit: MAX_REQ_BODY_SIZE }),
-    'multipart/form-data': function (req, res, next) {
+    'multipart/form-data': async function (req, res, next) {
       const multerRequestHandler = multer({
-        storage: multer.memoryStorage(),
+        storage: multer.memoryStorage(), // TOOD change to local/PVC storage and stream file uploads to S3?
         limits: { fileSize: MAX_UPLOAD_FILE_SIZE }
       }).array('media', MAX_UPLOAD_NUM_FILES);
 
-      multerRequestHandler(req, res, (error?: any) => {
+      return multerRequestHandler(req, res, async function (error?: any) {
         if (error) {
           return next(error);
         }
 
-        if (req.files && req.files.length) {
+        const promises = (req.files as Express.Multer.File[]).map(async function (file) {
           // Set original request file field to empty string to satisfy OpenAPI validation
           // See: https://www.npmjs.com/package/express-openapi#argsconsumesmiddleware
-          (req.files as Express.Multer.File[]).forEach((file) => (req.body[file.fieldname] = ''));
-        }
+          req.body[file.fieldname] = '';
+
+          // Scan file for malicious content, if enabled
+          if (!(await scanFileForVirus(file))) {
+            throw new HTTP400('Malicious file content detected.', [{ file_name: file.originalname }]);
+          }
+        });
+
+        await Promise.all(promises);
 
         return next();
       });
@@ -112,6 +121,7 @@ app.use('/api-docs', swaggerUIExperss.serve, swaggerUIExperss.setup(openAPIFrame
 // Start api
 try {
   initDBPool(defaultPoolConfig);
+  initDBConstants();
 
   app.listen(PORT, () => {
     defaultLog.info({ label: 'start api', message: `started api on ${HOST}:${PORT}/api` });

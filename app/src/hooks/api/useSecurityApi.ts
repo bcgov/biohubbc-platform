@@ -1,5 +1,42 @@
 import { AxiosInstance } from 'axios';
-import { IListPersecutionHarmResponse, ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
+import {
+  IListPersecutionHarmResponse,
+  IPatchFeatureSecurityRules,
+  ISecureDataAccessRequestForm
+} from 'interfaces/useSecurityApi.interface';
+
+export interface ISecurityRule {
+  security_rule_id: number;
+  name: string;
+  category: string;
+  description: string;
+  record_effective_date: string;
+  record_end_date: string;
+  create_date: string;
+  create_user: number;
+  update_date: string;
+  update_user: number;
+  revision_count: number;
+}
+
+export interface ISecurityRuleAndCategory {
+  security_rule_id: number;
+  name: string;
+  description: string;
+  record_effective_date: string;
+  record_end_date: string;
+  security_category_id: number;
+  category_name: string;
+  category_description: string;
+  category_record_effective_date: string;
+  category_record_end_date: string;
+}
+
+export interface ISubmissionFeatureSecurityRecord {
+  submission_feature_security_id: number;
+  submission_feature_id: number;
+  security_rule_id: number;
+}
 
 /**
  * Returns a set of supported api methods for working with security.
@@ -53,10 +90,59 @@ const useSecurityApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  /**
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
+   */
+  const getActiveSecurityRulesWithCategories = async (): Promise<ISecurityRuleAndCategory[]> => {
+    const { data } = await axios.get('api/administrative/security/rules');
+
+    return data;
+  };
+
+  /**
+   * Patches security rules that are applied or removed to the given set of submission features. If
+   * a particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always
+   * be added.
+   *
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} ruleIds
+   * @return {*}  {Promise<any[]>}
+   */
+  const patchSecurityRulesOnSubmissionFeatures = async (
+    submissionId: number,
+    featureSecurityRulesPatch: IPatchFeatureSecurityRules
+  ): Promise<void> => {
+    const { data } = await axios.patch(`api/administrative/security/submission/${submissionId}`, {
+      applyRuleIds: featureSecurityRulesPatch.stagedForApply.map((rule) => rule.security_rule_id),
+      removeRuleIds: featureSecurityRulesPatch.stagedForRemove.map((rule) => rule.security_rule_id),
+      submissionFeatureIds: featureSecurityRulesPatch.submissionFeatureIds
+    });
+
+    return data;
+  };
+
+  /**
+   * Retrieves the list of all security rule IDs associated with the features belonging to the given submission.
+   *
+   * @param {number[]} features
+   * @return {*}  {Promise<ISubmissionFeatureSecurityRecord[]>}
+   */
+  const getAllSecurityRulesForSubmission = async (
+    submissionId: number
+  ): Promise<ISubmissionFeatureSecurityRecord[]> => {
+    const { data } = await axios.get(`api/administrative/security/submission/${submissionId}`);
+
+    return data;
+  };
+
   return {
     sendSecureArtifactAccessRequest,
     listPersecutionHarmRules,
-    applySecurityReasonsToArtifacts
+    applySecurityReasonsToArtifacts,
+    patchSecurityRulesOnSubmissionFeatures,
+    getAllSecurityRulesForSubmission,
+    getActiveSecurityRulesWithCategories
   };
 };
 

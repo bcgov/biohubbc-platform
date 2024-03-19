@@ -4,6 +4,7 @@ import { getAPIUserDBConnection, getDBConnection } from '../../../../database/db
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { ArtifactService } from '../../../../services/artifact-service';
 import { SecurityService } from '../../../../services/security-service';
+import { UserService } from '../../../../services/user-service';
 import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/dwc/submission/{datasetId}/artifacts');
@@ -96,11 +97,28 @@ GET.apiDoc = {
                 },
                 supplementaryData: {
                   type: 'object',
-                  required: ['persecutionAndHarm'],
+                  required: ['persecutionAndHarmRules', 'persecutionAndHarmStatus'],
                   properties: {
-                    persecutionAndHarm: {
+                    persecutionAndHarmStatus: {
                       type: 'string',
                       enum: ['SECURED', 'UNSECURED', 'PENDING']
+                    },
+                    persecutionAndHarmRules: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          artifact_id: {
+                            type: 'integer'
+                          },
+                          artifact_persecution_id: {
+                            type: 'integer'
+                          },
+                          persecution_or_harm_id: {
+                            type: 'integer'
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -127,18 +145,19 @@ export function getArtifactsByDatasetId(): RequestHandler {
 
     try {
       await connection.open();
-
+      const userService = new UserService(connection);
       const artifactService = new ArtifactService(connection);
       const securityService = new SecurityService(connection);
 
+      const isAdmin = await userService.isSystemUserAdmin();
       const artifacts = await artifactService.getArtifactsByDatasetId(datasetId);
 
       const artifactsWithRules = await Promise.all(
         artifacts.map(async (artifact) => {
-          const appliedSecurity = await securityService.getSecurityAppliedStatus(artifact.artifact_id);
+          const supplementaryData = await securityService.getArtifactSupplementaryData(artifact.artifact_id, isAdmin);
           return {
             ...artifact,
-            supplementaryData: { persecutionAndHarm: appliedSecurity }
+            supplementaryData: supplementaryData
           };
         })
       );

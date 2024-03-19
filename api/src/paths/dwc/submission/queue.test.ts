@@ -6,6 +6,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { HTTPError } from '../../../errors/http-error';
+import { SystemUser } from '../../../repositories/user-repository';
 import { SubmissionJobQueueService } from '../../../services/submission-job-queue-service';
 import * as fileUtils from '../../../utils/file-utils';
 import * as keycloakUtils from '../../../utils/keycloak-utils';
@@ -330,7 +331,7 @@ describe('queue', () => {
       }
     });
 
-    it('throws an error when getKeycloakSource returns null', async () => {
+    it('throws error when getServiceClientSystemUser returns null', async () => {
       const dbConnectionObj = getMockDBConnection();
       sinon.stub(db, 'getServiceAccountDBConnection').returns(dbConnectionObj);
 
@@ -347,8 +348,8 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').returns(null);
-
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns(null);
+      const intakeStub = sinon.stub(SubmissionJobQueueService.prototype, 'intake').resolves();
       const requestHandler = queue.queueForProcess();
 
       try {
@@ -356,6 +357,7 @@ describe('queue', () => {
         expect.fail();
       } catch (actualError) {
         expect((actualError as Error).message).to.equal('Failed to identify known submission source system');
+        expect(intakeStub).to.not.be.called;
       }
     });
 
@@ -376,7 +378,7 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       sinon.stub(SubmissionJobQueueService.prototype, 'intake').throws(new Error('test error'));
 
@@ -414,7 +416,7 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
       const requestHandler = queue.queueForProcess();
 
       try {
@@ -448,7 +450,7 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
       const requestHandler = queue.queueForProcess();
 
       try {
@@ -482,7 +484,7 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const requestHandler = queue.queueForProcess();
 
@@ -517,7 +519,7 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
       const requestHandler = queue.queueForProcess();
 
       try {
@@ -551,7 +553,7 @@ describe('queue', () => {
       };
 
       sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const requestHandler = queue.queueForProcess();
 
@@ -589,7 +591,7 @@ describe('queue', () => {
       };
 
       const scanFileForVirusStub = sinon.stub(fileUtils, 'scanFileForVirus').resolves(true);
-      sinon.stub(keycloakUtils, 'getKeycloakSource').resolves(true);
+      sinon.stub(keycloakUtils, 'getServiceClientSystemUser').returns({} as unknown as SystemUser);
 
       const queueStub = sinon.stub(SubmissionJobQueueService.prototype, 'intake').resolves({ queue_id: 12 });
 

@@ -23,8 +23,8 @@ export const Artifact = ArtifactMetadata.extend({
   uuid: z.string().uuid(),
   key: z.string(),
   foi_reason: z.boolean().nullable().optional(),
-  security_review_timestamp: z.date().nullable().optional(),
-  create_date: z.date().optional()
+  security_review_timestamp: z.string().nullable().optional(),
+  create_date: z.string().optional()
 });
 
 export type Artifact = z.infer<typeof Artifact>;
@@ -181,6 +181,32 @@ export class ArtifactRepository extends BaseRepository {
   }
 
   /**
+   * Retrieves all artifacts belonging to the given submission.
+   *
+   * @param {string} uuid
+   * @return {*}  {Promise<Artifact>}
+   * @memberof ArtifactRepository
+   */
+  async getArtifactByUUID(uuid: string): Promise<Artifact | null> {
+    defaultLog.debug({ label: 'getArtifactByUUID', uuid });
+
+    const sqlStatement = SQL`
+      SELECT
+        a.*
+      FROM
+        artifact a
+      WHERE
+        a.uuid = ${uuid};
+    `;
+
+    const response = await this.connection.sql<Artifact>(sqlStatement, Artifact);
+
+    const result = (response.rowCount && response?.rows[0]) || null;
+
+    return result;
+  }
+
+  /**
    * Fetches multiple artifact records by the given artifact IDs
    *
    * @param {number[]} artifactIds
@@ -224,5 +250,21 @@ export class ArtifactRepository extends BaseRepository {
     if (!results) {
       throw new ApiExecuteSQLError('Failed to update artifact security review timestamp');
     }
+  }
+
+  /**
+   * Deletes a single artifact for a given UUID.
+   *
+   * @param uuid UUID of the artifact to delete
+   */
+  async deleteArtifactByUUID(uuid: string): Promise<void> {
+    defaultLog.debug({ label: 'deleteArtifactByUUID' });
+
+    const sql = SQL`
+      DELETE
+      FROM artifact
+      WHERE uuid = ${uuid}
+      RETURNING *;`;
+    await this.connection.sql(sql);
   }
 }

@@ -1,8 +1,9 @@
+import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
-import { IConfig } from 'contexts/configContext';
+import { Dayjs, default as dayjs } from 'dayjs';
 import { Feature, Polygon } from 'geojson';
 import { LatLngBounds } from 'leaflet';
-import moment from 'moment';
+import _ from 'lodash';
 
 /**
  * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
@@ -29,6 +30,28 @@ export const ensureProtocol = (url: string, protocol: 'http://' | 'https://' = '
   }
 
   return `${protocol}${url}`;
+};
+
+/**
+ * Returns a label specifying the number of days since Today.
+ * Label will include 'Today', 'Yesterday' or a count of the days.
+ *
+ * @param {Dayjs} oldDate Older date to get difference from
+ * @param {Dayjs} futureDate Future date to get difference from, defaulted to Today.
+ * @returns {string} Label constructed with date difference.
+ */
+export const getDaysSinceDate = (oldDate: Dayjs, futureDate = dayjs()) => {
+  const days = futureDate.diff(oldDate, 'days');
+  let label = '';
+  if (days < 1) {
+    // today
+    label = `Today (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  } else if (days < 2) {
+    label = `Yesterday (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  } else {
+    label = `${days} days ago (${oldDate.format(DATE_FORMAT.ShortDateFormat)})`;
+  }
+  return label;
 };
 
 /**
@@ -69,14 +92,14 @@ export const getFormattedDateRangeString = (
  * @return {string} formatted date string, or an empty string if unable to parse the date
  */
 export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateObject = dayjs(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateObject.isValid()) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(dateFormat);
+  return dateObject.format(dateFormat);
 };
 
 /**
@@ -87,14 +110,14 @@ export const getFormattedDate = (dateFormat: DATE_FORMAT, date: string): string 
  * @return {string} formatted time string, or an empty string if unable to parse the date
  */
 export const getFormattedTime = (timeFormat: TIME_FORMAT, date: string): string => {
-  const dateMoment = moment(date);
+  const dateObject = dayjs(date);
 
-  if (!dateMoment.isValid()) {
+  if (!dateObject.isValid()) {
     //date was invalid
     return '';
   }
 
-  return dateMoment.format(timeFormat);
+  return dateObject.format(timeFormat);
 };
 
 /**
@@ -116,24 +139,6 @@ export const getFormattedAmount = (amount: number): string => {
     return '';
   }
   return formatter.format(amount);
-};
-
-/**
- * Returns a url that when navigated to, will log the user out, redirecting them to the login page.
- *
- * @param {IConfig} config
- * @return {*}  {(string | undefined)}
- */
-export const getLogOutUrl = (config: IConfig): string | undefined => {
-  if (!config || !config.KEYCLOAK_CONFIG?.url || !config.KEYCLOAK_CONFIG?.realm || !config.SITEMINDER_LOGOUT_URL) {
-    return;
-  }
-
-  const localRedirectURL = `${window.location.origin}/`;
-
-  const keycloakLogoutRedirectURL = `${config.KEYCLOAK_CONFIG.url}/realms/${config.KEYCLOAK_CONFIG.realm}/protocol/openid-connect/logout?redirect_uri=${localRedirectURL}`;
-
-  return `${config.SITEMINDER_LOGOUT_URL}?returl=${keycloakLogoutRedirectURL}&retnow=1`;
 };
 
 export const getFormattedFileSize = (fileSize: number) => {
@@ -318,4 +323,71 @@ export const buildUrl = (...urlParts: (string | undefined)[]): string => {
  */
 export const getTitle = (pageName?: string) => {
   return pageName ? `BioHub - ${pageName}` : 'BioHub';
+};
+
+/**
+ * Pluralizes a word.
+ *
+ * @example p(2, 'apple'); // => 'apples'
+ * @example p(null, 'orange'); // => 'oranges'
+ * @example p(1, 'banana'); // => 'banana'
+ * @example p(10, 'berr', 'y', 'ies'); // => 'berries'
+ *
+ * @param quantity The quantity used to infer plural or singular
+ * @param word The word to pluralize
+ * @param {[string]} singularSuffix The suffix used for a singular item
+ * @param {[string]} pluralSuffix The suffix used for plural items
+ * @returns
+ */
+export const pluralize = (quantity: number, word: string, singularSuffix = '', pluralSuffix = 's') => {
+  return `${word}${quantity === 1 ? singularSuffix : pluralSuffix}`;
+};
+
+/**
+ * For a given property, alphabetize an array of objects
+ *
+ * @param {T[]} data an array of objects to be alphabetize
+ * @param {string} property a key property to alphabetize the data array on
+ * @returns {any[]} Returns an alphabetized array of objects
+ */
+export const alphabetizeObjects = <T extends { [key: string]: any }>(data: T[], property: string) => {
+  return _.sortBy(data, property);
+};
+
+/**
+ * Returns a human-readible identity source string.
+ *
+ * @example getFormattedIdentitySource("BCEIDBUSINESS"); // => "BCeID Business"
+ *
+ * @param {SYSTEM_IDENTITY_SOURCE} identitySource The identity source
+ * @returns {*} {string} the string representing the identity source
+ */
+export const getFormattedIdentitySource = (identitySource: SYSTEM_IDENTITY_SOURCE): string | null => {
+  switch (identitySource) {
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BASIC:
+      return 'BCeID Basic';
+
+    case SYSTEM_IDENTITY_SOURCE.BCEID_BUSINESS:
+      return 'BCeID Business';
+
+    case SYSTEM_IDENTITY_SOURCE.IDIR:
+      return 'IDIR';
+
+    case SYSTEM_IDENTITY_SOURCE.DATABASE:
+      return 'System';
+
+    default:
+      return null;
+  }
+};
+
+/**
+ * same implementation as Object.keys but with correct typings for interable
+ *
+ * @template Obj
+ * @param {Obj} obj - object to iterate through
+ * @returns {(keyof Obj)[]} array of object keys with correct typings ie: not string[]
+ */
+export const objectKeys = <Obj extends Record<any, any>>(obj: Obj): (keyof Obj)[] => {
+  return Object.keys(obj) as (keyof Obj)[];
 };

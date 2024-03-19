@@ -1,9 +1,11 @@
-import { AggregationsAggregate, SearchResponse } from '@elastic/elasticsearch/lib/api/types';
 import chai, { expect } from 'chai';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
-import { ITaxonomySource, TaxonomyService } from './taxonomy-service';
+import { TaxonomyRepository } from '../repositories/taxonomy-repository';
+import { getMockDBConnection } from '../__mocks__/db';
+import { ItisService, ItisSolrSearchResponse } from './itis-service';
+import { TaxonomyService } from './taxonomy-service';
 
 chai.use(sinonChai);
 
@@ -12,212 +14,170 @@ describe('TaxonomyService', () => {
     sinon.restore();
   });
 
-  const mockElasticResponse: SearchResponse<ITaxonomySource, Record<string, AggregationsAggregate>> | undefined = {
-    took: 0,
-    timed_out: false,
-    _shards: {
-      failed: 0,
-      successful: 1,
-      total: 1
-    },
-    hits: {
-      hits: []
+  const getItisSolrSearchResponse: ItisSolrSearchResponse[] = [
+    {
+      commonNames: ['$commonName'],
+      kingdom: 'kingdom',
+      name: 'name',
+      parentTSN: 'parentTSN',
+      scientificName: 'scientificName',
+      tsn: 'tsn',
+      updateDate: 'updateDate',
+      usage: 'usage'
     }
-  };
+  ];
 
   it('constructs', () => {
-    const taxonomyService = new TaxonomyService();
+    const mockDBConnection = getMockDBConnection();
+
+    const taxonomyService = new TaxonomyService(mockDBConnection);
     expect(taxonomyService).to.be.instanceof(TaxonomyService);
   });
 
-  describe('getTaxonomyFromIds', async () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should query elasticsearch and return []', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
-
-      const taxonomyService = new TaxonomyService();
-
-      const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves(undefined);
-
-      const response = await taxonomyService.getTaxonomyFromIds([1]);
-
-      expect(elasticSearchStub).to.be.calledOnce;
-      expect(response).to.eql([]);
-    });
-
-    it('should query elasticsearch and return taxonomy', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
-
-      const taxonomyService = new TaxonomyService();
-
-      const taxonDetails: Omit<ITaxonomySource, 'end_date'> = {
-        unit_name1: 'A',
-        unit_name2: 'B',
-        unit_name3: 'C',
-        taxon_authority: 'taxon_authority',
-        code: 'D',
-        tty_kingdom: 'kingdom',
-        tty_name: 'name',
-        english_name: 'animal',
-        note: null,
-        parent_id: 1,
-        parent_hierarchy: []
-      };
-
-      const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves({
-        ...mockElasticResponse,
-        hits: {
-          hits: [
-            {
-              _index: process.env.ELASTICSEARCH_TAXONOMY_INDEX,
-              _id: '1',
-              _source: {
-                ...taxonDetails,
-                end_date: null
-              }
-            }
-          ]
-        }
-      });
-
-      const response = await taxonomyService.getTaxonomyFromIds([1]);
-
-      expect(elasticSearchStub).to.be.calledOnce;
-
-      expect(response).to.eql([
+  describe('getTaxonByTsnIds', () => {
+    it('if all records exist in db should return array of taxon records', async () => {
+      const getTaxonRecord = [
         {
-          _index: process.env.ELASTICSEARCH_TAXONOMY_INDEX,
-          _id: '1',
-          _source: {
-            ...taxonDetails,
-            end_date: null
-          }
+          taxon_id: 1,
+          itis_tsn: 1,
+          bc_taxon_code: 'bc_taxon_code',
+          itis_scientific_name: 'itis_scientific_name',
+          common_name: 'common_name',
+          itis_data: {},
+          record_effective_date: 'record_effective_date',
+          record_end_date: 'record_end_date',
+          create_date: 'create_date',
+          create_user: 1,
+          update_date: 'update_date',
+          update_user: 1,
+          revision_count: 1
         }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const taxonomyService = new TaxonomyService(mockDBConnection);
+
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves(getTaxonRecord);
+
+      const response = await taxonomyService.getTaxonByTsnIds([1]);
+
+      expect(repo).to.be.calledOnce;
+      expect(response).to.be.eql([{ tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' }]);
+    });
+
+    it('if some records do not exist in db should return array of taxon records', async () => {
+      const getTaxonRecord = [
+        {
+          taxon_id: 1,
+          itis_tsn: 1,
+          bc_taxon_code: 'bc_taxon_code',
+          itis_scientific_name: 'itis_scientific_name',
+          common_name: 'common_name',
+          itis_data: {},
+          record_effective_date: 'record_effective_date',
+          record_end_date: 'record_end_date',
+          create_date: 'create_date',
+          create_user: 1,
+          update_date: 'update_date',
+          update_user: 1,
+          revision_count: 1
+        },
+        {
+          taxon_id: 2,
+          itis_tsn: 2,
+          bc_taxon_code: 'bc_taxon_code',
+          itis_scientific_name: 'itis_scientific_name',
+          common_name: 'common_name',
+          itis_data: {},
+          record_effective_date: 'record_effective_date',
+          record_end_date: 'record_end_date',
+          create_date: 'create_date',
+          create_user: 1,
+          update_date: 'update_date',
+          update_user: 1,
+          revision_count: 1
+        }
+      ];
+
+      const mockDBConnection = getMockDBConnection();
+
+      const taxonomyService = new TaxonomyService(mockDBConnection);
+
+      const repo = sinon.stub(TaxonomyRepository.prototype, 'getTaxonByTsnIds').resolves([getTaxonRecord[0]]);
+
+      const searchItisByTSNStub = sinon
+        .stub(ItisService.prototype, 'searchItisByTSN')
+        .resolves(getItisSolrSearchResponse);
+
+      const itisService = sinon.stub(TaxonomyService.prototype, 'addItisTaxonRecord').resolves(getTaxonRecord[1]);
+
+      const response = await taxonomyService.getTaxonByTsnIds([1, 2]);
+
+      expect(repo).to.be.calledOnce;
+      expect(searchItisByTSNStub).to.be.calledOnce;
+      expect(itisService).to.be.calledOnce;
+      expect(response).to.be.eql([
+        { tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' },
+        { tsn: 2, commonName: 'common_name', scientificName: 'itis_scientific_name' }
       ]);
     });
   });
 
-  describe('getSpeciesFromIds', async () => {
-    afterEach(() => {
-      sinon.restore();
-    });
+  describe('addItisTaxonRecord', () => {
+    it('should add a new taxon record', async () => {
+      const mockDBConnection = getMockDBConnection();
 
-    it('should query elasticsearch and return []', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
+      const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const taxonomyService = new TaxonomyService();
-
-      const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves(undefined);
-
-      const response = await taxonomyService.getSpeciesFromIds(['1']);
-
-      expect(elasticSearchStub).to.be.calledOnce;
-      expect(response).to.eql([]);
-    });
-
-    it('should query elasticsearch and return sanitized data', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
-
-      const taxonomyService = new TaxonomyService();
-
-      const taxonDetails: Omit<ITaxonomySource, 'end_date'> = {
-        unit_name1: 'A',
-        unit_name2: 'B',
-        unit_name3: 'C',
-        taxon_authority: 'taxon_authority',
-        code: 'D',
-        tty_kingdom: 'kingdom',
-        tty_name: 'name',
-        english_name: 'animal',
-        note: null,
-        parent_id: 1,
-        parent_hierarchy: []
-      };
-
-      const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves({
-        ...mockElasticResponse,
-        hits: {
-          hits: [
-            {
-              _index: process.env.ELASTICSEARCH_TAXONOMY_INDEX,
-              _id: '1',
-              _source: {
-                ...taxonDetails,
-                end_date: null
-              }
-            }
-          ]
-        }
+      const addItisTaxonRecordStub = sinon.stub(TaxonomyRepository.prototype, 'addItisTaxonRecord').resolves({
+        taxon_id: 1,
+        itis_tsn: 1,
+        bc_taxon_code: null,
+        itis_scientific_name: 'scientificName',
+        common_name: 'commonName',
+        itis_data: {},
+        record_effective_date: 'updateDate',
+        record_end_date: null,
+        create_date: 'now',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1
       });
 
-      const sanitizeSpeciesDataStub = sinon.spy(taxonomyService, '_sanitizeSpeciesData');
+      const response = await taxonomyService.addItisTaxonRecord(getItisSolrSearchResponse[0]);
 
-      const response = await taxonomyService.getSpeciesFromIds(['1']);
-
-      expect(elasticSearchStub).to.be.calledOnce;
-      expect(sanitizeSpeciesDataStub).to.be.calledOnce;
-      expect(response).to.eql([{ id: '1', code: 'D', label: 'animal, A B C' }]);
+      expect(addItisTaxonRecordStub).to.be.calledOnce;
+      expect(response).to.be.eql({
+        taxon_id: 1,
+        itis_tsn: 1,
+        bc_taxon_code: null,
+        itis_scientific_name: 'scientificName',
+        common_name: 'commonName',
+        itis_data: {},
+        record_effective_date: 'updateDate',
+        record_end_date: null,
+        create_date: 'now',
+        create_user: 1,
+        update_date: null,
+        update_user: null,
+        revision_count: 1
+      });
     });
   });
 
-  describe('searchSpecies', async () => {
-    it('should query elasticsearch', async () => {
-      process.env.ELASTICSEARCH_TAXONOMY_INDEX = 'taxonomy_test_3.0.0';
+  describe('deleteTaxonRecord', () => {
+    it('should delete a taxon record', async () => {
+      const mockDBConnection = getMockDBConnection();
 
-      const taxonomyService = new TaxonomyService();
+      const taxonomyService = new TaxonomyService(mockDBConnection);
 
-      const taxonDetails: Omit<ITaxonomySource, 'end_date'> = {
-        unit_name1: 'A',
-        unit_name2: 'B',
-        unit_name3: 'C',
-        taxon_authority: 'taxon_authority',
-        code: 'D',
-        tty_kingdom: 'kingdom',
-        tty_name: 'name',
-        english_name: 'animal',
-        note: null,
-        parent_id: 1,
-        parent_hierarchy: []
-      };
+      const deleteTaxonRecordStub = sinon.stub(TaxonomyRepository.prototype, 'deleteTaxonRecord').resolves();
 
-      const elasticSearchStub = sinon.stub(taxonomyService, 'elasticSearch').resolves({
-        ...mockElasticResponse,
-        hits: {
-          hits: [
-            {
-              _index: process.env.ELASTICSEARCH_TAXONOMY_INDEX,
-              _id: '1',
-              _source: {
-                ...taxonDetails,
-                end_date: null
-              }
-            },
-            {
-              _index: process.env.ELASTICSEARCH_TAXONOMY_INDEX,
-              _id: '2',
-              _source: {
-                ...taxonDetails,
-                end_date: '2010-01-01'
-              }
-            },
-            {
-              _index: process.env.ELASTICSEARCH_TAXONOMY_INDEX,
-              _id: '3',
-              _source: {
-                ...taxonDetails,
-                end_date: '2040-01-01'
-              }
-            }
-          ]
-        }
-      });
+      await taxonomyService.deleteTaxonRecord(1);
 
-      taxonomyService.searchSpecies('search term');
-
-      expect(elasticSearchStub).to.be.calledOnce;
+      expect(deleteTaxonRecordStub).to.be.calledOnce;
     });
   });
 });

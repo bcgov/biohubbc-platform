@@ -10,16 +10,17 @@ import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
 import { makeStyles } from '@mui/styles';
 import { IErrorDialogProps } from 'components/dialog/ErrorDialog';
-import { DialogContext } from 'contexts/dialogContext';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
+import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
 import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import { truncate } from 'lodash';
 import qs from 'qs';
-import { useCallback, useContext, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useHistory, useLocation } from 'react-router';
+import { pluralize as p } from 'utils/Utils';
 import SearchComponent from './SearchComponent';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -55,7 +56,7 @@ const SearchPage = () => {
   const biohubApi = useApi();
   const history = useHistory();
   const location = useLocation();
-  const dialogContext = useContext(DialogContext);
+  const dialogContext = useDialogContext();
 
   const searchDataLoader = useDataLoader((query: string) => {
     return biohubApi.search.keywordSearch(query);
@@ -196,10 +197,10 @@ const SearchPage = () => {
           {formikRef.current?.values.keywords && (
             <Typography variant="h2" className={classes.searchResultTitle}>
               {searchDataLoader.isLoading ? (
-                <>Loading...</>
+                <span>Loading...</span>
               ) : (
                 <>
-                  Found {`${results.length} result${results.length !== 1 ? 's' : ''}`}
+                  <span>{`Found ${results.length} ${p(results.length, 'result')}`}</span>
                   <Typography
                     variant="inherit"
                     component="span"

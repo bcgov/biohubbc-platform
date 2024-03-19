@@ -80,7 +80,7 @@ const phases = {
     volumeCapacity: (isStaticDeployment && '3Gi') || '500Mi',
     cpuRequest: '50m',
     cpuLimit: '200m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '2Gi',
     replicas: '1'
   },
@@ -97,9 +97,9 @@ const phases = {
     tz: config.timezone.db,
     dbSetupDockerfilePath: dbSetupDockerfilePath,
     volumeCapacity: '3Gi',
-    cpuRequest: '100m',
+    cpuRequest: '50m',
     cpuLimit: '500m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '3Gi',
     replicas: '1'
   },
@@ -116,9 +116,9 @@ const phases = {
     tz: config.timezone.db,
     dbSetupDockerfilePath: dbSetupDockerfilePath,
     volumeCapacity: '5Gi',
-    cpuRequest: '100m',
+    cpuRequest: '50m',
     cpuLimit: '500m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '3Gi',
     replicas: '1'
   }

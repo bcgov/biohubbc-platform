@@ -31,22 +31,39 @@ const apiDeploy = async (settings) => {
         HOST: phases[phase].host,
         CHANGE_ID: phases.build.changeId || changeId,
         APP_HOST: phases[phase].appHost,
+        // Node
         NODE_ENV: phases[phase].env || 'dev',
+        NODE_OPTIONS: phases[phase].nodeOptions,
+        // Elastic Search
         ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
         ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
         ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
+        // ITIS SOLR
+        ITIS_SOLR_URL: phases[phase].itisSolrUrl,
+        // S3 (Object Store)
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
+        OBJECT_STORE_SECRETS: 'biohubbc-object-store',
+        // Database
         TZ: phases[phase].tz,
-        KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.adminUserName,
-        KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
-        KEYCLOAK_SECRET_ADMIN_PASSWORD: phases[phase].sso.keycloakSecretAdminPassword,
         DB_SERVICE_NAME: `${phases[phase].dbName}-postgresql${phases[phase].suffix}`,
-        KEYCLOAK_HOST: phases[phase].sso.url,
-        KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
+        // Keycloak
+        KEYCLOAK_HOST: phases[phase].sso.host,
         KEYCLOAK_REALM: phases[phase].sso.realm,
-        KEYCLOAK_INTEGRATION_ID: phases[phase].sso.integrationId,
-        KEYCLOAK_API_HOST: phases[phase].sso.apiHost,
+        KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
+        // Keycloak secret
+        KEYCLOAK_SECRET: phases[phase].sso.keycloakSecret,
+        // Keycloak Service Client
+        KEYCLOAK_ADMIN_USERNAME: phases[phase].sso.serviceClient.serviceClientName,
+        KEYCLOAK_SECRET_ADMIN_PASSWORD_KEY: phases[phase].sso.serviceClient.keycloakSecretServiceClientPasswordKey,
+        // Keycloak CSS API
+        KEYCLOAK_API_TOKEN_URL: phases[phase].sso.cssApi.cssApiTokenUrl,
+        KEYCLOAK_API_CLIENT_ID: phases[phase].sso.cssApi.cssApiClientId,
+        KEYCLOAK_API_CLIENT_SECRET_KEY: phases[phase].sso.cssApi.keycloakSecretCssApiSecretKey,
+        KEYCLOAK_API_HOST: phases[phase].sso.cssApi.cssApiHost,
+        KEYCLOAK_API_ENVIRONMENT: phases[phase].sso.cssApi.cssApiEnvironment,
+        // Log Level
         LOG_LEVEL: phases[phase].logLevel || 'info',
+        // Openshift Resources
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,
         MEMORY_REQUEST: phases[phase].memoryRequest,

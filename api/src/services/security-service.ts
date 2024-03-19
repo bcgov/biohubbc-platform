@@ -3,8 +3,12 @@ import { HTTP403 } from '../errors/http-error';
 import {
   ArtifactPersecution,
   PersecutionAndHarmSecurity,
+  SecurityCategoryRecord,
   SecurityRepository,
-  SECURITY_APPLIED_STATUS
+  SecurityRuleAndCategory,
+  SecurityRuleRecord,
+  SECURITY_APPLIED_STATUS,
+  SubmissionFeatureSecurityRecord
 } from '../repositories/security-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
@@ -83,6 +87,39 @@ export class SecurityService extends DBService {
     defaultLog.debug({ label: 'getPersecutionAndHarmRulesByArtifactId' });
 
     return this.securityRepository.getPersecutionAndHarmRulesByArtifactId(artifactId);
+  }
+
+  /**
+   * Get Artifact Supplementary Data.
+   *
+   * @param {number} artifactId
+   * @param {boolean} isAdmin
+   * @return {*}  {Promise<{ persecutionAndHarmRules: ArtifactPersecution[]; persecutionAndHarmStatus: SECURITY_APPLIED_STATUS }>}
+   * @memberof SecurityService
+   */
+  async getArtifactSupplementaryData(
+    artifactId: number,
+    isAdmin: boolean
+  ): Promise<{ persecutionAndHarmRules: ArtifactPersecution[]; persecutionAndHarmStatus: SECURITY_APPLIED_STATUS }> {
+    defaultLog.debug({ label: 'getArtifactSupplementaryData' });
+
+    let persecutionAndHarmRules: ArtifactPersecution[] = [];
+
+    //If user is Admin, get all rules
+    if (isAdmin) {
+      persecutionAndHarmRules = await this.getPersecutionAndHarmRulesByArtifactId(artifactId);
+    }
+
+    let persecutionAndHarmStatus = await this.getSecurityAppliedStatus(artifactId);
+    //If user is not Admin and status is pending, set to secured
+    if (!isAdmin && persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING) {
+      persecutionAndHarmStatus = SECURITY_APPLIED_STATUS.SECURED;
+    }
+
+    return {
+      persecutionAndHarmRules: persecutionAndHarmRules,
+      persecutionAndHarmStatus: persecutionAndHarmStatus
+    };
   }
 
   /**
@@ -271,5 +308,143 @@ export class SecurityService extends DBService {
   async isArtifactPendingReview(artifactId: number): Promise<boolean> {
     const artifact = await this.artifactService.getArtifactById(artifactId);
     return artifact.security_review_timestamp ? false : true;
+  }
+
+  /**
+   * Returns true is any artifacts in the dataset are pending review
+   *
+   * @param {string} datasetId
+   * @return {*}  {Promise<boolean>}
+   * @memberof SecurityService
+   */
+  async isDatasetPendingReview(datasetId: string): Promise<boolean> {
+    const artifactIds = (await this.artifactService.getArtifactsByDatasetId(datasetId)).map((item) => item.artifact_id);
+
+    const artifactSecurityRules = await Promise.all(
+      artifactIds.map(async (artifactId) => await this.isArtifactPendingReview(artifactId))
+    );
+
+    const isPendingReview = artifactSecurityRules.includes(true);
+
+    return isPendingReview;
+  }
+
+  /**
+   * Patches security rules that are applied or removed to the given set of submission features. If a
+   * particular rule happens to belong to both `applyRuleIds` and `removeRuleIds`, it will always be
+   * added.
+   *
+   * @param {number[]} submissionFeatureIds IDs of the submission features whose security will be updated.
+   * @param {number[]} applyRuleIds IDs of the rules which will be applied after the patch operation
+   * @param {number[]} removeRuleIds IDs of the rules which will be removed after the patch operation
+   * @return {*}  {Promise<void>}
+   * @memberof SecurityService
+   */
+  async patchSecurityRulesOnSubmissionFeatures(
+    submissionFeatureIds: number[],
+    applyRuleIds: number[],
+    removeRuleIds: number[]
+  ): Promise<void> {
+    defaultLog.debug({ label: 'patchSecurityRulesOnSubmissionFeatures', applyRuleIds, removeRuleIds });
+
+    if (!submissionFeatureIds.length) {
+      return;
+    }
+
+    if (removeRuleIds.length > 0) {
+      await this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+    }
+
+    if (applyRuleIds.length > 0) {
+      await this.securityRepository.applySecurityRulesToSubmissionFeatures(submissionFeatureIds, applyRuleIds);
+    }
+  }
+
+  /**
+   * Removes the given security rules from the given set of submission feature ids. If
+   * no security rules ID is provided, all security rules will be removed for the given set
+   * of subission features.
+   *
+   * @param {number[]} submissionFeatureIds
+   * @param {number[]} [removeRuleIds]
+   *
+   * @return {*}  {Promise<SubmissionFeatureSecurityRecord[]>}
+   * @memberof SecurityService
+   */
+  async removeSecurityRulesFromSubmissionFeatures(
+    submissionFeatureIds: number[],
+    removeRuleIds?: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!submissionFeatureIds.length) {
+      return [];
+    }
+
+    if (!removeRuleIds) {
+      return this.securityRepository.removeAllSecurityRulesFromSubmissionFeatures(submissionFeatureIds);
+    }
+
+    return this.securityRepository.removeSecurityRulesFromSubmissionFeatures(submissionFeatureIds, removeRuleIds);
+  }
+
+  /**
+   * Gets Submission Feature Security Records for a given set of submission feature ids
+   *
+   * @param {number[]} submissionFeatureIds
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
+  async getSecurityRulesForSubmissionFeatures(
+    submissionFeatureIds: number[]
+  ): Promise<SubmissionFeatureSecurityRecord[]> {
+    if (!submissionFeatureIds.length) {
+      // no features, return early
+      return [];
+    }
+
+    return this.securityRepository.getSecurityRulesForSubmissionFeatures(submissionFeatureIds);
+  }
+
+  /**
+   * Gets all Security Records for all featues belonging to the given submission.
+   *
+   * @param {number} submissionId
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
+  async getAllSecurityRulesForSubmission(submissionId: number): Promise<SubmissionFeatureSecurityRecord[]> {
+    return this.securityRepository.getAllSecurityRulesForSubmission(submissionId);
+  }
+
+  /**
+   * Gets a list of all active security rules. A security rule is active if it has not
+   * been end-dated.
+   *
+   * @return {*}  {Promise<SecurityRuleRecord[]>}
+   * @memberof SecurityService
+   */
+  async getActiveSecurityRules(): Promise<SecurityRuleRecord[]> {
+    return this.securityRepository.getActiveSecurityRules();
+  }
+
+  /**
+   * Gets a list of all active security rules with associated categories. A security rule is
+   * active if it has not been end-dated.
+   *
+   * @return {*}  {Promise<SecurityRuleAndCategory[]>}
+   * @memberof SecurityService
+   */
+  async getActiveRulesAndCategories(): Promise<SecurityRuleAndCategory[]> {
+    return this.securityRepository.getActiveRulesAndCategories();
+  }
+
+  /**
+   * Gets a list of all active security categories. A security category is active if it has
+   * not been end-dated.
+   *
+   * @return {*}  {Promise<SecurityCategoryRecord[]>}
+   * @memberof SecurityService
+   */
+  async getActiveSecurityCategories(): Promise<SecurityCategoryRecord[]> {
+    return this.securityRepository.getActiveSecurityCategories();
   }
 }

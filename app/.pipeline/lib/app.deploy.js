@@ -26,13 +26,17 @@ const appDeploy = async (settings) => {
         CHANGE_ID: phases.build.changeId || changeId,
         REACT_APP_API_HOST: phases[phase].apiHost,
         REACT_APP_SITEMINDER_LOGOUT_URL: phases[phase].siteminderLogoutURL,
+        // File Upload Settings
         REACT_APP_MAX_UPLOAD_NUM_FILES: phases[phase].maxUploadNumFiles,
         REACT_APP_MAX_UPLOAD_FILE_SIZE: phases[phase].maxUploadFileSize,
+        // Node
         NODE_ENV: phases[phase].env || 'dev',
         REACT_APP_NODE_ENV: phases[phase].env || 'dev',
-        REACT_APP_KEYCLOAK_HOST: phases[phase].sso.url,
+        // Keycloak
+        REACT_APP_KEYCLOAK_HOST: phases[phase].sso.host,
         REACT_APP_KEYCLOAK_REALM: phases[phase].sso.realm,
         REACT_APP_KEYCLOAK_CLIENT_ID: phases[phase].sso.clientId,
+        // Openshift Resources
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,
         MEMORY_REQUEST: phases[phase].memoryRequest,

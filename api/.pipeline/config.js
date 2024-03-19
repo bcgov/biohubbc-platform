@@ -62,9 +62,9 @@ const phases = {
     env: 'build',
     tz: config.timezone.api,
     branch: branch,
-    cpuRequest: '100m',
+    cpuRequest: '50m',
     cpuLimit: '1250m',
-    memoryRequest: '512Mi',
+    memoryRequest: '100Mi',
     memoryLimit: '3Gi'
   },
   dev: {
@@ -83,15 +83,17 @@ const phases = {
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
+    itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: (isStaticDeployment && 'biohub') || `local/${deployChangeId}/biohub`,
     tz: config.timezone.api,
     sso: config.sso.dev,
-    logLevel: 'debug',
-    cpuRequest: '100m',
-    cpuLimit: '500m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
-    replicas: '1',
+    logLevel: (isStaticDeployment && 'info') || 'debug',
+    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    cpuRequest: '50m',
+    cpuLimit: '600m',
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
+    replicas: (isStaticDeployment && '1') || '1',
     replicasMax: (isStaticDeployment && '2') || '1'
   },
   test: {
@@ -110,16 +112,18 @@ const phases = {
     elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
+    itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     sso: config.sso.test,
     logLevel: 'info',
-    cpuRequest: '200m',
+    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
     replicas: '2',
-    replicasMax: '3'
+    replicasMax: '4'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -137,16 +141,18 @@ const phases = {
     elasticsearchURL: 'http://es01:9200',
     elasticsearchEmlIndex: 'eml',
     elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
+    itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     sso: config.sso.prod,
-    logLevel: 'info',
-    cpuRequest: '200m',
+    logLevel: 'warn',
+    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
     replicas: '2',
-    replicasMax: '3'
+    replicasMax: '4'
   }
 };
 

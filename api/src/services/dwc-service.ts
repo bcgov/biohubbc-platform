@@ -14,7 +14,7 @@ import { ArchiveFile } from '../utils/media/media-file';
 import { parseUnknownMedia, UnknownMedia } from '../utils/media/media-utils';
 import { DBService } from './db-service';
 import { EMLService } from './eml-service';
-import { ElasticSearchIndices } from './es-service';
+import { ElasticSearchIndices, ESService } from './es-service';
 import { SpatialService } from './spatial-service';
 import { SubmissionService } from './submission-service';
 
@@ -24,6 +24,7 @@ export class DarwinCoreService extends DBService {
   submissionService: SubmissionService;
   spatialService: SpatialService;
   emlService: EMLService;
+  esService: ESService;
 
   /**
    * Creates an instance of DarwinCoreService.
@@ -37,6 +38,7 @@ export class DarwinCoreService extends DBService {
     this.spatialService = new SpatialService(this.connection);
     this.submissionService = new SubmissionService(this.connection);
     this.emlService = new EMLService(this.connection);
+    this.esService = new ESService();
   }
 
   // Look and see if the decorate needs to be run on a fresh record
@@ -390,7 +392,8 @@ export class DarwinCoreService extends DBService {
    */
   async intakeJob_step_11(jobQueueRecord: ISubmissionJobQueueRecord) {
     try {
-      await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
+      //TODO: is this deprecated?
+      //await this.transformAndUploadMetaData(jobQueueRecord.submission_id);
       await this.submissionService.insertSubmissionStatus(
         jobQueueRecord.submission_id,
         SUBMISSION_STATUS_TYPE.METADATA_TO_ES
@@ -711,36 +714,37 @@ export class DarwinCoreService extends DBService {
    * @return {*}  {Promise<WriteResponseBase>}
    * @memberof DarwinCoreService
    */
-  async transformAndUploadMetaData(submissionId: number): Promise<void> {
-    const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
-
-    if (!submissionRecord.source_transform_id) {
-      throw new ApiGeneralError('The source_transform_id is not available');
-    }
-
-    const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
-      submissionRecord.source_transform_id
-    );
-
-    if (!sourceTransformRecord.metadata_transform) {
-      throw new ApiGeneralError('The source metadata transform is not available');
-    }
-
-    const jsonMetadata = await this.submissionService.getSubmissionMetadataJson(
-      submissionId,
-      sourceTransformRecord.metadata_transform
-    );
-
-    if (!jsonMetadata) {
-      throw new ApiGeneralError('The source metadata json is not available');
-    }
-
-    // call to the ElasticSearch API to create a record with our transformed EML
-    await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
-
-    // update submission metadata with a copy of the elastic search object
-    await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, jsonMetadata);
-  }
+  //TODO: is this deprecated?
+  // async transformAndUploadMetaData(submissionId: number): Promise<void> {
+  //   const submissionRecord = await this.submissionService.getSubmissionRecordBySubmissionId(submissionId);
+  //
+  //   if (!submissionRecord.source_transform_id) {
+  //     throw new ApiGeneralError('The source_transform_id is not available');
+  //   }
+  //
+  //   const sourceTransformRecord = await this.submissionService.getSourceTransformRecordBySourceTransformId(
+  //     submissionRecord.source_transform_id
+  //   );
+  //
+  //   if (!sourceTransformRecord.metadata_transform) {
+  //     throw new ApiGeneralError('The source metadata transform is not available');
+  //   }
+  //
+  //   const jsonMetadata = await this.submissionService.getSubmissionMetadataJson(
+  //     submissionId,
+  //     sourceTransformRecord.metadata_transform
+  //   );
+  //
+  //   if (!jsonMetadata) {
+  //     throw new ApiGeneralError('The source metadata json is not available');
+  //   }
+  //
+  //   // call to the ElasticSearch API to create a record with our transformed EML
+  //   await this.uploadToElasticSearch(submissionRecord.uuid, jsonMetadata);
+  //
+  //   // update submission metadata with a copy of the elastic search object
+  //   await this.submissionService.updateSubmissionMetadataWithSearchKeys(submissionId, jsonMetadata);
+  // }
 
   /**
    * Upload file to ES
@@ -751,7 +755,7 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async uploadToElasticSearch(dataPackageId: string, convertedEML: string) {
-    const esClient = await this.getEsClient();
+    const esClient = await this.esService.getEsClient();
 
     return esClient.index({
       id: dataPackageId,
@@ -768,7 +772,7 @@ export class DarwinCoreService extends DBService {
    * @memberof DarwinCoreService
    */
   async deleteEmlFromElasticSearchByDataPackageId(dataPackageId: string) {
-    const esClient = await this.getEsClient();
+    const esClient = await this.esService.getEsClient();
 
     return esClient.delete({ id: dataPackageId, index: ElasticSearchIndices.EML });
   }

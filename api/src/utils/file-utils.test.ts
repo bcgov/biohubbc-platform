@@ -201,7 +201,8 @@ describe('file-utils', () => {
       expect(deleteObjectStub).to.have.been.calledOnce;
       expect(deleteObjectStub).to.have.been.calledWith({
         Bucket: 'object-store-bucket-name',
-        Key: 'my-delete-key'
+        Key: 'my-delete-key',
+        VersionId: undefined
       });
       expect(result).to.eql({ DeleteMarker: true });
     });
@@ -678,18 +679,6 @@ describe('file-utils', () => {
       } catch (actualError) {
         expect((actualError as AWS.AWSError).message).to.equal('headObject test reject');
       }
-    });
-  });
-
-  describe('generateArtifactS3FileKey', () => {
-    it('returns an s3 key with a prefix', async () => {
-      const result = fileUtils.generateArtifactS3FileKey({
-        artifactId: 1,
-        datasetUUID: '123-456-789',
-        fileName: 'testFileName'
-      });
-
-      expect(result).to.equal('biohub/datasets/123-456-789/artifacts/1/testFileName');
     });
   });
 

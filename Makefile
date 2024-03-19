@@ -56,6 +56,14 @@ clean: ## Closes and cleans (removes) all project containers
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml down -v --rmi all --remove-orphans
 
+prune: ## Deletes ALL docker artifacts (even those not associated to this project)
+	@echo -n "Delete ALL docker artifacts? [y/n] " && read ans && [ $${ans:-n} = y ]
+	@echo "==============================================="
+	@echo "Make: prune - deleting all docker artifacts"
+	@echo "==============================================="
+	@docker system prune --all --volumes -f
+	@docker volume prune --all -f
+
 ## ------------------------------------------------------------------------------
 ## Build/Run Postgres DB Commands
 ## - Builds all of the BioHub postgres db projects (db, db_setup)
@@ -82,13 +90,15 @@ build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api queue
+	@docker-compose -f docker-compose.yml build db db_setup api
+	# @docker-compose -f docker-compose.yml build db db_setup api queue
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api queue
+	@docker-compose -f docker-compose.yml up -d db db_setup api
+	# @docker-compose -f docker-compose.yml up -d db db_setup api queue
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
@@ -99,13 +109,15 @@ build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api queue app
+	@docker-compose -f docker-compose.yml build db db_setup api app
+	# @docker-compose -f docker-compose.yml build db db_setup api queue app
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api queue app
+	@docker-compose -f docker-compose.yml up -d db db_setup api app
+	# @docker-compose -f docker-compose.yml up -d db db_setup api queue app
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container

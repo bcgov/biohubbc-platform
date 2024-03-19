@@ -274,7 +274,7 @@ describe('SecurityService', () => {
         .resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -311,7 +311,7 @@ describe('SecurityService', () => {
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(true);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -344,7 +344,7 @@ describe('SecurityService', () => {
       const isUserAdminStub = sinon.stub(UserService.prototype, 'isSystemUserAdmin').resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -377,7 +377,7 @@ describe('SecurityService', () => {
         .resolves(false);
 
       const getArtifactStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
-        security_review_timestamp: new Date(),
+        security_review_timestamp: 'date',
         key: 'sample-key'
       } as Artifact);
 
@@ -485,13 +485,278 @@ describe('SecurityService', () => {
 
       const getArtifactByIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactById').resolves({
         key: 'secured-string',
-        security_review_timestamp: new Date()
+        security_review_timestamp: 'date'
       } as Artifact);
 
       const result = await securityService.isArtifactPendingReview(1000);
 
       expect(getArtifactByIdStub).to.be.calledWith(1000);
       expect(result).to.eql(false);
+    });
+  });
+
+  describe('isDatasetPendingReview', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should return true if the any artifact in the dataset is pending review', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+        {
+          artifact_id: 1,
+          key: 'secured-string-a',
+          security_review_timestamp: null
+        } as Artifact,
+        {
+          artifact_id: 2,
+          key: 'secured-string-b',
+          security_review_timestamp: null
+        } as Artifact
+      ]);
+
+      sinon
+        .stub(SecurityService.prototype, 'isArtifactPendingReview')
+        .onFirstCall()
+        .resolves(true)
+        .onSecondCall()
+        .resolves(false);
+
+      const result = await securityService.isDatasetPendingReview('datasetId');
+
+      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(result).to.eql(true);
+    });
+
+    it('should return false if the no artifact in the dataset is pending review', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const securityService = new SecurityService(mockDBConnection);
+
+      const getArtifactsByDatasetIdStub = sinon.stub(ArtifactService.prototype, 'getArtifactsByDatasetId').resolves([
+        {
+          artifact_id: 1,
+          key: 'secured-string-a',
+          security_review_timestamp: null
+        } as Artifact,
+        {
+          artifact_id: 2,
+          key: 'secured-string-b',
+          security_review_timestamp: null
+        } as Artifact
+      ]);
+
+      sinon
+        .stub(SecurityService.prototype, 'isArtifactPendingReview')
+        .onFirstCall()
+        .resolves(false)
+        .onSecondCall()
+        .resolves(false);
+
+      const result = await securityService.isDatasetPendingReview('datasetId');
+
+      expect(getArtifactsByDatasetIdStub).to.be.calledWith('datasetId');
+      expect(result).to.eql(false);
+    });
+  });
+
+  describe('patchSecurityRulesOnSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed with valid data', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([1, 2, 3], [4, 5], [6, 7]);
+
+      expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
+      expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
+    });
+
+    it('should succeed when no submissionFeatureIds are called', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([], [4, 5], [6, 7]);
+
+      expect(removeStub).to.not.be.called;
+      expect(applyStub).to.not.be.called;
+    });
+
+    it('should succeed when no remove rule IDs are called', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([1, 2, 3], [4, 5], []);
+
+      expect(removeStub).to.not.be.called;
+      expect(applyStub).to.be.calledWith([1, 2, 3], [4, 5]);
+    });
+
+    it('should succeed when no apply rule IDs are called', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([]);
+
+      const applyStub = sinon.stub(SecurityRepository.prototype, 'applySecurityRulesToSubmissionFeatures').resolves([]);
+
+      await service.patchSecurityRulesOnSubmissionFeatures([1, 2, 3], [], [6, 7]);
+
+      expect(applyStub).to.not.be.called;
+      expect(removeStub).to.be.calledWith([1, 2, 3], [6, 7]);
+    });
+  });
+
+  describe('removeSecurityRulesFromSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('should succeed at removing a list of security rules', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'removeSecurityRulesFromSubmissionFeatures')
+        .resolves([
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: '',
+            update_user: 1,
+            revision_count: 1
+          }
+        ]);
+
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([1, 2, 3], [4, 5]);
+
+      expect(removeSecurityStub).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+
+    it('should succeed at removing all rules when no array is given', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const removeSecurityStub = sinon
+        .stub(SecurityRepository.prototype, 'removeAllSecurityRulesFromSubmissionFeatures')
+        .resolves([
+          {
+            submission_feature_security_id: 1,
+            submission_feature_id: 1,
+            security_rule_id: 1,
+            record_effective_date: '',
+            record_end_date: null,
+            create_date: '',
+            create_user: 1,
+            update_date: '',
+            update_user: 1,
+            revision_count: 1
+          }
+        ]);
+
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([1, 2, 3]);
+
+      expect(removeSecurityStub).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+
+    it('should return an empty array if no submission feature IDs have been given', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const response = await service.removeSecurityRulesFromSubmissionFeatures([]);
+
+      expect(response).to.eql([]);
+    });
+  });
+
+  describe('getSecurityRulesForSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('getSecurityRulesForSubmissionFeatures', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const applySecurity = sinon.stub(SecurityRepository.prototype, 'getSecurityRulesForSubmissionFeatures').resolves([
+        {
+          submission_feature_security_id: 1,
+          submission_feature_id: 1,
+          security_rule_id: 1,
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
+      ]);
+      const response = await service.getSecurityRulesForSubmissionFeatures([1]);
+
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
+    });
+  });
+
+  describe('getSecurityRulesForSubmissionFeatures', () => {
+    afterEach(() => {
+      sinon.restore();
+    });
+
+    it('getActiveSecurityRules', async () => {
+      const mockDBConnection = getMockDBConnection();
+      const service = new SecurityService(mockDBConnection);
+
+      const applySecurity = sinon.stub(SecurityRepository.prototype, 'getActiveSecurityRules').resolves([
+        {
+          security_rule_id: 1,
+          name: '',
+          description: '',
+          record_effective_date: '',
+          record_end_date: null,
+          create_date: '',
+          create_user: 1,
+          update_date: '',
+          update_user: 1,
+          revision_count: 1
+        }
+      ]);
+      const response = await service.getActiveSecurityRules();
+
+      expect(applySecurity).to.be.calledOnce;
+      expect(response.length).to.be.greaterThan(0);
     });
   });
 });

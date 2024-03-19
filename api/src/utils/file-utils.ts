@@ -16,9 +16,8 @@ export interface IDatasetS3FileKey {
 }
 
 export interface IArtifactS3FileKey {
-  datasetUUID: string;
-  artifactId: number;
-  fileName: string;
+  submissionId: number;
+  submissionFeatureId: number;
 }
 
 export interface IQueueS3FileKey {
@@ -102,19 +101,20 @@ export const getS3HostUrl = (key?: string): string => {
  * Delete a file from S3, based on its key.
  *
  * For potential future reference, for deleting the delete marker of a file in S3:
- * https://docs.aws.amazon.com/AmazonS3/latest/userguide/RemDelMarker.html
+ * https://docs.aws.amazon.com/AmazonS3/latest/userguide/DeleteMarker.html
  *
  * @export
  * @param {string} key the unique key assigned to the file in S3 when it was originally uploaded
+ * @param {string} versionId Version Id of an S3 object to be deleted. Can also remove a Delete Marker to "restore" a previously deleted object
  * @returns {Promise<GetObjectOutput>} the response from S3 or null if required parameters are null
  */
-export async function deleteFileFromS3(key: string): Promise<DeleteObjectOutput | null> {
+export async function deleteFileFromS3(key: string, versionId?: string): Promise<DeleteObjectOutput | null> {
   const s3Client = _getS3Client();
   if (!key || !s3Client) {
     return null;
   }
 
-  return s3Client.deleteObject({ Bucket: _getObjectStoreBucketName(), Key: key }).promise();
+  return s3Client.deleteObject({ Bucket: _getObjectStoreBucketName(), Key: key, VersionId: versionId }).promise();
 }
 
 /**
@@ -215,7 +215,7 @@ export async function getFileFromS3(key: string, versionId?: string): Promise<Ge
 }
 
 /**
- * Get an s3 signed url.
+ * Get an s3 signed url for downloading an object.
  *
  * @param {string} key S3 object key
  * @returns {Promise<string>} the response from S3 or null if required parameters are null
@@ -235,7 +235,7 @@ export async function getS3SignedURL(key: string): Promise<string | null> {
 }
 
 /**
- * Fetchs a list of files in S3 at the given path
+ * Fetches a list of files in S3 at the given path
  *
  * @export
  * @param {string} path the path (Prefix) of the directory in S3
@@ -271,17 +271,10 @@ export async function getObjectMeta(key: string): Promise<HeadObjectOutput> {
  * @param {IArtifactS3FileKey} options
  * @return {*}
  */
-export function generateArtifactS3FileKey(options: IArtifactS3FileKey) {
-  const keyParts: (string | number)[] = [];
-
-  keyParts.push(_getS3KeyPrefix());
-  keyParts.push('datasets');
-  keyParts.push(options.datasetUUID);
-  keyParts.push('artifacts');
-  keyParts.push(options.artifactId);
-  keyParts.push(options.fileName);
-
-  return keyParts.filter(Boolean).join('/');
+export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) {
+  return [_getS3KeyPrefix(), 'submissions', options.submissionId, 'features', options.submissionFeatureId]
+    .filter(Boolean)
+    .join('/');
 }
 
 /**
@@ -332,6 +325,8 @@ export function generateDatasetS3FileKey(options: IDatasetS3FileKey) {
 
 /**
  * Scan a file for viruses.
+ *
+ * TODO: Turn into middleware that is called in app.ts as one of the first steps before the endpoint even receives it?
  *
  * @export
  * @param {Express.Multer.File} file

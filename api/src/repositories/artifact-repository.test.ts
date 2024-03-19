@@ -236,4 +236,36 @@ describe('ArtifactRepository', () => {
       expect(response).to.eql([]);
     });
   });
+
+  describe('getArtifactByUUID', () => {
+    it('should return with valid data', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: [{ artifact_id: 1 }]
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+      const response = await artifactRepository.getArtifactByUUID('uuid');
+
+      expect(response).to.eql({ artifact_id: 1 });
+    });
+
+    it('should return null', async () => {
+      const mockQueryResponse = {
+        rowCount: 1,
+        rows: []
+      } as any as Promise<QueryResult<any>>;
+
+      const mockDBConnection = getMockDBConnection({
+        sql: () => mockQueryResponse
+      });
+      const artifactRepository = new ArtifactRepository(mockDBConnection);
+      const response = await artifactRepository.getArtifactByUUID('uuid');
+
+      expect(response).to.eql(null);
+    });
+  });
 });

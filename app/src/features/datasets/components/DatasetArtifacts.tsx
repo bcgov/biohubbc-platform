@@ -7,16 +7,21 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
+import { ErrorDialog } from 'components/dialog/ErrorDialog';
+import YesNoDialog from 'components/dialog/YesNoDialog';
 import { ActionToolbar } from 'components/toolbar/ActionToolbars';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
 import { SYSTEM_ROLE } from 'constants/roles';
+import { ISnackbarProps } from 'contexts/dialogContext';
 import { useApi } from 'hooks/useApi';
+import { useAuthStateContext } from 'hooks/useAuthStateContext';
+import { useDialogContext } from 'hooks/useContext';
 import useDataLoader from 'hooks/useDataLoader';
-import useKeycloakWrapper from 'hooks/useKeycloakWrapper';
 import { IArtifact, SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
 import { useState } from 'react';
-import { downloadFile, getFormattedDate, getFormattedFileSize } from 'utils/Utils';
+import { hasAtLeastOneValidValue } from 'utils/authUtils';
+import { downloadFile, getFormattedDate, getFormattedFileSize, pluralize as p } from 'utils/Utils';
 import SecureDataAccessRequestDialog from '../security/SecureDataAccessRequestDialog';
 import AttachmentItemMenuButton from './AttachmentItemMenuButton';
 import ApplySecurityDialog from './security/ApplySecurityDialog';
@@ -56,11 +61,17 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     null
   );
 
+  const [rowSelectionModel, setRowSelectionModel] = useState<GridRowSelectionModel>([]);
+
   const [openApplySecurity, setOpenApplySecurity] = useState<boolean>(false);
   const [selectedArtifacts, setSelectedArtifacts] = useState<IArtifact[]>([]);
+  const [showDeleteFileDialog, setShowDeleteFileDialog] = useState(false);
+  const [artifactToDelete, setArtifactToDelete] = useState<IArtifact | undefined>(undefined);
+  const [showErrorDialog, setShowErrorDialog] = useState(false);
 
-  const keycloakWrapper = useKeycloakWrapper();
+  const authStateContext = useAuthStateContext();
   const biohubApi = useApi();
+  const dialogContext = useDialogContext();
 
   const artifactsDataLoader = useDataLoader(() => biohubApi.dataset.getDatasetArtifacts(datasetId));
   artifactsDataLoader.load();
@@ -68,10 +79,18 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
   const artifactsList = artifactsDataLoader.data || [];
 
   const numPendingDocuments = artifactsList.filter(
-    (artifact) => artifact.supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING
+    (artifact) => artifact.supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING
   ).length;
 
-  const hasAdministrativePermissions = keycloakWrapper.hasSystemRole(VALID_SYSTEM_ROLES);
+  const hasAdministrativePermissions = hasAtLeastOneValidValue(
+    VALID_SYSTEM_ROLES,
+    authStateContext.biohubUserWrapper.roleNames
+  );
+
+  const handleApplySecurity = (artifact: IArtifact) => {
+    setSelectedArtifacts([artifact]);
+    setOpenApplySecurity(true);
+  };
 
   const handleDownloadAttachment = async (attachment: IArtifact) => {
     const signedUrl = await biohubApi.dataset.getArtifactSignedUrl(attachment.artifact_id);
@@ -80,6 +99,30 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
     }
 
     await downloadFile(signedUrl);
+  };
+
+  const handleDeleteArtifact = async (artifactUUIDs: string[]): Promise<boolean> => {
+    const data = await biohubApi.artifact.deleteArtifacts(artifactUUIDs);
+    artifactsDataLoader.refresh();
+
+    return data;
+  };
+
+  const showSnackBar = (textDialogProps?: Partial<ISnackbarProps>) => {
+    dialogContext.setSnackbar({ ...textDialogProps, open: true });
+  };
+
+  const handleShowSnackBar = (message: string) => {
+    showSnackBar({
+      snackbarMessage: (
+        <>
+          <Typography variant="body2" component="div">
+            {message}
+          </Typography>
+        </>
+      ),
+      open: true
+    });
   };
 
   const columns: GridColDef<IArtifact>[] = [
@@ -113,12 +156,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
       flex: 1,
       renderCell: (params) => {
         const { supplementaryData } = params.row;
-        if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.UNSECURED) {
+        if (supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.UNSECURED) {
           return <Chip color="success" sx={{ textTransform: 'uppercase' }} label="Available" />;
         }
 
         if (hasAdministrativePermissions) {
-          if (supplementaryData.persecutionAndHarm === SECURITY_APPLIED_STATUS.PENDING) {
+          if (supplementaryData.persecutionAndHarmStatus === SECURITY_APPLIED_STATUS.PENDING) {
             return <Chip color="info" sx={{ textTransform: 'uppercase' }} label="Pending Review" />;
           }
         }
@@ -134,7 +177,12 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <AttachmentItemMenuButton
             artifact={params.row}
             onDownload={handleDownloadAttachment}
+            onDelete={() => {
+              setArtifactToDelete(params.row);
+              setShowDeleteFileDialog(true);
+            }}
             onRequestAccess={(artifact) => setInitialSecureDataAccessRequestSelection(artifact.artifact_id)}
+            onApplySecurity={handleApplySecurity}
             isPendingReview={!params.row.security_review_timestamp}
             hasAdministrativePermissions={hasAdministrativePermissions}
           />
@@ -160,7 +208,42 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
         onClose={() => {
           setOpenApplySecurity(false);
           artifactsDataLoader.refresh();
+
+          setSelectedArtifacts([]);
+          setRowSelectionModel([]);
         }}
+      />
+
+      <ErrorDialog
+        dialogTitle="Error deleting document"
+        dialogText="If you continue to have difficulties deleting a document, please contact BioHub Support at biohub@gov.bc.ca."
+        open={showErrorDialog}
+        onClose={() => setShowErrorDialog(false)}
+        onOk={() => setShowErrorDialog(false)}
+      />
+
+      <YesNoDialog
+        open={showDeleteFileDialog}
+        onClose={() => setShowDeleteFileDialog(false)}
+        onYes={async () => {
+          if (artifactToDelete) {
+            const response = await handleDeleteArtifact([artifactToDelete.uuid]);
+            if (response) {
+              handleShowSnackBar(`You successfully deleted ${artifactToDelete.file_name}.`);
+            } else {
+              setShowErrorDialog(true);
+            }
+            setShowDeleteFileDialog(false);
+            setArtifactToDelete(undefined);
+          }
+        }}
+        onNo={() => {
+          setShowDeleteFileDialog(false);
+          setArtifactToDelete(undefined);
+        }}
+        dialogTitle="Delete document?"
+        dialogText="Are you sure you want to permanently delete this document? This action cannot be undone."
+        yesButtonProps={{ color: 'error' }}
       />
 
       <ActionToolbar label="Documents" labelProps={{ variant: 'h4' }}>
@@ -185,7 +268,7 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
           <Box pt={2} pb={2}>
             <Alert onClose={() => setShowAlert(false)} severity="info">
               <strong>
-                {`You have ${numPendingDocuments} project document${numPendingDocuments === 1 ? '' : 's'} to review.`}
+                {`You have ${numPendingDocuments} project ${p(numPendingDocuments, 'document')} to review.`}
               </strong>
             </Alert>
           </Box>
@@ -216,8 +299,9 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
             slots={{
               noRowsOverlay: NoArtifactRowsOverlay
             }}
-            onRowSelectionModelChange={(params) => {
-              const selectedArtifacts = params.map((rowId) => {
+            rowSelectionModel={rowSelectionModel}
+            onRowSelectionModelChange={(newRowSelectionModel) => {
+              const selectedArtifacts = newRowSelectionModel.map((rowId) => {
                 const findArtifact = artifactsList.find((artifact) => artifact.artifact_id === rowId);
                 if (findArtifact === undefined) {
                   throw Error('Artifact not found');
@@ -229,6 +313,8 @@ const DatasetAttachments: React.FC<IDatasetAttachmentsProps> = (props) => {
               if (selectedArtifacts) {
                 setSelectedArtifacts(selectedArtifacts);
               }
+
+              setRowSelectionModel(newRowSelectionModel);
             }}
           />
         </Box>
