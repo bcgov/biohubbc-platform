@@ -119,11 +119,11 @@ const phases = {
     logLevel: 'info',
     nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1000m',
+    cpuLimit: '1750m',
     memoryRequest: '100Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '6Gi',
     replicas: '2',
-    replicasMax: '4'
+    replicasMax: '2'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -148,11 +148,11 @@ const phases = {
     logLevel: 'warn',
     nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1000m',
+    cpuLimit: '1750m',
     memoryRequest: '100Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '8Gi',
     replicas: '2',
-    replicasMax: '4'
+    replicasMax: '2'
   }
 };
 
