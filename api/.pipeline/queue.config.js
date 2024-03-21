@@ -118,7 +118,7 @@ const phases = {
     logLevel: 'info',
     queueDockerfilePath: queueDockerfilePath,
     cpuRequest: '50m',
-    cpuLimit: '750m',
+    cpuLimit: '1000m',
     memoryRequest: '100Mi',
     memoryLimit: '3Gi',
     replicas: '1',
