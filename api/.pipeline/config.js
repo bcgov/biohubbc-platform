@@ -117,13 +117,13 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.test,
     logLevel: 'info',
-    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=3000', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1000m',
+    cpuLimit: '1250m',
     memoryRequest: '100Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '4Gi',
     replicas: '2',
-    replicasMax: '4'
+    replicasMax: '2'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -146,13 +146,13 @@ const phases = {
     tz: config.timezone.api,
     sso: config.sso.prod,
     logLevel: 'warn',
-    nodeOptions: '--max_old_space_size=2250', // 75% of memoryLimit (bytes)
+    nodeOptions: '--max_old_space_size=6000', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1000m',
+    cpuLimit: '1750m',
     memoryRequest: '100Mi',
-    memoryLimit: '3Gi',
+    memoryLimit: '8Gi',
     replicas: '2',
-    replicasMax: '4'
+    replicasMax: '2'
   }
 };
 

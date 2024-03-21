@@ -16,8 +16,7 @@
     "db": "biohub-platform-db",
     "api": "biohub-platform-api",
     "queue": "biohub-platform-queue",
-    "app": "biohub-platform-app",
-    "geoserver": "biohub-platform-geoserver"
+    "app": "biohub-platform-app"
   },
   "staticUrls": {
     "dev": "dev-biohub-platform.apps.silver.devops.gov.bc.ca",
@@ -28,11 +27,6 @@
     "dev": "api-dev-biohub-platform.apps.silver.devops.gov.bc.ca",
     "test": "api-test-biohub-platform.apps.silver.devops.gov.bc.ca",
     "prod": "api-biohub-platform.apps.silver.devops.gov.bc.ca"
-  },
-  "staticUrlsGeoServer": {
-    "dev": "geoserver-dev-biohub-platform.apps.silver.devops.gov.bc.ca",
-    "test": "geoserver-test-biohub-platform.apps.silver.devops.gov.bc.ca",
-    "prod": "geoserver-biohub-platform.apps.silver.devops.gov.bc.ca"
   },
   "siteminderLogoutURL": {
     "dev": "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi",
