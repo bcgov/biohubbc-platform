@@ -22,15 +22,14 @@ export $(shell sed 's/=.*//' .env)
 env: | setup ## Copies the default ./env_config/env.docker to ./.env
 
 postgres: | close build-postgres run-postgres ## Performs all commands necessary to run the postgres project (db) in docker
-backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api, queue) in docker
-web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, queue, app) in docker
+backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api) in docker
+web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, app) in docker
 
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
 db-migrate: | build-db-migrate run-db-migrate ## Performs all commands necessary to run the database migrations
 db-rollback: | build-db-rollback run-db-rollback ## Performs all commands necessary to rollback the latest database migrations
 
 clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
-geoserver: | build-geoserver run-geoserver ## Performs all commands necessary to run the geoserver project (db, geoserver) in docker
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
@@ -83,7 +82,7 @@ run-postgres: ## Runs the postgres db containers
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend Commands
-## - Builds all of the BioHub backend projects (db, db_setup, api, queue)
+## - Builds all of the BioHub backend projects (db, db_setup, api)
 ## ------------------------------------------------------------------------------
 
 build-backend: ## Builds all backend containers
@@ -91,18 +90,18 @@ build-backend: ## Builds all backend containers
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml build db db_setup api
-	# @docker-compose -f docker-compose.yml build db db_setup api queue
+	# @docker-compose -f docker-compose.yml build db db_setup api
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml up -d db db_setup api
-	# @docker-compose -f docker-compose.yml up -d db db_setup api queue
+	# @docker-compose -f docker-compose.yml up -d db db_setup api
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
-## - Builds all of the BioHub backend+web projects (db, db_setup, api, queue, app)
+## - Builds all of the BioHub backend+web projects (db, db_setup, api, app)
 ## ------------------------------------------------------------------------------
 
 build-web: ## Builds all backend+web containers
@@ -110,14 +109,14 @@ build-web: ## Builds all backend+web containers
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml build db db_setup api app
-	# @docker-compose -f docker-compose.yml build db db_setup api queue app
+	# @docker-compose -f docker-compose.yml build db db_setup api app
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml up -d db db_setup api app
-	# @docker-compose -f docker-compose.yml up -d db db_setup api queue app
+	# @docker-compose -f docker-compose.yml up -d db db_setup api app
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container
@@ -147,12 +146,6 @@ queue-container: ## Executes into the queue container.
 	@echo "Shelling into queue container"
 	@echo "==============================================="
 	@docker-compose exec queue bash
-
-geoserver-container: ## Executes into the geoserver container.
-	@echo "==============================================="
-	@echo "Shelling into geoserver container"
-	@echo "==============================================="
-	@docker-compose exec geoserver bash
 
 ## ------------------------------------------------------------------------------
 ## Database migration commands
@@ -209,22 +202,6 @@ run-clamav: ## Run clamav
 	@echo "Make: run-clamav - running clamav"
 	@echo "==============================================="
 	@docker-compose -f docker-compose.yml up -d clamav
-
-## ------------------------------------------------------------------------------
-## geoserver commands
-## ------------------------------------------------------------------------------
-
-build-geoserver: ## Build the geoserver image
-	@echo "==============================================="
-	@echo "Make: build-geoserver - building geoserver image"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build geoserver
-
-run-geoserver: ## Run geoserver
-	@echo "==============================================="
-	@echo "Make: run-geoserver - running geoserver"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d geoserver
 
 ## ------------------------------------------------------------------------------
 ## Run `npm` commands for all projects
@@ -367,12 +344,6 @@ log-db-setup: ## Runs `docker logs <container> -f` for the database setup contai
 	@echo "Running docker logs for the db-setup container"
 	@echo "==============================================="
 	@docker logs $(DOCKER_PROJECT_NAME)-db-setup-$(DOCKER_NAMESPACE)-container -f $(args)
-
-log-geoserver: ## Runs `docker logs <container> -f` for the geoserver container
-	@echo "==============================================="
-	@echo "Running docker logs for the geoserver container"
-	@echo "==============================================="
-	@docker logs $(DOCKER_PROJECT_NAME)-geoserver-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
 ## Help

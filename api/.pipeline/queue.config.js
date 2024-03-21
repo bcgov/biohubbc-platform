@@ -90,12 +90,12 @@ const phases = {
     tz: config.timezone.api,
     logLevel: 'debug',
     queueDockerfilePath: queueDockerfilePath,
-    cpuRequest: '100m',
+    cpuRequest: '50m',
     cpuLimit: '500m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
     replicas: '1',
-    replicasMax: (isStaticDeployment && '2') || '1'
+    replicasMax: '1'
   },
   test: {
     namespace: 'a0ec71-test',
@@ -117,12 +117,12 @@ const phases = {
     tz: config.timezone.api,
     logLevel: 'info',
     queueDockerfilePath: queueDockerfilePath,
-    cpuRequest: '200m',
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
-    replicas: '2',
-    replicasMax: '3'
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
+    replicas: '1',
+    replicasMax: '1'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -144,12 +144,12 @@ const phases = {
     tz: config.timezone.api,
     logLevel: 'info',
     queueDockerfilePath: queueDockerfilePath,
-    cpuRequest: '200m',
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
-    replicas: '2',
-    replicasMax: '3'
+    memoryRequest: '100Mi',
+    memoryLimit: '4Gi',
+    replicas: '1',
+    replicasMax: '1'
   }
 };
 

@@ -110,9 +110,9 @@ const phases = {
     cpuRequest: '50m',
     cpuLimit: '400m',
     memoryRequest: '100Mi',
-    memoryLimit: '400Mi',
+    memoryLimit: '750Mi',
     replicas: '2',
-    replicasMax: '3'
+    replicasMax: '2'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -131,11 +131,11 @@ const phases = {
     env: 'prod',
     sso: config.sso.prod,
     cpuRequest: '50m',
-    cpuLimit: '400m',
+    cpuLimit: '500m',
     memoryRequest: '100Mi',
-    memoryLimit: '400Mi',
+    memoryLimit: '1Gi',
     replicas: '2',
-    replicasMax: '3'
+    replicasMax: '2'
   }
 };
 

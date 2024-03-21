@@ -22,8 +22,8 @@ export type SystemUser = z.infer<typeof SystemUser>;
 
 export const SystemUserExtended = SystemUser.extend({
   identity_source: z.string(),
-  role_ids: z.array(z.number()).default([]),
-  role_names: z.array(z.string()).default([])
+  role_ids: z.array(z.number()),
+  role_names: z.array(z.string())
 });
 
 export type SystemUserExtended = z.infer<typeof SystemUserExtended>;
