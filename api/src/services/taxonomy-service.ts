@@ -7,7 +7,7 @@ const defaultLog = getLogger('services/taxonomy-service');
 
 export type TaxonSearchResult = {
   tsn: number;
-  commonName: string | null;
+  commonNames: string[];
   scientificName: string;
 };
 
@@ -56,13 +56,12 @@ export class TaxonomyService {
   }
 
   _sanitizeTaxonRecordsData(taxonRecords: TaxonRecord[]): TaxonSearchResult[] {
-    return taxonRecords.map((item: TaxonRecord) => {
-      return {
-        tsn: item.itis_tsn,
-        commonName: item.common_name,
-        scientificName: item.itis_scientific_name
-      };
-    });
+    return taxonRecords.map((item: TaxonRecord) => ({
+      tsn: item.itis_tsn,
+      // TODO: wrap commonNames in array until the database supports multiple common names
+      commonNames: item?.common_name ? [item.common_name] : [],
+      scientificName: item.itis_scientific_name
+    }));
   }
 
   /**
@@ -73,23 +72,23 @@ export class TaxonomyService {
    * @memberof TaxonomyService
    */
   async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
-    let commonName = null;
-    if (itisSolrResponse.commonNames) {
-      commonName = itisSolrResponse.commonNames[0].split('$')[1];
-      /* Sample itisResponse:
-       * commonNames: [
-       *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
-       *   '$woolly locoweed$English$N$124501$2011-06-29 00:00:00$',
-       *   '$Davis Mountains locoweed$English$N$124502$2011-06-29 00:00:00$',
-       *   '$woolly milkvetch$English$N$72035$2012-12-21 00:00:00$'
-       * ]
-       */
-    }
+    const commonNames =
+      itisSolrResponse.commonNames
+        .filter((name) => name.split('$')[2] === 'English')
+        .map((name) => name.split('$')[1]) ?? [];
+    /* Sample itisResponse:
+     * commonNames: [
+     *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
+     *   '$woolly locoweed$English$N$124501$2011-06-29 00:00:00$',
+     *   '$Davis Mountains locoweed$English$N$124502$2011-06-29 00:00:00$',
+     *   '$woolly milkvetch$English$N$72035$2012-12-21 00:00:00$'
+     * ]
+     */
 
     return this.taxonRepository.addItisTaxonRecord(
       Number(itisSolrResponse.tsn),
       itisSolrResponse.scientificName,
-      commonName,
+      commonNames,
       itisSolrResponse,
       itisSolrResponse.updateDate
     );

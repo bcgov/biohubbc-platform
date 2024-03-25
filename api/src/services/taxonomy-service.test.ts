@@ -16,14 +16,15 @@ describe('TaxonomyService', () => {
 
   const getItisSolrSearchResponse: ItisSolrSearchResponse[] = [
     {
-      commonNames: ['$commonName'],
+      commonNames: ['$commonNames'],
       kingdom: 'kingdom',
       name: 'name',
       parentTSN: 'parentTSN',
       scientificName: 'scientificName',
       tsn: 'tsn',
       updateDate: 'updateDate',
-      usage: 'usage'
+      usage: 'usage',
+      rank: 'rank'
     }
   ];
 
@@ -63,7 +64,7 @@ describe('TaxonomyService', () => {
       const response = await taxonomyService.getTaxonByTsnIds([1]);
 
       expect(repo).to.be.calledOnce;
-      expect(response).to.be.eql([{ tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' }]);
+      expect(response).to.be.eql([{ tsn: 1, commonNames: ['common_name'], scientificName: 'itis_scientific_name' }]);
     });
 
     it('if some records do not exist in db should return array of taxon records', async () => {
@@ -118,8 +119,8 @@ describe('TaxonomyService', () => {
       expect(searchItisByTSNStub).to.be.calledOnce;
       expect(itisService).to.be.calledOnce;
       expect(response).to.be.eql([
-        { tsn: 1, commonName: 'common_name', scientificName: 'itis_scientific_name' },
-        { tsn: 2, commonName: 'common_name', scientificName: 'itis_scientific_name' }
+        { tsn: 1, commonNames: ['common_name'], scientificName: 'itis_scientific_name' },
+        { tsn: 2, commonNames: ['common_name'], scientificName: 'itis_scientific_name' }
       ]);
     });
   });
@@ -135,7 +136,7 @@ describe('TaxonomyService', () => {
         itis_tsn: 1,
         bc_taxon_code: null,
         itis_scientific_name: 'scientificName',
-        common_name: 'commonName',
+        common_name: 'commonNames',
         itis_data: {},
         record_effective_date: 'updateDate',
         record_end_date: null,
@@ -154,7 +155,7 @@ describe('TaxonomyService', () => {
         itis_tsn: 1,
         bc_taxon_code: null,
         itis_scientific_name: 'scientificName',
-        common_name: 'commonName',
+        common_name: 'commonNames',
         itis_data: {},
         record_effective_date: 'updateDate',
         record_end_date: null,
