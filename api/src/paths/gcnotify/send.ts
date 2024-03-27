@@ -8,7 +8,7 @@ import { authorizeRequestHandler } from '../../request-handlers/security/authori
 import { GCNotifyService } from '../../services/gcnotify-service';
 import { getLogger } from '../../utils/logger';
 
-const defaultLog = getLogger('paths/gcnotify');
+const defaultLog = getLogger('paths/gcnotify/send');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {

@@ -14,23 +14,6 @@ describe('useSearchApi', () => {
     mock.restore();
   });
 
-  it('getSearchResults works as expected', async () => {
-    const res = [
-      {
-        id: '1',
-        name: 'name',
-        objectives: 'objectives',
-        geometry: []
-      }
-    ];
-
-    mock.onGet('api/search').reply(200, res);
-
-    const result = await useSearchApi(axios).getSearchResults();
-
-    expect(result[0].id).toEqual('1');
-  });
-
   describe('getSpatialData', () => {
     it('with criteria `type` works as expected', async () => {
       const res = [{ type: 'FeatureCollection' } as FeatureCollection];

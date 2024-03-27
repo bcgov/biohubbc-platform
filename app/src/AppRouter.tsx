@@ -4,7 +4,6 @@ import NotFoundPage from 'features/404/NotFoundPage';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
-import SearchRouter from 'features/search/SearchRouter';
 import SubmissionsRouter from 'features/submissions/SubmissionsRouter';
 import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
@@ -23,12 +22,6 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
       <Route exact path="/">
         <BaseLayout>
           <SubmissionsRouter />
-        </BaseLayout>
-      </Route>
-
-      <Route path="/search">
-        <BaseLayout>
-          <SearchRouter />
         </BaseLayout>
       </Route>
 

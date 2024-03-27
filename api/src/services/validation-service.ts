@@ -8,10 +8,6 @@ import {
   ValidationRepository
 } from '../repositories/validation-repository';
 import { getLogger } from '../utils/logger';
-import { ICsvState } from '../utils/media/csv/csv-file';
-import { DWCArchive } from '../utils/media/dwc/dwc-archive-file';
-import { IMediaState } from '../utils/media/media-file';
-import { ValidationSchemaParser } from '../utils/media/validation/validation-schema-parser';
 import { GeoJSONFeatureCollectionZodSchema } from '../zod-schema/geoJsonZodSchema';
 import { DBService } from './db-service';
 
@@ -191,30 +187,5 @@ export class ValidationService extends DBService {
    */
   async getStyleSchemaByStyleId(styleId: number): Promise<IStyleModel> {
     return this.validationRepository.getStyleSchemaByStyleId(styleId);
-  }
-
-  /**
-   * Validate DWCArchive file with given stylesheet
-   *
-   * @param {DWCArchive} dwcArchive
-   * @param {IStyleModel} styleSchema
-   * @return {*}  {{ validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] }}
-   * @memberof ValidationService
-   */
-  validateDWCArchiveWithStyleSchema(
-    dwcArchive: DWCArchive,
-    styleSchema: IStyleModel
-  ): { validation: boolean; mediaState: IMediaState; csvState?: ICsvState[] } {
-    const validationSchemaParser: ValidationSchemaParser = new ValidationSchemaParser(styleSchema);
-
-    const mediaState: IMediaState = dwcArchive.isMediaValid(validationSchemaParser);
-
-    if (!mediaState.isValid) {
-      return { validation: false, mediaState: mediaState };
-    }
-
-    const csvState: ICsvState[] = dwcArchive.isContentValid(validationSchemaParser);
-
-    return { validation: true, mediaState: mediaState, csvState: csvState };
   }
 }

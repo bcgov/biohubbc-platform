@@ -1,6 +1,5 @@
 import { AxiosInstance } from 'axios';
 import { IArtifact, IHandlebarsTemplates, IListRelatedDatasetsResponse } from 'interfaces/useDatasetApi.interface';
-import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with datasets.
@@ -9,17 +8,6 @@ import { IKeywordSearchResponse } from 'interfaces/useSearchApi.interface';
  * @return {*} object whose properties are supported api methods.
  */
 const useDatasetApi = (axios: AxiosInstance) => {
-  /**
-   * Fetch all datasets.
-   *
-   * @return {*}  {Promise<IElasticsearchResponse<{ datasetTitle: string[] }>>}
-   */
-  const listAllDatasets = async (): Promise<IKeywordSearchResponse[]> => {
-    const { data } = await axios.get(`api/dwc/eml/search`);
-
-    return data;
-  };
-
   /**
    * Fetch dataset metadata by datasetId.
    *
@@ -92,7 +80,6 @@ const useDatasetApi = (axios: AxiosInstance) => {
   };
 
   return {
-    listAllDatasets,
     getDatasetEML,
     getDataset,
     getDatasetArtifacts,

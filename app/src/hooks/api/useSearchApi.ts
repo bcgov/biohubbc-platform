@@ -1,6 +1,6 @@
 import { AxiosInstance } from 'axios';
 import { Feature, GeoJsonProperties } from 'geojson';
-import { IGetSearchResultsResponse, IKeywordSearchResponse, ISpatialData } from 'interfaces/useSearchApi.interface';
+import { IGetSearchResultsResponse, ISpatialData } from 'interfaces/useSearchApi.interface';
 
 /**
  * Returns a set of supported api methods for working with search functionality
@@ -9,17 +9,6 @@ import { IGetSearchResultsResponse, IKeywordSearchResponse, ISpatialData } from 
  * @return {*} object whose properties are supported api methods.
  */
 const useSearchApi = (axios: AxiosInstance) => {
-  /**
-   * Get search results (spatial)
-   *
-   * @return {*}  {Promise<IGetSearchResultsResponse[]>}
-   */
-  const getSearchResults = async (): Promise<IGetSearchResultsResponse[]> => {
-    const { data } = await axios.get(`/api/search`);
-
-    return data;
-  };
-
   const getSpatialData = async (criteria: {
     boundary: Feature[];
     type: string[];
@@ -60,21 +49,7 @@ const useSearchApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  /**
-   * Get keyword search results
-   *
-   * @param searchQuery The keywords to search for
-   * @returns {*} {Promise<>}
-   */
-  const keywordSearch = async (searchQuery: string): Promise<IKeywordSearchResponse[]> => {
-    const { data } = await axios.get(`api/dwc/eml/search?terms=${searchQuery}`);
-
-    return data;
-  };
-
   return {
-    getSearchResults,
-    keywordSearch,
     getSpatialData,
     getSpatialMetadata,
     getSpatialDataFile

@@ -39,19 +39,6 @@ export class ApiGeneralError extends ApiError {
 }
 
 /**
- * API encountered an unknown/unexpected error.
- *
- * @export
- * @class ApiUnknownError
- * @extends {ApiError}
- */
-export class ApiUnknownError extends ApiError {
-  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
-    super(ApiErrorType.UNKNOWN, message, errors);
-  }
-}
-
-/**
  * API executed a query against the database, but the response was missing data, or indicated the query failed.
  *
  * Examples:
