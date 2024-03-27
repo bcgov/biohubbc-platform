@@ -5,7 +5,7 @@ import { defaultErrorResponses } from '../../../../openapi/schemas/http-response
 import { SubmissionService } from '../../../../services/submission-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/eml/get');
+const defaultLog = getLogger('paths/dwc/submission/{datasetId}/get');
 
 export const GET: Operation = [getMetadataByDatasetId()];
 
