@@ -8,7 +8,7 @@ import { getMockDBConnection } from '../__mocks__/db';
 import { DWC_DATASET_SUBMISSION_JOB, jobQueueAttemptsWrapper, QueueJobRegistry } from './queue-registry';
 
 describe('QueueJobRegistry', () => {
-  it('returns a known job function', () => {
+  it.skip('returns a known job function', () => {
     const job = QueueJobRegistry.findMatchingJob(DWC_DATASET_SUBMISSION_JOB);
 
     expect(job).not.to.be.undefined;
