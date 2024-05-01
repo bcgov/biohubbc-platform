@@ -116,7 +116,7 @@ const phases = {
     cpuLimit: '1250m',
     memoryRequest: '100Mi',
     memoryLimit: '4Gi',
-    replicas: '2',
+    replicas: '1',
     replicasMax: '2'
   },
   prod: {
@@ -139,10 +139,10 @@ const phases = {
     logLevel: 'warn',
     nodeOptions: '--max_old_space_size=6000', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1750m',
+    cpuLimit: '1500m',
     memoryRequest: '100Mi',
-    memoryLimit: '8Gi',
-    replicas: '2',
+    memoryLimit: '6Gi',
+    replicas: '1',
     replicasMax: '2'
   }
 };
