@@ -20,32 +20,6 @@ describe('ArtifactService', () => {
     sinon.restore();
   });
 
-  describe('getNextArtifactIds', () => {
-    it('should retrieve an array of artifact primary keys', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const artifactService = new ArtifactService(mockDBConnection);
-
-      const getNextArtifactIdsStub = sinon.stub(ArtifactRepository.prototype, 'getNextArtifactIds').resolves([1, 2]);
-
-      const result = await artifactService.getNextArtifactIds(2);
-
-      expect(getNextArtifactIdsStub).to.be.calledWith(2);
-      expect(result).to.eql([1, 2]);
-    });
-
-    it('should retrieve one artifact primary key by default', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const artifactService = new ArtifactService(mockDBConnection);
-
-      const getNextArtifactIdsStub = sinon.stub(ArtifactRepository.prototype, 'getNextArtifactIds').resolves([1]);
-
-      const result = await artifactService.getNextArtifactIds();
-
-      expect(getNextArtifactIdsStub).to.be.calledWith(1);
-      expect(result).to.eql([1]);
-    });
-  });
-
   describe('insertArtifactRecord', () => {
     it('should return artifact_id on insert', async () => {
       const mockDBConnection = getMockDBConnection();

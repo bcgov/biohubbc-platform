@@ -12,7 +12,7 @@ export const GET: Operation = [getSubmissionFeatureSignedUrl()];
 
 GET.apiDoc = {
   description: 'Retrieves a signed url of a submission feature',
-  tags: ['eml'],
+  tags: ['submission'],
   security: [
     {
       OptionalBearer: []

@@ -11,7 +11,7 @@ export const GET: Operation = [getSubmissionFeatures()];
 
 GET.apiDoc = {
   description: 'Retrieves a submission record from the submission table',
-  tags: ['eml'],
+  tags: ['submission'],
   security: [
     {
       OptionalBearer: []

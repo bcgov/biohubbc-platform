@@ -90,32 +90,6 @@ export class SubmissionJobQueueRepository extends BaseRepository {
   }
 
   /**
-   * Finds a transform source Id based for a particular user
-   *
-   * @param {number} userId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionJobQueueRepository
-   */
-  async getSourceTransformIdForUserId(userId: number): Promise<number> {
-    const sqlStatement = SQL`
-      SELECT source_transform_id 
-      FROM source_transform 
-      WHERE system_user_id = ${userId};
-    `;
-
-    const response = await this.connection.sql<{ source_transform_id: number }>(sqlStatement);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get source transform Id', [
-        'SubmissionJobQueueRepository->getSourceTransformIdForUserId',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0].source_transform_id;
-  }
-
-  /**
    * Fetch the next available job queue record(s).
    *
    * @param {number} [concurrency] The number of job queue processes to select (based on how many can be processed

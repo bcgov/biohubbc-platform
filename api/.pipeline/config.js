@@ -80,9 +80,6 @@ const phases = {
     host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev',
-    elasticsearchURL: 'http://es01:9200',
-    elasticsearchEmlIndex: 'eml',
-    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: (isStaticDeployment && 'biohub') || `local/${deployChangeId}/biohub`,
     tz: config.timezone.api,
@@ -109,9 +106,6 @@ const phases = {
     host: staticUrlsAPI.test,
     appHost: staticUrls.test,
     env: 'test',
-    elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
-    elasticsearchEmlIndex: 'eml',
-    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
@@ -122,7 +116,7 @@ const phases = {
     cpuLimit: '1250m',
     memoryRequest: '100Mi',
     memoryLimit: '4Gi',
-    replicas: '2',
+    replicas: '1',
     replicasMax: '2'
   },
   prod: {
@@ -138,9 +132,6 @@ const phases = {
     host: staticUrlsAPI.prod,
     appHost: staticUrls.prod,
     env: 'prod',
-    elasticsearchURL: 'http://es01:9200',
-    elasticsearchEmlIndex: 'eml',
-    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     itisSolrUrl: 'https://services.itis.gov',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
@@ -148,10 +139,10 @@ const phases = {
     logLevel: 'warn',
     nodeOptions: '--max_old_space_size=6000', // 75% of memoryLimit (bytes)
     cpuRequest: '50m',
-    cpuLimit: '1750m',
+    cpuLimit: '1500m',
     memoryRequest: '100Mi',
-    memoryLimit: '8Gi',
-    replicas: '2',
+    memoryLimit: '6Gi',
+    replicas: '1',
     replicasMax: '2'
   }
 };
