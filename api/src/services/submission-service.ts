@@ -1,20 +1,13 @@
-import { default as dayjs } from 'dayjs';
 import { JSONPath } from 'jsonpath-plus';
-import { z } from 'zod';
 import { IDBConnection } from '../database/db';
-import { ApiExecuteSQLError, ApiGeneralError } from '../errors/api-error';
+import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
-  IDatasetsForReview,
-  ISourceTransformModel,
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
-  ISubmissionMetadataRecord,
   ISubmissionModel,
-  ISubmissionModelWithStatus,
   ISubmissionObservationRecord,
   ISubmissionRecord,
-  ISubmissionRecordWithSpatial,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
   SubmissionFeatureRecord,
@@ -31,19 +24,10 @@ import {
 } from '../repositories/submission-repository';
 import { getS3SignedURL } from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
-import { EMLFile } from '../utils/media/eml/eml-file';
 import { DBService } from './db-service';
 import { SearchIndexService } from './search-index-service';
 
 const defaultLog = getLogger('submission-service');
-
-export const RelatedDataset = z.object({
-  datasetId: z.string(),
-  title: z.string(),
-  url: z.string()
-});
-
-export type RelatedDataset = z.infer<typeof RelatedDataset>;
 
 export class SubmissionService extends DBService {
   submissionRepository: SubmissionRepository;
@@ -159,42 +143,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Update the `eml_source` column of a submission record.
-   *
-   * @param {number} submissionId
-   * @param {EMLFile} file
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionMetadataEMLSource(
-    submissionId: number,
-    submissionMetadataId: number,
-    file: EMLFile
-  ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.updateSubmissionMetadataEMLSource(submissionId, submissionMetadataId, file);
-  }
-
-  /**
-   * Update the `eml_json_source` column of a submission record.
-   *
-   * @param {number} submissionId
-   * @param {ISubmissionRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_metadata_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionRecordEMLJSONSource(
-    submissionId: number,
-    submissionMetadataId: number,
-    EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
-  ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.updateSubmissionMetadataEMLJSONSource(
-      submissionId,
-      submissionMetadataId,
-      EMLJSONSource
-    );
-  }
-
-  /**
    * Get submission record by id.
    *
    * @param {number} submissionId
@@ -214,111 +162,6 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionIdByUUID(uuid: string): Promise<{ submission_id: number } | null> {
     return this.submissionRepository.getSubmissionIdByUUID(uuid);
-  }
-
-  /**
-   * Set record_end_date of submission id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<number> {
-    return this.submissionRepository.updateSubmissionMetadataRecordEndDate(submissionId);
-  }
-
-  /**
-   * Set record_effective_timestamp of submission id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
-    return this.submissionRepository.updateSubmissionMetadataRecordEffectiveDate(submissionId);
-  }
-
-  /**
-   * Update end time stamp for submission observation record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionService
-   */
-  async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
-    return this.submissionRepository.updateSubmissionObservationRecordEndDate(submissionId);
-  }
-
-  /**
-   * Get source transform record by its associated source system user id.
-   *
-   * @param {number} systemUserId
-   * @return {*}  {Promise<ISourceTransformModel>}
-   * @memberof SubmissionService
-   */
-  async getSourceTransformRecordBySystemUserId(systemUserId: number, version?: string): Promise<ISourceTransformModel> {
-    return this.submissionRepository.getSourceTransformRecordBySystemUserId(systemUserId, version);
-  }
-
-  /**
-   * Get json representation of eml source from submission.
-   *
-   * @param {number} submissionId
-   * @param {string} transform
-   * @return {string}
-   * @memberof SubmissionService
-   */
-  async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
-    return this.submissionRepository.getSubmissionMetadataJson(submissionId, transform);
-  }
-
-  /**
-   * Get source transform record by its associated source transform id.
-   *
-   * @param {number} sourceTransformId
-   * @return {*}  {Promise<ISourceTransformModel>}
-   * @memberof SubmissionService
-   */
-  async getSourceTransformRecordBySourceTransformId(sourceTransformId: number): Promise<ISourceTransformModel> {
-    return this.submissionRepository.getSourceTransformRecordBySourceTransformId(sourceTransformId);
-  }
-
-  /**
-   * Get json representation of eml source from submission by datasetId.
-   *
-   * @param {string} datasetId
-   * @return {Promise<Record<string, unknown>>}
-   * @memberof SubmissionService
-   */
-  async getSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown>> {
-    const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
-
-    if (response.rowCount !== 1) {
-      throw new ApiExecuteSQLError('Failed to get dataset', [
-        'SubmissionRepository->getSubmissionRecordEMLJSONByDatasetId',
-        'rowCount was null or undefined, expected rowCount = 1'
-      ]);
-    }
-
-    return response.rows[0].eml_json_source;
-  }
-
-  /**
-   * Find json representation of eml source from submission by datasetId. May return null if `datasetId` does not match
-   * any existing records.
-   *
-   * @param {string} datasetId
-   * @return {Record<string, unknown> | null}
-   * @memberof SubmissionService
-   */
-  async findSubmissionRecordEMLJSONByDatasetId(datasetId: string): Promise<Record<string, unknown> | null> {
-    const response = await this.submissionRepository.getSubmissionRecordEMLJSONByDatasetId(datasetId);
-
-    if (response.rowCount !== 1) {
-      return null;
-    }
-
-    return response.rows[0].eml_json_source;
   }
 
   /**
@@ -369,17 +212,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * List all submissions
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModelWithStatus>}
-   * @memberof SubmissionService
-   */
-  async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
-    return this.submissionRepository.listSubmissionRecords();
-  }
-
-  /**
    * Inserts both the status and message of a submission
    *
    * @param {number} submissionId
@@ -420,41 +252,6 @@ export class SubmissionService extends DBService {
   }
 
   /**
-   * Retrieves an array of submission records with spatial count by dataset id.
-   *
-   * @param {string[]} datasetIds
-   * @return {*}  {(Promise<(ISubmissionRecordWithSpatial | null)[]>)}
-   * @memberof SubmissionService
-   */
-  async findSubmissionRecordsWithSpatialCount(datasetIds: string[]): Promise<(ISubmissionRecordWithSpatial | null)[]> {
-    return Promise.all(datasetIds.map(async (datasetId) => this.findSubmissionRecordWithSpatialCount(datasetId)));
-  }
-
-  /**
-   * Retrieves a submission record with spatial count by dataset id.
-   *
-   * @param {string} datasetId
-   * @return {*}  {(Promise<ISubmissionRecordWithSpatial | null>)}
-   * @memberof SubmissionService
-   */
-  async findSubmissionRecordWithSpatialCount(datasetId: string): Promise<ISubmissionRecordWithSpatial | null> {
-    const [submissionEMLJSON, spatialComponentCounts] = await Promise.all([
-      this.findSubmissionRecordEMLJSONByDatasetId(datasetId),
-      this.submissionRepository.getSpatialComponentCountByDatasetId(datasetId)
-    ]);
-
-    if (!submissionEMLJSON) {
-      return null;
-    }
-
-    return {
-      id: datasetId,
-      source: submissionEMLJSON,
-      observation_count: spatialComponentCounts.find((countItem) => countItem.spatial_type === 'Occurrence')?.count ?? 0
-    };
-  }
-
-  /**
    *  Fetch row of submission job queue by submission Id
    *
    * @param {number} submissionId
@@ -463,19 +260,6 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
     return this.submissionRepository.getSubmissionJobQueue(submissionId);
-  }
-
-  /**
-   * Insert a new metadata record
-   *
-   * @param {ISubmissionMetadataRecord} submissionMetadata
-   * @return {*}  {Promise<{ submission_metadata_id: number }>}
-   * @memberof SubmissionService
-   */
-  async insertSubmissionMetadataRecord(
-    submissionMetadata: ISubmissionMetadataRecord
-  ): Promise<{ submission_metadata_id: number }> {
-    return this.submissionRepository.insertSubmissionMetadataRecord(submissionMetadata);
   }
 
   /**
@@ -489,110 +273,6 @@ export class SubmissionService extends DBService {
     submissionObservation: ISubmissionObservationRecord
   ): Promise<{ submission_observation_id: number }> {
     return this.submissionRepository.insertSubmissionObservationRecord(submissionObservation);
-  }
-
-  /**
-   * Retrieves an array of datasets related to the given dataset.
-   *
-   * @param {string} datasetId
-   * @return {*}  {Promise<RelatedDataset[]>}
-   * @memberof SubmissionService
-   */
-  async findRelatedDatasetsByDatasetId(datasetId: string): Promise<RelatedDataset[]> {
-    const emlJson = await this.getSubmissionRecordEMLJSONByDatasetId(datasetId);
-
-    if (!emlJson) {
-      return [];
-    }
-
-    const result = JSONPath({
-      path: '$..eml:eml..relatedProject',
-      json: emlJson,
-      resultType: 'all'
-    });
-
-    if (!result.length) {
-      return [];
-    }
-
-    return result[0].value.map((relatedProject: any) => {
-      return {
-        datasetId: relatedProject['@_id'],
-        title: relatedProject['title'],
-        url: [relatedProject['@_system'], relatedProject['@_id']].join('/')
-      };
-    });
-  }
-
-  /**
-   * Gets datasets that have artifacts that require a security review.
-   * This will roll up any related projects to provide a "total" count of artifacts to review
-   *
-   * @param keys A list of keys to filter the data based on search criteria defined by the transform process
-   * @returns {*}  {Promise<IDatasetsForReview[]>}
-   * @memberof SubmissionService
-   */
-  async getDatasetsForReview(keys: string[]): Promise<IDatasetsForReview[]> {
-    const data = await this.submissionRepository.getDatasetsForReview(keys);
-    const datasetsForReview: IDatasetsForReview[] = [];
-
-    for await (const item of data) {
-      let rollUpCount = 0;
-      const dates: string[] = [];
-
-      if (item.related_projects) {
-        for await (const rp of item.related_projects) {
-          const rpCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(rp['@_id']);
-          if (rpCount) {
-            rollUpCount += rpCount.artifacts_to_review;
-            dates.push(rpCount.last_updated ?? '');
-          }
-        }
-      }
-
-      const parentArtifactCount = await this.submissionRepository.getArtifactForReviewCountForSubmissionUUID(
-        item.dataset_id
-      );
-      if (parentArtifactCount) {
-        const finalCount = rollUpCount + parentArtifactCount.artifacts_to_review;
-
-        // only push projects with artifacts to review
-        if (finalCount > 0) {
-          dates.push(parentArtifactCount.last_updated ?? '');
-          datasetsForReview.push({
-            dataset_id: parentArtifactCount.dataset_id,
-            artifacts_to_review: finalCount,
-            dataset_name: item.dataset_name,
-            last_updated: this.mostRecentDate(dates),
-            keywords: item.keywords
-          });
-        }
-      }
-    }
-    return datasetsForReview;
-  }
-
-  /**
-   * Compares and finds the most recent date given a list of date strings. Todays date is returned if no data is present in the list
-   *
-   * @param dates a list of date strings
-   * @returns {*} {string} the most recent date found
-   */
-  mostRecentDate(dates: string[]): string {
-    dates.sort((d1, d2) => dayjs(d1).diff(dayjs(d2)));
-    return dates[0] ?? dayjs();
-  }
-
-  /**
-   *
-   * @param submissionId
-   * @param submitterSystem
-   * @param datasetSearch
-   * @returns
-   * @memberof SubmissionService
-   */
-  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
-    return this.submissionRepository.updateSubmissionMetadataWithSearchKeys(submissionId, datasetSearch);
   }
 
   /**

@@ -37,19 +37,6 @@ parameters:
     required: true
     value: 'dev'
   - name: NODE_OPTIONS
-  # Elastic Search
-  - name: ELASTICSEARCH_URL
-    description: Platform Elasticsearch URL
-    required: true
-    value: 'http://es01:9200'
-  - name: ELASTICSEARCH_EML_INDEX
-    description: Platform Elasticsearch index for EML data
-    required: true
-    value: 'eml'
-  - name: ELASTICSEARCH_TAXONOMY_INDEX
-    description: Platform Elasticsearch Taxonomy Index
-    required: true
-    vale: 'taxonomy_3.0.0'
   - name: TZ
     description: Application timezone
     required: false
@@ -262,12 +249,6 @@ objects:
                   value: ${NODE_ENV}
                 - name: NODE_OPTIONS
                   value: ${NODE_OPTIONS}
-                - name: ELASTICSEARCH_URL
-                  value: ${ELASTICSEARCH_URL}
-                - name: ELASTICSEARCH_EML_INDEX
-                  value: ${ELASTICSEARCH_EML_INDEX}
-                - name: ELASTICSEARCH_TAXONOMY_INDEX
-                  value: ${ELASTICSEARCH_TAXONOMY_INDEX}
                 # ITIS SOLR
                 - name: ITIS_SOLR_URL
                   value: ${ITIS_SOLR_URL}

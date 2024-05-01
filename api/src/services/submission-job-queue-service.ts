@@ -3,10 +3,8 @@ import {
   ISubmissionJobQueueRecord,
   SubmissionJobQueueRepository
 } from '../repositories/submission-job-queue-repository';
-import { SUBMISSION_MESSAGE_TYPE, SUBMISSION_STATUS_TYPE } from '../repositories/submission-repository';
 import { generateQueueS3FileKey, uploadFileToS3 } from '../utils/file-utils';
 import { DBService } from './db-service';
-import { SubmissionService } from './submission-service';
 
 export interface ISecurityRequest {
   first_nations_id: number;
@@ -40,33 +38,9 @@ export class SubmissionJobQueueService extends DBService {
     file: Express.Multer.File,
     securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
-    const submissionService = new SubmissionService(this.connection);
-    const { queueId } = await this.jobQueueRepository.getNextQueueId();
+    // NOT IMPLEMENTED
 
-    const key = await this.uploadDatasetToS3(datasetUUID, queueId, file);
-    let submission = await submissionService.getSubmissionIdByUUID(datasetUUID);
-
-    if (!submission) {
-      // Create a submission if one does not exist
-      const currentUserId = this.connection.systemUserId();
-
-      const sourceTransformId = await this.getSourceTransformIdForUserId(currentUserId);
-      submission = await submissionService.insertSubmissionRecord({
-        uuid: datasetUUID,
-        source_transform_id: sourceTransformId
-      });
-    }
-
-    const queueRecord = await this.createQueueJob(queueId, submission.submission_id, key, securityRequest);
-
-    await submissionService.insertSubmissionStatusAndMessage(
-      submission.submission_id,
-      SUBMISSION_STATUS_TYPE.INGESTED,
-      SUBMISSION_MESSAGE_TYPE.NOTICE,
-      'Uploaded successfully.'
-    );
-
-    return queueRecord;
+    return { queue_id: 0 };
   }
 
   /**
@@ -104,17 +78,6 @@ export class SubmissionJobQueueService extends DBService {
     securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
     return await this.jobQueueRepository.insertJobQueueRecord(queueId, submissionId, s3Key, securityRequest);
-  }
-
-  /**
-   * Gets Transform Id for user Id
-   *
-   * @param {number} userId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionJobQueueService
-   */
-  async getSourceTransformIdForUserId(userId: number): Promise<number> {
-    return await this.jobQueueRepository.getSourceTransformIdForUserId(userId);
   }
 
   /**

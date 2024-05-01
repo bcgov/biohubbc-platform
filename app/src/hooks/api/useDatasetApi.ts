@@ -1,5 +1,5 @@
 import { AxiosInstance } from 'axios';
-import { IArtifact, IHandlebarsTemplates, IListRelatedDatasetsResponse } from 'interfaces/useDatasetApi.interface';
+import { IArtifact } from 'interfaces/useDatasetApi.interface';
 
 /**
  * Returns a set of supported api methods for working with datasets.
@@ -8,18 +8,6 @@ import { IArtifact, IHandlebarsTemplates, IListRelatedDatasetsResponse } from 'i
  * @return {*} object whose properties are supported api methods.
  */
 const useDatasetApi = (axios: AxiosInstance) => {
-  /**
-   * Fetch dataset metadata by datasetId.
-   *
-   * @param {string} datasetId
-   * @return {*}  {Promise<any>}
-   */
-  const getDatasetEML = async (datasetId: string): Promise<any> => {
-    const { data } = await axios.get(`api/dwc/submission/${datasetId}/get`);
-
-    return data;
-  };
-
   /**
    * Fetch dataset data by datasetUUID.
    *
@@ -55,37 +43,10 @@ const useDatasetApi = (axios: AxiosInstance) => {
     return data;
   };
 
-  /**
-   * Fetch the signed handlebar template for a given dataset ID.
-   *
-   * @param {string} datasetId
-   * @return {*}  {Promise<string>}
-   */
-  const getHandleBarsTemplateByDatasetId = async (datasetId: string): Promise<IHandlebarsTemplates> => {
-    const { data } = await axios.get<IHandlebarsTemplates>(`api/dwc/submission/${datasetId}/handlebar`);
-
-    return data;
-  };
-
-  /**
-   * Fetch a list of datasets related to the given dataset
-   *
-   * @param {string} datasetId
-   * @return {*}  {Promise<IRelatedDataset>}
-   */
-  const getRelatedDatasets = async (datasetId: string): Promise<IListRelatedDatasetsResponse> => {
-    const { data } = await axios.get<IListRelatedDatasetsResponse>(`api/dwc/submission/${datasetId}/related`);
-
-    return data;
-  };
-
   return {
-    getDatasetEML,
     getDataset,
     getDatasetArtifacts,
-    getArtifactSignedUrl,
-    getHandleBarsTemplateByDatasetId,
-    getRelatedDatasets
+    getArtifactSignedUrl
   };
 };
 

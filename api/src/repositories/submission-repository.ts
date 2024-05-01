@@ -1,24 +1,10 @@
 import { Knex } from 'knex';
-import { QueryResult } from 'pg';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex, getKnexQueryBuilder } from '../database/db';
 import { ApiExecuteSQLError } from '../errors/api-error';
-import { EMLFile } from '../utils/media/eml/eml-file';
 import { BaseRepository } from './base-repository';
 import { SECURITY_APPLIED_STATUS } from './security-repository';
-
-export interface IHandlebarsTemplates {
-  header: string;
-  details: string;
-}
-export interface IDatasetsForReview {
-  dataset_id: string; // UUID
-  artifacts_to_review: number;
-  dataset_name: string;
-  last_updated: string;
-  keywords: string[];
-}
 
 export interface ISubmissionFeature {
   id: string | null;
@@ -26,29 +12,6 @@ export interface ISubmissionFeature {
   properties: Record<string, unknown>;
   child_features: ISubmissionFeature[];
 }
-
-export const DatasetMetadata = z.object({
-  dataset_id: z.string(),
-  submission_id: z.number(),
-  dataset_name: z.string(),
-  keywords: z.array(z.string()),
-  related_projects: z
-    .array(z.any())
-    .nullable()
-    .optional()
-    .transform((item) => item || [])
-});
-
-export type DatasetMetadata = z.infer<typeof DatasetMetadata>;
-
-export const DatasetArtifactCount = z.object({
-  dataset_id: z.string(),
-  submission_id: z.number(),
-  artifacts_to_review: z.number(),
-  last_updated: z.string().nullable()
-});
-
-export type DatasetArtifactCount = z.infer<typeof DatasetArtifactCount>;
 
 export interface ISpatialComponentCount {
   spatial_type: string;
@@ -504,84 +467,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Update the `eml_source` column of a submission record.
-   *
-   * @param {number} submissionId
-   * @param {number} submissionMetadataId
-   * @param {EMLFile} file
-   * @return {*}  {Promise<{ submission_metadata_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionMetadataEMLSource(
-    submissionId: number,
-    submissionMetadataId: number,
-    file: EMLFile
-  ): Promise<{ submission_metadata_id: number }> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_metadata
-      SET
-        eml_source = ${file.emlFile.buffer.toString()}
-      WHERE
-        submission_id = ${submissionId}
-        AND
-        submission_metadata_id =${submissionMetadataId}
-      RETURNING
-        submission_metadata_id;
-    `;
-
-    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to update submission Metadata source', [
-        'SubmissionRepository->updateSubmissionMetadataEMLSource',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Update the `eml_json_source` column of a submission metadata.
-   *
-   * @param {number} submissionId
-   * @param {number} submissionMetadataId
-   * @param {ISubmissionMetadataRecord['eml_json_source']} EMLJSONSource
-   * @return {*}  {Promise<{ submission_metadata_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionMetadataEMLJSONSource(
-    submissionId: number,
-    submissionMetadataId: number,
-    EMLJSONSource: ISubmissionMetadataRecord['eml_json_source']
-  ): Promise<{ submission_metadata_id: number }> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_metadata
-      SET
-        eml_json_source = ${EMLJSONSource}
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        submission_metadata_id =${submissionMetadataId}
-      RETURNING
-        submission_metadata_id;
-    `;
-
-    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to update submission Metadata eml json', [
-        'SubmissionRepository->updateSubmissionMetadataEMLJSONSource',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * Fetch a submission record by primary id.
    *
    * @param {number} submissionId
@@ -633,29 +518,6 @@ export class SubmissionRepository extends BaseRepository {
     } else {
       return null;
     }
-  }
-
-  /**
-   * Get submission eml json by dataset id.
-   *
-   * @param {string} datasetId
-   * @return {*}  {Promise<QueryResult<{ eml_json_source: Record<string, unknown> }>>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionRecordEMLJSONByDatasetId(
-    datasetId: string
-  ): Promise<QueryResult<{ eml_json_source: Record<string, unknown> }>> {
-    const sqlStatement = SQL`
-      SELECT
-        sm.eml_json_source
-      FROM submission s, submission_metadata sm
-      WHERE s.submission_id = sm.submission_id
-      AND sm.record_end_timestamp IS NULL
-      AND sm.record_effective_timestamp IS NOT NULL
-      AND s.uuid = ${datasetId};
-    `;
-
-    return this.connection.sql<{ eml_json_source: Record<string, unknown> }>(sqlStatement);
   }
 
   /**
@@ -714,27 +576,6 @@ export class SubmissionRepository extends BaseRepository {
     }
 
     return response.rows[0];
-  }
-
-  /**
-   * Fetch a submissions metadata json representation.
-   *
-   * @param {number} sourceTransformId
-   * @param {string} transform
-   * @return {*}  {Promise<ISourceTransformModel>}
-   * @memberof SubmissionRepository
-   */
-  async getSubmissionMetadataJson(submissionId: number, transform: string): Promise<string> {
-    const response = await this.connection.query<{ result_data: any }>(transform, [submissionId]);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to transform submission eml to json', [
-        'SubmissionRepository->getSubmissionMetadataJson',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
-
-    return response.rows[0].result_data;
   }
 
   /**
@@ -866,74 +707,6 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Fetch a submission record by primary id.
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISubmissionModel>}
-   * @memberof SubmissionRepository
-   */
-  async listSubmissionRecords(): Promise<ISubmissionModelWithStatus[]> {
-    const sqlStatement = SQL`
-      SELECT
-        t1.submission_status,
-        s.*
-      FROM
-        submission s
-      LEFT JOIN
-        (SELECT DISTINCT ON (ss.submission_id)
-          ss.submission_id,
-          sst.name AS submission_status
-        FROM
-          submission_status ss
-        LEFT JOIN
-          submission_status_type sst
-        ON
-          ss.submission_status_type_id = sst.submission_status_type_id
-        ORDER BY
-          ss.submission_id, ss.submission_status_id DESC) t1
-      ON
-        t1.submission_id = s.submission_id;
-    `;
-
-    const response = await this.connection.sql<ISubmissionModelWithStatus>(sqlStatement);
-
-    return response.rows;
-  }
-
-  /**
-   * Fetch a submission source transform record by associated source system user id.
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<ISourceTransformModel>}
-   * @memberof SubmissionRepository
-   */
-  async getSourceTransformRecordBySubmissionId(submissionId: number): Promise<ISourceTransformModel> {
-    const sqlStatement = SQL`
-          SELECT
-            *
-          FROM
-            source_transform st
-          LEFT JOIN
-            submission s
-          ON
-            st.source_transform_id = s.source_transform_id
-          WHERE
-            s.submission_id = ${submissionId};
-        `;
-
-    const response = await this.connection.sql<ISourceTransformModel>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to get submission source transform record', [
-        'SubmissionRepository->getSourceTransformRecordBySubmissionId',
-        'rowCount was null or undefined, expected rowCount != 0'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
    * Fetch row of submission job queue by submission Id
    *
    * @param {number} submissionId
@@ -956,43 +729,6 @@ export class SubmissionRepository extends BaseRepository {
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
         'SubmissionRepository->getSubmissionJobQueue',
-        'rowCount was null or undefined, expected rowCount >= 0'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Insert a new metadata record
-   *
-   * @param {ISubmissionMetadataRecord} submissionMetadata
-   * @return {*}  {Promise<{ submission_metadata_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionMetadataRecord(
-    submissionMetadata: ISubmissionMetadataRecord
-  ): Promise<{ submission_metadata_id: number }> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_metadata (
-        submission_id,
-        eml_source,
-        eml_json_source
-      ) VALUES (
-        ${submissionMetadata.submission_id},
-        ${submissionMetadata.eml_source},
-        ${submissionMetadata.eml_json_source}
-      )
-      RETURNING
-        submission_metadata_id
-      ;
-    `;
-
-    const response = await this.connection.sql<{ submission_metadata_id: number }>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to insert submission metadata record', [
-        'SubmissionRepository->insertSubmissionMetadataRecord',
         'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }
@@ -1037,173 +773,6 @@ export class SubmissionRepository extends BaseRepository {
         'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Update record_end_timestamp of submission id
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<{ submission_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionMetadataRecordEndDate(submissionId: number): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_metadata
-      SET
-        record_end_timestamp = now()
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        record_end_timestamp IS NULL
-      AND
-        record_effective_timestamp IS NOT NULL
-      ;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    return response.rowCount;
-  }
-
-  /**
-   * Update start time stamp of submission metadata record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionMetadataRecordEffectiveDate(submissionId: number): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_metadata
-      SET
-        record_effective_timestamp = now()
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        record_effective_timestamp IS NULL
-      AND
-        record_end_timestamp IS NULL
-      ;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to update record_effective_timestamp submission metadata record', [
-        'SubmissionRepository->updateSubmissionMetadataRecordEffectiveDate',
-        'rowCount was null or undefined, expected rowCount >= 0'
-      ]);
-    }
-
-    return response.rowCount;
-  }
-
-  /**
-   * Update end time stamp for submission observation record
-   *
-   * @param {number} submissionId
-   * @return {*}  {Promise<number>}
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionObservationRecordEndDate(submissionId: number): Promise<number> {
-    const sqlStatement = SQL`
-      UPDATE
-        submission_observation
-      SET
-        record_end_timestamp = now()
-      WHERE
-        submission_id = ${submissionId}
-      AND
-        record_end_timestamp IS NULL
-      AND
-        record_effective_timestamp IS NOT NULL
-      ;
-    `;
-
-    const response = await this.connection.sql(sqlStatement);
-
-    return response.rowCount;
-  }
-
-  /**
-   *
-   * @param submissionId the submission to update
-   * @param datasetSearch
-   * @returns {*} {Promise<number>} the number of rows updated
-   * @memberof SubmissionRepository
-   */
-  async updateSubmissionMetadataWithSearchKeys(submissionId: number, datasetSearch: any): Promise<number> {
-    const sql = SQL`
-    UPDATE
-      submission_metadata
-    SET
-      dataset_search_criteria=${datasetSearch}
-    WHERE submission_id = ${submissionId}
-    AND record_end_timestamp IS NULL
-    AND record_effective_timestamp IS NOT NULL;
-    `;
-
-    const response = await this.connection.sql(sql);
-
-    return response.rowCount;
-  }
-
-  /**
-   * Gets datasets that have artifacts that require a security review.
-   *
-   * @param keywordFilter A list of keys to filter the data based on search criteria defined by the transform process
-   * @returns {*}  {Promise<IDatasetsForReview[]>}
-   */
-  async getDatasetsForReview(keywordFilter: string[]): Promise<DatasetMetadata[]> {
-    const knex = getKnex();
-    const queryBuilder = knex
-      .queryBuilder()
-      .select(
-        's.uuid as dataset_id',
-        'sm.submission_id',
-        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->>'title' as dataset_name`),
-        knex.raw(`sm.dataset_search_criteria::json->'primaryKeywords' as keywords`),
-        knex.raw(`sm.eml_json_source::json->'eml:eml'->'dataset'->'project'->'relatedProject' as related_projects`)
-      )
-      .from('submission as s')
-      .leftJoin('submission_metadata as sm', 'sm.submission_id', 's.submission_id')
-      .whereNull('sm.record_end_timestamp')
-      // the ?| operator does a containment check meaning it will check if any elements in the left side array exist in the right side array
-      .whereRaw(
-        `(sm.dataset_search_criteria->'primaryKeywords')::jsonb \\?| array[${"'" + keywordFilter.join("','") + "'"}]`
-      );
-
-    const response = await this.connection.knex(queryBuilder, DatasetMetadata);
-
-    return response.rows;
-  }
-
-  /**
-   * Gets a count of all artifacts for a given submission UUID.
-   *
-   * @param uuid UUID of the submission to look for
-   * @returns {*} Promise<DatasetArtifactCount | undefined>
-   */
-  async getArtifactForReviewCountForSubmissionUUID(uuid: string): Promise<DatasetArtifactCount | undefined> {
-    const knex = getKnex();
-    const queryBuilder = knex
-      .queryBuilder()
-      .select(
-        's.uuid as dataset_id',
-        's.submission_id',
-        knex.raw(`COUNT(a.artifact_id)::int as artifacts_to_review`),
-        knex.raw(`MAX(a.create_date)::date as last_updated`)
-      )
-      .from('submission as s')
-      .leftJoin('artifact as a', 'a.submission_id', 's.submission_id')
-      .whereNull('a.security_review_timestamp')
-      .where('s.uuid', uuid)
-      .groupBy(['s.submission_id', 's.uuid']);
-    const response = await this.connection.knex(queryBuilder, DatasetArtifactCount);
 
     return response.rows[0];
   }

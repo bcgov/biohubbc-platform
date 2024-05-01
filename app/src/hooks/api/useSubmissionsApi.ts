@@ -2,7 +2,6 @@ import { AxiosInstance } from 'axios';
 import {
   IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
-  IListSubmissionsResponse,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecordPublishedForPublic,
   SubmissionRecordWithSecurity,
@@ -16,17 +15,6 @@ import {
  * @return {*} object whose properties are supported api methods.
  */
 const useSubmissionsApi = (axios: AxiosInstance) => {
-  /**
-   * Fetch all submissions.
-   *
-   * @return {*}  {Promise<IListSubmissionsResponse>}
-   */
-  const listSubmissions = async (): Promise<IListSubmissionsResponse> => {
-    const { data } = await axios.get('/api/dwc/submission/list');
-
-    return data;
-  };
-
   /**
    * Fetch the signed URL of a submission by submission ID.
    *
@@ -169,7 +157,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   return {
-    listSubmissions,
     getSignedUrl,
     getSubmissionDownloadPackage,
     getSubmissionPublishedDownloadPackage,

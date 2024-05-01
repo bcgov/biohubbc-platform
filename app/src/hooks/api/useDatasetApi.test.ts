@@ -13,16 +13,6 @@ describe('useDatasetApi', () => {
     mock.restore();
   });
 
-  it('getDatasetEML works as expected', async () => {
-    const response = 'response';
-
-    mock.onGet('api/dwc/submission/a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf/get').reply(200, response);
-
-    const actualResult = await useDatasetApi(axios).getDatasetEML('a6f90fb7-2f20-4d6e-b1cd-75f3336c2dcf');
-
-    expect(actualResult).toEqual('response');
-  });
-
   it('getDatasetArtifacts works as expected', async () => {
     const response = {
       artifacts: [{ artifact_id: 1 }, { artifact_id: 2 }]
@@ -43,30 +33,5 @@ describe('useDatasetApi', () => {
     const actualResult = await useDatasetApi(axios).getArtifactSignedUrl(1);
 
     expect(actualResult).toEqual('http://example.com');
-  });
-
-  it('getRelatedDatasets works as expected', async () => {
-    mock.onGet(`api/dwc/submission/${'123-456-789'}/related`).reply(200, {
-      datasets: [{ datasetId: '123' }, { datasetId: '456' }]
-    });
-
-    const actualResult = await useDatasetApi(axios).getRelatedDatasets('123-456-789');
-
-    expect(actualResult).toEqual({
-      datasets: [{ datasetId: '123' }, { datasetId: '456' }]
-    });
-  });
-
-  it('getHandleBarsTemplateByDatasetId works as expected', async () => {
-    mock.onGet(`api/dwc/submission/uuid/handlebar`).reply(200, {
-      header: 'Header Template',
-      details: 'Details Template'
-    });
-
-    const results = await useDatasetApi(axios).getHandleBarsTemplateByDatasetId('uuid');
-    expect(results).toEqual({
-      header: 'Header Template',
-      details: 'Details Template'
-    });
   });
 });
