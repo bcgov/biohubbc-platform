@@ -5,16 +5,9 @@ import * as db from '../database/db';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
 import { SubmissionJobQueueService } from '../services/submission-job-queue-service';
 import { getMockDBConnection } from '../__mocks__/db';
-import { DWC_DATASET_SUBMISSION_JOB, jobQueueAttemptsWrapper, QueueJobRegistry } from './queue-registry';
+import { jobQueueAttemptsWrapper, QueueJobRegistry } from './queue-registry';
 
 describe('QueueJobRegistry', () => {
-  it.skip('returns a known job function', () => {
-    const job = QueueJobRegistry.findMatchingJob(DWC_DATASET_SUBMISSION_JOB);
-
-    expect(job).not.to.be.undefined;
-    expect(typeof job).to.equal('function');
-  });
-
   it('returns null if no matching job found', () => {
     const job = QueueJobRegistry.findMatchingJob('not_a_real_job');
 

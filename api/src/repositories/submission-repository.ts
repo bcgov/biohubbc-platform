@@ -186,20 +186,6 @@ export interface ISubmissionJobQueueRecord {
   revision_count: number;
 }
 
-export interface ISubmissionMetadataRecord {
-  submission_metadata_id?: number;
-  submission_id: number;
-  eml_source: string;
-  eml_json_source?: any;
-  record_effective_timestamp?: string | null;
-  record_end_timestamp?: string | null;
-  create_date?: string;
-  create_user?: string;
-  update_date?: string;
-  update_user?: string;
-  revision_count?: string;
-}
-
 export interface ISubmissionObservationRecord {
   submission_observation_id?: number;
   submission_id: number;
@@ -729,47 +715,6 @@ export class SubmissionRepository extends BaseRepository {
     if (!response.rowCount) {
       throw new ApiExecuteSQLError('Failed to get submission job queue from submission id', [
         'SubmissionRepository->getSubmissionJobQueue',
-        'rowCount was null or undefined, expected rowCount >= 0'
-      ]);
-    }
-
-    return response.rows[0];
-  }
-
-  /**
-   * Insert a new Observation Record
-   *
-   * @param {ISubmissionObservationRecord} submissionObservation
-   * @return {*}  {Promise<{ submission_observation_id: number }>}
-   * @memberof SubmissionRepository
-   */
-  async insertSubmissionObservationRecord(
-    submissionObservation: ISubmissionObservationRecord
-  ): Promise<{ submission_observation_id: number }> {
-    const sqlStatement = SQL`
-      INSERT INTO submission_observation (
-        submission_id,
-        darwin_core_source,
-        submission_security_request,
-        foi_reason,
-        record_effective_timestamp
-      ) VALUES (
-        ${submissionObservation.submission_id},
-        ${submissionObservation.darwin_core_source},
-        ${submissionObservation.submission_security_request},
-        ${submissionObservation.foi_reason},
-        now()
-      )
-      RETURNING
-        submission_observation_id
-      ;
-    `;
-
-    const response = await this.connection.sql<{ submission_observation_id: number }>(sqlStatement);
-
-    if (!response.rowCount) {
-      throw new ApiExecuteSQLError('Failed to insert submission observation record', [
-        'SubmissionRepository->insertSubmissionObservationRecord',
         'rowCount was null or undefined, expected rowCount >= 0'
       ]);
     }

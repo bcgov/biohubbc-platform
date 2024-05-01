@@ -4,7 +4,6 @@ import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
-import useDatasetApi from './api/useDatasetApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
@@ -27,8 +26,6 @@ export const useApi = () => {
 
   const taxonomy = useTaxonomyApi(apiAxios);
 
-  const dataset = useDatasetApi(apiAxios);
-
   const artifact = useArtifactApi(apiAxios);
 
   const security = useSecurityApi(apiAxios);
@@ -39,7 +36,6 @@ export const useApi = () => {
     user,
     admin,
     submissions,
-    dataset,
     taxonomy,
     security,
     artifact,

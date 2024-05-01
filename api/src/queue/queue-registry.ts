@@ -7,8 +7,6 @@ const defaultLog = getLogger('queue/queue-registry');
 
 type QueueJob = (jobQueueRecord: ISubmissionJobQueueRecord) => Promise<any>;
 
-export const DWC_DATASET_SUBMISSION_JOB = 'dwc_dataset_submission_job';
-
 /**
  * Translates a string to a queue-job compatible function.
  */

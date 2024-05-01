@@ -16,19 +16,6 @@ import {
  */
 const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
-   * Fetch the signed URL of a submission by submission ID.
-   *
-   * @return {*}  {Promise<string>}
-   */
-  const getSignedUrl = async (submissionId: number): Promise<string> => {
-    const { data } = await axios.get<string>(`/api/dwc/submission/${submissionId}/getSignedUrl`);
-
-    return data;
-  };
-
-  /** NET-NEW FRONTEND REQUESTS FOR UPDATED SCHEMA **/
-
-  /**
    * repackages and retrieves json data from self and each child under submission
    *
    * @async
@@ -157,7 +144,6 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   };
 
   return {
-    getSignedUrl,
     getSubmissionDownloadPackage,
     getSubmissionPublishedDownloadPackage,
     getSubmissionFeatureGroups,

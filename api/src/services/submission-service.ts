@@ -6,7 +6,6 @@ import {
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionModel,
-  ISubmissionObservationRecord,
   ISubmissionRecord,
   PatchSubmissionRecord,
   SubmissionFeatureDownloadRecord,
@@ -260,19 +259,6 @@ export class SubmissionService extends DBService {
    */
   async getSubmissionJobQueue(submissionId: number): Promise<ISubmissionJobQueueRecord> {
     return this.submissionRepository.getSubmissionJobQueue(submissionId);
-  }
-
-  /**
-   * Insert a new Observation Record
-   *
-   * @param {ISubmissionObservationRecord} submissionObservation
-   * @return {*}  {Promise<{ submission_observation_id: number }>}
-   * @memberof SubmissionService
-   */
-  async insertSubmissionObservationRecord(
-    submissionObservation: ISubmissionObservationRecord
-  ): Promise<{ submission_observation_id: number }> {
-    return this.submissionRepository.insertSubmissionObservationRecord(submissionObservation);
   }
 
   /**

@@ -10,6 +10,7 @@ import { SECURITY_APPLIED_STATUS } from './security-repository';
 import {
   ISourceTransformModel,
   ISpatialComponentCount,
+  ISubmissionModel,
   PatchSubmissionRecord,
   SubmissionFeatureRecord,
   SubmissionRecord,
@@ -86,14 +87,8 @@ describe('SubmissionRepository', () => {
     });
 
     it('should succeed with valid data', async () => {
-      const mockResponse = {
-        source_transform_id: 'test',
-        input_file_name: 'test',
-        input_key: 'test',
-        record_effective_date: 'test',
-        eml_source: 'test',
-        darwin_core_source: 'test',
-        uuid: 'test'
+      const mockResponse: ISubmissionModel = {
+        uuid: '123-456-789'
       };
       const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
 
@@ -418,56 +413,6 @@ describe('SubmissionRepository', () => {
       const submissionRepository = new SubmissionRepository(mockDBConnection);
 
       const response = await submissionRepository.getSubmissionJobQueue(1);
-
-      expect(response).to.eql(mockResponse);
-    });
-  });
-
-  describe('insertSubmissionObservationRecord', () => {
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it('should throw an error when insert sql fails', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const submissionData = {
-        submission_id: 1,
-        darwin_core_source: '',
-        submission_security_request: '',
-        foi_reason: ''
-      };
-      try {
-        await submissionRepository.insertSubmissionObservationRecord(submissionData);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as ApiGeneralError).message).to.equal('Failed to insert submission observation record');
-      }
-    });
-
-    it('should succeed with valid data', async () => {
-      const mockResponse = {
-        id: 1
-      };
-
-      const mockQueryResponse = { rowCount: 1, rows: [mockResponse] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({ sql: () => mockQueryResponse });
-
-      const submissionRepository = new SubmissionRepository(mockDBConnection);
-
-      const submissionData = {
-        submission_id: 1,
-        darwin_core_source: '',
-        submission_security_request: '',
-        foi_reason: ''
-      };
-
-      const response = await submissionRepository.insertSubmissionObservationRecord(submissionData);
 
       expect(response).to.eql(mockResponse);
     });

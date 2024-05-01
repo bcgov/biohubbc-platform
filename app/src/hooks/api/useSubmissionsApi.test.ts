@@ -13,17 +13,6 @@ describe('useSubmissionApi', () => {
     mock.restore();
   });
 
-  it('getSignedUrl works as expected', async () => {
-    const res = 'test-signed-url';
-    const testSubmissionId = 1;
-
-    mock.onGet(`/api/dwc/submission/${testSubmissionId}/getSignedUrl`).reply(200, res);
-
-    const result = await useSubmissionsApi(axios).getSignedUrl(testSubmissionId);
-
-    expect(result).toEqual('test-signed-url');
-  });
-
   describe('getSubmissionFeatureSignedUrl', () => {
     it('should return signed URL', async () => {
       const payload = {
