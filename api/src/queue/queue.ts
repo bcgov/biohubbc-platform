@@ -1,6 +1,6 @@
 import fastq from 'fastq';
 import { ISubmissionJobQueueRecord } from '../repositories/submission-job-queue-repository';
-import { DWC_DATASET_SUBMISSION_JOB, QueueJobRegistry } from './queue-registry';
+import { QueueJobRegistry } from './queue-registry';
 import { QUEUE_DEFAULT_CONCURRENCY, QUEUE_DEFAULT_TIMEOUT } from './queue-scheduler';
 
 export class Queue {
@@ -39,7 +39,7 @@ export class Queue {
    * @memberof Queue
    */
   async _queueWorker(jobQueueRecord: ISubmissionJobQueueRecord) {
-    const job = QueueJobRegistry.findMatchingJob(DWC_DATASET_SUBMISSION_JOB);
+    const job = QueueJobRegistry.findMatchingJob('placeholder-not_a_real_job');
 
     if (!job) {
       throw new Error('Failed to find matching queue job handler');

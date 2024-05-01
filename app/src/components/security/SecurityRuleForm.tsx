@@ -97,7 +97,12 @@ const SecurityRuleForm = () => {
           return ruleGroups;
         }, [])
     );
-  }, [initialAppliedSecurityRules, submissionFeatureGroupsDataLoader.data]);
+  }, [
+    allSecurityRules,
+    formikProps.initialValues.submissionFeatureIds,
+    initialAppliedSecurityRules,
+    submissionFeatureGroupsDataLoader.data
+  ]);
 
   const toggleStageApply = (securityRule: ISecurityRuleAndCategory) => {
     if (

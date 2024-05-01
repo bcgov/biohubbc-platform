@@ -1,13 +1,9 @@
 import { mdiMagnify } from '@mdi/js';
 import { Icon } from '@mdi/react';
 import { Theme } from '@mui/material';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Input from '@mui/material/Input';
 import InputAdornment from '@mui/material/InputAdornment';
 import { makeStyles } from '@mui/styles';
-import { useFormikContext } from 'formik';
-import { IAdvancedSearch } from 'interfaces/useSearchApi.interface';
 import { ChangeEvent } from 'react';
 
 export const useSearchInputStyles = makeStyles((theme: Theme) => ({
@@ -86,35 +82,3 @@ export const SearchInput = (props: ISearchInputProps) => {
     />
   );
 };
-
-const SearchComponent: React.FC<React.PropsWithChildren> = () => {
-  const classes = useSearchInputStyles();
-
-  const formikProps = useFormikContext<IAdvancedSearch>();
-  const { handleSubmit, handleChange, values } = formikProps;
-
-  return (
-    <form onSubmit={handleSubmit} autoComplete="off">
-      <Box className={classes.searchInputContainer}>
-        <SearchInput
-          placeholderText="Enter a species name or keyword"
-          handleChange={handleChange}
-          value={values.keywords}
-        />
-        <Button
-          type="submit"
-          size="large"
-          variant="contained"
-          color="primary"
-          disableElevation
-          disableRipple
-          className={classes.searchInputBtn}
-          onClick={() => handleSubmit()}>
-          Search
-        </Button>
-      </Box>
-    </form>
-  );
-};
-
-export default SearchComponent;

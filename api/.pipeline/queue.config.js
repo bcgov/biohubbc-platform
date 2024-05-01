@@ -83,19 +83,16 @@ const phases = {
     host: (isStaticDeployment && staticUrlsAPI.dev) || `${name}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     appHost: (isStaticDeployment && staticUrls.dev) || `${appName}-${changeId}-a0ec71-dev.apps.silver.devops.gov.bc.ca`,
     env: 'dev',
-    elasticsearchURL: 'http://es01:9200',
-    elasticsearchEmlIndex: 'eml',
-    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     logLevel: 'debug',
     queueDockerfilePath: queueDockerfilePath,
-    cpuRequest: '100m',
+    cpuRequest: '50m',
     cpuLimit: '500m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
     replicas: '1',
-    replicasMax: (isStaticDeployment && '2') || '1'
+    replicasMax: '1'
   },
   test: {
     namespace: 'a0ec71-test',
@@ -110,19 +107,16 @@ const phases = {
     host: staticUrlsAPI.test,
     appHost: staticUrls.test,
     env: 'test',
-    elasticsearchURL: 'http://es01.a0ec71-dev:9200', // TODO: Update to test instance (es is not yet deployed to test)
-    elasticsearchEmlIndex: 'eml',
-    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     logLevel: 'info',
     queueDockerfilePath: queueDockerfilePath,
-    cpuRequest: '200m',
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
-    replicas: '2',
-    replicasMax: '3'
+    memoryRequest: '100Mi',
+    memoryLimit: '3Gi',
+    replicas: '1',
+    replicasMax: '1'
   },
   prod: {
     namespace: 'a0ec71-prod',
@@ -137,19 +131,16 @@ const phases = {
     host: staticUrlsAPI.prod,
     appHost: staticUrls.prod,
     env: 'prod',
-    elasticsearchURL: 'http://es01:9200',
-    elasticsearchEmlIndex: 'eml',
-    elasticsearchTaxonomyIndex: 'taxonomy_3.0.0',
     s3KeyPrefix: 'biohub',
     tz: config.timezone.api,
     logLevel: 'info',
     queueDockerfilePath: queueDockerfilePath,
-    cpuRequest: '200m',
+    cpuRequest: '50m',
     cpuLimit: '1000m',
-    memoryRequest: '512Mi',
-    memoryLimit: '2Gi',
-    replicas: '2',
-    replicasMax: '3'
+    memoryRequest: '100Mi',
+    memoryLimit: '4Gi',
+    replicas: '1',
+    replicasMax: '1'
   }
 };
 

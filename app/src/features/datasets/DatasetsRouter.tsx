@@ -13,10 +13,6 @@ const DatasetsRouter: React.FC<React.PropsWithChildren> = () => {
     <Switch>
       <Redirect exact from="/datasets/:id" to="/datasets/:id/details" />
 
-      {/* <RouteWithTitle exact path="/datasets" title={getTitle('Datasets')}>
-        <DatasetListPage />
-      </RouteWithTitle> */}
-
       <RouteWithTitle exact path="/datasets/:id/details" title={getTitle('Dataset Details')}>
         <DatasetPage />
       </RouteWithTitle>

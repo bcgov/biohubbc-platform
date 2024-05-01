@@ -73,37 +73,6 @@ describe('SubmissionJobQueueRepository', () => {
     });
   });
 
-  describe('getSourceTransformIdForUserId', () => {
-    it('should return with transform id', async () => {
-      const mockQueryResponse = { rowCount: 1, rows: [{ source_transform_id: 3 }] } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-      const repo = new SubmissionJobQueueRepository(mockDBConnection);
-
-      const transformId = await repo.getSourceTransformIdForUserId(1);
-      expect(transformId).to.be.eql(3);
-    });
-
-    it('should throw an error when no transforms are found', async () => {
-      const mockQueryResponse = { rowCount: 0 } as any as Promise<QueryResult<any>>;
-
-      const mockDBConnection = getMockDBConnection({
-        sql: () => mockQueryResponse
-      });
-
-      const repo = new SubmissionJobQueueRepository(mockDBConnection);
-
-      try {
-        await repo.getSourceTransformIdForUserId(1);
-        expect.fail();
-      } catch (error) {
-        expect((error as ApiGeneralError).message).to.equal('Failed to get source transform Id');
-      }
-    });
-  });
-
   describe('getNextUnprocessedJobQueueRecords', () => {
     it('should return all matching rows with no optional parameters', async () => {
       const mockQueryResponse = {
