@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { sortTaxonSearchResults } from '../utils/itis-sort';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
 
@@ -13,6 +14,7 @@ export type ItisSolrSearchResponse = {
   tsn: string;
   updateDate: string;
   usage: string;
+  rank: string;
 };
 
 /**
@@ -42,7 +44,14 @@ export class ItisService {
       return [];
     }
 
-    return this._sanitizeItisData(response.data.response.docs);
+    const sanitizedResponse = this._sanitizeItisData(response.data.response.docs);
+
+    // Sort the results to place exact matches at the top
+    const sortedResponse = sortTaxonSearchResults(sanitizedResponse, searchTerms);
+
+    // Return only a subset of the records
+    // More records than are returned here are requested from ITIS to help find and prioritize exact matches
+    return sortedResponse.slice(0, 15);
   }
 
   /**
@@ -67,19 +76,22 @@ export class ItisService {
   }
 
   /**
-   * Cleans up the ITIS search response data.
+   * Cleans up the ITIS search response data
    *
    * @param {ItisSolrSearchResponse[]} data
    * @memberof ItisService
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
-      const commonName = item.commonNames ? item.commonNames[0].split('$')[1] : null;
+      const englishNames = item.commonNames?.filter((name) => name.split('$')[2] === 'English');
+      const commonNames = englishNames?.map((name) => name.split('$')[1]) ?? [];
 
       return {
         tsn: Number(item.tsn),
-        commonName: commonName,
-        scientificName: item.scientificName
+        commonNames: commonNames,
+        scientificName: item.scientificName,
+        rank: item.rank,
+        kingdom: item.kingdom
       };
     });
   };
@@ -100,9 +112,9 @@ export class ItisService {
     }
 
     return `${itisUrl}?${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'nameWOInd',
-      'asc',
-      25
+      ['kingdom'],
+      ['asc'],
+      150
     )}&${this._getItisSolrFilterParam()}&${this._getItisSolrQueryParam(searchTerms)}`;
   }
 
@@ -122,9 +134,9 @@ export class ItisService {
     }
 
     return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
-      'nameWOInd',
-      'asc',
-      25
+      ['kingdom'],
+      ['asc'],
+      150
     )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(searchTsnIds)}`;
   }
 
@@ -153,12 +165,12 @@ export class ItisService {
    *
    * @param {string} sortBy
    * @param {('asc' | 'desc')} sortDir
-   * @param {number} [limit=25]
+   * @param {number} limit
    * @return {*}  {string}
    * @memberof ItisService
    */
-  _getItisSolrSortParam(sortBy: string, sortDir: 'asc' | 'desc', limit = 25): string {
-    return `sort=${sortBy}+${sortDir}&rows=${limit}`;
+  _getItisSolrSortParam(sortBy: string[], sortDir: ('asc' | 'desc')[], limit: number): string {
+    return `sort=${sortBy.map((f, index) => `${f}+${sortDir[index]}`).join(',')}&rows=${limit}`;
   }
 
   /**
@@ -168,7 +180,7 @@ export class ItisService {
    * @memberof ItisService
    */
   _getItisSolrFilterParam(): string {
-    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage';
+    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank';
   }
 
   /**
