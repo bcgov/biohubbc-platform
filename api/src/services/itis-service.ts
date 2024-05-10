@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { sortExactMatches } from '../utils/itis-sort';
+import { sortTaxonSearchResults } from '../utils/itis-sort';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
 
@@ -47,7 +47,7 @@ export class ItisService {
     const sanitizedResponse = this._sanitizeItisData(response.data.response.docs);
 
     // Sort the results to place exact matches at the top
-    const sortedResponse = sortExactMatches(sanitizedResponse, searchTerms);
+    const sortedResponse = sortTaxonSearchResults(sanitizedResponse, searchTerms);
 
     // Return only a subset of the records
     // More records than are returned here are requested from ITIS to help find and prioritize exact matches
