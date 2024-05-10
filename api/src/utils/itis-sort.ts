@@ -3,11 +3,14 @@ import { TaxonSearchResult } from '../services/taxonomy-service';
 /**
  * Sorts the ITIS response by how strongly records match the search terms
  *
- * @param {TaxonSearchResult[]} data
+ * @param {TaxonSearchResult[]} taxonSearchResults
  * @param {string[]} searchTerms
  * @return {*}  {TaxonSearchResult[]}
  */
-export const sortTaxonSearchResults = (data: TaxonSearchResult[], searchTerms: string[]): TaxonSearchResult[] => {
+export const sortTaxonSearchResults = (
+  taxonSearchResults: TaxonSearchResult[],
+  searchTerms: string[]
+): TaxonSearchResult[] => {
   const searchTermsLower = searchTerms.map((item) => item.toLowerCase());
   const searchTermJoined = searchTermsLower.join(' ');
 
@@ -28,29 +31,30 @@ export const sortTaxonSearchResults = (data: TaxonSearchResult[], searchTerms: s
 
   // Returns the common names data, adding it to the cache if it doesn't exist
   const getCommonNamesData = (commonNames: string[]) => {
-    return commonNames.map((name) => {
-      if (!commonNamesDataMap.has(name)) {
-        const lowercased = name.toLowerCase();
-        commonNamesDataMap.set(name, { words: lowercased.trim().split(' '), lowercased });
+    return commonNames.map((commonName) => {
+      if (!commonNamesDataMap.has(commonName)) {
+        const lowercased = commonName.toLowerCase();
+        commonNamesDataMap.set(commonName, { words: lowercased.trim().split(' '), lowercased });
       }
 
-      return commonNamesDataMap.get(name) as { words: string[]; lowercased: string };
+      return commonNamesDataMap.get(commonName) as { words: string[]; lowercased: string };
     });
   };
 
   /**
-   * Custom scoring function to determine how well a record matches the search terms
+   * Custom scoring function to determine how well a record matches the search terms.
    *
-   * @param {TaxonSearchResult} item
+   * @param {TaxonSearchResult} taxonSearchResult
    * @return {*}
    */
-  const calculateScore = (item: TaxonSearchResult) => {
+  const calculateScore = (taxonSearchResult: TaxonSearchResult) => {
     let score = 0;
 
-    const scientificNameData = getScientificNameData(item.scientificName);
-    const commonNamesData = getCommonNamesData(item.commonNames);
+    const scientificNameData = getScientificNameData(taxonSearchResult.scientificName);
+    const commonNamesData = getCommonNamesData(taxonSearchResult.commonNames);
 
     // Check if any word in the scientific or common name matches ANY of the search terms
+    // eg. ['Black', 'bear'] -> "Black" matches on "Black widow"
     if (
       searchTermsLower.some(
         (term) => scientificNameData.words.includes(term) || commonNamesData.some((data) => data.words.includes(term))
@@ -60,6 +64,7 @@ export const sortTaxonSearchResults = (data: TaxonSearchResult[], searchTerms: s
     }
 
     // Check if either the scientific name or any common name CONTAINS the search terms joined
+    // eg. ['Black', 'bear'] -> "Black bear" matches on "American black bear"
     if (
       scientificNameData.lowercased.includes(searchTermJoined) ||
       commonNamesData.some((data) => data.lowercased.includes(searchTermJoined))
@@ -68,6 +73,7 @@ export const sortTaxonSearchResults = (data: TaxonSearchResult[], searchTerms: s
     }
 
     // Check if either the scientific name or any common name is EXACTLY EQUAL to the search terms joined
+    // eg. ['Wolf'] -> "Wolf" is prioritized over "Forest Wolf"
     if (
       scientificNameData.lowercased === searchTermJoined ||
       commonNamesData.some((data) => data.lowercased === searchTermJoined)
@@ -79,5 +85,5 @@ export const sortTaxonSearchResults = (data: TaxonSearchResult[], searchTerms: s
   };
 
   // Sort the data by the score
-  return data.sort((a, b) => calculateScore(b) - calculateScore(a));
+  return taxonSearchResults.sort((a, b) => calculateScore(b) - calculateScore(a));
 };
