@@ -3,7 +3,7 @@ import { describe } from 'mocha';
 import { TaxonSearchResult } from '../services/taxonomy-service';
 import { sortTaxonSearchResults } from './itis-sort';
 
-describe.only('itis-sort', () => {
+describe('itis-sort', () => {
   describe('sortTaxonSearchResults', () => {
     it('Sorts the list when there is only 1 item', () => {
       const data: TaxonSearchResult[] = [
