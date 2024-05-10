@@ -68,8 +68,8 @@ describe('ItisService', () => {
       expect(response).to.eql([
         {
           tsn: 123,
-          commonNames: ['commonnames'],
-          scientificName: 'scientificname',
+          commonNames: ['commonNames'],
+          scientificName: 'scientificName',
           rank: 'kingdom',
           kingdom: 'kingdom'
         }
@@ -128,7 +128,7 @@ describe('ItisService', () => {
                 kingdom: 'kingdom',
                 name: 'name',
                 parentTSN: 'parentTSN',
-                scientificName: 'scientificname',
+                scientificName: 'scientificName',
                 tsn: '123',
                 updateDate: 'updateDate',
                 usage: '',
@@ -153,7 +153,7 @@ describe('ItisService', () => {
           kingdom: 'kingdom',
           name: 'name',
           parentTSN: 'parentTSN',
-          scientificName: 'scientificname',
+          scientificName: 'scientificName',
           tsn: '123',
           updateDate: 'updateDate',
           usage: '',
