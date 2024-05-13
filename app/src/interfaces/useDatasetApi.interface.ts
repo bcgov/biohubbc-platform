@@ -47,10 +47,6 @@ export interface IListRelatedDatasetsResponse {
   datasetsWithSupplementaryData: IRelatedDataset[];
 }
 
-export interface IHandlebarsTemplates {
-  header: string;
-  details: string;
-}
 export interface IDatasetForReview {
   dataset_id: string; // UUID
   artifacts_to_review: number;

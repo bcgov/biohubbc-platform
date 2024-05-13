@@ -30,17 +30,6 @@ export class ArtifactService extends DBService {
   }
 
   /**
-   * Retrieves an array of of new primary keys for an artifact record.
-   *
-   * @param {number} [count=1] The number of artifact primary keys to generate (by default, only 1).
-   * @returns {*} {Promise<number[]>} The array of artifact primary keys
-   * @memberof ArtifactRepository
-   */
-  async getNextArtifactIds(count = 1): Promise<number[]> {
-    return this.artifactRepository.getNextArtifactIds(count);
-  }
-
-  /**
    * Inserts a new artifact record
    *
    * @param {IArtifact} artifact The artifact record to insert

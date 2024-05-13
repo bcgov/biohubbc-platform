@@ -73,7 +73,7 @@ describe('TaxonomyRepository', () => {
 
       const taxonomyRepository = new TaxonomyRepository(mockDBConnection);
 
-      const response = await taxonomyRepository.addItisTaxonRecord(1, 'string', 'string', {}, 'string');
+      const response = await taxonomyRepository.addItisTaxonRecord(1, 'string', ['string'], {}, 'string');
 
       expect(response).to.be.eql({
         taxon_id: 1,
