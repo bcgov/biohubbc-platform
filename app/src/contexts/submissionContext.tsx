@@ -120,6 +120,7 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
    */
   useEffect(() => {
     submissionFeaturesAppliedRulesDataLoader.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allSubmissionFeatureIds]);
 
   const submissionContext: ISubmissionContext = useMemo(() => {

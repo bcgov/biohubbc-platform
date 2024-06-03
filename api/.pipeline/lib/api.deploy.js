@@ -34,10 +34,6 @@ const apiDeploy = async (settings) => {
         // Node
         NODE_ENV: phases[phase].env || 'dev',
         NODE_OPTIONS: phases[phase].nodeOptions,
-        // Elastic Search
-        ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
-        ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
-        ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
         // ITIS SOLR
         ITIS_SOLR_URL: phases[phase].itisSolrUrl,
         // S3 (Object Store)

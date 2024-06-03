@@ -33,10 +33,6 @@ const queueDeploy = async (settings) => {
         APP_HOST: phases[phase].appHost,
         // Node
         NODE_ENV: phases[phase].env || 'dev',
-        // Elastic Search
-        ELASTICSEARCH_URL: phases[phase].elasticsearchURL,
-        ELASTICSEARCH_EML_INDEX: phases[phase].elasticsearchEmlIndex,
-        ELASTICSEARCH_TAXONOMY_INDEX: phases[phase].elasticsearchTaxonomyIndex,
         // S3 (Object Store)
         S3_KEY_PREFIX: phases[phase].s3KeyPrefix,
         OBJECT_STORE_SECRETS: 'biohubbc-object-store',

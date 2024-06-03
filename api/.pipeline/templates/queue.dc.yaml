@@ -30,19 +30,6 @@ parameters:
     description: Application Environment type variable
     required: true
     value: 'dev'
-  # Elastic Search
-  - name: ELASTICSEARCH_URL
-    description: Platform Elasticsearch URL
-    required: true
-    value: 'http://es01:9200'
-  - name: ELASTICSEARCH_EML_INDEX
-    description: Platform Elasticsearch index for EML data
-    required: true
-    value: 'eml'
-  - name: ELASTICSEARCH_TAXONOMY_INDEX
-    description: Platform Elasticsearch Taxonomy Index
-    required: true
-    vale: 'taxonomy_3.0.0'
   - name: TZ
     description: Application timezone
     required: false
@@ -149,12 +136,6 @@ objects:
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
                   value: ${NODE_ENV}
-                - name: ELASTICSEARCH_URL
-                  value: ${ELASTICSEARCH_URL}
-                - name: ELASTICSEARCH_EML_INDEX
-                  value: ${ELASTICSEARCH_EML_INDEX}
-                - name: ELASTICSEARCH_TAXONOMY_INDEX
-                  value: ${ELASTICSEARCH_TAXONOMY_INDEX}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ

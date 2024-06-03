@@ -5,7 +5,7 @@ import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { SecurityService } from '../../../services/security-service';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/dwc/eml/get');
+const defaultLog = getLogger('paths/artifact/{artifactId}/getSignedUrl');
 
 export const GET: Operation = [getArtifactSignedUrl()];
 
