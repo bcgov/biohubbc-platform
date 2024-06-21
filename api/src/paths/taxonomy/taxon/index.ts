@@ -9,7 +9,7 @@ export const GET: Operation = [findTaxonBySearchTerms()];
 
 GET.apiDoc = {
   description: 'Find taxon records by search criteria.',
-  tags: ['taxonomy'],
+  tags: ['taxon_id'],
   security: [
     {
       Bearer: []

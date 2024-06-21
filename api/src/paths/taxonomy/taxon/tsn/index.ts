@@ -10,7 +10,7 @@ export const GET: Operation = [getTaxonByTSN()];
 
 GET.apiDoc = {
   description: 'Get taxon records by TSN ids.',
-  tags: ['taxonomy'],
+  tags: ['taxon_id'],
   security: [
     {
       Bearer: []
