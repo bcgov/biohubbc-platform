@@ -87,3 +87,24 @@ export const sortTaxonSearchResults = (
   // Sort the data by the score
   return taxonSearchResults.sort((a, b) => calculateScore(b) - calculateScore(a));
 };
+
+/**
+ * Parse the raw common names string from an ITIS taxon record into an array of english common names.
+ *
+ * @example
+ * const commonNames = [
+ *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
+ *   '$woolly locoweed$English$N$124501$2011-06-29 00:00:00$',
+ *   '$Davis Mountains locoweed$English$N$124502$2011-06-29 00:00:00$',
+ *   '$woolly milkvetch$English$N$72035$2012-12-21 00:00:00$'
+ * ]
+ *
+ * const result = _parseItisTaxonCommonNames(commonNames)
+ * // result: ['withered wooly milk-vetch', 'woolly locoweed', 'Davis Mountains locoweed', 'woolly milkvetch']
+ *
+ * @param {string[]} [commonNames]
+ * @memberof TaxonomyService
+ */
+export const getItisTaxonCommonNames = (commonNames?: string[]): string[] => {
+  return commonNames?.filter((name) => name.split('$')[2] === 'English').map((name) => name.split('$')[1]) ?? [];
+};

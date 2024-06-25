@@ -1,5 +1,6 @@
 import { IDBConnection } from '../database/db';
 import { TaxonomyRepository, TaxonRecord } from '../repositories/taxonomy-repository';
+import { getItisTaxonCommonNames } from '../utils/itis-utils';
 import { getLogger } from '../utils/logger';
 import { ItisService, ItisSolrSearchResponse } from './itis-service';
 
@@ -72,7 +73,7 @@ export class TaxonomyService {
    * @memberof TaxonomyService
    */
   async addItisTaxonRecord(itisSolrResponse: ItisSolrSearchResponse): Promise<TaxonRecord> {
-    const commonNames = this._parseItisTaxonCommonNames(itisSolrResponse?.commonNames);
+    const commonNames = getItisTaxonCommonNames(itisSolrResponse?.commonNames);
 
     return this.taxonRepository.addItisTaxonRecord(
       Number(itisSolrResponse.tsn),
@@ -82,27 +83,6 @@ export class TaxonomyService {
       itisSolrResponse.updateDate
     );
   }
-
-  /**
-   * Parse the raw common names string from an ITIS taxon record into an array of english common names.
-   *
-   * @example
-   * const commonNames = [
-   *   '$withered wooly milk-vetch$English$N$152846$2012-12-21 00:00:00$',
-   *   '$woolly locoweed$English$N$124501$2011-06-29 00:00:00$',
-   *   '$Davis Mountains locoweed$English$N$124502$2011-06-29 00:00:00$',
-   *   '$woolly milkvetch$English$N$72035$2012-12-21 00:00:00$'
-   * ]
-   *
-   * const result = _parseItisTaxonCommonNames(commonNames)
-   * // result: ['withered wooly milk-vetch', 'woolly locoweed', 'Davis Mountains locoweed', 'woolly milkvetch']
-   *
-   * @param {string[]} [commonNames]
-   * @memberof TaxonomyService
-   */
-  _parseItisTaxonCommonNames = (commonNames?: string[]): string[] => {
-    return commonNames?.filter((name) => name.split('$')[2] === 'English').map((name) => name.split('$')[1]) ?? [];
-  };
 
   /**
    * Delete an existing taxon record.

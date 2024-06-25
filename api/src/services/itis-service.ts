@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { sortTaxonSearchResults } from '../utils/itis-sort';
+import { getItisTaxonCommonNames, sortTaxonSearchResults } from '../utils/itis-utils';
 import { getLogger } from '../utils/logger';
 import { TaxonSearchResult } from './taxonomy-service';
 
@@ -83,8 +83,7 @@ export class ItisService {
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
     return data.map((item: ItisSolrSearchResponse) => {
-      const englishNames = item.commonNames?.filter((name) => name.split('$')[2] === 'English');
-      const commonNames = englishNames?.map((name) => name.split('$')[1]) ?? [];
+      const commonNames = getItisTaxonCommonNames(item.commonNames);
 
       return {
         tsn: Number(item.tsn),
