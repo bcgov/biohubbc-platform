@@ -99,7 +99,7 @@ export const sortTaxonSearchResults = (
  *   '$woolly milkvetch$English$N$72035$2012-12-21 00:00:00$'
  * ]
  *
- * const result = _parseItisTaxonCommonNames(commonNames)
+ * const result = getItisTaxonCommonNames(commonNames)
  * // result: ['withered wooly milk-vetch', 'woolly locoweed', 'Davis Mountains locoweed', 'woolly milkvetch']
  *
  * @param {string[]} [commonNames]
