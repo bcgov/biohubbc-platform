@@ -6,7 +6,7 @@ import { TaxonSearchResult } from './taxonomy-service';
 const defaultLog = getLogger('services/itis-service');
 
 export type ItisSolrSearchResponse = {
-  commonNames: string[];
+  commonNames?: string[];
   kingdom: string;
   name: string;
   parentTSN: string;
