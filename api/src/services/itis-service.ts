@@ -185,7 +185,7 @@ export class ItisService {
       ['kingdom'],
       ['asc'],
       150
-    )}&${this._getItisSolrFilterParam()}&&q=${this._getItisSolrTsnSearch(tsnIds)}`;
+    )}&${this._getItisSolrHierarchyParam()}&&q=${this._getItisSolrTsnSearch(tsnIds)}`;
   }
 
   /**
@@ -238,7 +238,7 @@ export class ItisService {
    * @memberof ItisService
    */
   _getItisSolrHierarchyParam(): string {
-    return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank';
+    return 'omitHeader=true&fl=tsn+hierarchy';
   }
 
   /**
