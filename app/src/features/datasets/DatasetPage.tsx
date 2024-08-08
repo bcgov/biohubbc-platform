@@ -7,7 +7,7 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
     <Container maxWidth="xl">
       <Box py={3}>
         <Paper elevation={0}>
-          <Box display="flex">TBD</Box>
+          <Box display="flex">To be determined</Box>
         </Paper>
       </Box>
     </Container>
