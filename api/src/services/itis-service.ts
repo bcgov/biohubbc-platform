@@ -19,7 +19,12 @@ export type ItisSolrSearchResponse = {
 
 export type ItisSolrSearchResponseHierarchy = {
   tsn: string;
-  hierarchy: string[];
+  hierarchyTSN: [string]; // Array with one item
+};
+
+export type TSNWithHierarchy = {
+  tsn: number;
+  hierarchy: number[];
 };
 
 /**
@@ -87,7 +92,7 @@ export class ItisService {
    * @return {*}  {Promise<ItisSolrSearchResponse[]>}
    * @memberof ItisService
    */
-  async getHierarchyForTSNs(tsnIds: number[]): Promise<ItisSolrSearchResponseHierarchy[]> {
+  async getHierarchyForTSNs(tsnIds: number[]): Promise<TSNWithHierarchy[]> {
     const url = await this.getItisSolrTsnHierarchyUrl(tsnIds);
 
     defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'url', url });
@@ -98,7 +103,7 @@ export class ItisService {
       return [];
     }
 
-    return response.data.response.docs;
+    return this._sanitizeHierarchyData(response.data.response.docs);
   }
 
   /**
@@ -119,6 +124,22 @@ export class ItisService {
         kingdom: item.kingdom
       };
     });
+  };
+
+  /**
+   * Cleans up the ITIS hierarchy response data
+   *
+   * @param {ItisSolrSearchResponse[]} data
+   * @memberof ItisService
+   */
+  _sanitizeHierarchyData = (data: ItisSolrSearchResponseHierarchy[]): TSNWithHierarchy[] => {
+    return data.map((item: ItisSolrSearchResponseHierarchy) => ({
+      tsn: Number(item.tsn),
+      hierarchy: item.hierarchyTSN[0]
+        .split('$')
+        .filter((part) => part !== '')
+        .map((tsn) => Number(tsn))
+    }));
   };
 
   /**
@@ -237,7 +258,7 @@ export class ItisService {
    * @memberof ItisService
    */
   _getItisSolrHierarchyParam(): string {
-    return 'omitHeader=true&fl=tsn+hierarchy';
+    return 'omitHeader=true&fl=tsn+hierarchyTSN';
   }
 
   /**

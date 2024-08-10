@@ -4,9 +4,9 @@ import { getAPIUserDBConnection } from '../../../../database/db';
 import { ItisService } from '../../../../services/itis-service';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/taxonomy/taxon/tsn');
+const defaultLog = getLogger('paths/taxonomy/taxon/tsn/hierarchy');
 
-export const GET: Operation = [getTaxonByTSN()];
+export const GET: Operation = [getTaxonHierarchyByTSN()];
 
 GET.apiDoc = {
   description: 'Get taxon records by TSN ids.',
@@ -40,39 +40,19 @@ GET.apiDoc = {
       content: {
         'application/json': {
           schema: {
-            type: 'object',
-            properties: {
-              searchResponse: {
-                type: 'array',
-                items: {
-                  title: 'Species',
-                  type: 'object',
-                  required: ['tsn', 'commonNames', 'scientificName'],
-                  properties: {
-                    tsn: {
-                      type: 'integer'
-                    },
-                    commonNames: {
-                      type: 'array',
-                      items: {
-                        type: 'string'
-                      }
-                    },
-                    scientificName: {
-                      type: 'string'
-                    },
-                    rank: {
-                      type: 'string'
-                    },
-                    kingdom: {
-                      type: 'string'
-                    }
-                  },
-                  additionalProperties: false
-                }
-              }
-            },
-            additionalProperties: false
+            type: 'array',
+            items: {
+              title: 'Species',
+              type: 'object',
+              required: ['tsn', 'hierarchy'],
+              properties: {
+                tsn: {
+                  type: 'integer'
+                },
+                hierarchy: { type: 'array', items: { type: 'integer' } }
+              },
+              additionalProperties: false
+            }
           }
         }
       }
@@ -97,9 +77,9 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function getTaxonByTSN(): RequestHandler {
+export function getTaxonHierarchyByTSN(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'getTaxonByTSN', message: 'query params', query: req.query });
+    defaultLog.debug({ label: 'getTaxonHierarchyByTSN', message: 'query params', query: req.query });
 
     const connection = getAPIUserDBConnection();
 
@@ -114,12 +94,9 @@ export function getTaxonByTSN(): RequestHandler {
 
       connection.commit();
 
-      // Overwrite default cache-control header, allow caching up to 7 days
-      res.setHeader('Cache-Control', 'max-age=604800');
-
-      res.status(200).json({ searchResponse: response });
+      res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getTaxonByTSN', message: 'error', error });
+      defaultLog.error({ label: 'getTaxonHierarchyByTSN', message: 'error', error });
       connection.rollback();
       throw error;
     } finally {
