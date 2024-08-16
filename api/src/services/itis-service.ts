@@ -89,7 +89,7 @@ export class ItisService {
    * Returns the parent hierarchy for multiple TSNs
    *
    * @param {number[]} tsnIds
-   * @return {*}  {Promise<ItisSolrSearchResponse[]>}
+   * @return {*}  {Promise<TSNWithHierarchy[]>}
    * @memberof ItisService
    */
   async getHierarchyForTSNs(tsnIds: number[]): Promise<TSNWithHierarchy[]> {
@@ -110,6 +110,7 @@ export class ItisService {
    * Cleans up the ITIS search response data
    *
    * @param {ItisSolrSearchResponse[]} data
+   * @return {*}  {Promise<TaxonSearchResult[]>}
    * @memberof ItisService
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
@@ -187,7 +188,7 @@ export class ItisService {
   }
 
   /**
-   * Get the ITIS SOLR search-by-tsn URL with hierarchy
+   * Get the ITIS SOLR search-by-tsn URL for hierarchy information
    *
    * @param {number[]} tsnIds
    * @return {*}  {Promise<string>}
