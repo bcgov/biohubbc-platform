@@ -71,6 +71,12 @@ const systemUsers: SystemUserSeed[] = [
     type: SYSTEM_IDENTITY_SOURCE.IDIR,
     role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
     user_guid: '62EC624E50844486A046DC9709854F8D'
+  },
+  {
+    identifier: 'ameijer',
+    type: SYSTEM_IDENTITY_SOURCE.IDIR,
+    role_name: SYSTEM_USER_ROLE_NAME.SYSTEM_ADMINISTRATOR,
+    user_guid: '74231b32026141a7acec6bcc0284f038'
   }
 ];
 
