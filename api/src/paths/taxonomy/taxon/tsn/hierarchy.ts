@@ -6,7 +6,7 @@ import { getLogger } from '../../../../utils/logger';
 
 const defaultLog = getLogger('paths/taxonomy/taxon/tsn/hierarchy');
 
-export const GET: Operation = [getTaxonHierarchyByTSN()];
+export const GET: Operation = [getHierarchyForTSNs()];
 
 GET.apiDoc = {
   description: 'Get taxon hierarchy information by TSN ids.',
@@ -79,9 +79,9 @@ GET.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function getTaxonHierarchyByTSN(): RequestHandler {
+export function getHierarchyForTSNs(): RequestHandler {
   return async (req, res) => {
-    defaultLog.debug({ label: 'getTaxonHierarchyByTSN', message: 'query params', query: req.query });
+    defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'query params', query: req.query });
 
     const connection = getAPIUserDBConnection();
 
@@ -98,7 +98,7 @@ export function getTaxonHierarchyByTSN(): RequestHandler {
 
       res.status(200).json(response);
     } catch (error) {
-      defaultLog.error({ label: 'getTaxonHierarchyByTSN', message: 'error', error });
+      defaultLog.error({ label: 'getHierarchyForTSNs', message: 'error', error });
       connection.rollback();
       throw error;
     } finally {

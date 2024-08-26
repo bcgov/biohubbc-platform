@@ -102,7 +102,7 @@ export class ItisService {
    * @memberof ItisService
    */
   async getHierarchyForTSNs(tsnIds: number[]): Promise<TSNWithHierarchy[]> {
-    const url = await this.getItisSolrTsnHierarchyUrl(tsnIds);
+    const url = this.getItisSolrTsnHierarchyUrl(tsnIds);
 
     defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'url', url });
 
@@ -140,6 +140,7 @@ export class ItisService {
    * Cleans up the ITIS hierarchy response data
    *
    * @param {ItisSolrSearchResponse[]} data
+   * @return {TSNWithHierarchy[]}
    * @memberof ItisService
    */
   _sanitizeHierarchyData = (data: ItisSolrSearchResponseHierarchy[]): TSNWithHierarchy[] => {
@@ -200,10 +201,10 @@ export class ItisService {
    * Get the ITIS SOLR search-by-tsn URL for hierarchy information
    *
    * @param {number[]} tsnIds
-   * @return {*}  {Promise<string>}
+   * @return {*}  {string}
    * @memberof ItisService
    */
-  async getItisSolrTsnHierarchyUrl(tsnIds: number[]): Promise<string> {
+  getItisSolrTsnHierarchyUrl(tsnIds: number[]): string {
     const itisUrl = this._getItisSolrUrl();
 
     if (!itisUrl) {
