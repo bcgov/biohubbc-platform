@@ -28,6 +28,15 @@ export type TSNWithHierarchy = {
 };
 
 /**
+ * Generic base type for the ITIS Solr service
+ */
+type ItisSolrResponseBase<T> = {
+  response: {
+    docs: T;
+  };
+};
+
+/**
  * Service for retrieving and processing taxonomic data from the Integrated Taxonomic Information System (ITIS).
  *
  * @See https://itis.gov
@@ -48,7 +57,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
-    const response = await axios.get(url);
+    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -76,7 +85,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
 
-    const response = await axios.get(url);
+    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -97,7 +106,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'url', url });
 
-    const response = await axios.get(url);
+    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponseHierarchy[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];

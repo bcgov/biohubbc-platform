@@ -9,13 +9,9 @@ const defaultLog = getLogger('paths/taxonomy/taxon/tsn/hierarchy');
 export const GET: Operation = [getTaxonHierarchyByTSN()];
 
 GET.apiDoc = {
-  description: 'Get taxon records by TSN ids.',
+  description: 'Get taxon hierarchy information by TSN ids.',
   tags: ['taxon_id'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
+  security: [],
   parameters: [
     {
       description: 'Taxon TSN ids.',
@@ -44,12 +40,18 @@ GET.apiDoc = {
             items: {
               title: 'Species',
               type: 'object',
+              description: 'Taxon hierarchy response object with an array of parent TSNs',
               required: ['tsn', 'hierarchy'],
               properties: {
                 tsn: {
                   type: 'integer'
                 },
-                hierarchy: { type: 'array', items: { type: 'integer' } }
+                hierarchy: {
+                  type: 'array',
+                  description:
+                    'Array of parent TSNs in descending order, where the highest-ranking parent is first and the TSN for which the hierarchy was requested is last.',
+                  items: { type: 'integer' }
+                }
               },
               additionalProperties: false
             }
@@ -83,7 +85,7 @@ export function getTaxonHierarchyByTSN(): RequestHandler {
 
     const connection = getAPIUserDBConnection();
 
-    const tsnIds: number[] = (req.query.tsn as (string | number)[]).map(Number);
+    const tsnIds: number[] = (req.query.tsn as string[]).map(Number);
 
     try {
       await connection.open();
