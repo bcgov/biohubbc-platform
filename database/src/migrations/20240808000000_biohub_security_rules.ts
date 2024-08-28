@@ -1,8 +1,8 @@
 import { Knex } from 'knex';
 
 /**
- * this adds new security rules to biohub 
- * insert comments here 
+ * this adds new security rules to biohub
+ * insert comments here
  *
  * @export
  * @param {Knex} knex
