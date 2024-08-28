@@ -61,22 +61,16 @@ export async function up(knex: Knex): Promise<void> {
     (now(), (SELECT security_category_id FROM security_category WHERE name = 'Proprietary'), 'First Nations Land', 'Proprietary due to First Nations Land'),
     (now(), (SELECT security_category_id FROM security_category WHERE name = 'Statutory Constraints'), 'Provincial Statute', 'Secured due to Provincial Statute'),
     (now(), (SELECT security_category_id FROM security_category WHERE name = 'Statutory Constraints'), 'Federal Statute', 'Secured due to Federal Statute'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Mule Deer Telemetry', 'Secured due to Mule Deer Telemetry'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Mule Deer Survey Data', 'Secured due to Mule Deer Survey Data'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Modeled Freshwater Fish Habitat Capability Mapping', 'Secured due to Experimental Technology'),
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Mule Deer Data', 'Secured due to Mule Deer Data'),
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Experimental Technology', 'Secured due to Experimental Technology'),
     (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Predator Reduction', 'Secured due to Predator Reduction Information'),
     (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Bighorn or Thinhorn Sheep', 'Secured due to Species of Sheep'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Rocky Mountain Elk Telemetry', 'Secured due to Rocky Mountain Elk Telemetry'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Rocky Mountain Elk  Survey Data', 'Secured due to Rocky Mountain Elk Survey Data'),
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Rocky Mountain Elk Data', 'Secured due to Rocky Mountain Elk Data'),
     (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Harvested Species', 'Secured due to Increased Risk of Illegal Harvest'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Secured Caribou Herd', 'Secured due to association with a Secured Caribou Herd'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Secured Caribou Telemetry', 'Secured due to Caribou Telemetry'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Secured Moose Data', 'Secured Moose Data'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Secured Moose Telemetry', 'Secured due to Moose Telemetry'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Moose Stratification', 'Secured due to Moose Stratification'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Grizzly Bear DNA', 'Secured due to Grizzly Bear DNA'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Grizzly Bear Telemetry', 'Secured due to Grizzly Bear Telemetry'),
-    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Grizzly Bear Den', 'Secured due to Grizzly Bear Den Location');
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Caribou Data', 'Secured due to association with Secured Caribou Data'),
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Moose Data', 'Secured Moose Data'),
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Grey Wolf Data', 'Secured Grey Wolf Data'),
+    (now(), (SELECT security_category_id FROM security_category WHERE name = 'Government Interests'), 'Grizzly Bear Data', 'Secured due to Grizzly Bear Data');
   `);
 }
 
