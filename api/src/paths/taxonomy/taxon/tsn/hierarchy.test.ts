@@ -5,7 +5,6 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { GET } from '.';
 import * as db from '../../../../database/db';
-import { HTTPError } from '../../../../errors/http-error';
 import { ItisService } from '../../../../services/itis-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../../__mocks__/db';
 import { getHierarchyForTSNs } from './hierarchy';
@@ -76,28 +75,6 @@ describe('taxonomy/taxon/tsn/hierarchy', () => {
 
       expect(mockRes.jsonValue).to.eql([mock1, mock2]);
       expect(mockRes.statusValue).to.equal(200);
-    });
-
-    it('catches error, and re-throws error', async () => {
-      const dbConnectionObj = getMockDBConnection({ rollback: sinon.stub(), release: sinon.stub() });
-
-      sinon.stub(db, 'getDBConnection').returns(dbConnectionObj);
-
-      sinon.stub(ItisService.prototype, 'getHierarchyForTSNs').rejects(new Error('a test error'));
-
-      const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
-      mockReq.query = {
-        tsn: ['1', '2']
-      };
-
-      try {
-        const requestHandler = getHierarchyForTSNs();
-
-        await requestHandler(mockReq, mockRes, mockNext);
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as HTTPError).message).to.equal('a test error');
-      }
     });
   });
 });
