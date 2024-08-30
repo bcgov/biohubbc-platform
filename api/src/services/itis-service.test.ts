@@ -3,7 +3,7 @@ import chai, { expect } from 'chai';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import { ApiGeneralError } from '../errors/api-error';
-import { ItisService } from './itis-service';
+import { ItisService, ItisSolrSearchResponseHierarchy } from './itis-service';
 
 chai.use(sinonChai);
 
@@ -182,6 +182,65 @@ describe('ItisService', () => {
     });
   });
 
+  describe('getHierarchyForTSNs', async () => {
+    it('returns array of hierarchy objects for tsns', async () => {
+      const mockTsns = [1, 2];
+      const mockTsnHierarchies = [
+        { tsn: mockTsns[0], hierarchyTSN: ['$3$2$1$'] },
+        { tsn: mockTsns[1], hierarchyTSN: ['$3$2$'] }
+      ];
+      const mockAxiosResponse = {
+        data: {
+          response: {
+            docs: mockTsnHierarchies
+          }
+        }
+      };
+
+      const getItisSolrTsnHierarchyUrlStub = sinon
+        .stub(ItisService.prototype, 'getItisSolrTsnHierarchyUrl')
+        .returns('url');
+
+      const axiosStub = sinon.stub(axios, 'get').resolves(mockAxiosResponse);
+
+      const itisService = new ItisService();
+
+      const response = await itisService.getHierarchyForTSNs(mockTsns);
+
+      expect(getItisSolrTsnHierarchyUrlStub).to.have.been.calledWith(mockTsns);
+      expect(axiosStub).to.have.been.calledWith('url');
+      expect(response).to.eql([
+        {
+          tsn: mockTsns[0],
+          hierarchy: [3, 2, 1]
+        },
+        {
+          tsn: mockTsns[1],
+          hierarchy: [3, 2]
+        }
+      ]);
+    });
+
+    it('catches and re-throws an error', async () => {
+      const mockTsns = [1, 2];
+      sinon.stub(axios, 'get').rejects(new Error('a test error'));
+
+      const itisService = new ItisService();
+      const getItisSolrTsnHierarchyUrlStub = sinon
+        .stub(ItisService.prototype, 'getItisSolrTsnHierarchyUrl')
+        .resolves('url');
+
+      try {
+        await itisService.getHierarchyForTSNs(mockTsns);
+
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiGeneralError).message).to.equal('a test error');
+        expect(getItisSolrTsnHierarchyUrlStub).to.have.been.calledWith(mockTsns);
+      }
+    });
+  });
+
   describe('getItisSolrTermSearchUrl', () => {
     it('throws an error when itis solr url is not set', async () => {
       process.env.ITIS_SOLR_URL = '';
@@ -206,6 +265,35 @@ describe('ItisService', () => {
 
       expect(response).to.equal(
         'https://services.itis.gov/?wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&q=((nameWOInd:*term*+AND+usage:/(valid|accepted)/)+OR+(vernacular:*term*+AND+usage:/(valid|accepted)/))'
+      );
+    });
+  });
+
+  describe('getItisSolrTsnHierarchyUrl', () => {
+    const mockTsns = [1];
+    it('throws an error when itis solr url is not set', async () => {
+      process.env.ITIS_SOLR_URL = '';
+
+      const itisService = new ItisService();
+
+      try {
+        await itisService.getItisSolrTsnHierarchyUrl(mockTsns);
+
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiGeneralError).message).to.equal('Failed to build ITIS query.');
+      }
+    });
+
+    it('returns a valid url', async () => {
+      process.env.ITIS_SOLR_URL = 'https://services.itis.gov/';
+
+      const itisService = new ItisService();
+
+      const response = await itisService.getItisSolrTsnHierarchyUrl(mockTsns);
+
+      expect(response).to.equal(
+        'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+hierarchyTSN&&q=tsn:1'
       );
     });
   });
@@ -236,5 +324,46 @@ describe('ItisService', () => {
         'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&&q=tsn:123'
       );
     });
+  });
+
+  describe('getItisSolrTsnSearchUrl', () => {
+    it('throws an error when itis solr url is not set', async () => {
+      process.env.ITIS_SOLR_URL = '';
+
+      const itisService = new ItisService();
+
+      try {
+        await itisService.getItisSolrTsnSearchUrl([123]);
+
+        expect.fail();
+      } catch (error) {
+        expect((error as ApiGeneralError).message).to.equal('Failed to build ITIS query.');
+      }
+    });
+
+    it('returns a valid url', async () => {
+      process.env.ITIS_SOLR_URL = 'https://services.itis.gov/';
+
+      const itisService = new ItisService();
+
+      const response = await itisService.getItisSolrTsnSearchUrl([123]);
+
+      expect(response).to.equal(
+        'https://services.itis.gov/??wt=json&sort=kingdom+asc&rows=150&omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank&&q=tsn:123'
+      );
+    });
+  });
+
+  describe('_sanitizeHierarchyData', () => {
+    it('turns an ITIS hierarchy string into an array'),
+      () => {
+        const mockData: ItisSolrSearchResponseHierarchy[] = [{ tsn: '1', hierarchyTSN: ['$3$2$1$'] }];
+
+        const itisService = new ItisService();
+
+        const result = itisService._sanitizeHierarchyData(mockData);
+
+        expect(result).to.eql([3, 2, 1]);
+      };
   });
 });
