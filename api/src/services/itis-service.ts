@@ -17,6 +17,25 @@ export type ItisSolrSearchResponse = {
   rank: string;
 };
 
+export type ItisSolrSearchResponseHierarchy = {
+  tsn: string;
+  hierarchyTSN: [string]; // Array with one item
+};
+
+export type TSNWithHierarchy = {
+  tsn: number;
+  hierarchy: number[];
+};
+
+/**
+ * Generic base type for the ITIS Solr service
+ */
+type ItisSolrResponseBase<T> = {
+  response: {
+    docs: T;
+  };
+};
+
 /**
  * Service for retrieving and processing taxonomic data from the Integrated Taxonomic Information System (ITIS).
  *
@@ -38,7 +57,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTerm', message: 'url', url });
 
-    const response = await axios.get(url);
+    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -66,7 +85,7 @@ export class ItisService {
 
     defaultLog.debug({ label: 'searchItisByTSN', message: 'url', url });
 
-    const response = await axios.get(url);
+    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponse[]>>(url);
 
     if (!response.data || !response.data.response || !response.data.response.docs) {
       return [];
@@ -76,9 +95,31 @@ export class ItisService {
   }
 
   /**
+   * Returns the parent hierarchy for multiple TSNs
+   *
+   * @param {number[]} tsnIds
+   * @return {*}  {Promise<TSNWithHierarchy[]>}
+   * @memberof ItisService
+   */
+  async getHierarchyForTSNs(tsnIds: number[]): Promise<TSNWithHierarchy[]> {
+    const url = this.getItisSolrTsnHierarchyUrl(tsnIds);
+
+    defaultLog.debug({ label: 'getHierarchyForTSNs', message: 'url', url });
+
+    const response = await axios.get<ItisSolrResponseBase<ItisSolrSearchResponseHierarchy[]>>(url);
+
+    if (!response.data || !response.data.response || !response.data.response.docs) {
+      return [];
+    }
+
+    return this._sanitizeHierarchyData(response.data.response.docs);
+  }
+
+  /**
    * Cleans up the ITIS search response data
    *
    * @param {ItisSolrSearchResponse[]} data
+   * @return {*}  {Promise<TaxonSearchResult[]>}
    * @memberof ItisService
    */
   _sanitizeItisData = (data: ItisSolrSearchResponse[]): TaxonSearchResult[] => {
@@ -93,6 +134,23 @@ export class ItisService {
         kingdom: item.kingdom
       };
     });
+  };
+
+  /**
+   * Cleans up the ITIS hierarchy response data
+   *
+   * @param {ItisSolrSearchResponse[]} data
+   * @return {TSNWithHierarchy[]}
+   * @memberof ItisService
+   */
+  _sanitizeHierarchyData = (data: ItisSolrSearchResponseHierarchy[]): TSNWithHierarchy[] => {
+    return data.map((item: ItisSolrSearchResponseHierarchy) => ({
+      tsn: Number(item.tsn),
+      hierarchy: item.hierarchyTSN[0]
+        .split('$')
+        .filter((part) => part !== '')
+        .map((tsn) => Number(tsn))
+    }));
   };
 
   /**
@@ -140,6 +198,28 @@ export class ItisService {
   }
 
   /**
+   * Get the ITIS SOLR search-by-tsn URL for hierarchy information
+   *
+   * @param {number[]} tsnIds
+   * @return {*}  {string}
+   * @memberof ItisService
+   */
+  getItisSolrTsnHierarchyUrl(tsnIds: number[]): string {
+    const itisUrl = this._getItisSolrUrl();
+
+    if (!itisUrl) {
+      defaultLog.debug({ label: 'getItisTsnHierarchyUrl', message: 'Environment variable ITIS_URL is not defined.' });
+      throw new Error('Failed to build ITIS query.');
+    }
+
+    return `${itisUrl}??${this._getItisSolrTypeParam()}&${this._getItisSolrSortParam(
+      ['kingdom'],
+      ['asc'],
+      150
+    )}&${this._getItisSolrHierarchyParam()}&&q=${this._getItisSolrTsnSearch(tsnIds)}`;
+  }
+
+  /**
    * Get ITIS SOLR base URL.
    *
    * @return {*}  {(string | undefined)}
@@ -180,6 +260,16 @@ export class ItisService {
    */
   _getItisSolrFilterParam(): string {
     return 'omitHeader=true&fl=tsn+scientificName:nameWOInd+kingdom+parentTSN+commonNames:vernacular+updateDate+usage+rank';
+  }
+
+  /**
+   * Get ITIS SOLR filter param.
+   *
+   * @return {*}  {string}
+   * @memberof ItisService
+   */
+  _getItisSolrHierarchyParam(): string {
+    return 'omitHeader=true&fl=tsn+hierarchyTSN';
   }
 
   /**

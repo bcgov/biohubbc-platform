@@ -10,11 +10,7 @@ export const GET: Operation = [findTaxonBySearchTerms()];
 GET.apiDoc = {
   description: 'Find taxon records by search criteria.',
   tags: ['taxonomy'],
-  security: [
-    {
-      Bearer: []
-    }
-  ],
+  security: [],
   parameters: [
     {
       description: 'Taxonomy search terms.',
