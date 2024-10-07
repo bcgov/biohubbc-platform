@@ -24,13 +24,18 @@ export async function up(knex: Knex): Promise<void> {
         ),
         (
             'file',
-            'File',
+            'File',.
             'A file such as an image or document.'
         ),
         (
             'sample_site',
             'Sampling site',
             'A location where species observations are collected.'
+        ),
+        (
+            'sample_technique',
+            'Sampling technique',
+            'A technique by which species observations or other ecological data are collected.'
         ),
         (
             'sample_method',
@@ -40,7 +45,7 @@ export async function up(knex: Knex): Promise<void> {
         (
             'sample_period',
             'Sampling period',
-            'A time period in which a sampling method is conducted.'
+            'A time period in which sampling is conducted.'
         ),
         (
             'species_observation',
@@ -61,6 +66,11 @@ export async function up(knex: Knex): Promise<void> {
             'telemetry_deployment',
             'Telemetry deployment',
             'Metadata describing the deployment of a telemetry device.'
+        ),        
+        (
+            'frequency',
+            'Frequency',
+            'Metadata describing the frequency of a telemetry device.'
         ),
         (
             'capture',
@@ -233,6 +243,13 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'sex',
+            'Sex',
+            'The biological sex of an organism.',
+            false
+        ),
+        (
             (SELECT feature_property_type_id from feature_property_type where name = 'boolean'),
             'proprietary_information',
             'Proprietary Information',
@@ -244,6 +261,42 @@ export async function up(knex: Knex): Promise<void> {
             'partnership',
             'Partnership',
             'Name of the collaborative project or data-sharing partnership.',
+            false
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'site_select_strategy',
+            'Site selection strategy',
+            'The tactic employed when determining site locations.',
+            false
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'eco_variables',
+            'Ecological Variables',
+            'The key ecological aspect(s) that the study aims to assess .',
+            false
+        ),
+        -- TECHNIQUE-RELATED PROPERTIES 
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'attractant',
+            'Attractants',
+            'Attractants employed under your sampling technique that entice or encourage observations.',
+            false
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'method_attribute',
+            'Method Attributes',
+            'Key characteristics or details of the method used in this data collection.',
+            false
+        ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'number'),
+            'detect_distance',
+            'Detection Distance',
+            'The maximum distance at which an observation can be made while employing this technique.',
             false
         ),
         -- TELEMETRY-RELATED PROPERTIES
@@ -349,6 +402,13 @@ export async function up(knex: Knex): Promise<void> {
             'The location of a marking on an animal',
             false
         ),
+        (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'marking_type',
+            'Marking Type',
+            'The nature of the marking on the animal.',
+            false
+        ),
     -- REPORT-RELATED PROPERTIES 
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'number'),
@@ -418,6 +478,16 @@ VALUES
         false
     ),
     (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'site_select_strategy'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'dataset'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'eco_variables'),
+        false
+    ),
+    (
         (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'artifact_key'),
         true
@@ -455,6 +525,31 @@ VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_method'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
+        true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'attractant'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method_attribute'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'detect_distance'),
         false
     ),
     (
@@ -518,12 +613,12 @@ VALUES
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'frequency'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'frequency'),
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
+        (SELECT feature_type_id FROM feature_type WHERE name = 'frequency'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'frequency_unit'),
         false
     ),
@@ -550,6 +645,11 @@ VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'animal'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'animal'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'sex'),
         false
     ),
     (
@@ -680,6 +780,11 @@ VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'measurement'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'measurement_value'),
+        true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'marking'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'marking_type'),
         true
     ),
     (
