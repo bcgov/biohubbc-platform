@@ -38,11 +38,6 @@ export async function up(knex: Knex): Promise<void> {
             'A technique by which species observations or other ecological data are collected.'
         ),
         (
-            'sample_method',
-            'Sampling method',
-            'A method by which species observations or other ecological data are collected.'
-        ),
-        (
             'sample_period',
             'Sampling period',
             'A time period in which sampling is conducted.'
@@ -293,6 +288,13 @@ export async function up(knex: Knex): Promise<void> {
             false
         ),
         (
+            (SELECT feature_property_type_id from feature_property_type where name = 'string'),
+            'method',
+            'Method',
+            'The name of the method used in this data collection.',
+            false
+        ),
+        (
             (SELECT feature_property_type_id from feature_property_type where name = 'number'),
             'detect_distance',
             'Detection Distance',
@@ -518,16 +520,6 @@ VALUES
         false
     ),
     (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_method'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
-        true
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_method'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
-        false
-    ),
-    (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
         true
@@ -546,6 +538,11 @@ VALUES
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'method_attribute'),
         false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method'),
+        true
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
