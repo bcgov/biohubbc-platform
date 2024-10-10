@@ -24,7 +24,7 @@ export async function up(knex: Knex): Promise<void> {
         ),
         (
             'file',
-            'File',.
+            'File',
             'A file such as an image or document.'
         ),
         (
@@ -219,7 +219,7 @@ export async function up(knex: Knex): Promise<void> {
             (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'artifact_key'),
             'artifact_key',
             'Key',
-            'The S3 storage key for an artifact',
+            'The S3 storage key for an artifact.',
             true
         ),
          (
@@ -269,7 +269,7 @@ export async function up(knex: Knex): Promise<void> {
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'eco_variables',
             'Ecological Variables',
-            'The key ecological aspect(s) that the study aims to assess .',
+            'The key ecological aspect(s) that the study aims to assess.',
             false
         ),
         -- TECHNIQUE-RELATED PROPERTIES 
@@ -289,8 +289,8 @@ export async function up(knex: Knex): Promise<void> {
         ),
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
-            'method',
-            'Method',
+            'method_name',
+            'Method Name',
             'The name of the method used in this data collection.',
             false
         ),
@@ -401,7 +401,7 @@ export async function up(knex: Knex): Promise<void> {
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
             'body_position',
             'Body position',
-            'The location of a marking on an animal',
+            'The location of a marking on an animal.',
             false
         ),
         (
@@ -541,7 +541,7 @@ VALUES
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'sample_technique'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'method'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'method_name'),
         true
     ),
     (
@@ -592,11 +592,6 @@ VALUES
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'start_date'),
-        false
-    ),
-    (
-        (SELECT feature_type_id FROM feature_type WHERE name = 'telemetry_deployment'),
-        (SELECT feature_property_id FROM feature_property WHERE name = 'start_time'),
         false
     ),
     (

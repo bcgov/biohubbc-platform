@@ -1,6 +1,5 @@
-ARG POSTGRES_VERSION=12.5
 
-FROM postgres:$POSTGRES_VERSION
+FROM postgres:14.2-bullseye
 
 # read env variables
 ARG TZ=America/Vancouver
