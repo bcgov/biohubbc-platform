@@ -28,6 +28,11 @@ export async function up(knex: Knex): Promise<void> {
             'A file such as an image or document.'
         ),
         (
+            'image',
+            'Image',
+            'An image file'
+        ),
+        (
             'sample_site',
             'Sampling site',
             'A location where species observations are collected.'
@@ -426,6 +431,13 @@ export async function up(knex: Knex): Promise<void> {
             'The author(s) of the report.',
             false
         ),
+        (
+            (SELECT feature_property_type_id FROM feature_property_type WHERE name = 'string'),
+            'file_type',
+            'File Type',
+            'The type of file.',
+            false
+        ),
     -- ECOLOGICAL UNIT-RELATED PROPERTIES
         (
             (SELECT feature_property_type_id from feature_property_type where name = 'string'),
@@ -493,6 +505,36 @@ VALUES
         (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
         (SELECT feature_property_id FROM feature_property WHERE name = 'artifact_key'),
         true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'name'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'file'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'file_type'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'artifact_key'),
+        true
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'description'),
+        false
+    ),
+    (
+        (SELECT feature_type_id FROM feature_type WHERE name = 'image'),
+        (SELECT feature_property_id FROM feature_property WHERE name = 'file_type'),
+        false
     ),
     (
         (SELECT feature_type_id FROM feature_type WHERE name = 'report'),
