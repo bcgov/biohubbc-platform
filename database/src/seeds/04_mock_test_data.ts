@@ -177,9 +177,9 @@ export const insertObservationRecord = async (
     `${insertSubmissionFeature({
       submission_id: options.submission_id,
       parent_submission_feature_id: options.parent_submission_feature_id,
-      feature_type: 'observation',
+      feature_type: 'species_observation',
       data: {
-        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
         geometry: random.point(
           1, // number of features in feature collection
           [-135.878906, 48.617424, -114.433594, 60.664785] // bbox constraint
@@ -223,7 +223,7 @@ const insertAnimalRecord = async (
       data: {
         species: faker.animal.type(),
         count: faker.number.int({ min: 0, max: 100 }),
-        taxonomy: faker.number.int({ min: 10000, max: 99999 }),
+        taxon_id: faker.number.int({ min: 10000, max: 99999 }),
         start_date: faker.date.past().toISOString(),
         end_date: faker.date.future().toISOString()
       }
@@ -288,7 +288,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
 export const insertSubmissionFeature = (options: {
   submission_id: number;
   parent_submission_feature_id: number | null;
-  feature_type: 'dataset' | 'sample_site' | 'observation' | 'animal' | 'artifact';
+  feature_type: 'dataset' | 'sample_site' | 'species_observation' | 'animal' | 'file';
   data: { [key: string]: any };
 }) => `
     INSERT INTO submission_feature
@@ -352,7 +352,7 @@ const insertSearchStringTaxonomy = (options: { submission_feature_id: number }) 
     values
     (
         ${options.submission_feature_id},
-        (select feature_property_id from feature_property where name = 'taxonomy'),
+        (select feature_property_id from feature_property where name = 'taxon_id'),
         $$${faker.number.int({ min: 10000, max: 99999 })}$$
     );
 `;
