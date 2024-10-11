@@ -55,8 +55,8 @@ const insertArtifactRecord = async (
   const sql = insertSubmissionFeature({
     submission_id: row.submission_id,
     parent_submission_feature_id: row.parent_submission_feature_id,
-    feature_type: 'artifact',
-    data: { artifact_key: S3_KEY }
+    feature_type: 'file',
+    data: { file: S3_KEY }
   });
 
   const submission_feature = await knex.raw(sql);
