@@ -436,7 +436,7 @@ export async function up(knex: Knex): Promise<void> {
             'file_type',
             'File Type',
             'The type of file.',
-            false
+            true
         ),
     -- ECOLOGICAL UNIT-RELATED PROPERTIES
         (
