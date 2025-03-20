@@ -58,7 +58,13 @@ const apiDeploy = async (settings) => {
         KEYCLOAK_API_HOST: phases[phase].sso.cssApi.cssApiHost,
         KEYCLOAK_API_ENVIRONMENT: phases[phase].sso.cssApi.cssApiEnvironment,
         // Log Level
-        LOG_LEVEL: phases[phase].logLevel || 'info',
+        LOG_LEVEL: phases[phase].logLevel,
+        LOG_LEVEL_FILE: phases[phase].logLevelFile,
+        LOG_FILE_DIR: phases[phase].logFileDir,
+        LOG_FILE_NAME: phases[phase].logFileName,
+        LOG_FILE_DATE_PATTERN: phases[phase].logFileDatePattern,
+        LOG_FILE_MAX_SIZE: phases[phase].logFileMaxSize,
+        LOG_FILE_MAX_FILES: phases[phase].logFileMaxFiles,
         // Openshift Resources
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,

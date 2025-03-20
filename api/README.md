@@ -77,11 +77,9 @@ A centralized logger has been created (see `api/utils/logger.ts`).
 
 ## Logger configuration
 
-The loggers log level can be configured via an environment variable: `LOG_LEVEL`
+The loggers log level can be configured via environment variables: `LOG_LEVEL` and `LOG_LEVEL_FILE`
 
-Set this variable to one of: `error`, `warn`, `info`, `debug`
-
-Default value: `info`
+Set this variable to one of: `silent`, `error`, `warn`, `info`, `debug`, `silly`
 
 ## Instantiating the logger in your class/file
 
@@ -103,16 +101,6 @@ or
 log.debug({ label: 'functionName', message: 'Useful for logging objects and other developer data', someLabel: aJSONObjectToPrint, anotherObject });
 ```
 
-Supported log properties:
-
-```
-- timestamp: overwrite the default time of `now` with your own timestamp.
-- level: overwrite the default level (via log.<level>()) with your own level string.
-- label: adds an additional label to the log message.
-- message: a log message.
-- <anyObject>: any additional object properties will be JSON.stringify'd and appended to the log message.
-```
-
 <br />
 
 # Testing
@@ -121,8 +109,6 @@ Supported log properties:
 
 - [Mocha](https://www.npmjs.com/package/mocha) - Unit test framework
 - [Chai](https://www.npmjs.com/package/chai) - Assertion library
-- [SuperTest](https://www.npmjs.com/package/supertest) - API testing library
-- [Nock](https://www.npmjs.com/package/nock) - HTTP mocking library
 
 ## Running Tests
 
@@ -130,12 +116,6 @@ Supported log properties:
 
   ```
   npm test
-  ```
-
-- Run the unit tests in watch mode (will re-run the tests on code changes).
-
-  ```
-  npm run test-watch
   ```
 
 - Run the unit test coverage report
@@ -156,3 +136,5 @@ See [Mocha](https://mochajs.org) for documentation on writing tests.
 # Keycloak
 
 This project uses [Keycloak](https://www.keycloak.org/) to handle authentication.
+
+# Troubleshooting and Known Issues
