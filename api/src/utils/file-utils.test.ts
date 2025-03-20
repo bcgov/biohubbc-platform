@@ -1,765 +1,304 @@
-import AWS from 'aws-sdk';
-import { Metadata } from 'aws-sdk/clients/appstream';
-import { ManagedUpload } from 'aws-sdk/clients/s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import { expect } from 'chai';
-import clamd from 'clamdjs';
 import { describe } from 'mocha';
-import sinon from 'sinon';
-import * as fileUtils from './file-utils';
+import {
+  bulkDeleteFilesFromS3,
+  deleteFileFromS3,
+  generateDatasetS3FileKey,
+  generateQueueS3FileKey,
+  getS3HostUrl,
+  getS3KeyPrefix,
+  getS3SignedURL,
+  _getClamAvScanner,
+  _getObjectStoreBucketName,
+  _getObjectStoreUrl,
+  _getS3Client
+} from './file-utils';
 
-const generateStubs = () => {
-  const _getObjectStoreUrlStub = sinon.stub(fileUtils, '_getObjectStoreUrl').returns('object.store.url');
+describe('deleteFileFromS3', () => {
+  it('returns null when no key specified', async () => {
+    const result = await deleteFileFromS3(null as unknown as string);
 
-  const _getObjectStoreBucketNameStub = sinon
-    .stub(fileUtils, '_getObjectStoreBucketName')
-    .returns('object-store-bucket-name');
-
-  const _getS3KeyPrefixStub = sinon.stub(fileUtils, '_getS3KeyPrefix').returns('platform-test');
-
-  return {
-    _getObjectStoreUrlStub,
-    _getObjectStoreBucketNameStub,
-    _getS3KeyPrefixStub
-  };
-};
-
-describe('file-utils', () => {
-  let sinonSandbox: sinon.SinonSandbox;
-
-  beforeEach(() => {
-    process.env.OBJECT_STORE_ACCESS_KEY_ID = 'object-store-access-key-id';
-    process.env.OBJECT_STORE_SECRET_KEY_ID = 'object-store-secret-key-id';
+    expect(result).to.be.null;
   });
+});
+
+describe('bulkDeleteFilesFromS3', () => {
+  it('returns null when no keys provided', async () => {
+    const result = await bulkDeleteFilesFromS3([]);
+
+    expect(result).to.be.null;
+  });
+});
+
+describe('getS3SignedURL', () => {
+  it('returns null when no key specified', async () => {
+    const result = await getS3SignedURL(null as unknown as string);
+
+    expect(result).to.be.null;
+  });
+});
+
+describe('generateS3FileKey', () => {
+  const S3_KEY_PREFIX = process.env.S3_KEY_PREFIX;
 
   afterEach(() => {
-    sinon.restore();
-    sinonSandbox?.restore();
+    process.env.S3_KEY_PREFIX = S3_KEY_PREFIX;
   });
 
-  describe('_getClamAvScanner', () => {
-    it('should return a clamAv scanner client', () => {
-      process.env.ENABLE_FILE_VIRUS_SCAN = 'true';
-      process.env.CLAMAV_HOST = 'host';
-      process.env.CLAMAV_PORT = '1111';
+  it('returns project file path', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
 
-      const result = fileUtils._getClamAvScanner();
-      expect(result).to.not.be.null;
-    });
+    const result = generateS3FileKey({ projectId: 1, fileName: 'testFileName' });
 
-    it('should return null if enable file virus scan is not set to true', () => {
-      process.env.ENABLE_FILE_VIRUS_SCAN = 'false';
-      process.env.CLAMAV_HOST = 'host';
-      process.env.CLAMAV_PORT = '1111';
-
-      const result = fileUtils._getClamAvScanner();
-      expect(result).to.be.null;
-    });
-
-    it('should return null if CLAMAV_HOST is not set', () => {
-      process.env.ENABLE_FILE_VIRUS_SCAN = 'true';
-      delete process.env.CLAMAV_HOST;
-      process.env.CLAMAV_PORT = '1111';
-
-      const result = fileUtils._getClamAvScanner();
-      expect(result).to.be.null;
-    });
-
-    it('should return null if CLAMAV_PORT is not set', () => {
-      process.env.ENABLE_FILE_VIRUS_SCAN = 'true';
-      process.env.CLAMAV_HOST = 'host';
-      delete process.env.CLAMAV_PORT;
-
-      const result = fileUtils._getClamAvScanner();
-      expect(result).to.be.null;
-    });
+    expect(result).to.equal('some/s3/prefix/projects/1/testFileName');
   });
 
-  describe('_getS3Client', () => {
-    it('should return an S3 client', () => {
-      const result = fileUtils._getS3Client();
-      expect(result).to.be.instanceOf(AWS.S3);
-    });
+  it('returns survey file path', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
 
-    it('constructs an S3 client', async () => {
-      const { _getObjectStoreUrlStub } = generateStubs();
-      const s3Stub = sinon.stub(AWS, 'S3').returns({});
+    const result = generateS3FileKey({ projectId: 1, surveyId: 2, fileName: 'testFileName' });
 
-      fileUtils._getS3Client();
-
-      expect(_getObjectStoreUrlStub).to.be.calledOnce;
-      expect(s3Stub).to.have.been.calledWith({
-        endpoint: 'https://object.store.url/',
-        accessKeyId: 'object-store-access-key-id',
-        secretAccessKey: 'object-store-secret-key-id',
-        signatureVersion: 'v4',
-        s3ForcePathStyle: true,
-        region: 'ca-central-1'
-      });
-    });
+    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/testFileName');
   });
 
-  describe('_getObjectStoreUrl', () => {
-    it('should return an object store bucket name', () => {
-      process.env.OBJECT_STORE_URL = 'test-url1';
+  it('returns project folder file path', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
 
-      const result = fileUtils._getObjectStoreUrl();
-      expect(result).to.equal('test-url1');
-    });
+    const result = generateS3FileKey({ projectId: 1, folder: 'reports', fileName: 'testFileName' });
 
-    it('should return its default value', () => {
-      delete process.env.OBJECT_STORE_URL;
-
-      const result = fileUtils._getObjectStoreUrl();
-      expect(result).to.equal('nrs.objectstore.gov.bc.ca');
-    });
+    expect(result).to.equal('some/s3/prefix/projects/1/reports/testFileName');
   });
 
-  describe('_getObjectStoreBucketName', () => {
-    it('should return an object store bucket name', () => {
-      process.env.OBJECT_STORE_BUCKET_NAME = 'test-bucket1';
+  it('returns survey folder file path', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
 
-      const result = fileUtils._getObjectStoreBucketName();
-      expect(result).to.equal('test-bucket1');
+    const result = generateS3FileKey({
+      projectId: 1,
+      surveyId: 2,
+      folder: 'telemetry-credentials',
+      fileName: 'testFileName'
     });
 
-    it('should return its default value', () => {
-      delete process.env.OBJECT_STORE_BUCKET_NAME;
-
-      const result = fileUtils._getObjectStoreBucketName();
-      expect(result).to.equal('');
-    });
+    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/telemetry-credentials/testFileName');
   });
 
-  describe('_getS3KeyPrefix', () => {
-    it('should return an s3 key prefix', () => {
-      process.env.S3_KEY_PREFIX = 'test-platform1';
+  it('returns survey submission folder file path when a submission ID is passed', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
 
-      const result = fileUtils._getS3KeyPrefix();
-      expect(result).to.equal('test-platform1');
+    const result = generateS3FileKey({
+      projectId: 1,
+      surveyId: 2,
+      submissionId: 3,
+      fileName: 'testFileName'
     });
 
-    it('should return its default value', () => {
-      delete process.env.S3_KEY_PREFIX;
-
-      const result = fileUtils._getS3KeyPrefix();
-      expect(result).to.equal('biohub');
-    });
+    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/submissions/3/testFileName');
   });
 
-  describe('getS3HostUrl', () => {
-    beforeEach(() => {
-      process.env.OBJECT_STORE_URL = 's3.host.example.com';
-      process.env.OBJECT_STORE_BUCKET_NAME = 'test-bucket-name';
+  it('returns critter captures folder file path', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
+
+    const result = generateS3FileKey({
+      projectId: 1,
+      surveyId: 2,
+      critterId: 3,
+      folder: 'captures',
+      critterbaseCaptureId: '123-456-789',
+      fileName: 'testFileName'
     });
 
-    it('should yield a default S3 host url', () => {
-      delete process.env.OBJECT_STORE_URL;
-      delete process.env.OBJECT_STORE_BUCKET_NAME;
-
-      const result = fileUtils.getS3HostUrl();
-
-      expect(result).to.equal('nrs.objectstore.gov.bc.ca');
-    });
-
-    it('should successfully produce an S3 host url', () => {
-      const result = fileUtils.getS3HostUrl();
-
-      expect(result).to.equal('s3.host.example.com/test-bucket-name');
-    });
-
-    it('should successfully append a key to an S3 host url', () => {
-      const result = fileUtils.getS3HostUrl('my-test-file.txt');
-
-      expect(result).to.equal('s3.host.example.com/test-bucket-name/my-test-file.txt');
-    });
+    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/critters/3/captures/123-456-789/testFileName');
   });
 
-  describe('deleteFileFromS3', () => {
-    it('returns null when no key specified', async () => {
-      const result = await fileUtils.deleteFileFromS3(null as unknown as string);
+  it('returns critter mortalities folder file path', async () => {
+    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
 
-      expect(result).to.be.null;
+    const result = generateS3FileKey({
+      projectId: 1,
+      surveyId: 2,
+      critterId: 3,
+      folder: 'mortalities',
+      critterbaseMortalityId: '123-456-789',
+      fileName: 'testFileName'
     });
 
-    it('deletes a file', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/critters/3/mortalities/123-456-789/testFileName');
+  });
+});
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
+describe('getS3HostUrl', () => {
+  const OBJECT_STORE_URL = process.env.OBJECT_STORE_URL;
+  const OBJECT_STORE_BUCKET_NAME = process.env.OBJECT_STORE_BUCKET_NAME;
 
-      const deleteObjectStub = sinonSandbox.stub(mockS3Client, 'deleteObject').returns({
-        promise: () =>
-          Promise.resolve({
-            DeleteMarker: true
-          })
-      } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
-
-      const result = await fileUtils.deleteFileFromS3('my-delete-key');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(deleteObjectStub).to.have.been.calledOnce;
-      expect(deleteObjectStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Key: 'my-delete-key',
-        VersionId: undefined
-      });
-      expect(result).to.eql({ DeleteMarker: true });
-    });
-
-    it('throws an error when deleteObject rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'deleteObject').returns({
-        promise: () =>
-          Promise.reject({
-            message: 'deleteObject test reject'
-          })
-      } as AWS.Request<AWS.S3.DeleteObjectOutput, AWS.AWSError>);
-
-      try {
-        await fileUtils.deleteFileFromS3('my-delete-key');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as AWS.AWSError).message).to.equal('deleteObject test reject');
-      }
-    });
+  afterEach(() => {
+    process.env.OBJECT_STORE_URL = OBJECT_STORE_URL;
+    process.env.OBJECT_STORE_BUCKET_NAME = OBJECT_STORE_BUCKET_NAME;
   });
 
-  describe('copyFileInS3', () => {
-    it('copies a file', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+  it('should yield a default S3 host url', () => {
+    Object.assign(process.env, { OBJECT_STORE_URL: undefined, OBJECT_STORE_BUCKET_NAME: undefined });
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
+    const result = getS3HostUrl();
 
-      const copyObjectStub = sinonSandbox.stub(mockS3Client, 'copyObject').returns({
-        promise: () =>
-          Promise.resolve({
-            CopyObjectResult: {
-              LastModified: new Date('1970-01-01')
-            }
-          })
-      } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
-
-      const result = await fileUtils.copyFileInS3('old-key', 'new-key');
-
-      expect(_getObjectStoreBucketNameStub).to.have.callCount(2);
-      expect(copyObjectStub).to.have.been.calledOnce;
-      expect(copyObjectStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        CopySource: '/object-store-bucket-name/old-key',
-        Key: 'new-key'
-      });
-      expect(result).to.eql({
-        CopyObjectResult: {
-          LastModified: new Date('1970-01-01')
-        }
-      });
-    });
-
-    it('throws an error when copyObject rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'copyObject').returns({
-        promise: () =>
-          Promise.reject({
-            message: 'copyObject test reject'
-          })
-      } as AWS.Request<AWS.S3.CopyObjectOutput, AWS.AWSError>);
-
-      try {
-        await fileUtils.copyFileInS3('old-key', 'new-key');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as AWS.AWSError).message).to.equal('copyObject test reject');
-      }
-    });
+    expect(result).to.equal('https://nrs.objectstore.gov.bc.ca');
   });
 
-  describe('uploadFileToS3', () => {
-    const mockFile = {
-      originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip',
-      buffer: Buffer.from('helloworld'),
-      mimetype: 'test-mimetype'
-    } as unknown as Express.Multer.File;
+  it('should successfully produce an S3 host url', () => {
+    process.env.OBJECT_STORE_URL = 'http://s3.host.example.com';
+    process.env.OBJECT_STORE_BUCKET_NAME = 'test-bucket-name';
 
-    it('uploads a file', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+    const result = getS3HostUrl();
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      const uploadStub = sinonSandbox.stub(mockS3Client, 'upload').returns({
-        promise: () =>
-          Promise.resolve({
-            Location: 'test-location',
-            ETag: 'test-etag',
-            Bucket: 'test-bucket',
-            Key: 'test-key'
-          })
-      } as ManagedUpload);
-
-      const result = await fileUtils.uploadFileToS3(mockFile, 'my-upload-key', { test_name: 'test_value' });
-
-      expect(_getObjectStoreBucketNameStub).to.have.been.calledOnce;
-      expect(uploadStub).to.have.been.calledOnce;
-      expect(uploadStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Body: Buffer.from('helloworld'),
-        Key: 'my-upload-key',
-        ContentType: 'test-mimetype',
-        Metadata: { test_name: 'test_value' }
-      });
-      expect(result).to.eql({
-        Location: 'test-location',
-        ETag: 'test-etag',
-        Bucket: 'test-bucket',
-        Key: 'test-key'
-      });
-    });
-
-    it('throws an error when upload rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'upload').returns({
-        promise: () => Promise.reject(new Error('upload test reject'))
-      } as ManagedUpload);
-
-      try {
-        await fileUtils.uploadFileToS3(mockFile, 'my-upload-key');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as Error).message).to.eql('upload test reject');
-      }
-    });
+    expect(result).to.equal('http://s3.host.example.com/test-bucket-name');
   });
 
-  describe('uploadBufferToS3', () => {
-    const mockBuffer = Buffer.from('helloworld');
+  it('should successfully append a key to an S3 host url', () => {
+    process.env.OBJECT_STORE_URL = 's3.host.example.com';
+    process.env.OBJECT_STORE_BUCKET_NAME = 'test-bucket-name';
 
-    it('uploads a buffer without metadata', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+    const result = getS3HostUrl('my-test-file.txt');
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
+    expect(result).to.equal('https://s3.host.example.com/test-bucket-name/my-test-file.txt');
+  });
+});
 
-      const uploadStub = sinonSandbox.stub(mockS3Client, 'upload').returns({
-        promise: () =>
-          Promise.resolve({
-            Location: 'test-location',
-            ETag: 'test-etag',
-            Bucket: 'test-bucket',
-            Key: 'test-key'
-          })
-      } as ManagedUpload);
+describe('_getS3Client', () => {
+  const OBJECT_STORE_ACCESS_KEY_ID = process.env.OBJECT_STORE_ACCESS_KEY_ID;
 
-      const result = await fileUtils.uploadBufferToS3(mockBuffer, 'test-mimetype', 'my-upload-key');
-
-      expect(_getObjectStoreBucketNameStub).to.have.been.calledOnce;
-      expect(uploadStub).to.have.been.calledOnce;
-      expect(uploadStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Body: Buffer.from('helloworld'),
-        ContentType: 'test-mimetype',
-        Key: 'my-upload-key',
-        Metadata: {}
-      });
-      expect(result).to.eql({
-        Location: 'test-location',
-        ETag: 'test-etag',
-        Bucket: 'test-bucket',
-        Key: 'test-key'
-      });
-    });
-
-    it('uploads a buffer with metadata', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      const uploadStub = sinonSandbox.stub(mockS3Client, 'upload').returns({
-        promise: () =>
-          Promise.resolve({
-            Location: 'test-location',
-            ETag: 'test-etag',
-            Bucket: 'test-bucket',
-            Key: 'test-key'
-          })
-      } as ManagedUpload);
-
-      const result = await fileUtils.uploadBufferToS3(mockBuffer, 'test-mimetype', 'my-upload-key', {
-        test_name: 'test_value'
-      });
-
-      expect(_getObjectStoreBucketNameStub).to.have.been.calledOnce;
-      expect(uploadStub).to.have.been.calledOnce;
-      expect(uploadStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Body: Buffer.from('helloworld'),
-        ContentType: 'test-mimetype',
-        Key: 'my-upload-key',
-        Metadata: { test_name: 'test_value' }
-      });
-      expect(result).to.eql({
-        Location: 'test-location',
-        ETag: 'test-etag',
-        Bucket: 'test-bucket',
-        Key: 'test-key'
-      });
-    });
-
-    it('throws an error when buffer upload rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'upload').returns({
-        promise: () => Promise.reject(new Error('upload buffer test reject'))
-      } as ManagedUpload);
-
-      try {
-        await fileUtils.uploadBufferToS3(mockBuffer, 'test-mimetype', 'my-upload-key', { test_name: 'test_value' });
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as Error).message).to.eql('upload buffer test reject');
-      }
-    });
+  afterEach(() => {
+    process.env.OBJECT_STORE_ACCESS_KEY_ID = OBJECT_STORE_ACCESS_KEY_ID;
   });
 
-  describe('getFileFromS3', () => {
-    it('gets a file with a versionId', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+  it('should return an S3 client', () => {
+    process.env.OBJECT_STORE_ACCESS_KEY_ID = 'aaaa';
+    process.env.OBJECT_STORE_SECRET_KEY_ID = 'bbbb';
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
+    const result = _getS3Client();
+    expect(result).to.be.instanceOf(S3Client);
+  });
+});
 
-      const getObjectStub = sinonSandbox.stub(mockS3Client, 'getObject').returns({
-        promise: () =>
-          Promise.resolve({
-            Body: 'helloworld'
-          })
-      } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
+describe('_getClamAvScanner', () => {
+  const ENABLE_FILE_VIRUS_SCAN = process.env.ENABLE_FILE_VIRUS_SCAN;
+  const CLAMAV_HOST = process.env.CLAMAV_HOST;
+  const CLAMAV_PORT = process.env.CLAMAV_PORT;
 
-      const result = await fileUtils.getFileFromS3('my-get-key', 'my-version-id');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(getObjectStub).to.have.been.calledOnce;
-      expect(getObjectStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Key: 'my-get-key',
-        VersionId: 'my-version-id'
-      });
-      expect(result).to.eql({ Body: 'helloworld' });
-    });
-
-    it('gets a file with no versionId', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      const getObjectStub = sinonSandbox.stub(mockS3Client, 'getObject').returns({
-        promise: () =>
-          Promise.resolve({
-            Body: 'helloworld'
-          })
-      } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
-
-      const result = await fileUtils.getFileFromS3('my-get-key');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(getObjectStub).to.have.been.calledOnce;
-      expect(getObjectStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Key: 'my-get-key',
-        VersionId: undefined
-      });
-      expect(result).to.eql({ Body: 'helloworld' });
-    });
-
-    it('throws an error when getObject rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'getObject').returns({
-        promise: () =>
-          Promise.reject({
-            message: 'getObject test reject'
-          })
-      } as AWS.Request<AWS.S3.GetObjectOutput, AWS.AWSError>);
-
-      try {
-        await fileUtils.getFileFromS3('my-get-key');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as AWS.AWSError).message).to.equal('getObject test reject');
-      }
-    });
+  afterEach(() => {
+    process.env.ENABLE_FILE_VIRUS_SCAN = ENABLE_FILE_VIRUS_SCAN;
+    process.env.CLAMAV_HOST = CLAMAV_HOST;
+    process.env.CLAMAV_PORT = CLAMAV_PORT;
   });
 
-  describe('getS3SignedURL', () => {
-    it('returns null when no key specified', async () => {
-      sinon.stub(fileUtils, '_getS3Client').returns(new AWS.S3());
+  it('should return a clamAv scanner client', () => {
+    process.env.ENABLE_FILE_VIRUS_SCAN = 'true';
+    process.env.CLAMAV_HOST = 'host';
+    process.env.CLAMAV_PORT = '1111';
 
-      const result = await fileUtils.getS3SignedURL(null as unknown as string);
+    const result = _getClamAvScanner();
+    expect(result).to.not.be.null;
+  });
+});
 
-      expect(result).to.be.null;
-    });
+describe('_getObjectStoreBucketName', () => {
+  const OBJECT_STORE_BUCKET_NAME = process.env.OBJECT_STORE_BUCKET_NAME;
 
-    it('returns null when s3Client is null', async () => {
-      sinon.stub(fileUtils, '_getS3Client').returns(null as unknown as AWS.S3);
-
-      const result = await fileUtils.getS3SignedURL('my-test-key');
-
-      expect(result).to.be.null;
-    });
-
-    it('calls getSignedUrl', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      const getSignedUrlStub = sinonSandbox.stub(mockS3Client, 'getSignedUrl').returns('test-signed-url');
-
-      const result = await fileUtils.getS3SignedURL('my-test-key');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(getSignedUrlStub).to.have.been.calledOnce;
-      expect(getSignedUrlStub).to.have.been.calledWith('getObject', {
-        Bucket: 'object-store-bucket-name',
-        Key: 'my-test-key',
-        Expires: 300000
-      });
-      expect(result).to.eql('test-signed-url');
-    });
-
-    it('generates a signed URL', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      const result = await fileUtils.getS3SignedURL('my-test-key');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(result).to.eql('https://s3.amazonaws.com/');
-    });
+  afterEach(() => {
+    process.env.OBJECT_STORE_BUCKET_NAME = OBJECT_STORE_BUCKET_NAME;
   });
 
-  describe('listFilesFromS3', () => {
-    it('lists files from S3', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+  it('should return an object store bucket name', () => {
+    process.env.OBJECT_STORE_BUCKET_NAME = 'test-bucket1';
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      const listObjectsStub = sinonSandbox.stub(mockS3Client, 'listObjects').returns({
-        promise: () =>
-          Promise.resolve({
-            Contents: ['file1', 'file2']
-          } as AWS.S3.ListObjectsOutput)
-      } as AWS.Request<AWS.S3.ListObjectsOutput, AWS.AWSError>);
-
-      const result = await fileUtils.listFilesFromS3('my-test-path');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(listObjectsStub).to.have.been.calledOnce;
-      expect(listObjectsStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Prefix: 'my-test-path'
-      });
-      expect(result).to.eql({
-        Contents: ['file1', 'file2']
-      });
-    });
-
-    it('throws an error when listObjects rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'listObjects').returns({
-        promise: () =>
-          Promise.reject({
-            message: 'listObjects test reject'
-          })
-      } as AWS.Request<AWS.S3.ListObjectsOutput, AWS.AWSError>);
-
-      try {
-        await fileUtils.listFilesFromS3('my-testPath');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as AWS.AWSError).message).to.equal('listObjects test reject');
-      }
-    });
+    const result = _getObjectStoreBucketName();
+    expect(result).to.equal('test-bucket1');
   });
 
-  describe('getObjectMeta', () => {
-    it('gets object metadata from S3', async () => {
-      sinonSandbox = sinon.createSandbox();
-      const { _getObjectStoreBucketNameStub } = generateStubs();
-      const mockS3Client = new AWS.S3();
+  it('should return its default value', () => {
+    Object.assign(process.env, { OBJECT_STORE_BUCKET_NAME: undefined });
 
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
+    const result = _getObjectStoreBucketName();
+    expect(result).to.equal('');
+  });
+});
 
-      const getObjectMetaStub = sinonSandbox.stub(mockS3Client, 'headObject').returns({
-        promise: () =>
-          Promise.resolve({
-            Metadata: {
-              test_key1: 'test_value1',
-              test_key2: 'test_value2'
-            } as Metadata
-          })
-      } as AWS.Request<AWS.S3.HeadObjectOutput, AWS.AWSError>);
+describe('_getObjectStoreUrl', () => {
+  const OBJECT_STORE_URL = process.env.OBJECT_STORE_URL;
 
-      const result = await fileUtils.getObjectMeta('my-get-meta-key');
-
-      expect(_getObjectStoreBucketNameStub).to.be.calledOnce;
-      expect(getObjectMetaStub).to.have.been.calledOnce;
-      expect(getObjectMetaStub).to.have.been.calledWith({
-        Bucket: 'object-store-bucket-name',
-        Key: 'my-get-meta-key'
-      });
-      expect(result).to.eql({
-        Metadata: {
-          test_key1: 'test_value1',
-          test_key2: 'test_value2'
-        }
-      });
-    });
-
-    it('throws an error when headObject rejects', async () => {
-      sinonSandbox = sinon.createSandbox();
-      generateStubs();
-      const mockS3Client = new AWS.S3();
-
-      sinonSandbox.stub(AWS, 'S3').returns(mockS3Client);
-
-      sinonSandbox.stub(mockS3Client, 'headObject').returns({
-        promise: () =>
-          Promise.reject({
-            message: 'headObject test reject'
-          })
-      } as AWS.Request<AWS.S3.HeadObjectOutput, AWS.AWSError>);
-
-      try {
-        await fileUtils.getObjectMeta('my-get-meta-key');
-        expect.fail();
-      } catch (actualError) {
-        expect((actualError as AWS.AWSError).message).to.equal('headObject test reject');
-      }
-    });
+  afterEach(() => {
+    process.env.OBJECT_STORE_URL = OBJECT_STORE_URL;
   });
 
-  describe('generateQueueS3FileKey', () => {
-    it('returns an s3 key with a prefix', async () => {
-      const result = fileUtils.generateQueueS3FileKey({
-        queueId: 1,
-        datasetUUID: '123-456-789',
-        fileName: 'testFileName'
-      });
+  it('should return an object store bucket name that http protocol', () => {
+    process.env.OBJECT_STORE_URL = 'http://s3.host.example.com';
 
-      expect(result).to.equal('biohub/queue/1/datasets/123-456-789/dwca/testFileName');
-    });
+    const result = _getObjectStoreUrl();
+    expect(result).to.equal('http://s3.host.example.com');
   });
 
-  describe('generateDatasetS3FileKey', () => {
-    it('returns an s3 key with a prefix', async () => {
-      const result = fileUtils.generateDatasetS3FileKey({
-        datasetUUID: '123-456-789',
-        fileName: 'testFileName'
-      });
+  it('should return an object store bucket name that https protocol', () => {
+    process.env.OBJECT_STORE_URL = 'https://s3.host.example.com';
 
-      expect(result).to.equal('biohub/datasets/123-456-789/dwca/testFileName');
-    });
+    const result = _getObjectStoreUrl();
+    expect(result).to.equal('https://s3.host.example.com');
   });
 
-  describe('scanFileForVirus', () => {
-    const mockFile = {
-      originalname: 'aaa47e65-f306-410e-82fa-115f9916910b.zip',
-      buffer: 'test-buffer',
-      mimetype: 'test-mimetype'
-    } as unknown as Express.Multer.File;
+  it('should return an object store bucket name that had no protocol', () => {
+    process.env.OBJECT_STORE_URL = 's3.host.example.com';
 
-    it('should return true if ClamAV scanner returns as null', async () => {
-      sinon.stub(fileUtils, '_getClamAvScanner').returns(null);
+    const result = _getObjectStoreUrl();
+    expect(result).to.equal('https://s3.host.example.com');
+  });
 
-      const result = await fileUtils.scanFileForVirus(mockFile);
+  it('should return its default value', () => {
+    Object.assign(process.env, { OBJECT_STORE_URL: undefined });
 
-      expect(result).to.equal(true);
+    const result = _getObjectStoreUrl();
+    expect(result).to.equal('https://nrs.objectstore.gov.bc.ca');
+  });
+});
+
+describe('getS3KeyPrefix', () => {
+  const OLD_S3_KEY_PREFIX = process.env.S3_KEY_PREFIX;
+
+  afterEach(() => {
+    process.env.S3_KEY_PREFIX = OLD_S3_KEY_PREFIX;
+  });
+
+  it('should return an s3 key prefix', () => {
+    process.env.S3_KEY_PREFIX = 'test-sims';
+
+    const result = getS3KeyPrefix();
+    expect(result).to.equal('test-sims');
+  });
+
+  it('should return its default value', () => {
+    Object.assign(process.env, { S3_KEY_PREFIX: undefined });
+
+    const result = getS3KeyPrefix();
+    expect(result).to.equal('sims');
+  });
+});
+
+describe('generateQueueS3FileKey', () => {
+  it('returns an s3 key with a prefix', async () => {
+    const result = generateQueueS3FileKey({
+      queueId: 1,
+      datasetUUID: '123-456-789',
+      fileName: 'testFileName'
     });
 
-    it('should return false if ClamAV scanner detects a virus', async () => {
-      process.env.ENABLE_FILE_VIRUS_SCAN = 'true';
-      process.env.CLAMAV_HOST = 'mock.host';
-      process.env.CLAMAV_PORT = '1000';
+    expect(result).to.equal('biohub/queue/1/datasets/123-456-789/dwca/testFileName');
+  });
+});
 
-      sinonSandbox = sinon.createSandbox();
-
-      const mockClamAvScanner = clamd.createScanner(process.env.CLAMAV_HOST, Number(process.env.CLAMAV_PORT));
-
-      sinonSandbox.stub(clamd, 'createScanner').returns(mockClamAvScanner);
-
-      const scanBufferStub = sinonSandbox.stub(mockClamAvScanner, 'scanBuffer').resolves('virus FOUND');
-
-      const result = await fileUtils.scanFileForVirus(mockFile);
-
-      expect(scanBufferStub).to.have.been.calledOnce;
-      expect(scanBufferStub).to.have.been.calledWith('test-buffer', 3000, 1048576);
-      expect(result).to.equal(false);
+describe('generateDatasetS3FileKey', () => {
+  it('returns an s3 key with a prefix', async () => {
+    const result = generateDatasetS3FileKey({
+      datasetUUID: '123-456-789',
+      fileName: 'testFileName'
     });
 
-    it('should return true if ClamAV scanner does not detect a virus', async () => {
-      process.env.ENABLE_FILE_VIRUS_SCAN = 'true';
-      process.env.CLAMAV_HOST = 'mock.host';
-      process.env.CLAMAV_PORT = '1000';
-
-      sinonSandbox = sinon.createSandbox();
-
-      const mockClamAvScanner = clamd.createScanner(process.env.CLAMAV_HOST, Number(process.env.CLAMAV_PORT));
-
-      sinonSandbox.stub(clamd, 'createScanner').returns(mockClamAvScanner);
-
-      const scanBufferStub = sinonSandbox
-        .stub(mockClamAvScanner, 'scanBuffer')
-        .resolves('arbitrary scan result output');
-
-      const result = await fileUtils.scanFileForVirus(mockFile);
-
-      expect(scanBufferStub).to.have.been.calledOnce;
-      expect(scanBufferStub).to.have.been.calledWith('test-buffer', 3000, 1048576);
-      expect(result).to.equal(true);
-    });
+    expect(result).to.equal('biohub/datasets/123-456-789/dwca/testFileName');
   });
 });
