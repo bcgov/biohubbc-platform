@@ -8,7 +8,7 @@ Platform Components for BioHub - updated
 
 ## Install Node/NPM
 
-- Requires Node version 14+
+- Requires Node version 20+
 - https://nodejs.org/en/download/
 
 ## Install Git

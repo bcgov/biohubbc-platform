@@ -24,7 +24,7 @@ parameters:
     value: database
   - name: DB_SETUP_DOCKERFILE_PATH
     required: true
-    value: './.docker/db/Dockerfile.migrate'
+    value: './.docker/db/Dockerfile.setup'
   - name: SOURCE_REPOSITORY_URL
     required: true
     value: https://github.com/bcgov/biohubbc-platform.git
@@ -33,19 +33,19 @@ parameters:
     value: dev
   - name: BASE_IMAGE_URL
     required: true
-    value: image-registry.openshift-image-registry.svc:5000/openshift/nodejs:14-ubi8
+    value: image-registry.openshift-image-registry.svc:5000/openshift/nodejs:latest
   - name: SOURCE_IMAGE_NAME
     required: true
     value: nodejs
   - name: SOURCE_IMAGE_TAG
     required: true
-    value: 14-ubi8
+    value: latest
   - name: CPU_REQUEST
-    value: '100m'
+    value: '50m'
   - name: CPU_LIMIT
     value: '1000m'
   - name: MEMORY_REQUEST
-    value: '512Mi'
+    value: '100Mi'
   - name: MEMORY_LIMIT
     value: '1.5Gi'
 objects:

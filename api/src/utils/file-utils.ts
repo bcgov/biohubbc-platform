@@ -9,7 +9,7 @@ import {
   Metadata
 } from 'aws-sdk/clients/s3';
 import { PromiseResult } from 'aws-sdk/lib/request';
-import clamd from 'clamdjs';
+import NodeClam from 'clamscan';
 export interface IDatasetS3FileKey {
   datasetUUID: string;
   fileName: string;
@@ -29,15 +29,15 @@ export interface IQueueS3FileKey {
 /**
  * Local getter for retrieving the ClamAV client.
  *
- * @returns {*} {clamd.ClamScanner | null} The ClamAV Scanner if `process.env.ENABLE_FILE_VIRUS_SCAN` is set to
- * 'true' and other appropriate environment variables are set; `null` otherwise.
+ * @return {*}  {Promise<NodeClam>}
  */
-export const _getClamAvScanner = (): clamd.ClamScanner | null => {
-  if (process.env.ENABLE_FILE_VIRUS_SCAN === 'true' && process.env.CLAMAV_HOST && process.env.CLAMAV_PORT) {
-    return clamd.createScanner(process.env.CLAMAV_HOST, Number(process.env.CLAMAV_PORT));
-  }
-
-  return null;
+export const _getClamAvScanner = async (): Promise<NodeClam> => {
+  return new NodeClam().init({
+    clamdscan: {
+      host: process.env.CLAMAV_HOST,
+      port: Number(process.env.CLAMAV_PORT)
+    }
+  });
 };
 
 /**
@@ -326,25 +326,37 @@ export function generateDatasetS3FileKey(options: IDatasetS3FileKey) {
 /**
  * Scan a file for viruses.
  *
- * TODO: Turn into middleware that is called in app.ts as one of the first steps before the endpoint even receives it?
- *
  * @export
  * @param {Express.Multer.File} file
  * @return {*}  {Promise<boolean>} `true` if the file is safe, `false` if the file is a virus or contains malicious
  * content.
  */
 export async function scanFileForVirus(file: Express.Multer.File): Promise<boolean> {
-  const ClamAVScanner = _getClamAvScanner();
+  if (process.env.ENABLE_FILE_VIRUS_SCAN !== 'true' || !process.env.CLAMAV_HOST || !process.env.CLAMAV_PORT) {
+    // Virus scanning is not enabled or necessary environment variables are not set
+    return true;
+  }
+
+  const ClamAVScanner = await _getClamAvScanner();
 
   // if virus scan is not to be performed/cannot be performed
   if (!ClamAVScanner) {
     return true;
   }
 
-  const clamavScanResult = await ClamAVScanner.scanBuffer(file.buffer, 3000, 1024 * 1024);
+  const fileStream = Readable.from(file.buffer);
+
+  const clamavScanResult = await ClamAVScanner.scanStream(fileStream);
 
   // if virus found in file
-  if (clamavScanResult.includes('FOUND')) {
+  if (clamavScanResult.isInfected) {
+    defaultLog.warn({
+      label: 'scanFileForVirus',
+      message: 'Malicious content detected',
+      file: file.originalname,
+      clamavScanResult
+    });
+
     return false;
   }
 

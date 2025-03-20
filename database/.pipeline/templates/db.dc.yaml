@@ -69,7 +69,7 @@ parameters:
     displayName: Version of PostgreSQL-PostGIS Image
     name: IMAGE_STREAM_VERSION
     required: true
-    value: 'ubi8-14.2-3.1-0'
+    value: '17-bullseye'
   - name: CPU_REQUEST
     value: '50m'
   - name: CPU_LIMIT

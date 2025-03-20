@@ -1,17 +1,22 @@
-# Clean out all deployment artifacts when a PR is closed, but not merged.
-# Will attempt to remove all artifacts from any PR that was opened against any branch (and then closed (not merged)), except for test and prod.
-name: Clean Closed PR Artifacts
+# Clean out all deployment artifacts when a PR is merged against a non-standard base branch (aka: neither dev, test, or prod)
+# Standard branches (aka: dev, test, prod) have their own cleanup routine that runs as part of the deployStatic action.
+name: Clean Merged PR Artifacts
 
 on:
   pull_request:
     types: [closed]
+    branches-ignore:
+      - dev
+      - test
+      - prod
 
 jobs:
   clean:
-    name: Clean Deployment Artifacts for API, App, and DB in Dev and Tools environment
+    name: Clean Deployment Artifacts for API and App in Dev and Tools environment
     runs-on: ubuntu-latest
-    # Don't run if the PR was merged
-    if: ${{ github.event.pull_request.merged != true }}
+    timeout-minutes: 20
+    # Only run if the PR was merged
+    if: ${{ github.event.pull_request.merged == true }}
     env:
       PR_NUMBER: ${{ github.event.number }}
     steps:
@@ -30,7 +35,7 @@ jobs:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
@@ -74,14 +79,6 @@ jobs:
           npm ci
           DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=build
           DEBUG=* npm run clean -- --pr=$PR_NUMBER --env=dev
-
-      #   # Clean the queue deployment artifacts
-      #   - name: Clean Queue Deployment
-      #     working-directory: "./api/.pipeline/"
-      #     run: |
-      #       npm ci
-      #       DEBUG=* npm run queue:clean -- --pr=$PR_NUMBER --env=build
-      #       DEBUG=* npm run queue:clean -- --pr=$PR_NUMBER --env=dev
 
       # Clean the reamaining build/deployment artifacts
       - name: Clean remaining Artifacts
