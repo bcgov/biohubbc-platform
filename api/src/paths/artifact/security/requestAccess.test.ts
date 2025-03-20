@@ -1,12 +1,11 @@
 import chai, { expect } from 'chai';
-import { cloneDeep } from 'lodash';
 import { describe } from 'mocha';
 import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import * as db from '../../../database/db';
 import { GCNotifyService } from '../../../services/gcnotify-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
-import { POST, requestAccess } from './requestAccess';
+import { requestAccess } from './requestAccess';
 
 chai.use(sinonChai);
 

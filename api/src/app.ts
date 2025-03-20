@@ -8,6 +8,7 @@ import { initDBConstants } from './database/db-constants';
 import { ensureHTTPError, HTTP400, HTTP500 } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
 import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
+import { initRequestStorage } from './utils/async-request-storage';
 import { scanFileForVirus } from './utils/file-utils';
 import { getLogger } from './utils/logger';
 
@@ -28,8 +29,6 @@ const app: express.Express = express();
 
 // Enable CORS
 app.use(function (req: Request, res: Response, next: NextFunction) {
-  defaultLog.debug(`${req.method} ${req.url}`);
-
   res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, responseType');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE, HEAD');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,6 +39,8 @@ app.use(function (req: Request, res: Response, next: NextFunction) {
     return;
   }
 
+  defaultLog.debug({ message: 'request', label: 'api-middleware', method: req.method, url: req.url });
+
   next();
 });
 
@@ -47,7 +48,7 @@ app.use(function (req: Request, res: Response, next: NextFunction) {
 const openAPIFramework = initialize({
   apiDoc: {
     ...(rootAPIDoc as OpenAPIV3.Document), // base open api spec
-    'x-express-openapi-additional-middleware': [validateAllResponses],
+    'x-express-openapi-additional-middleware': getAdditionalMiddleware(),
     'x-express-openapi-validation-strict': true
   },
   app: app, // express app to initialize
@@ -59,29 +60,48 @@ const openAPIFramework = initialize({
   docsPath: '/raw-api-docs', // path to view raw openapi spec
   consumesMiddleware: {
     'application/json': express.json({ limit: MAX_REQ_BODY_SIZE }),
-    'multipart/form-data': async function (req, res, next) {
+    'multipart/form-data': function (req, res, next) {
       const multerRequestHandler = multer({
-        storage: multer.memoryStorage(), // TOOD change to local/PVC storage and stream file uploads to S3?
+        storage: multer.memoryStorage(), // TODO change to local/PVC storage and stream file uploads to S3?
         limits: { fileSize: MAX_UPLOAD_FILE_SIZE }
       }).array('media', MAX_UPLOAD_NUM_FILES);
 
-      return multerRequestHandler(req, res, async function (error?: any) {
+      /**
+       * Multer transforms and moves the incoming files from `req.body.media` --> `req.files`.
+       *
+       * OpenAPI only allows validation on specific parts of the request object (requestBody / parameters...) this excludes the contents of `req.files`.
+       * To get around this we re-assign `req.body.media` to the Multer transformed files stored in `req.files`.
+       *
+       * Files can be accessed via `req.body.media` OR `req.files`.
+       *
+       * @see https://www.npmjs.com/package/express-openapi#argsconsumesmiddleware
+       */
+      multerRequestHandler(req, res, async (error?: any) => {
         if (error) {
           return next(error);
         }
 
-        const promises = (req.files as Express.Multer.File[]).map(async function (file) {
-          // Set original request file field to empty string to satisfy OpenAPI validation
-          // See: https://www.npmjs.com/package/express-openapi#argsconsumesmiddleware
-          req.body[file.fieldname] = '';
+        // Scan files for malicious content, if enabled
+        const virusScanPromises = (req.files as Express.Multer.File[]).map(async function (file) {
+          const isSafe = await scanFileForVirus(file);
 
-          // Scan file for malicious content, if enabled
-          if (!(await scanFileForVirus(file))) {
+          if (!isSafe) {
             throw new HTTP400('Malicious file content detected.', [{ file_name: file.originalname }]);
           }
         });
 
-        await Promise.all(promises);
+        try {
+          await Promise.all(virusScanPromises);
+        } catch (error) {
+          // If a virus is detected, return error and do not continue
+          return next(error);
+        }
+
+        // Ensure `req.files` or `req.body.media` is always set to an array
+        const multerFiles = req.files ?? [];
+
+        req.files = multerFiles;
+        req.body = { ...req.body, media: multerFiles };
 
         return next();
       });
@@ -151,6 +171,9 @@ try {
  */
 function getAdditionalMiddleware(): express.RequestHandler[] {
   const additionalMiddleware = [];
+
+  // Initialize the request storage for each request
+  additionalMiddleware.push(initRequestStorage);
 
   if (process.env.API_RESPONSE_VALIDATION_ENABLED === 'true') {
     // Validate endpoint responses against openapi spec

@@ -6,7 +6,6 @@ import * as db from '../../../database/db';
 import { SecurityService } from '../../../services/security-service';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../../__mocks__/db';
 import * as apply from './apply';
-import { POST } from './apply';
 
 chai.use(sinonChai);
 

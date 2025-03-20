@@ -6,12 +6,11 @@ import * as db from '../../database/db';
 import { ArtifactService } from '../../services/artifact-service';
 import * as keycloakUtils from '../../utils/keycloak-utils';
 import { getMockDBConnection, getRequestHandlerMocks } from '../../__mocks__/db';
-import { deleteArtifact, POST } from './delete';
+import { deleteArtifact } from './delete';
 
 chai.use(sinonChai);
 
 describe('delete artifact', () => {
-
   describe('deleteArtifact', () => {
     afterEach(() => {
       sinon.restore();

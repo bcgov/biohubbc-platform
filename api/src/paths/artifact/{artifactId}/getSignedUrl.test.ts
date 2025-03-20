@@ -7,7 +7,6 @@ import { HTTPError } from '../../../errors/http-error';
 import { SecurityService } from '../../../services/security-service';
 import { getMockDBConnection } from '../../../__mocks__/db';
 import * as getSignedUrl from './getSignedUrl';
-import { GET } from './getSignedUrl';
 
 chai.use(sinonChai);
 
