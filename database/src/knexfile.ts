@@ -18,7 +18,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: './seeds'
+      directory: ['./seeds']
     }
   },
   dev: {
@@ -40,7 +40,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: './seeds'
+      directory: ['./seeds']
     }
   },
   test: {
@@ -62,7 +62,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: './seeds'
+      directory: ['./seeds']
     }
   },
   prod: {
@@ -84,7 +84,7 @@ export default {
       directory: './migrations'
     },
     seeds: {
-      directory: './seeds'
+      directory: []
     }
   }
 };
