@@ -1,9 +1,7 @@
-import { ThemeProvider } from '@mui/material/styles';
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
 import { Router } from 'react-router';
-import appTheme from 'themes/appTheme';
 import DashboardPage from './DashboardPage';
 
 const history = createMemoryHistory();
@@ -18,11 +16,9 @@ const mockUseApi = {
 
 const renderContainer = () => {
   return render(
-    <ThemeProvider theme={appTheme}>
-      <Router history={history}>
-        <DashboardPage />
-      </Router>
-    </ThemeProvider>
+    <Router history={history}>
+      <DashboardPage />
+    </Router>
   );
 };
 

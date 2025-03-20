@@ -1,6 +1,7 @@
+import { fireEvent, waitFor } from '@testing-library/react';
 import DropZone from 'components/attachments/DropZone';
 import { ConfigContext, IConfig } from 'contexts/configContext';
-import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
+import { render } from 'test-helpers/test-utils';
 
 const onFiles = jest.fn();
 

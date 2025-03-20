@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { renderHook } from 'test-helpers/test-utils';
 import useDownload from './useDownload';
 describe('useDownload', () => {
   describe('mounting', () => {

@@ -1,9 +1,10 @@
+import { fireEvent, waitFor } from '@testing-library/react';
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { AuthStateContext } from 'contexts/authStateContext';
 import { createMemoryHistory } from 'history';
 import { Router } from 'react-router-dom';
 import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
-import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
+import { render } from 'test-helpers/test-utils';
 import Header from './Header';
 
 const history = createMemoryHistory();

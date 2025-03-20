@@ -1,5 +1,6 @@
+import { fireEvent, waitFor } from '@testing-library/react';
 import YesNoDialog from 'components/dialog/YesNoDialog';
-import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
+import { render } from 'test-helpers/test-utils';
 
 const handleOnYes = jest.fn();
 const handleOnNo = jest.fn();
