@@ -1,7 +1,6 @@
 import { mdiAlertCircle, mdiInformationOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Alert, Box, Typography } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import FileUpload from 'components/attachments/FileUpload';
 import { IUploadHandler } from 'components/attachments/FileUploadItem';
 import CustomTextField from 'components/fields/CustomTextField';
@@ -12,15 +11,17 @@ import React from 'react';
 import { handleKMLUpload, handleShapefileUpload } from 'utils/mapUtils';
 import yup from 'utils/YupSchema';
 
-const useStyles = makeStyles((theme) => ({
-  pointType: {
-    lineHeight: 'unset'
-  },
-  date: {
-    margin: 0,
-    lineHeight: 'unset'
-  }
-}));
+const useStyles = () => {
+  return {
+    pointType: {
+      lineHeight: 'unset'
+    },
+    date: {
+      margin: 0,
+      lineHeight: 'unset'
+    }
+  };
+};
 
 export interface IFormikAreaUpload {
   name: string;
@@ -44,11 +45,11 @@ export const AreaToolTip: React.FC<React.PropsWithChildren<{ name: string }>> = 
   const classes = useStyles();
   return (
     <Box mb={1}>
-      <Typography variant="overline" className={classes.pointType}>
+      <Typography variant="overline" sx={classes.pointType}>
         Area:
       </Typography>
       {props.name && (
-        <Typography className={classes.date} component="h6" variant="subtitle1">
+        <Typography sx={classes.date} component="h6" variant="subtitle1">
           {props.name}
         </Typography>
       )}
@@ -56,7 +57,7 @@ export const AreaToolTip: React.FC<React.PropsWithChildren<{ name: string }>> = 
   );
 };
 
-const UploadArea: React.FC<React.PropsWithChildren<any>> = (props) => {
+const UploadArea: React.FC<React.PropsWithChildren<any>> = () => {
   const formikProps = useFormikContext<IFormikAreaUpload>();
 
   const AreaUploadHandler = (): IUploadHandler => {
@@ -95,8 +96,6 @@ const UploadArea: React.FC<React.PropsWithChildren<any>> = (props) => {
         dropZoneProps={{
           acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
         }}
-        hideStatus={true}
-        multiple={false}
       />
     </>
   );

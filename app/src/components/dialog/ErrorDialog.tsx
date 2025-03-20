@@ -1,4 +1,3 @@
-import { Theme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
@@ -8,17 +7,18 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
-import { makeStyles } from '@mui/styles';
 import DOMPurify from 'dompurify';
 import { useState } from 'react';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  dialogSubTitle: {
-    fontSize: '14px',
-    color: '#787f81',
-    fontWeight: 'bold'
-  }
-}));
+const useStyles = () => {
+  return {
+    dialogSubTitle: {
+      fontSize: '14px',
+      color: '#787f81',
+      fontWeight: 'bold'
+    }
+  };
+};
 
 export interface IErrorDialogProps {
   /**
@@ -115,7 +115,7 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
         <DialogTitle id="alert-dialog-title">{props.dialogTitle}</DialogTitle>
         <DialogContent>
           {props.dialogSubTitle && (
-            <DialogContentText mb={'1em'} className={classes.dialogSubTitle} id="alert-dialog-sub-title">
+            <DialogContentText mb={'1em'} sx={classes.dialogSubTitle} id="alert-dialog-sub-title">
               {props.dialogSubTitle}
             </DialogContentText>
           )}

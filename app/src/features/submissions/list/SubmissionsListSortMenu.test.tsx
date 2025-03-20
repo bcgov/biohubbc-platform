@@ -1,7 +1,6 @@
-import { ThemeProvider } from '@mui/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import { createTheme } from '@mui/system';
 import { fireEvent, render } from '@testing-library/react';
-import React from 'react';
 import SubmissionsListSortMenu from './SubmissionsListSortMenu';
 
 const mockHandleSubmissions = jest.fn();

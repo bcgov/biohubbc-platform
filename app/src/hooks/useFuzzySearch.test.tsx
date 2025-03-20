@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react-hooks';
+import { act, renderHook } from '@testing-library/react';
 import { FuseResult } from 'fuse.js';
 import useFuzzySearch from './useFuzzySearch';
 

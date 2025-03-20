@@ -170,7 +170,7 @@ export const _getOrCreateLoggerSingleton = function (loggerName: string): winsto
     transports.push(
       new DailyRotateFile({
         dirname: process.env.LOG_FILE_DIR || 'data/logs',
-        filename: process.env.LOG_FILE_NAME || 'sims-api.log',
+        filename: process.env.LOG_FILE_NAME || 'biohub-platform-api.log',
         datePattern: process.env.LOG_FILE_DATE_PATTERN || 'YYYY-MM-DD',
         maxSize: process.env.LOG_FILE_MAX_SIZE || '49m',
         maxFiles: process.env.LOG_FILE_MAX_FILES || '10',

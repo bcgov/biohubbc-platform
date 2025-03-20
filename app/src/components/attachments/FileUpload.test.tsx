@@ -1,8 +1,13 @@
+import FileUpload, { IFileUploadProps } from 'components/attachments/FileUpload';
+import { ConfigContext, IConfig } from 'contexts/configContext';
 import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
-import FileUpload, { IFileUploadProps } from './FileUpload';
 
 const renderContainer = (props: IFileUploadProps) => {
-  return render(<FileUpload {...props} />);
+  return render(
+    <ConfigContext.Provider value={{} as IConfig}>
+      <FileUpload {...props} />
+    </ConfigContext.Provider>
+  );
 };
 
 describe('FileUpload', () => {
@@ -14,7 +19,7 @@ describe('FileUpload', () => {
     expect(getByText('Drag your files here', { exact: false })).toBeVisible();
   });
 
-  it('renders an item in the list for each file added', async () => {
+  it('renders an item in the list for each file added for survey list', async () => {
     const mockUploadHandler = jest.fn().mockResolvedValue(null);
 
     const { getByTestId, getByText } = renderContainer({ uploadHandler: mockUploadHandler });

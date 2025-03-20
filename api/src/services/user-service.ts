@@ -108,7 +108,7 @@ export class UserService extends DBService {
     userIdentifier: string,
     identitySource: string
   ): Promise<SystemUserExtended> {
-    // Check if the user exists in SIMS
+    // Check if the user exists in BioHub
     const existingUser = userGuid
       ? await this.getUserByGuid(userGuid)
       : await this.getUserByIdentifier(userIdentifier, identitySource);

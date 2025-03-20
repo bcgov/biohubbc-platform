@@ -112,7 +112,7 @@ export const getS3HostUrl = (key?: string): string => {
  * @returns {*} {string} The S3 key prefix
  */
 export const getS3KeyPrefix = (): string => {
-  return process.env.S3_KEY_PREFIX || 'sims';
+  return process.env.S3_KEY_PREFIX || 'biohub';
 };
 
 /**

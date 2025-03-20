@@ -6,8 +6,8 @@ It allows you to do things like:
 expect(element).toHaveTextContent(/react/i)
 learn more: https://github.com/testing-library/jest-dom
 */
-import '@testing-library/jest-dom/extend-expect';
-import { configure } from 'test-helpers/test-utils';
+import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
 
 /*
   Extend JSDOM SVGSVGElement by introducing createSVGRect as an empty function
@@ -31,6 +31,14 @@ global.document.createElementNS = function (namespaceURI, qualifiedName) {
 
   // eslint-disable-next-line prefer-rest-params
   return createElementNSOrig.apply(this, arguments);
+};
+
+global.console = {
+  ...console,
+  // Disable console.warning(...) messages from appearing in the console when running tests
+  warn: jest.fn(),
+  // Disable console.error(...) messages from appearing in the console when running tests
+  error: jest.fn()
 };
 
 /*

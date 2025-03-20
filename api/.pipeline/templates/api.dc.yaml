@@ -144,7 +144,7 @@ parameters:
     value: data/logs
     description: Directory where log files are stored
   - name: LOG_FILE_NAME
-    value: sims-api.log
+    value: biohub-platform-api.log
     description: Name of the log file
   - name: LOG_FILE_DATE_PATTERN
     value: YYYY-MM-DD

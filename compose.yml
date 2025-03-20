@@ -25,7 +25,7 @@ services:
       - PORT=5432
       - PGDATA=${PGDATA}/${POSTGRES_VERSION}
     networks:
-      - sims-network
+      - biohubbc-network
     volumes:
       - postgres:${PGDATA}
 

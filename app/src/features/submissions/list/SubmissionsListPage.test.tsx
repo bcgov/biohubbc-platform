@@ -1,10 +1,9 @@
-import { ThemeProvider } from '@mui/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import { createTheme } from '@mui/system';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import React from 'react';
 import { Router } from 'react-router';
 import SubmissionsListPage from './SubmissionsListPage';
 

@@ -1,5 +1,4 @@
-import { ConfigContext } from 'contexts/configContext';
-import { useContext } from 'react';
+import { useConfigContext } from 'hooks/useContext';
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
@@ -15,7 +14,7 @@ import useUserApi from './api/useUserApi';
  * @return {*} object whose properties are supported api methods.
  */
 export const useApi = () => {
-  const config = useContext(ConfigContext);
+  const config = useConfigContext();
   const apiAxios = useAxios(config?.API_HOST);
 
   const user = useUserApi(apiAxios);

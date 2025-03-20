@@ -151,7 +151,7 @@ export class GCNotifyService extends DBService {
 
     const submitterMessage = {
       ...baseMessage,
-      subject: 'Species Inventory Management System - Your Request to Access Secure Documents Has Been Sent',
+      subject: 'Biodiversity Hub BC - Your Request to Access Secure Documents Has Been Sent',
       header: `Your request to access secure documents has been sent.
 
       A BioHub Administrator should be in contact with you shortly to discuss your request.`
@@ -159,7 +159,7 @@ export class GCNotifyService extends DBService {
 
     const adminMessage = {
       ...baseMessage,
-      subject: 'Species Inventory Management System - Request to Access Secure Documents',
+      subject: 'Biodiversity Hub BC - Request to Access Secure Documents',
       header: 'A request to access secured documents has been submitted.'
     };
 

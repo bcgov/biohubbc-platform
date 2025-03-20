@@ -11,7 +11,7 @@ export interface IAuthState {
    */
   auth: AuthContextProps;
   /**
-   * The logged in user's SIMS user information.
+   * The logged in user's BioHub user information.
    *
    * @type {IBiohubUserWrapper}
    * @memberof IAuthState

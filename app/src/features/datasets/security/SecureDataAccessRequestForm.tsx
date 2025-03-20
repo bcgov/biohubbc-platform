@@ -1,16 +1,7 @@
-import {
-  DialogContentText,
-  FormControl,
-  FormControlLabel,
-  FormHelperText,
-  Radio,
-  RadioGroup,
-  Theme
-} from '@mui/material';
+import { DialogContentText, FormControl, FormControlLabel, FormHelperText, Radio, RadioGroup } from '@mui/material';
 import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
-import { makeStyles } from '@mui/styles';
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import CustomTextField from 'components/fields/CustomTextField';
 import { useFormikContext } from 'formik';
@@ -19,14 +10,16 @@ import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interfac
 import { useEffect, useState } from 'react';
 import yup from 'utils/YupSchema';
 
-const useStyles = makeStyles((theme: Theme) => ({
-  subheader: {
-    textTransform: 'uppercase'
-  },
-  dataGrid: {
-    borderWidth: 1
-  }
-}));
+const useStyles = () => {
+  return {
+    subheader: {
+      textTransform: 'uppercase'
+    },
+    dataGrid: {
+      borderWidth: 1
+    }
+  };
+};
 
 export const secureDataAccessRequestFormInitialValues: ISecureDataAccessRequestForm = {
   fullName: '',
@@ -145,7 +138,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
         <Box py={2}>
           <Box mb={1}>
             <DataGrid
-              className={classes.dataGrid}
+              sx={classes.dataGrid}
               getRowId={(row) => row.artifact_id}
               autoHeight
               rows={props.artifacts}
@@ -170,7 +163,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
       </Box>
 
       <Box mt={2}>
-        <Typography variant="body1" className={classes.subheader}>
+        <Typography variant="body1" sx={classes.subheader}>
           <strong>Contact Details</strong>
         </Typography>
 
@@ -208,7 +201,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
       </Box>
 
       <Box mt={2}>
-        <Typography variant="body1" className={classes.subheader}>
+        <Typography variant="body1" sx={classes.subheader}>
           <strong>Reason for Request</strong>
         </Typography>
         <DialogContentText variant="body1">Please be specific in describing your request.</DialogContentText>
@@ -252,7 +245,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
 
       {formikProps.values['hasSignedAgreement'] === false && (
         <Box mt={2}>
-          <Typography variant="body1" className={classes.subheader}>
+          <Typography variant="body1" sx={classes.subheader}>
             <strong>Company Information</strong>
           </Typography>
 
@@ -307,7 +300,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
           </Box>
 
           <Box mt={2}>
-            <Typography variant="body1" className={classes.subheader}>
+            <Typography variant="body1" sx={classes.subheader}>
               <strong>Professional Organization (Optional)</strong>
             </Typography>
 
