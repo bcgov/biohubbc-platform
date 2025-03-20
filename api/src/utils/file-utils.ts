@@ -44,10 +44,14 @@ export interface IQueueS3FileKey {
  * @return {*}  {Promise<NodeClam>}
  */
 export const _getClamAvScanner = async (): Promise<NodeClam> => {
+  if (!process.env.CLAMAV_HOST || !process.env.CLAMAV_PORT) {
+    throw new Error('ClamAV host and port must be set to enable virus scanning');
+  }
+
   return new NodeClam().init({
     clamdscan: {
       host: process.env.CLAMAV_HOST,
-      port: process.env.CLAMAV_PORT
+      port: Number(process.env.CLAMAV_PORT)
     }
   });
 };
@@ -164,26 +168,6 @@ export async function bulkDeleteFilesFromS3(keys: string[]): Promise<DeleteObjec
       }
     })
   );
-}
-
-/**
- * Copy a file from S3, to a new location in S3
- *
- * @export
- * @param {string} oldKey
- * @param {string} newKey
- * @return {*}  {Promise<PromiseResult<CopyObjectOutput, AWSError>>}
- */
-export async function copyFileInS3(oldKey: string, newKey: string): Promise<PromiseResult<CopyObjectOutput, AWSError>> {
-  const s3Client = _getS3Client();
-
-  const copyparams = {
-    Bucket: _getObjectStoreBucketName(),
-    CopySource: encodeURI(`/${_getObjectStoreBucketName()}/${oldKey}`),
-    Key: newKey
-  };
-
-  return s3Client.copyObject(copyparams).promise();
 }
 
 /**
@@ -371,7 +355,7 @@ export async function getS3SignedURLs(keys: string[]): Promise<(string | null)[]
  * @return {*}
  */
 export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) {
-  return [_getS3KeyPrefix(), 'submissions', options.submissionId, 'features', options.submissionFeatureId]
+  return [getS3KeyPrefix(), 'submissions', options.submissionId, 'features', options.submissionFeatureId]
     .filter(Boolean)
     .join('/');
 }
@@ -389,7 +373,7 @@ export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) 
 export function generateQueueS3FileKey(options: IQueueS3FileKey) {
   const keyParts: (string | number)[] = [];
 
-  keyParts.push(_getS3KeyPrefix());
+  keyParts.push(getS3KeyPrefix());
   keyParts.push('queue');
   keyParts.push(options.queueId);
   keyParts.push('datasets');
@@ -413,7 +397,7 @@ export function generateQueueS3FileKey(options: IQueueS3FileKey) {
 export function generateDatasetS3FileKey(options: IDatasetS3FileKey) {
   const keyParts: (string | number)[] = [];
 
-  keyParts.push(_getS3KeyPrefix());
+  keyParts.push(getS3KeyPrefix());
   keyParts.push('datasets');
   keyParts.push(options.datasetUUID);
   keyParts.push('dwca');

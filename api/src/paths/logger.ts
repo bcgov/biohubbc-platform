@@ -2,7 +2,7 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../constants/roles';
 import { authorizeRequestHandler } from '../request-handlers/security/authorization';
-import { setLogLevel, WinstonLogLevel, WinstonLogLevels } from '../utils/logger';
+import { setLogLevel, setLogLevelFile, WinstonLogLevel, WinstonLogLevels } from '../utils/logger';
 
 export const GET: Operation = [
   authorizeRequestHandler(() => {
