@@ -40,8 +40,15 @@ export function initRequestStorage(req: Request, _res: Response, next: NextFunct
   requestStore.set('requestId', uuid());
 
   if (req['keycloak_token']) {
-    // Set the username of the user who made the current request
-    requestStore.set('username', getUserIdentifier(req['keycloak_token']));
+    const userIdentifier = getUserIdentifier(req['keycloak_token']);
+
+    if (!userIdentifier) {
+      // Set the username of the user who made the current request
+      requestStore.set('username', DEFAULT_REQUEST_STORE_VALUE);
+    } else {
+      // Set the username of the user who made the current request
+      requestStore.set('username', userIdentifier);
+    }
   }
 
   // Note: Must call `next()` within the `AsyncRequestStorage` callback to ensure
