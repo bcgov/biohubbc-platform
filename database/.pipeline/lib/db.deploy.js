@@ -27,13 +27,13 @@ const dbDeploy = async (settings) => {
   objects.push(
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/db.dc.yaml`, {
       param: {
+        NAMESPACE: phases[phase].namespace,
         NAME: name,
         DATABASE_SERVICE_NAME: `${name}-postgresql${phases[phase].suffix}`,
         IMAGE_STREAM_NAME: name,
         IMAGE_STREAM_VERSION: phases.build.tag,
         POSTGRES_DB: 'biohubbc',
         TZ: phases[phase].tz,
-        NAMESPACE: phases.build.namespace,
         VOLUME_CAPACITY: phases[phase].volumeCapacity,
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,
