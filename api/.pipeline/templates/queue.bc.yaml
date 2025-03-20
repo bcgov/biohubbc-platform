@@ -1,10 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  creationTimestamp: null
+  name: biohub-platform-queue-bc
   labels:
     build: biohub-platform-queue
-  name: biohub-platform-queue
 parameters:
   - name: NAME
     displayName: Name
@@ -40,12 +39,19 @@ parameters:
   - name: SOURCE_IMAGE_TAG
     required: true
     value: latest
+  - name: CPU_REQUEST
+    value: '50m'
+  - name: CPU_LIMIT
+    value: '1250m'
+  - name: MEMORY_REQUEST
+    value: '100Mi'
+  - name: MEMORY_LIMIT
+    value: '3Gi'
 objects:
   - kind: ImageStream
     apiVersion: image.openshift.io/v1
     metadata:
       name: ${SOURCE_IMAGE_NAME}
-      creationTimestamp: null
       annotations:
         description: Nodejs Base Image
       labels:
@@ -62,11 +68,11 @@ objects:
           importPolicy: {}
           referencePolicy:
             type: Local
+
   - kind: ImageStream
     apiVersion: image.openshift.io/v1
     metadata:
       name: '${NAME}'
-      creationTimestamp: null
       annotations:
         description: Nodejs Runtime Image
       labels:
@@ -74,11 +80,11 @@ objects:
     spec:
       lookupPolicy:
         local: false
+
   - kind: BuildConfig
-    apiVersion: build.openshift.io/v1
+    apiVersion: v1
     metadata:
       name: '${NAME}${SUFFIX}'
-      creationTimestamp:
       labels: {}
       annotations: {}
     spec:
@@ -90,12 +96,12 @@ objects:
           name: '${NAME}:${VERSION}'
       postCommit: {}
       resources:
-        limits:
-          cpu: 1250m
-          memory: 3Gi
         requests:
-          cpu: 100m
-          memory: 512Mi
+          cpu: ${CPU_REQUEST}
+          memory: ${MEMORY_REQUEST}
+        limits:
+          cpu: ${CPU_LIMIT}
+          memory: ${MEMORY_LIMIT}
       runPolicy: SerialLatestOnly
       source:
         contextDir: '${SOURCE_CONTEXT_DIR}'
@@ -105,7 +111,6 @@ objects:
         type: Git
       strategy:
         dockerStrategy:
-          dockerfilePath: '${QUEUE_DOCKERFILE_PATH}'
           from:
             kind: ImageStreamTag
             name: ${SOURCE_IMAGE_NAME}:${SOURCE_IMAGE_TAG}
@@ -114,5 +119,3 @@ objects:
       triggers:
         - type: ConfigChange
         - type: ImageChange
-    status:
-      lastVersion: 7

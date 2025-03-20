@@ -20,7 +20,7 @@ objects:
       namespace: "${NAMESPACE}"
     spec:
       accessModes:
-      - ReadWriteOnce
+        - ReadWriteOnce
       resources:
         requests:
           storage: 1Gi
@@ -40,7 +40,7 @@ objects:
       namespace: "${NAMESPACE}"
     spec:
       accessModes:
-      - ReadWriteOnce
+        - ReadWriteOnce
       resources:
         requests:
           storage: 1Gi
@@ -60,7 +60,7 @@ objects:
       namespace: "${NAMESPACE}"
     spec:
       accessModes:
-      - ReadWriteOnce
+        - ReadWriteOnce
       resources:
         requests:
           storage: 1Gi
@@ -120,15 +120,15 @@ objects:
               name: es01
               env:
                 - name: ES_JAVA_OPTS
-                  value: '-Xms512m -Xmx512m'
+                  value: "-Xms512m -Xmx512m"
                 - name: bootstrap.memory_lock
-                  value: 'false'
+                  value: "false"
                 - name: cluster.initial_master_nodes
-                  value: 'es01,es02,es03'
+                  value: "es01,es02,es03"
                 - name: cluster.name
                   value: es-docker-cluster
                 - name: discovery.seed_hosts
-                  value: 'es02,es03'
+                  value: "es02,es03"
                 - name: node.name
                   value: es01
               ports:
@@ -139,7 +139,7 @@ objects:
                 - name: data01
                   mountPath: /usr/share/elasticsearch/data
               terminationMessagePolicy: File
-              image: 'docker.elastic.co/elasticsearch/elasticsearch:7.17.0'
+              image: "docker.elastic.co/elasticsearch/elasticsearch:7.17.0"
           restartPolicy: Always
           terminationGracePeriodSeconds: 30
           dnsPolicy: ClusterFirst
@@ -219,7 +219,7 @@ objects:
                 - name: data02
                   mountPath: /usr/share/elasticsearch/data
               terminationMessagePolicy: File
-              image: 'docker.elastic.co/elasticsearch/elasticsearch:7.17.0'
+              image: "docker.elastic.co/elasticsearch/elasticsearch:7.17.0"
           restartPolicy: Always
           terminationGracePeriodSeconds: 30
           dnsPolicy: ClusterFirst
@@ -299,7 +299,7 @@ objects:
                 - name: data03
                   mountPath: /usr/share/elasticsearch/data
               terminationMessagePolicy: File
-              image: 'docker.elastic.co/elasticsearch/elasticsearch:7.17.0'
+              image: "docker.elastic.co/elasticsearch/elasticsearch:7.17.0"
           restartPolicy: Always
           terminationGracePeriodSeconds: 30
           dnsPolicy: ClusterFirst
@@ -333,8 +333,7 @@ objects:
         io.kompose.service: es01
       sessionAffinity: None
       type: ClusterIP
-    status:
-      loadBalancer: {}
+
   - kind: Service
     apiVersion: v1
     metadata:
@@ -359,8 +358,7 @@ objects:
         io.kompose.service: es02
       sessionAffinity: None
       type: ClusterIP
-    status:
-      loadBalancer: {}
+
   - kind: Service
     apiVersion: v1
     metadata:
@@ -385,8 +383,7 @@ objects:
         io.kompose.service: es03
       sessionAffinity: None
       type: ClusterIP
-    status:
-      loadBalancer: {}
+
   - kind: Route
     apiVersion: route.openshift.io/v1
     metadata:
@@ -423,13 +420,13 @@ parameters:
     value: a0ec71-tools
   - name: CPU_REQUEST
     description: CPU REQUEST for deployment config
-    value: '50m'
+    value: "50m"
   - name: CPU_LIMIT
     description: CPU LIMIT for dc
-    value: '200m'
+    value: "200m"
   - name: MEMORY_REQUEST
     description: MEMORY REQUEST for dc
-    value: '500Mi'
+    value: "500Mi"
   - name: MEMORY_LIMIT
     description: MEMORY LIMIT for dc
-    value: '1Gi'
+    value: "1Gi"

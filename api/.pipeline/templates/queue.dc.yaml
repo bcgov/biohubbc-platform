@@ -5,6 +5,12 @@ metadata:
   labels:
     build: biohub-platform-queue-dc
 parameters:
+  - name: NAMESPACE
+    description: Openshift namespace name
+    value: ''
+  - name: BASE_IMAGE_REGISTRY_URL
+    description: The base image registry URL
+    value: image-registry.openshift-image-registry.svc:5000
   - name: NAME
     value: biohub-platform-queue
   - name: SUFFIX
@@ -22,18 +28,29 @@ parameters:
     description: Change id of the project. This will help to pull image stream
     required: true
     value: '0'
+  # Volume (for API logs and other persistent data)
+  - name: VOLUME_CAPACITY
+    required: true
+    description: Volume space available for data, e.g. 512Mi, 2Gi.
+    value: '500Mi'
+  # Database
   - name: DB_SERVICE_NAME
     description: 'Database service name associated with deployment'
     required: true
+  - name: DB_PORT
+    description: 'Database port'
+    required: true
+    value: '5432'
+  - name: TZ
+    description: Application timezone
+    required: false
+    value: 'America/Vancouver'
   # Node
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
     value: 'dev'
-  - name: TZ
-    description: Application timezone
-    required: false
-    value: 'America/Vancouver'
+  - name: NODE_OPTIONS
   # Object Store (S3)
   - name: S3_KEY_PREFIX
     description: S3 key optional prefix
@@ -66,18 +83,28 @@ objects:
         description: Nodejs Runtime Image
       labels:
         shared: 'true'
-      creationTimestamp: null
       generation: 0
       name: ${NAME}
     spec:
       lookupPolicy:
         local: false
-  - kind: DeploymentConfig
-    apiVersion: apps.openshift.io/v1
+
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: ${NAME}${SUFFIX}
+    spec:
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: '${VOLUME_CAPACITY}'
+
+  - kind: Deployment
+    apiVersion: apps/v1
     metadata:
       annotations:
         openshift.io/generated-by: OpenShiftWebConsole
-      creationTimestamp: null
       generation: 0
       labels:
         role: queue
@@ -86,29 +113,23 @@ objects:
       replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
-        deploymentConfig: ${NAME}${SUFFIX}
+        matchLabels:
+          deployment: ${NAME}${SUFFIX}
       strategy:
-        activeDeadlineSeconds: 21600
-        recreateParams:
-          timeoutSeconds: 600
-        resources:
-          limits:
-            cpu: ${CPU_LIMIT}
-            memory: ${MEMORY_LIMIT}
-          requests:
-            cpu: ${CPU_REQUEST}
-            memory: ${MEMORY_REQUEST}
-        type: Rolling
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
       template:
         metadata:
           annotations: null
-          creationTimestamp: null
           labels:
-            deploymentConfig: ${NAME}${SUFFIX}
+            deployment: ${NAME}${SUFFIX}
             role: queue
         spec:
           containers:
-            - env:
+            - name: queue
+              env:
                 - name: API_HOST
                   value: ${HOST}
                 - name: APP_HOST
@@ -131,11 +152,13 @@ objects:
                       key: database-name
                       name: ${DB_SERVICE_NAME}
                 - name: DB_PORT
-                  value: '5432'
+                  value: ${DB_PORT}
                 - name: CHANGE_VERSION
                   value: ${CHANGE_ID}
                 - name: NODE_ENV
                   value: ${NODE_ENV}
+                - name: NODE_OPTIONS
+                  value: ${NODE_OPTIONS}
                 - name: S3_KEY_PREFIX
                   value: ${S3_KEY_PREFIX}
                 - name: TZ
@@ -164,47 +187,64 @@ objects:
                       name: ${OBJECT_STORE_SECRETS}
                 - name: LOG_LEVEL
                   value: ${LOG_LEVEL}
-              image: ' '
+              image: ${BASE_IMAGE_REGISTRY_URL}/${NAMESPACE}/${NAME}:${VERSION}
               imagePullPolicy: Always
-              name: queue
+              ports:
+                - containerPort: ${{API_PORT_DEFAULT}}
+                  protocol: TCP
               resources:
-                limits:
-                  cpu: ${CPU_LIMIT}
-                  memory: ${MEMORY_LIMIT}
                 requests:
                   cpu: ${CPU_REQUEST}
                   memory: ${MEMORY_REQUEST}
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+              startupProbe:
+                httpGet:
+                  path: /api/version
+                  port: ${{API_PORT_DEFAULT}}
+                  scheme: HTTP
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 10
+                successThreshold: 1
+                failureThreshold: 30
+              readinessProbe:
+                httpGet:
+                  path: /api/version
+                  port: ${{API_PORT_DEFAULT}}
+                  scheme: HTTP
+                initialDelaySeconds: 0
+                periodSeconds: 30
+                timeoutSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              livenessProbe:
+                httpGet:
+                  path: /api/version
+                  port: ${{API_PORT_DEFAULT}}
+                  scheme: HTTP
+                initialDelaySeconds: 0
+                periodSeconds: 30
+                timeoutSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File
               volumeMounts:
-                - mountPath: /opt/app-root/app
-                  name: ${NAME}${SUFFIX}
+                - name: ${NAME}${SUFFIX}
+                  mountPath: /opt/app-root/src/data
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           schedulerName: default-scheduler
           securityContext: {}
           terminationGracePeriodSeconds: 30
           volumes:
-            - emptyDir: {}
-              name: ${NAME}${SUFFIX}
+            - name: ${NAME}${SUFFIX}
+              persistentVolumeClaim:
+                claimName: ${NAME}${SUFFIX}
       test: false
-      triggers:
-        - imageChangeParams:
-            automatic: true
-            containerNames:
-              - queue
-            from:
-              kind: ImageStreamTag
-              name: ${NAME}:${VERSION}
-          type: ImageChange
-        - type: ConfigChange
-    status:
-      availableReplicas: 0
-      latestVersion: 0
-      observedGeneration: 0
-      replicas: 0
-      unavailableReplicas: 0
-      updatedReplicas: 0
+
   - kind: Secret
     apiVersion: v1
     stringData:
@@ -214,27 +254,27 @@ objects:
     metadata:
       annotations:
         as-copy-of: ${DB_SERVICE_NAME}
-      creationTimestamp: null
       name: ${NAME}${SUFFIX}
     type: Opaque
-  - kind: HorizontalPodAutoscaler
-    apiVersion: autoscaling/v2
-    metadata:
-      annotations: {}
-      creationTimestamp: null
-      labels: {}
-      name: ${NAME}${SUFFIX}
-    spec:
-      minReplicas: ${{REPLICAS}}
-      maxReplicas: ${{REPLICAS_MAX}}
-      scaleTargetRef:
-        apiVersion: apps.openshift.io/v1
-        kind: DeploymentConfig
-        name: ${NAME}${SUFFIX}
-      metrics:
-        - type: Resource
-          resource:
-            name: cpu
-            target:
-              type: Utilization
-              averageUtilization: 80
+
+  # Disable the HPA for now, as it is preferrable to run an exact number of pods (e.g. min:2, max:2)
+  # - kind: HorizontalPodAutoscaler
+  #   apiVersion: autoscaling/v2
+  #   metadata:
+  #     annotations: {}
+  #     labels: {}
+  #     name: ${NAME}${SUFFIX}
+  #   spec:
+  #     minReplicas: ${{REPLICAS}}
+  #     maxReplicas: ${{REPLICAS_MAX}}
+  #     scaleTargetRef:
+  #       kind: Deployment
+  #       apiVersion: apps/v1
+  #       name: ${NAME}${SUFFIX}
+  #     metrics:
+  #       - type: Resource
+  #         resource:
+  #           name: cpu
+  #           target:
+  #             type: Utilization
+  #             averageUtilization: 80

@@ -1,7 +1,6 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  creationTimestamp: null
   labels:
     build: biohub-platform-db-setup
   name: biohub-platform-db-setup
@@ -50,10 +49,9 @@ parameters:
     value: '1.5Gi'
 objects:
   - kind: ImageStream
-    apiVersion: v1
+    apiVersion: image.openshift.io/v1
     metadata:
       name: ${SOURCE_IMAGE_NAME}
-      creationTimestamp: null
       annotations:
         description: Nodejs Base Image
       labels:
@@ -70,11 +68,11 @@ objects:
           importPolicy: {}
           referencePolicy:
             type: Local
+
   - kind: ImageStream
-    apiVersion: v1
+    apiVersion: image.openshift.io/v1
     metadata:
       name: '${NAME}'
-      creationTimestamp:
       annotations:
         description: Nodejs Runtime Image
       labels:
@@ -82,11 +80,11 @@ objects:
     spec:
       lookupPolicy:
         local: false
-  - apiVersion: v1
+
+  - apiVersion: build.openshift.io/v1
     kind: BuildConfig
     metadata:
       name: '${NAME}${SUFFIX}'
-      creationTimestamp:
       labels: {}
       annotations: {}
     spec:
@@ -122,5 +120,3 @@ objects:
       triggers:
         - type: ConfigChange
         - type: ImageChange
-    status:
-      lastVersion: 7

@@ -46,10 +46,9 @@ parameters:
     value: '5Gi'
 objects:
   - kind: ImageStream
-    apiVersion: v1
+    apiVersion: image.openshift.io/v1
     metadata:
       name: ${SOURCE_IMAGE_NAME}
-      creationTimestamp: null
       annotations:
         description: Nodejs Base Image
       labels:
@@ -66,11 +65,11 @@ objects:
           importPolicy: {}
           referencePolicy:
             type: Local
+
   - kind: ImageStream
-    apiVersion: v1
+    apiVersion: image.openshift.io/v1
     metadata:
       name: '${NAME}'
-      creationTimestamp: null
       annotations:
         description: Nodejs Runtime Image
       labels:
@@ -78,11 +77,11 @@ objects:
     spec:
       lookupPolicy:
         local: false
-  - apiVersion: v1
-    kind: BuildConfig
+
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
     metadata:
       name: '${NAME}${SUFFIX}'
-      creationTimestamp:
       labels: {}
       annotations: {}
     spec:
@@ -100,7 +99,7 @@ objects:
         limits:
           cpu: ${CPU_LIMIT}
           memory: ${MEMORY_LIMIT}
-      runPolicy: SerialLatestOnly
+      runPolicy: Serial
       source:
         contextDir: '${SOURCE_CONTEXT_DIR}'
         git:
@@ -117,5 +116,3 @@ objects:
       triggers:
         - type: ConfigChange
         - type: ImageChange
-    status:
-      lastVersion: 7

@@ -1,8 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  name: migration
-  creationTimestamp: null
+  name: biohub-platform-db-setup-dc
+  labels:
+    build: biohub-platform-db-setup
 parameters:
   - name: IMAGE
     description: 'Image for pod'

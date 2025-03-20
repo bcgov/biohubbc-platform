@@ -34,6 +34,8 @@ const apiDeploy = async (settings) => {
         // Node
         NODE_ENV: phases[phase].env || 'dev',
         NODE_OPTIONS: phases[phase].nodeOptions,
+        // Persistent Volume
+        VOLUME_CAPACITY: phases[phase].volumeCapacity,
         // ITIS SOLR
         ITIS_SOLR_URL: phases[phase].itisSolrUrl,
         // S3 (Object Store)
