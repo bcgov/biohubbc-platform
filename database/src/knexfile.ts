@@ -38,9 +38,6 @@ export default {
       tableName: 'migration',
       schemaName: 'public',
       directory: './migrations'
-    },
-    seeds: {
-      directory: []
     }
   }
 };

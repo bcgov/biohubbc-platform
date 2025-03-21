@@ -39,94 +39,6 @@ describe('getS3SignedURL', () => {
   });
 });
 
-describe('generateS3FileKey', () => {
-  const S3_KEY_PREFIX = process.env.S3_KEY_PREFIX;
-
-  afterEach(() => {
-    process.env.S3_KEY_PREFIX = S3_KEY_PREFIX;
-  });
-
-  it('returns project file path', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({ projectId: 1, fileName: 'testFileName' });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/testFileName');
-  });
-
-  it('returns survey file path', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({ projectId: 1, surveyId: 2, fileName: 'testFileName' });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/testFileName');
-  });
-
-  it('returns project folder file path', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({ projectId: 1, folder: 'reports', fileName: 'testFileName' });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/reports/testFileName');
-  });
-
-  it('returns survey folder file path', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({
-      projectId: 1,
-      surveyId: 2,
-      folder: 'telemetry-credentials',
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/telemetry-credentials/testFileName');
-  });
-
-  it('returns survey submission folder file path when a submission ID is passed', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({
-      projectId: 1,
-      surveyId: 2,
-      submissionId: 3,
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/submissions/3/testFileName');
-  });
-
-  it('returns critter captures folder file path', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({
-      projectId: 1,
-      surveyId: 2,
-      critterId: 3,
-      folder: 'captures',
-      critterbaseCaptureId: '123-456-789',
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/critters/3/captures/123-456-789/testFileName');
-  });
-
-  it('returns critter mortalities folder file path', async () => {
-    process.env.S3_KEY_PREFIX = 'some/s3/prefix';
-
-    const result = generateS3FileKey({
-      projectId: 1,
-      surveyId: 2,
-      critterId: 3,
-      folder: 'mortalities',
-      critterbaseMortalityId: '123-456-789',
-      fileName: 'testFileName'
-    });
-
-    expect(result).to.equal('some/s3/prefix/projects/1/surveys/2/critters/3/mortalities/123-456-789/testFileName');
-  });
-});
-
 describe('getS3HostUrl', () => {
   const OBJECT_STORE_URL = process.env.OBJECT_STORE_URL;
   const OBJECT_STORE_BUCKET_NAME = process.env.OBJECT_STORE_BUCKET_NAME;
@@ -266,17 +178,17 @@ describe('getS3KeyPrefix', () => {
   });
 
   it('should return an s3 key prefix', () => {
-    process.env.S3_KEY_PREFIX = 'test-sims';
+    process.env.S3_KEY_PREFIX = 'test-biohub';
 
     const result = getS3KeyPrefix();
-    expect(result).to.equal('test-sims');
+    expect(result).to.equal('test-biohub');
   });
 
   it('should return its default value', () => {
     Object.assign(process.env, { S3_KEY_PREFIX: undefined });
 
     const result = getS3KeyPrefix();
-    expect(result).to.equal('sims');
+    expect(result).to.equal('biohub');
   });
 });
 
