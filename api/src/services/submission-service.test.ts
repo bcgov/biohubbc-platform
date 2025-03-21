@@ -1270,12 +1270,15 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'getSubmissionFeatureArtifactKey')
         .resolves('KEY');
 
+      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
+
       const submissionService = new SubmissionService(mockDBConnection);
 
       await submissionService.getSubmissionFeatureSignedUrl(payload);
 
       expect(getAdminSubmissionFeatureSignedUrlStub).to.be.calledOnceWith(payload);
       expect(getSubmissionFeatureSignedUrlStub).to.not.be.called;
+      expect(getS3SignedURLStub).to.be.calledOnceWith('KEY');
     });
 
     it('should call regular user repository when isAdmin == false', async () => {
@@ -1289,12 +1292,15 @@ describe('SubmissionService', () => {
         .stub(SubmissionRepository.prototype, 'getAdminSubmissionFeatureArtifactKey')
         .resolves('KEY');
 
+      const getS3SignedURLStub = sinon.stub(fileUtils, 'getS3SignedURL').resolves('signed-url');
+
       const submissionService = new SubmissionService(mockDBConnection);
 
       await submissionService.getSubmissionFeatureSignedUrl({ ...payload, isAdmin: false });
 
       expect(getSubmissionFeatureSignedUrlStub).to.be.calledOnceWith({ ...payload, isAdmin: false });
       expect(getAdminSubmissionFeatureSignedUrlStub).to.not.be.called;
+      expect(getS3SignedURLStub).to.be.calledOnceWith('KEY');
     });
 
     it('should return signed url if no error', async () => {

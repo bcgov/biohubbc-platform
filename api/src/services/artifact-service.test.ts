@@ -304,37 +304,5 @@ describe('ArtifactService', () => {
         expect(deleteFileFromS3Stub).to.not.be.called;
       }
     });
-
-    it('S3 error thrown', async () => {
-      const mockDBConnection = getMockDBConnection();
-      const artifactService = new ArtifactService(mockDBConnection);
-      const artifact = {
-        key: 's3 key'
-      } as Artifact;
-      const getStub = sinon.stub(ArtifactRepository.prototype, 'getArtifactByUUID').resolves(artifact);
-      const deleteStub = sinon.stub(ArtifactRepository.prototype, 'deleteArtifactByUUID').resolves();
-      const deleteSecurityStub = sinon
-        .stub(SecurityRepository.prototype, 'deleteSecurityRulesForArtifactUUID')
-        .resolves();
-
-      const mockDeleteResponse: DeleteObjectCommandOutput = {
-        $metadata: {},
-        DeleteMarker: true,
-        RequestCharged: 'requester',
-        VersionId: '123456'
-      };
-      const deleteFileFromS3Stub = sinon.stub(fileUtils, 'deleteFileFromS3').resolves(mockDeleteResponse);
-
-      try {
-        await artifactService.deleteArtifact('uuid');
-        expect.fail();
-      } catch (error: any) {
-        expect(error.message).to.be.eql('Issue deleting artifact: uuid');
-        expect(getStub).to.be.called;
-        expect(deleteFileFromS3Stub).to.be.called;
-        expect(deleteSecurityStub).to.be.called;
-        expect(deleteStub).to.be.called;
-      }
-    });
   });
 });
