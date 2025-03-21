@@ -69,7 +69,11 @@ const dbSetupDeploy = async (settings) => {
         NODE_ENV: phases[phase].env || 'dev',
         DB_SERVICE_NAME: dbName,
         DB_SCHEMA: 'biohub',
-        IMAGE: dbSetupImageStream.image.dockerImageReference
+        IMAGE: dbSetupImageStream.image.dockerImageReference,
+        CPU_REQUEST: '50m',
+        CPU_LIMIT: '1000m',
+        MEMORY_REQUEST: '100Mi',
+        MEMORY_LIMIT: '1.75Gi'
       }
     })
   );

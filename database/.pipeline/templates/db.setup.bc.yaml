@@ -2,7 +2,7 @@ kind: Template
 apiVersion: template.openshift.io/v1
 metadata:
   labels:
-    build: biohub-platform-db-setup
+    build: biohub-platform-db-setup-bc
   name: biohub-platform-db-setup
 parameters:
   - name: NAME
