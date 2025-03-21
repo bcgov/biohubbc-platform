@@ -90,7 +90,7 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
     return api.security.getAllSecurityRulesForSubmission(submissionId);
   });
 
-  const urlParams = useParams();
+  const urlParams = useParams<{ submission_id: string }>();
   const submissionId = Number(urlParams['submission_id']);
 
   if (!submissionId) {

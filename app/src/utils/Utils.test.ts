@@ -258,7 +258,7 @@ describe('safeJSONStringify', () => {
   });
 
   it('returns original value if the value cannot be stringified', () => {
-    const circle = {};
+    const circle: Record<string, any> = {};
     circle['circle'] = circle;
 
     expect(safeJSONStringify(circle)).toEqual(circle);

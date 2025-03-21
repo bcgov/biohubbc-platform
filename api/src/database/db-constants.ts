@@ -64,11 +64,11 @@ const selectServiceAccountsSqlStatement = SQL`
   SELECT
     *
   FROM
-    system_user
+    "system_user"
   INNER JOIN
     user_identity_source
   ON
-    system_user.user_identity_source_id = user_identity_source.user_identity_source_id
+    "system_user".user_identity_source_id = user_identity_source.user_identity_source_id
   WHERE
     user_identity_source.name = ${SYSTEM_IDENTITY_SOURCE.SYSTEM};
 `;
