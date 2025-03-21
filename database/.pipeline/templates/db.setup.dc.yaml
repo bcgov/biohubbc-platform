@@ -28,7 +28,7 @@ parameters:
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
-    value: 'dev'
+    value: 'development'
   - name: CPU_REQUEST
     value: '50m'
   - name: CPU_LIMIT

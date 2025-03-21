@@ -12,7 +12,7 @@ const path = require('path');
 const apiDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const phase = options.env;
+  const phase = settings.options.env;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
@@ -33,7 +33,7 @@ const apiDeploy = async (settings) => {
         CHANGE_ID: phases.build.changeId || changeId,
         APP_HOST: phases[phase].appHost,
         // Node
-        NODE_ENV: phases[phase].env || 'dev',
+        NODE_ENV: phases[phase].nodeEnv,
         NODE_OPTIONS: phases[phase].nodeOptions,
         // Persistent Volume
         VOLUME_CAPACITY: phases[phase].volumeCapacity,

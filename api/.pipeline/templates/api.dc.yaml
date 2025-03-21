@@ -44,7 +44,7 @@ parameters:
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
-    value: 'dev'
+    value: 'development'
   - name: NODE_OPTIONS
   # Database
   - name: DB_SERVICE_NAME

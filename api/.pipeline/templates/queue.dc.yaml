@@ -49,7 +49,7 @@ parameters:
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
-    value: 'dev'
+    value: 'development'
   - name: NODE_OPTIONS
   # Object Store (S3)
   - name: S3_KEY_PREFIX
