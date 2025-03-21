@@ -1,29 +1,6 @@
-//
-// Index initializers and boot-strapper of NodeJs application which only serve static app
-//
-// Copyright © 2019 Province of British Columbia
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-/**
- * Imports
- */
-import express from 'express';
-import console from 'node:console';
-import process from 'node:process';
-import path from 'path';
-import request from 'request';
-import { fileURLToPath } from 'url';
+const express = require('express');
+const path = require('path');
+const request = require('request');
 
 /**
  * An immediately invoked function that runs a simple express server to serve the app static build files.
@@ -43,7 +20,7 @@ import { fileURLToPath } from 'url';
   // Getting Port
   const port = process.env.APP_PORT || 7100;
   // Resource path
-  const resourcePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../build');
+  const resourcePath = path.resolve(__dirname, '../build');
   // Setting express static
   app.use(express.static(resourcePath));
 
