@@ -104,8 +104,10 @@ services:
     networks:
       - biohubbc-network
     depends_on:
-      - db
-      - db_setup
+      db:
+        condition: service_healthy
+      db_setup:
+        condition: service_completed_successfully
 
   # Build the api_worker docker image
   queue:
