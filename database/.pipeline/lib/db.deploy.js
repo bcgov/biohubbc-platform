@@ -12,7 +12,7 @@ const path = require('path');
 const dbDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const phase = options.env;
+  const phase = settings.options.env;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
@@ -31,9 +31,9 @@ const dbDeploy = async (settings) => {
         DATABASE_SERVICE_NAME: `${name}-postgresql${phases[phase].suffix}`,
         IMAGE_STREAM_NAME: name,
         IMAGE_STREAM_VERSION: phases.build.tag,
-        POSTGRESQL_DATABASE: 'biohubbc',
+        POSTGRES_DB: 'biohubbc',
         TZ: phases[phase].tz,
-        IMAGE_STREAM_NAMESPACE: phases.build.namespace,
+        NAMESPACE: phases.build.namespace,
         VOLUME_CAPACITY: phases[phase].volumeCapacity,
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,

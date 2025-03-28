@@ -34,9 +34,9 @@ export class SubmissionJobQueueService extends DBService {
    * @memberof SubmissionJobQueueService
    */
   async intake(
-    datasetUUID: string,
-    file: Express.Multer.File,
-    securityRequest?: ISecurityRequest
+    _datasetUUID: string,
+    _file: Express.Multer.File,
+    _securityRequest?: ISecurityRequest
   ): Promise<{ queue_id: number }> {
     // NOT IMPLEMENTED
 

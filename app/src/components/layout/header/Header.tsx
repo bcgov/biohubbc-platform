@@ -65,7 +65,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
             mr: 2
           }
         }}>
-        <RouterLink to="/" aria-label="Go to SIMS Home">
+        <RouterLink to="/" aria-label="Go to BioHub Home">
           <picture>
             <source srcSet={headerImageLarge} media="(min-width: 1200px)"></source>
             <source srcSet={headerImageSmall} media="(min-width: 600px)"></source>
@@ -287,9 +287,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
         <DialogContent>
           <Typography variant="body1" component="div" color="textSecondary">
             For technical support or questions about this application, please email &zwnj;
-            <a href="mailto:biohub@gov.bc.ca?subject=Support Request - Species Inventory Management System">
-              biohub@gov.bc.ca
-            </a>
+            <a href="mailto:biohub@gov.bc.ca?subject=Support Request - Biodiversity Hub BC">biohub@gov.bc.ca</a>
           </Typography>
         </DialogContent>
         <DialogActions>

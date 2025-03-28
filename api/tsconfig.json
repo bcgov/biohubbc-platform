@@ -20,9 +20,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noFallthroughCasesInSwitch": true,
-    "strict": true
+    "noErrorTruncation": true,
+    "strict": true,
+    "typeRoots": ["node_modules/@types", "src/types"]
   },
-  "include": ["src", "src/queue/queue/.ts"],
+  "include": ["src"],
   "ts-node": {
     "files": true
   }

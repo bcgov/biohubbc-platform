@@ -6,7 +6,7 @@
 
 -include .env
 
-# Apply the contents of the .env to the terminal, so that the docker-compose file can use them in its builds
+# Apply the contents of the .env to the terminal, so that the compose file can use them in its builds
 export $(shell sed 's/=.*//' .env)
 
 ## ------------------------------------------------------------------------------
@@ -19,41 +19,50 @@ export $(shell sed 's/=.*//' .env)
 # 2. Edit the `.env` file as needed to update variables and secrets
 # 3. Run `make web`
 
-env: | setup ## Copies the default ./env_config/env.docker to ./.env
+setup: | setup-env check-env ## Copies the default ./env_config/env.docker to ./.env
+env: | setup-env check-env ## Copies the default ./env_config/env.docker to ./.env
 
 postgres: | close build-postgres run-postgres ## Performs all commands necessary to run the postgres project (db) in docker
 backend: | close build-backend run-backend ## Performs all commands necessary to run all backend projects (db, api) in docker
 web: | close build-web run-web ## Performs all commands necessary to run all backend+web projects (db, api, app) in docker
 
 db-setup: | build-db-setup run-db-setup ## Performs all commands necessary to run the database migrations and seeding
-db-migrate: | build-db-migrate run-db-migrate ## Performs all commands necessary to run the database migrations
-db-rollback: | build-db-rollback run-db-rollback ## Performs all commands necessary to rollback the latest database migrations
 
 clamav: | build-clamav run-clamav ## Performs all commands necessary to run clamav
 
 fix: | lint-fix format-fix ## Performs both lint-fix and format-fix commands
 
 ## ------------------------------------------------------------------------------
-## Setup/Cleanup Commands
+## Setup Commands
 ## ------------------------------------------------------------------------------
 
-setup: ## Prepares the environment variables used by all project docker containers
+setup-env: ## Prepares the environment variables used by all project docker containers, by copying the sample 'env.docker' to '.env'. Note: Some variables may need to be updated, like secrets
 	@echo "==============================================="
-	@echo "Make: setup - copying env.docker to .env"
+	@echo "Make: setup-env - copying env.docker to .env"
 	@echo "==============================================="
 	@cp -i env_config/env.docker .env
+
+check-env: ## Logs any env vars that are missing or have no value, in the '.env' file
+	@echo "==============================================="
+	@echo "Make: check-env - checking for missing env vars"
+	@echo "==============================================="
+	@awk -F '=' 'NR==FNR && !/^#/ && NF {a[$$1]; next} !/^#/ && NF && !($$1 in a)' .env env_config/env.docker | while read -r line; do echo "Warning: Missing value for $$line in .env"; done
+
+## ------------------------------------------------------------------------------
+## Cleanup Commands
+## ------------------------------------------------------------------------------
 
 close: ## Closes all project containers
 	@echo "==============================================="
 	@echo "Make: close - closing Docker containers"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml down
+	@docker compose down
 
 clean: ## Closes and cleans (removes) all project containers
 	@echo "==============================================="
 	@echo "Make: clean - closing and cleaning Docker containers"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml down -v --rmi all --remove-orphans
+	@docker compose down -v --rmi all --remove-orphans
 
 prune: ## Deletes ALL docker artifacts (even those not associated to this project)
 	@echo -n "Delete ALL docker artifacts? [y/n] " && read ans && [ $${ans:-n} = y ]
@@ -72,13 +81,13 @@ build-postgres: ## Builds the postgres db containers
 	@echo "==============================================="
 	@echo "Make: build-postgres - building postgres db  images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup
+	@docker compose build db db_setup
 
 run-postgres: ## Runs the postgres db containers
 	@echo "==============================================="
 	@echo "Make: run-postgres - running postgres db  images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup
+	@docker compose up -d db db_setup
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend Commands
@@ -89,15 +98,13 @@ build-backend: ## Builds all backend containers
 	@echo "==============================================="
 	@echo "Make: build-backend - building backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api
-	# @docker-compose -f docker-compose.yml build db db_setup api
+	@docker compose build db db_setup api
 
 run-backend: ## Runs all backend containers
 	@echo "==============================================="
 	@echo "Make: run-backend - running backend images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api
-	# @docker-compose -f docker-compose.yml up -d db db_setup api
+	@docker compose up -d db db_setup api
 
 ## ------------------------------------------------------------------------------
 ## Build/Run Backend+Web Commands (backend + web frontend)
@@ -108,15 +115,13 @@ build-web: ## Builds all backend+web containers
 	@echo "==============================================="
 	@echo "Make: build-web - building web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db db_setup api app
-	# @docker-compose -f docker-compose.yml build db db_setup api app
+	@docker compose build db db_setup api app
 
 run-web: ## Runs all backend+web containers
 	@echo "==============================================="
 	@echo "Make: run-web - running web images"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d db db_setup api app
-	# @docker-compose -f docker-compose.yml up -d db db_setup api app
+	@docker compose up -d db db_setup api app
 
 ## ------------------------------------------------------------------------------
 ## Commands to shell into the target container
@@ -127,25 +132,25 @@ db-container: ## Executes into database container.
 	@echo "Make: Shelling into database container"
 	@echo "==============================================="
 	@export PGPASSWORD=$(DB_ADMIN_PASS)
-	@docker-compose exec db psql -U $(DB_ADMIN) -d $(DB_DATABASE)
+	@docker compose exec db psql -U $(DB_ADMIN) -d $(DB_DATABASE)
 
 app-container: ## Executes into the app container.
 	@echo "==============================================="
 	@echo "Shelling into app container"
 	@echo "==============================================="
-	@docker-compose exec app bash
+	@docker compose exec app bash
 
 api-container: ## Executes into the api container.
 	@echo "==============================================="
 	@echo "Shelling into api container"
 	@echo "==============================================="
-	@docker-compose exec api bash
+	@docker compose exec api bash
 
 queue-container: ## Executes into the queue container.
 	@echo "==============================================="
 	@echo "Shelling into queue container"
 	@echo "==============================================="
-	@docker-compose exec queue bash
+	@docker compose exec queue bash
 
 ## ------------------------------------------------------------------------------
 ## Database migration commands
@@ -155,37 +160,13 @@ build-db-setup: ## Build the db knex setup (migrations + seeding) image
 	@echo "==============================================="
 	@echo "Make: build-db-setup - building db knex setup image"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db_setup
+	@docker compose build db_setup
 
 run-db-setup: ## Run the database migrations and seeding
 	@echo "==============================================="
 	@echo "Make: run-db-setup - running database migrations and seeding"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up db_setup
-
-build-db-migrate: ## Build the db knex migrations image
-	@echo "==============================================="
-	@echo "Make: build-db-migrate - bnuilding db knex migrate image"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db_migrate
-
-run-db-migrate: ## Run the database migrations
-	@echo "==============================================="
-	@echo "Make: run-db-migrate - running database migrations"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up db_migrate
-
-build-db-rollback: ## Build the db knex rollback image
-	@echo "==============================================="
-	@echo "Make: build-db-rollback - building db knex rollback image"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build db_rollback
-
-run-db-rollback: ## Rollback the latest database migrations
-	@echo "==============================================="
-	@echo "Make: run-db-rollback - rolling back the latest database migrations"
-	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up db_rollback
+	@docker compose up db_setup
 
 ## ------------------------------------------------------------------------------
 ## clamav commands
@@ -195,13 +176,13 @@ build-clamav: ## Build the clamav image
 	@echo "==============================================="
 	@echo "Make: build-clamav - building clamav image"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml build clamav
+	@docker compose build clamav
 
 run-clamav: ## Run clamav
 	@echo "==============================================="
 	@echo "Make: run-clamav - running clamav"
 	@echo "==============================================="
-	@docker-compose -f docker-compose.yml up -d clamav
+	@docker compose up -d clamav
 
 ## ------------------------------------------------------------------------------
 ## Run `npm` commands for all projects
@@ -346,9 +327,24 @@ log-db-setup: ## Runs `docker logs <container> -f` for the database setup contai
 	@docker logs $(DOCKER_PROJECT_NAME)-db-setup-$(DOCKER_NAMESPACE)-container -f $(args)
 
 ## ------------------------------------------------------------------------------
+## Typescript Trace Commands
+## Runs ts-trace to find typescript compilation issues and hotspots
+## Docs: https://github.com/microsoft/typescript-analyze-trace
+## ------------------------------------------------------------------------------
+trace-app: ## Runs ts-trace to find typescript compilation issues and hotspots in the app
+	@echo "==============================================="
+	@echo "Typscript trace - searching App hotspots"
+	@echo "==============================================="
+	@cd app && npx tsc -p ./tsconfig.json --generateTrace ts-traces || npx @typescript/analyze-trace --skipMillis 100 --forceMillis 300 --expandTypes ts-traces
+
+trace-api: ## Runs ts-trace to find typescript compilation issues and hotspots in the api
+	@echo "==============================================="
+	@echo "Typscript trace - searching for Api hotspots"
+	@echo "==============================================="
+	@cd api && npx tsc -p ./tsconfig.json --generateTrace ts-traces || npx @typescript/analyze-trace --skipMillis 100 --forceMillis 300 --expandTypes ts-traces
+
+## ------------------------------------------------------------------------------
 ## Help
 ## ------------------------------------------------------------------------------
-
-help:	## Display this help screen.
+help: ## Display this help screen.
 	@grep -h -E '^[0-9a-zA-Z_-]+:.*?##.*$$|^##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[33m%-20s\033[0m %s\n", $$1, $$2}' | awk 'BEGIN {FS = "## "}; {printf "\033[36m%-1s\033[0m %s\n", $$2, $$1}'
-

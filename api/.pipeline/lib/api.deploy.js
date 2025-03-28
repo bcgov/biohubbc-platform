@@ -12,7 +12,7 @@ const path = require('path');
 const apiDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const phase = options.env;
+  const phase = settings.options.env;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
@@ -25,6 +25,7 @@ const apiDeploy = async (settings) => {
   objects.push(
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/api.dc.yaml`, {
       param: {
+        NAMESPACE: phases[phase].namespace,
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
@@ -32,8 +33,10 @@ const apiDeploy = async (settings) => {
         CHANGE_ID: phases.build.changeId || changeId,
         APP_HOST: phases[phase].appHost,
         // Node
-        NODE_ENV: phases[phase].env || 'dev',
+        NODE_ENV: phases[phase].nodeEnv,
         NODE_OPTIONS: phases[phase].nodeOptions,
+        // Persistent Volume
+        VOLUME_CAPACITY: phases[phase].volumeCapacity,
         // ITIS SOLR
         ITIS_SOLR_URL: phases[phase].itisSolrUrl,
         // S3 (Object Store)
@@ -58,7 +61,13 @@ const apiDeploy = async (settings) => {
         KEYCLOAK_API_HOST: phases[phase].sso.cssApi.cssApiHost,
         KEYCLOAK_API_ENVIRONMENT: phases[phase].sso.cssApi.cssApiEnvironment,
         // Log Level
-        LOG_LEVEL: phases[phase].logLevel || 'info',
+        LOG_LEVEL: phases[phase].logLevel,
+        LOG_LEVEL_FILE: phases[phase].logLevelFile,
+        LOG_FILE_DIR: phases[phase].logFileDir,
+        LOG_FILE_NAME: phases[phase].logFileName,
+        LOG_FILE_DATE_PATTERN: phases[phase].logFileDatePattern,
+        LOG_FILE_MAX_SIZE: phases[phase].logFileMaxSize,
+        LOG_FILE_MAX_FILES: phases[phase].logFileMaxFiles,
         // Openshift Resources
         CPU_REQUEST: phases[phase].cpuRequest,
         CPU_LIMIT: phases[phase].cpuLimit,

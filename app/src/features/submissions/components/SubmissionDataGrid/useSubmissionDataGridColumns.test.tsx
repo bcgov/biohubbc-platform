@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react-hooks';
+import { renderHook, waitFor } from '@testing-library/react';
 import { PropsWithChildren } from 'react';
 import { AuthProvider } from 'react-oidc-context';
 import useSubmissionDataGridColumns from './useSubmissionDataGridColumns';
@@ -8,11 +8,13 @@ const wrapper = ({ children }: PropsWithChildren) => <AuthProvider>{children}</A
 describe('useSubmissionDataGridColumns', () => {
   describe('mounting conditions', () => {
     it('should mount', async () => {
-      const { result, waitForNextUpdate } = renderHook(() => useSubmissionDataGridColumns('test'), {
+      const { result } = renderHook(() => useSubmissionDataGridColumns('test'), {
         wrapper
       });
-      await waitForNextUpdate();
-      expect(result.current.length).toBeDefined();
+
+      waitFor(() => {
+        expect(result.current.length).toBeDefined();
+      });
     });
   });
 });

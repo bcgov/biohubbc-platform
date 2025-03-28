@@ -1,7 +1,8 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { fireEvent, waitFor } from '@testing-library/react';
 import ComponentDialog from 'components/dialog/ComponentDialog';
-import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
+import { render } from 'test-helpers/test-utils';
 
 const handleOnClose = jest.fn();
 

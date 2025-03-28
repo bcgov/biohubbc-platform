@@ -5,9 +5,10 @@ import { OpenAPIV3 } from 'openapi-types';
 import swaggerUIExperss from 'swagger-ui-express';
 import { defaultPoolConfig, initDBPool } from './database/db';
 import { initDBConstants } from './database/db-constants';
-import { ensureHTTPError, HTTP400, HTTPErrorType } from './errors/http-error';
+import { ensureHTTPError, HTTP400, HTTP500 } from './errors/http-error';
 import { rootAPIDoc } from './openapi/root-api-doc';
 import { authenticateRequest, authenticateRequestOptional } from './request-handlers/security/authentication';
+import { initRequestStorage } from './utils/async-request-storage';
 import { scanFileForVirus } from './utils/file-utils';
 import { getLogger } from './utils/logger';
 
@@ -28,12 +29,17 @@ const app: express.Express = express();
 
 // Enable CORS
 app.use(function (req: Request, res: Response, next: NextFunction) {
-  defaultLog.debug(`${req.method} ${req.url}`);
-
   res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Authorization, responseType');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE, HEAD');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'no-store');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  defaultLog.debug({ message: 'request', label: 'api-middleware', method: req.method, url: req.url });
 
   next();
 });
@@ -42,7 +48,7 @@ app.use(function (req: Request, res: Response, next: NextFunction) {
 const openAPIFramework = initialize({
   apiDoc: {
     ...(rootAPIDoc as OpenAPIV3.Document), // base open api spec
-    'x-express-openapi-additional-middleware': [validateAllResponses],
+    'x-express-openapi-additional-middleware': getAdditionalMiddleware(),
     'x-express-openapi-validation-strict': true
   },
   app: app, // express app to initialize
@@ -54,29 +60,48 @@ const openAPIFramework = initialize({
   docsPath: '/raw-api-docs', // path to view raw openapi spec
   consumesMiddleware: {
     'application/json': express.json({ limit: MAX_REQ_BODY_SIZE }),
-    'multipart/form-data': async function (req, res, next) {
+    'multipart/form-data': function (req, res, next) {
       const multerRequestHandler = multer({
-        storage: multer.memoryStorage(), // TOOD change to local/PVC storage and stream file uploads to S3?
+        storage: multer.memoryStorage(), // TODO change to local/PVC storage and stream file uploads to S3?
         limits: { fileSize: MAX_UPLOAD_FILE_SIZE }
       }).array('media', MAX_UPLOAD_NUM_FILES);
 
-      return multerRequestHandler(req, res, async function (error?: any) {
+      /**
+       * Multer transforms and moves the incoming files from `req.body.media` --> `req.files`.
+       *
+       * OpenAPI only allows validation on specific parts of the request object (requestBody / parameters...) this excludes the contents of `req.files`.
+       * To get around this we re-assign `req.body.media` to the Multer transformed files stored in `req.files`.
+       *
+       * Files can be accessed via `req.body.media` OR `req.files`.
+       *
+       * @see https://www.npmjs.com/package/express-openapi#argsconsumesmiddleware
+       */
+      multerRequestHandler(req, res, async (error?: any) => {
         if (error) {
           return next(error);
         }
 
-        const promises = (req.files as Express.Multer.File[]).map(async function (file) {
-          // Set original request file field to empty string to satisfy OpenAPI validation
-          // See: https://www.npmjs.com/package/express-openapi#argsconsumesmiddleware
-          req.body[file.fieldname] = '';
+        // Scan files for malicious content, if enabled
+        const virusScanPromises = (req.files as Express.Multer.File[]).map(async function (file) {
+          const isSafe = await scanFileForVirus(file);
 
-          // Scan file for malicious content, if enabled
-          if (!(await scanFileForVirus(file))) {
+          if (!isSafe) {
             throw new HTTP400('Malicious file content detected.', [{ file_name: file.originalname }]);
           }
         });
 
-        await Promise.all(promises);
+        try {
+          await Promise.all(virusScanPromises);
+        } catch (error) {
+          // If a virus is detected, return error and do not continue
+          return next(error);
+        }
+
+        // Ensure `req.files` or `req.body.media` is always set to an array
+        const multerFiles = req.files ?? [];
+
+        req.files = multerFiles;
+        req.body = { ...req.body, media: multerFiles };
 
         return next();
       });
@@ -93,14 +118,22 @@ const openAPIFramework = initialize({
       return authenticateRequestOptional(req);
     }
   },
-  errorTransformer: function (openapiError: object, ajvError: object): object {
-    // Transform openapi-request-validator and openapi-response-validator errors
-    defaultLog.error({ label: 'errorTransformer', message: 'ajvError', ajvError });
+  errorTransformer: function (_, ajvError: object): object {
+    // Transform openapi-request-validator or openapi-response-validator errors
     return ajvError;
   },
   // If `next` is not included express will silently skip calling the `errorMiddleware` entirely.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   errorMiddleware: function (error, req, res, next) {
+    defaultLog.error({
+      label: 'errorMiddleware',
+      message: 'error',
+      error,
+      req_url: `${req.method} ${req.url}`,
+      req_params: req.params,
+      req_body: req.body
+    });
+
     // Ensure all errors (intentionally thrown or not) are in the same format as specified by the schema
     const httpError = ensureHTTPError(error);
 
@@ -132,6 +165,25 @@ try {
 }
 
 /**
+ * Get additional middleware to apply to all routes.
+ *
+ * @return {*}  {express.RequestHandler[]}
+ */
+function getAdditionalMiddleware(): express.RequestHandler[] {
+  const additionalMiddleware = [];
+
+  // Initialize the request storage for each request
+  additionalMiddleware.push(initRequestStorage);
+
+  if (process.env.API_RESPONSE_VALIDATION_ENABLED === 'true') {
+    // Validate endpoint responses against openapi spec
+    additionalMiddleware.push(validateAllResponses);
+  }
+
+  return additionalMiddleware;
+}
+
+/**
  * Middleware to apply openapi response validation to all routes.
  *
  * Note: validates `<data>` sent via `res.status(<status>).json(<data>)` against the matching openapi response schema
@@ -149,15 +201,16 @@ function validateAllResponses(req: Request, res: Response, next: NextFunction) {
 
     res.json = (...args) => {
       if (res.get('x-express-openapi-validation-error-for')) {
-        // Already validated, return
+        // Already validated this response once, skip validation and return
         return json.apply(res, args);
       }
 
-      const body = args[0];
+      const reqBody = args[0];
 
+      // Run openapi response validation function
       const validationResult: { message: any; errors: any[] } | undefined = res['validateResponse'](
         res.statusCode,
-        body
+        reqBody
       );
 
       let validationMessage = '';
@@ -178,16 +231,14 @@ function validateAllResponses(req: Request, res: Response, next: NextFunction) {
         defaultLog.debug({
           label: 'validateAllResponses',
           message: validationMessage,
-          responseBody: body,
-          errors: errorList
+          error: errorList,
+          req_url: `${req.method} ${req.url}`,
+          req_params: req.params,
+          req_body: req.body,
+          res_body: reqBody
         });
 
-        return res.status(500).json({
-          name: HTTPErrorType.INTERNAL_SERVER_ERROR,
-          status: 500,
-          message: validationMessage,
-          errors: errorList
-        });
+        throw new HTTP500(validationMessage, errorList);
       }
     };
   }

@@ -278,7 +278,7 @@ export const insertSubmission = (includeSecurityReviewTimestamp: boolean, includ
       $$Comment: ${faker.lorem.words({ min: 5, max: 100 })}$$,
       ${securityReviewTimestamp},
       ${publishTimestamp},
-      (SELECT system_user_id from system_user where user_identifier = 'SIMS'),
+      (SELECT system_user_id from "system_user" where user_identifier = 'SIMS'),
       'SIMS'
   )
   RETURNING submission_id;

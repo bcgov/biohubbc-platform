@@ -1,4 +1,4 @@
-import { ThemeProvider } from '@mui/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import { render } from 'test-helpers/test-utils';
 import appTheme from 'themes/appTheme';
 import Footer from './Footer';

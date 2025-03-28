@@ -7,7 +7,7 @@ import { Redirect, Route, RouteProps, useLocation } from 'react-router';
 import { buildUrl } from 'utils/Utils';
 
 /**
- * Route guard that requires the user to be authenticated and registered with Sims.
+ * Route guard that requires the user to be authenticated and registered with BioHub.
  *
  * @param {RouteProps} props
  * @return {*}

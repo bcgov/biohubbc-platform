@@ -1,111 +1,113 @@
 kind: Template
-apiVersion: template.openshift.io/v1
+apiVersion: v1
 metadata:
-  name: clamav-deploy
+  name: clamav
 parameters:
-  - name: NAME_SPACE
-    value: a0ec71-tools
+  - name: BASE_IMAGE_REGISTRY_URL
+    description: The base image registry URL
     required: true
-  - name: CPU_REQUEST
-    value: "100m"
-  - name: CPU_LIMIT
-    value: "1100m"
-  - name: MEMORY_REQUEST
-    value: "500M"
-  - name: MEMORY_LIMIT
-    value: "2G"
-  - name: REPLICAS
-    value: "1"
+    value: image-registry.openshift-image-registry.svc:5000
+  - name: IMAGE_NAMESPACE
+    description: The namespace where to get the above image name
+    displayName: Image Namespace
+    required: true
+    value: af2668-tools
+  - name: NAME
+    description:
+      The name assigned to all of the openshift objects defined in this template.
+      It is also the name of runtime image you want.
+    displayName: Name
+    required: true
+    value: clamav
+  - name: TAG_NAME
+    description: The TAG name for this environment, e.g., dev, test, prod, latest
+    displayName: Env TAG name
+    value: latest
+  - name: ROLE_NAME
+    description: The name of the role label, used to uniquely identify this deployment
+    displayName: Role Name
+    value: clamav
 objects:
-  - kind: Service
-    apiVersion: v1
+  - kind: Deployment
+    apiVersion: apps/v1
     metadata:
-      name: clamav
+      creationTimestamp:
       labels:
-        app: clamav
+        app: "${NAME}"
+        role: "${ROLE_NAME}"
+      name: "${NAME}"
     spec:
-      ports:
-        - name: 3310-tcp
-          protocol: TCP
-          port: 3310
-          targetPort: 3310
+      replicas: 1
       selector:
-        deploymentconfig: clamav
-      type: ClusterIP
-      sessionAffinity: None
-    status:
-      loadBalancer: {}
-
-  - kind: DeploymentConfig
-    apiVersion: apps.openshift.io/v1
-    metadata:
-      name: clamav
-      generation: 1
-      creationTimestamp: null
-      labels:
-        app: clamav
-    spec:
+        matchLabels:
+          app: "${NAME}"
+          deployment: "${NAME}"
       strategy:
-        type: Rolling
-        activeDeadlineSeconds: 21600
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+      template:
+        metadata:
+          creationTimestamp:
+          labels:
+            app: "${NAME}"
+            role: "${ROLE_NAME}"
+            deployment: "${NAME}"
+        spec:
+          containers:
+            - image: ${BASE_IMAGE_REGISTRY_URL}/${IMAGE_NAMESPACE}/${NAME}:${TAG_NAME}
+              imagePullPolicy: Always
+              name: "${NAME}"
+              ports:
+                - containerPort: 3310
+                  protocol: TCP
+              env:
+                - name: RealIpFrom
+                  value: "${REAL_IP_FROM}"
+                - name: AdditionalRealIpFromRules
+                  value: "${AdditionalRealIpFromRules}"
+                - name: IpFilterRules
+                  value: "${IpFilterRules}"
+              resources:
+                requests:
+                  cpu: 1000m
+                  memory: 1Gi
+                limits:
+                  cpu: 2000m
+                  memory: 2Gi
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+      test: false
       triggers:
+        - type: ConfigChange
         - type: ImageChange
           imageChangeParams:
             automatic: true
             containerNames:
-              - clamav
+              - "${NAME}"
             from:
               kind: ImageStreamTag
-              namespace: "${NAME_SPACE}"
-              name: "clamav:latest"
-        - type: ConfigChange
-      replicas: ${{REPLICAS}}
-      test: false
+              namespace: "${IMAGE_NAMESPACE}"
+              name: "${NAME}:${TAG_NAME}"
+
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      creationTimestamp:
+      labels:
+        app: "${NAME}"
+      name: "${NAME}"
+    spec:
+      ports:
+        - name: 3310-tcp
+          port: 3310
+          protocol: TCP
+          targetPort: 3310
       selector:
-        app: clamav
-        deploymentconfig: clamav
-      template:
-        metadata:
-          creationTimestamp: null
-          labels:
-            app: clamav
-            deploymentconfig: clamav
-          annotations:
-            openshift.io/generated-by: OpenShiftWebConsole
-        spec:
-          containers:
-            - resources:
-                requests:
-                  cpu: ${CPU_REQUEST}
-                  memory: ${MEMORY_REQUEST}
-                limits:
-                  cpu: ${CPU_LIMIT}
-                  memory: ${MEMORY_LIMIT}
-              readinessProbe:
-                tcpSocket:
-                  port: 3310
-                initialDelaySeconds: 240
-                timeoutSeconds: 3
-                periodSeconds: 10
-                successThreshold: 1
-                failureThreshold: 3
-              terminationMessagePath: /dev/termination-log
-              name: clamav
-              livenessProbe:
-                tcpSocket:
-                  port: 3310
-                initialDelaySeconds: 240
-                timeoutSeconds: 3
-                periodSeconds: 10
-                successThreshold: 1
-                failureThreshold: 3
-              ports:
-                - containerPort: 3310
-                  protocol: TCP
-              imagePullPolicy: Always
-              terminationMessagePolicy: File
-          restartPolicy: Always
-          terminationGracePeriodSeconds: 30
-          dnsPolicy: ClusterFirst
-          securityContext: {}
-          schedulerName: default-scheduler
+        app: "${NAME}"
+        deployment: "${NAME}"
+      sessionAffinity: None
+      type: ClusterIP

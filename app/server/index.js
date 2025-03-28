@@ -1,29 +1,17 @@
-//
-// Index initializers and boot-strapper of NodeJs application which only serve static app
-//
-// Copyright © 2019 Province of British Columbia
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-/**
- * Imports
- */
 const express = require('express');
 const path = require('path');
 const request = require('request');
 
 /**
- * @description Bootstrap script to start app web server
+ * An immediately invoked function that runs a simple express server to serve the app static build files.
+ *
+ * This includes a health check endpoint that OpenShift uses to determine if the app is healthy.
+ *
+ * This file is only used when serving the app in OpenShift.
+ * When running the app locally, the app is served by compose.yml, and doesn't use this file at all.
+ *
+ * Note: All changes to env vars here must also be reflected in the `app/src/contexts/configContext.tsx` file, so that
+ * the app has access to the same env vars when running in both OpenShift and local development.
  */
 (() => {
   process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
@@ -39,19 +27,19 @@ const request = require('request');
   // App config
   app.use('/config', (_, resp) => {
     const config = {
-      API_HOST: process.env.REACT_APP_API_HOST || 'localhost',
-      CHANGE_VERSION: process.env.CHANGE_VERSION || 'NA',
-      NODE_ENV: process.env.NODE_ENV || 'development',
-      REACT_APP_NODE_ENV: process.env.REACT_APP_NODE_ENV || 'dev',
-      VERSION: `${process.env.VERSION || 'NA'}(build #${process.env.CHANGE_VERSION || 'NA'})`,
+      API_HOST: process.env.REACT_APP_API_HOST,
+      CHANGE_VERSION: process.env.CHANGE_VERSION,
+      NODE_ENV: process.env.NODE_ENV,
+      REACT_APP_NODE_ENV: process.env.REACT_APP_NODE_ENV,
+      VERSION: `${process.env.VERSION}(build #${process.env.CHANGE_VERSION})`,
       KEYCLOAK_CONFIG: {
         authority: process.env.REACT_APP_KEYCLOAK_HOST,
         realm: process.env.REACT_APP_KEYCLOAK_REALM,
         clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID
       },
       SITEMINDER_LOGOUT_URL: process.env.REACT_APP_SITEMINDER_LOGOUT_URL,
-      MAX_UPLOAD_NUM_FILES: Number(process.env.REACT_APP_MAX_UPLOAD_NUM_FILES) || 10,
-      MAX_UPLOAD_FILE_SIZE: Number(process.env.REACT_APP_MAX_UPLOAD_FILE_SIZE) || 52428800
+      MAX_UPLOAD_NUM_FILES: Number(process.env.REACT_APP_MAX_UPLOAD_NUM_FILES),
+      MAX_UPLOAD_FILE_SIZE: Number(process.env.REACT_APP_MAX_UPLOAD_FILE_SIZE)
     };
     resp.status(200).json(config);
   });

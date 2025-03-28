@@ -1,5 +1,5 @@
-import { act, renderHook } from '@testing-library/react-hooks';
 import { FuseResult } from 'fuse.js';
+import { act, renderHook } from 'test-helpers/test-utils';
 import useFuzzySearch from './useFuzzySearch';
 
 const item = { a: 'zzz', b: 'hello world' };

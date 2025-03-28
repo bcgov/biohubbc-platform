@@ -1,22 +1,18 @@
-import { ThemeProvider } from '@mui/styles';
-import { createTheme } from '@mui/system';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
 import { SECURITY_APPLIED_STATUS } from 'interfaces/useDatasetApi.interface';
-import React from 'react';
 import { Router } from 'react-router';
+import { render } from 'test-helpers/test-utils';
 import SubmissionsListPage from './SubmissionsListPage';
 
 const history = createMemoryHistory();
 
 const renderPage = () =>
   render(
-    <ThemeProvider theme={createTheme()}>
-      <Router history={history}>
-        <SubmissionsListPage />
-      </Router>
-    </ThemeProvider>
+    <Router history={history}>
+      <SubmissionsListPage />
+    </Router>
   );
 
 jest.mock('../../../hooks/useApi');

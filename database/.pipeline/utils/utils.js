@@ -10,7 +10,7 @@
  */
 const getResourceByName = (resourceName, oc) => {
   console.log(`1 - getResourceByName - Fetching resource: ${resourceName}`);
-  const matches = oc.get(resourceName); // oc --namespace=a0ec71-dev get pod/biohub-platform-db-setup-dev-108 --output=json
+  const matches = oc.get(resourceName);
 
   if (!matches || !matches.length) {
     return null;
@@ -30,8 +30,7 @@ const getResourceByName = (resourceName, oc) => {
  */
 const getResourceByRaw = (selector, type, settings, oc) => {
   const phases = settings.phases;
-  const options = settings.options;
-  const phase = options.env;
+  const phase = settings.options.env;
 
   const result = oc.raw('get', [type], {
     selector: selector,

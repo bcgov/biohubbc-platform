@@ -6,6 +6,7 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     branches-ignore:
+      - test
       - prod
 
 concurrency:
@@ -88,7 +89,7 @@ jobs:
       # Get the head commit for this pull request, parse out the commit message, and assign to the `commit_message`
       # output variable, which is then used to determine if the term `ignore-skip` is found in the commit message.
       - name: Checkout head commit
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Get head commit message
@@ -109,27 +110,27 @@ jobs:
       - skipDuplicateActions
     steps:
       - name: Checkout Target Branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
 
       # Cache the repo
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           # Cache repo based on the commit sha that triggered the workflow
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Install Node - for `node` and `npm` commands
       # Note: This already uses actions/cache internally, so repeat calls in subsequent jobs are not a performance hit
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
   # Build the web frontend app image
   buildAPP:
@@ -150,24 +151,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -179,7 +186,7 @@ jobs:
       # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
       # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
       - name: Scale down app pods
-        run: oc get deploymentconfig --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
+        run: oc get DeploymentConfig,Deployment --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
       # Install app pipeline node modules
       # Note: This already caches node modules internally
@@ -212,24 +219,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -241,7 +254,7 @@ jobs:
       # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
       # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
       - name: Scale down database pods
-        run: oc get deploymentconfig --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
+        run: oc get DeploymentConfig,Deployment --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
       # Install database pipeline node modules
       # Note: This already caches node modules internally
@@ -273,24 +286,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -329,24 +348,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -358,7 +383,7 @@ jobs:
       # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
       # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
       - name: Scale down api pods
-        run: oc get deploymentconfig --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
+        run: oc get DeploymentConfig,Deployment --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
       # Install api pipeline node modules
       # Note: This already caches node modules internally
@@ -391,24 +416,30 @@ jobs:
   #     steps:
   #       # Install Node - for `node` and `npm` commands
   #       - name: Setup Node.js
-  #         uses: actions/setup-node@v3
+  #         uses: actions/setup-node@v4
   #         with:
-  #           node-version: 14
+  #           node-version: 20
 
   #       # Load repo from cache
   #       - name: Cache repo
-  #         uses: actions/cache@v3
+  #         uses: actions/cache@v4
   #         id: cache-repo
   #         env:
   #           cache-name: cache-repo
   #         with:
   #           path: ${{ github.workspace }}/*
-  #           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+  #           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
+
+  #       # Install oc, which was removed from the ubuntu-latest image in v24.04
+  #       - name: Install OpenShift CLI tools
+  #         uses: redhat-actions/openshift-tools-installer@v1
+  #         with:
+  #           oc: "4.14"
 
   #       # Checkout the branch if not restored via cache
   #       - name: Checkout Target Branch
   #         if: steps.cache-repo.outputs.cache-hit != 'true'
-  #         uses: actions/checkout@v3
+  #         uses: actions/checkout@v4
 
   #       # Log in to OpenShift.
   #       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -420,7 +451,7 @@ jobs:
   #       # Why? The new pods will be deployed before the existing pods are terminated, and twice the resources will be needed
   #       # in that moment. If not enough resources are available to spin up the new pods, then they may fail to deploy.
   #       - name: Scale down api pods
-  #         run: oc get deploymentconfig --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
+  #         run: oc get DeploymentConfig,Deployment --namespace a0ec71-dev --selector env-id=$PR_NUMBER,app-name=$APP_NAME -o name | awk '{print "oc scale --replicas=0 " $1}' | bash
 
   #       # Install api pipeline node modules
   #       # Note: This already caches node modules internally
@@ -451,24 +482,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -505,24 +542,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -560,24 +603,30 @@ jobs:
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -614,27 +663,34 @@ jobs:
     needs:
       - buildAPI
       - deployDatabase
+      - deployDatabaseSetup
     steps:
       # Install Node - for `node` and `npm` commands
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -674,24 +730,30 @@ jobs:
   #     steps:
   #       # Install Node - for `node` and `npm` commands
   #       - name: Setup Node.js
-  #         uses: actions/setup-node@v3
+  #         uses: actions/setup-node@v4
   #         with:
-  #           node-version: 14
+  #           node-version: 20
 
   #       # Load repo from cache
   #       - name: Cache repo
-  #         uses: actions/cache@v3
+  #         uses: actions/cache@v4
   #         id: cache-repo
   #         env:
   #           cache-name: cache-repo
   #         with:
   #           path: ${{ github.workspace }}/*
-  #           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+  #           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
+
+  #       # Install oc, which was removed from the ubuntu-latest image in v24.04
+  #       - name: Install OpenShift CLI tools
+  #         uses: redhat-actions/openshift-tools-installer@v1
+  #         with:
+  #           oc: "4.14"
 
   #       # Checkout the branch if not restored via cache
   #       - name: Checkout Target Branch
   #         if: steps.cache-repo.outputs.cache-hit != 'true'
-  #         uses: actions/checkout@v3
+  #         uses: actions/checkout@v4
 
   #       # Log in to OpenShift.
   #       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.

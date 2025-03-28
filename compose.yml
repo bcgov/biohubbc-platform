@@ -1,5 +1,3 @@
-version: "3.5"
-
 services:
   ## Build postgres docker image
   db:
@@ -25,10 +23,11 @@ services:
       - POSTGRES_PASSWORD=${DB_ADMIN_PASS}
       - POSTGRES_DB=${DB_DATABASE}
       - PORT=5432
+      - PGDATA=${PGDATA}/${POSTGRES_VERSION}
     networks:
       - biohubbc-network
     volumes:
-      - postgres:/var/lib/postgresql/data
+      - postgres:${PGDATA}
 
   ## Build the api docker image
   api:
@@ -78,10 +77,19 @@ services:
       - MAX_REQ_BODY_SIZE=${MAX_REQ_BODY_SIZE}
       - MAX_UPLOAD_NUM_FILES=${MAX_UPLOAD_NUM_FILES}
       - MAX_UPLOAD_FILE_SIZE=${MAX_UPLOAD_FILE_SIZE}
+      # Logging
       - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_LEVEL_FILE=${LOG_LEVEL_FILE}
+      - LOG_FILE_DIR=${LOG_FILE_DIR}
+      - LOG_FILE_NAME=${LOG_FILE_NAME}
+      - LOG_FILE_DATE_PATTERN=${LOG_FILE_DATE_PATTERN}
+      - LOG_FILE_MAX_SIZE=${LOG_FILE_MAX_SIZE}
+      - LOG_FILE_MAX_FILES=${LOG_FILE_MAX_FILES}
+      # Clamav
       - CLAMAV_PORT=${CLAMAV_PORT}
       - CLAMAV_HOST=${CLAMAV_HOST}
       - ENABLE_FILE_VIRUS_SCAN=${ENABLE_FILE_VIRUS_SCAN}
+      # GCNotify
       - GCNOTIFY_SECRET_API_KEY=${GCNOTIFY_SECRET_API_KEY}
       - GCNOTIFY_ADMIN_EMAIL=${GCNOTIFY_ADMIN_EMAIL}
       - GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS=${GCNOTIFY_REQUEST_ACCESS_SECURE_DOCUMENTS}
@@ -96,8 +104,10 @@ services:
     networks:
       - biohubbc-network
     depends_on:
-      - db
-      - db_setup
+      db:
+        condition: service_healthy
+      db_setup:
+        condition: service_completed_successfully
 
   # Build the api_worker docker image
   queue:
@@ -202,58 +212,6 @@ services:
       db:
         condition: service_healthy
     command: ["npm", "run", "setup"]
-
-  ## Run the database migrations
-  db_migrate:
-    image: ${DOCKER_PROJECT_NAME}-db-migrate-${DOCKER_NAMESPACE}-img
-    container_name: ${DOCKER_PROJECT_NAME}-db-migrate-${DOCKER_NAMESPACE}-container
-    build:
-      context: ./database
-      dockerfile: ./.docker/db/Dockerfile.migrate
-    environment:
-      - NODE_ENV=${NODE_ENV}
-      - DB_HOST=${DB_HOST}
-      - DB_ADMIN=${DB_ADMIN}
-      - DB_ADMIN_PASS=${DB_ADMIN_PASS}
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_SCHEMA=${DB_SCHEMA}
-      - DB_USER_API=${DB_USER_API}
-      - DB_USER_API_PASS=${DB_USER_API_PASS}
-    volumes:
-      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
-    networks:
-      - biohubbc-network
-    depends_on:
-      db:
-        condition: service_healthy
-    command: ["npm", "run", "migrate-latest"]
-
-  ## Rollback the latest database migrations
-  db_rollback:
-    image: ${DOCKER_PROJECT_NAME}-db-rollback-${DOCKER_NAMESPACE}-img
-    container_name: ${DOCKER_PROJECT_NAME}-db-rollback-${DOCKER_NAMESPACE}-container
-    build:
-      context: ./database
-      dockerfile: ./.docker/db/Dockerfile.rollback
-    environment:
-      - NODE_ENV=${NODE_ENV}
-      - DB_HOST=${DB_HOST}
-      - DB_ADMIN=${DB_ADMIN}
-      - DB_ADMIN_PASS=${DB_ADMIN_PASS}
-      - DB_PORT=5432
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_SCHEMA=${DB_SCHEMA}
-      - DB_USER_API=${DB_USER_API}
-      - DB_USER_API_PASS=${DB_USER_API_PASS}
-    volumes:
-      - /opt/app-root/src/node_modules # prevents local node_modules overriding container node_modules
-    networks:
-      - biohubbc-network
-    depends_on:
-      db:
-        condition: service_healthy
-    command: ["npm", "run", "migrate-rollback"]
 
 networks:
   biohubbc-network:
