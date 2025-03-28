@@ -5,12 +5,12 @@ metadata:
   labels:
     build: biohub-platform-api
 parameters:
-  - name: ENABLE_FILE_VIRUS_SCAN
-    value: 'true'
-  - name: CLAMAV_HOST
-    value: 'clamav'
-  - name: CLAMAV_PORT
-    value: '3310'
+  - name: NAMESPACE
+    description: Openshift namespace name
+    value: ''
+  - name: BASE_IMAGE_REGISTRY_URL
+    description: The base image registry URL
+    value: image-registry.openshift-image-registry.svc:5000
   - name: NAME
     value: biohub-platform-api
   - name: SUFFIX
@@ -28,15 +28,32 @@ parameters:
     description: Change id of the project. This will help to pull image stream
     required: true
     value: '0'
-  - name: DB_SERVICE_NAME
-    description: 'Database service name associated with deployment'
+  # Clamav
+  - name: ENABLE_FILE_VIRUS_SCAN
+    value: 'true'
+  - name: CLAMAV_HOST
+    value: 'clamav'
+  - name: CLAMAV_PORT
+    value: '3310'
+  # Volume (for API logs and other persistent data)
+  - name: VOLUME_CAPACITY
     required: true
+    description: Volume space available for data, e.g. 512Mi, 2Gi.
+    value: '500Mi'
   # Node
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
-    value: 'dev'
+    value: 'development'
   - name: NODE_OPTIONS
+  # Database
+  - name: DB_SERVICE_NAME
+    description: 'Database service name associated with deployment'
+    required: true
+  - name: DB_PORT
+    description: 'Database port'
+    required: true
+    value: '5432'
   - name: TZ
     description: Application timezone
     required: false
@@ -116,9 +133,28 @@ parameters:
     value: https://api.notification.canada.ca/v2/notifications/email
   - name: GCNOTIFY_SMS_URL
     value: https://api.notification.canada.ca/v2/notifications/sms
-  # Log Level
+  # Logging
   - name: LOG_LEVEL
-    value: 'info'
+    value: 'silent'
+    description: Log level for logs written to the console (console transport)
+  - name: LOG_LEVEL_FILE
+    value: 'debug'
+    description: Log level for logs written to log files (file transport)
+  - name: LOG_FILE_DIR
+    value: data/logs
+    description: Directory where log files are stored
+  - name: LOG_FILE_NAME
+    value: biohub-platform-api.log
+    description: Name of the log file
+  - name: LOG_FILE_DATE_PATTERN
+    value: YYYY-MM-DD
+    description: Date pattern for log the files
+  - name: LOG_FILE_MAX_SIZE
+    value: 45m
+    description: Maximum size an individual log file can reach before a new file is created
+  - name: LOG_FILE_MAX_FILES
+    value: '10'
+    description: Either the maximum number of log files to keep (10) or the maximum number of days to keep log files (10d)
   # Openshift
   - name: CPU_REQUEST
     value: '100m'
@@ -140,18 +176,28 @@ objects:
         description: Nodejs Runtime Image
       labels:
         shared: 'true'
-      creationTimestamp: null
       generation: 0
       name: ${NAME}
     spec:
       lookupPolicy:
         local: false
-  - kind: DeploymentConfig
-    apiVersion: apps.openshift.io/v1
+
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: ${NAME}${SUFFIX}
+    spec:
+      accessModes:
+        - ReadWriteMany
+      resources:
+        requests:
+          storage: '${VOLUME_CAPACITY}'
+
+  - kind: Deployment
+    apiVersion: apps/v1
     metadata:
       annotations:
         openshift.io/generated-by: OpenShiftWebConsole
-      creationTimestamp: null
       generation: 0
       labels:
         role: api
@@ -160,41 +206,41 @@ objects:
       replicas: ${{REPLICAS}}
       revisionHistoryLimit: 10
       selector:
-        deploymentConfig: ${NAME}${SUFFIX}
+        matchLabels:
+          deployment: ${NAME}${SUFFIX}
       strategy:
-        activeDeadlineSeconds: 21600
-        recreateParams:
-          timeoutSeconds: 600
-        resources:
-          limits:
-            cpu: ${CPU_LIMIT}
-            memory: ${MEMORY_LIMIT}
-          requests:
-            cpu: ${CPU_REQUEST}
-            memory: ${MEMORY_REQUEST}
-        type: Rolling
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
       template:
         metadata:
           annotations: null
-          creationTimestamp: null
           labels:
-            deploymentConfig: ${NAME}${SUFFIX}
+            deployment: ${NAME}${SUFFIX}
             role: api
         spec:
           containers:
-            - env:
+            - name: api
+              env:
                 - name: API_HOST
                   value: ${HOST}
                 - name: API_PORT
                   value: ${API_PORT_DEFAULT}
                 - name: APP_HOST
                   value: ${APP_HOST}
+                - name: VERSION
+                  value: ${VERSION}
+                # File Virus Scan
                 - name: ENABLE_FILE_VIRUS_SCAN
                   value: ${ENABLE_FILE_VIRUS_SCAN}
                 - name: CLAMAV_HOST
                   value: ${CLAMAV_HOST}
                 - name: CLAMAV_PORT
                   value: ${CLAMAV_PORT}
+                # Database
+                - name: TZ
+                  value: ${TZ}
                 - name: DB_HOST
                   value: ${DB_SERVICE_NAME}
                 - name: DB_USER_API
@@ -213,7 +259,7 @@ objects:
                       key: database-name
                       name: ${DB_SERVICE_NAME}
                 - name: DB_PORT
-                  value: '5432'
+                  value: ${DB_PORT}
                 # Keycloak
                 - name: KEYCLOAK_HOST
                   value: ${KEYCLOAK_HOST}
@@ -252,12 +298,7 @@ objects:
                 # ITIS SOLR
                 - name: ITIS_SOLR_URL
                   value: ${ITIS_SOLR_URL}
-                - name: S3_KEY_PREFIX
-                  value: ${S3_KEY_PREFIX}
-                - name: TZ
-                  value: ${TZ}
-                - name: VERSION
-                  value: ${VERSION}
+                # Object Store (S3)
                 - name: OBJECT_STORE_URL
                   valueFrom:
                     secretKeyRef:
@@ -278,8 +319,24 @@ objects:
                     secretKeyRef:
                       key: object_store_bucket_name
                       name: ${OBJECT_STORE_SECRETS}
+                - name: S3_KEY_PREFIX
+                  value: ${S3_KEY_PREFIX}
+                # Logging
                 - name: LOG_LEVEL
                   value: ${LOG_LEVEL}
+                - name: LOG_LEVEL_FILE
+                  value: ${LOG_LEVEL_FILE}
+                - name: LOG_FILE_DIR
+                  value: ${LOG_FILE_DIR}
+                - name: LOG_FILE_NAME
+                  value: ${LOG_FILE_NAME}
+                - name: LOG_FILE_DATE_PATTERN
+                  value: ${LOG_FILE_DATE_PATTERN}
+                - name: LOG_FILE_MAX_SIZE
+                  value: ${LOG_FILE_MAX_SIZE}
+                - name: LOG_FILE_MAX_FILES
+                  value: ${LOG_FILE_MAX_FILES}
+                # GC Notify
                 - name: GCNOTIFY_SECRET_API_KEY
                   valueFrom:
                     secretKeyRef:
@@ -297,70 +354,64 @@ objects:
                   value: ${GCNOTIFY_EMAIL_URL}
                 - name: GCNOTIFY_SMS_URL
                   value: ${GCNOTIFY_SMS_URL}
-              image: ' '
+              image: ${BASE_IMAGE_REGISTRY_URL}/${NAMESPACE}/${NAME}:${VERSION}
               imagePullPolicy: Always
-              name: api
               ports:
                 - containerPort: ${{API_PORT_DEFAULT}}
                   protocol: TCP
               resources:
-                limits:
-                  cpu: ${CPU_LIMIT}
-                  memory: ${MEMORY_LIMIT}
                 requests:
                   cpu: ${CPU_REQUEST}
                   memory: ${MEMORY_REQUEST}
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
+              startupProbe:
+                httpGet:
+                  path: /api/version
+                  port: ${{API_PORT_DEFAULT}}
+                  scheme: HTTP
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 10
+                successThreshold: 1
+                failureThreshold: 30
               readinessProbe:
                 httpGet:
                   path: /api/version
                   port: ${{API_PORT_DEFAULT}}
                   scheme: HTTP
-                initialDelaySeconds: 10
-                periodSeconds: 15
+                initialDelaySeconds: 0
+                periodSeconds: 30
                 timeoutSeconds: 10
                 successThreshold: 1
-                failureThreshold: 20
+                failureThreshold: 3
               livenessProbe:
                 httpGet:
                   path: /api/version
                   port: ${{API_PORT_DEFAULT}}
                   scheme: HTTP
-                initialDelaySeconds: 10
-                periodSeconds: 15
+                initialDelaySeconds: 0
+                periodSeconds: 30
                 timeoutSeconds: 10
                 successThreshold: 1
-                failureThreshold: 20
+                failureThreshold: 3
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File
               volumeMounts:
-                - mountPath: /opt/app-root/app
-                  name: ${NAME}${SUFFIX}
+                - name: ${NAME}${SUFFIX}
+                  mountPath: /opt/app-root/src/data
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           schedulerName: default-scheduler
           securityContext: {}
           terminationGracePeriodSeconds: 30
           volumes:
-            - emptyDir: {}
-              name: ${NAME}${SUFFIX}
+            - name: ${NAME}${SUFFIX}
+              persistentVolumeClaim:
+                claimName: ${NAME}${SUFFIX}
       test: false
-      triggers:
-        - imageChangeParams:
-            automatic: true
-            containerNames:
-              - api
-            from:
-              kind: ImageStreamTag
-              name: ${NAME}:${VERSION}
-          type: ImageChange
-        - type: ConfigChange
-    status:
-      availableReplicas: 0
-      latestVersion: 0
-      observedGeneration: 0
-      replicas: 0
-      unavailableReplicas: 0
-      updatedReplicas: 0
+
   - kind: Secret
     apiVersion: v1
     stringData:
@@ -370,14 +421,13 @@ objects:
     metadata:
       annotations:
         as-copy-of: ${DB_SERVICE_NAME}
-      creationTimestamp: null
       name: ${NAME}${SUFFIX}
     type: Opaque
+
   - kind: Service
     apiVersion: v1
     metadata:
       annotations: null
-      creationTimestamp: null
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
@@ -387,16 +437,14 @@ objects:
           protocol: TCP
           targetPort: ${{API_PORT_DEFAULT}}
       selector:
-        deploymentconfig: ${NAME}${SUFFIX}
+        deployment: ${NAME}${SUFFIX}
       sessionAffinity: None
       type: ClusterIP
-    status:
-      loadBalancer: {}
+
   - kind: Route
     apiVersion: route.openshift.io/v1
     metadata:
       annotations: {}
-      creationTimestamp: null
       labels: {}
       name: ${NAME}${SUFFIX}
     spec:
@@ -411,26 +459,25 @@ objects:
         name: ${NAME}${SUFFIX}
         weight: 100
       wildcardPolicy: None
-    status:
-      ingress: null
-  - kind: HorizontalPodAutoscaler
-    apiVersion: autoscaling/v2
-    metadata:
-      annotations: {}
-      creationTimestamp: null
-      labels: {}
-      name: ${NAME}${SUFFIX}
-    spec:
-      minReplicas: ${{REPLICAS}}
-      maxReplicas: ${{REPLICAS_MAX}}
-      scaleTargetRef:
-        apiVersion: apps.openshift.io/v1
-        kind: DeploymentConfig
-        name: ${NAME}${SUFFIX}
-      metrics:
-        - type: Resource
-          resource:
-            name: cpu
-            target:
-              type: Utilization
-              averageUtilization: 80
+
+  # Disable the HPA for now, as it is preferrable to run an exact number of pods (e.g. min:2, max:2)
+  # - kind: HorizontalPodAutoscaler
+  #   apiVersion: autoscaling/v2
+  #   metadata:
+  #     annotations: {}
+  #     labels: {}
+  #     name: ${NAME}${SUFFIX}
+  #   spec:
+  #     minReplicas: ${{REPLICAS}}
+  #     maxReplicas: ${{REPLICAS_MAX}}
+  #     scaleTargetRef:
+  #       kind: Deployment
+  #       apiVersion: apps/v1
+  #       name: ${NAME}${SUFFIX}
+  #     metrics:
+  #       - type: Resource
+  #         resource:
+  #           name: cpu
+  #           target:
+  #             type: Utilization
+  #             averageUtilization: 80

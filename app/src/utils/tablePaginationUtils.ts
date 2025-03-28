@@ -1,4 +1,4 @@
-export const handleChangePage = (event: unknown, newPage: number, setPage: (page: number) => void) => {
+export const handleChangePage = (_event: unknown, newPage: number, setPage: (page: number) => void) => {
   setPage(newPage);
 };
 

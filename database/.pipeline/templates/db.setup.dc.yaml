@@ -1,8 +1,9 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
-  name: migration
-  creationTimestamp: null
+  name: biohub-platform-db-setup-dc
+  labels:
+    build: biohub-platform-db-setup
 parameters:
   - name: IMAGE
     description: 'Image for pod'
@@ -27,15 +28,15 @@ parameters:
   - name: NODE_ENV
     description: Application Environment type variable
     required: true
-    value: 'dev'
+    value: 'development'
   - name: CPU_REQUEST
-    value: '100m'
+    value: '50m'
   - name: CPU_LIMIT
     value: '1000m'
   - name: MEMORY_REQUEST
-    value: '512Mi'
+    value: '100Mi'
   - name: MEMORY_LIMIT
-    value: '1.5Gi'
+    value: '1.75Gi'
 objects:
   - kind: Pod
     apiVersion: v1

@@ -13,7 +13,6 @@ import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { makeStyles } from '@mui/styles';
 import EditDialog from 'components/dialog/EditDialog';
 import { CustomMenuButton, CustomMenuIconButton } from 'components/toolbar/ActionToolbars';
 import { AddSystemUserI18N, DeleteSystemUserI18N, UpdateSystemUserI18N } from 'constants/i18n';
@@ -32,13 +31,15 @@ import AddSystemUsersForm, {
   IAddSystemUsersForm
 } from './AddSystemUsersForm';
 
-const useStyles = makeStyles(() => ({
-  table: {
-    '& td': {
-      verticalAlign: 'middle'
+const useStyles = () => {
+  return {
+    table: {
+      '& td': {
+        verticalAlign: 'middle'
+      }
     }
-  }
-}));
+  };
+};
 
 export interface IActiveUsersListProps {
   activeUsers: ISystemUser[];
@@ -286,7 +287,7 @@ const ActiveUsersList: React.FC<React.PropsWithChildren<IActiveUsersListProps>> 
             </Typography>
           </Toolbar>
           <TableContainer>
-            <Table className={classes.table}>
+            <Table sx={classes.table}>
               <TableHead>
                 <TableRow>
                   <TableCell>Username</TableCell>

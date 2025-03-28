@@ -6,7 +6,7 @@ const { checkAndClean } = require('../utils/utils');
 const clean = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const target_phase = options.env;
+  const target_phase = options.phase;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases.build.namespace }, options));
 
@@ -38,14 +38,14 @@ const clean = async (settings) => {
       }
     });
 
-    // get deployment configs
-    let deploymentConfigs = oc.get('dc', {
+    // get deployments
+    let deployments = oc.get('deployments', {
       selector: `app=${phaseObj.instance},env-id=${phaseObj.changeId},env-name=${phaseKey},!shared,github-repo=${oc.git.repository},github-owner=${oc.git.owner}`,
       namespace: phaseObj.namespace
     });
 
-    // Clean deployment configs
-    deploymentConfigs.forEach((dc) => {
+    // Clean deployments
+    deployments.forEach((dc) => {
       dc.spec.triggers.forEach((trigger) => {
         if (trigger.type == 'ImageChange' && trigger.imageChangeParams.from.kind == 'ImageStreamTag') {
           oc.delete([`ImageStreamTag/${trigger.imageChangeParams.from.name}`], {

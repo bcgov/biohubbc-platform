@@ -1,10 +1,6 @@
 import SQL from 'sql-template-strings';
 import { SYSTEM_IDENTITY_SOURCE } from '../constants/database';
 import { SystemUser } from '../repositories/user-repository';
-import { getLogger } from '../utils/logger';
-import { getAPIUserDBConnection } from './db';
-
-const defaultLog = getLogger('database/db');
 
 export type DBConstants = {
   serviceClientUsers: SystemUser[];
@@ -24,7 +20,15 @@ export const initDBConstants = async function (): Promise<void> {
     return;
   }
 
+  // Lazy load logger to prevent circular dependencies
+  const { getLogger } = await import('../utils/logger');
+
+  const defaultLog = getLogger('database/db');
+
   try {
+    // Lazy load logger to prevent circular dependencies
+    const { getAPIUserDBConnection } = await import('./db');
+
     const connection = getAPIUserDBConnection();
 
     try {
@@ -60,11 +64,11 @@ const selectServiceAccountsSqlStatement = SQL`
   SELECT
     *
   FROM
-    system_user
+    "system_user"
   INNER JOIN
     user_identity_source
   ON
-    system_user.user_identity_source_id = user_identity_source.user_identity_source_id
+    "system_user".user_identity_source_id = user_identity_source.user_identity_source_id
   WHERE
     user_identity_source.name = ${SYSTEM_IDENTITY_SOURCE.SYSTEM};
 `;

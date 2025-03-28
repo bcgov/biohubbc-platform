@@ -14,7 +14,7 @@ const {
 const dbSetupDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const phase = options.env;
+  const phase = settings.options.env;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
@@ -66,10 +66,14 @@ const dbSetupDeploy = async (settings) => {
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
         CHANGE_ID: changeId,
-        NODE_ENV: phases[phase].env || 'dev',
+        NODE_ENV: phases[phase].nodeEnv,
         DB_SERVICE_NAME: dbName,
         DB_SCHEMA: 'biohub',
-        IMAGE: dbSetupImageStream.image.dockerImageReference
+        IMAGE: dbSetupImageStream.image.dockerImageReference,
+        CPU_REQUEST: '50m',
+        CPU_LIMIT: '1000m',
+        MEMORY_REQUEST: '100Mi',
+        MEMORY_LIMIT: '1.75Gi'
       }
     })
   );

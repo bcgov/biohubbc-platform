@@ -19,6 +19,12 @@ jobs:
       - checkEnv
       - deployDatabaseSetup
     steps:
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
+
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
       # PR's must originate from a branch off the original repo or else all openshift `oc` commands will fail.
@@ -52,7 +58,7 @@ jobs:
     steps:
       # Checkout the PR branch
       - name: Checkout Target Branch
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Wait for API response
         uses: nev7n/wait_for_response@v1.0.1
@@ -71,7 +77,7 @@ jobs:
           interval: 500
 
       - name: E2E Smoke tests
-        uses: cypress-io/github-action@v2
+        uses: cypress-io/github-action@v6
         # let's give this action an ID so we can refer
         # to its output values later
         id: smoke

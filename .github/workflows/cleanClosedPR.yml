@@ -4,10 +4,6 @@ name: Clean Closed PR Artifacts
 
 on:
   pull_request:
-    branches:
-      - "*"
-      - "!test"
-      - "!prod"
     types: [closed]
 
 jobs:
@@ -22,26 +18,32 @@ jobs:
       # Install Node - for `node` and `npm` commands
       # Note: This already uses actions/cache internally, so repeat calls in subsequent jobs are not a performance hit
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       # Load repo from cache
       - name: Cache repo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-repo
         env:
           cache-name: cache-repo
         with:
           path: ${{ github.workspace }}/*
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.sha }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ github.event.pull_request.head.sha }}
 
       # Checkout the branch if not restored via cache
       - name: Checkout Target Branch
         if: steps.cache-repo.outputs.cache-hit != 'true'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      # Install oc, which was removed from the ubuntu-latest image in v24.04
+      - name: Install OpenShift CLI tools
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: "4.14"
 
       # Log in to OpenShift.
       # Note: The secrets needed to log in are NOT available if the PR comes from a FORK.
@@ -86,5 +88,5 @@ jobs:
         env:
           POD_SELECTOR: biohub-platform
         run: |
-          oc --namespace a0ec71-dev   get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found " $1}' | bash
-          oc --namespace a0ec71-tools get all,pvc,secret,pods,ReplicationController,DeploymentConfig,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found " $1}' | bash
+          oc --namespace a0ec71-dev   get all,pvc,secret,pods,ReplicationController,DeploymentConfig,Deployment,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found " $1}' | bash
+          oc --namespace a0ec71-tools get all,pvc,secret,pods,ReplicationController,DeploymentConfig,Deployment,HorizontalPodAutoscaler,imagestreamtag -o name | grep $POD_SELECTOR | grep $PR_NUMBER | awk '{print "oc delete --ignore-not-found " $1}' | bash

@@ -1,9 +1,7 @@
-apiVersion: template.openshift.io/v1
 kind: Template
+apiVersion: template.openshift.io/v1
 metadata:
   name: postgresql
-  labels:
-    build: postgresql
 parameters:
   - name: NAME
     displayName: Name
@@ -17,7 +15,7 @@ parameters:
     required: true
 objects:
   - kind: ImageStream
-    apiVersion: v1
+    apiVersion: image.openshift.io/v1
     metadata:
       name: '${NAME}'
       labels:
@@ -31,7 +29,7 @@ objects:
           annotations:
           from:
             kind: ImageStreamTag
-            name: crunchy-postgres-gis:ubi8-14.2-3.1-0
+            name: postgres-postgis:17-bullseye
             namespace: a0ec71-tools
           generation: 1
           importPolicy: {}

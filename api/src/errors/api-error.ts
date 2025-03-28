@@ -1,27 +1,16 @@
+import { BaseError } from './base-error';
+
 export enum ApiErrorType {
   BUILD_SQL = 'Error constructing SQL query',
   EXECUTE_SQL = 'Error executing SQL query',
   GENERAL = 'Error',
+  CONFLICT = 'Conflict',
   UNKNOWN = 'Unknown Error'
 }
 
-export class ApiError extends Error {
-  errors?: (string | Record<string, unknown>)[];
-
-  constructor(name: ApiErrorType, message: string, errors?: (string | Record<string, unknown>)[], stack?: string) {
-    super(message);
-
-    this.name = name;
-    this.errors = errors || [];
-    this.stack = stack;
-
-    if (stack) {
-      this.stack = stack;
-    }
-
-    if (!this.stack) {
-      Error.captureStackTrace(this);
-    }
+export class ApiError extends BaseError {
+  constructor(name: ApiErrorType, message: string, errors?: (string | object)[], stack?: string) {
+    super(name, message, errors, stack);
   }
 }
 
@@ -33,8 +22,36 @@ export class ApiError extends Error {
  * @extends {ApiError}
  */
 export class ApiGeneralError extends ApiError {
-  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
+  constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.GENERAL, message, errors);
+  }
+}
+
+/**
+ * API encountered an unknown/unexpected error.
+ *
+ * @export
+ * @class ApiUnknownError
+ * @extends {ApiError}
+ */
+export class ApiUnknownError extends ApiError {
+  constructor(message: string, errors?: (string | object)[]) {
+    super(ApiErrorType.UNKNOWN, message, errors);
+  }
+}
+
+/**
+ * Api encountered an error related to a data conflict.
+ *
+ * Example: Unable to delete a record because it is referenced by another record.
+ *
+ * @export
+ * @class ApiConflictError
+ * @extends {ApiError}
+ */
+export class ApiConflictError extends ApiError {
+  constructor(message: string, errors?: (string | object)[]) {
+    super(ApiErrorType.CONFLICT, message, errors);
   }
 }
 
@@ -50,7 +67,20 @@ export class ApiGeneralError extends ApiError {
  * @extends {ApiError}
  */
 export class ApiExecuteSQLError extends ApiError {
-  constructor(message: string, errors?: (string | Record<string, unknown>)[]) {
+  constructor(message: string, errors?: (string | object)[]) {
     super(ApiErrorType.EXECUTE_SQL, message, errors);
+  }
+}
+
+/**
+ * API failed to build SQL a query.
+ *
+ * @export
+ * @class ApiBuildSQLError
+ * @extends {ApiError}
+ */
+export class ApiBuildSQLError extends ApiError {
+  constructor(message: string, errors?: (string | object)[]) {
+    super(ApiErrorType.BUILD_SQL, message, errors);
   }
 }

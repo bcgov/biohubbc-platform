@@ -1,4 +1,8 @@
-ARG POSTGRES_VERSION=12.5
+# ########################################################################################################
+# This DockerFile is used for local development (via compose.yml) only.
+# ########################################################################################################
+
+ARG POSTGRES_VERSION=17-bullseye
 
 FROM postgres:$POSTGRES_VERSION
 

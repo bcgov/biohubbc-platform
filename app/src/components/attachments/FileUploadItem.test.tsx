@@ -1,6 +1,7 @@
+import { fireEvent, waitFor } from '@testing-library/react';
+import FileUploadItem, { IFileUploadItemProps } from 'components/attachments/FileUploadItem';
 import { APIError } from 'hooks/api/useAxios';
-import { fireEvent, render, waitFor } from 'test-helpers/test-utils';
-import FileUploadItem, { IFileUploadItemProps } from './FileUploadItem';
+import { render } from 'test-helpers/test-utils';
 
 const renderContainer = (props: IFileUploadItemProps) => {
   return render(<FileUploadItem {...props} />);
@@ -10,7 +11,7 @@ describe('FileUploadItem', () => {
   it('calls props.onCancel when the `X` button is clicked', async () => {
     let rejectRef: (value: unknown) => void;
 
-    const mockUploadPromise = new Promise(function (resolve: any, reject: any) {
+    const mockUploadPromise = new Promise(function (_, reject: any) {
       rejectRef = reject;
     });
 
@@ -43,7 +44,7 @@ describe('FileUploadItem', () => {
     fireEvent.click(cancelButton);
 
     // Manually trigger the upload reject to simulate a cancelled request
-    // @ts-ignore: ignore used before assigned warning
+    // @ts-ignore
     rejectRef({ message: '' });
 
     await waitFor(() => {
@@ -56,7 +57,7 @@ describe('FileUploadItem', () => {
   it('handles file upload success', async () => {
     let resolveRef: (value: unknown) => void;
 
-    const mockUploadPromise = new Promise(function (resolve: any, reject: any) {
+    const mockUploadPromise = new Promise(function (resolve: any, _) {
       resolveRef = resolve;
     });
 
@@ -98,7 +99,7 @@ describe('FileUploadItem', () => {
   it('handles file upload rejection', async () => {
     let rejectRef: (reason: unknown) => void;
 
-    const mockUploadPromise = new Promise(function (resolve: any, reject: any) {
+    const mockUploadPromise = new Promise(function (_, reject: any) {
       rejectRef = reject;
     });
 

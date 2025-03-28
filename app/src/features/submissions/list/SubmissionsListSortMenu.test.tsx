@@ -1,7 +1,7 @@
-import { ThemeProvider } from '@mui/styles';
-import { createTheme } from '@mui/system';
-import { fireEvent, render } from '@testing-library/react';
-import React from 'react';
+import { ThemeProvider } from '@mui/material/styles';
+import { fireEvent } from '@testing-library/react';
+import { render } from 'test-helpers/test-utils';
+import appTheme from 'themes/appTheme';
 import SubmissionsListSortMenu from './SubmissionsListSortMenu';
 
 const mockHandleSubmissions = jest.fn();
@@ -15,7 +15,7 @@ const mockSubmissions: any[] = [first, second];
 
 const renderMenu = () =>
   render(
-    <ThemeProvider theme={createTheme()}>
+    <ThemeProvider theme={appTheme}>
       <SubmissionsListSortMenu
         submissions={mockSubmissions}
         handleSubmissions={mockHandleSubmissions}

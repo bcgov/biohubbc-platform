@@ -8,31 +8,29 @@ import * as UserQueries from '../queries/database/user-context-queries';
 import { SystemUser } from '../repositories/user-repository';
 import { getUserGuid, getUserIdentitySource } from '../utils/keycloak-utils';
 import { getLogger } from '../utils/logger';
-import { asyncErrorWrapper, getZodQueryResult, syncErrorWrapper } from './db-utils';
-
-export const DB_CLIENT = 'pg';
+import { asyncErrorWrapper, syncErrorWrapper } from './db-utils';
 
 const defaultLog = getLogger('database/db');
 
-const DB_HOST = process.env.DB_HOST;
-const DB_PORT = Number(process.env.DB_PORT);
-const DB_USERNAME = process.env.DB_USER_API;
-const DB_PASSWORD = process.env.DB_USER_API_PASS;
-const DB_DATABASE = process.env.DB_DATABASE;
+const getDbHost = () => process.env.DB_HOST;
+const getDbPort = () => Number(process.env.DB_PORT);
+const getDbUsername = () => process.env.DB_USER_API;
+const getDbPassword = () => process.env.DB_USER_API_PASS;
+const getDbDatabase = () => process.env.DB_DATABASE;
 
-const DB_POOL_SIZE: number = Number(process.env.DB_POOL_SIZE) || 20;
-const DB_CONNECTION_MAX_USES: number = Number(process.env.DB_CONNECTION_MAX_USES) || 7500;
-const DB_CONNECTION_TIMEOUT: number = Number(process.env.DB_CONNECTION_TIMEOUT) || 0;
-const DB_IDLE_TIMEOUT: number = Number(process.env.DB_IDLE_TIMEOUT) || 10000;
+const DB_POOL_SIZE = 20;
+const DB_CONNECTION_TIMEOUT = 0;
+const DB_IDLE_TIMEOUT = 10000;
+
+export const DB_CLIENT = 'pg';
 
 export const defaultPoolConfig: pg.PoolConfig = {
-  user: DB_USERNAME,
-  password: DB_PASSWORD,
-  database: DB_DATABASE,
-  port: DB_PORT,
-  host: DB_HOST,
+  user: getDbUsername(),
+  password: getDbPassword(),
+  database: getDbDatabase(),
+  port: getDbPort(),
+  host: getDbHost(),
   max: DB_POOL_SIZE,
-  maxUses: DB_CONNECTION_MAX_USES,
   connectionTimeoutMillis: DB_CONNECTION_TIMEOUT,
   idleTimeoutMillis: DB_IDLE_TIMEOUT
 };
@@ -305,19 +303,58 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    *
    * @template T
    * @param {SQLStatement} sqlStatement SQL statement object
-   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
+   * @param {z.ZodSchema<T, any, any>} [ZodSchema] An optional zod schema that defines the expected shape of a `row`.
    * @throws {Error} if the connection is not open
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
   const _sql = async <T extends pg.QueryResultRow = any>(
     sqlStatement: SQLStatement,
-    zodSchema?: z.Schema<T, any, any>
+    ZodSchema?: z.ZodSchema<T, any, any>
   ): Promise<pg.QueryResult<T>> => {
+    const queryStart = Date.now();
+
     const response = await _query(sqlStatement.text, sqlStatement.values);
 
-    if (zodSchema) {
-      // Validate the response against the zod schema
-      return getZodQueryResult(zodSchema).parseAsync(response);
+    const queryEnd = Date.now();
+
+    defaultLog.silly({
+      label: '_sql',
+      message: 'Sql performance',
+      sql: { sql: sqlStatement.text, bindings: sqlStatement.values },
+      queryExecutionTime: queryEnd - queryStart
+    });
+
+    if (!ZodSchema || process.env.DATABASE_RESPONSE_VALIDATION_ENABLED !== 'true') {
+      // No zod schema provided, or database response validation is disabled
+      return response;
+    }
+
+    // Validate the response rows against the zod schema
+    const zodStart = Date.now();
+
+    const zodResponse =
+      ZodSchema instanceof z.ZodObject
+        ? z.strictObject({ rows: z.array(ZodSchema.strict()) }).safeParse({ rows: response.rows })
+        : z.strictObject({ rows: z.array(ZodSchema) }).safeParse({ rows: response.rows });
+
+    const zodEnd = Date.now();
+
+    defaultLog.silly({
+      label: '_sql',
+      message: 'Zod performance',
+      sql: { sql: sqlStatement.text, bindings: sqlStatement.values },
+      queryExecutionTime: queryEnd - queryStart,
+      zodExecutionTime: zodEnd - zodStart
+    });
+
+    if (!zodResponse.success) {
+      defaultLog.debug({
+        label: '_sql',
+        message: 'zodResponse',
+        zodResponse
+      });
+
+      throw new ApiExecuteSQLError('Failed to validate database response', zodResponse.error.errors);
     }
 
     return response;
@@ -328,21 +365,60 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
    *
    * @template T
    * @param {Knex.QueryBuilder} queryBuilder Knex query builder object
-   * @param {z.Schema<T, any, any>} zodSchema An optional zod schema
+   * @param {z.ZodSchema<T, any, any>} [ZodSchema] An optional zod schema that defines the expected shape of a `row`.
    * @throws {Error} if the connection is not open
    * @return {*}  {Promise<pg.QueryResult<T>>}
    */
   const _knex = async <T extends pg.QueryResultRow = any>(
     queryBuilder: Knex.QueryBuilder,
-    zodSchema?: z.Schema<T, any, any>
+    ZodSchema?: z.ZodSchema<T, any, any>
   ) => {
     const { sql, bindings } = queryBuilder.toSQL().toNative();
 
+    const queryStart = Date.now();
+
     const response = await _query(sql, bindings as any[]);
 
-    if (zodSchema) {
-      // Validate the response against the zod schema
-      return getZodQueryResult(zodSchema).parseAsync(response);
+    const queryEnd = Date.now();
+
+    defaultLog.silly({
+      label: '_knex',
+      message: 'Sql performance',
+      sql: { sql, bindings },
+      queryExecutionTime: queryEnd - queryStart
+    });
+
+    if (!ZodSchema || process.env.DATABASE_RESPONSE_VALIDATION_ENABLED !== 'true') {
+      // No zod schema provided, or database response validation is disabled
+      return response;
+    }
+
+    // Validate the response rows against the zod schema
+    const zodStart = Date.now();
+
+    const zodResponse =
+      ZodSchema instanceof z.ZodObject
+        ? z.strictObject({ rows: z.array(ZodSchema.strict()) }).safeParse({ rows: response.rows })
+        : z.object({ rows: z.array(ZodSchema) }).safeParse({ rows: response.rows });
+
+    const zodEnd = Date.now();
+
+    defaultLog.silly({
+      label: '_knex',
+      message: 'Zod performance',
+      sql: { sql, bindings },
+      queryExecutionTime: queryEnd - queryStart,
+      zodExecutionTime: zodEnd - zodStart
+    });
+
+    if (!zodResponse.success) {
+      defaultLog.debug({
+        label: '_knex',
+        message: 'zodResponse',
+        zodResponse
+      });
+
+      throw new ApiExecuteSQLError('Failed to validate database response', zodResponse.error.errors);
     }
 
     return response;
@@ -418,7 +494,7 @@ export const getDBConnection = function (keycloakToken: object): IDBConnection {
  */
 export const getAPIUserDBConnection = (): IDBConnection => {
   return getDBConnection({
-    preferred_username: `${DB_USERNAME}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
+    preferred_username: `${getDbUsername()}@${SYSTEM_IDENTITY_SOURCE.DATABASE}`,
     identity_provider: SYSTEM_IDENTITY_SOURCE.DATABASE
   });
 };

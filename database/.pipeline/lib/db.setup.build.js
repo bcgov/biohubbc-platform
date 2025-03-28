@@ -11,7 +11,7 @@ const path = require('path');
 const dbSetupBuild = (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const phase = 'build';
+  const phase = settings.phase;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
@@ -30,7 +30,11 @@ const dbSetupBuild = (settings) => {
         SOURCE_CONTEXT_DIR: 'database',
         DB_SETUP_DOCKERFILE_PATH: phases[phase].dbSetupDockerfilePath,
         SOURCE_REPOSITORY_URL: oc.git.http_url,
-        SOURCE_REPOSITORY_REF: phases[phase].branch || oc.git.ref
+        SOURCE_REPOSITORY_REF: phases[phase].branch || oc.git.ref,
+        CPU_REQUEST: '50m',
+        CPU_LIMIT: '1000m',
+        MEMORY_REQUEST: '100Mi',
+        MEMORY_LIMIT: '1.5Gi'
       }
     })
   );

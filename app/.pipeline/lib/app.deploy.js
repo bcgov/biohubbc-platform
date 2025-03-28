@@ -6,7 +6,7 @@ const path = require('path');
 const appDeploy = async (settings) => {
   const phases = settings.phases;
   const options = settings.options;
-  const phase = options.env;
+  const phase = settings.options.env;
 
   const oc = new OpenShiftClientX(Object.assign({ namespace: phases[phase].namespace }, options));
 
@@ -19,6 +19,7 @@ const appDeploy = async (settings) => {
   objects.push(
     ...oc.processDeploymentTemplate(`${templatesLocalBaseUrl}/app.dc.yaml`, {
       param: {
+        NAMESPACE: phases[phase].namespace,
         NAME: phases[phase].name,
         SUFFIX: phases[phase].suffix,
         VERSION: phases[phase].tag,
@@ -30,8 +31,8 @@ const appDeploy = async (settings) => {
         REACT_APP_MAX_UPLOAD_NUM_FILES: phases[phase].maxUploadNumFiles,
         REACT_APP_MAX_UPLOAD_FILE_SIZE: phases[phase].maxUploadFileSize,
         // Node
-        NODE_ENV: phases[phase].env || 'dev',
-        REACT_APP_NODE_ENV: phases[phase].env || 'dev',
+        NODE_ENV: phases[phase].nodeEnv,
+        REACT_APP_NODE_ENV: phases[phase].nodeEnv,
         // Keycloak
         REACT_APP_KEYCLOAK_HOST: phases[phase].sso.host,
         REACT_APP_KEYCLOAK_REALM: phases[phase].sso.realm,

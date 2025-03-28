@@ -1,5 +1,4 @@
-import { act, renderHook } from '@testing-library/react-hooks';
-import { waitFor } from 'test-helpers/test-utils';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import useDebounce from './useDebounce';
 
 const mockCallback = jest.fn();

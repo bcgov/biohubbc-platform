@@ -71,7 +71,7 @@ export class UserRepository extends BaseRepository {
         array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
         array_remove(array_agg(sr.name), NULL) AS role_names
       FROM
-        system_user su
+        "system_user" su
       LEFT JOIN
         system_user_role sur
       ON
@@ -130,7 +130,7 @@ export class UserRepository extends BaseRepository {
         array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
         array_remove(array_agg(sr.name), NULL) AS role_names
       FROM
-        system_user su
+        "system_user" su
       LEFT JOIN
         system_user_role sur
       ON
@@ -182,7 +182,7 @@ export class UserRepository extends BaseRepository {
         array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
         array_remove(array_agg(sr.name), NULL) AS role_names
       FROM
-        system_user su
+        "system_user" su
       LEFT JOIN
         system_user_role sur
       ON
@@ -233,7 +233,7 @@ export class UserRepository extends BaseRepository {
   async addSystemUser(userGuid: string, userIdentifier: string, identitySource: string): Promise<SystemUser> {
     const sqlStatement = SQL`
       INSERT INTO
-        system_user
+        "system_user"
       (
         user_guid,
         user_identity_source_id,
@@ -283,7 +283,7 @@ export class UserRepository extends BaseRepository {
         array_remove(array_agg(sr.system_role_id), NULL) AS role_ids,
         array_remove(array_agg(sr.name), NULL) AS role_names
       FROM
-        system_user su
+        "system_user" su
       LEFT JOIN
         system_user_role sur
       ON
@@ -327,7 +327,7 @@ export class UserRepository extends BaseRepository {
   async activateSystemUser(systemUserId: number) {
     const sqlStatement = SQL`
       UPDATE
-        system_user
+        "system_user"
       SET
         record_end_date = NULL
       WHERE
@@ -355,7 +355,7 @@ export class UserRepository extends BaseRepository {
   async deactivateSystemUser(systemUserId: number) {
     const sqlStatement = SQL`
       UPDATE
-        system_user
+        "system_user"
       SET
         record_end_date = now()
       WHERE

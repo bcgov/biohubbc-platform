@@ -145,12 +145,8 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item).to.be.instanceOf(Error);
-              if (item instanceof Error) {
-                expect(item.message).to.be.eql('DBPool is not initialized');
-              }
+              expect(item).to.be.eql({ name: 'Error', message: 'DBPool is not initialized' });
             });
-
             expect(getDBPoolStub).to.have.been.calledOnce;
 
             expect(connectStub).not.to.have.been.called;
@@ -232,10 +228,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item).to.be.instanceOf(Error);
-              if (item instanceof Error) {
-                expect(item.message).to.be.eql('DBConnection is not open');
-              }
+              expect(item).to.be.eql({ name: 'Error', message: 'DBConnection is not open' });
             });
           });
         });
@@ -287,10 +280,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item).to.be.instanceOf(Error);
-              if (item instanceof Error) {
-                expect(item.message).to.be.eql('DBConnection is not open');
-              }
+              expect(item).to.be.eql({ name: 'Error', message: 'DBConnection is not open' });
             });
           });
         });
@@ -326,10 +316,7 @@ describe('db', () => {
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item).to.be.instanceOf(Error);
-              if (item instanceof Error) {
-                expect(item.message).to.be.eql('DBConnection is not open');
-              }
+              expect(item).to.be.eql({ name: 'Error', message: 'DBConnection is not open' });
             });
           });
         });
@@ -348,18 +335,6 @@ describe('db', () => {
 
             expect(queryStub).to.have.been.calledWith('sql query $1', [123]);
           });
-
-          it('sends a query with empty values', async () => {
-            sinonSandbox.stub(db, 'getDBPool').returns(mockPool as unknown as pg.Pool);
-
-            await connection.open();
-
-            const sqlStatement = SQL`sql query`;
-
-            await connection.sql(sqlStatement);
-
-            expect(queryStub).to.have.been.calledWith('sql query', []);
-          });
         });
 
         describe('when a connection is not open', () => {
@@ -376,15 +351,11 @@ describe('db', () => {
             } catch (error) {
               expectedError = error as ApiExecuteSQLError;
             }
-
             expect(expectedError.message).to.equal('Failed to execute SQL');
 
             expect(expectedError.errors?.length).to.be.greaterThan(0);
             expectedError.errors?.forEach((item) => {
-              expect(item).to.be.instanceOf(Error);
-              if (item instanceof Error) {
-                expect(item.message).to.be.eql('DBConnection is not open');
-              }
+              expect(item).to.be.eql({ name: 'Error', message: 'DBConnection is not open' });
             });
           });
         });

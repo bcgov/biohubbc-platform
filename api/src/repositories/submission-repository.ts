@@ -499,7 +499,7 @@ export class SubmissionRepository extends BaseRepository {
     `;
 
     const response = await this.connection.sql<{ submission_id: number }>(sqlStatement);
-    if (response.rowCount > 0) {
+    if (response.rowCount !== 0) {
       return response.rows[0];
     } else {
       return null;

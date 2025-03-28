@@ -193,7 +193,7 @@ COMMENT ON TABLE system_role IS 'Agency or Ministry funding the project.';
 -- TABLE: system_user 
 --
 
-CREATE TABLE system_user(
+CREATE TABLE "system_user"(
     system_user_id             integer           GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1),
     user_identity_source_id    integer           NOT NULL,
     user_identifier            varchar(200)      NOT NULL,
@@ -208,17 +208,17 @@ CREATE TABLE system_user(
     CONSTRAINT system_user_pk PRIMARY KEY (system_user_id)
 );
 
-COMMENT ON COLUMN system_user.system_user_id IS 'System generated surrogate primary key identifier.';
-COMMENT ON COLUMN system_user.user_identity_source_id IS 'System generated surrogate primary key identifier.';
-COMMENT ON COLUMN system_user.user_identifier IS 'The identifier of the user.';
-COMMENT ON COLUMN system_user.record_effective_date IS 'Record level effective date.';
-COMMENT ON COLUMN system_user.record_end_date IS 'Record level end date.';
-COMMENT ON COLUMN system_user.create_date IS 'The datetime the record was created.';
-COMMENT ON COLUMN system_user.create_user IS 'The id of the user who created the record as identified in the system user table.';
-COMMENT ON COLUMN system_user.update_date IS 'The datetime the record was updated.';
-COMMENT ON COLUMN system_user.update_user IS 'The id of the user who updated the record as identified in the system user table.';
-COMMENT ON COLUMN system_user.revision_count IS 'Revision count used for concurrency control.';
-COMMENT ON TABLE system_user IS 'Agency or Ministry funding the project.';
+COMMENT ON COLUMN "system_user".system_user_id IS 'System generated surrogate primary key identifier.';
+COMMENT ON COLUMN "system_user".user_identity_source_id IS 'System generated surrogate primary key identifier.';
+COMMENT ON COLUMN "system_user".user_identifier IS 'The identifier of the user.';
+COMMENT ON COLUMN "system_user".record_effective_date IS 'Record level effective date.';
+COMMENT ON COLUMN "system_user".record_end_date IS 'Record level end date.';
+COMMENT ON COLUMN "system_user".create_date IS 'The datetime the record was created.';
+COMMENT ON COLUMN "system_user".create_user IS 'The id of the user who created the record as identified in the system user table.';
+COMMENT ON COLUMN "system_user".update_date IS 'The datetime the record was updated.';
+COMMENT ON COLUMN "system_user".update_user IS 'The id of the user who updated the record as identified in the system user table.';
+COMMENT ON COLUMN "system_user".revision_count IS 'Revision count used for concurrency control.';
+COMMENT ON TABLE "system_user" IS 'Agency or Ministry funding the project.';
 
 -- 
 -- TABLE: system_user_role 
@@ -284,7 +284,7 @@ COMMENT ON TABLE user_identity_source IS 'The source of the user identifier. Thi
 
 ALTER TABLE submission ADD CONSTRAINT submission_fk1
     FOREIGN KEY (system_user_id)
-    REFERENCES system_user(system_user_id);
+    REFERENCES "system_user"(system_user_id);
 
 CREATE INDEX submission_idx1 ON submission(system_user_id);
 
@@ -321,13 +321,13 @@ CREATE UNIQUE INDEX system_role_nuk1 ON system_role(name, (record_end_date is NU
 -- TABLE: system_user 
 --
 
-ALTER TABLE system_user ADD CONSTRAINT system_user_fk1
+ALTER TABLE "system_user" ADD CONSTRAINT system_user_fk1
     FOREIGN KEY (user_identity_source_id)
     REFERENCES user_identity_source(user_identity_source_id);
 
-CREATE UNIQUE INDEX system_user_nuk1 ON system_user(user_identifier, user_identity_source_id, (record_end_date is NULL)) where record_end_date is null;
+CREATE UNIQUE INDEX system_user_nuk1 ON "system_user"(user_identifier, user_identity_source_id, (record_end_date is NULL)) where record_end_date is null;
 
-CREATE INDEX system_user_id_idx1 ON system_user(user_identity_source_id);
+CREATE INDEX system_user_id_idx1 ON "system_user"(user_identity_source_id);
 
 -- 
 -- TABLE: system_user_role 
@@ -335,7 +335,7 @@ CREATE INDEX system_user_id_idx1 ON system_user(user_identity_source_id);
 
 ALTER TABLE system_user_role ADD CONSTRAINT system_user_role_fk1
     FOREIGN KEY (system_user_id)
-    REFERENCES system_user(system_user_id);
+    REFERENCES "system_user"(system_user_id);
 
 ALTER TABLE system_user_role ADD CONSTRAINT system_user_role_fk2
     FOREIGN KEY (system_role_id)
