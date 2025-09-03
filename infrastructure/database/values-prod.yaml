@@ -1,0 +1,22 @@
+# Production environment values for Biohub
+environment:
+  name: prod
+  id: deploy
+
+# Database configuration
+app:
+  nodeEnv: production
+
+# Openshift Resources
+replicas: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 1500m
+    memory: 6Gi
+
+# Volume for persistent data
+persistence:
+  size: 5Gi

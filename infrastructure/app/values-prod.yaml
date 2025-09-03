@@ -1,0 +1,30 @@
+# Production environment values for Biohub
+environment:
+  name: prod
+  id: deploy
+  
+# App configuration
+app:
+  nodeEnv: production
+  apiHost: api-biohub-platform.apps.silver.devops.gov.bc.ca
+
+  # Siteminder
+  siteminderLogoutURL: "https://logon7.gov.bc.ca/clp-cgi/logoff.cgi"
+
+  # Keycloak
+  keycloak:
+    host: "https://loginproxy.gov.bc.ca/auth"
+  
+# Openshift Resources
+replicas: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+# Route configuration
+route:
+  host: biohubbc.apps.silver.devops.gov.bc.ca

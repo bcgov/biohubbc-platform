@@ -6,7 +6,8 @@ metadata:
     build: biohub-platform-api
 parameters:
   - name: NAMESPACE
-    description: Openshift namespace name
+    description: The OpenShift Namespace where the ImageStream resides.
+    required: true
     value: ''
   - name: BASE_IMAGE_REGISTRY_URL
     description: The base image registry URL

@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    role: setup
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+    - name: postgresql
+      env:
+        - name: DB_HOST
+          value: {{ include "dbHost" . }}
+        - name: DB_ADMIN
+          valueFrom:
+            secretKeyRef:
+              key: database-admin
+              name: {{ include "dbHost" . }}
+        - name: DB_ADMIN_PASS
+          valueFrom:
+            secretKeyRef:
+              key: database-admin-password
+              name: {{ include "dbHost" . }}
+        - name: DB_USER_API
+          valueFrom:
+            secretKeyRef:
+              key: database-user-api
+              name: {{ include "dbHost" . }}
+        - name: DB_USER_API_PASS
+          valueFrom:
+            secretKeyRef:
+              key: database-user-api-password
+              name: {{ include "dbHost" . }}
+        - name: DB_DATABASE
+          valueFrom:
+            secretKeyRef:
+              key: database-name
+              name: {{ include "dbHost" . }}
+        - name: DB_PORT
+          value: '5432'
+        - name: CHANGE_VERSION
+          value: {{ .Values.environment.changeId | quote }}
+        - name: NODE_ENV
+          value: {{ .Values.app.nodeEnv }}
+        - name: VERSION
+          value: {{ .Values.environment.name }}-{{ .Chart.AppVersion }}-{{ .Values.environment.changeId }}
+        - name: DB_SCHEMA
+          value: {{ .Values.app.dbSchema }}
+      image: "{{ .Values.image.registry }}/{{ .Values.image.image }}:{{ include "app.imageTag" . }}"
+      imagePullPolicy: Always
+      resources:
+        requests:
+          cpu: {{ .Values.resources.requests.cpu }}
+          memory: {{ .Values.resources.requests.memory }}
+        limits:
+          cpu: {{ .Values.resources.limits.cpu }}
+          memory: {{ .Values.resources.limits.memory }}
+  restartPolicy: Never
+  activeDeadlineSeconds: 900
+  dnsPolicy: ClusterFirst

@@ -1,0 +1,52 @@
+# Default values for app chart
+environment:
+  licensePlate: "a0ec71" # License plate of the project
+  name: "" # Environment name (dev, test, prod)
+  id: "" # Environment id (PR, deploy)
+  ts: "" # Timestamp of the deployment
+  
+image:
+  registry: "image-registry.openshift-image-registry.svc:5000" # The base image registry URL
+  image: a0ec71-tools/biohub-platform-app # Always pull from tools namespace
+
+# App configuration
+app:
+  name: biohub-platform-app
+  nodeEnv: "" # NODE_ENV specification variable
+  apiHost: "" # API host for application backend
+
+  # Siteminder
+  siteminderLogoutURL: "" # Siteminder URL to log out and clear the session for the logged in user
+
+  # Keycloak
+  keycloak:
+    host: "" # Keycloak login url
+    realm: standard # Realm identifier or name
+    clientId: bio-hub-browser-4230 # Client Id for application
+
+  # Request limits
+  requestLimits:
+    uploadNumFiles: 10 # Default maximum number of files that can be uploaded at a time vai the upload component UI.
+    uploadFileSize: "52428800" # Default maximum size of a single file that can be uploaded by the upload component UI.
+  
+  
+# Openshift Resources
+replicas: ""
+resources:
+  requests:
+    cpu: ""
+    memory: ""
+  limits:
+    cpu: ""
+    memory: ""
+
+# Service configuration
+service:
+  type: ClusterIP
+  name: 7100-tcp
+  port: 7100
+  targetPort: 7100
+
+# Route configuration (OpenShift)
+route:
+  host: ""

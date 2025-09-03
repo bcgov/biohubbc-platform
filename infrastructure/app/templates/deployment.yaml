@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  namespace: {{ include "environment.namespace" . }}
+  labels:
+    {{- include "app.labels" . | nindent 4 }}
+    role: app
+  annotations:
+    {{- include "app.annotations" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      deployment: {{ include "app.fullname" . | quote }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      labels:
+        deployment: {{ include "app.fullname" . | quote }}
+        role: app
+    spec:
+      containers:
+        - name: app
+          env:
+            - name: CHANGE_VERSION
+              value: {{ .Values.environment.changeId | quote }}
+            - name: REACT_APP_API_HOST
+              value: {{ include "apiHost" . }}
+            - name: REACT_APP_SITEMINDER_LOGOUT_URL
+              value: {{ .Values.app.siteminderLogoutURL }}
+            - name: REACT_APP_MAX_UPLOAD_NUM_FILES
+              value: {{ .Values.app.requestLimits.uploadNumFiles | quote }}
+            - name: REACT_APP_MAX_UPLOAD_FILE_SIZE
+              value: {{ .Values.app.requestLimits.uploadFileSize | quote }}
+            - name: NODE_ENV
+              value: {{ .Values.app.nodeEnv }}
+            - name: REACT_APP_NODE_ENV
+              value: {{ .Values.app.nodeEnv }}
+            - name: VERSION
+              value: {{ .Values.environment.name }}-{{ .Chart.AppVersion }}-{{ .Values.environment.changeId }}
+            - name: REACT_APP_KEYCLOAK_HOST
+              value: {{ .Values.app.keycloak.host }}
+            - name: REACT_APP_KEYCLOAK_REALM
+              value: {{ .Values.app.keycloak.realm }}
+            - name: REACT_APP_KEYCLOAK_CLIENT_ID
+              value: {{ .Values.app.keycloak.clientId }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.image }}:{{ include "app.imageTag" . }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.service.port }}
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 30
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - emptyDir: {}
+          name: {{ include "app.fullname" . }}

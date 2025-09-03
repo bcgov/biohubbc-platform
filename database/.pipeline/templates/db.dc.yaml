@@ -15,7 +15,7 @@ parameters:
   - name: NAMESPACE
     description: The OpenShift Namespace where the ImageStream resides.
     required: true
-    value: 'a0ec71-tools'
+    value: ''
   - name: BASE_IMAGE_REGISTRY_URL
     description: The base image registry URL
     value: image-registry.openshift-image-registry.svc:5000
