@@ -1,0 +1,6 @@
+apiVersion: v2
+name: biohub-platform-db
+description: A Helm chart for Biohub Database (PostgreSQL with PostGIS)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

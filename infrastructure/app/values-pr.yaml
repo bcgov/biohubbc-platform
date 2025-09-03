@@ -1,0 +1,29 @@
+# Pull Request environment values for Biohub. This template will be used for dynamic PR deployments
+environment:
+  name: dev
+  # id will be dynamically set: "1234"
+
+# App configuration
+app:
+  nodeEnv: development
+  # apiHost will be dynamically set: "biohub-platform-api-1234-a0ec71-dev.apps.silver.devops.gov.bc.ca"
+
+  # Siteminder
+  siteminderLogoutURL: "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi"
+
+  # Keycloak
+  keycloak:
+    host: "https://dev.loginproxy.gov.bc.ca/auth"
+
+# Openshift Resources
+replicas: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 200m
+    memory: 200Mi
+
+# Route configuration
+# route.host will be dynamically set: "biohub-platform-1234-a0ec71-dev.apps.silver.devops.gov.bc.ca"
