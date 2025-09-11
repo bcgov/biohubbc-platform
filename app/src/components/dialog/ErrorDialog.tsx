@@ -7,7 +7,6 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
-import DOMPurify from 'dompurify';
 import { useState } from 'react';
 
 const useStyles = () => {
@@ -119,9 +118,7 @@ export const ErrorDialog: React.FC<React.PropsWithChildren<IErrorDialogProps>> =
               {props.dialogSubTitle}
             </DialogContentText>
           )}
-          <DialogContentText id="alert-dialog-description">
-            <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(props.dialogText as string) }} />
-          </DialogContentText>
+          <DialogContentText id="alert-dialog-description">{props.dialogText}</DialogContentText>
         </DialogContent>
         {props.dialogError && (
           <DialogContent>

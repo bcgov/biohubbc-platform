@@ -1,5 +1,5 @@
 import Fuse, { FuseResult, IFuseOptions, RangeTuple } from 'fuse.js';
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, JSX, useEffect, useState } from 'react';
 import useDebounce from './useDebounce';
 
 interface IUseFuzzyOptions<T> extends IFuseOptions<T> {
