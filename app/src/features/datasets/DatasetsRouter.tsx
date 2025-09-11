@@ -8,17 +8,17 @@ import DatasetPage from './DatasetPage';
  *
  * @return {*}
  */
-const DatasetsRouter: React.FC<React.PropsWithChildren> = () => {
+const DatasetsRouter = () => {
   return (
     <Switch>
-      <Redirect exact from="/datasets/:id" to="/datasets/:id/details" />
+      <Redirect exact from="/:id" to="/:id/details" />
 
-      <RouteWithTitle exact path="/datasets/:id/details" title={getTitle('Dataset Details')}>
+      <RouteWithTitle exact path="/:id/details" title={getTitle('Dataset Details')}>
         <DatasetPage />
       </RouteWithTitle>
 
       {/*  Catch any unknown routes, and re-direct to the not found page */}
-      <Route path="/datasets/*">
+      <Route path="/*">
         <Redirect to="/page-not-found" />
       </Route>
     </Switch>
