@@ -1,10 +1,8 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
-import { LatLngBounds, LatLngLiteral } from 'leaflet';
 import {
   downloadFile,
   ensureProtocol,
-  getFeatureObjectFromLatLngBounds,
   getFormattedAmount,
   getFormattedDate,
   getFormattedDateRangeString,
@@ -17,6 +15,7 @@ import {
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
+import { expect } from 'vitest';
 
 describe('ensureProtocol', () => {
   it('upgrades the URL if string begins with `http://`', async () => {
@@ -148,34 +147,6 @@ describe('getFormattedFileSize', () => {
   it('returns answer in GB if fileSize >= 1000000000', async () => {
     const formattedFileSize = getFormattedFileSize(1000000000);
     expect(formattedFileSize).toEqual('1.0 GB');
-  });
-});
-
-describe('getFeatureObjectFromLatLngBounds', () => {
-  it('returns a feature object', () => {
-    const southWest: LatLngLiteral = { lat: 111, lng: 222 };
-    const northEast: LatLngLiteral = { lat: 333, lng: 444 };
-
-    const bounds = new LatLngBounds(southWest, northEast);
-
-    const feature = getFeatureObjectFromLatLngBounds(bounds);
-
-    expect(feature).toEqual({
-      type: 'Feature',
-      properties: {},
-      geometry: {
-        type: 'Polygon',
-        coordinates: [
-          [
-            [southWest.lng, southWest.lat],
-            [southWest.lng, northEast.lat],
-            [northEast.lng, northEast.lat],
-            [northEast.lng, southWest.lat],
-            [southWest.lng, southWest.lat]
-          ]
-        ]
-      }
-    });
   });
 });
 
