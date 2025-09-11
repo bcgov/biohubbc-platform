@@ -1,11 +1,11 @@
 import CircularProgress from '@mui/material/CircularProgress';
 import { ThemeProvider } from '@mui/material/styles';
-import AppRouter from 'AppRouter';
 import { AuthStateContext, AuthStateContextProvider } from 'contexts/authStateContext';
 import { ConfigContext, ConfigContextProvider } from 'contexts/configContext';
 import { WebStorageStateStore } from 'oidc-client-ts';
 import { AuthProvider, AuthProviderProps } from 'react-oidc-context';
 import { BrowserRouter } from 'react-router-dom';
+import { AppRouter } from 'router/AppRouter';
 import appTheme from 'themes/appTheme';
 import { buildUrl } from 'utils/Utils';
 
