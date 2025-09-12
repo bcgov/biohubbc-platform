@@ -25,7 +25,8 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     environment: 'jsdom',
     setupFiles: './src/setupTests.ts',
-    include: ['src/**/*.test.{ts,tsx}']
+    include: ['src/**/*.test.{ts,tsx}'],
+    transformIgnorePatterns: ['**/*.css']
   },
   build: {
     outDir: 'build',

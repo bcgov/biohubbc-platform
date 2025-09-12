@@ -1,10 +1,10 @@
-import LoadingButton, { LoadingButtonProps } from '@mui/lab/LoadingButton';
+import Button, { ButtonProps } from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { ReactNode } from 'react';
 
@@ -75,18 +75,18 @@ export interface IYesNoDialogProps {
   /**
    * Optional yes-button props
    *
-   * @type {Partial<LoadingButtonProps>}
+   * @type {Partial<ButtonProps>}
    * @memberof IYesNoDialogProps
    */
-  yesButtonProps?: Partial<LoadingButtonProps>;
+  yesButtonProps?: Partial<ButtonProps>;
 
   /**
    * Optional no-button props
    *
-   * @type {Partial<LoadingButtonProps>}
+   * @type {Partial<ButtonProps>}
    * @memberof IYesNoDialogProps
    */
-  noButtonProps?: Partial<LoadingButtonProps>;
+  noButtonProps?: Partial<ButtonProps>;
 }
 
 /**
@@ -120,23 +120,23 @@ const YesNoDialog: React.FC<React.PropsWithChildren<IYesNoDialogProps>> = (props
         {props.dialogContent}
       </DialogContent>
       <DialogActions>
-        <LoadingButton
+        <Button
           data-testid="yes-button"
           onClick={props.onYes}
           color="primary"
           variant="contained"
           {...props.yesButtonProps}>
           {props.yesButtonLabel ? props.yesButtonLabel : 'Yes'}
-        </LoadingButton>
+        </Button>
 
-        <LoadingButton
+        <Button
           data-testid="no-button"
           onClick={props.onNo}
           color="primary"
           variant="outlined"
           {...props.noButtonProps}>
           {props.noButtonLabel ? props.noButtonLabel : 'No'}
-        </LoadingButton>
+        </Button>
       </DialogActions>
     </Dialog>
   );

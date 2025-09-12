@@ -1,18 +1,18 @@
 // @ts-nocheck
 /*
-jest-dom adds custom jest matchers for asserting on DOM nodes
+vi-dom adds custom vi matchers for asserting on DOM nodes
 It allows you to do things like:
 
 expect(element).toHaveTextContent(/react/i)
-learn more: https://github.com/testing-library/jest-dom
+learn more: https://github.com/testing-library/vi-dom
 */
-import '@testing-library/jest-dom';
+import '@testing-library/vi-dom';
 import { configure } from 'test-helpers/test-utils';
 
 /*
   Extend JSDOM SVGSVGElement by introducing createSVGRect as an empty function
 
-  This technique allows us to emulate SVG support in JSDOM in order to pass Jest tests
+  This technique allows us to emulate SVG support in JSDOM in order to pass vi tests
   for vector overlays such as Polygon
 */
 const createElementNSOrig = global.document.createElementNS;
@@ -36,9 +36,9 @@ global.document.createElementNS = function (namespaceURI, qualifiedName) {
 global.console = {
   ...console,
   // Disable console.warning(...) messages from appearing in the console when running tests
-  warn: jest.fn(),
+  warn: vi.fn(),
   // Disable console.error(...) messages from appearing in the console when running tests
-  error: jest.fn()
+  error: vi.fn()
 };
 
 /*

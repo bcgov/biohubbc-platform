@@ -103,7 +103,16 @@ const SubmissionsListSortMenu = <RecordType extends object, SortableRecordType e
   };
 
   const handleMenuItemClick = (sortKey: keyof RecordType) => {
-    const sortDirection = !sortProp || sortProp.sort === 'desc' ? 'asc' : 'desc';
+    let sortDirection: 'asc' | 'desc';
+
+    if (!sortProp || sortProp.key !== sortKey) {
+      // If new key, start with ascending sort
+      sortDirection = 'asc';
+    } else {
+      // Same key clicked again, toggle
+      sortDirection = sortProp.sort === 'asc' ? 'desc' : 'asc';
+    }
+
     const newSortProp: SortProp<RecordType> = {
       key: sortKey,
       sort: sortDirection

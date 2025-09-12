@@ -1,13 +1,10 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { AuthStateContext } from 'contexts/authStateContext';
-import { createMemoryHistory } from 'history';
-import { Router } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { getMockAuthState, SystemAdminAuthState, SystemUserAuthState } from 'test-helpers/auth-helpers';
 import { render } from 'test-helpers/test-utils';
 import Header from './Header';
-
-const history = createMemoryHistory();
 
 describe('Header', () => {
   it('renders correctly with system admin role (IDIR)', () => {
@@ -15,9 +12,9 @@ describe('Header', () => {
 
     const { getByTestId } = render(
       <AuthStateContext.Provider value={authState}>
-        <Router history={history}>
+        <MemoryRouter initialEntries={['/']}>
           <Header />
-        </Router>
+        </MemoryRouter>
       </AuthStateContext.Provider>
     );
 
@@ -33,9 +30,9 @@ describe('Header', () => {
 
     const { getByTestId } = render(
       <AuthStateContext.Provider value={authState}>
-        <Router history={history}>
+        <MemoryRouter initialEntries={['/']}>
           <Header />
-        </Router>
+        </MemoryRouter>
       </AuthStateContext.Provider>
     );
 
@@ -51,9 +48,9 @@ describe('Header', () => {
 
     const { getByTestId } = render(
       <AuthStateContext.Provider value={authState}>
-        <Router history={history}>
+        <MemoryRouter initialEntries={['/']}>
           <Header />
-        </Router>
+        </MemoryRouter>
       </AuthStateContext.Provider>
     );
 
@@ -69,9 +66,9 @@ describe('Header', () => {
 
     const { getByTestId, getByText } = render(
       <AuthStateContext.Provider value={authState}>
-        <Router history={history}>
+        <MemoryRouter initialEntries={['/']}>
           <Header />
-        </Router>
+        </MemoryRouter>
       </AuthStateContext.Provider>
     );
 
@@ -83,7 +80,7 @@ describe('Header', () => {
   describe('Log out', () => {
     describe('expanded menu button', () => {
       it('calls logout', async () => {
-        const signoutRedirectStub = jest.fn();
+        const signoutRedirectStub = vi.fn();
 
         const authState = getMockAuthState({
           base: SystemUserAuthState,
@@ -92,9 +89,9 @@ describe('Header', () => {
 
         const { getByTestId } = render(
           <AuthStateContext.Provider value={authState}>
-            <Router history={history}>
+            <MemoryRouter initialEntries={['/']}>
               <Header />
-            </Router>
+            </MemoryRouter>
           </AuthStateContext.Provider>
         );
 
@@ -112,7 +109,7 @@ describe('Header', () => {
 
     describe('collapsed menu button', () => {
       it('calls logout', async () => {
-        const signoutRedirectStub = jest.fn();
+        const signoutRedirectStub = vi.fn();
 
         const authState = getMockAuthState({
           base: SystemUserAuthState,
@@ -121,9 +118,9 @@ describe('Header', () => {
 
         const { getByTestId } = render(
           <AuthStateContext.Provider value={authState}>
-            <Router history={history}>
+            <MemoryRouter initialEntries={['/']}>
               <Header />
-            </Router>
+            </MemoryRouter>
           </AuthStateContext.Provider>
         );
 
