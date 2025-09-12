@@ -94,7 +94,10 @@ interface ISecureDataAccessRequestFormProps {
 const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) => {
   const classes = useStyles();
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
-  const [currentRowSelection, setCurrentRowSelection] = useState<GridRowSelectionModel>(props.initialArtifactSelection);
+  const [currentRowSelection, setCurrentRowSelection] = useState<GridRowSelectionModel>({
+    type: 'include',
+    ids: new Set(props.initialArtifactSelection)
+  });
 
   useEffect(() => {
     // Ensure that the initially selected artifact is persisted

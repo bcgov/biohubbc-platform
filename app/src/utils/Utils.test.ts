@@ -199,7 +199,6 @@ describe('isObject', () => {
     });
 
     it('when a new Object', () => {
-      // eslint-disable-next-line no-new-object
       expect(isObject(new Object())).toEqual(true);
     });
   });

@@ -13,10 +13,9 @@ vi.mock('popper.js', () => {
         return {
           update: () => {},
           destroy: () => {},
-          scheduleUpdate: () => {},
+          scheduleUpdate: () => {}
         };
       }
     }
   };
 });
-
