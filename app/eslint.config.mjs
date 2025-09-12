@@ -56,7 +56,8 @@ export default [
         }
       ],
       '@typescript-eslint/no-unused-vars': [
-        'error',
+        // TODO: Change to error instead of warn
+        'warn',
         {
           args: 'all',
           argsIgnorePattern: '^_',

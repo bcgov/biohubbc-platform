@@ -78,8 +78,6 @@ export const SubmissionContextProvider: React.FC<React.PropsWithChildren> = (pro
       },
       []
     );
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionFeatureGroupsDataLoader.data]);
 
   /**
