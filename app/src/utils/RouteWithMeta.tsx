@@ -17,11 +17,7 @@ const RouteWithMeta = ({ title, description, element, ...rest }: RouteWithMetaPr
     }
   }, [title, description]);
 
-  return (
-    <>
-      <Route {...rest} element={element} />
-    </>
-  );
+  return <Route {...rest} element={element} />;
 };
 
 export default RouteWithMeta;

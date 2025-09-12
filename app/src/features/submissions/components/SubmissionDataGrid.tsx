@@ -3,14 +3,7 @@ import Icon from '@mdi/react';
 import { Divider, Paper, Stack, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { Box } from '@mui/system';
-import {
-  DataGrid,
-  GridColDef,
-  GridInputRowSelectionModel,
-  GridRenderCellParams,
-  GridRowSelectionModel,
-  GridValueGetterParams
-} from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams, GridRowSelectionModel } from '@mui/x-data-grid';
 import { useCodesContext } from 'hooks/useContext';
 import { FeaturePropertyCode } from 'interfaces/useCodesApi.interface';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
@@ -19,7 +12,7 @@ export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
   feature_type_name: string;
   submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
-  rowSelectionModel: GridInputRowSelectionModel;
+  rowSelectionModel: GridRowSelectionModel;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
 }
 
@@ -39,26 +32,27 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     featureTypesWithProperties?.find((item) => item.feature_type.feature_type_name === feature_type_name)
       ?.feature_type_properties || [];
 
-  const fieldColumns = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => {
-    return {
-      field: featureType.feature_property_type_name,
-      headerName: featureType.feature_property_display_name,
-      flex: 1,
-      disableColumnMenu: true,
-      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.feature_property_type_name] ?? null,
-      renderCell: (params: GridRenderCellParams) => {
-        return (
-          <Box
-            sx={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}>
-            {String(params.value)}
-          </Box>
-        );
-      }
-    };
-  });
+  // Dynamically create the columns
+  const fieldColumns: GridColDef[] = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => ({
+    field: featureType.feature_property_type_name,
+    headerName: featureType.feature_property_display_name,
+    flex: 1,
+    disableColumnMenu: true,
+    valueGetter: (value: any, row: SubmissionFeatureRecordWithTypeAndSecurity) => {
+      return row.data[featureType.feature_property_type_name] ?? null;
+    },
+    renderCell: (params: GridRenderCellParams) => {
+      return (
+        <Box
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+          {String(params.value)}
+        </Box>
+      );
+    }
+  }));
 
   const columns: GridColDef[] = [
     {
@@ -67,7 +61,7 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
       flex: 0,
       disableColumnMenu: true,
       width: 160,
-      renderCell: (params) => {
+      renderCell: (params: GridRenderCellParams) => {
         if (params.value.length > 0) {
           return (
             <Stack flexDirection="row" alignItems="center" gap={1}>
@@ -132,7 +126,6 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           rows={submissionFeatures}
           columns={columns}
           pageSizeOptions={[5]}
-          editMode="row"
           rowSelectionModel={props.rowSelectionModel}
           onRowSelectionModelChange={props.onRowSelectionModelChange}
           disableRowSelectionOnClick

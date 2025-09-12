@@ -46,11 +46,13 @@ const SecurityRuleForm = () => {
    * in addition to all of the features IDs and features types (with counts) that belong to each rule.
    */
   const groupedAppliedSecurityRules: IAppliedSecurityRuleGroup[] = useMemo(() => {
+    const ids = formikProps.initialValues.submissionFeatureIds;
     return (
       initialAppliedSecurityRules
-        // Filter out any security records that don't pertain to the selected.
         .filter((securityRecord) =>
-          formikProps.initialValues.submissionFeatureIds.includes(securityRecord.submission_feature_id)
+          Array.isArray(ids)
+            ? ids.includes(securityRecord.submission_feature_id)
+            : securityRecord.submission_feature_id in ids
         )
 
         // Group security records by rule, including associated feature IDs and feature type counts.
