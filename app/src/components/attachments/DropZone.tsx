@@ -4,7 +4,6 @@ import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { useConfigContext } from 'hooks/useContext';
-import React from 'react';
 import Dropzone, { FileRejection } from 'react-dropzone';
 
 const BYTES_PER_MEGABYTE = 1048576;
@@ -54,16 +53,17 @@ export interface IDropZoneConfigProps {
    * @type {(string | string[])}
    * @memberof IDropZoneConfigProps
    */
-  acceptedFileExtensions?: string | string[];
+  acceptedFileExtensions?: string[];
 }
 
-export const DropZone: React.FC<IDropZoneProps & IDropZoneConfigProps> = (props) => {
+export const DropZone = (props: IDropZoneProps & IDropZoneConfigProps) => {
   const config = useConfigContext();
 
   const maxNumFiles = props.maxNumFiles || config.MAX_UPLOAD_NUM_FILES;
   const maxFileSize = props.maxFileSize || config.MAX_UPLOAD_FILE_SIZE;
   const multiple = props.multiple ?? true;
-  const acceptedFileExtensions = props.acceptedFileExtensions;
+
+  const acceptObject = props.acceptedFileExtensions && { 'application/octet-stream': props.acceptedFileExtensions };
 
   return (
     <Box className="dropZoneContainer">
@@ -72,7 +72,7 @@ export const DropZone: React.FC<IDropZoneProps & IDropZoneConfigProps> = (props)
         maxSize={maxFileSize}
         multiple={multiple}
         onDrop={props.onFiles}
-        accept={props.acceptedFileExtensions}>
+        accept={acceptObject}>
         {({ getRootProps, getInputProps }) => (
           <Box {...getRootProps()}>
             <input {...getInputProps()} data-testid="drop-zone-input" />
@@ -90,7 +90,7 @@ export const DropZone: React.FC<IDropZoneProps & IDropZoneConfigProps> = (props)
                 Drag your {(multiple && 'files') || 'file'} here, or <Link underline="always">Browse Files</Link>
               </Box>
               <Box textAlign="center">
-                {acceptedFileExtensions && (
+                {props.acceptedFileExtensions && (
                   <Typography
                     component="span"
                     variant="subtitle2"
@@ -98,7 +98,7 @@ export const DropZone: React.FC<IDropZoneProps & IDropZoneConfigProps> = (props)
                     sx={{
                       mx: 1
                     }}>
-                    {`Supported files: ${acceptedFileExtensions}`}
+                    {`Supported files: ${props.acceptedFileExtensions.join(', ')}`}
                   </Typography>
                 )}
                 {!!maxFileSize && maxFileSize !== Infinity && (

@@ -8,7 +8,7 @@ const onFiles = vi.fn();
 const renderContainer = () => {
   return render(
     <ConfigContext.Provider value={{ MAX_UPLOAD_NUM_FILES: 10, MAX_UPLOAD_FILE_SIZE: 52428800 } as IConfig}>
-      <DropZone onFiles={onFiles} acceptedFileExtensions=".txt" />
+      <DropZone onFiles={onFiles} acceptedFileExtensions={['.txt']} />
     </ConfigContext.Provider>
   );
 };
