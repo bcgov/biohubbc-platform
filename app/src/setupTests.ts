@@ -19,7 +19,6 @@ const createElementNSOrig = global.document.createElementNS;
 
 global.document.createElementNS = function (namespaceURI, qualifiedName) {
   if (namespaceURI === 'http://www.w3.org/2000/svg' && qualifiedName === 'svg') {
-    // eslint-disable-next-line prefer-rest-params
     const element = createElementNSOrig.apply(this, arguments);
 
     element.createSVGRect = function () {
@@ -29,7 +28,6 @@ global.document.createElementNS = function (namespaceURI, qualifiedName) {
     return element;
   }
 
-  // eslint-disable-next-line prefer-rest-params
   return createElementNSOrig.apply(this, arguments);
 };
 
