@@ -1,25 +1,7 @@
 import { CodesContext, ICodesContext } from 'contexts/codesContext';
-import { ConfigContext, IConfig } from 'contexts/configContext';
 import { DialogContext, IDialogContext } from 'contexts/dialogContext';
 import { useContext } from 'react';
 import { ISubmissionContext, SubmissionContext } from '../contexts/submissionContext';
-
-/**
- * Returns an instance of `IConfig` from `ConfigContext`.
- *
- * @return {*}  {IConfig}
- */
-export const useConfigContext = (): IConfig => {
-  const context = useContext(ConfigContext);
-
-  if (!context) {
-    throw Error(
-      'ConfigContext is undefined, please verify you are calling useConfigContext() as child of an <ConfigContextProvider> component.'
-    );
-  }
-
-  return context;
-};
 
 /**
  * Returns an instance of `ISubmissionContext` from `SubmissionContext`.

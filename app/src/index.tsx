@@ -12,7 +12,7 @@ if (container) {
 }
 
 // Register the service worker only in production
-if (process.env.NODE_ENV === 'production') {
+if (import.meta.env.VITE_NODE_ENV === 'production') {
   serviceWorker.register();
 } else {
   serviceWorker.unregister();
