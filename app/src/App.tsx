@@ -4,7 +4,6 @@ import { AuthStateContext, AuthStateContextProvider } from 'contexts/authStateCo
 import { ConfigContext, ConfigContextProvider } from 'contexts/configContext';
 import { WebStorageStateStore } from 'oidc-client-ts';
 import { AuthProvider, AuthProviderProps } from 'react-oidc-context';
-import { BrowserRouter } from 'react-router-dom';
 import { AppRouter } from 'router/AppRouter';
 import appTheme from 'themes/appTheme';
 import { buildUrl } from 'utils/Utils';
@@ -48,11 +47,7 @@ const App = () => {
                       if (!authState) {
                         return <CircularProgress className="pageProgress" size={40} />;
                       }
-                      return (
-                        <BrowserRouter>
-                          <AppRouter />
-                        </BrowserRouter>
-                      );
+                      return <AppRouter />;
                     }}
                   </AuthStateContext.Consumer>
                 </AuthStateContextProvider>

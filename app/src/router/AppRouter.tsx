@@ -2,9 +2,8 @@ import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import BaseLayout from 'layouts/BaseLayout';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import RouteWithTitle from 'utils/RouteWithTitle';
-import { getTitle } from 'utils/Utils';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import RouteWithMeta from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 
 export const AppRouter = () => {
@@ -17,35 +16,43 @@ export const AppRouter = () => {
   }
 
   return (
-    <Routes>
-      {/* Admin Routes */}
-      <Route path="/admin/*" element={<AdminRouter />} />
-
-      {/* App Routes inside BaseLayout */}
-      <Route element={<BaseLayout />}>
-        <Route path="/" element={<DatasetsRouter />} />
-
-        <Route
-          path="/page-not-found"
-          element={
-            <RouteWithTitle title={getTitle('Page Not Found')}>
-              <NotFoundPage />
-            </RouteWithTitle>
-          }
+    <BrowserRouter>
+      <Routes>
+        {/* Admin Routes */}
+        <RouteWithMeta
+          path="/admin/*"
+          title="Admin Panel"
+          description="Administrative interface"
+          element={<AdminRouter />}
         />
 
-        <Route
-          path="/forbidden"
-          element={
-            <RouteWithTitle title={getTitle('Forbidden')}>
-              <AccessDenied />
-            </RouteWithTitle>
-          }
-        />
-      </Route>
+        {/* App Routes inside BaseLayout */}
+        <Route element={<BaseLayout />}>
+          <Routes>
+            <RouteWithMeta
+              path="/"
+              title="Search Datasets"
+              description="Browse and manage your datasets"
+              element={<DatasetsRouter />}
+            />
+            <RouteWithMeta
+              path="/page-not-found"
+              title="Page Not Found"
+              description="The page you're looking for doesn't exist"
+              element={<NotFoundPage />}
+            />
+            <RouteWithMeta
+              path="/forbidden"
+              title="Access Denied"
+              description="You don't have permission to access this page"
+              element={<AccessDenied />}
+            />
+          </Routes>
+        </Route>
 
-      {/* Catch-all redirect to 404 */}
-      <Route path="*" element={<Navigate to="/page-not-found" replace />} />
-    </Routes>
+        {/* Catch-all redirect to 404 */}
+        <Route path="*" element={<Navigate to="/page-not-found" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 };

@@ -4,7 +4,7 @@ import { render } from 'test-helpers/test-utils';
 import appTheme from 'themes/appTheme';
 import SubmissionsListSortMenu from './SubmissionsListSortMenu';
 
-const mockHandleSubmissions = jest.fn();
+const mockHandleSubmissions = vi.fn();
 
 const menuItems = { name: 'NAME', source_system: 'TEST' };
 

@@ -1,5 +1,6 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT } from 'constants/dateTimeFormats';
+import { expect } from 'vitest';
 import {
   downloadFile,
   ensureProtocol,
@@ -15,7 +16,6 @@ import {
   safeJSONParse,
   safeJSONStringify
 } from './Utils';
-import { expect } from 'vitest';
 
 describe('ensureProtocol', () => {
   it('upgrades the URL if string begins with `http://`', async () => {
@@ -72,7 +72,7 @@ describe('getFormattedAmount', () => {
 describe('getFormattedDate', () => {
   beforeAll(() => {
     // ignore warning about invalid date string being passed to dayjs
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('returns empty string if invalid date is provided', async () => {
@@ -91,7 +91,7 @@ describe('getFormattedDate', () => {
 describe('getFormattedDateRangeString', () => {
   beforeAll(() => {
     // ignore warning about invalid date string being passed to dayjs
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   it('returns empty string if invalid startDate is provided', async () => {
@@ -276,9 +276,9 @@ describe('downloadFile', () => {
   it('should create an anchor element with the provided URL and simulate a click', () => {
     const url = 'https://example.com/file.pdf';
     const anchor = document.createElement('a');
-    jest.spyOn(document, 'createElement').mockReturnValue(anchor);
-    jest.spyOn(anchor, 'click');
-    jest.spyOn(anchor, 'remove');
+    vi.spyOn(document, 'createElement').mockReturnValue(anchor);
+    vi.spyOn(anchor, 'click');
+    vi.spyOn(anchor, 'remove');
 
     downloadFile(url);
 

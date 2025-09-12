@@ -2,7 +2,7 @@ import { mdiMagnify } from '@mdi/js';
 import { Icon } from '@mdi/react';
 import Input from '@mui/material/Input';
 import InputAdornment from '@mui/material/InputAdornment';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import { ChangeEvent } from 'react';
 
 export const useSearchInputStyles = () => {

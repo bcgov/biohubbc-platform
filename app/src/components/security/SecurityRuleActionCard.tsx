@@ -1,7 +1,7 @@
 import { mdiClose } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Card, IconButton } from '@mui/material';
-import grey from '@mui/material/colors/grey';
+import { grey } from '@mui/material/colors';
 import SecurityRuleCard, { ISecurityRuleCardProps } from './SecurityRuleCard';
 
 interface ISecurityRuleActionCardProps extends ISecurityRuleCardProps {
