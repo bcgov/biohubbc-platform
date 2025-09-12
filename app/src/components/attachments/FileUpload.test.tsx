@@ -1,14 +1,9 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import FileUpload, { IFileUploadProps } from 'components/attachments/FileUpload';
-import { ConfigContext, IConfig } from 'contexts/configContext';
 import { render } from 'test-helpers/test-utils';
 
 const renderContainer = (props: IFileUploadProps) => {
-  return render(
-    <ConfigContext.Provider value={{} as IConfig}>
-      <FileUpload {...props} />
-    </ConfigContext.Provider>
-  );
+  return render(<FileUpload {...props} />);
 };
 
 describe('FileUpload', () => {
