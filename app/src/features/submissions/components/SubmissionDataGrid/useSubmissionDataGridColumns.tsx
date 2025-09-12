@@ -2,7 +2,7 @@ import { mdiLock, mdiLockOpenOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import { Button, Stack, Typography } from '@mui/material';
 import { Box } from '@mui/system';
-import { GridColDef, GridRenderCellParams, GridValueGetterParams } from '@mui/x-data-grid';
+import { GridColDef, GridRenderCellParams, GridValueGetter } from '@mui/x-data-grid';
 import { useApi } from 'hooks/useApi';
 import { useCodesContext } from 'hooks/useContext';
 import useDownload from 'hooks/useDownload';
@@ -34,7 +34,7 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
         disableColumnMenu: true,
         disableReorder: true,
         hideSortIcons: true,
-        valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.feature_property_name] ?? null,
+        valueGetter: ((_, row) => row.data[featureType.feature_property_name] ?? null) as GridValueGetter,
         renderCell: (params: GridRenderCellParams) => {
           const download = async () => {
             const signedUrlPromise = api.submissions.getSubmissionFeatureSignedUrl({
@@ -58,7 +58,7 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
       headerName: featureType.feature_property_display_name,
       flex: 1,
       disableColumnMenu: true,
-      valueGetter: (params: GridValueGetterParams) => params.row.data[featureType.feature_property_name] ?? null,
+      valueGetter: ((_, row) => row.data[featureType.feature_property_name] ?? null) as GridValueGetter,
       renderCell: (params: GridRenderCellParams) => (
         <Box
           sx={{

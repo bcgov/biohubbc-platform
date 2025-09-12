@@ -94,7 +94,7 @@ const UploadArea: React.FC<React.PropsWithChildren<any>> = () => {
       <FileUpload
         uploadHandler={AreaUploadHandler()}
         dropZoneProps={{
-          acceptedFileExtensions: AttachmentValidExtensions.SPATIAL
+          acceptedFileExtensions: [AttachmentValidExtensions.SPATIAL]
         }}
       />
     </>

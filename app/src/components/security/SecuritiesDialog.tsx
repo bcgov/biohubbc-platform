@@ -10,7 +10,7 @@ import yup from 'utils/YupSchema';
 import SecurityRuleForm from './SecurityRuleForm';
 
 interface ISecuritiesDialogProps {
-  submissionFeatureIds: GridRowSelectionModel;
+  submissionFeatureIds: Pick<GridRowSelectionModel, 'ids'>;
   open: boolean;
   onClose: () => void;
 }
@@ -64,7 +64,11 @@ const SecuritiesDialog = (props: ISecuritiesDialogProps) => {
       onSave={handleSave}
       component={{
         element: <SecurityRuleForm />,
-        initialValues: { submissionFeatureIds: props.submissionFeatureIds, stagedForRemove: [], stagedForApply: [] },
+        initialValues: {
+          submissionFeatureIds: [...props.submissionFeatureIds.ids].map(Number),
+          stagedForRemove: [],
+          stagedForApply: []
+        },
         validationSchema: yup.object()
       }}
     />
