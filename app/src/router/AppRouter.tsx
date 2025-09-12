@@ -2,19 +2,11 @@ import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
 import BaseLayout from 'layouts/BaseLayout';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import RouteWithMeta from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 
 export const AppRouter = () => {
-  const location = useLocation();
-
-  // Strip trailing slashes (optional redirect)
-  if (location.pathname.match(/.+\/$/)) {
-    const cleanedPath = location.pathname.replace(/\/+$/, '');
-    return <Navigate to={cleanedPath} replace />;
-  }
-
   return (
     <BrowserRouter>
       <Routes>
@@ -50,7 +42,7 @@ export const AppRouter = () => {
           </Routes>
         </Route>
 
-        {/* Catch-all redirect to 404 */}
+        {/* Catch-all route to redirect to 404 */}
         <Route path="*" element={<Navigate to="/page-not-found" replace />} />
       </Routes>
     </BrowserRouter>
