@@ -44,7 +44,8 @@ export default [
       // Prettier rules
       'prettier/prettier': ['warn'],
       // TypeScript rules
-      '@typescript-eslint/no-explicit-any': 'off',
+      // TODO: Change no-explicit-any to error, but in its own PR that also fixes the errors
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/ban-ts-comment': [
         'error',
@@ -56,7 +57,7 @@ export default [
         }
       ],
       '@typescript-eslint/no-unused-vars': [
-        // TODO: Change to error instead of warn
+        // TODO: Change to error instead of warn, but in its own PR that also fixes the errors
         'warn',
         {
           args: 'all',
@@ -64,7 +65,7 @@ export default [
           caughtErrorsIgnorePattern: '^_'
         }
       ],
-      '@typescript-eslint/no-redeclare': 'off',
+      '@typescript-eslint/no-redeclare': 'error',
       'no-undef': 'off',
       'no-redeclare': 'off',
       'no-unused-vars': 'off',
