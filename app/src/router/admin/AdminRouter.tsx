@@ -4,8 +4,8 @@ import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import RouteWithMeta from 'utils/RouteWithMeta'; // Import RouteWithMeta
 import { SubmissionsRouter } from './submission/SubmissionRouter';
+import { PageTitle } from 'utils/RouteWithMeta';
 
 export const AdminRouter = () => {
   return (
@@ -14,12 +14,11 @@ export const AdminRouter = () => {
       <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
 
       {/* Dashboard route with meta */}
-      <RouteWithMeta
+      <Route
         path="dashboard"
-        title="Admin Dashboard"
-        description="Overview of the admin dashboard"
         element={
           <BaseLayout>
+            <PageTitle title="Admin Dashboard" description="Overview of the admin dashboard" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
@@ -32,12 +31,11 @@ export const AdminRouter = () => {
       />
 
       {/* Manage Users route with meta */}
-      <RouteWithMeta
+      <Route
         path="users"
-        title="Manage Users"
-        description="Manage users and their roles"
         element={
           <BaseLayout>
+            <PageTitle title="Manage Users" description="Manage users and their roles" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}

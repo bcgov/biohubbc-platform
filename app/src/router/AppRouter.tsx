@@ -2,7 +2,7 @@ import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import BaseLayout from 'layouts/BaseLayout';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import RouteWithMeta from 'utils/RouteWithMeta';
+import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
 import DatasetsRouter from './dataset/DatasetRouter';
 
@@ -14,46 +14,42 @@ export const AppRouter = () => {
         <Route path="/" element={<Navigate to="/datasets" replace />} />
 
         {/* App Routes wrapped in BaseLayout */}
-        <RouteWithMeta
+        <Route
           path="/datasets/*"
-          title="Search Datasets"
-          description="Browse and manage datasets"
           element={
             <BaseLayout>
+              <PageTitle title="Search Datasets" description="Browse and manage datasets" />
               <DatasetsRouter />
             </BaseLayout>
           }
         />
 
         {/* Admin Routes */}
-        <RouteWithMeta
+        <Route
           path="/admin/*"
-          title="Admin Panel"
-          description="Administrative interface"
           element={
             <BaseLayout>
+              <PageTitle title="Admin Panel" description="Administrative interface" />
               <AdminRouter />
             </BaseLayout>
           }
         />
 
-        <RouteWithMeta
+        <Route
           path="/page-not-found"
-          title="Page Not Found"
-          description="The page you're looking for doesn't exist"
           element={
             <BaseLayout>
+              <PageTitle title="Page Not Found" description="The page you're looking for doesn't exist" />
               <NotFoundPage />
             </BaseLayout>
           }
         />
 
-        <RouteWithMeta
+        <Route
           path="/forbidden"
-          title="Access Denied"
-          description="You don't have permission to access this page"
           element={
             <BaseLayout>
+              <PageTitle title="Access Denied" description="You don't have permission to access this page" />
               <AccessDenied />
             </BaseLayout>
           }

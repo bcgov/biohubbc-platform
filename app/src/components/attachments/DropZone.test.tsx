@@ -1,15 +1,21 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import DropZone from 'components/attachments/DropZone';
-import { ConfigContext, IConfig } from 'contexts/configContext';
 import { render } from 'test-helpers/test-utils';
 
 const onFiles = vi.fn();
 
+// You can define the max file size and max file count directly for testing
+const maxUploadNumFiles = 10;
+const maxUploadFileSize = 52428800; // 50 MB
+
 const renderContainer = () => {
   return render(
-    <ConfigContext.Provider value={{ MAX_UPLOAD_NUM_FILES: 10, MAX_UPLOAD_FILE_SIZE: 52428800 } as IConfig}>
-      <DropZone onFiles={onFiles} acceptedFileExtensions={['.txt']} />
-    </ConfigContext.Provider>
+    <DropZone
+      onFiles={onFiles}
+      acceptedFileExtensions={['.txt']}
+      maxNumFiles={maxUploadNumFiles}
+      maxFileSize={maxUploadFileSize}
+    />
   );
 };
 

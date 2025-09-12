@@ -1,19 +1,22 @@
 import SubmissionsListPage from 'features/submissions/list/SubmissionsListPage';
-import { Routes } from 'react-router-dom';
-import RouteWithMeta from 'utils/RouteWithMeta';
-import { getTitle } from 'utils/Utils'; // Assuming this is a function to get the title
+import { Route, Routes } from 'react-router-dom';
+import { PageTitle } from 'utils/RouteWithMeta';
+import { getTitle } from 'utils/Utils';
 
 /**
- * Router for all `/submissions/*` pages.
+ * Router for all `/submissions/` pages.
  */
 export const SubmissionsRouter = () => {
   return (
     <Routes>
-      <RouteWithMeta
+      <Route
         path="/"
-        title={getTitle('Submissions')}
-        description="Browse and manage submissions"
-        element={<SubmissionsListPage />}
+        element={
+          <>
+            <PageTitle title={getTitle('Submissions')} description="Browse and manage submissions" />
+            <SubmissionsListPage />
+          </>
+        }
       />
     </Routes>
   );
