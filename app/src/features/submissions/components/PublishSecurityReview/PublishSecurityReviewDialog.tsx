@@ -1,11 +1,10 @@
-import { LoadingButton } from '@mui/lab';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import CompleteSecurityReviewStatusMessage from 'features/submissions/components/PublishSecurityReview/CompleteSecurityReviewStatusMessage';
 import { SubmissionRecordWithSecurity } from 'interfaces/useSubmissionsApi.interface';
@@ -46,9 +45,9 @@ const PublishSecurityReviewDialog = (props: IPublishSecurityReviewDialogProps) =
         </DialogContentText>
       </DialogContent>
       <DialogActions>
-        <LoadingButton onClick={async () => onComplete()} color="primary" variant="contained">
+        <Button onClick={async () => onComplete()} color="primary" variant="contained">
           Publish
-        </LoadingButton>
+        </Button>
         <Button onClick={() => onCancel()} color="primary" variant="outlined">
           Cancel
         </Button>

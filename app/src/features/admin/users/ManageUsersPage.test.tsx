@@ -1,27 +1,25 @@
 import { cleanup, waitFor } from '@testing-library/react';
-import { createMemoryHistory } from 'history';
 import { useApi } from 'hooks/useApi';
-import { Router } from 'react-router';
+import { MemoryRouter } from 'react-router';
 import { render } from 'test-helpers/test-utils';
+import { Mock } from 'vitest';
 import ManageUsersPage from './ManageUsersPage';
-
-const history = createMemoryHistory();
 
 const renderContainer = () => {
   return render(
-    <Router history={history}>
+    <MemoryRouter initialEntries={['/']}>
       <ManageUsersPage />
-    </Router>
+    </MemoryRouter>
   );
 };
 
-jest.mock('../../../hooks/useApi');
+vi.mock('../../../hooks/useApi');
 
-const mockBiohubApi = useApi as jest.Mock;
+const mockBiohubApi = useApi as Mock;
 
 const mockUseApi = {
   user: {
-    getUsersList: jest.fn()
+    getUsersList: vi.fn()
   }
 };
 

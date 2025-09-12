@@ -1,5 +1,5 @@
 import { Redirect, Route, Switch } from 'react-router';
-import RouteWithTitle from 'utils/RouteWithTitle';
+import RouteWithTitle from 'utils/RouteWithMeta';
 import { getTitle } from 'utils/Utils';
 import DatasetPage from './DatasetPage';
 

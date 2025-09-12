@@ -1,6 +1,6 @@
 import SubmissionsListPage from 'features/submissions/list/SubmissionsListPage';
 import { Route, Routes } from 'react-router';
-import RouteWithTitle from 'utils/RouteWithTitle';
+import RouteWithTitle from 'utils/RouteWithMeta';
 import { getTitle } from 'utils/Utils';
 
 /**

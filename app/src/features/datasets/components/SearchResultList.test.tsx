@@ -1,19 +1,20 @@
 import { useApi } from 'hooks/useApi';
 import { cleanup, render } from 'test-helpers/test-utils';
 import SearchResultList, { ISearchResult } from './SearchResultList';
+import { Mock } from 'vitest';
 
-jest.mock('../../../hooks/useApi');
+vi.mock('../../../hooks/useApi');
 
-const mockBiohubApi = useApi as jest.Mock;
-const mockBackToSearch = jest.fn();
-const mockOnToggleDataVisibility = jest.fn();
+const mockBiohubApi = useApi as Mock;
+const mockBackToSearch = vi.fn();
+const mockOnToggleDataVisibility = vi.fn();
 
 const mockUseApi = {
   taxonomy: {
-    searchSpecies: jest.fn()
+    searchSpecies: vi.fn()
   },
   search: {
-    getSpatialData: jest.fn()
+    getSpatialData: vi.fn()
   }
 };
 
