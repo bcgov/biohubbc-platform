@@ -32,13 +32,12 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
     featureTypesWithProperties?.find((item) => item.feature_type.feature_type_name === feature_type_name)
       ?.feature_type_properties || [];
 
-  // Dynamically create the columns
   const fieldColumns: GridColDef[] = featureTypeWithProperties.map((featureType: FeaturePropertyCode) => ({
     field: featureType.feature_property_type_name,
     headerName: featureType.feature_property_display_name,
     flex: 1,
     disableColumnMenu: true,
-    valueGetter: (value: any, row: SubmissionFeatureRecordWithTypeAndSecurity) => {
+    valueGetter: (_, row: SubmissionFeatureRecordWithTypeAndSecurity) => {
       return row.data[featureType.feature_property_type_name] ?? null;
     },
     renderCell: (params: GridRenderCellParams) => {

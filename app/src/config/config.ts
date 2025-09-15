@@ -1,19 +1,5 @@
 import { ensureProtocol } from 'utils/Utils';
-
-export interface IConfig {
-  API_HOST: string;
-  CHANGE_VERSION: string;
-  NODE_ENV: string;
-  VERSION: string;
-  KEYCLOAK_CONFIG: {
-    authority: string;
-    realm: string;
-    clientId: string;
-  };
-  SITEMINDER_LOGOUT_URL: string;
-  MAX_UPLOAD_NUM_FILES: number;
-  MAX_UPLOAD_FILE_SIZE: number;
-}
+import { IConfig } from './config.interface';
 
 export const getConfig = (): IConfig => {
   const {
@@ -34,7 +20,7 @@ export const getConfig = (): IConfig => {
 
   return {
     API_HOST: ensureProtocol(API_URL, 'http://'),
-    CHANGE_VERSION: VITE_CHANGE_VERSION || 'unknown',
+    CHANGE_VERSION: VITE_CHANGE_VERSION,
     NODE_ENV: VITE_NODE_ENV || 'development',
     VERSION: `${VITE_VERSION || 'NA'} (build #${VITE_CHANGE_VERSION || 'N/A'})`,
     KEYCLOAK_CONFIG: {
