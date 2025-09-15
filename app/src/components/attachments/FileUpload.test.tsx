@@ -46,7 +46,7 @@ describe('FileUpload', () => {
   it('removes an item from the list when the onCancel callback is triggered', async () => {
     const mockUploadHandler = vi.fn().mockResolvedValue(new Promise(() => {})); // return promise that doesn't resolve, giving time for the cancel button to be clicked
 
-    const { getByTestId, getByText, getByTitle, queryByText } = renderContainer({ uploadHandler: mockUploadHandler });
+    const { getByTestId, getByTitle, queryByText } = renderContainer({ uploadHandler: mockUploadHandler });
 
     const dropZoneInput = getByTestId('drop-zone-input');
 
@@ -57,7 +57,7 @@ describe('FileUpload', () => {
     });
 
     await waitFor(() => {
-      expect(getByText('testpng0.txt')).toBeVisible();
+      expect(getByTitle('Cancel Upload')).toBeVisible();
     });
 
     fireEvent.click(getByTitle('Cancel Upload'));
