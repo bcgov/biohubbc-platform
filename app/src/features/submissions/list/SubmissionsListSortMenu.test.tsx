@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@mui/material/styles';
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { render } from 'test-helpers/test-utils';
 import appTheme from 'themes/appTheme';
 import SubmissionsListSortMenu from './SubmissionsListSortMenu';
@@ -24,6 +24,11 @@ const renderMenu = () =>
       />
     </ThemeProvider>
   );
+
+// Clear mock calls before each test to avoid call count pollution across tests
+beforeEach(() => {
+  mockHandleSubmissions.mockClear();
+});
 
 describe('SubmissionsListSortMenu', () => {
   it('renders the menu button correctly', async () => {
@@ -67,12 +72,24 @@ describe('SubmissionsListSortMenu', () => {
 
     fireEvent.click(menuBtn);
 
-    const menuItemA = actions.getByText('NAME');
+    // Use findByText to wait for item to be available
+    const menuItemA = await actions.findByText('NAME');
 
     fireEvent.click(menuItemA);
-    expect(mockHandleSubmissions.mock.calls[0][0]).toStrictEqual([second, first]);
 
-    fireEvent.click(menuItemA);
-    expect(mockHandleSubmissions.mock.calls[1][0]).toStrictEqual([first, second]);
+    await waitFor(() => {
+      expect(mockHandleSubmissions).toHaveBeenCalledTimes(1);
+      expect(mockHandleSubmissions.mock.calls[0][0]).toStrictEqual([second, first]);
+    });
+
+    // Click again to toggle sort order back
+    fireEvent.click(menuBtn);
+    const menuItemA2 = await actions.findByText('NAME');
+    fireEvent.click(menuItemA2);
+
+    await waitFor(() => {
+      expect(mockHandleSubmissions).toHaveBeenCalledTimes(2);
+      expect(mockHandleSubmissions.mock.calls[1][0]).toStrictEqual([first, second]);
+    });
   });
 });

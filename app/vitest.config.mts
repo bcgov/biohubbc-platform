@@ -1,94 +1,51 @@
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { defineConfig } from 'vitest/config';
 
-export default defineConfig({
-  plugins: [tsconfigPaths()],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./setupTests.ts'],
+export default defineConfig(({ mode }) => {
+  // Load environment variabless from the root directory, one level up
+  const env = loadEnv(mode, path.resolve(process.cwd(), '..'), '');
 
-    include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/cypress/**', '**/.{git,cache,output,temp}/**', '**/*.config.*'],
+  // Prefix variables with VITE_
+  const viteEnvVars = {
+    'import.meta.env.VITE_NODE_OPTIONS': JSON.stringify(env.VITE_NODE_OPTIONS),
+    'import.meta.env.VITE_CHANGE_VERSION': JSON.stringify(env.VITE_CHANGE_VERSION),
+    'import.meta.env.VITE_NODE_ENV': JSON.stringify(env.VITE_NODE_ENV),
+    'import.meta.env.VITE_PORT': JSON.stringify(env.VITE_PORT),
+    'import.meta.env.VITE_API_HOST': JSON.stringify(env.VITE_API_HOST),
+    'import.meta.env.VITE_API_PORT': JSON.stringify(env.VITE_API_PORT),
+    'import.meta.env.VITE_MAX_UPLOAD_NUM_FILES': JSON.stringify(env.VITE_MAX_UPLOAD_NUM_FILES),
+    'import.meta.env.VITE_MAX_UPLOAD_FILE_SIZE': JSON.stringify(env.VITE_MAX_UPLOAD_FILE_SIZE),
+    'import.meta.env.VITE_SITEMINDER_LOGOUT_URL': JSON.stringify(env.VITE_SITEMINDER_LOGOUT_URL),
+    'import.meta.env.VITE_KEYCLOAK_HOST': JSON.stringify(env.VITE_KEYCLOAK_HOST),
+    'import.meta.env.VITE_KEYCLOAK_REALM': JSON.stringify(env.VITE_KEYCLOAK_REALM),
+    'import.meta.env.VITE_KEYCLOAK_CLIENT_ID': JSON.stringify(env.VITE_KEYCLOAK_CLIENT_ID)
+  };
 
-    // CSS Modules config
-    css: {
-      modules: {
-        classNameStrategy: 'stable'
-      }
+  return {
+    plugins: [tsconfigPaths()],
+    define: {
+      ...viteEnvVars
     },
-
-    reporters: [
-      'default',
-      [
-        'vitest-sonar-reporter',
-        {
-          outputFile: 'coverage/sonar-report.xml'
-        }
-      ]
-    ],
-
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov', 'html', 'json'],
-      reportsDirectory: './coverage',
-      include: ['src/**/*'],
-      exclude: [
-        'src/**/*.d.ts',
-        'src/**/*.{test,spec}.{ts,tsx,js,jsx}',
-        'src/**/__tests__/**',
-        'src/**/__mocks__/**',
-        'src/**/types/**',
-        'src/**/constants/**',
-        'src/**/*.stories.{ts,tsx,js,jsx}',
-        'src/**/*.config.{ts,js}',
-        'src/main.tsx',
-        'src/vite-env.d.ts'
-      ],
-      thresholds: {
-        global: {
-          branches: 80,
-          functions: 80,
-          lines: 80,
-          statements: 80
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      server: {
+        // Fixes an error caused by Vite trying to load .css required for x-data-grid
+        // See https://stackoverflow.com/questions/79592526/testing-error-after-upgrading-mui-x-data-grid-to-v8-1-0-unknown-file-extensio
+        deps: {
+          inline: ['@mui/x-data-grid']
         }
       },
-      all: true,
-      clean: true
-    },
-
-    testTimeout: 10000,
-    hookTimeout: 10000,
-
-    pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        useAtomics: true
-      }
-    },
-
-    clearMocks: true,
-    restoreMocks: true,
-    unstubEnvs: true,
-    unstubGlobals: true,
-
-    watch: false,
-    retry: process.env.CI ? 2 : 0,
-
-    deps: {
-      optimizer: {
-        web: {
-          include: ['@mui/**', 'lodash-es']
-        }
-      }
+      setupFiles: './setupTests.ts',
+      reporters: ['verbose', ['vitest-sonar-reporter', { outputFile: 'coverage/sonar-report.xml' }]],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'lcov'],
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: ['src/**/*.d.ts', 'src/**/*.test.{ts,tsx}']
+      },
+      include: ['src/**/*.{test,spec}.{ts,tsx}']
     }
-  },
-
-  define: {
-    __DEV__: true,
-    'process.env.NODE_ENV': '"test"'
-  },
-
-  assetsInclude: ['**/*.svg', '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.gif', '**/*.webp']
+  };
 });

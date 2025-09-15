@@ -63,6 +63,7 @@
     "react-window": "^2.1.0",
     "shapefile": "^0.6.6",
     "shpjs": "^6.1.0",
+    "uuid": "^13.0.0",
     "yup": "^1.7.0"
   },
   "devDependencies": {
