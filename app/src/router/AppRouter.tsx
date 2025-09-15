@@ -1,26 +1,26 @@
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
 import BaseLayout from 'layouts/BaseLayout';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 import { AdminRouter } from './admin/AdminRouter';
-import DatasetsRouter from './dataset/DatasetRouter';
+import { SearchRouter } from './search/SearchRouter';
 
 export const AppRouter = () => {
   return (
-    <BrowserRouter>
+    <>
       <Routes>
-        {/* Redirect base to datasets router */}
-        <Route path="/" element={<Navigate to="/datasets" replace />} />
+        {/* Redirect base to search router */}
+        <Route path="/" element={<Navigate to="/search" replace />} />
 
-        {/* App Routes wrapped in BaseLayout */}
+        {/* Search Routes  */}
         <Route
-          path="/datasets/*"
+          path="/search/*"
           element={
-            <BaseLayout>
-              <PageTitle title="Search Datasets" description="Browse and manage datasets" />
-              <DatasetsRouter />
-            </BaseLayout>
+            <>
+              <PageTitle title="Search Search" description="Browse and manage search" />
+              <SearchRouter />
+            </>
           }
         />
 
@@ -28,10 +28,10 @@ export const AppRouter = () => {
         <Route
           path="/admin/*"
           element={
-            <BaseLayout>
+            <>
               <PageTitle title="Admin Panel" description="Administrative interface" />
               <AdminRouter />
-            </BaseLayout>
+            </>
           }
         />
 
@@ -58,6 +58,6 @@ export const AppRouter = () => {
         {/* Catch-all route to redirect to 404 */}
         <Route path="*" element={<Navigate to="/page-not-found" replace />} />
       </Routes>
-    </BrowserRouter>
+    </>
   );
 };
