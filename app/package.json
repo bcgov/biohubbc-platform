@@ -26,7 +26,6 @@
     "npm": ">= 10.0.0"
   },
   "dependencies": {
-    "@babel/core": "^7.28.4",
     "@bcgov/bc-sans": "^2.1.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
