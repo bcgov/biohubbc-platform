@@ -1,6 +1,6 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import { AuthStateContext } from 'contexts/authStateContext';
-import { MemoryRouter, Route } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import {
   getMockAuthState,
   SystemAdminAuthState,
@@ -17,14 +17,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -35,14 +40,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -55,16 +65,21 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -76,16 +91,21 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -99,16 +119,21 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -120,16 +145,21 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <SystemRoleGuard
-                  validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
-                  fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </SystemRoleGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <SystemRoleGuard
+                      validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}
+                      fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </SystemRoleGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -145,14 +175,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -163,14 +198,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -183,14 +223,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -202,14 +247,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -223,14 +273,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -242,14 +297,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </AuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <AuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </AuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -264,14 +324,19 @@ describe('Guards', () => {
       it('renders the child when user is not authenticated', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
         const { getByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -282,14 +347,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -302,14 +372,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -321,14 +396,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={<div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -342,14 +422,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: UnauthenticatedUserAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 
@@ -361,14 +446,19 @@ describe('Guards', () => {
         const authState = getMockAuthState({ base: SystemAdminAuthState });
 
         const { getByTestId, queryByTestId } = render(
-          <MemoryRouter initialEntries={['/']}>
-            <Route path="test/:id">
-              <AuthStateContext.Provider value={authState}>
-                <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
-                  <div data-testid="child-component" />
-                </UnAuthGuard>
-              </AuthStateContext.Provider>
-            </Route>
+          <MemoryRouter initialEntries={['/test/123']}>
+            <Routes>
+              <Route
+                path="test/:id"
+                element={
+                  <AuthStateContext.Provider value={authState}>
+                    <UnAuthGuard fallback={() => <div data-testid="fallback-child-component" />}>
+                      <div data-testid="child-component" />
+                    </UnAuthGuard>
+                  </AuthStateContext.Provider>
+                }
+              />
+            </Routes>
           </MemoryRouter>
         );
 

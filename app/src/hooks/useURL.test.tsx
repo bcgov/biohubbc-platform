@@ -28,7 +28,7 @@ describe('useURL', () => {
 
       expect(result.current.path).toEqual('/test/123/page');
       expect(result.current.pathParams).toEqual({ id: '123' });
-      expect(result.current.queryParams).toEqual({ val0: '0', val1: '1' });
+      expect(result.current.queryParams).toEqual({ val0: 0, val1: 1 });
     });
   });
 
@@ -38,14 +38,14 @@ describe('useURL', () => {
       const { result } = renderHook(() => useURL(), { wrapper: getWrapper(initialEntries) });
 
       // Expect initial query params
-      expect(result.current.queryParams).toEqual({ val0: '0', val1: '1' });
+      expect(result.current.queryParams).toEqual({ val0: 0, val1: 1 });
       expect(result.current.path).toEqual('/test/123/page');
       expect(result.current.pathParams).toEqual({ id: '123' });
 
-      act(() => result.current.replaceQueryParams({ val1: '2', val2: 'objVal' }));
+      act(() => result.current.replaceQueryParams({ val1: 2, val2: 'objVal' }));
 
       // Expect replaced query params
-      expect(result.current.queryParams).toEqual({ val1: '2', val2: 'objVal' });
+      expect(result.current.queryParams).toEqual({ val1: 2, val2: 'objVal' });
       expect(result.current.path).toEqual('/test/123/page');
       expect(result.current.pathParams).toEqual({ id: '123' });
     });
@@ -57,14 +57,14 @@ describe('useURL', () => {
       const { result } = renderHook(() => useURL(), { wrapper: getWrapper(initialEntries) });
 
       // Expect initial query params
-      expect(result.current.queryParams).toEqual({ val0: '0', val1: '1' });
+      expect(result.current.queryParams).toEqual({ val0: 0, val1: 1 });
       expect(result.current.path).toEqual('/test/123/page');
       expect(result.current.pathParams).toEqual({ id: '123' });
 
-      act(() => result.current.appendQueryParams({ val1: '2', val2: 'objVal' }));
+      act(() => result.current.appendQueryParams({ val1: 2, val2: 'objVal' }));
 
       // Expect updated query params with new params appended
-      expect(result.current.queryParams).toEqual({ val0: '0', val1: '2', val2: 'objVal' });
+      expect(result.current.queryParams).toEqual({ val0: 0, val1: 2, val2: 'objVal' });
       expect(result.current.path).toEqual('/test/123/page');
       expect(result.current.pathParams).toEqual({ id: '123' });
     });
