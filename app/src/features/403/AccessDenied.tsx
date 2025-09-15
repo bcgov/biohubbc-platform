@@ -17,7 +17,7 @@ const AccessDenied = () => {
   }
 
   return (
-    <Container maxWidth="sm">
+    <Container>
       <Box pt={6} textAlign="center">
         <Icon path={mdiAlertCircleOutline} size={2} color="#ff5252" />
         <Typography variant="h3" component="h1" gutterBottom>
