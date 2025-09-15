@@ -4,9 +4,14 @@ import { SystemRoleGuard } from 'guards/Guards';
 import { AuthenticatedRouteGuard } from 'guards/RouteGuards';
 import BaseLayout from 'layouts/BaseLayout';
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { SubmissionsRouter } from './submission/SubmissionRouter';
 import { PageTitle } from 'utils/RouteWithMeta';
+import { SubmissionsRouter } from './submission/SubmissionRouter';
 
+/**
+ * Returns routes for system administrators
+ *
+ * @returns
+ */
 export const AdminRouter = () => {
   return (
     <Routes>

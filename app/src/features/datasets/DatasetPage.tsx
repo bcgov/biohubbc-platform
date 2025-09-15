@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
 
-const DatasetPage: React.FC<React.PropsWithChildren> = () => {
+const SubmissionPage = () => {
   return (
     <Container maxWidth="xl">
       <Box py={3}>
@@ -14,4 +14,4 @@ const DatasetPage: React.FC<React.PropsWithChildren> = () => {
   );
 };
 
-export default DatasetPage;
+export default SubmissionPage;
