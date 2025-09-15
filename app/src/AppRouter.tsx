@@ -1,6 +1,7 @@
 import { SYSTEM_ROLE } from 'constants/roles';
 import AccessDenied from 'features/403/AccessDenied';
 import NotFoundPage from 'features/404/NotFoundPage';
+import { PolicyPage } from 'features/access/policy/PolicyPage';
 import AdminUsersRouter from 'features/admin/AdminUsersRouter';
 import AdminDashboardRouter from 'features/admin/dashboard/AdminDashboardRouter';
 import DatasetsRouter from 'features/datasets/DatasetsRouter';
@@ -22,6 +23,12 @@ const AppRouter: React.FC<React.PropsWithChildren> = () => {
       <Route exact path="/">
         <BaseLayout>
           <SubmissionsRouter />
+        </BaseLayout>
+      </Route>
+
+      <Route path="/policy">
+        <BaseLayout>
+          <PolicyPage />
         </BaseLayout>
       </Route>
 

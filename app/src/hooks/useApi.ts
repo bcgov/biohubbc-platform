@@ -3,6 +3,7 @@ import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
 import useCodesApi from './api/useCodesApi';
+import { usePolicyApi } from './api/usePolicyApi';
 import useSecurityApi from './api/useSecurityApi';
 import useSubmissionsApi from './api/useSubmissionsApi';
 import useTaxonomyApi from './api/useTaxonomyApi';
@@ -31,8 +32,11 @@ export const useApi = () => {
 
   const codes = useCodesApi(apiAxios);
 
+  const policy = usePolicyApi(apiAxios);
+
   return {
     user,
+    policy,
     admin,
     submissions,
     taxonomy,
