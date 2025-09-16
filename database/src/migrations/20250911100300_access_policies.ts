@@ -1,5 +1,44 @@
 import { Knex } from 'knex';
 
+/**
+ * Migration to enable fine-grained, role-based access control to submission features using policy-based URNs.
+ *
+ * Features included:
+ * - Creates RBAC-related tables:
+ *   - `policy`
+ *   - `team`
+ *   - `team_policy`
+ *   - `policy_statement`
+ *   - `policy_statement_condition`
+ *   - `team_member`
+ *
+ * - Defines enum types:
+ *   - `policy_effect` for access logic (e.g., allow/deny)
+ *   - `policy_condition_operator` for conditional filters
+ *
+ * - Adds `submission_feature_urn` column to `submission_feature` table,
+ *   automatically populated via an AFTER INSERT trigger. Also sets the urn column for existing data.
+ *
+ * - Adds `submission_feature_urn` column to `policy_statement` table,
+ *   with a validation trigger to enforce URN format and referential integrity.
+ *
+ * - URNs follow the format:
+ *   `urn:<submission_id>:<feature_type_name>:<submission_feature_id>`
+ *   and support wildcards (`*`) in any segment.
+ *
+ * - Regex check enforces urn structure and syntax
+ * - Triggers enforce referential integrity of the urn:
+ *   - Existence of referenced `submission_id`, `feature_type.name`, and `submission_feature_id` (unless wildcarded).
+ *   - Correct matching between URN components
+ *     (e.g., `submission_feature_id` must belong to the `submission_id`)
+ * - Triggers enforce referential integrity in policy statements and conditions:
+ *   - Policy statement conditions must reference existing feature properties
+ *
+ * Additional features:
+ * - Audit and journal triggers for all new RBAC tables.
+ * - GIN and B-tree indexes to optimize queries on URNs and JSON conditions.
+ */
+
 export async function up(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
@@ -24,15 +63,13 @@ export async function up(knex: Knex): Promise<void> {
       'Exists',              -- Field/key must exist in the input data (e.g., {"value": true} to require presence)
 
       -- Temporal operators (typically assume ISO 8601 date strings)
-      'DateEquals',          -- Date field must match the provided date exactly
       'DateBefore',          -- Date field must be before the given date
       'DateAfter',           -- Date field must be after the given date
-      'DateBetween',         -- Date field must be between two dates (inclusive or exclusive, based on implementation)
 
       -- Spatial relationships (assumes field contains geometry or GeoJSON)
       'Within',              -- Geometry must be entirely within the provided geometry
       'Intersects',          -- Geometry must intersect (overlap) the provided geometry
-      'Contains'             -- Geometry must contain the provided geometry
+      'Contains',             -- Geometry must contain the provided geometry
 
       -- Taxonomy operators
       'ParentOf',             -- Field value must be a parent (ancestor) of the provided taxon_id
@@ -55,6 +92,8 @@ export async function up(knex: Knex): Promise<void> {
       revision_count     integer          DEFAULT 0 NOT NULL,
       CONSTRAINT policy_pk PRIMARY KEY (policy_id)
     );
+
+    CREATE UNIQUE INDEX policy_nuk1 ON policy(name, (record_end_date is NULL)) where record_end_date is null;
 
     COMMENT ON TABLE policy IS 'Defines access policies containing one or more permission statements.';
     COMMENT ON COLUMN policy.policy_id IS 'System-generated primary key.';
@@ -82,6 +121,8 @@ export async function up(knex: Knex): Promise<void> {
       revision_count     integer          DEFAULT 0 NOT NULL,
       CONSTRAINT team_pk PRIMARY KEY (team_id)
     );
+    
+    CREATE UNIQUE INDEX team_nuk1 ON team(name, (record_end_date is NULL)) where record_end_date is null;
 
     COMMENT ON TABLE team IS 'Teams that can be assigned access policies.';
     COMMENT ON COLUMN team.team_id IS 'System-generated primary key.';
@@ -115,6 +156,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE INDEX team_policy_team_id_idx ON team_policy(team_id);
     CREATE INDEX team_policy_policy_id_idx ON team_policy(policy_id);
+    CREATE UNIQUE INDEX team_policy_nuk1 ON team_policy(team_id, policy_id, (record_end_date is NULL)) where record_end_date is null;
 
     COMMENT ON TABLE team_policy IS 'Associates teams with policies and tracks access request status.';
     COMMENT ON COLUMN team_policy.team_policy_id IS 'System-generated primary key.';
@@ -131,36 +173,37 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- Create policy_statement table
     --------------------------------------------------------------------------------
-    -- NOTE: policy_statement.feature_urn does not have a FK constraint on feature.urn to enable wildcards 
-    -- (ie. urn:1:telemetry:*, which should grant access to all telemetry in submission ID 1,
-    -- following the format of urn:<submission_id>:<feature_type_name>:<)
+    -- NOTE: policy_statement.submission_feature_urn does not have a FK constraint on feature.urn to enable wildcards .
+    -- ie. urn:1:telemetry:*, which should grant access to all telemetry in submission ID 1,
+    -- following the format of urn:<submission_id>:<feature_type_name>:<submission_feature_id>.
 
     CREATE TABLE policy_statement (
-      policy_statement_id   uuid DEFAULT public.gen_random_uuid(),
-      policy_id             uuid             NOT NULL,
-      effect                policy_effect    NOT NULL,
-      feature_urn           varchar(500)     NOT NULL,
-      record_end_date       timestamptz(6),
-      create_date           timestamptz(6)   DEFAULT now() NOT NULL,
-      create_user           integer          NOT NULL,
-      update_date           timestamptz(6),
-      update_user           integer,
-      revision_count        integer          DEFAULT 0 NOT NULL,
+      policy_statement_id     uuid DEFAULT public.gen_random_uuid(),
+      policy_id               uuid             NOT NULL,
+      effect                  policy_effect    NOT NULL,
+      submission_feature_urn  varchar(500)     NOT NULL,
+      record_end_date         timestamptz(6),
+      create_date             timestamptz(6)   DEFAULT now() NOT NULL,
+      create_user             integer          NOT NULL,
+      update_date             timestamptz(6),
+      update_user             integer,
+      revision_count          integer          DEFAULT 0 NOT NULL,
       CONSTRAINT policy_statement_pk PRIMARY KEY (policy_statement_id),
       CONSTRAINT policy_statement_policy_fk FOREIGN KEY (policy_id) REFERENCES policy(policy_id),
-      CONSTRAINT feature_urn_format_check CHECK (feature_urn ~ '^urn:(\\*|[0-9]+):\\*|[a-z]+:(\\*|[^:]+)$')
+      CONSTRAINT submission_feature_urn_format_check CHECK (submission_feature_urn ~ '^urn:(\\*|[0-9]+):([a-z]+|\\*):(\\*|[^:]+)$')
     );
 
     CREATE INDEX policy_statement_policy_id_idx ON policy_statement(policy_id);
+    CREATE UNIQUE INDEX policy_statement_nuk1 ON policy_statement(policy_id, effect, submission_feature_urn, (record_end_date is NULL)) where record_end_date is null;
     
     -- index on feature_run to accelerate lookups for a given urn
-    CREATE INDEX policy_statement_feature_urn_idx ON policy_statement(feature_urn);
+    CREATE INDEX policy_statement_submission_feature_urn_idx ON policy_statement(submission_feature_urn);
 
     COMMENT ON TABLE policy_statement IS 'Permission rule associated with a policy.';
     COMMENT ON COLUMN policy_statement.policy_statement_id IS 'System-generated primary key.';
     COMMENT ON COLUMN policy_statement.policy_id IS 'Foreign key to the policy table.';
     COMMENT ON COLUMN policy_statement.effect IS 'Effect of the statement: allow or deny.';
-    COMMENT ON COLUMN policy_statement.feature_urn IS 'Feature urn identifier the statement applies to.';
+    COMMENT ON COLUMN policy_statement.submission_feature_urn IS 'Feature urn identifier the statement applies to.';
     COMMENT ON COLUMN policy_statement.record_end_date IS 'The end date of the record for soft deletes.';
     COMMENT ON COLUMN policy_statement.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN policy_statement.create_user IS 'The id of the user who created the record.';
@@ -188,6 +231,19 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     CREATE INDEX policy_statement_condition_statement_id_idx ON policy_statement_condition(policy_statement_id);
+
+    -- NOTE: The 'value' column uses the jsonb data type, which stores JSON data in a binary format.
+    -- This means that the order of keys within the JSON object does NOT affect equality comparisons,
+    -- allowing the unique index to correctly enforce uniqueness regardless of key order.
+    --
+    -- In contrast, the regular json data type preserves key order as text, so two JSON objects
+    -- with the same keys and values but in different orders would be considered different,
+    -- making uniqueness enforcement unreliable.
+    --
+    -- Therefore, this unique index relies on jsonb to ensure consistent and accurate uniqueness checks
+    -- on the combination of policy_statement_id, operator, key, value, and active records
+    -- (where record_end_date IS NULL).
+    CREATE UNIQUE INDEX policy_statement_condition_nuk1 ON policy_statement_condition(policy_statement_id, operator, key, value, (record_end_date is NULL)) where record_end_date is null;
 
     -- GIN index to accelerate lookups within the value json
     CREATE INDEX policy_statement_condition_value_gin_idx ON policy_statement_condition USING GIN (value);
@@ -247,7 +303,7 @@ export async function up(knex: Knex): Promise<void> {
     -- but at that point the PK hasn't been assigned yet, making it impossible to construct the 'urn'.
     ALTER TABLE submission_feature ADD COLUMN urn varchar(500);
 
-    ALTER TABLE submission_feature ADD CONSTRAINT feature_urn_format_check CHECK (urn ~ '^urn:\d+:[a-z]+:[^:]+$');
+    ALTER TABLE submission_feature ADD CONSTRAINT feature_urn_format_check CHECK (urn ~ '^urn:(\\*|[0-9]+):([a-z]+|\\*):(\\*|[^:]+)$');
 
     -- index on submission_feature.urn to accelerate lookups by urn
     CREATE INDEX submission_feature_urn_idx ON submission_feature(urn);
@@ -284,9 +340,24 @@ export async function up(knex: Knex): Promise<void> {
     $function$;
 
     --------------------------------------------------------------------------------
+    -- Update existing submission_feature records with the URN
+    --------------------------------------------------------------------------------
+    UPDATE submission_feature sf
+    SET urn = (
+      SELECT CONCAT(
+        'urn:',
+        sf.submission_id, ':',
+        ft.name, ':',
+        sf.submission_feature_id
+      )
+      FROM biohub.feature_type ft
+      WHERE ft.feature_type_id = sf.feature_type_id
+    );
+
+    --------------------------------------------------------------------------------
     -- URN validation procedure
     --------------------------------------------------------------------------------
-    CREATE OR REPLACE FUNCTION biohub.policy_statement_urn_validation()
+    CREATE OR REPLACE FUNCTION biohub.tr_policy_statement_urn_validation()
     RETURNS trigger
     LANGUAGE plpgsql
     SECURITY INVOKER
@@ -297,10 +368,10 @@ export async function up(knex: Knex): Promise<void> {
       feature_type_name TEXT;
       urn_submission_feature_id TEXT;
     BEGIN
-      urn_parts := string_to_array(NEW.feature_urn, ':');
+      urn_parts := string_to_array(NEW.submission_feature_urn, ':');
 
       IF array_length(urn_parts, 1) != 4 OR urn_parts[1] != 'urn' THEN
-        RAISE EXCEPTION 'Invalid URN format. Expected: urn:<submission_id>:<feature_type_name>:<submission_feature_id>, got: %', NEW.feature_urn;
+        RAISE EXCEPTION 'Invalid URN format. Expected: urn:<submission_id>:<feature_type_name>:<submission_feature_id>, got: %', NEW.submission_feature_urn;
       END IF;
 
       urn_submission_id := urn_parts[2];
@@ -312,7 +383,7 @@ export async function up(knex: Knex): Promise<void> {
         IF NOT EXISTS (
           SELECT 1 FROM biohub.submission s WHERE s.submission_id = urn_submission_id::integer
         ) THEN
-          RAISE EXCEPTION 'Invalid feature_urn: submission_id % does not exist', urn_submission_id;
+          RAISE EXCEPTION 'Invalid submission_feature_urn: submission_id % does not exist', urn_submission_id;
         END IF;
       END IF;
 
@@ -321,7 +392,7 @@ export async function up(knex: Knex): Promise<void> {
         IF NOT EXISTS (
           SELECT 1 FROM biohub.feature_type ft WHERE ft.name = feature_type_name
         ) THEN
-          RAISE EXCEPTION 'Invalid feature_urn: feature_type_name % does not exist', feature_type_name;
+          RAISE EXCEPTION 'Invalid submission_feature_urn: feature_type_name % does not exist', feature_type_name;
         END IF;
       END IF;
 
@@ -330,7 +401,7 @@ export async function up(knex: Knex): Promise<void> {
         IF NOT EXISTS (
           SELECT 1 FROM biohub.submission_feature f WHERE f.submission_feature_id = urn_submission_feature_id::integer
         ) THEN
-          RAISE EXCEPTION 'Invalid feature_urn: submission_feature_id % does not exist', urn_submission_feature_id;
+          RAISE EXCEPTION 'Invalid submission_feature_urn: submission_feature_id % does not exist', urn_submission_feature_id;
         END IF;
       END IF;
 
@@ -343,7 +414,7 @@ export async function up(knex: Knex): Promise<void> {
           WHERE f.submission_feature_id = urn_submission_feature_id::integer
             AND ft.name = feature_type_name
         ) THEN
-          RAISE EXCEPTION 'Invalid feature_urn: submission_feature_id % does not have feature_type %', 
+          RAISE EXCEPTION 'Invalid submission_feature_urn: submission_feature_id % does not have feature_type %', 
             urn_submission_feature_id, feature_type_name;
         END IF;
       END IF;
@@ -358,7 +429,7 @@ export async function up(knex: Knex): Promise<void> {
             AND f.submission_id = urn_submission_id::integer
             AND ft.name = feature_type_name
         ) THEN
-          RAISE EXCEPTION 'Invalid feature_urn: submission_feature_id % does not belong to submission_id % or feature_type %', 
+          RAISE EXCEPTION 'Invalid submission_feature_urn: submission_feature_id % does not belong to submission_id % or feature_type %', 
             urn_submission_feature_id, urn_submission_id, feature_type_name;
         END IF;
       END IF;
@@ -367,15 +438,164 @@ export async function up(knex: Knex): Promise<void> {
     END;
     $function$;
 
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+    -- Validate that the operands in policy_statement_conditions match the data type, and that the feature_type_property referenced in the policy is valid
+    ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+    CREATE OR REPLACE FUNCTION biohub.tr_validate_policy_condition_key()
+    RETURNS TRIGGER
+    LANGUAGE plpgsql
+    SECURITY INVOKER
+    AS $$
+    DECLARE
+        property_type_name TEXT;
+        operator_text TEXT;
+        value_type TEXT;
+        valid_operators TEXT[];
+        elem JSONB;
+    BEGIN
+        -- Convert operator to text for consistent handling
+        operator_text := NEW.operator::TEXT;
+        
+        -- Get the data type for this property key
+        SELECT fpt.name INTO property_type_name
+        FROM biohub.feature_type_property ftp
+        JOIN biohub.feature_property fp ON fp.feature_property_id = ftp.feature_property_id
+        JOIN biohub.feature_property_type fpt ON fp.feature_property_type_id = fpt.feature_property_type_id
+        WHERE fp.name = NEW.key
+        LIMIT 1;
+
+        -- Validate that the property key exists
+        IF property_type_name IS NULL THEN
+            RAISE EXCEPTION 'Invalid property key "%": not found in feature_type_property', NEW.key;
+        END IF;
+
+        -- Set valid operators based on property type
+        valid_operators := CASE property_type_name
+            WHEN 'string' THEN 
+                ARRAY['StringEquals', 'StringNotEquals', 'StringLike', 'Exists']
+            WHEN 'number' THEN 
+                ARRAY['NumericEquals', 'Exists']
+            WHEN 'datetime' THEN 
+                ARRAY['DateBefore', 'DateAfter', 'Exists']
+            WHEN 'spatial' THEN 
+                ARRAY['Within', 'Intersects', 'Contains', 'Exists']
+            WHEN 'boolean' THEN 
+                ARRAY['Bool', 'Exists']
+            WHEN 'object' THEN 
+                ARRAY['Exists']
+            WHEN 'array' THEN 
+                ARRAY['Exists']
+            WHEN 'artifact_key' THEN 
+                ARRAY['StringEquals', 'StringNotEquals', 'StringLike', 'Exists']
+            ELSE
+                NULL
+        END;
+
+        -- Validate operator compatibility with property type
+        IF valid_operators IS NULL THEN
+            RAISE EXCEPTION 'Unknown property type "%"', property_type_name;
+        END IF;
+
+        IF NOT (operator_text = ANY(valid_operators)) THEN
+            RAISE EXCEPTION 'Operator "%" not valid for property type "%". Valid operators: %', 
+                operator_text, property_type_name, array_to_string(valid_operators, ', ');
+        END IF;
+
+        -- Get the JSON type of the value for validation
+        value_type := jsonb_typeof(NEW.value);
+
+        -- Validate operator-specific value requirements
+        
+        -- Boolean operators
+        IF operator_text = 'Bool' THEN
+            IF value_type != 'boolean' THEN
+                RAISE EXCEPTION 'Bool operator requires a boolean value, got: %', value_type;
+            END IF;
+        END IF;
+
+        -- Numeric operators
+        IF operator_text = 'NumericEquals' THEN
+            IF value_type NOT IN ('number', 'array') THEN
+                RAISE EXCEPTION 'NumericEquals operator requires a number or array of numbers, got: %', value_type;
+            END IF;
+            IF value_type = 'array' THEN
+                FOR elem IN SELECT * FROM jsonb_array_elements(NEW.value) LOOP
+                    IF jsonb_typeof(elem) != 'number' THEN
+                        RAISE EXCEPTION 'NumericEquals array must contain only numbers, found: %', jsonb_typeof(elem);
+                    END IF;
+                END LOOP;
+            END IF;
+        END IF;
+
+        -- String operators
+        IF operator_text = 'StringEquals' OR operator_text = 'StringNotEquals' OR operator_text = 'StringLike' THEN
+            IF value_type NOT IN ('string', 'array') THEN
+                RAISE EXCEPTION '% operator requires a string or array of strings, got: %', operator_text, value_type;
+            END IF;
+            IF value_type = 'array' THEN
+                FOR elem IN SELECT * FROM jsonb_array_elements(NEW.value) LOOP
+                    IF jsonb_typeof(elem) != 'string' THEN
+                        RAISE EXCEPTION '% operator array must contain only strings, found: %', operator_text, jsonb_typeof(elem);
+                    END IF;
+                END LOOP;
+            END IF;
+        END IF;
+
+        -- Existence operators
+        IF operator_text = 'Exists' THEN
+            IF value_type != 'boolean' THEN
+                RAISE EXCEPTION 'Exists operator requires a boolean value, got: %', value_type;
+            END IF;
+        END IF;
+
+        -- Spatial operators
+        IF operator_text = 'Within' OR operator_text = 'Intersects' OR operator_text = 'Contains' THEN
+            IF value_type != 'object' THEN
+                RAISE EXCEPTION 'Spatial operator % requires a GeoJSON object, got: %', operator_text, value_type;
+            END IF;
+            IF NEW.value -> 'type' IS NULL THEN
+                RAISE EXCEPTION 'Spatial operator % requires valid GeoJSON with "type" field', operator_text;
+            END IF;
+        END IF;
+
+        -- Date operators
+        IF operator_text = ANY(ARRAY['DateBefore', 'DateAfter']) THEN
+            IF value_type NOT IN ('string', 'array') THEN
+                RAISE EXCEPTION '% operator requires a date string or array of date strings, got: %', operator_text, value_type;
+            END IF;
+            IF value_type = 'array' THEN
+                FOR elem IN SELECT * FROM jsonb_array_elements(NEW.value) LOOP
+                    IF jsonb_typeof(elem) != 'string' THEN
+                        RAISE EXCEPTION '% operator array must contain only date strings, found: %', operator_text, jsonb_typeof(elem);
+                    END IF;
+                END LOOP;
+            END IF;
+        END IF;
+
+        -- NOTE: ParentOf and ChildOf operators cannot be validated at the database layer
+        -- as they require external API calls for taxonomy validation
+
+        RETURN NEW;
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Re-raise with context about which record failed
+            RAISE EXCEPTION 'Policy condition validation failed for key="%", operator="%": %', 
+                NEW.key, operator_text, SQLERRM;
+    END;
+    $$;
+    
     --------------------------------------------------------------------------------
     -- Create table triggers
     --------------------------------------------------------------------------------
 
     -- Trigger to validate the URN
-    CREATE TRIGGER tr_policy_statement_urn_validation BEFORE INSERT ON biohub.policy_statement FOR EACH ROW EXECUTE FUNCTION biohub.policy_statement_urn_validation();
+    CREATE TRIGGER policy_statement_urn_validation BEFORE INSERT ON biohub.policy_statement FOR EACH ROW EXECUTE PROCEDURE biohub.tr_policy_statement_urn_validation();
+    
+    -- Trigger to validate policy statement conditions (conditions must reference existing feature properties)
+    CREATE TRIGGER validate_policy_condition_key BEFORE INSERT ON biohub.policy_statement_condition FOR EACH ROW EXECUTE PROCEDURE biohub.tr_validate_policy_condition_key();
     
     -- Trigger to insert the URN for each feature
-    CREATE TRIGGER insert_submission_feature_urn AFTER INSERT ON biohub.submission_feature FOR EACH ROW EXECUTE PROCEDURE biohub.tr_submission_feature_urn();
+    CREATE TRIGGER submission_feature_urn AFTER INSERT ON biohub.submission_feature FOR EACH ROW EXECUTE PROCEDURE biohub.tr_submission_feature_urn();
 
     -- Audit triggers for new tables
     CREATE TRIGGER audit_policy BEFORE INSERT OR UPDATE OR DELETE ON policy FOR EACH ROW EXECUTE PROCEDURE tr_audit_trigger();
