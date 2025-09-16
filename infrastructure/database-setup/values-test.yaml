@@ -1,0 +1,8 @@
+# Test environment values for Biohub
+environment:
+  name: test
+  id: deploy
+
+# Database configuration
+app:
+  nodeEnv: production # This is set to production as test is not a valid name in the Knexfile
