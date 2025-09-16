@@ -620,20 +620,5 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
-  await knex.raw(`
-    SET SEARCH_PATH = biohub;
-
-    DROP INDEX IF EXISTS submission_feature_urn_idx;
-    ALTER TABLE submission_feature DROP CONSTRAINT IF EXISTS feature_urn_format_check;
-    ALTER TABLE submission_feature DROP COLUMN IF EXISTS urn;
-
-    DROP TABLE IF EXISTS team_member;
-    DROP TABLE IF EXISTS team_policy;
-    DROP TABLE IF EXISTS policy_statement_condition;
-    DROP TABLE IF EXISTS policy_statement;
-    DROP TABLE IF EXISTS team;
-    DROP TABLE IF EXISTS policy;
-
-    DROP TYPE IF EXISTS policy_condition_operator;
-  `);
+  await knex.raw(``);
 }
