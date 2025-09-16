@@ -78,7 +78,7 @@ biohub-platform-db:
 
   # Volume for persistent data
   persistence:
-    size: 5Gi
+    existingClaim: "biohubbc-db-postgresql-prod"
 
 # Values passed to biohub-platform-db-setup subchart
 biohub-platform-db-setup:
@@ -136,7 +136,7 @@ biohub-platform-api:
 
   # Volume for logs and persistent data
   persistence:
-    size: 500Mi
+    existingClaim: "biohubbc-api-prod"
 
   # Route configuration (OpenShift)
   route:
