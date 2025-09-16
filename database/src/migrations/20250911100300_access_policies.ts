@@ -334,7 +334,21 @@ export async function up(knex: Knex): Promise<void> {
         END IF;
       END IF;
 
-      -- If none of the parts are wildcards, validate their association
+      -- Validate that submission_feature_id matches the given feature_type_name (if both are provided)
+      IF urn_submission_feature_id != '*' AND feature_type_name != '*' THEN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM biohub.submission_feature f
+          JOIN biohub.feature_type ft ON f.feature_type_id = ft.feature_type_id
+          WHERE f.submission_feature_id = urn_submission_feature_id::integer
+            AND ft.name = feature_type_name
+        ) THEN
+          RAISE EXCEPTION 'Invalid feature_urn: submission_feature_id % does not have feature_type %', 
+            urn_submission_feature_id, feature_type_name;
+        END IF;
+      END IF;
+
+      -- If all 3 parts are non-wildcard, validate full association
       IF urn_submission_id != '*' AND urn_submission_feature_id != '*' AND feature_type_name != '*' THEN
         IF NOT EXISTS (
           SELECT 1
