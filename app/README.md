@@ -94,8 +94,8 @@ The snapshot files produced should be saved in the repo.
   - See: https://vitejs.dev/guide/env-and-mode.html
 
   - Caveat: Vite uses `MODE` instead of `NODE_ENV` to determine the environment, though `NODE_ENV` is still set for compatibility:
-    - `vite dev` or `vite --mode development` → `MODE=development`
-    - `vite build` or `vite --mode production` → `MODE=production`
+    - `vite start` → `MODE=development`
+    - `vite build` → `MODE=production`
     - `vite --mode test` → `MODE=test`
 
 ## .env
