@@ -88,19 +88,28 @@ The snapshot files produced should be saved in the repo.
 
 ## Environment Variables
 
-- With the exception of `NODE_ENV`, any environment variable that needs to be accessible by the react app (via `process.env.<var>`) must be prefixed with `REACT_APP_`. If it is not prefixed, react will not read it, and it will be `undefined` when you try to access it.
+- With the exception of `MODE`, any environment variable that needs to be accessible by the Vite-powered React app (via `import.meta.env.<VAR>`) must be prefixed with `VITE_`.  
+  If it is not prefixed, Vite will not expose it to the client, and it will be `undefined` when you try to access it.
 
-  - See: https://create-react-app.dev/docs/adding-custom-environment-variables
+  - See: https://vitejs.dev/guide/env-and-mode.html
 
-  - Caveat: React only allows/supports `NODE_ENV:'development'|'test'|'production'`
-    - `react-scripts start` -> `NODE_ENV=development`
-    - `react-scripts test` -> `NODE_ENV=test`
-    - `react-scripts build` -> `NODE_ENV=production`
+  - Caveat: Vite uses `MODE` instead of `NODE_ENV` to determine the environment, though `NODE_ENV` is still set for compatibility:
+    - `vite dev` or `vite --mode development` → `MODE=development`
+    - `vite build` or `vite --mode production` → `MODE=production`
+    - `vite --mode test` → `MODE=test`
 
 ## .env
 
-- React will read a `.env` or similar file by default, and will read any variables prefixed with `REACT_APP_`.
-  - See: https://create-react-app.dev/docs/adding-custom-environment-variables/#what-other-env-files-can-be-used
+- Vite will automatically read a `.env` file or similar variant depending on the mode, and will load any variables prefixed with `VITE_`.
+
+  | File Name             | Loaded When...              |
+  |-----------------------|-----------------------------|
+  | `.env`                | Always                      |
+  | `.env.development`    | When `--mode development`   |
+  | `.env.production`     | When `--mode production`    |
+  | `.env.test`           | When `--mode test`          |
+
+  - See: https://vitejs.dev/guide/env-and-mode.html#env-files
 
 # Troubleshooting and Known Issues
 

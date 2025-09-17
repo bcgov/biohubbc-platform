@@ -27,19 +27,19 @@ const request = require('request');
   // App config
   app.use('/config', (_, resp) => {
     const config = {
-      API_HOST: process.env.REACT_APP_API_HOST,
+      API_HOST: process.env.VITE_API_HOST,
       CHANGE_VERSION: process.env.CHANGE_VERSION,
       NODE_ENV: process.env.NODE_ENV,
-      REACT_APP_NODE_ENV: process.env.REACT_APP_NODE_ENV,
+      VITE_NODE_ENV: process.env.VITE_NODE_ENV,
       VERSION: `${process.env.VERSION}(build #${process.env.CHANGE_VERSION})`,
       KEYCLOAK_CONFIG: {
-        authority: process.env.REACT_APP_KEYCLOAK_HOST,
-        realm: process.env.REACT_APP_KEYCLOAK_REALM,
-        clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID
+        authority: process.env.VITE_KEYCLOAK_HOST,
+        realm: process.env.VITE_KEYCLOAK_REALM,
+        clientId: process.env.VITE_KEYCLOAK_CLIENT_ID
       },
-      SITEMINDER_LOGOUT_URL: process.env.REACT_APP_SITEMINDER_LOGOUT_URL,
-      MAX_UPLOAD_NUM_FILES: Number(process.env.REACT_APP_MAX_UPLOAD_NUM_FILES),
-      MAX_UPLOAD_FILE_SIZE: Number(process.env.REACT_APP_MAX_UPLOAD_FILE_SIZE)
+      SITEMINDER_LOGOUT_URL: process.env.VITE_SITEMINDER_LOGOUT_URL,
+      MAX_UPLOAD_NUM_FILES: Number(process.env.VITE_MAX_UPLOAD_NUM_FILES),
+      MAX_UPLOAD_FILE_SIZE: Number(process.env.VITE_MAX_UPLOAD_FILE_SIZE)
     };
     resp.status(200).json(config);
   });
@@ -47,7 +47,7 @@ const request = require('request');
   // Health check
   app.use('/healthcheck', (_, resp) => {
     // Request server api
-    const host = process.env.REACT_APP_API_HOST || process.env.LOCAL_API_HOST || 'localhost';
+    const host = process.env.VITE_API_HOST || process.env.LOCAL_API_HOST || 'localhost';
     request(`https://${host}/`, (err, res) => {
       if (err) {
         console.log(`Error: ${err}, host: ${host}`);
