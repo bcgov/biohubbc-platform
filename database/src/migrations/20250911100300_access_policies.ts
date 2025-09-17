@@ -16,11 +16,12 @@ import { Knex } from 'knex';
  *   - `policy_effect` for access logic (e.g., allow/deny)
  *   - `policy_condition_operator` for conditional filters
  *
- * - Adds `submission_feature_urn` column to `submission_feature` table,
- *   automatically populated via an AFTER INSERT trigger. Also sets the urn column for existing data.
+ * - Adds `urn` column to `submission_feature` table,
+ *   automatically populated via an AFTER INSERT trigger. This migrations also sets the urn column for existing data.
  *
  * - Adds `submission_feature_urn` column to `policy_statement` table,
  *   with a validation trigger to enforce URN format and referential integrity.
+ *   policy_statement.submission_feature_urn corresponds to submission_feature.urn.
  *
  * - URNs follow the format:
  *   `urn:<submission_id>:<feature_type_name>:<submission_feature_id>`
@@ -62,11 +63,11 @@ export async function up(knex: Knex): Promise<void> {
       -- Existence check
       'Exists',              -- Field/key must exist in the input data (e.g., {"value": true} to require presence)
 
-      -- Temporal operators (typically assume ISO 8601 date strings)
+      -- Temporal operators (DateEquals can be achieved by making before = after)
       'DateBefore',          -- Date field must be before the given date
       'DateAfter',           -- Date field must be after the given date
 
-      -- Spatial relationships (assumes field contains geometry or GeoJSON)
+      -- Spatial relationships
       'Within',              -- Geometry must be entirely within the provided geometry
       'Intersects',          -- Geometry must intersect (overlap) the provided geometry
       'Contains',             -- Geometry must contain the provided geometry
@@ -156,6 +157,8 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE INDEX team_policy_team_id_idx ON team_policy(team_id);
     CREATE INDEX team_policy_policy_id_idx ON team_policy(policy_id);
+
+    -- A team can only have a policy applied once
     CREATE UNIQUE INDEX team_policy_nuk1 ON team_policy(team_id, policy_id, (record_end_date is NULL)) where record_end_date is null;
 
     COMMENT ON TABLE team_policy IS 'Associates teams with policies and tracks access request status.';
@@ -174,8 +177,8 @@ export async function up(knex: Knex): Promise<void> {
     -- Create policy_statement table
     --------------------------------------------------------------------------------
     -- NOTE: policy_statement.submission_feature_urn does not have a FK constraint on feature.urn to enable wildcards .
-    -- ie. urn:1:telemetry:*, which should grant access to all telemetry in submission ID 1,
-    -- following the format of urn:<submission_id>:<feature_type_name>:<submission_feature_id>.
+    -- ie. urn:1:telemetry:*, which should grant access to all telemetry in submission ID 1.
+    -- URNs follow the format of urn:<submission_id>:<feature_type_name>:<submission_feature_id>.
 
     CREATE TABLE policy_statement (
       policy_statement_id     uuid DEFAULT public.gen_random_uuid(),
@@ -240,12 +243,12 @@ export async function up(knex: Knex): Promise<void> {
     -- with the same keys and values but in different orders would be considered different,
     -- making uniqueness enforcement unreliable.
     --
-    -- Therefore, this unique index relies on jsonb to ensure consistent and accurate uniqueness checks
-    -- on the combination of policy_statement_id, operator, key, value, and active records
-    -- (where record_end_date IS NULL).
+    -- This unique check does not consider the order of values (eg. {"key": [1, 2, 3]} vs {"key": [3, 1, 2]} are different).
+    -- It is possible to normalize the json data, but not all arrays can be reordered (eg. polygon vertices, time series).
+    -- The best solution is to be intentional and cautious when creating policy statement conditions to avoid redundancy.
     CREATE UNIQUE INDEX policy_statement_condition_nuk1 ON policy_statement_condition(policy_statement_id, operator, key, value, (record_end_date is NULL)) where record_end_date is null;
 
-    -- GIN index to accelerate lookups within the value json
+    -- GIN index to accelerate lookups within the value jsonb
     CREATE INDEX policy_statement_condition_value_gin_idx ON policy_statement_condition USING GIN (value);
 
     COMMENT ON TABLE policy_statement_condition IS 'Key-value condition associated with a policy statement, with support for operator-based evaluations.';
@@ -355,8 +358,24 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     --------------------------------------------------------------------------------
-    -- URN validation procedure
+    -- Function: biohub.tr_policy_statement_urn_validation()
+    --
+    -- Purpose:
+    --   Validates that a URN in the form
+    --   "urn:<submission_id>:<feature_type_name>:<submission_feature_id>" is valid.
+    --
+    -- Behavior:
+    --   - Ensures the URN format is correct (4 parts, starting with "urn").
+    --   - Validates that the referenced submission, feature type, and submission feature exist,
+    --     unless a wildcard '*' is provided.
+    --   - Ensures that the submission_feature_id is associated with the correct submission_id
+    --     and feature_type, when all three components are provided.
+    --
+    -- Notes:
+    --   - This function is intended to be used as a BEFORE INSERT OR UPDATE trigger.
+    --   - Wildcards ('*') are allowed to represent "any" value, but only for looser matching.
     --------------------------------------------------------------------------------
+
     CREATE OR REPLACE FUNCTION biohub.tr_policy_statement_urn_validation()
     RETURNS trigger
     LANGUAGE plpgsql
@@ -438,9 +457,28 @@ export async function up(knex: Knex): Promise<void> {
     END;
     $function$;
 
-    ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-    -- Validate that the operands in policy_statement_conditions match the data type, and that the feature_type_property referenced in the policy is valid
-    ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+    --------------------------------------------------------------------------------
+    -- Function: biohub.tr_validate_policy_condition_key()
+    --
+    -- Purpose:
+    --   Validates that a policy condition (key, operator, and value) inserted into
+    --   the policy_statement_condition table is semantically correct based on the
+    --   metadata stored in feature_type_property and related tables.
+    --
+    -- Behavior:
+    --   - Validates that the 'key' corresponds to a valid feature property.
+    --   - Checks that the 'operator' is allowed for the data type of the property.
+    --   - Ensures that the 'value' matches the expected JSON type based on the operator and property type.
+    --   - For array values, validates that all elements are of the expected type.
+    --   - Performs deeper validation for spatial operators, requiring valid GeoJSON with a 'type' field.
+    --
+    -- Notes:
+    --   - This function is designed to catch semantic and structural errors at the database level.
+    --   - Assumes consistent and up-to-date metadata in supporting tables.
+    --   - Does not perform validation for taxonomy-based operators like "ParentOf" or "ChildOf"
+    --     as they require external services.
+    --------------------------------------------------------------------------------
+
     CREATE OR REPLACE FUNCTION biohub.tr_validate_policy_condition_key()
     RETURNS TRIGGER
     LANGUAGE plpgsql
@@ -571,10 +609,6 @@ export async function up(knex: Knex): Promise<void> {
                 END LOOP;
             END IF;
         END IF;
-
-        -- NOTE: ParentOf and ChildOf operators cannot be validated at the database layer
-        -- as they require external API calls for taxonomy validation
-
         RETURN NEW;
     EXCEPTION
         WHEN OTHERS THEN
