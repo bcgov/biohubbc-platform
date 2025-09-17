@@ -1,0 +1,30 @@
+# Test environment values for Biohub
+environment:
+  name: test
+  id: deploy
+  
+# App configuration
+app:
+  nodeEnv: production
+  apiHost: api-test-biohub-platform.apps.silver.devops.gov.bc.ca
+
+  # Siteminder
+  siteminderLogoutURL: "https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi" # Siteminder URL to log out and clear the session for the logged in user
+
+  # Keycloak
+  keycloak:
+    host: "https://test.loginproxy.gov.bc.ca/auth"
+
+# Openshift Resources
+replicas: 1
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 400m
+    memory: 750Mi
+
+# Route configuration
+route:
+  host: test-biohub-platform.apps.silver.devops.gov.bc.ca
