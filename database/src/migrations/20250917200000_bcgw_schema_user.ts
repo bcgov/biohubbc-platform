@@ -29,9 +29,9 @@ export async function up(knex: Knex): Promise<void> {
     GRANT USAGE ON SCHEMA bcgw TO ${DB_USER_BCGW};
     alter role ${DB_USER_BCGW} set search_path to "$user", bcgw, public;
 
-    -- alter default privileges for the schema owner so that bcgw user is granted access to all future materialized views
+    -- alter default privileges for the schema owner so that bcgw user is granted access to all future tables, views, and materialized views
     ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA bcgw
-    GRANT SELECT ON MATERIALIZED VIEWS TO ${DB_USER_BCGW};
+    GRANT SELECT ON TABLES TO ${DB_USER_BCGW};
   `);
 }
 
@@ -46,7 +46,7 @@ export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     -- revert default privileges for the schema owner
     ALTER DEFAULT PRIVILEGES FOR ROLE CURRENT_USER IN SCHEMA bcgw
-    REVOKE SELECT ON MATERIALIZED VIEWS FROM ${DB_USER_BCGW};
+    REVOKE SELECT ON TABLES FROM ${DB_USER_BCGW};
 
     -- drop bcgw user and schema
     DROP SCHEMA IF EXISTS bcgw CASCADE;
