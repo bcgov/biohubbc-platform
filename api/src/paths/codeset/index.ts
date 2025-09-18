@@ -65,7 +65,7 @@ export function submitCodeSet(): RequestHandler {
     try {
       await connection.open();
 
-      const codeset = req.body as CreateCodeset;
+      const codeset = { ...req.body, contributor_id: 1 } as CreateCodeset;
 
       const contributorCodesetService = new ContributorCodesetService(connection);
 

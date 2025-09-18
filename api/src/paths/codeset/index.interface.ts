@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-interface CreateContributorCode {
-  name: string;
+export interface CreateContributorCode {
+  label: string;
   value: string;
   description?: string;
 }
@@ -17,13 +17,17 @@ export interface CreateCodeset {
   categories: CreateContributorCodeCategory[];
 }
 
-const GetContributorCode = z.object({
-  code_name: z.string(),
+export const GetContributorCode = z.object({
+  contributor_code_id: z.number(),
+  name: z.string(),
+  value: z.string(),
   description: z.string().nullable()
 });
 
-const GetContributorCodeCategory = z.object({
+export const GetContributorCodeCategory = z.object({
+  contributor_code_category_id: z.number(),
   name: z.string(),
+  description: z.string(),
   codes: z.array(GetContributorCode)
 });
 
@@ -32,10 +36,11 @@ export const GetCodeset = z.object({
 });
 
 export type GetContributorCodeCategory = z.infer<typeof GetContributorCodeCategory>;
-
 export type GetCodeset = z.infer<typeof GetCodeset>;
 
 export interface CodesetFilters {
   contributor_id?: number;
   code_category_name?: string;
+  code_value?: string;
+  code_name?: string;
 }

@@ -2,27 +2,35 @@ import { OpenAPIV3 } from 'openapi-types';
 
 export const CreateCodesetSchema: OpenAPIV3.SchemaObject = {
   type: 'object',
-  required: ['codes'],
+  required: ['categories'],
   properties: {
-    codes: {
+    categories: {
       type: 'array',
       items: {
         type: 'object',
-        required: ['category', 'codes'],
+        required: ['name', 'codes', 'description'],
         properties: {
-          category: {
+          name: {
             type: 'string',
-            description: 'The category of the codes (e.g., "sign", "status").'
+            description: 'The name of the category (e.g., "sign", "status"), like the key in a key-value pair.'
+          },
+          description: {
+            type: 'string',
+            description: 'The description of the category.'
           },
           codes: {
             type: 'array',
             items: {
               type: 'object',
-              required: ['code_name'],
+              required: ['label', 'value', 'description'],
               properties: {
-                code_name: {
+                label: {
                   type: 'string',
-                  description: 'The actual code value from the contributor system.'
+                  description: 'The label of the code value in the contributing system.'
+                },
+                value: {
+                  type: 'number',
+                  description: 'The value for the code referenced in the data.'
                 },
                 description: {
                   type: 'string',
