@@ -1,11 +1,7 @@
-import * as fs from 'fs';
 import { Knex } from 'knex';
-import path from 'path';
 
 const DB_USER_BCGW_PASS = process.env.DB_USER_BCGW_PASS;
 const DB_USER_BCGW = process.env.DB_USER_BCGW;
-
-const DB_RELEASE = 'release.0.8.0';
 
 /**
  * Apply biohub-platform release changes.
@@ -15,12 +11,7 @@ const DB_RELEASE = 'release.0.8.0';
  * @return {*}  {Promise<void>}
  */
 export async function up(knex: Knex): Promise<void> {
-  const create_spatial_extensions = fs.readFileSync(path.join(__dirname, DB_RELEASE, 'create_spatial_extensions.psql'));
-
   await knex.raw(`
-    -- set up spatial extensions
-    ${create_spatial_extensions}
-
     -- set up bcgw schema
     create schema if not exists bcgw;
 
