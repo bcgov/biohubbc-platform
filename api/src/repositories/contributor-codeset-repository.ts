@@ -106,7 +106,7 @@ export class ContributorCodesetRepository extends BaseRepository {
       WITH w_code_category AS (
         INSERT INTO code_category (name)
         VALUES (${category.name})
-        ON CONFLICT (name) DO NOTHING
+        ON CONFLICT DO NOTHING
         RETURNING code_category_id
       ),
       w_existing_category AS (

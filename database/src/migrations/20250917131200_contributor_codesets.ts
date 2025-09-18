@@ -23,7 +23,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE contributor (
       contributor_id      integer         GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      name                varchar(100)    NOT NULL UNIQUE,
+      client_id           varchar(100)    NOT NULL,
       description         varchar(1000),
       record_end_date     timestamptz(6),
       create_date         timestamptz(6)  DEFAULT now() NOT NULL,
@@ -34,12 +34,12 @@ export async function up(knex: Knex): Promise<void> {
     );
 
     CREATE UNIQUE INDEX contributor_uk 
-      ON contributor (name, (record_end_date IS NULL)) 
+      ON contributor (client_id, (record_end_date IS NULL)) 
       WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE contributor IS 'A system, organization, or source that contributes data to this system.';
     COMMENT ON COLUMN contributor.contributor_id IS 'System-generated primary key.';
-    COMMENT ON COLUMN contributor.name IS 'The name of the contributing system or organization.';
+    COMMENT ON COLUMN contributor.client_id IS 'The Keycloak client_id of the contributing system or organization.';
     COMMENT ON COLUMN contributor.description IS 'Description of the contributor.';
     COMMENT ON COLUMN contributor.record_end_date IS 'The date the record was soft-deleted or expired.';
     COMMENT ON COLUMN contributor.create_date IS 'Timestamp when the record was created.';
@@ -91,7 +91,7 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE code_category (
       code_category_id        integer         GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      name                    varchar(100)    NOT NULL UNIQUE,
+      name                    varchar(100)    NOT NULL,
       record_end_date         timestamptz(6),
       create_date             timestamptz(6)  DEFAULT now() NOT NULL,
       create_user             integer         NOT NULL,
@@ -99,6 +99,10 @@ export async function up(knex: Knex): Promise<void> {
       update_user             integer,
       revision_count          integer         DEFAULT 0 NOT NULL
     );
+
+    CREATE UNIQUE INDEX code_category_nuk1 
+      ON code_category (name, (record_end_date IS NULL)) 
+      WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE code_category IS 'Categories/types of codes (e.g., sign, status, habitat).';
     COMMENT ON COLUMN code_category.code_category_id IS 'System-generated primary key.';
@@ -202,6 +206,14 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TRIGGER journal_contributor 
       AFTER INSERT OR UPDATE OR DELETE ON contributor 
+      FOR EACH ROW EXECUTE PROCEDURE tr_journal_trigger();
+
+    CREATE TRIGGER audit_contributor_system_user 
+      BEFORE INSERT OR UPDATE OR DELETE ON contributor_system_user 
+      FOR EACH ROW EXECUTE PROCEDURE tr_audit_trigger();
+
+    CREATE TRIGGER journal_contributor_system_user 
+      AFTER INSERT OR UPDATE OR DELETE ON contributor_system_user 
       FOR EACH ROW EXECUTE PROCEDURE tr_journal_trigger();
 
     CREATE TRIGGER audit_contributor_code 

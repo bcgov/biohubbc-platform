@@ -13,19 +13,15 @@ export class ContributorRepository extends BaseRepository {
   /**
    * Create a new contributor.
    *
-   * @param {{
-   *   name: string;
-   *   description?: string;
-   *   createUser: number;
-   * }} contributor
-   * @return {*}  {Promise<number>} inserted contributor_id
+   * @param {string} clientId
+   * @return {Promise<number>}
    * @memberof ContributorRepository
    */
-  async createContributor(contributor: { name: string; description?: string }): Promise<number> {
+  async createContributor(clientId: string): Promise<number> {
     const sql = SQL`
-      INSERT INTO contributor (name, description)
-      VALUES (${contributor.name}, ${contributor.description || null})
-      RETURNING contributor_id;
+      INSERT INTO contributor (client_id)
+      VALUES (${clientId})
+      RETURNING contributor_id
     `;
 
     const response = await this.connection.sql(sql);
@@ -38,6 +34,23 @@ export class ContributorRepository extends BaseRepository {
     }
 
     return response.rows[0].contributor_id;
+  }
+
+  /**
+   * Create a new contributor system user.
+   *
+   * @param {number} contributorId
+   * @param {number} systemUserId
+   * @return {Promise<void>}
+   * @memberof ContributorRepository
+   */
+  async createContributorMember(contributorId: number, systemUserId: number): Promise<void> {
+    const sql = SQL`
+      INSERT INTO contributor_system_user (contributor_id, system_user_id)
+      VALUES (${contributorId}, ${systemUserId});
+    `;
+
+    await this.connection.sql(sql);
   }
 
   /**
