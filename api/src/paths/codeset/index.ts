@@ -22,7 +22,7 @@ export const POST: Operation = [
       ]
     };
   }),
-  submitCodeSet()
+  submitCodeset()
 ];
 
 POST.apiDoc = {
@@ -50,7 +50,7 @@ POST.apiDoc = {
  *
  * @returns {RequestHandler}
  */
-export function submitCodeSet(): RequestHandler {
+export function submitCodeset(): RequestHandler {
   return async (req, res) => {
     const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
 
@@ -75,7 +75,7 @@ export function submitCodeSet(): RequestHandler {
 
       return res.sendStatus(201);
     } catch (error) {
-      defaultLog.error({ label: 'submitCodeSet', message: 'error', error });
+      defaultLog.error({ label: 'submitCodeset', message: 'error', error });
       await connection.rollback();
       throw error;
     } finally {
