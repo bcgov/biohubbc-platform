@@ -81,7 +81,7 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
       renderCell: (params) => {
         if (params.value.length > 0) {
           return (
-            <Stack flexDirection="row" alignItems="center" gap={1} color="error.main">
+            <Stack flexDirection="row" alignItems="center" color="error.main" height="100%" gap={1}>
               <Icon path={mdiLock} size={0.75} />
               <Typography variant="body2" component="span" fontWeight={700} textTransform="uppercase">
                 Secured

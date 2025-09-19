@@ -170,7 +170,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   <MenuItem
                     tabIndex={1}
                     component={RouterLink}
-                    to="/admin/dashboard"
+                    to="/admin/submissions"
                     id="menu_dashboard_sm"
                     onClick={hideMobileMenu}
                     data-testid="collapsed_submissions-header-item">
@@ -247,7 +247,7 @@ const Header: React.FC<React.PropsWithChildren> = () => {
                   Home
                 </RouterLink>
                 <SystemRoleGuard validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN]}>
-                  <RouterLink to="/admin/dashboard" id="menu_dashboard" data-testid="submissions-header-item">
+                  <RouterLink to="/admin/submissions" id="menu_dashboard" data-testid="submissions-header-item">
                     Submissions
                   </RouterLink>
                 </SystemRoleGuard>

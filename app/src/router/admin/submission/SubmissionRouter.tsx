@@ -1,5 +1,6 @@
-import DatasetPage from 'features/datasets/DatasetPage';
-import SubmissionsListPage from 'features/submissions/list/SubmissionsListPage';
+import { SubmissionContextProvider } from 'contexts/submissionContext';
+import DashboardPage from 'features/admin/dashboard/DashboardPage';
+import AdminSubmissionPage from 'features/submissions/AdminSubmissionPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 
@@ -15,18 +16,19 @@ export const SubmissionsRouter = () => {
         element={
           <>
             <PageTitle title="Submissions" description="Browse submitted submissions" />
-            <SubmissionsListPage />
+            <DashboardPage />
           </>
         }
       />
+
       {/* Route for submission details with meta */}
       <Route
-        path="/:id/details"
+        path="/:submission_id"
         element={
-          <>
+          <SubmissionContextProvider>
             <PageTitle title="Dataset Details" description="Details of a specific submission" />
-            <DatasetPage />
-          </>
+            <AdminSubmissionPage />
+          </SubmissionContextProvider>
         }
       />
       {/* Catch any unknown routes, and re-direct to the not found page */}
