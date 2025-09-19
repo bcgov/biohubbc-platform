@@ -8,9 +8,9 @@ import { SubmissionUploadService } from '../../../../services/submission-upload-
 import { getServiceClientSystemUser } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/upload/complete');
+const defaultLog = getLogger('paths/submission/upload/{uploadId}');
 
-export const POST: Operation = [
+export const PUT: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
@@ -23,12 +23,24 @@ export const POST: Operation = [
   completeMultipartUploadHandler()
 ];
 
-POST.apiDoc = {
+PUT.apiDoc = {
   description: 'Complete a multipart file upload for a submission',
   tags: ['submission'],
   security: [
     {
       Bearer: []
+    }
+  ],
+  parameters: [
+    {
+      description: 'The upload ID that is being completed',
+      in: 'path',
+      name: 'uploadId',
+      schema: {
+        type: 'string',
+        format: 'uuid'
+      },
+      required: true
     }
   ],
   requestBody: {
@@ -38,12 +50,8 @@ POST.apiDoc = {
         schema: {
           title: 'Complete Multipart Upload Request',
           type: 'object',
-          required: ['uploadId', 'key', 'parts'],
+          required: ['key', 'parts'],
           properties: {
-            uploadId: {
-              type: 'string',
-              description: 'The multipart upload ID provided during initiation'
-            },
             key: {
               type: 'string',
               description: 'The S3 object key for the uploaded file'
@@ -76,35 +84,7 @@ POST.apiDoc = {
   },
   responses: {
     200: {
-      description: 'Multipart upload completed successfully',
-      content: {
-        'application/json': {
-          schema: {
-            type: 'object',
-            required: ['success', 'location', 'bucket', 'key', 'etag'],
-            properties: {
-              success: {
-                type: 'boolean'
-              },
-              location: {
-                type: 'string',
-                description: 'Final location of the uploaded object'
-              },
-              bucket: {
-                type: 'string'
-              },
-              key: {
-                type: 'string'
-              },
-              etag: {
-                type: 'string',
-                description: 'ETag of the completed object'
-              }
-            },
-            additionalProperties: false
-          }
-        }
-      }
+      description: 'Multipart upload completed successfully'
     },
     ...defaultErrorResponses
   }
@@ -125,17 +105,16 @@ export function completeMultipartUploadHandler(): RequestHandler {
     try {
       await connection.open();
 
-      const { uploadId, key, parts } = req.body;
+      const uploadId = req.params.uploadId;
 
       const submissionUploadService = new SubmissionUploadService(connection);
 
-      const result = await submissionUploadService.completeMultipartUpload({
+      await submissionUploadService.completeMultipartUpload({
         uploadId,
-        key,
-        parts
+        ...req.body
       });
 
-      res.status(200).json(result);
+      res.sendStatus(200);
     } catch (error) {
       defaultLog.error({ label: 'completeMultipartUploadHandler', message: 'error', error });
       await connection.rollback();
