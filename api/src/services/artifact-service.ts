@@ -1,11 +1,18 @@
+import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { Artifact, ArtifactRepository } from '../repositories/artifact-repository';
 import { SearchIndexRepository } from '../repositories/search-index-respository';
 import { SecurityRepository } from '../repositories/security-repository';
 import { SubmissionFeatureRecord } from '../repositories/submission-repository';
-import { deleteFileFromS3, generateSubmissionFeatureS3FileKey, uploadFileToS3 } from '../utils/file-utils';
+import {
+  deleteFileFromS3,
+  generatePresignedS3UploadUrl,
+  generateSubmissionFeatureS3FileKey,
+  uploadFileToS3
+} from '../utils/file-utils';
 import { getLogger } from '../utils/logger';
+import { SubmissionUpload } from './artifact-service.interface';
 import { CodeService } from './code-service';
 import { DBService } from './db-service';
 import { SubmissionService } from './submission-service';
@@ -38,6 +45,23 @@ export class ArtifactService extends DBService {
    */
   async insertArtifactRecord(artifact: Artifact): Promise<{ artifact_id: number }> {
     return this.artifactRepository.insertArtifactRecord(artifact);
+  }
+
+  /**
+   * Generate a presigned upload URL that clients can use to write data to S3 directly, bypassing the API
+   *
+   * @return {*}  {Promise<SubmissionUpload>}
+   * @memberof ArtifactService
+   */
+  async getSubmissionUploadUrl(): Promise<SubmissionUpload> {
+    // TODO: Create a submission record to return to the client with the upload URL, for the client to
+    // mark the submissionId as complete
+    const submissionId = v4();
+
+    // Generate S3 key
+    const uploadUrl = await generatePresignedS3UploadUrl(submissionId);
+
+    return { submissionId, uploadUrl };
   }
 
   /**
