@@ -361,29 +361,6 @@ export function generateSubmissionFeatureS3FileKey(options: IArtifactS3FileKey) 
 }
 
 /**
- * Generate a presigned upload URL that clients can use to write data to S3 directly, bypassing the API
- *
- * @param {string} submissionId
- * @export
- * @return {*}
- */
-export async function generatePresignedS3UploadUrl(submissionId: string): Promise<string> {
-  const s3Client = _getS3Client();
-
-  const fileKey = `${submissionId}.bin`;
-
-  const command = new PutObjectCommand({
-    Bucket: _getObjectStoreBucketName(),
-    Key: fileKey,
-    ContentType: 'application/octet-stream'
-  });
-
-  const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-
-  return url;
-}
-
-/**
  * Generate an S3 key for a submission job queue file.
  *
  * @example

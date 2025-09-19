@@ -4,13 +4,13 @@ import { getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
-import { ArtifactService } from '../../../services/artifact-service';
+import { SubmissionUploadService } from '../../../services/submission-upload-service';
 import { getServiceClientSystemUser } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
 
 const defaultLog = getLogger('paths/submission/upload');
 
-export const GET: Operation = [
+export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
       and: [
@@ -23,7 +23,7 @@ export const GET: Operation = [
   getSubmissionUploadUrl()
 ];
 
-GET.apiDoc = {
+POST.apiDoc = {
   description: 'Get a presigned upload URL',
   tags: ['submission'],
   security: [
@@ -31,26 +31,54 @@ GET.apiDoc = {
       Bearer: []
     }
   ],
-  parameters: [],
+  requestBody: {
+    required: true,
+    content: {
+      'application/json': {
+        schema: {
+          title: 'BioHub Data Submission Upload Request',
+          type: 'object',
+          required: ['expectedSizeBytes'],
+          properties: {
+            expectedSizeBytes: {
+              description: 'The size of the file to be uploaded in bytes (max 1 GB).',
+              type: 'integer',
+              minimum: 1,
+              maximum: 1073741824, // 1 GB
+              example: 524288000 // 500 MB example
+            }
+          }
+        }
+      }
+    }
+  },
   responses: {
     200: {
-      description: 'Submission OK',
+      description: 'Multipart upload URLs and related metadata',
       content: {
         'application/json': {
           schema: {
             type: 'object',
-            required: ['submissionId', 'uploadUrl'],
+            additionalProperties: false,
+            required: ['submissionId', 'uploadId', 'key', 'partSizeBytes', 'partCount', 'presignedUrls'],
             properties: {
-              submissionId: {
-                type: 'string',
-                description: 'The primary key of the submission that the upload is for'
-              },
-              uploadUrl: {
-                description: 'Presigned upload URL',
-                type: 'string'
+              submissionId: { type: 'string' },
+              uploadId: { type: 'string' },
+              key: { type: 'string' },
+              partSizeBytes: { type: 'integer' },
+              partCount: { type: 'integer' },
+              presignedUrls: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['partNumber', 'url'],
+                  properties: {
+                    partNumber: { type: 'integer' },
+                    url: { type: 'string', format: 'uri' }
+                  }
+                }
               }
-            },
-            additionalProperties: false
+            }
           }
         }
       }
@@ -75,9 +103,11 @@ export function getSubmissionUploadUrl(): RequestHandler {
     try {
       await connection.open();
 
-      const artifactService = new ArtifactService(connection);
+      const expectedSizeBytes = Number(req.body.expectedSizeBytes);
 
-      const result = await artifactService.getSubmissionUploadUrl();
+      const submissionUploadService = new SubmissionUploadService(connection);
+
+      const result = await submissionUploadService.getTarUploadPresignedUrls(expectedSizeBytes);
 
       res.status(200).json(result);
     } catch (error) {
