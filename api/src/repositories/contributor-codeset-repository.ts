@@ -2,7 +2,12 @@ import { Knex } from 'knex';
 import SQL from 'sql-template-strings';
 import { z } from 'zod';
 import { getKnex } from '../database/db';
-import { CodesetFilters, CreateContributorCodeCategory, GetCodeset } from '../paths/codeset/index.interface';
+import {
+  CodesetFilters,
+  CreateContributorCode,
+  CreateContributorCodeCategory,
+  GetCodeset
+} from '../paths/codeset/index.interface';
 import { BaseRepository } from './base-repository';
 
 /**
@@ -39,7 +44,9 @@ export class ContributorCodesetRepository extends BaseRepository {
         this.on('ccc.code_category_id', '=', 'cc.code_category_id').andOnNull('cc.record_end_date');
       })
       .leftJoin('contributor_code as c', function () {
-        this.on('ccc.code_category_id', '=', 'c.code_category_id').andOnNull('c.record_end_date');
+        this.on('ccc.contributor_code_category_id', '=', 'c.contributor_code_category_id').andOnNull(
+          'c.record_end_date'
+        );
       })
       .whereNull('ccc.record_end_date')
       .modify((qb) => {
@@ -95,6 +102,42 @@ export class ContributorCodesetRepository extends BaseRepository {
   }
 
   /**
+   * Inserts new codes for a code category
+   *
+   * @param {string} contributorCodeCategory
+   * @param {CreateContributorCode[]} codes
+   * @return {Promise<void>}
+   */
+  async createCodeForCategory(contributorCodeCategory: string, codes: CreateContributorCode[]): Promise<void> {
+    const sqlStatement = SQL`
+      INSERT INTO contributor_code (
+        contributor_code_category_id,
+        value,
+        label,
+        description
+      )
+      VALUES 
+    `;
+
+    // Prepare values for insertion
+    const codeValues = codes.map(
+      (code) => SQL`(${contributorCodeCategory}, ${code.value}, ${code.label}, ${code.description ?? null})`
+    );
+
+    // Append VALUES list
+    codeValues.forEach((val, index) => {
+      sqlStatement.append(val);
+      if (index < codeValues.length - 1) {
+        sqlStatement.append(SQL`,`);
+      }
+    });
+
+    sqlStatement.append(SQL`;`);
+
+    await this.connection.sql(sqlStatement);
+  }
+
+  /**
    * Inserts a codeset category and set of codes for a given contributor system
    *
    * @param {number} contributorId
@@ -112,7 +155,7 @@ export class ContributorCodesetRepository extends BaseRepository {
       w_existing_category AS (
         SELECT code_category_id FROM w_code_category
         UNION
-        SELECT code_category_id FROM code_category WHERE name = ${category.name}
+        SELECT cc.code_category_id FROM code_category cc WHERE name = ${category.name}
       ),
       w_contributor_category AS (
         INSERT INTO contributor_code_category (
@@ -122,21 +165,21 @@ export class ContributorCodesetRepository extends BaseRepository {
         )
         SELECT ${contributorId}, code_category_id, ${category.description}
         FROM w_existing_category
-        RETURNING code_category_id
+        RETURNING contributor_code_category_id
       ),
       all_code_category AS (
-        SELECT code_category_id FROM w_contributor_category
+        SELECT contributor_code_category_id FROM w_contributor_category
         UNION
-        SELECT code_category_id FROM code_category WHERE name = ${category.name}
+        SELECT contributor_code_category_id FROM contributor_code_category ccc JOIN code_category cc ON cc.code_category_id = ccc.code_category_id WHERE name = ${category.name}
       )
       INSERT INTO contributor_code (
-        code_category_id,
+        contributor_code_category_id,
         value,
         label,
         description
       )
       SELECT 
-        acc.code_category_id,
+        acc.contributor_code_category_id,
         codes.value,
         codes.label,
         codes.description

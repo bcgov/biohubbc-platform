@@ -58,8 +58,9 @@ describe('submitCodeSet', () => {
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
 
+    mockReq['keycloak_token'] = { clientId: 'some-client-id' };
+
     mockReq.body = {
-      contributor_id: 1,
       categories: [
         {
           name: 'temperature',
@@ -72,7 +73,7 @@ describe('submitCodeSet', () => {
     await requestHandler(mockReq, mockRes, mockNext);
 
     expect(upsertStub).to.have.been.calledOnceWith({
-      contributor_id: 1,
+      clientId: 'some-client-id',
       categories: [
         {
           name: 'temperature',
@@ -84,7 +85,7 @@ describe('submitCodeSet', () => {
 
     expect(mockDBConnection.commit).to.have.been.calledOnce;
     expect(mockDBConnection.rollback).to.not.have.been.called;
-    expect(mockRes.statusValue).to.equal(201);
+    expect(mockRes.sendStatusValue).to.equal(201);
   });
 
   it('rolls back and rethrows error if service fails', async () => {
@@ -103,8 +104,10 @@ describe('submitCodeSet', () => {
     const requestHandler = submitCodeset();
 
     const { mockReq, mockRes, mockNext } = getRequestHandlerMocks();
+
+    mockReq['keycloak_token'] = { clientId: 'some-client-id' };
+
     mockReq.body = {
-      contributor_id: 1,
       categories: []
     };
 

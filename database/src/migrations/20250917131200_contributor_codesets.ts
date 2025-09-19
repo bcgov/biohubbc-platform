@@ -119,7 +119,7 @@ export async function up(knex: Knex): Promise<void> {
     ---------------------------------------------------
 
     CREATE TABLE contributor_code_category (
-      contributor_code_category_id  integer         GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      contributor_code_category_id  uuid            PRIMARY KEY DEFAULT public.gen_random_uuid(),
       contributor_id                integer         NOT NULL,
       code_category_id              integer         NOT NULL,
       description                   varchar(1000)   NOT NULL,
@@ -158,34 +158,31 @@ export async function up(knex: Knex): Promise<void> {
     ---------------------------------------------------
 
     CREATE TABLE contributor_code (
-      contributor_code_id     integer         GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-      code_category_id        integer         NOT NULL,
-      value                   varchar(100)    NOT NULL,
-      label                    varchar(100)    NOT NULL,
-      description             varchar(1000),
-      record_end_date         timestamptz(6),
-      create_date             timestamptz(6)  DEFAULT now() NOT NULL,
-      create_user             integer         NOT NULL,
-      update_date             timestamptz(6),
-      update_user             integer,
-      revision_count          integer         DEFAULT 0 NOT NULL,
+      contributor_code_id                 integer         GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      contributor_code_category_id        uuid            NOT NULL,
+      value                               varchar(100)    NOT NULL,
+      label                               varchar(100)    NOT NULL,
+      description                         varchar(1000),
+      record_end_date                     timestamptz(6),
+      create_date                         timestamptz(6)  DEFAULT now() NOT NULL,
+      create_user                         integer         NOT NULL,
+      update_date                         timestamptz(6),
+      update_user                         integer,
+      revision_count                      integer         DEFAULT 0 NOT NULL,
 
-      CONSTRAINT contributor_code_category_fk 
-        FOREIGN KEY (code_category_id) REFERENCES code_category(code_category_id)
+      CONSTRAINT contributor_contributor_code_category_fk 
+        FOREIGN KEY (contributor_code_category_id) REFERENCES contributor_code_category(contributor_code_category_id)
     );
 
-    CREATE INDEX contributor_code_category_idx ON contributor_code (code_category_id);
-
-    -- Index on name to accelerate lookups
-    CREATE INDEX contributor_code_label_idx ON contributor_code (label);
+    CREATE INDEX contributor_contributor_code_category_idx ON contributor_code (contributor_code_category_id);
 
     CREATE UNIQUE INDEX contributor_code_nuk1 
-      ON contributor_code (code_category_id, value, (record_end_date IS NULL)) 
+      ON contributor_code (contributor_code_category_id, value, (record_end_date IS NULL)) 
       WHERE record_end_date IS NULL;
 
     COMMENT ON TABLE contributor_code IS 'Code mappings from contributor systems to standardized BiodiversityHub codes.';
     COMMENT ON COLUMN contributor_code.contributor_code_id IS 'System-generated primary key.';
-    COMMENT ON COLUMN contributor_code.code_category_id IS 'Foreign key to the code category this code belongs to.';
+    COMMENT ON COLUMN contributor_code.contributor_code_category_id IS 'Foreign key to the code category this code belongs to.';
     COMMENT ON COLUMN contributor_code.value IS 'The actual code value from the contributor system (e.g., "1", "direct_observation").';
     COMMENT ON COLUMN contributor_code.label IS 'Standardized code label to display';
     COMMENT ON COLUMN contributor_code.description IS 'Human-readable description of what this code means.';

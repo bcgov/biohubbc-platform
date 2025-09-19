@@ -13,7 +13,7 @@ export interface CreateContributorCodeCategory {
 }
 
 export interface CreateCodeset {
-  contributor_id: number;
+  clientId: string;
   categories: CreateContributorCodeCategory[];
 }
 
@@ -25,7 +25,7 @@ export const GetContributorCode = z.object({
 });
 
 export const GetContributorCodeCategory = z.object({
-  contributor_code_category_id: z.number(),
+  contributor_code_category_id: z.string().uuid(),
   name: z.string(),
   description: z.string(),
   codes: z.array(GetContributorCode)

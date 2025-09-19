@@ -65,7 +65,7 @@ export function submitCodeset(): RequestHandler {
     try {
       await connection.open();
 
-      const codeset = { ...req.body, contributor_id: 1 } as CreateCodeset;
+      const codeset = { ...req.body, clientId: req['keycloak_token'].clientId } as CreateCodeset;
 
       const contributorCodesetService = new ContributorCodesetService(connection);
 

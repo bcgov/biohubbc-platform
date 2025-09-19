@@ -111,7 +111,6 @@ export class MockRes {
   sendStatusValue: any;
   sendStatus = sinon.fake((value: any) => {
     this.sendStatusValue = value;
-    this.statusValue = value;
     return this;
   });
 

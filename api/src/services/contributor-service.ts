@@ -1,5 +1,5 @@
 import { IDBConnection } from '../database/db';
-import { CreateContributor } from '../paths/contributor/index.interface';
+import { CreateContributor, GetContributor } from '../paths/contributor/index.interface';
 import { ContributorRepository } from '../repositories/contributor-repository';
 import { DBService } from './db-service';
 
@@ -9,6 +9,16 @@ export class ContributorService extends DBService {
   constructor(connection: IDBConnection) {
     super(connection);
     this.contributorRepository = new ContributorRepository(connection);
+  }
+
+  /**
+   * Get the contributor record for a clientId
+   *
+   * @param {string} clientId
+   * @returns {Promise<GetContributor>}
+   */
+  async getContributorByClientId(clientId: string): Promise<GetContributor> {
+    return this.contributorRepository.getContributorByClientId(clientId);
   }
 
   /**

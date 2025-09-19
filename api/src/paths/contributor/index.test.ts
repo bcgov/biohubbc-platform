@@ -67,7 +67,7 @@ describe('registerNewContributor', () => {
 
     expect(mockDBConnection.commit).to.have.been.calledOnce;
     expect(mockDBConnection.rollback).to.not.have.been.called;
-    expect(mockRes.statusValue).to.equal(201);
+    expect(mockRes.sendStatusValue).to.equal(201);
   });
 
   it('rolls back and rethrows error if ContributorService fails', async () => {

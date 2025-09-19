@@ -37,7 +37,9 @@ POST.apiDoc = {
 };
 
 /**
- * Registers the requestor as a new contributor
+ * Registers the system that the requestor is a service account for as a new contributor,
+ * and associates the service account with that contributor, letting the service account create submissions
+ * on behalf of its associated system (eg. SIMS)
  *
  * @returns {RequestHandler}
  */
