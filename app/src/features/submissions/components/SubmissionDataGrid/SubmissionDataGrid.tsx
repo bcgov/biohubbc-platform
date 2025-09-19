@@ -60,6 +60,10 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
             }
           }}
           sx={{
+            bgcolor: '#fff',
+            '& .MuiDataGrid-columnHeader': {
+              bgcolor: '#fff'
+            },
             '& .MuiDataGrid-columnHeaderTitle': {
               fontWeight: 700,
               textTransform: 'uppercase',

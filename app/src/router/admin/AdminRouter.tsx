@@ -16,14 +16,14 @@ export const AdminRouter = () => {
   return (
     <Routes>
       {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/admin/submissions" replace />} />
 
-      {/* Dashboard route with meta */}
+      {/* Submissions route  */}
       <Route
-        path="dashboard"
+        path="submissions/*"
         element={
           <BaseLayout>
-            <PageTitle title="Admin Dashboard" description="Overview of the admin dashboard" />
+            <PageTitle title="Review Submissions" description="Overview of the Submissions for Review" />
             <AuthenticatedRouteGuard>
               <SystemRoleGuard
                 validSystemRoles={[SYSTEM_ROLE.SYSTEM_ADMIN, SYSTEM_ROLE.DATA_ADMINISTRATOR]}
@@ -35,7 +35,7 @@ export const AdminRouter = () => {
         }
       />
 
-      {/* Manage Users route with meta */}
+      {/* Manage Users route */}
       <Route
         path="users"
         element={

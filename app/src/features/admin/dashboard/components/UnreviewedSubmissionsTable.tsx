@@ -201,7 +201,7 @@ const UnreviewedSubmissionsTable = () => {
                       component={RouterLink}
                       variant="contained"
                       color="primary"
-                      to={`/admin/dashboard/submissions/${submissionRecord.submission_id}`}
+                      to={`/admin/submissions/${submissionRecord.submission_id}`}
                       sx={{
                         flex: '0 0 auto',
                         minWidth: '7rem'
