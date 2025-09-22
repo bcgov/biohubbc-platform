@@ -90,7 +90,7 @@ const useSubmissionDataGridColumns = (featureTypeName: string): GridColDef[] => 
           );
         }
         return (
-          <Stack flexDirection="row" alignItems="center" gap={1} color="error.main">
+          <Stack flexDirection="row" alignItems="center" gap={1} color="error.main" height="100%">
             <Icon path={mdiLockOpenOutline} size={0.75} />
             <Typography variant="body2" component="span" fontWeight={700} textTransform="uppercase">
               Unsecured
