@@ -1,6 +1,10 @@
 import { CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { _getObjectStoreBucketName, _getS3Client } from './file-utils';
+import { MultipartUploadParams, MultipartUploadResult } from './submission-upload-utils.interface';
+
+const MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_PARTS = 10000;
 
 /**
  * Generate a presigned upload URL that clients can use to write data to S3 directly, bypassing the API
@@ -14,13 +18,13 @@ export async function generateMultipartUploadPresignedUrls(
 ): Promise<MultipartUploadResult> {
   const { key, contentType, expectedSizeBytes } = params;
 
-  const PART_SIZE = 100 * 1024 * 1024;
-  const partCount = Math.ceil(expectedSizeBytes / PART_SIZE);
+  const partSizeBytes = Math.max(MIN_PART_SIZE, Math.ceil(expectedSizeBytes / MAX_PARTS));
+  const partCount = Math.ceil(expectedSizeBytes / partSizeBytes);
 
   const s3Client = _getS3Client();
 
   // Create multipart upload
-  const createUploadResp = await s3Client.send(
+  const { UploadId } = await s3Client.send(
     new CreateMultipartUploadCommand({
       Bucket: _getObjectStoreBucketName(),
       Key: key,
@@ -28,8 +32,7 @@ export async function generateMultipartUploadPresignedUrls(
     })
   );
 
-  const uploadId = createUploadResp.UploadId;
-  if (!uploadId) {
+  if (!UploadId) {
     throw new Error('Failed to create multipart upload');
   }
 
@@ -40,7 +43,7 @@ export async function generateMultipartUploadPresignedUrls(
       const uploadPartCommand = new UploadPartCommand({
         Bucket: _getObjectStoreBucketName(),
         Key: key,
-        UploadId: uploadId,
+        UploadId,
         PartNumber: partNumber
       });
 
@@ -53,9 +56,9 @@ export async function generateMultipartUploadPresignedUrls(
   );
 
   return {
-    uploadId,
+    uploadId: UploadId,
     presignedUrls,
-    partSizeBytes: PART_SIZE,
+    partSizeBytes,
     partCount
   };
 }
