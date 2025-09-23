@@ -123,6 +123,9 @@ biohub-platform-api:
     # Object Store (S3)
     # objectStore.keyPrefix will be dynamically set: "local/1234/sims"
 
+    # Quarantine Object Store (S3)
+    # quarantineObjectStore.keyPrefix will be dynamically set: "local/1234/biohub"
+
     # Logging
     logging:
       level: debug

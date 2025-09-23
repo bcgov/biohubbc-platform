@@ -18,7 +18,11 @@ app:
   # Object Store (S3)
   objectStore:
     keyPrefix: biohub
-  
+
+  # Quarantine Object Store (S3)
+  quarantineObjectStore:
+    keyPrefix: biohub
+
   # Logging
   logging:
     level: silent
