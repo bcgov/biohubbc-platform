@@ -2,7 +2,7 @@ import { CompleteMultipartUploadCommand } from '@aws-sdk/client-s3';
 import { v4 } from 'uuid';
 import { IDBConnection } from '../database/db';
 import { ArtifactRepository } from '../repositories/artifact-repository';
-import { _getObjectStoreBucketName, _getS3Client } from '../utils/file-utils';
+import { _getQuarantineObjectStoreBucketName, _getQuarantineS3Client } from '../utils/file-utils';
 import { generateMultipartUploadPresignedUrls } from '../utils/submission-upload-utils';
 import { SubmissionService } from './submission-service';
 import { CompleteMultipartUploadParams, PresignedUploadUrlResponse } from './submission-upload-service.interface';
@@ -53,10 +53,10 @@ export class SubmissionUploadService {
   async completeMultipartUpload(params: CompleteMultipartUploadParams) {
     const { uploadId, key, parts } = params;
 
-    const s3Client = _getS3Client();
+    const s3Client = _getQuarantineS3Client();
 
     const completeCommand = new CompleteMultipartUploadCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: _getQuarantineObjectStoreBucketName(),
       Key: key,
       UploadId: uploadId,
       MultipartUpload: {

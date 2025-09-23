@@ -1,6 +1,6 @@
 import { CreateMultipartUploadCommand, UploadPartCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { _getObjectStoreBucketName, _getS3Client } from './file-utils';
+import { _getQuarantineObjectStoreBucketName, _getQuarantineS3Client } from './file-utils';
 import { MultipartUploadParams, MultipartUploadResult } from './submission-upload-utils.interface';
 
 const MIN_PART_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -21,12 +21,12 @@ export async function generateMultipartUploadPresignedUrls(
   const partSizeBytes = Math.max(MIN_PART_SIZE, Math.ceil(expectedSizeBytes / MAX_PARTS));
   const partCount = Math.ceil(expectedSizeBytes / partSizeBytes);
 
-  const s3Client = _getS3Client();
+  const s3Client = _getQuarantineS3Client();
 
   // Create multipart upload
   const { UploadId } = await s3Client.send(
     new CreateMultipartUploadCommand({
-      Bucket: _getObjectStoreBucketName(),
+      Bucket: _getQuarantineObjectStoreBucketName(),
       Key: key,
       ContentType: contentType
     })
@@ -41,7 +41,7 @@ export async function generateMultipartUploadPresignedUrls(
     Array.from({ length: partCount }, async (_, i) => {
       const partNumber = i + 1;
       const uploadPartCommand = new UploadPartCommand({
-        Bucket: _getObjectStoreBucketName(),
+        Bucket: _getQuarantineObjectStoreBucketName(),
         Key: key,
         UploadId,
         PartNumber: partNumber

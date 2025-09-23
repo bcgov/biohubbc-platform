@@ -74,6 +74,23 @@ export const _getS3Client = (): S3Client => {
 };
 
 /**
+ * Local getter for retrieving the S3 quarantine client.
+ *
+ * @return {*}  {S3Client} The S3 quarantine client
+ */
+export const _getQuarantineS3Client = (): S3Client => {
+  return new S3Client({
+    endpoint: _getObjectStoreUrl(),
+    credentials: {
+      accessKeyId: process.env.QUARANTINE_OBJECT_STORE_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.QUARANTINE_OBJECT_STORE_SECRET_KEY_ID!
+    },
+    forcePathStyle: true,
+    region: 'ca-central-1'
+  });
+};
+
+/**
  * Local getter for retrieving the S3 object store URL.
  *
  * @returns {*} {string} The object store URL
@@ -95,6 +112,15 @@ export const _getObjectStoreUrl = (): string => {
  */
 export const _getObjectStoreBucketName = (): string => {
   return process.env.OBJECT_STORE_BUCKET_NAME || '';
+};
+
+/**
+ * Local getter for retrieving the S3 quarantine object store bucket name.
+ *
+ * @returns {*} {string} The quarantine object store bucket name
+ */
+export const _getQuarantineObjectStoreBucketName = (): string => {
+  return process.env.QUARANTINE_OBJECT_STORE_BUCKET_NAME || '';
 };
 
 /**
