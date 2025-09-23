@@ -3,7 +3,7 @@ import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
-import { getConfig } from 'config/config';
+import { useConfigContext } from 'hooks/useContext';
 import Dropzone, { FileRejection } from 'react-dropzone';
 
 const BYTES_PER_MEGABYTE = 1048576;
@@ -57,7 +57,7 @@ export interface IDropZoneConfigProps {
 }
 
 export const DropZone = (props: IDropZoneProps & IDropZoneConfigProps) => {
-  const config = getConfig();
+  const config = useConfigContext();
 
   const maxNumFiles = props.maxNumFiles || config.MAX_UPLOAD_NUM_FILES;
   const maxFileSize = props.maxFileSize || config.MAX_UPLOAD_FILE_SIZE;
