@@ -143,6 +143,12 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
     return data;
   };
 
+  const getSubmissionUploadUrls = async (): Promise<SubmissionUploadUrls> => {
+    const { data } = await axios.get(`api/submission/upload`);
+
+    return data;
+  };
+
   return {
     getSubmissionDownloadPackage,
     getSubmissionPublishedDownloadPackage,

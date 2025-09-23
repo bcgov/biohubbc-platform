@@ -44,6 +44,7 @@ export interface ISubmissionFeature {
   create_date: string;
   create_user: string;
 }
+
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   uuid: string;
