@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getServiceAccountDBConnection } from '../../../database/db';
+import { SYSTEM_ROLE } from '../../../constants/roles';
+import { getDBConnection, getServiceAccountDBConnection } from '../../../database/db';
 import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
@@ -13,9 +14,13 @@ const defaultLog = getLogger('paths/submission/upload');
 export const POST: Operation = [
   authorizeRequestHandler(() => {
     return {
-      and: [
+      or: [
         {
           discriminator: 'ServiceClient'
+        },
+        {
+          validSystemRoles: [SYSTEM_ROLE.SYSTEM_ADMIN],
+          discriminator: 'SystemRole'
         }
       ]
     };
@@ -89,16 +94,21 @@ POST.apiDoc = {
 
 export function getSubmissionUploadUrl(): RequestHandler {
   return async (req, res) => {
-    // TODO Allow system admins
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const token = req['keycloak_token'];
 
-    if (!serviceClientSystemUser) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a sub or sub value is unknown'
+    // TODO: Why do service accounts need to be distinct, if they are just user records like system admins?
+    const serviceClientSystemUser = getServiceClientSystemUser(token);
+
+    // Choose the appropriate DB connection based on auth type
+    const connection = serviceClientSystemUser
+      ? getServiceAccountDBConnection(serviceClientSystemUser)
+      : getDBConnection(token);
+
+    if (!connection) {
+      throw new HTTP400('Failed to establish a database connection', [
+        'Invalid or missing credentials for DB connection'
       ]);
     }
-
-    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();

@@ -1,31 +1,122 @@
-import {
-  secureDataAccessRequestFormInitialValues,
-  secureDataAccessRequestFormYupSchema
-} from 'features/datasets/security/SecureDataAccessRequestForm';
-import { Formik } from 'formik';
+import { Box, Button, Container, Paper, Stack } from '@mui/material';
+import BaseHeader from 'components/layout/header/BaseHeader';
+import { Formik, FormikProps } from 'formik';
+import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
-import { ISubmissionFeature } from 'interfaces/useSubmissionsApi.interface';
+import { useDialogContext } from 'hooks/useContext';
+import { useRef, useState } from 'react';
+import { createTarData, fileToUint8Array, uploadMultipartTar } from 'utils/submission-upload-utils';
+import yup from 'utils/YupSchema';
+import { CreateSubmissionForm } from './form/CreateSubmissionForm';
+import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 
-interface ICreateSubmissionForm {
-  features: ISubmissionFeature[];
-}
+const initialSubmissionValues: ICreateSubmissionForm = {
+  name: '',
+  description: '',
+  file: null as unknown as File
+};
+
+export const SubmissionYupSchema = yup.object().shape({
+  name: yup.string().required('Enter a name for the submission').max(100),
+  description: yup.string().max(500).nullable(),
+  file: yup
+    .mixed<File>()
+    .required('You must submit a .json file')
+    .test('fileType', 'Only .json files are supported', (value) => {
+      return value instanceof File && value.name.toLowerCase().endsWith('.json');
+    })
+});
 
 export const CreateSubmissionPage = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const bioHubApi = useApi();
+  const dialogContext = useDialogContext();
 
-  const handleSubmit = (values: ICreateSubmissionForm) => {
-    bioHubApi.submissions.createSubmission();
+  const formikRef = useRef<FormikProps<ICreateSubmissionForm>>(null);
+
+  const handleSubmit = async (values: ICreateSubmissionForm) => {
+    setIsSubmitting(true);
+
+    try {
+      // Convert the JSON file to Uint8Array
+      const fileBytes = await fileToUint8Array(values.file);
+
+      // Prepare files for TAR - just the JSON file
+      const filesToTar = [
+        {
+          name: 'features.json',
+          content: fileBytes
+        }
+        // Add more files here if needed
+      ];
+
+      // Create TAR data
+      const tarData = createTarData(filesToTar);
+
+      // Request pre-signed upload URLs for multipart upload
+      const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls(tarData.length);
+      const uploadUrls = uploadResponse.presignedUrls.map((presigned) => presigned.url);
+
+      // Upload TAR file in multiple parts
+      await uploadMultipartTar(uploadUrls, tarData);
+
+      // Mark upload as complete
+      await bioHubApi.submissions.completeSubmissionUpload(uploadResponse.uploadId);
+
+      dialogContext.setSnackbar({
+        snackbarMessage: `Successfully submitted "${values.name}"`,
+        open: true
+      });
+    } catch (error) {
+      console.error('Submission error:', error);
+      dialogContext.setSnackbar({
+        snackbarMessage: (error as APIError).message,
+        open: true
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
   return (
-    <Formik
-      innerRef={formikRef}
-      initialValues={secureDataAccessRequestFormInitialValues}
-      validationSchema={secureDataAccessRequestFormYupSchema}
-      validateOnBlur={true}
-      validateOnChange={false}
-      enableReinitialize={true}
-      onSubmit={handleSubmit}>
-      <CreateSubmissionForm />
-    </Formik>
+    <>
+      <BaseHeader
+        title="New Submission"
+        buttonJSX={
+          <Stack gap={1} flexDirection="row">
+            <Button variant="outlined" disabled={isSubmitting} onClick={formikRef.current?.submitForm}>
+              Cancel
+            </Button>
+            <Button loading={isSubmitting} variant="contained" onClick={formikRef.current?.submitForm}>
+              Submit
+            </Button>
+          </Stack>
+        }
+      />
+      <Formik
+        innerRef={formikRef}
+        initialValues={initialSubmissionValues}
+        validationSchema={SubmissionYupSchema}
+        validateOnBlur
+        validateOnChange={false}
+        enableReinitialize
+        onSubmit={handleSubmit}>
+        {(formikProps) => (
+          <Container component={Paper} maxWidth="xl" sx={{ bgcolor: '#fff', py: 2, mt: 3 }}>
+            <Box my={3}>
+              <CreateSubmissionForm />
+            </Box>
+            <Stack gap={1} flexDirection="row" flex="1 1 auto" justifyContent="flex-end">
+              <Button variant="outlined" disabled={isSubmitting} onClick={formikRef.current?.submitForm}>
+                Cancel
+              </Button>
+              <Button loading={isSubmitting} variant="contained" onClick={formikProps.submitForm}>
+                Submit
+              </Button>
+            </Stack>
+          </Container>
+        )}
+      </Formik>
+    </>
   );
 };
