@@ -23,7 +23,7 @@ interface TarFileData {
 /**
  * Interface for multipart upload result
  */
-interface UploadResult {
+export interface UploadResult {
   /** The part number in the multipart upload sequence */
   partNumber: number;
   /** The ETag returned by the server for this part */

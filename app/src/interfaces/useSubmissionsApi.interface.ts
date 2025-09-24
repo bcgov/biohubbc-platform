@@ -58,6 +58,11 @@ export interface IPostSubmissionFeature {
   children: IPostSubmissionFeature[];
 }
 
+export interface ISubmissionUploadPart {
+  partNumber: number;
+  etag: string;
+}
+
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   uuid: string;

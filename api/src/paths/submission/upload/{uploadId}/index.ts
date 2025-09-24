@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
-import { getServiceAccountDBConnection } from '../../../../database/db';
+import { getDBConnection, getServiceAccountDBConnection } from '../../../../database/db';
 import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
@@ -33,12 +33,11 @@ PUT.apiDoc = {
   ],
   parameters: [
     {
-      description: 'The upload ID that is being completed',
+      description: 'The upload ID that was returned from the /submission/upload endpoint',
       in: 'path',
       name: 'uploadId',
       schema: {
-        type: 'string',
-        format: 'uuid'
+        type: 'string'
       },
       required: true
     }
@@ -92,15 +91,21 @@ PUT.apiDoc = {
 
 export function completeMultipartUploadHandler(): RequestHandler {
   return async (req, res) => {
-    const serviceClientSystemUser = getServiceClientSystemUser(req['keycloak_token']);
+    const token = req['keycloak_token'];
 
-    if (!serviceClientSystemUser) {
-      throw new HTTP400('Failed to identify known submission source system', [
-        'token did not contain a sub or sub value is unknown'
+    // TODO: Why do service accounts need to be distinct, if they are just user records like system admins?
+    const serviceClientSystemUser = getServiceClientSystemUser(token);
+
+    // Choose the appropriate DB connection based on auth type
+    const connection = serviceClientSystemUser
+      ? getServiceAccountDBConnection(serviceClientSystemUser)
+      : getDBConnection(token);
+
+    if (!connection) {
+      throw new HTTP400('Failed to establish a database connection', [
+        'Invalid or missing credentials for DB connection'
       ]);
     }
-
-    const connection = getServiceAccountDBConnection(serviceClientSystemUser);
 
     try {
       await connection.open();

@@ -2,6 +2,7 @@ import { AxiosInstance } from 'axios';
 import {
   IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
+  ISubmissionUploadPart,
   PresignedUploadUrlResponse,
   SubmissionFeatureSignedUrlPayload,
   SubmissionRecordPublishedForPublic,
@@ -160,10 +161,16 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * Update the submission upload as completed
    *
    * @param {string} uploadId
+   * @param {string} key
+   * @param {ISubmissionUploadPart[]} parts
    * @returns {Promise<void>}
    */
-  const completeSubmissionUpload = async (uploadId: string): Promise<void> => {
-    await axios.put(`api/submission/upload/${uploadId}`);
+  const completeSubmissionUpload = async (
+    uploadId: string,
+    key: string,
+    parts: ISubmissionUploadPart[]
+  ): Promise<void> => {
+    await axios.put(`api/submission/upload/${uploadId}`, { key, parts });
   };
 
   return {

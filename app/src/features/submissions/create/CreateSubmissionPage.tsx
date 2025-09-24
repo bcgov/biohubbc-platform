@@ -34,6 +34,9 @@ export const CreateSubmissionPage = () => {
 
   const formikRef = useRef<FormikProps<ICreateSubmissionForm>>(null);
 
+  /**
+   * NOTE: The logic in creating the .tar file should be improved, where possible
+   */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
     setIsSubmitting(true);
 
@@ -47,7 +50,7 @@ export const CreateSubmissionPage = () => {
           name: 'features.json',
           content: fileBytes
         }
-        // Add more files here if needed
+        // Add more files here
       ];
 
       // Create TAR data
@@ -58,10 +61,11 @@ export const CreateSubmissionPage = () => {
       const uploadUrls = uploadResponse.presignedUrls.map((presigned) => presigned.url);
 
       // Upload TAR file in multiple parts
-      await uploadMultipartTar(uploadUrls, tarData);
+      const parts = await uploadMultipartTar(uploadUrls, tarData);
+      const parsedParts = parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }));
 
       // Mark upload as complete
-      await bioHubApi.submissions.completeSubmissionUpload(uploadResponse.uploadId);
+      await bioHubApi.submissions.completeSubmissionUpload(uploadResponse.uploadId, uploadResponse.key, parsedParts);
 
       dialogContext.setSnackbar({
         snackbarMessage: `Successfully submitted "${values.name}"`,
