@@ -1,5 +1,5 @@
 import LinearProgress from '@mui/material/LinearProgress';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import { IProgressBarProps, UploadFileStatus } from './FileUploadItem';
 
 const useStyles = () => {

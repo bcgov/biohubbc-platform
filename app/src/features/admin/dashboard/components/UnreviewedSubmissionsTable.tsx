@@ -7,7 +7,7 @@ import CardActions from '@mui/material/CardActions';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
 import Chip from '@mui/material/Chip';
-import grey from '@mui/material/colors/grey';
+import { grey } from '@mui/material/colors';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -201,7 +201,7 @@ const UnreviewedSubmissionsTable = () => {
                       component={RouterLink}
                       variant="contained"
                       color="primary"
-                      to={`/admin/dashboard/submissions/${submissionRecord.submission_id}`}
+                      to={`/admin/submissions/${submissionRecord.submission_id}`}
                       sx={{
                         flex: '0 0 auto',
                         minWidth: '7rem'

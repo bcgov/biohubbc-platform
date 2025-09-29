@@ -17,9 +17,9 @@ describe('FileUploadItem', () => {
 
     const testFile = new File(['test png content'], 'testpng.txt', { type: 'text/plain' });
 
-    const mockUploadHandler = jest.fn();
-    const mockOnSuccess = jest.fn();
-    const mockOnCancel = jest.fn();
+    const mockUploadHandler = vi.fn();
+    const mockOnSuccess = vi.fn();
+    const mockOnCancel = vi.fn();
 
     const { getByText, getByTitle } = renderContainer({
       uploadHandler: mockUploadHandler.mockResolvedValue(mockUploadPromise),
@@ -63,9 +63,9 @@ describe('FileUploadItem', () => {
 
     const testFile = new File(['test png content'], 'testpng.txt', { type: 'text/plain' });
 
-    const mockUploadHandler = jest.fn();
-    const mockOnSuccess = jest.fn();
-    const mockOnCancel = jest.fn();
+    const mockUploadHandler = vi.fn();
+    const mockOnSuccess = vi.fn();
+    const mockOnCancel = vi.fn();
 
     const { getByText } = renderContainer({
       uploadHandler: mockUploadHandler.mockResolvedValue(mockUploadPromise),
@@ -105,9 +105,9 @@ describe('FileUploadItem', () => {
 
     const testFile = new File(['test png content'], 'testpng.txt', { type: 'text/plain' });
 
-    const mockUploadHandler = jest.fn();
-    const mockOnSuccess = jest.fn();
-    const mockOnCancel = jest.fn();
+    const mockUploadHandler = vi.fn();
+    const mockOnSuccess = vi.fn();
+    const mockOnCancel = vi.fn();
 
     const { getByText } = renderContainer({
       uploadHandler: mockUploadHandler.mockResolvedValue(mockUploadPromise),
@@ -141,9 +141,9 @@ describe('FileUploadItem', () => {
   it('shows an error message if the component initially receives an error', async () => {
     const testFile = new File(['test png content'], 'testpng.txt', { type: 'text/plain' });
 
-    const mockUploadHandler = jest.fn();
-    const mockOnSuccess = jest.fn();
-    const mockOnCancel = jest.fn();
+    const mockUploadHandler = vi.fn();
+    const mockOnSuccess = vi.fn();
+    const mockOnCancel = vi.fn();
 
     const { getByText } = renderContainer({
       uploadHandler: mockUploadHandler,

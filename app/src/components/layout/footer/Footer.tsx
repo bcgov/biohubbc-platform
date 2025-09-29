@@ -1,5 +1,5 @@
 import Box from '@mui/material/Box';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import Toolbar from '@mui/material/Toolbar';
 import React from 'react';
 

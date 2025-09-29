@@ -94,7 +94,10 @@ interface ISecureDataAccessRequestFormProps {
 const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) => {
   const classes = useStyles();
   const formikProps = useFormikContext<ISecureDataAccessRequestForm>();
-  const [currentRowSelection, setCurrentRowSelection] = useState<GridRowSelectionModel>(props.initialArtifactSelection);
+  const [currentRowSelection, setCurrentRowSelection] = useState<GridRowSelectionModel>({
+    type: 'include',
+    ids: new Set(props.initialArtifactSelection)
+  });
 
   useEffect(() => {
     // Ensure that the initially selected artifact is persisted
@@ -169,7 +172,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
 
         <Box py={2}>
           <Grid container spacing={3}>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <CustomTextField
                 name="fullName"
                 label="Full Name"
@@ -178,7 +181,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                 }}
               />
             </Grid>
-            <Grid item xs={6}>
+            <Grid size={{ xs: 6 }}>
               <CustomTextField
                 name="emailAddress"
                 label="Email Address"
@@ -187,7 +190,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                 }}
               />
             </Grid>
-            <Grid item xs={6}>
+            <Grid size={{ xs: 6 }}>
               <CustomTextField
                 name="phoneNumber"
                 label="Phone Number"
@@ -251,7 +254,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
 
           <Box py={2}>
             <Grid container spacing={3}>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <CustomTextField
                   name="companyInformation.companyName"
                   label="Company Name"
@@ -260,7 +263,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                   }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <CustomTextField
                   name="companyInformation.jobTitle"
                   label="Job/Position Title"
@@ -269,7 +272,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                   }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid size={{ xs: 12 }}>
                 <CustomTextField
                   name="companyInformation.streetAddress"
                   label="Street Address"
@@ -278,7 +281,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                   }}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <CustomTextField
                   name="companyInformation.city"
                   label="City / Town"
@@ -287,7 +290,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                   }}
                 />
               </Grid>
-              <Grid item xs={6}>
+              <Grid size={{ xs: 6 }}>
                 <CustomTextField
                   name="companyInformation.postalCode"
                   label="Postal Code"
@@ -306,7 +309,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
 
             <Box py={2}>
               <Grid container spacing={3}>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                   <CustomTextField
                     name="professionalOrganization.organizationName"
                     label="Organization Name"
@@ -315,7 +318,7 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
                     }}
                   />
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                   <CustomTextField
                     name="professionalOrganization.memberNumber"
                     label="Member Number"

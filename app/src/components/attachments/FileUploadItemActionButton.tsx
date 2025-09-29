@@ -2,7 +2,7 @@ import { mdiCheck, mdiTrashCanOutline } from '@mdi/js';
 import Icon from '@mdi/react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
-import useTheme from '@mui/material/styles/useTheme';
+import { useTheme } from '@mui/material/styles';
 import { IActionButtonProps, UploadFileStatus } from './FileUploadItem';
 
 const useStyles = () => {

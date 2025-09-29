@@ -1,4 +1,3 @@
-import LoadingButton from '@mui/lab/LoadingButton';
 import { useMediaQuery, useTheme } from '@mui/material';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -13,7 +12,6 @@ import { useApi } from 'hooks/useApi';
 import { IArtifact } from 'interfaces/useDatasetApi.interface';
 import { ISecureDataAccessRequestForm } from 'interfaces/useSecurityApi.interface';
 import { useRef, useState } from 'react';
-import { useHistory } from 'react-router';
 import SecureDataAccessRequestForm, {
   secureDataAccessRequestFormInitialValues,
   secureDataAccessRequestFormYupSchema
@@ -28,7 +26,6 @@ interface ISecureDataAccessRequestDialogProps {
 
 const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProps) => {
   const biohubApi = useApi();
-  const history = useHistory();
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
   const [showErrorDialog, setShowErrorDialog] = useState(false);
@@ -40,7 +37,7 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
     try {
       await biohubApi.security.sendSecureArtifactAccessRequest({
         ...values,
-        pathToParent: history.location.pathname
+        pathToParent: location.pathname
       });
       setShowSuccessDialog(true);
     } catch (error) {
@@ -108,14 +105,14 @@ const SecureDataAccessRequestDialog = (props: ISecureDataAccessRequestDialogProp
           </Box>
         </DialogContent>
         <DialogActions>
-          <LoadingButton
+          <Button
             loading={isSubmitting}
             onClick={() => formikRef.current?.submitForm()}
             color="primary"
             variant="contained"
             autoFocus>
             Submit Request
-          </LoadingButton>
+          </Button>
           <Button onClick={() => props.onClose()} color="primary" variant="outlined" autoFocus>
             Cancel
           </Button>

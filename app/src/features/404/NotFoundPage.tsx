@@ -4,11 +4,10 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-import { useHistory } from 'react-router';
+import { useNavigate } from 'react-router';
 
 const NotFoundPage = () => {
-  const history = useHistory();
-
+  const navigate = useNavigate();
   return (
     <Container>
       <Box pt={6} textAlign="center">
@@ -17,7 +16,7 @@ const NotFoundPage = () => {
         <Typography>Sorry, the page you are trying to access does not exist.</Typography>
         <Box pt={4}>
           <Button
-            onClick={() => history.push('/')}
+            onClick={() => navigate('/')}
             type="submit"
             size="large"
             variant="contained"

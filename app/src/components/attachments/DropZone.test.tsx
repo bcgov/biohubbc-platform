@@ -1,14 +1,15 @@
 import { fireEvent, waitFor } from '@testing-library/react';
 import DropZone from 'components/attachments/DropZone';
 import { ConfigContext, IConfig } from 'contexts/configContext';
+
 import { render } from 'test-helpers/test-utils';
 
-const onFiles = jest.fn();
+const onFiles = vi.fn();
 
 const renderContainer = () => {
   return render(
     <ConfigContext.Provider value={{ MAX_UPLOAD_NUM_FILES: 10, MAX_UPLOAD_FILE_SIZE: 52428800 } as IConfig}>
-      <DropZone onFiles={onFiles} acceptedFileExtensions=".txt" />
+      <DropZone onFiles={onFiles} acceptedFileExtensions={['.txt']} />
     </ConfigContext.Provider>
   );
 };

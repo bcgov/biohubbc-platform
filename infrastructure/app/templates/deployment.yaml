@@ -30,25 +30,25 @@ spec:
           env:
             - name: CHANGE_VERSION
               value: {{ .Values.environment.changeId | quote }}
-            - name: REACT_APP_API_HOST
+            - name: VITE_API_HOST
               value: {{ include "apiHost" . }}
-            - name: REACT_APP_SITEMINDER_LOGOUT_URL
+            - name: VITE_SITEMINDER_LOGOUT_URL
               value: {{ .Values.app.siteminderLogoutURL }}
-            - name: REACT_APP_MAX_UPLOAD_NUM_FILES
+            - name: VITE_MAX_UPLOAD_NUM_FILES
               value: {{ .Values.app.requestLimits.uploadNumFiles | quote }}
-            - name: REACT_APP_MAX_UPLOAD_FILE_SIZE
+            - name: VITE_MAX_UPLOAD_FILE_SIZE
               value: {{ .Values.app.requestLimits.uploadFileSize | quote }}
             - name: NODE_ENV
               value: {{ .Values.app.nodeEnv }}
-            - name: REACT_APP_NODE_ENV
+            - name: VITE_NODE_ENV
               value: {{ .Values.app.nodeEnv }}
             - name: VERSION
               value: {{ .Values.environment.name }}-{{ .Chart.AppVersion }}-{{ .Values.environment.changeId }}
-            - name: REACT_APP_KEYCLOAK_HOST
+            - name: VITE_KEYCLOAK_HOST
               value: {{ .Values.app.keycloak.host }}
-            - name: REACT_APP_KEYCLOAK_REALM
+            - name: VITE_KEYCLOAK_REALM
               value: {{ .Values.app.keycloak.realm }}
-            - name: REACT_APP_KEYCLOAK_CLIENT_ID
+            - name: VITE_KEYCLOAK_CLIENT_ID
               value: {{ .Values.app.keycloak.clientId }}
           image: "{{ .Values.image.registry }}/{{ .Values.image.image }}:{{ include "app.imageTag" . }}"
           imagePullPolicy: Always

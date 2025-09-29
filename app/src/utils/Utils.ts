@@ -1,9 +1,6 @@
 import { SYSTEM_IDENTITY_SOURCE } from 'constants/auth';
 import { DATE_FORMAT, TIME_FORMAT } from 'constants/dateTimeFormats';
 import { Dayjs, default as dayjs } from 'dayjs';
-import { Feature, Polygon } from 'geojson';
-import { LatLngBounds } from 'leaflet';
-import _ from 'lodash';
 
 /**
  * Checks if a url string starts with an `http[s]://` protocol, and adds `https://` if it does not. If the url
@@ -159,35 +156,6 @@ export const getFormattedFileSize = (fileSize: number) => {
   // gigabyte size
   return `${(fileSize / 1000000000).toFixed(1)} GB`;
 };
-
-/**
- * Converts a `LatLngBounds` object into a GeoJSON Feature object.
- *
- * @export
- * @param {LatLngBounds} bounds
- * @return {*}  {Feature<Polygon>}
- */
-export function getFeatureObjectFromLatLngBounds(bounds: LatLngBounds): Feature<Polygon> {
-  const southWest = bounds.getSouthWest();
-  const northEast = bounds.getNorthEast();
-
-  return {
-    type: 'Feature',
-    properties: {},
-    geometry: {
-      type: 'Polygon',
-      coordinates: [
-        [
-          [southWest.lng, southWest.lat],
-          [southWest.lng, northEast.lat],
-          [northEast.lng, northEast.lat],
-          [northEast.lng, southWest.lat],
-          [southWest.lng, southWest.lat]
-        ]
-      ]
-    }
-  };
-}
 
 /**
  * Check if an unknown value is an object.
@@ -346,12 +314,20 @@ export const pluralize = (quantity: number, word: string, singularSuffix = '', p
 /**
  * For a given property, alphabetize an array of objects
  *
- * @param {T[]} data an array of objects to be alphabetize
+ * @param {T[]} data an array of objects to be alphabetized
  * @param {string} property a key property to alphabetize the data array on
- * @returns {any[]} Returns an alphabetized array of objects
+ * @returns {T[]} Returns an alphabetized array of objects
  */
-export const alphabetizeObjects = <T extends { [key: string]: any }>(data: T[], property: string) => {
-  return _.sortBy(data, property);
+export const alphabetizeObjects = <T extends { [key: string]: any }>(data: T[], property: string): T[] => {
+  return data.sort((a, b) => {
+    if (a[property] < b[property]) {
+      return -1;
+    }
+    if (a[property] > b[property]) {
+      return 1;
+    }
+    return 0;
+  });
 };
 
 /**

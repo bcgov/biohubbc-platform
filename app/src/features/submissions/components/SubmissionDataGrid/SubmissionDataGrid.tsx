@@ -1,7 +1,7 @@
 import { Divider, Paper, Toolbar } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { Box } from '@mui/system';
-import { DataGrid, GridInputRowSelectionModel, GridRowSelectionModel } from '@mui/x-data-grid';
+import { DataGrid, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SubmissionFeatureRecordWithTypeAndSecurity } from 'interfaces/useSubmissionsApi.interface';
 import { pluralize } from 'utils/Utils';
 import useSubmissionDataGridColumns from './useSubmissionDataGridColumns';
@@ -10,7 +10,7 @@ export interface ISubmissionDataGridProps {
   feature_type_display_name: string;
   feature_type_name: string;
   submissionFeatures: SubmissionFeatureRecordWithTypeAndSecurity[];
-  rowSelectionModel: GridInputRowSelectionModel;
+  rowSelectionModel: GridRowSelectionModel;
   onRowSelectionModelChange: (rowSelectionModel: GridRowSelectionModel) => void;
 }
 
@@ -22,7 +22,6 @@ export interface ISubmissionDataGridProps {
  */
 export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
   const { submissionFeatures, feature_type_display_name, feature_type_name } = props;
-
   const columns = useSubmissionDataGridColumns(feature_type_name);
 
   return (
@@ -35,7 +34,6 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
           </Typography>
         </Typography>
       </Toolbar>
-
       <Box px={3}>
         <Divider flexItem></Divider>
         <DataGrid
@@ -62,6 +60,10 @@ export const SubmissionDataGrid = (props: ISubmissionDataGridProps) => {
             }
           }}
           sx={{
+            bgcolor: '#fff',
+            '& .MuiDataGrid-columnHeader': {
+              bgcolor: '#fff'
+            },
             '& .MuiDataGrid-columnHeaderTitle': {
               fontWeight: 700,
               textTransform: 'uppercase',

@@ -6,7 +6,7 @@ export interface IConfig {
   API_HOST: string;
   CHANGE_VERSION: string;
   NODE_ENV: string;
-  REACT_APP_NODE_ENV: string;
+  VITE_NODE_ENV: string;
   VERSION: string;
   KEYCLOAK_CONFIG: {
     authority: string;
@@ -22,7 +22,7 @@ export const ConfigContext = React.createContext<IConfig | undefined>({
   API_HOST: '',
   CHANGE_VERSION: '',
   NODE_ENV: '',
-  REACT_APP_NODE_ENV: '',
+  VITE_NODE_ENV: '',
   VERSION: '',
   KEYCLOAK_CONFIG: {
     authority: '',
@@ -40,25 +40,25 @@ export const ConfigContext = React.createContext<IConfig | undefined>({
  * @return {*}  {IConfig}
  */
 const getLocalConfig = (): IConfig => {
-  const API_HOST = process.env.REACT_APP_API_HOST;
-  const API_PORT = process.env.REACT_APP_API_PORT;
+  const API_HOST = import.meta.env.VITE_API_HOST;
+  const API_PORT = import.meta.env.VITE_API_PORT;
 
   const API_URL = (API_PORT && `${API_HOST}:${API_PORT}`) || API_HOST || 'localhost';
 
   return {
     API_HOST: ensureProtocol(API_URL, 'http://'),
-    CHANGE_VERSION: process.env.CHANGE_VERSION || 'NA',
-    NODE_ENV: process.env.NODE_ENV,
-    REACT_APP_NODE_ENV: process.env.REACT_APP_NODE_ENV || 'dev',
-    VERSION: `${process.env.VERSION || 'NA'}(build #${process.env.CHANGE_VERSION || 'NA'})`,
+    CHANGE_VERSION: import.meta.env.CHANGE_VERSION || 'NA',
+    NODE_ENV: import.meta.env.NODE_ENV,
+    VITE_NODE_ENV: import.meta.env.VITE_NODE_ENV || 'dev',
+    VERSION: `${import.meta.env.VERSION || 'NA'}(build #${import.meta.env.CHANGE_VERSION || 'NA'})`,
     KEYCLOAK_CONFIG: {
-      authority: process.env.REACT_APP_KEYCLOAK_HOST || '',
-      realm: process.env.REACT_APP_KEYCLOAK_REALM || '',
-      clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || ''
+      authority: import.meta.env.VITE_KEYCLOAK_HOST || '',
+      realm: import.meta.env.VITE_KEYCLOAK_REALM || '',
+      clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || ''
     },
-    SITEMINDER_LOGOUT_URL: process.env.REACT_APP_SITEMINDER_LOGOUT_URL || '',
-    MAX_UPLOAD_NUM_FILES: Number(process.env.REACT_APP_MAX_UPLOAD_NUM_FILES) || 10,
-    MAX_UPLOAD_FILE_SIZE: Number(process.env.REACT_APP_MAX_UPLOAD_FILE_SIZE) || 52428800
+    SITEMINDER_LOGOUT_URL: import.meta.env.VITE_SITEMINDER_LOGOUT_URL || '',
+    MAX_UPLOAD_NUM_FILES: Number(import.meta.env.VITE_MAX_UPLOAD_NUM_FILES) || 10,
+    MAX_UPLOAD_FILE_SIZE: Number(import.meta.env.VITE_MAX_UPLOAD_FILE_SIZE) || 52428800
   };
 };
 

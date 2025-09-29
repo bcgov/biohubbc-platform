@@ -1,4 +1,5 @@
 import { useConfigContext } from 'hooks/useContext';
+
 import useAdminApi from './api/useAdminApi';
 import useArtifactApi from './api/useArtifactApi';
 import useAxios from './api/useAxios';
@@ -15,6 +16,7 @@ import useUserApi from './api/useUserApi';
  */
 export const useApi = () => {
   const config = useConfigContext();
+
   const apiAxios = useAxios(config?.API_HOST);
 
   const user = useUserApi(apiAxios);
