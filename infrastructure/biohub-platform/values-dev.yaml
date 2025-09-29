@@ -125,10 +125,6 @@ biohub-platform-api:
     objectStore:
       keyPrefix: biohub
 
-    # Quarantine Object Store (S3)
-    quarantineObjectStore:
-      keyPrefix: biohub
-      
     # Logging
     logging:
       level: info
