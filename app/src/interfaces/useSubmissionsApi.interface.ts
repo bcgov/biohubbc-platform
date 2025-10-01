@@ -44,6 +44,25 @@ export interface ISubmissionFeature {
   create_date: string;
   create_user: string;
 }
+
+type SubmissionPropertyValue =
+  | string
+  | number
+  | boolean
+  | SubmissionPropertyValue[]
+  | { [key: string]: SubmissionPropertyValue };
+
+export interface IPostSubmissionFeature {
+  feature_type: string;
+  properties: Record<string, SubmissionPropertyValue>;
+  children: IPostSubmissionFeature[];
+}
+
+export interface ISubmissionUploadPart {
+  partNumber: number;
+  etag: string;
+}
+
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   uuid: string;
@@ -84,3 +103,15 @@ export type SubmissionFeatureSignedUrlPayload = {
   submissionFeatureKey: string;
   submissionFeatureValue: string;
 };
+
+export interface PresignedUrl {
+  partNumber: number;
+  url: string;
+}
+export interface PresignedUploadUrlResponse {
+  uploadId: string;
+  key: string;
+  partSizeBytes: number;
+  partCount: number;
+  presignedUrls: PresignedUrl[];
+}

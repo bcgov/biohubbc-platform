@@ -1,4 +1,5 @@
 export enum AttachmentValidExtensions {
+  JSON = '.json',
   AUDIO = '.wav, .mp3, .mp4, .wma',
   DATA = '.txt, .xls, .xlsx, .xlsm, .xlsb, .accdb, .mdb, .ods, .csv',
   IMAGE = '.gif, .png, .jpg, .jpeg, .svg, .tiff, .bmp, .tif',

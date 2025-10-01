@@ -1,6 +1,7 @@
 import { SubmissionContextProvider } from 'contexts/submissionContext';
 import DashboardPage from 'features/admin/dashboard/DashboardPage';
 import AdminSubmissionPage from 'features/submissions/AdminSubmissionPage';
+import { CreateSubmissionPage } from 'features/submissions/create/CreateSubmissionPage';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { PageTitle } from 'utils/RouteWithMeta';
 
@@ -17,6 +18,17 @@ export const SubmissionsRouter = () => {
           <>
             <PageTitle title="Submissions" description="Browse submitted submissions" />
             <DashboardPage />
+          </>
+        }
+      />
+
+      {/* Default redirect */}
+      <Route
+        path="/create"
+        element={
+          <>
+            <PageTitle title="Create Submission" description="Create a new submission" />
+            <CreateSubmissionPage />
           </>
         }
       />
