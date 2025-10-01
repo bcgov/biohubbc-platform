@@ -53,7 +53,6 @@ app:
   
   # Quarantine Object Store (S3)
   quarantineObjectStore:
-    keyPrefix: "" # S3 key optional prefix
     secretName: quarantine-object-store # Secrets used to read and write to the S3 storage
 
   # Logging
