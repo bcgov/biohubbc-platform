@@ -5,6 +5,7 @@ import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createTarData, fileToUint8Array, uploadMultipartTar } from 'utils/submission-upload-utils';
 import yup from 'utils/YupSchema';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
@@ -31,6 +32,7 @@ export const CreateSubmissionPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const bioHubApi = useApi();
   const dialogContext = useDialogContext();
+  const navigate = useNavigate();
 
   const formikRef = useRef<FormikProps<ICreateSubmissionForm>>(null);
 
@@ -82,13 +84,17 @@ export const CreateSubmissionPage = () => {
     }
   };
 
+  const handleCancel = () => {
+    navigate('/admin/submissions');
+  };
+
   return (
     <>
       <BaseHeader
         title="New Submission"
         buttonJSX={
           <Stack gap={1} flexDirection="row">
-            <Button variant="outlined" disabled={isSubmitting} onClick={formikRef.current?.submitForm}>
+            <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
               Cancel
             </Button>
             <Button loading={isSubmitting} variant="contained" onClick={formikRef.current?.submitForm}>
@@ -111,7 +117,7 @@ export const CreateSubmissionPage = () => {
               <CreateSubmissionForm />
             </Box>
             <Stack gap={1} flexDirection="row" flex="1 1 auto" justifyContent="flex-end">
-              <Button variant="outlined" disabled={isSubmitting} onClick={formikRef.current?.submitForm}>
+              <Button variant="outlined" disabled={isSubmitting} onClick={handleCancel}>
                 Cancel
               </Button>
               <Button loading={isSubmitting} variant="contained" onClick={formikProps.submitForm}>
