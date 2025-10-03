@@ -176,9 +176,12 @@ export async function up(knex: Knex): Promise<void> {
     --------------------------------------------------------------------------------
     -- Create policy_statement table
     --------------------------------------------------------------------------------
-    -- NOTE: policy_statement.submission_feature_urn does not have a FK constraint on feature.urn to enable wildcards .
-    -- ie. urn:1:telemetry:*, which should grant access to all telemetry in submission ID 1.
-    -- URNs follow the format of urn:<submission_id>:<feature_type_name>:<submission_feature_id>.
+    -- NOTE: policy_statement.submission_feature_urn intentionally does not have a FK constraint 
+    -- on submission_feature.urn to enable wildcard URNs (e.g., urn:1:telemetry:*).
+    -- Wildcard URNs allow policies to apply to multiple features without requiring 
+    -- individual foreign key relationships for each wildcard pattern.
+    -- URNs follow the format: urn:<submission_id>:<feature_type_name>:<submission_feature_id>
+    -- Referential integrity is enforced via the tr_policy_statement_urn_validation() trigger.
 
     CREATE TABLE policy_statement (
       policy_statement_id     uuid DEFAULT public.gen_random_uuid(),
@@ -199,7 +202,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE INDEX policy_statement_policy_id_idx ON policy_statement(policy_id);
     CREATE UNIQUE INDEX policy_statement_nuk1 ON policy_statement(policy_id, effect, submission_feature_urn, (record_end_date is NULL)) where record_end_date is null;
     
-    -- index on feature_run to accelerate lookups for a given urn
+    -- index on submission_feature_urn to accelerate lookups for a given urn
     CREATE INDEX policy_statement_submission_feature_urn_idx ON policy_statement(submission_feature_urn);
 
     COMMENT ON TABLE policy_statement IS 'Permission rule associated with a policy.';
@@ -656,6 +659,25 @@ export async function up(knex: Knex): Promise<void> {
 export async function down(knex: Knex): Promise<void> {
   await knex.raw(`
     SET SEARCH_PATH = biohub, public;
+
+    --------------------------------------------------------------------------------
+    -- Create backup tables to preserve data before dropping RBAC tables
+    --------------------------------------------------------------------------------
+    -- This ensures data is not lost during rollback in production environments
+    CREATE TABLE IF NOT EXISTS policy_backup AS SELECT * FROM policy;
+    CREATE TABLE IF NOT EXISTS team_backup AS SELECT * FROM team;
+    CREATE TABLE IF NOT EXISTS team_policy_backup AS SELECT * FROM team_policy;
+    CREATE TABLE IF NOT EXISTS team_member_backup AS SELECT * FROM team_member;
+    CREATE TABLE IF NOT EXISTS policy_statement_backup AS SELECT * FROM policy_statement;
+    CREATE TABLE IF NOT EXISTS policy_statement_condition_backup AS SELECT * FROM policy_statement_condition;
+    
+    -- Add comments to backup tables for identification
+    COMMENT ON TABLE policy_backup IS 'Backup of policy table created during RBAC migration rollback';
+    COMMENT ON TABLE team_backup IS 'Backup of team table created during RBAC migration rollback';
+    COMMENT ON TABLE team_policy_backup IS 'Backup of team_policy table created during RBAC migration rollback';
+    COMMENT ON TABLE team_member_backup IS 'Backup of team_member table created during RBAC migration rollback';
+    COMMENT ON TABLE policy_statement_backup IS 'Backup of policy_statement table created during RBAC migration rollback';
+    COMMENT ON TABLE policy_statement_condition_backup IS 'Backup of policy_statement_condition table created during RBAC migration rollback';
 
     --------------------------------------------------------------------------------
     -- Drop triggers first
