@@ -654,5 +654,62 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
-  await knex.raw(``);
+  await knex.raw(`
+    SET SEARCH_PATH = biohub, public;
+
+    --------------------------------------------------------------------------------
+    -- Drop triggers first
+    --------------------------------------------------------------------------------
+    DROP TRIGGER IF EXISTS policy_statement_urn_validation ON biohub.policy_statement;
+    DROP TRIGGER IF EXISTS validate_policy_condition_key ON biohub.policy_statement_condition;
+    DROP TRIGGER IF EXISTS submission_feature_urn ON biohub.submission_feature;
+    
+    DROP TRIGGER IF EXISTS audit_policy ON policy;
+    DROP TRIGGER IF EXISTS journal_policy ON policy;
+    DROP TRIGGER IF EXISTS audit_policy_statement ON policy_statement;
+    DROP TRIGGER IF EXISTS journal_policy_statement ON policy_statement;
+    DROP TRIGGER IF EXISTS audit_policy_statement_condition ON policy_statement_condition;
+    DROP TRIGGER IF EXISTS journal_policy_statement_condition ON policy_statement_condition;
+    DROP TRIGGER IF EXISTS audit_team ON team;
+    DROP TRIGGER IF EXISTS journal_team ON team;
+    DROP TRIGGER IF EXISTS audit_team_member ON team_member;
+    DROP TRIGGER IF EXISTS journal_team_member ON team_member;
+    DROP TRIGGER IF EXISTS audit_team_policy ON team_policy;
+    DROP TRIGGER IF EXISTS journal_team_policy ON team_policy;
+
+    --------------------------------------------------------------------------------
+    -- Drop functions
+    --------------------------------------------------------------------------------
+    DROP FUNCTION IF EXISTS biohub.tr_policy_statement_urn_validation();
+    DROP FUNCTION IF EXISTS biohub.tr_validate_policy_condition_key();
+    DROP FUNCTION IF EXISTS biohub.tr_submission_feature_urn();
+
+    --------------------------------------------------------------------------------
+    -- Drop indexes on submission_feature table
+    --------------------------------------------------------------------------------
+    DROP INDEX IF EXISTS submission_feature_urn_idx;
+
+    --------------------------------------------------------------------------------
+    -- Remove URN column and constraint from submission_feature table
+    --------------------------------------------------------------------------------
+    ALTER TABLE submission_feature DROP CONSTRAINT IF EXISTS feature_urn_format_check;
+    ALTER TABLE submission_feature DROP COLUMN IF EXISTS urn;
+
+    --------------------------------------------------------------------------------
+    -- Drop tables in reverse dependency order
+    --------------------------------------------------------------------------------
+    DROP TABLE IF EXISTS team_policy;
+    DROP TABLE IF EXISTS team_member;
+    DROP TABLE IF EXISTS policy_statement_condition;
+    DROP TABLE IF EXISTS policy_statement;
+    DROP TABLE IF EXISTS team;
+    DROP TABLE IF EXISTS policy;
+
+    --------------------------------------------------------------------------------
+    -- Drop enum types
+    --------------------------------------------------------------------------------
+    DROP TYPE IF EXISTS policy_condition_operator;
+    DROP TYPE IF EXISTS policy_effect;
+
+  `);
 }
