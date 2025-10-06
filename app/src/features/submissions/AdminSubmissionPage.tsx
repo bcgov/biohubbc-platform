@@ -24,8 +24,8 @@ const extractIdsFromSelectionModel = (selectionModel: GridRowSelectionModel): nu
 
   // MUI X Data Grid v8 format: {type: 'include', ids: Set(...)}
   return Array.from(selectionModel.ids)
-    .map((id) => (typeof id === 'string' ? parseInt(id, 10) : id))
-    .filter((id): id is number => id !== null && id !== undefined && !isNaN(id));
+    .map((id) => (typeof id === 'string' ? Number.parseInt(id, 10) : id))
+    .filter((id): id is number => id !== null && id !== undefined && !Number.isNaN(id));
 };
 
 const SubmissionHeader = (props: { submissionFeatureIds: number[] }) => {

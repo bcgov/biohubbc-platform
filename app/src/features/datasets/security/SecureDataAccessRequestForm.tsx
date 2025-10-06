@@ -124,8 +124,8 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
     const artifactIds =
       rowSelectionModel && 'ids' in rowSelectionModel
         ? Array.from(rowSelectionModel.ids)
-            .map((id) => (typeof id === 'string' ? parseInt(id, 10) : id))
-            .filter((id): id is number => id !== null && id !== undefined && !isNaN(id))
+            .map((id) => (typeof id === 'string' ? Number.parseInt(id, 10) : id))
+            .filter((id): id is number => id !== null && id !== undefined && !Number.isNaN(id))
         : [];
 
     formikProps.setFieldValue('artifactIds', artifactIds);
