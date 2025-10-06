@@ -120,7 +120,15 @@ const SecureDataAccessRequestForm = (props: ISecureDataAccessRequestFormProps) =
   ];
 
   const onChangeSelection = (rowSelectionModel: GridRowSelectionModel) => {
-    formikProps.setFieldValue('artifactIds', rowSelectionModel);
+    // Extract artifact IDs from MUI X Data Grid v8 format: {type: 'include', ids: Set(...)}
+    const artifactIds =
+      rowSelectionModel && 'ids' in rowSelectionModel
+        ? Array.from(rowSelectionModel.ids)
+            .map((id) => (typeof id === 'string' ? parseInt(id, 10) : id))
+            .filter((id): id is number => id !== null && id !== undefined && !isNaN(id))
+        : [];
+
+    formikProps.setFieldValue('artifactIds', artifactIds);
     setCurrentRowSelection(rowSelectionModel);
   };
 
