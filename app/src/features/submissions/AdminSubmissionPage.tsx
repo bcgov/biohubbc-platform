@@ -18,12 +18,14 @@ type GroupedSubmissionFeatureSelection = Record<
 
 // Helper function to extract IDs from GridRowSelectionModel
 const extractIdsFromSelectionModel = (selectionModel: GridRowSelectionModel): number[] => {
-  if (Array.isArray(selectionModel)) {
-    return selectionModel.map((id) => (typeof id === 'string' ? parseInt(id, 10) : id));
-  } else {
-    // Object format like {1: true, 2: true}
-    return Object.keys(selectionModel).map((id) => parseInt(id, 10));
+  if (!selectionModel || !('ids' in selectionModel)) {
+    return [];
   }
+
+  // MUI X Data Grid v8 format: {type: 'include', ids: Set(...)}
+  return Array.from(selectionModel.ids)
+    .map((id) => (typeof id === 'string' ? Number.parseInt(id, 10) : id))
+    .filter((id): id is number => id !== null && id !== undefined && !Number.isNaN(id));
 };
 
 const SubmissionHeader = (props: { submissionFeatureIds: number[] }) => {
