@@ -46,7 +46,7 @@ export const CreateSubmissionPage = () => {
       // Convert the JSON file to Uint8Array
       const fileBytes = await fileToUint8Array(values.file);
 
-      // Prepare files for TAR - just the JSON file
+      // Prepare files for TAR - just the JSON file.
       const filesToTar = [
         {
           name: 'features.json',

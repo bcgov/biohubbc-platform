@@ -3,6 +3,7 @@ import { IDBConnection } from '../database/db';
 import { ApiGeneralError } from '../errors/api-error';
 import { SubmissionFeatureSearchKeyValues } from '../repositories/search-index-respository';
 import {
+  ICreateSubmissionRecord,
   ISubmissionFeature,
   ISubmissionJobQueueRecord,
   ISubmissionModel,
@@ -52,32 +53,12 @@ export class SubmissionService extends DBService {
    * Insert a new submission record, returning the record having the matching UUID if it already exists
    * in the database.
    *
-   * @param {string} uuid
-   * @param {string} name
-   * @param {string} description A description of the submission. Should not contain any sensitive information.
-   * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
-   * sensitive information. Should never be shared with the general public.
-   * @param {number} systemUserId
-   * @param {string} systemUserIdentifier
+   * @param {ICreateSubmissionRecord} submission
    * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionService
    */
-  async insertSubmissionRecordWithPotentialConflict(
-    uuid: string,
-    name: string,
-    description: string,
-    comment: string,
-    systemUserId: number,
-    systemUserIdentifier: string
-  ): Promise<SubmissionRecord> {
-    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(
-      uuid,
-      name,
-      description,
-      comment,
-      systemUserId,
-      systemUserIdentifier
-    );
+  async insertSubmissionRecordWithPotentialConflict(submission: ICreateSubmissionRecord): Promise<SubmissionRecord> {
+    return this.submissionRepository.insertSubmissionRecordWithPotentialConflict(submission);
   }
 
   /**

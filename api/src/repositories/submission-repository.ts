@@ -205,6 +205,7 @@ export interface ISubmissionObservationRecord {
 export const SubmissionRecord = z.object({
   submission_id: z.number(),
   uuid: z.string(),
+  quarantine_id: z.string().nullable(),
   security_review_timestamp: z.string().nullable(),
   submitted_timestamp: z.string(),
   system_user_id: z.number(),
@@ -221,6 +222,19 @@ export const SubmissionRecord = z.object({
 });
 
 export type SubmissionRecord = z.infer<typeof SubmissionRecord>;
+
+/**
+ * Interface for creating a new submission record with potential conflict handling
+ */
+export interface ICreateSubmissionRecord {
+  uuid: string;
+  quarantine_id: string | null;
+  name: string;
+  description: string;
+  comment: string;
+  system_user_id: number;
+  system_user_identifier: string;
+}
 
 export const SubmissionRecordWithSecurity = SubmissionRecord.extend({
   security: z.nativeEnum(SECURITY_APPLIED_STATUS)
@@ -320,46 +334,39 @@ export class SubmissionRepository extends BaseRepository {
   }
 
   /**
-   * Insert a new submission record.
+   * Insert a new submission record, returning the record having the matching UUID if it already exists
+   * in the database.
    *
-   * @param {string} uuid
-   * @param {string} name
-   * @param {string} description A description of the submission. Should not contain any sensitive information.
-   * @param {string} comment An internal comment/description of the submission for administrative purposes. May contain
-   * sensitive information. Should never be shared with the general public.
-   * @param {string} userIdentifier
+   * @param {ICreateSubmissionRecord} submission
    * @return {*}  {Promise<SubmissionRecord>}
    * @memberof SubmissionRepository
    */
-  async insertSubmissionRecordWithPotentialConflict(
-    uuid: string,
-    name: string,
-    description: string,
-    comment: string,
-    systemUserId: number,
-    systemUserIdentifier: string
-  ): Promise<SubmissionRecord> {
+  async insertSubmissionRecordWithPotentialConflict(submission: ICreateSubmissionRecord): Promise<SubmissionRecord> {
     const sqlStatement = SQL`
-      INSERT INTO submission (
-        uuid,
-        submitted_timestamp,
-        name,
-        description,
-        comment,
-        system_user_id,
-        source_system
-      ) VALUES (
-        ${uuid},
-        now(),
-        ${name},
-        ${description},
-        ${comment},
-        ${systemUserId},
-        ${systemUserIdentifier}
-      )
-      RETURNING
-        *;
-    `;
+    INSERT INTO submission (
+      uuid,
+      quarantine_id,
+      submitted_timestamp,
+      name,
+      description,
+      comment,
+      system_user_id,
+      source_system
+    ) VALUES (
+      ${submission.uuid},
+      ${submission.quarantine_id},
+      now(),
+      ${submission.name},
+      ${submission.description},
+      ${submission.comment},
+      ${submission.system_user_id},
+      ${submission.system_user_identifier}
+    )
+    ON CONFLICT (uuid) DO UPDATE SET
+      uuid = EXCLUDED.uuid
+    RETURNING
+      *;
+  `;
 
     const response = await this.connection.sql(sqlStatement, SubmissionRecord);
 

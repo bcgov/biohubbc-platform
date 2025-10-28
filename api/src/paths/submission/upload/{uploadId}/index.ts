@@ -49,7 +49,7 @@ PUT.apiDoc = {
         schema: {
           title: 'Complete Multipart Upload Request',
           type: 'object',
-          required: ['key', 'parts'],
+          required: ['quarantineId', 'key', 'parts'],
           properties: {
             key: {
               type: 'string',
@@ -94,6 +94,7 @@ export function completeMultipartUploadHandler(): RequestHandler {
     const token = req['keycloak_token'];
 
     // TODO: Why do service accounts need to be distinct, if they are just user records like system admins?
+    // Can we just call getDBConnection(service_account_token) to resolve the service client user?
     const serviceClientSystemUser = getServiceClientSystemUser(token);
 
     // Choose the appropriate DB connection based on auth type
@@ -106,6 +107,8 @@ export function completeMultipartUploadHandler(): RequestHandler {
         'Invalid or missing credentials for DB connection'
       ]);
     }
+
+    // TODO: Authorize the request using the uploadId? use the quarantine ID instead?
 
     try {
       await connection.open();
