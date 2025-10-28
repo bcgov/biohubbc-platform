@@ -116,6 +116,7 @@ export interface PresignedUrl {
   url: string;
 }
 export interface PresignedUploadUrlResponse {
+  quarantineId: string;
   uploadId: string;
   key: string;
   partSizeBytes: number;

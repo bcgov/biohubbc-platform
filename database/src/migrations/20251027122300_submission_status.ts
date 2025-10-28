@@ -53,16 +53,15 @@ export async function up(knex: Knex): Promise<void> {
 
     CREATE TABLE quarantine (
       quarantine_id     uuid             DEFAULT public.gen_random_uuid(),
-      uri               text             NOT NULL,
-      status            quarantine_status DEFAULT 'pending' NOT NULL,
-      upload_id         varchar(100)     NOT NULL,
+      uri               varchar(200)     NOT NULL,
+      status            quarantine_status NOT NULL,
+      upload_id         varchar(100),
       create_date       timestamptz(6)   DEFAULT now() NOT NULL,
       create_user       integer          NOT NULL,
       update_date       timestamptz(6),
       update_user       integer,
       revision_count    integer          DEFAULT 0 NOT NULL,
-      CONSTRAINT quarantine_pk PRIMARY KEY (quarantine_id),
-      CONSTRAINT quarantine_uri_format_chk CHECK (uri ~ '^[a-z0-9]+://')
+      CONSTRAINT quarantine_pk PRIMARY KEY (quarantine_id)
     );
 
     CREATE INDEX quarantine_status_idx ON quarantine(status);
@@ -85,7 +84,7 @@ export async function up(knex: Knex): Promise<void> {
     CREATE TABLE quarantine_scan (
       quarantine_scan_id uuid             DEFAULT public.gen_random_uuid(),
       quarantine_id      uuid             NOT NULL,
-      scan_status        scan_status      DEFAULT 'pending' NOT NULL,
+      scan_status        scan_status      NOT NULL,
       scanned_at         timestamptz(6),
       scanner_version    varchar(100),
       results            jsonb,
@@ -123,7 +122,7 @@ export async function up(knex: Knex): Promise<void> {
       quarantine_scan_file_id uuid             DEFAULT public.gen_random_uuid(),
       quarantine_scan_id      uuid             NOT NULL,
       file_path               text             NOT NULL,
-      scan_result             file_scan_result DEFAULT 'pending' NOT NULL,
+      scan_result             file_scan_result NOT NULL,
       create_date             timestamptz(6)   DEFAULT now() NOT NULL,
       create_user             integer          NOT NULL,
       update_date             timestamptz(6),
@@ -153,23 +152,27 @@ export async function up(knex: Knex): Promise<void> {
     
     ALTER TABLE submission ADD COLUMN quarantine_id uuid;
     ALTER TABLE submission ADD CONSTRAINT submission_quarantine_fk FOREIGN KEY (quarantine_id) REFERENCES quarantine(quarantine_id);
+
     CREATE INDEX submission_quarantine_id_idx ON submission(quarantine_id);
+    
     COMMENT ON COLUMN submission.quarantine_id IS 'Foreign key to the quarantine table if this submission required security scanning.';
+
+    --------------------------------------------------------------------------------
+    -- Add audit triggers for each of the new tables
+    --------------------------------------------------------------------------------
+    
+    CREATE TRIGGER audit_quarantine BEFORE INSERT OR UPDATE OR DELETE ON quarantine FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_quarantine AFTER INSERT OR UPDATE OR DELETE ON quarantine FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    
+    CREATE TRIGGER audit_quarantine_scan BEFORE INSERT OR UPDATE OR DELETE ON quarantine_scan FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_quarantine_scan AFTER INSERT OR UPDATE OR DELETE ON quarantine_scan FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    
+    CREATE TRIGGER audit_quarantine_scan_file BEFORE INSERT OR UPDATE OR DELETE ON quarantine_scan_file FOR EACH ROW EXECUTE PROCEDURE biohub.tr_audit_trigger();
+    CREATE TRIGGER journal_quarantine_scan_file AFTER INSERT OR UPDATE OR DELETE ON quarantine_scan_file FOR EACH ROW EXECUTE PROCEDURE biohub.tr_journal_trigger();
+    
   `);
 }
 
 export async function down(knex: Knex): Promise<void> {
-  await knex.raw(`
-    SET SEARCH_PATH = biohub, public;
-
-    ALTER TABLE submission DROP COLUMN IF EXISTS quarantine_id;
-
-    DROP TABLE IF EXISTS quarantine_scan_file CASCADE;
-    DROP TABLE IF EXISTS quarantine_scan CASCADE;
-    DROP TABLE IF EXISTS quarantine CASCADE;
-    
-    DROP TYPE IF EXISTS file_scan_result;
-    DROP TYPE IF EXISTS scan_status;
-    DROP TYPE IF EXISTS quarantine_status;
-  `);
+  await knex.raw(``);
 }

@@ -153,7 +153,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * @returns {Promise<PresignedUploadUrlResponse>}
    */
   const getSubmissionUploadUrls = async (expectedSizeBytes: number): Promise<PresignedUploadUrlResponse> => {
-    const { data } = await axios.post(`api/submission/upload`, { expectedSizeBytes });
+    const { data } = await axios.post(`api/submission/quarantine`, { expectedSizeBytes });
 
     return data;
   };
@@ -161,6 +161,7 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
   /**
    * Update the submission upload as completed
    *
+   * @param {string} quarantineId
    * @param {string} uploadId
    * @param {string} key
    * @param {ISubmissionUploadPart[]} parts
@@ -168,12 +169,13 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * @returns {Promise<void>}
    */
   const completeSubmissionUpload = async (
+    quarantineId: string,
     uploadId: string,
     key: string,
     parts: ISubmissionUploadPart[],
     metadata: ICompleteSubmissionUploadMetadata
   ): Promise<void> => {
-    await axios.put(`api/submission/upload/${uploadId}`, { key, parts, metadata });
+    await axios.put(`api/submission/quarantine/${quarantineId}`, { uploadId, key, parts, metadata });
   };
 
   return {

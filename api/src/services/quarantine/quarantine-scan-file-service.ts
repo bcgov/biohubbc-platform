@@ -1,6 +1,10 @@
 import { IDBConnection } from '../../database/db';
-import { IInsertQuarantine, IUpdateQuarantine } from '../../models/quarantine';
-import { QuarantineScanFileRecord } from '../../models/quarantine-scan-file';
+import {
+  IInsertQuarantineScanFile,
+  IUpdateQuarantineScanFile,
+  QuarantineScanFileRecord
+} from '../../models/quarantine-scan-file';
+import { QuarantineScanFileRepository } from '../../repositories/quarantine/quarantine-scan-file-repository';
 import { DBService } from '../db-service';
 
 export class QuarantineScanFileService extends DBService {
@@ -25,27 +29,40 @@ export class QuarantineScanFileService extends DBService {
   /**
    * Insert a new quarantineScanFile record.
    *
-   * @param {IInsertQuarantine} quarantineScanFile
+   * @param {IInsertQuarantineScanFile} quarantineScanFile
    * @return {*}  {Promise<{ quarantine_scan_file_id: string }>}
    * @memberof QuarantineScanFileService
    */
   async insertQuarantineScanFileRecord(
-    quarantineScanFile: IInsertQuarantine
+    quarantineScanFile: IInsertQuarantineScanFile
   ): Promise<{ quarantine_scan_file_id: string }> {
     return this.quarantineScanFileRepository.insertQuarantineScanFileRecord(quarantineScanFile);
+  }
+
+  /**
+   * Insert a new quarantineScanFile record.
+   *
+   * @param {IInsertQuarantineScanFile[]} quarantineScanFile
+   * @return {*}  {Promise<{ quarantine_scan_file_id: string }[]>}
+   * @memberof QuarantineScanFileService
+   */
+  async insertQuarantineScanFileRecordBatch(
+    quarantineScanFile: IInsertQuarantineScanFile[]
+  ): Promise<{ quarantine_scan_file_id: string }[]> {
+    return this.quarantineScanFileRepository.insertQuarantineScanFileRecordBatch(quarantineScanFile);
   }
 
   /**
    * Update an existing quarantineScanFile record.
    *
    * @param {string} quarantineScanFileId
-   * @param {IUpdateQuarantine} quarantineScanFile
+   * @param {IUpdateQuarantineScanFile} quarantineScanFile
    * @return {*}  {Promise<{ quarantine_scan_file_id: string }>}
    * @memberof QuarantineScanFileService
    */
   async updateQuarantineScanFileRecord(
     quarantineScanFileId: string,
-    quarantineScanFile: IUpdateQuarantine
+    quarantineScanFile: IUpdateQuarantineScanFile
   ): Promise<{ quarantine_scan_file_id: string }> {
     return this.quarantineScanFileRepository.updateQuarantineScanFileRecord(quarantineScanFileId, quarantineScanFile);
   }

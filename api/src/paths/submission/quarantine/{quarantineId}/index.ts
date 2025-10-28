@@ -142,9 +142,11 @@ export function completeMultipartUploadHandler(): RequestHandler {
         quarantineId,
         uploadId,
         systemUserId: req['system_user'].system_user_id,
-        systemUserIdentifier: req['system_user'].system_user_identifier,
+        systemUserIdentifier: 'SIMS',
         ...rest
       });
+
+      await connection.commit();
 
       res.sendStatus(200);
     } catch (error) {

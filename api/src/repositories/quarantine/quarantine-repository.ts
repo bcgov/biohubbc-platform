@@ -17,6 +17,7 @@ export class QuarantineRepository extends BaseRepository {
         quarantine_id,
         uri,
         status,
+        upload_id
       FROM
         quarantine
       WHERE
@@ -48,8 +49,8 @@ export class QuarantineRepository extends BaseRepository {
         uri,
         status
       ) VALUES (
-        ${quarantine.uri ?? ''},
-        ${quarantine.status ?? 'draft'}
+        ${quarantine.uri},
+        ${quarantine.status}
       )
       RETURNING quarantine_id;
     `;
@@ -82,7 +83,8 @@ export class QuarantineRepository extends BaseRepository {
     UPDATE biohub.quarantine
     SET
       uri = COALESCE(${quarantine.uri}, uri),
-      status = COALESCE(${quarantine.status}, status)
+      status = COALESCE(${quarantine.status}, status),
+      upload_id = COALESCE(${quarantine.upload_id}, upload_id)
     WHERE
       quarantine_id = ${quarantineId}
     RETURNING quarantine_id;

@@ -1,13 +1,16 @@
 import { Box, Button, Container, Paper, Stack } from '@mui/material';
 import BaseHeader from 'components/layout/header/BaseHeader';
+import { TAR_BLOCK_SIZE, TAR_HEADER_SIZE } from 'constants/submission';
 import { Formik, FormikProps } from 'formik';
 import { APIError } from 'hooks/api/useAxios';
 import { useApi } from 'hooks/useApi';
 import { useDialogContext } from 'hooks/useContext';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createTarData, fileToUint8Array, uploadMultipartTar } from 'utils/submission-upload-utils';
+import { fileToUint8Array, uploadMultipartTarStreamed } from 'utils/submission-upload-utils';
+import { TarFileData } from 'utils/submission-upload-utils.interface';
 import yup from 'utils/YupSchema';
+import { v4 } from 'uuid';
 import { CreateSubmissionForm } from './form/CreateSubmissionForm';
 import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 
@@ -15,7 +18,7 @@ const initialSubmissionValues: ICreateSubmissionForm = {
   name: '',
   description: '',
   comment: '',
-  uid: '',
+  uid: v4(),
   file: null as unknown as File
 };
 
@@ -51,28 +54,40 @@ export const CreateSubmissionPage = () => {
       // Convert the JSON file to Uint8Array
       const fileBytes = await fileToUint8Array(file);
 
-      // Prepare files for TAR - just the JSON file.
-      const filesToTar = [
+      // Prepare files for TAR - just the JSON file
+      const filesToTar: TarFileData[] = [
         {
           name: 'features.json',
           content: fileBytes
         }
-        // Add more files here
+        // Add more files here if needed
       ];
 
-      // Create TAR data
-      const tarData = createTarData(filesToTar);
-
       // Request pre-signed upload URLs for multipart upload
-      const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls(tarData.length);
-      const uploadUrls = uploadResponse.presignedUrls.map((presigned) => presigned.url);
+      const uploadResponse = await bioHubApi.submissions.getSubmissionUploadUrls(
+        // Estimate total size: sum of file sizes + headers + padding
+        filesToTar.reduce(
+          (sum, f) => sum + Math.ceil(f.content.length / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE + TAR_HEADER_SIZE,
+          0
+        ) +
+          TAR_BLOCK_SIZE * 2
+      );
 
-      // Upload TAR file in multiple parts
-      const parts = await uploadMultipartTar(uploadUrls, tarData);
+      const uploadUrls = uploadResponse.presignedUrls.map((p) => p.url);
+
+      // Upload TAR file using streaming/memory-efficient approach
+      const parts = await uploadMultipartTarStreamed(uploadUrls, filesToTar, {
+        concurrencyLimit: 4,
+        onProgress: (completed, total) => {
+          console.log(`Uploaded ${completed}/${total} parts`);
+        }
+      });
+
       const parsedParts = parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }));
 
       // Mark upload as complete
       await bioHubApi.submissions.completeSubmissionUpload(
+        uploadResponse.quarantineId,
         uploadResponse.uploadId,
         uploadResponse.key,
         parsedParts,

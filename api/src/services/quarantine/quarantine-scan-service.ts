@@ -1,6 +1,7 @@
 import { IDBConnection } from '../../database/db';
+import { IInsertQuarantineScan, IUpdateQuarantineScan, QuarantineScanRecord } from '../../models/quarantine-scan';
+import { QuarantineScanRepository } from '../../repositories/quarantine/quarantine-scan-repository';
 import { DBService } from '../db-service';
-import { IInsertQuarantine, IUpdateQuarantine, QuarantineScanRecord } from '../models/quarantineScan';
 
 export class QuarantineScanService extends DBService {
   quarantineScanRepository: QuarantineScanRepository;
@@ -24,11 +25,11 @@ export class QuarantineScanService extends DBService {
   /**
    * Insert a new quarantineScan record.
    *
-   * @param {IInsertQuarantine} quarantineScan
+   * @param {IInsertQuarantineScan} quarantineScan
    * @return {*}  {Promise<{ quarantine_scan_id: string }>}
    * @memberof QuarantineScanService
    */
-  async insertQuarantineScanRecord(quarantineScan: IInsertQuarantine): Promise<{ quarantine_scan_id: string }> {
+  async insertQuarantineScanRecord(quarantineScan: IInsertQuarantineScan): Promise<{ quarantine_scan_id: string }> {
     return this.quarantineScanRepository.insertQuarantineScanRecord(quarantineScan);
   }
 
@@ -36,13 +37,13 @@ export class QuarantineScanService extends DBService {
    * Update an existing quarantineScan record.
    *
    * @param {string} quarantineScanId
-   * @param {IUpdateQuarantine} quarantineScan
+   * @param {IUpdateQuarantineScan} quarantineScan
    * @return {*}  {Promise<{ quarantine_scan_id: string }>}
    * @memberof QuarantineScanService
    */
   async updateQuarantineScanRecord(
     quarantineScanId: string,
-    quarantineScan: IUpdateQuarantine
+    quarantineScan: IUpdateQuarantineScan
   ): Promise<{ quarantine_scan_id: string }> {
     return this.quarantineScanRepository.updateQuarantineScanRecord(quarantineScanId, quarantineScan);
   }

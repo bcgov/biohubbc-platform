@@ -15,6 +15,10 @@ export interface CompleteMultipartUploadParams {
   parts: Array<{ partNumber: number; etag: string }>;
 }
 
+export interface CompleteMultipartUploadResponse {
+  submissionId: number;
+}
+
 interface PresignedUrl {
   partNumber: number;
   url: string;

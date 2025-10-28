@@ -153,14 +153,15 @@ export function submissionIntake(): RequestHandler {
       }
 
       // insert the submission record
-      const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict(
-        submissionUuid,
-        submissionName,
-        submissionDescription,
-        submissionComment,
-        serviceClientSystemUser.system_user_id,
-        serviceClientSystemUser.user_identifier
-      );
+      const submissionRecord = await submissionService.insertSubmissionRecordWithPotentialConflict({
+        quarantine_id: null,
+        uuid: submissionUuid,
+        name: submissionName,
+        comment: submissionComment,
+        description: submissionDescription,
+        system_user_id: serviceClientSystemUser.system_user_id,
+        system_user_identifier: serviceClientSystemUser.user_identifier
+      });
 
       // insert each submission feature record
       await submissionService.insertSubmissionFeatureRecords(submissionRecord.submission_id, [submissionFeature]);

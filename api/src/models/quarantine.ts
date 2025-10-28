@@ -14,9 +14,9 @@ export enum QuarantineStatusEnum {
   /** Used when malware scan is in progress */
   SCANNING = 'scanning',
   /** Used when malware scan completed and no threats were found */
-  PASSED = 'passed',
+  CLEAN = 'clean',
   /** Used when malware scan completed and threats were found */
-  REJECTED = 'rejected',
+  INFECTED = 'infected',
   /** Used when malware scan failed due to error */
   FAILED = 'failed'
 }

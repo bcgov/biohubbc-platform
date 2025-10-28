@@ -41,6 +41,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
       - NODE_OPTIONS=${API_NODE_OPTIONS}
+      - DATABASE_RESPONSE_VALIDATION_ENABLED=${TRUE}
       # ITIS API
       - ITIS_SOLR_URL=${ITIS_SOLR_URL}
       - TZ=${API_TZ}
