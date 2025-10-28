@@ -1,21 +1,25 @@
 import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
+import { SYSTEM_ROLE } from '../../../../constants/roles';
 import { getDBConnection, getServiceAccountDBConnection } from '../../../../database/db';
-import { HTTP400 } from '../../../../errors/http-error';
 import { defaultErrorResponses } from '../../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../../request-handlers/security/authorization';
 import { SubmissionUploadService } from '../../../../services/submission-upload-service';
 import { getServiceClientSystemUser } from '../../../../utils/keycloak-utils';
 import { getLogger } from '../../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/upload/{uploadId}');
+const defaultLog = getLogger('paths/submission/quarantine/{quarantineId}');
 
 export const PUT: Operation = [
   authorizeRequestHandler(() => {
     return {
-      and: [
+      or: [
         {
           discriminator: 'ServiceClient'
+        },
+        {
+          discriminator: 'SystemRole',
+          validSystemRoles: [SYSTEM_ROLE.DATA_ADMINISTRATOR, SYSTEM_ROLE.SYSTEM_ADMIN]
         }
       ]
     };
@@ -33,9 +37,9 @@ PUT.apiDoc = {
   ],
   parameters: [
     {
-      description: 'The upload ID that was returned from the /submission/upload endpoint',
+      description: 'The quarantine ID that was returned from the /submission/quarantine endpoint',
       in: 'path',
-      name: 'uploadId',
+      name: 'quarantineId',
       schema: {
         type: 'string'
       },
@@ -49,8 +53,12 @@ PUT.apiDoc = {
         schema: {
           title: 'Complete Multipart Upload Request',
           type: 'object',
-          required: ['quarantineId', 'key', 'parts'],
+          required: ['uploadId', 'key', 'parts', 'metadata'],
           properties: {
+            uploadId: {
+              type: 'string',
+              description: 'Upload ID that was returned by the /submission/quarantine/ endpoint'
+            },
             key: {
               type: 'string',
               description: 'The S3 object key for the uploaded file'
@@ -74,6 +82,25 @@ PUT.apiDoc = {
                 },
                 additionalProperties: false
               }
+            },
+            metadata: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['name', 'description', 'comment', 'uid'],
+              properties: {
+                name: { type: 'string', description: 'Name of the submission', minimum: 1 },
+                description: { type: 'string', description: 'Description of the submission', minimum: 1 },
+                comment: {
+                  type: 'string',
+                  description: 'Comment from the submitter about the submission, only shown to administrators.',
+                  minimum: 1
+                },
+                uid: {
+                  type: 'string',
+                  description: 'External universal identifier for the submission, provided by the submitting system',
+                  nullable: true
+                }
+              }
             }
           },
           additionalProperties: false
@@ -93,33 +120,30 @@ export function completeMultipartUploadHandler(): RequestHandler {
   return async (req, res) => {
     const token = req['keycloak_token'];
 
-    // TODO: Why do service accounts need to be distinct, if they are just user records like system admins?
-    // Can we just call getDBConnection(service_account_token) to resolve the service client user?
     const serviceClientSystemUser = getServiceClientSystemUser(token);
 
-    // Choose the appropriate DB connection based on auth type
     const connection = serviceClientSystemUser
       ? getServiceAccountDBConnection(serviceClientSystemUser)
       : getDBConnection(token);
 
-    if (!connection) {
-      throw new HTTP400('Failed to establish a database connection', [
-        'Invalid or missing credentials for DB connection'
-      ]);
-    }
-
-    // TODO: Authorize the request using the uploadId? use the quarantine ID instead?
-
     try {
       await connection.open();
 
-      const uploadId = req.params.uploadId;
+      const quarantineId = req.params.quarantineId;
+      const { uploadId, ...rest } = req.body;
 
       const submissionUploadService = new SubmissionUploadService(connection);
 
+      // Authorize the upload completion
+      await submissionUploadService.authorizeUpload(quarantineId, uploadId);
+
+      // Complete the upload
       await submissionUploadService.completeMultipartUpload({
+        quarantineId,
         uploadId,
-        ...req.body
+        systemUserId: req['system_user'].system_user_id,
+        systemUserIdentifier: req['system_user'].system_user_identifier,
+        ...rest
       });
 
       res.sendStatus(200);

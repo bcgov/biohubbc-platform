@@ -14,12 +14,15 @@ import { ICreateSubmissionForm } from './form/CreateSubmissionForm.interface';
 const initialSubmissionValues: ICreateSubmissionForm = {
   name: '',
   description: '',
+  comment: '',
+  uid: '',
   file: null as unknown as File
 };
 
 export const SubmissionYupSchema = yup.object().shape({
-  name: yup.string().required('Enter a name for the submission').max(100),
-  description: yup.string().max(500).nullable(),
+  name: yup.string().required('Enter a name for the submission').max(100).min(1),
+  description: yup.string().max(1000).min(1),
+  comment: yup.string().max(1000).min(1),
   file: yup
     .mixed<File>()
     .required('You must submit a .json file')
@@ -40,11 +43,13 @@ export const CreateSubmissionPage = () => {
    * NOTE: The logic in creating the .tar file should be improved, where possible
    */
   const handleSubmit = async (values: ICreateSubmissionForm) => {
+    const { file, ...metadata } = values;
+
     setIsSubmitting(true);
 
     try {
       // Convert the JSON file to Uint8Array
-      const fileBytes = await fileToUint8Array(values.file);
+      const fileBytes = await fileToUint8Array(file);
 
       // Prepare files for TAR - just the JSON file.
       const filesToTar = [
@@ -67,7 +72,12 @@ export const CreateSubmissionPage = () => {
       const parsedParts = parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag }));
 
       // Mark upload as complete
-      await bioHubApi.submissions.completeSubmissionUpload(uploadResponse.uploadId, uploadResponse.key, parsedParts);
+      await bioHubApi.submissions.completeSubmissionUpload(
+        uploadResponse.uploadId,
+        uploadResponse.key,
+        parsedParts,
+        metadata
+      );
 
       dialogContext.setSnackbar({
         snackbarMessage: `Successfully submitted "${values.name}"`,

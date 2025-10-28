@@ -36,12 +36,25 @@ export const CreateSubmissionForm = () => {
   return (
     <Box component="form" display="flex" flexDirection="column" gap={3}>
       {/* Name Field */}
+      <CustomTextField name="uid" label="External ID" />
+
+      {/* Name Field */}
       <CustomTextField name="name" label="Name" />
 
       {/* Description Field */}
       <CustomTextField
         name="description"
         label="Description"
+        other={{
+          multiline: true,
+          rows: 4
+        }}
+      />
+
+      {/* Comment Field */}
+      <CustomTextField
+        name="comment"
+        label="Comments for Administrators"
         other={{
           multiline: true,
           rows: 4

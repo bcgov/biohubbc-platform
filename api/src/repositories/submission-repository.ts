@@ -231,7 +231,7 @@ export interface ICreateSubmissionRecord {
   quarantine_id: string | null;
   name: string;
   description: string;
-  comment: string;
+  comment: string | null;
   system_user_id: number;
   system_user_identifier: string;
 }
@@ -362,8 +362,6 @@ export class SubmissionRepository extends BaseRepository {
       ${submission.system_user_id},
       ${submission.system_user_identifier}
     )
-    ON CONFLICT (uuid) DO UPDATE SET
-      uuid = EXCLUDED.uuid
     RETURNING
       *;
   `;

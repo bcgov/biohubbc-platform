@@ -1,4 +1,14 @@
+interface ICreateSubmissionMetadata {
+  name: string;
+  description: string;
+  uid: string | null;
+  comment: string; // comments from the submitter about the submission
+}
+
 export interface CompleteMultipartUploadParams {
+  systemUserId: number;
+  systemUserIdentifier: string;
+  metadata: ICreateSubmissionMetadata;
   quarantineId: string;
   uploadId: string;
   key: string;

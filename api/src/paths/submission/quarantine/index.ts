@@ -2,14 +2,13 @@ import { RequestHandler } from 'express';
 import { Operation } from 'express-openapi';
 import { SYSTEM_ROLE } from '../../../constants/roles';
 import { getDBConnection, getServiceAccountDBConnection } from '../../../database/db';
-import { HTTP400 } from '../../../errors/http-error';
 import { defaultErrorResponses } from '../../../openapi/schemas/http-responses';
 import { authorizeRequestHandler } from '../../../request-handlers/security/authorization';
 import { SubmissionUploadService } from '../../../services/submission-upload-service';
 import { getServiceClientSystemUser } from '../../../utils/keycloak-utils';
 import { getLogger } from '../../../utils/logger';
 
-const defaultLog = getLogger('paths/submission/upload');
+const defaultLog = getLogger('paths/submission/quarantine/index');
 
 export const POST: Operation = [
   authorizeRequestHandler(() => {
@@ -103,12 +102,6 @@ export function getSubmissionUploadUrl(): RequestHandler {
     const connection = serviceClientSystemUser
       ? getServiceAccountDBConnection(serviceClientSystemUser)
       : getDBConnection(token);
-
-    if (!connection) {
-      throw new HTTP400('Failed to establish a database connection', [
-        'Invalid or missing credentials for DB connection'
-      ]);
-    }
 
     try {
       await connection.open();

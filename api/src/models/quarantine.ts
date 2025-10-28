@@ -26,7 +26,7 @@ export enum QuarantineStatusEnum {
  */
 export interface IInsertQuarantine {
   uri?: string;
-  status?: QuarantineStatusEnum;
+  status: QuarantineStatusEnum;
 }
 
 /**
@@ -35,6 +35,7 @@ export interface IInsertQuarantine {
 export interface IUpdateQuarantine {
   uri?: string;
   status?: QuarantineStatusEnum;
+  upload_id?: string;
 }
 
 /**
@@ -44,6 +45,7 @@ export const QuarantineRecord = z.object({
   quarantine_id: z.string().uuid(),
   uri: z.string(),
   status: z.nativeEnum(QuarantineStatusEnum),
+  upload_id: z.string(),
   create_date: z.string(),
   create_user: z.number(),
   update_date: z.string().nullable(),

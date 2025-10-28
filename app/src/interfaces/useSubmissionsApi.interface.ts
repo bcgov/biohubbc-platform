@@ -63,6 +63,13 @@ export interface ISubmissionUploadPart {
   etag: string;
 }
 
+export interface ICompleteSubmissionUploadMetadata {
+  name: string;
+  description: string;
+  comment: string;
+  uid: string;
+}
+
 export type SubmissionFeatureRecordWithTypeAndSecurity = {
   submission_feature_id: number;
   uuid: string;

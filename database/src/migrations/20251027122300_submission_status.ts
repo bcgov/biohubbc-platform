@@ -55,12 +55,14 @@ export async function up(knex: Knex): Promise<void> {
       quarantine_id     uuid             DEFAULT public.gen_random_uuid(),
       uri               text             NOT NULL,
       status            quarantine_status DEFAULT 'pending' NOT NULL,
+      upload_id         varchar(100)     NOT NULL,
       create_date       timestamptz(6)   DEFAULT now() NOT NULL,
       create_user       integer          NOT NULL,
       update_date       timestamptz(6),
       update_user       integer,
       revision_count    integer          DEFAULT 0 NOT NULL,
-      CONSTRAINT quarantine_pk PRIMARY KEY (quarantine_id)
+      CONSTRAINT quarantine_pk PRIMARY KEY (quarantine_id),
+      CONSTRAINT quarantine_uri_format_chk CHECK (uri ~ '^[a-z0-9]+://')
     );
 
     CREATE INDEX quarantine_status_idx ON quarantine(status);
@@ -69,6 +71,7 @@ export async function up(knex: Knex): Promise<void> {
     COMMENT ON COLUMN quarantine.quarantine_id IS 'System-generated primary key.';
     COMMENT ON COLUMN quarantine.uri IS 'S3 URI or storage location for the quarantined tarball.';
     COMMENT ON COLUMN quarantine.status IS 'Overall status of the quarantine: pending (awaiting scan), scanning (in progress), passed (safe), rejected (threats found), failed (scan error).';
+    COMMENT ON COLUMN quarantine.upload_id IS 'The upload ID used to completed the upload to the URI.';
     COMMENT ON COLUMN quarantine.create_date IS 'The datetime the record was created.';
     COMMENT ON COLUMN quarantine.create_user IS 'The id of the user who created the record.';
     COMMENT ON COLUMN quarantine.update_date IS 'The datetime the record was last updated.';
@@ -92,7 +95,7 @@ export async function up(knex: Knex): Promise<void> {
       update_user        integer,
       revision_count     integer          DEFAULT 0 NOT NULL,
       CONSTRAINT quarantine_scan_pk PRIMARY KEY (quarantine_scan_id),
-      CONSTRAINT quarantine_scan_quarantine_fk FOREIGN KEY (quarantine_id) REFERENCES quarantine(quarantine_id) ON DELETE CASCADE
+      CONSTRAINT quarantine_scan_quarantine_fk FOREIGN KEY (quarantine_id) REFERENCES quarantine(quarantine_id)
     );
 
     CREATE INDEX quarantine_scan_quarantine_id_idx ON quarantine_scan(quarantine_id);
@@ -127,7 +130,7 @@ export async function up(knex: Knex): Promise<void> {
       update_user             integer,
       revision_count          integer          DEFAULT 0 NOT NULL,
       CONSTRAINT quarantine_scan_file_pk PRIMARY KEY (quarantine_scan_file_id),
-      CONSTRAINT quarantine_scan_file_quarantine_scan_fk FOREIGN KEY (quarantine_scan_id) REFERENCES quarantine_scan(quarantine_scan_id) ON DELETE CASCADE
+      CONSTRAINT quarantine_scan_file_quarantine_scan_fk FOREIGN KEY (quarantine_scan_id) REFERENCES quarantine_scan(quarantine_scan_id)
     );
 
     CREATE INDEX quarantine_scan_file_quarantine_scan_id_idx ON quarantine_scan_file(quarantine_scan_id);

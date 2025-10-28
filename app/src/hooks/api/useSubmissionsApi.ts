@@ -1,5 +1,6 @@
 import { AxiosInstance } from 'axios';
 import {
+  ICompleteSubmissionUploadMetadata,
   IGetDownloadSubmissionResponse,
   IGetSubmissionGroupedFeatureResponse,
   ISubmissionUploadPart,
@@ -163,14 +164,16 @@ const useSubmissionsApi = (axios: AxiosInstance) => {
    * @param {string} uploadId
    * @param {string} key
    * @param {ISubmissionUploadPart[]} parts
+   * @param {ICompleteSubmissionUploadMetadata} metadata
    * @returns {Promise<void>}
    */
   const completeSubmissionUpload = async (
     uploadId: string,
     key: string,
-    parts: ISubmissionUploadPart[]
+    parts: ISubmissionUploadPart[],
+    metadata: ICompleteSubmissionUploadMetadata
   ): Promise<void> => {
-    await axios.put(`api/submission/upload/${uploadId}`, { key, parts });
+    await axios.put(`api/submission/upload/${uploadId}`, { key, parts, metadata });
   };
 
   return {
